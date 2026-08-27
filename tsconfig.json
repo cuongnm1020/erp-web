@@ -1,5 +1,4 @@
 {
-  "extends": "../../tsconfig.base.json",
   "compilerOptions": {
     "target": "ES2022",
     "lib": [
@@ -13,8 +12,20 @@
     "noEmit": true,
     "allowJs": false,
     "isolatedModules": true,
+    "strict": true,
+    "noImplicitAny": true,
+    "strictNullChecks": true,
+    "noImplicitOverride": true,
+    "noUncheckedIndexedAccess": true,
+    "useUnknownInCatchVariables": true,
+    "forceConsistentCasingInFileNames": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "resolveJsonModule": true,
     "emitDecoratorMetadata": false,
     "experimentalDecorators": false,
+    "sourceMap": true,
+    "declaration": false,
     "incremental": true,
     "plugins": [
       {

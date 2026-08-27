@@ -1,6 +1,6 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { moneySchema, phoneSchema } from '@erp/shared';
+import { moneySchema, phoneSchema } from '@/lib/shared';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
 import { Button } from '@/components/ui/button';

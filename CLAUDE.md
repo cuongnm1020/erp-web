@@ -90,7 +90,8 @@ Cấm `setQueryData` bằng payload từ socket: payload không đi qua lớp sc
 - Số lượng: số nguyên theo đơn vị cơ sở, đổi đơn vị chỉ ở lớp hiển thị.
 
 ### 11. Zod schema là nguồn chân lý dùng chung
-Schema validate sống ở `packages/shared/schemas`, `apps/api` và `apps/web` cùng import.
+Schema validate sống ở `src/lib/shared/` (vendored từ `@erp/shared` cũ khi tách repo).
+Ràng buộc phải khớp DTO của `apps/api` — đổi luật nghiệp vụ là đổi cả hai repo.
 Cấm định nghĩa lại luật validate ở frontend. Nếu frontend cần luật riêng (ví dụ định dạng nhập liệu),
 đặt thành `.superRefine` bọc ngoài schema chung, không sửa schema chung.
 
@@ -104,7 +105,7 @@ features/<mod>/ → api/ (hooks), components/, schema.ts, types.ts.
 lib/            → api client, error map, format, permission, env.
 ```
 `components/**` **cấm** import từ `features/**`. `features/a` cấm import trực tiếp từ `features/b`;
-nếu cần dùng chung thì nâng lên `components/data/` hoặc `packages/shared`.
+nếu cần dùng chung thì nâng lên `components/data/` hoặc `lib/shared`.
 
 ### 13. Mỗi màn hình phải có đủ 4 trạng thái
 `loading` (skeleton đúng hình dạng nội dung, không phải spinner giữa màn) / `empty` (kèm đúng

@@ -1,5 +1,5 @@
 import { zodResolver } from '@hookform/resolvers/zod';
-import { moneySchema, phoneSchema } from '@erp/shared';
+import { moneySchema, phoneSchema } from '@/lib/shared';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { useState } from 'react';
@@ -148,7 +148,7 @@ function SampleForm({
 }
 
 describe('Form kit + applyServerErrors', () => {
-  it('đi hết form bằng bàn phím (Tab/Enter), schema dùng chung từ @erp/shared', async () => {
+  it('đi hết form bằng bàn phím (Tab/Enter), schema nghiệp vụ từ lib/shared', async () => {
     const user = userEvent.setup();
     const onSubmit = vi.fn();
     render(<SampleForm onSubmit={onSubmit} />);
