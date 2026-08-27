@@ -1,0 +1,81 @@
+import { render, screen } from '@testing-library/react';
+import { describe, expect, it, vi } from 'vitest';
+import { AbilityProvider } from '@/lib/permission';
+import { visibleModules } from '@/lib/navigation';
+import { crumbsFromPath } from './breadcrumb';
+import { Sidebar } from './sidebar';
+
+vi.mock('next/navigation', () => ({
+  usePathname: () => '/crm/customers',
+  useRouter: () => ({ push: vi.fn(), replace: vi.fn(), refresh: vi.fn() }),
+}));
+
+const SALE = { permissions: ['customer.read', 'sales_order.read'], hasGlobalAccess: false };
+const ADMIN = { permissions: [], hasGlobalAccess: true };
+
+describe('visibleModules', () => {
+  it('sale không thấy Tài chính/Quản trị; con "Tạo đơn" bị ẩn vì thiếu create', () => {
+    const mods = visibleModules((a, s) => {
+      const ab = new Set(['read:Customer', 'read:SalesOrder']);
+      return ab.has(`${a}:${s}`);
+    });
+    const labels = mods.map((m) => m.label);
+    expect(labels).toContain('Bán hàng');
+    expect(labels).toContain('Khách hàng');
+    expect(labels).not.toContain('Tài chính');
+    expect(labels).not.toContain('Quản trị');
+    const orders = mods.find((m) => m.label === 'Bán hàng')!;
+    expect(orders.children?.map((c) => c.label)).not.toContain('Tạo đơn');
+    expect(orders.children?.map((c) => c.label)).toContain('Đơn hàng');
+  });
+
+  it('admin thấy đủ 8 module', () => {
+    expect(visibleModules(() => true)).toHaveLength(8);
+  });
+});
+
+describe('<Sidebar>', () => {
+  it('ẩn mục không có quyền, đánh dấu mục đang mở', () => {
+    render(
+      <AbilityProvider me={SALE}>
+        <Sidebar />
+      </AbilityProvider>,
+    );
+    expect(screen.getByRole('link', { name: 'Khách hàng' })).toHaveAttribute(
+      'aria-current',
+      'page',
+    );
+    expect(screen.getByRole('link', { name: 'Bán hàng' })).toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'Quản trị' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'Tài chính' })).not.toBeInTheDocument();
+  });
+
+  it('admin thấy 8 module', () => {
+    render(
+      <AbilityProvider me={ADMIN}>
+        <Sidebar />
+      </AbilityProvider>,
+    );
+    for (const l of [
+      'Tổng quan',
+      'Bán hàng',
+      'Khách hàng',
+      'Sản phẩm',
+      'Kho',
+      'Giá & KM',
+      'Tài chính',
+      'Quản trị',
+    ]) {
+      expect(screen.getByRole('link', { name: l })).toBeInTheDocument();
+    }
+  });
+});
+
+describe('crumbsFromPath', () => {
+  it('map nhãn tiếng Việt, UUID → Chi tiết, mục cuối không có link', () => {
+    const c = crumbsFromPath('/crm/customers/3f2a1b6c-1111-4222-8333-444455556666/edit');
+    expect(c.map((x) => x.label)).toEqual(['CRM', 'Khách hàng', 'Chi tiết', 'Chỉnh sửa']);
+    expect(c[1]?.href).toBe('/crm/customers');
+    expect(c[3]?.href).toBeUndefined();
+  });
+});

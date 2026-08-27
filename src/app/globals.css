@@ -1,0 +1,106 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/*
+ * Giá trị token theo DESIGN-BRIEF.md §3 (bàn giao 23/08/2026).
+ * Tên biến khớp tailwind.config.ts; chỉ sửa giá trị ở đây.
+ * Nền sáng, không dark mode ở v1 — block .dark giữ nguyên cho tương lai.
+ */
+@layer base {
+  :root {
+    --font-sans: 'Inter', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+    --font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+
+    /* --bg-page */
+    --background: 220 23% 97%;
+    --foreground: 214 12% 12%;
+    /* --bg-surface */
+    --card: 0 0% 100%;
+    --card-foreground: 214 12% 12%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 214 12% 12%;
+    /* --brand #1F5FA8 */
+    --primary: 212 69% 39%;
+    --primary-foreground: 0 0% 100%;
+    /* --brand-weak */
+    --secondary: 212 59% 94%;
+    --secondary-foreground: 212 69% 39%;
+    /* --bg-muted */
+    --muted: 210 17% 95%;
+    /* --text-secondary */
+    --muted-foreground: 214 10% 40%;
+    --accent: 212 59% 94%;
+    --accent-foreground: 212 69% 39%;
+    /* --danger #C0392B */
+    --destructive: 6 63% 46%;
+    --destructive-foreground: 0 0% 100%;
+    /* --success #217A4B */
+    --success: 148 57% 30%;
+    --success-foreground: 0 0% 100%;
+    /* --warning #B7791F */
+    --warning: 36 71% 42%;
+    --warning-foreground: 0 0% 100%;
+    /* --info #4A5568 */
+    --info: 218 17% 35%;
+    --info-foreground: 0 0% 100%;
+    /* --border / --border-strong (input) */
+    --border: 214 13% 90%;
+    --input: 217 14% 81%;
+    --ring: 212 69% 39%;
+    --radius: 0.25rem;
+  }
+
+  .dark {
+    --background: 222 47% 11%;
+    --foreground: 210 40% 98%;
+    --card: 222 47% 11%;
+    --card-foreground: 210 40% 98%;
+    --popover: 222 47% 11%;
+    --popover-foreground: 210 40% 98%;
+    --primary: 210 40% 98%;
+    --primary-foreground: 222 47% 11%;
+    --secondary: 217 33% 17%;
+    --secondary-foreground: 210 40% 98%;
+    --muted: 217 33% 17%;
+    --muted-foreground: 215 20% 65%;
+    --accent: 217 33% 17%;
+    --accent-foreground: 210 40% 98%;
+    --destructive: 0 63% 31%;
+    --destructive-foreground: 210 40% 98%;
+    --success: 142 71% 45%;
+    --success-foreground: 222 47% 11%;
+    --warning: 38 92% 50%;
+    --warning-foreground: 222 47% 11%;
+    --info: 217 91% 60%;
+    --info-foreground: 222 47% 11%;
+    --border: 217 33% 17%;
+    --input: 217 33% 17%;
+    --ring: 213 27% 84%;
+  }
+
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground antialiased;
+  }
+
+  /* Chất lượng nền: focus bàn phím nhìn thấy được ở mọi nơi. */
+  :focus-visible {
+    @apply outline-none ring-2 ring-ring ring-offset-2 ring-offset-background;
+  }
+
+  /* Chất lượng nền: tôn trọng prefers-reduced-motion. */
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
+  }
+}
