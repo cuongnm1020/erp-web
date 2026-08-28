@@ -16,6 +16,7 @@ const MESSAGES: Record<string, string> = {
   VALIDATION: 'Một số trường chưa hợp lệ. Kiểm tra các ô được đánh dấu.',
   DB_ERROR: 'Máy chủ gặp lỗi khi lưu dữ liệu. Thử lại; nếu vẫn lỗi, gửi mã truy vết cho IT.',
   SERVER_ERROR: 'Máy chủ gặp lỗi. Thử lại; nếu vẫn lỗi, gửi mã truy vết cho IT.',
+  UPSTREAM_INVALID: 'API trả về phản hồi không hợp lệ. Kiểm tra API đang chạy và cấu hình API_URL.',
   BAD_REQUEST: 'Yêu cầu không hợp lệ. Tải lại trang rồi thử lại.',
 };
 

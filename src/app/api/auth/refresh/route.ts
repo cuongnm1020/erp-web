@@ -3,6 +3,8 @@ import type { TokenPairLike } from '@/lib/auth/cookies';
 import {
   callApi,
   readAuthCookies,
+  readJsonSafe,
+  upstreamInvalid,
   withAuthCookies,
   withClearedAuthCookies,
 } from '@/lib/auth/server';
@@ -28,6 +30,8 @@ export async function POST(): Promise<NextResponse> {
   if (!upstream.ok) {
     return withClearedAuthCookies(NextResponse.json(UNAUTHORIZED, { status: 401 }));
   }
-  const pair = (await upstream.json()) as TokenPairLike;
+  const pair = await readJsonSafe<TokenPairLike>(upstream);
+  // Không xóa cookie: đây là lỗi cấu hình phía server, không phải phiên hỏng.
+  if (!pair?.accessToken) return upstreamInvalid();
   return withAuthCookies(new NextResponse(null, { status: 204 }), pair);
 }

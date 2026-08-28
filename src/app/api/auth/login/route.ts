@@ -1,5 +1,11 @@
 import { NextResponse } from 'next/server';
-import { callApi, passthroughError, withAuthCookies } from '@/lib/auth/server';
+import {
+  callApi,
+  passthroughError,
+  readJsonSafe,
+  upstreamInvalid,
+  withAuthCookies,
+} from '@/lib/auth/server';
 import type { TokenPairLike } from '@/lib/auth/cookies';
 
 export const runtime = 'nodejs';
@@ -9,6 +15,7 @@ export async function POST(req: Request): Promise<NextResponse> {
   const body = await req.text();
   const upstream = await callApi('/auth/login', { method: 'POST', body });
   if (!upstream.ok) return passthroughError(upstream);
-  const pair = (await upstream.json()) as TokenPairLike;
+  const pair = await readJsonSafe<TokenPairLike>(upstream);
+  if (!pair?.accessToken) return upstreamInvalid();
   return withAuthCookies(new NextResponse(null, { status: 204 }), pair);
 }

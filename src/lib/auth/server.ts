@@ -40,7 +40,31 @@ export async function callApi(path: string, init: RequestInit & { accessToken?: 
   headers.set('content-type', 'application/json');
   headers.set('x-request-id', crypto.randomUUID());
   if (init.accessToken) headers.set('authorization', `Bearer ${init.accessToken}`);
-  return fetch(`${env.apiUrl}${path}`, { ...init, headers, cache: 'no-store' });
+  // redirect: 'manual' — API thật không bao giờ redirect; nếu apiUrl trỏ nhầm (vd vào chính
+  // web app) thì nhận 3xx/!ok thay vì đi theo redirect tới trang HTML rồi vỡ JSON.parse.
+  return fetch(`${env.apiUrl}${path}`, { ...init, headers, cache: 'no-store', redirect: 'manual' });
+}
+
+/** Đọc body JSON an toàn: upstream trả HTML/rác (apiUrl sai, API chết giữa chừng) → null, không throw. */
+export async function readJsonSafe<T>(res: Response): Promise<T | null> {
+  const text = await res.text();
+  try {
+    return JSON.parse(text) as T;
+  } catch {
+    return null;
+  }
+}
+
+/** 502 chuẩn envelope khi upstream trả phản hồi không phải JSON. */
+export function upstreamInvalid(): NextResponse {
+  return NextResponse.json(
+    {
+      statusCode: 502,
+      code: 'UPSTREAM_INVALID',
+      message: 'API trả về phản hồi không hợp lệ — kiểm tra API đang chạy và API_URL',
+    },
+    { status: 502 },
+  );
 }
 
 /** Chuyển tiếp nguyên envelope lỗi của API (status + body + x-request-id) về browser. */
