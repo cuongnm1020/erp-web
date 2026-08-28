@@ -1637,6 +1637,38 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/shipments/{id}/status-log": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["CarrierStatusLogController_statusLog"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/carriers/stuck-shipments": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["CarrierStatusLogController_stuck"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/invoices": {
         parameters: {
             query?: never;
@@ -2867,6 +2899,49 @@ export interface components {
         };
         CancelWaybillDto: {
             reason?: string;
+        };
+        CarrierStatusLogDto: {
+            id: string;
+            /** @enum {string} */
+            source: "WEBHOOK" | "POLL";
+            carrierCode: string;
+            carrierName: string;
+            trackingNo: string;
+            /** @description Mã thô của hãng. */
+            carrierStatusCode: string;
+            /** @enum {string|null} */
+            mappedStatus: "PENDING" | "PICKED_UP" | "IN_TRANSIT" | "DELIVERED" | "FAILED" | "RETURNED" | null;
+            /** @enum {string} */
+            outcome: "NOT_FOUND" | "APPLIED" | "DUPLICATE" | "REJECTED_UNMAPPED" | "REJECTED_TRANSITION";
+            note: string | null;
+            /** @description Mốc theo hãng (null = hãng không trả). */
+            occurredAt: string | null;
+            createdAt: string;
+        };
+        CarrierStatusLogListDto: {
+            shipmentId: string;
+            shipmentDocNumber: string;
+            items: components["schemas"]["CarrierStatusLogDto"][];
+        };
+        StuckShipmentDto: {
+            id: string;
+            docNumber: string;
+            orderId: string | null;
+            /** @enum {string} */
+            status: "PENDING" | "PICKED_UP" | "IN_TRANSIT" | "DELIVERED" | "FAILED" | "RETURNED";
+            carrierCode: string | null;
+            carrierName: string | null;
+            trackingNo: string | null;
+            shippedAt: string | null;
+            /** @description Lần poller hỏi hãng gần nhất. */
+            lastCarrierSyncAt: string | null;
+            /** @description Mã thô gần nhất hãng trả. */
+            carrierStatusCode: string | null;
+            daysSinceShipped: number;
+        };
+        StuckShipmentListDto: {
+            items: components["schemas"]["StuckShipmentDto"][];
+            total: number;
         };
         IssueInvoiceDto: {
             /** Format: uuid */
@@ -5783,6 +5858,51 @@ export interface operations {
                 };
                 content: {
                     "application/json": Record<string, never>;
+                };
+            };
+        };
+    };
+    CarrierStatusLogController_statusLog: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CarrierStatusLogListDto"];
+                };
+            };
+        };
+    };
+    CarrierStatusLogController_stuck: {
+        parameters: {
+            query: {
+                /** @description Treo = quá N ngày kể từ shippedAt mà chưa terminal. Quyết định #3: mặc định 5. */
+                days: number;
+                take: number;
+                skip: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StuckShipmentListDto"];
                 };
             };
         };

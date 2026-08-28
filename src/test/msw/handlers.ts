@@ -315,6 +315,57 @@ export const DEPARTMENTS_FIXTURE = [
   },
 ];
 
+/** Đúng shape `StuckShipmentDto`. */
+export function makeStuckShipments(n: number) {
+  return Array.from({ length: n }, (_, i) => ({
+    id: uuid('0000000e', i),
+    docNumber: `DN-2608-${String(i + 1).padStart(5, '0')}`,
+    orderId: uuid('00000001', i),
+    status: (['PICKED_UP', 'IN_TRANSIT', 'FAILED'] as const)[i % 3]!,
+    carrierCode: 'GHTK',
+    carrierName: 'Giao Hàng Tiết Kiệm',
+    trackingNo: `S${String(i + 1).padStart(8, '0')}.HN`,
+    shippedAt: new Date(Date.UTC(2026, 7, 20) - i * 86_400_000).toISOString(),
+    lastCarrierSyncAt: i % 2 === 0 ? new Date(Date.UTC(2026, 7, 27)).toISOString() : null,
+    carrierStatusCode: String(4 + (i % 3)),
+    daysSinceShipped: 6 + i,
+  }));
+}
+
+/** Đúng shape `CarrierStatusLogListDto`. */
+export const STATUS_LOG_FIXTURE = {
+  shipmentId: uuid('0000000e', 0),
+  shipmentDocNumber: 'DN-2608-00001',
+  items: [
+    {
+      id: uuid('0000000f', 0),
+      source: 'WEBHOOK',
+      carrierCode: 'GHTK',
+      carrierName: 'Giao Hàng Tiết Kiệm',
+      trackingNo: 'S00000001.HN',
+      carrierStatusCode: '4',
+      mappedStatus: 'IN_TRANSIT',
+      outcome: 'APPLIED',
+      note: null,
+      occurredAt: new Date(Date.UTC(2026, 7, 21, 3)).toISOString(),
+      createdAt: new Date(Date.UTC(2026, 7, 21, 3, 1)).toISOString(),
+    },
+    {
+      id: uuid('0000000f', 1),
+      source: 'POLL',
+      carrierCode: 'GHTK',
+      carrierName: 'Giao Hàng Tiết Kiệm',
+      trackingNo: 'S00000001.HN',
+      carrierStatusCode: '45',
+      mappedStatus: null,
+      outcome: 'REJECTED_UNMAPPED',
+      note: 'mã trạng thái 45 chưa được ánh xạ',
+      occurredAt: null,
+      createdAt: new Date(Date.UTC(2026, 7, 22, 3)).toISOString(),
+    },
+  ],
+};
+
 export const handlers = [
   http.get('/api/auth/me', () => HttpResponse.json(ME_ADMIN)),
   http.get('/api/health', () =>
@@ -470,6 +521,17 @@ export const handlers = [
     );
   }),
   http.get('/api/permissions', () => HttpResponse.json(PERMISSIONS_FIXTURE)),
+  http.get('/api/carriers/stuck-shipments', async ({ request }) => {
+    const url = new URL(request.url);
+    const days = Number(url.searchParams.get('days') ?? 5);
+    const skip = Number(url.searchParams.get('skip') ?? 0);
+    const take = Number(url.searchParams.get('take') ?? 50);
+    const all = makeStuckShipments(12).filter((s) => s.daysSinceShipped >= days);
+    return HttpResponse.json({ items: all.slice(skip, skip + take), total: all.length });
+  }),
+  http.get('/api/shipments/:id/status-log', ({ params }) =>
+    HttpResponse.json({ ...STATUS_LOG_FIXTURE, shipmentId: params.id }),
+  ),
   http.get('/api/departments', () => HttpResponse.json(DEPARTMENTS_FIXTURE)),
 ];
 
