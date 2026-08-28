@@ -132,6 +132,55 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/users": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["UserController_list"];
+        put?: never;
+        post: operations["UserController_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/users/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["UserController_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch: operations["UserController_update"];
+        trace?: never;
+    };
+    "/users/{id}/permissions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["UserController_permissions"];
+        /** Cùng cặp quyền với PUT /users/:id/roles (AND). */
+        put: operations["UserController_updatePermissions"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/audit/{entity}/{entityId}": {
         parameters: {
             query?: never;
@@ -2010,8 +2059,24 @@ export interface components {
             hasGlobalAccess: boolean;
             deviceId?: string;
         };
+        PermissionDto: {
+            id: string;
+            code: string;
+            module: string;
+            action: string;
+        };
         CreatePermissionDto: {
             code: string;
+        };
+        RoleDto: {
+            id: string;
+            code: string;
+            name: string;
+            description: string | null;
+            /** @description Permission code của role. */
+            permissions: string[];
+            /** @description Số user đang mang role. */
+            memberCount: number;
         };
         CreateRoleDto: {
             code: string;
@@ -2028,6 +2093,109 @@ export interface components {
         };
         AssignRolesDto: {
             roles: string[];
+        };
+        AssignRolesResponseDto: {
+            userId: string;
+            roles: string[];
+            /** @description Quyền hiệu lực sau khi gán (đã tính override). */
+            permissions: string[];
+        };
+        UserListItemDto: {
+            id: string;
+            code: string;
+            email: string;
+            fullName: string;
+            departmentId: string | null;
+            departmentName: string | null;
+            roleCodes: string[];
+            isActive: boolean;
+            isSuperAdmin: boolean;
+            createdAt: string;
+            updatedAt: string;
+        };
+        UserListResponseDto: {
+            items: components["schemas"]["UserListItemDto"][];
+            total: number;
+        };
+        CreateUserDto: {
+            /** @description Cùng quy ước mã của seed: chữ/số/./-/_ (vd sale.hn.1). */
+            code: string;
+            /** Format: email */
+            email: string;
+            fullName: string;
+            /** @description bcrypt giới hạn 72 byte. */
+            password: string;
+            /** Format: uuid */
+            departmentId?: string;
+            roleCodes?: string[];
+        };
+        UserDepartmentDto: {
+            id: string;
+            code: string;
+            name: string;
+        };
+        UserRoleItemDto: {
+            code: string;
+            name: string;
+        };
+        UserTeamDto: {
+            teamId: string;
+            teamCode: string;
+            teamName: string;
+            /** @enum {string} */
+            role: "LEADER" | "MEMBER";
+            joinedAt: string;
+        };
+        UserDetailDto: {
+            id: string;
+            code: string;
+            email: string;
+            fullName: string;
+            department: components["schemas"]["UserDepartmentDto"] | null;
+            roles: components["schemas"]["UserRoleItemDto"][];
+            /** @description Membership đang hiệu lực (leftAt IS NULL). */
+            teams: components["schemas"]["UserTeamDto"][];
+            /** @description Override ALLOW/DENY hiện có (permission code). */
+            allow: string[];
+            deny: string[];
+            isActive: boolean;
+            isSuperAdmin: boolean;
+            createdAt: string;
+            updatedAt: string;
+        };
+        UpdateUserDto: {
+            fullName?: string;
+            /** Format: email */
+            email?: string;
+            /**
+             * Format: uuid
+             * @description null = bỏ khỏi phòng ban.
+             */
+            departmentId?: string | null;
+            isActive?: boolean;
+            /** @description Admin đặt lại mật khẩu. */
+            password?: string;
+        };
+        UserPermissionEntryDto: {
+            code: string;
+            module: string;
+            action: string;
+            /** @description Role code đang cấp quyền này ([] nếu không role nào cấp). */
+            fromRoles: string[];
+            /** @enum {string|null} */
+            override: "ALLOW" | "DENY" | null;
+            effective: boolean;
+        };
+        UserPermissionsDto: {
+            userId: string;
+            /** @description Superadmin: toàn quyền, ma trận chỉ hiển thị — override không có tác dụng. */
+            isSuperAdmin: boolean;
+            /** @description Toàn bộ catalog, sắp theo module rồi action. */
+            entries: components["schemas"]["UserPermissionEntryDto"][];
+        };
+        UpdateUserPermissionsDto: {
+            allow: string[];
+            deny: string[];
         };
         ApprovalStepDto: {
             sequence: number;
@@ -2267,6 +2435,18 @@ export interface components {
             baseUom?: string;
             /** @description Sinh barcode INTERNAL tự động cho mỗi SKU mới */
             generateBarcode?: boolean;
+        };
+        DepartmentCountDto: {
+            members: number;
+        };
+        DepartmentDto: {
+            id: string;
+            code: string;
+            name: string;
+            parentId: string | null;
+            managerId: string | null;
+            isActive: boolean;
+            _count: components["schemas"]["DepartmentCountDto"];
         };
         CreateDepartmentDto: {
             code: string;
@@ -2940,7 +3120,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": Record<string, never>;
+                    "application/json": components["schemas"]["PermissionDto"][];
                 };
             };
         };
@@ -2958,11 +3138,13 @@ export interface operations {
             };
         };
         responses: {
-            201: {
+            200: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["PermissionDto"];
+                };
             };
         };
     };
@@ -2980,7 +3162,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": Record<string, never>;
+                    "application/json": components["schemas"]["RoleDto"][];
                 };
             };
         };
@@ -2998,12 +3180,12 @@ export interface operations {
             };
         };
         responses: {
-            201: {
+            200: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": Record<string, never>;
+                    "application/json": components["schemas"]["RoleDto"];
                 };
             };
         };
@@ -3024,7 +3206,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": Record<string, never>;
+                    "application/json": components["schemas"]["RoleDto"];
                 };
             };
         };
@@ -3049,7 +3231,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": Record<string, never>;
+                    "application/json": components["schemas"]["RoleDto"];
                 };
             };
         };
@@ -3093,7 +3275,151 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": Record<string, never>;
+                    "application/json": components["schemas"]["AssignRolesResponseDto"];
+                };
+            };
+        };
+    };
+    UserController_list: {
+        parameters: {
+            query: {
+                q?: string;
+                take: number;
+                skip: number;
+                departmentId?: string;
+                roleCode?: string;
+                /** @description Query string → boolean tường minh; @Type(() => Boolean) biến "false" thành true. */
+                isActive?: boolean;
+                sortBy?: "code" | "fullName" | "email" | "createdAt" | "updatedAt";
+                sortDir?: "asc" | "desc";
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UserListResponseDto"];
+                };
+            };
+        };
+    };
+    UserController_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateUserDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UserDetailDto"];
+                };
+            };
+        };
+    };
+    UserController_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UserDetailDto"];
+                };
+            };
+        };
+    };
+    UserController_update: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateUserDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UserDetailDto"];
+                };
+            };
+        };
+    };
+    UserController_permissions: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UserPermissionsDto"];
+                };
+            };
+        };
+    };
+    UserController_updatePermissions: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateUserPermissionsDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UserPermissionsDto"];
                 };
             };
         };
@@ -4156,7 +4482,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": Record<string, never>;
+                    "application/json": components["schemas"]["DepartmentDto"][];
                 };
             };
         };

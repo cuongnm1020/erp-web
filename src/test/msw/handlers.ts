@@ -213,6 +213,108 @@ export const errorEnvelope = (status: number, code: string, message = 'x', detai
     { status, headers: { 'x-request-id': `trace-${code.toLowerCase()}` } },
   );
 
+/** Đúng shape `RoleDto` (permissions phẳng string[] + memberCount). */
+export const ROLES_FIXTURE = [
+  {
+    id: uuid('00000009', 0),
+    code: 'ADMIN',
+    name: 'Quản trị',
+    description: null,
+    permissions: ['customer.read', 'customer.update', 'role.read', 'role.update', 'user.read'],
+    memberCount: 1,
+  },
+  {
+    id: uuid('00000009', 1),
+    code: 'SALES_MEMBER',
+    name: 'Nhân viên kinh doanh',
+    description: null,
+    permissions: ['customer.read', 'customer.update', 'sales_order.read'],
+    memberCount: 4,
+  },
+];
+
+/** Đúng shape `PermissionDto`. */
+export const PERMISSIONS_FIXTURE = [
+  { id: uuid('0000000a', 0), code: 'customer.read', module: 'customer', action: 'read' },
+  { id: uuid('0000000a', 1), code: 'customer.update', module: 'customer', action: 'update' },
+  { id: uuid('0000000a', 2), code: 'role.read', module: 'role', action: 'read' },
+  { id: uuid('0000000a', 3), code: 'role.update', module: 'role', action: 'update' },
+  { id: uuid('0000000a', 4), code: 'sales_order.read', module: 'sales_order', action: 'read' },
+  { id: uuid('0000000a', 5), code: 'stock.adjust', module: 'stock', action: 'adjust' },
+  { id: uuid('0000000a', 6), code: 'user.read', module: 'user', action: 'read' },
+];
+
+/** Đúng shape `UserListItemDto`. */
+export function makeUsers(n: number) {
+  return Array.from({ length: n }, (_, i) => ({
+    id: uuid('0000000b', i),
+    code: `nv.${String(i + 1).padStart(3, '0')}`,
+    email: `nv${i + 1}@erp.local`,
+    fullName: `Nhân viên ${i + 1}`,
+    departmentId: null,
+    departmentName: i % 2 === 0 ? 'Kinh doanh' : null,
+    roleCodes: i % 3 === 0 ? [] : ['SALES_MEMBER'],
+    isActive: i % 7 !== 6,
+    isSuperAdmin: i === 0,
+    createdAt: new Date(Date.UTC(2026, 7, 20) + i * 3_600_000).toISOString(),
+    updatedAt: new Date(Date.UTC(2026, 7, 23) + i * 3_600_000).toISOString(),
+  }));
+}
+
+/** Đúng shape `UserDetailDto`. */
+export const USER_DETAIL_FIXTURE = {
+  id: uuid('0000000b', 1),
+  code: 'nv.002',
+  email: 'nv2@erp.local',
+  fullName: 'Nhân viên 2',
+  department: { id: uuid('0000000c', 0), code: 'SALES', name: 'Kinh doanh' },
+  roles: [{ code: 'SALES_MEMBER', name: 'Nhân viên kinh doanh' }],
+  teams: [
+    {
+      teamId: uuid('0000000d', 0),
+      teamCode: 'SALES-HN',
+      teamName: 'Kinh doanh Hà Nội',
+      role: 'MEMBER',
+      joinedAt: new Date(Date.UTC(2026, 7, 1)).toISOString(),
+    },
+  ],
+  allow: [],
+  deny: [],
+  isActive: true,
+  isSuperAdmin: false,
+  createdAt: new Date(Date.UTC(2026, 7, 20)).toISOString(),
+  updatedAt: new Date(Date.UTC(2026, 7, 23)).toISOString(),
+};
+
+/** Đúng shape `UserPermissionsDto` — nv.002 mang SALES_MEMBER, chưa override. */
+export const USER_PERMISSIONS_FIXTURE = {
+  userId: USER_DETAIL_FIXTURE.id,
+  isSuperAdmin: false,
+  entries: PERMISSIONS_FIXTURE.map((p) => {
+    const fromRoles = ROLES_FIXTURE[1]!.permissions.includes(p.code) ? ['SALES_MEMBER'] : [];
+    return {
+      code: p.code,
+      module: p.module,
+      action: p.action,
+      fromRoles,
+      override: null,
+      effective: fromRoles.length > 0,
+    };
+  }),
+};
+
+export const DEPARTMENTS_FIXTURE = [
+  {
+    id: uuid('0000000c', 0),
+    code: 'SALES',
+    name: 'Kinh doanh',
+    parentId: null,
+    managerId: null,
+    isActive: true,
+    _count: { members: 5 },
+  },
+];
+
 export const handlers = [
   http.get('/api/auth/me', () => HttpResponse.json(ME_ADMIN)),
   http.get('/api/health', () =>
@@ -304,6 +406,71 @@ export const handlers = [
     if (type) all = all.filter((t) => t.type === type);
     return HttpResponse.json({ items: all.slice(skip, skip + take), total: all.length });
   }),
+
+  // ── Quản trị: users / roles / permissions / departments ──
+  http.get('/api/users', async ({ request }) => {
+    const url = new URL(request.url);
+    const q = url.searchParams.get('q')?.toLowerCase() ?? '';
+    const skip = Number(url.searchParams.get('skip') ?? 0);
+    const take = Number(url.searchParams.get('take') ?? 50);
+    const sortDir = url.searchParams.get('sortDir') ?? 'asc';
+    let all = makeUsers(57);
+    if (q) all = all.filter((u) => `${u.code} ${u.fullName} ${u.email}`.toLowerCase().includes(q));
+    if (url.searchParams.get('sortBy') === 'code' && sortDir === 'desc') all = all.reverse();
+    return HttpResponse.json({ items: all.slice(skip, skip + take), total: all.length });
+  }),
+  http.post('/api/users', async ({ request }) => {
+    const body = (await request.json()) as { code: string; fullName: string; email: string };
+    return HttpResponse.json(
+      { ...USER_DETAIL_FIXTURE, code: body.code, fullName: body.fullName, email: body.email },
+      { status: 201 },
+    );
+  }),
+  http.get('/api/users/:id', () => HttpResponse.json(USER_DETAIL_FIXTURE)),
+  http.patch('/api/users/:id', async ({ request }) => {
+    const body = (await request.json()) as Record<string, unknown>;
+    return HttpResponse.json({ ...USER_DETAIL_FIXTURE, ...body });
+  }),
+  http.get('/api/users/:id/permissions', () => HttpResponse.json(USER_PERMISSIONS_FIXTURE)),
+  http.put('/api/users/:id/permissions', async ({ request }) => {
+    const body = (await request.json()) as { allow: string[]; deny: string[] };
+    return HttpResponse.json({
+      ...USER_PERMISSIONS_FIXTURE,
+      entries: USER_PERMISSIONS_FIXTURE.entries.map((e) => ({
+        ...e,
+        override: body.allow.includes(e.code)
+          ? 'ALLOW'
+          : body.deny.includes(e.code)
+            ? 'DENY'
+            : null,
+      })),
+    });
+  }),
+  http.put('/api/users/:id/roles', async ({ request }) => {
+    const body = (await request.json()) as { roles: string[] };
+    return HttpResponse.json({
+      userId: USER_DETAIL_FIXTURE.id,
+      roles: body.roles,
+      permissions: [],
+    });
+  }),
+  http.get('/api/roles', () => HttpResponse.json(ROLES_FIXTURE)),
+  http.put('/api/roles/:code', async ({ params, request }) => {
+    const body = (await request.json()) as { permissions?: string[] };
+    const role = ROLES_FIXTURE.find((r) => r.code === params.code);
+    return role
+      ? HttpResponse.json({ ...role, permissions: body.permissions ?? role.permissions })
+      : errorEnvelope(404, 'NOT_FOUND');
+  }),
+  http.post('/api/roles', async ({ request }) => {
+    const body = (await request.json()) as { code: string; name: string };
+    return HttpResponse.json(
+      { id: uuid('00000009', 9), description: null, permissions: [], memberCount: 0, ...body },
+      { status: 201 },
+    );
+  }),
+  http.get('/api/permissions', () => HttpResponse.json(PERMISSIONS_FIXTURE)),
+  http.get('/api/departments', () => HttpResponse.json(DEPARTMENTS_FIXTURE)),
 ];
 
 /** Bộ handler trạng thái — story "error" / "empty" / "forbidden" dùng. */
@@ -319,6 +486,15 @@ export const scenario = {
   customerError: http.get('/api/customers/:id', () => errorEnvelope(500, 'DB_ERROR')),
   customerForbidden: http.get('/api/customers/:id', () => errorEnvelope(403, 'FORBIDDEN')),
   meSale: http.get('/api/auth/me', () => HttpResponse.json(ME_SALE)),
+
+  usersEmpty: http.get('/api/users', () => HttpResponse.json({ items: [], total: 0 })),
+  usersError: http.get('/api/users', () => errorEnvelope(500, 'DB_ERROR')),
+  userCreate422: http.post('/api/users', () =>
+    errorEnvelope(422, 'VALIDATION', 'x', { missing: ['NOPE'] }),
+  ),
+  userCreateDupCode: http.post('/api/users', () =>
+    errorEnvelope(400, 'VALIDATION', 'x', ['code đã tồn tại']),
+  ),
 
   ordersEmpty: http.get('/api/sales-orders', () => HttpResponse.json({ items: [], total: 0 })),
   ordersError: http.get('/api/sales-orders', () => errorEnvelope(500, 'DB_ERROR')),
