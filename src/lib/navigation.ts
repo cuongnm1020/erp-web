@@ -30,9 +30,10 @@ export interface NavModule extends NavItem {
 }
 
 /**
- * Nav theo 8 nhóm của design canvas (DESIGN-BRIEF §5). Route mới trong giai đoạn
- * UI-first chưa gắn ability backend — chỉ gắn khi subject đã tồn tại ở /auth/me;
- * còn lại hiện cho mọi người đăng nhập, siết lại theo từng phase FE-1…6.
+ * Nav theo 8 nhóm của design canvas (DESIGN-BRIEF §5). Mục có subject backend
+ * (tồn tại ở /auth/me) phải gắn ability; chỉ mục chưa có quyền backend tương ứng
+ * (Giá & KM, RMA…) mới để trống — siết nốt khi backend thêm subject.
+ * Module không gắn ability sẽ tự ẩn khi mọi mục con của nó bị ẩn.
  */
 export const NAV_MODULES: NavModule[] = [
   {
@@ -95,11 +96,31 @@ export const NAV_MODULES: NavModule[] = [
     icon: Package,
     shortcut: 'g s',
     children: [
-      { label: 'Danh sách sản phẩm', href: '/catalog/products' },
-      { label: 'Danh mục · thương hiệu', href: '/catalog/categories' },
-      { label: 'In tem barcode', href: '/catalog/barcode-print' },
-      { label: 'Lô & hạn dùng', href: '/catalog/lots' },
-      { label: 'Nhà cung cấp', href: '/catalog/suppliers' },
+      {
+        label: 'Danh sách sản phẩm',
+        href: '/catalog/products',
+        ability: { action: 'read', subject: 'Product' },
+      },
+      {
+        label: 'Danh mục · thương hiệu',
+        href: '/catalog/categories',
+        ability: { action: 'read', subject: 'Product' },
+      },
+      {
+        label: 'In tem barcode',
+        href: '/catalog/barcode-print',
+        ability: { action: 'read', subject: 'Product' },
+      },
+      {
+        label: 'Lô & hạn dùng',
+        href: '/catalog/lots',
+        ability: { action: 'read', subject: 'Stock' },
+      },
+      {
+        label: 'Nhà cung cấp',
+        href: '/catalog/suppliers',
+        ability: { action: 'read', subject: 'Supplier' },
+      },
     ],
   },
   {
@@ -108,22 +129,46 @@ export const NAV_MODULES: NavModule[] = [
     icon: Warehouse,
     shortcut: 'g w',
     children: [
-      { label: 'Tồn kho', href: '/wms/stock' },
-      { label: 'Kho & vị trí', href: '/wms/warehouses' },
-      { label: 'Phiếu nhập kho', href: '/wms/grn' },
-      { label: 'Phiếu xuất kho', href: '/wms/gdn' },
-      { label: 'Điều phối task', href: '/wms/dispatch' },
-      { label: 'Chuyển kho', href: '/wms/transfers' },
-      { label: 'Purchase order', href: '/wms/po' },
-      { label: 'Kiểm kê', href: '/wms/stocktake' },
-      { label: 'Điều chỉnh tồn', href: '/wms/adjustments' },
-      { label: 'Sổ cái tồn', href: '/wms/ledger' },
+      { label: 'Tồn kho', href: '/wms/stock', ability: { action: 'read', subject: 'Stock' } },
+      {
+        label: 'Kho & vị trí',
+        href: '/wms/warehouses',
+        ability: { action: 'read', subject: 'Stock' },
+      },
+      { label: 'Phiếu nhập kho', href: '/wms/grn', ability: { action: 'read', subject: 'Stock' } },
+      { label: 'Phiếu xuất kho', href: '/wms/gdn', ability: { action: 'read', subject: 'Stock' } },
+      {
+        label: 'Điều phối task',
+        href: '/wms/dispatch',
+        ability: { action: 'read', subject: 'Task' },
+      },
+      {
+        label: 'Chuyển kho',
+        href: '/wms/transfers',
+        ability: { action: 'read', subject: 'Stock' },
+      },
+      {
+        label: 'Purchase order',
+        href: '/wms/po',
+        ability: { action: 'read', subject: 'PurchaseOrder' },
+      },
+      { label: 'Kiểm kê', href: '/wms/stocktake', ability: { action: 'read', subject: 'Stock' } },
+      {
+        label: 'Điều chỉnh tồn',
+        href: '/wms/adjustments',
+        ability: { action: 'read', subject: 'Stock' },
+      },
+      { label: 'Sổ cái tồn', href: '/wms/ledger', ability: { action: 'read', subject: 'Stock' } },
       {
         label: 'Theo dõi giao hàng',
         href: '/wms/shipping',
         ability: { action: 'read', subject: 'Shipment' },
       },
-      { label: 'Điểm đặt hàng lại', href: '/wms/reorder-points' },
+      {
+        label: 'Điểm đặt hàng lại',
+        href: '/wms/reorder-points',
+        ability: { action: 'read', subject: 'Stock' },
+      },
     ],
   },
   {
@@ -186,11 +231,14 @@ export interface CanFn {
 }
 
 export function visibleModules(can: CanFn): NavModule[] {
-  return NAV_MODULES.filter((m) => !m.ability || can(m.ability.action, m.ability.subject)).map(
-    (m) => ({
-      ...m,
-      children: m.children?.filter((c) => !c.ability || can(c.ability.action, c.ability.subject)),
-    }),
+  return NAV_MODULES.map((m) => ({
+    ...m,
+    children: m.children?.filter((c) => !c.ability || can(c.ability.action, c.ability.subject)),
+  })).filter(
+    (m) =>
+      (!m.ability || can(m.ability.action, m.ability.subject)) &&
+      // Module có children mà bị ẩn hết → ẩn luôn module (href của nó cũng cần quyền)
+      (!m.children || m.children.length > 0),
   );
 }
 

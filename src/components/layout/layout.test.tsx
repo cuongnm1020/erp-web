@@ -27,6 +27,19 @@ describe('visibleModules', () => {
     const orders = mods.find((m) => m.label === 'Bán hàng')!;
     expect(orders.children?.map((c) => c.label)).not.toContain('Tạo đơn');
     expect(orders.children?.map((c) => c.label)).toContain('Đơn hàng');
+    // Không có product.read / stock.read → cả module ẩn (mọi con đều bị ẩn)
+    expect(labels).not.toContain('Sản phẩm');
+    expect(labels).not.toContain('Kho');
+  });
+
+  it('không có quyền nào → chỉ thấy Tổng quan và Giá & KM (chưa có subject backend)', () => {
+    expect(visibleModules(() => false).map((m) => m.label)).toEqual(['Tổng quan', 'Giá & KM']);
+  });
+
+  it('chỉ có shipment.read → module Kho hiện đúng một mục Theo dõi giao hàng', () => {
+    const mods = visibleModules((a, s) => a === 'read' && s === 'Shipment');
+    const wms = mods.find((m) => m.label === 'Kho');
+    expect(wms?.children?.map((c) => c.label)).toEqual(['Theo dõi giao hàng']);
   });
 
   it('admin thấy đủ 8 module', () => {
