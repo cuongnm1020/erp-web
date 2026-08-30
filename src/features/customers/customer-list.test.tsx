@@ -1,4 +1,5 @@
-import { screen, waitFor } from '@testing-library/react';
+import { fireEvent, screen, waitFor } from '@testing-library/react';
+import { http, HttpResponse } from 'msw';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ME_SALE, makeCustomers, scenario } from '@/test/msw/handlers';
 import { server } from '@/test/msw/server';
@@ -85,5 +86,35 @@ describe('CustomerListScreen — GET /customers (P1-12)', () => {
     server.use(scenario.customersForbidden);
     renderApp(<CustomerListScreen />);
     expect(await screen.findByText('Bạn không có quyền xem mục này')).toBeInTheDocument();
+  });
+
+  it('không có customer.delete → không có nút Xóa trên dòng (luật 7)', async () => {
+    renderApp(<CustomerListScreen />, { me: ME_SALE }); // read + create, không update/delete
+    await screen.findByText('Khách hàng 1');
+    expect(screen.queryByRole('button', { name: 'Xóa' })).not.toBeInTheDocument();
+  });
+
+  it('Xóa: qua hộp xác nhận → DELETE /customers/:id → toast + refetch danh sách', async () => {
+    const deleted: string[] = [];
+    server.use(
+      http.delete('/api/customers/:id', ({ params }) => {
+        deleted.push(params.id as string);
+        return new HttpResponse(null, { status: 204 });
+      }),
+    );
+    renderApp(<CustomerListScreen />, {
+      me: { ...ME_SALE, permissions: ['customer.read', 'customer.update', 'customer.delete'] },
+    });
+    await screen.findByText('Khách hàng 1');
+    fireEvent.click(screen.getAllByRole('button', { name: 'Xóa' })[0]!);
+    expect(await screen.findByText(`Xóa khách hàng ${FIRST.code}?`)).toBeInTheDocument();
+    // Nút xác nhận trong dialog cũng tên "Xóa" — là nút cuối cùng
+    const buttons = screen.getAllByRole('button', { name: 'Xóa' });
+    fireEvent.click(buttons[buttons.length - 1]!);
+    await waitFor(() => expect(deleted).toEqual([FIRST.id]));
+    // Mutation xong → hộp xác nhận đóng (toast không render trong test harness)
+    await waitFor(() =>
+      expect(screen.queryByText(`Xóa khách hàng ${FIRST.code}?`)).not.toBeInTheDocument(),
+    );
   });
 });

@@ -291,7 +291,8 @@ export interface paths {
         get: operations["CustomerController_get"];
         put?: never;
         post?: never;
-        delete?: never;
+        /** Soft delete — chuyển Ngừng hợp tác, không xóa dữ liệu. Scope như mọi truy cập Customer. */
+        delete: operations["CustomerController_remove"];
         options?: never;
         head?: never;
         patch: operations["CustomerController_update"];
@@ -339,7 +340,8 @@ export interface paths {
         get: operations["SupplierController_get"];
         put?: never;
         post?: never;
-        delete?: never;
+        /** Soft delete — ngừng giao dịch, giữ lịch sử PO/công nợ. */
+        delete: operations["SupplierController_remove"];
         options?: never;
         head?: never;
         patch: operations["SupplierController_update"];
@@ -467,7 +469,8 @@ export interface paths {
         get: operations["ProductController_getProduct"];
         put?: never;
         post?: never;
-        delete?: never;
+        /** Soft delete — ngừng bán product + toàn bộ SKU; tồn kho và chứng từ cũ giữ nguyên. */
+        delete: operations["ProductController_removeProduct"];
         options?: never;
         head?: never;
         patch: operations["ProductController_updateProduct"];
@@ -3699,6 +3702,25 @@ export interface operations {
             };
         };
     };
+    CustomerController_remove: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
     CustomerController_update: {
         parameters: {
             query?: never;
@@ -3805,6 +3827,25 @@ export interface operations {
                 content: {
                     "application/json": Record<string, never>;
                 };
+            };
+        };
+    };
+    SupplierController_remove: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };
@@ -4080,6 +4121,25 @@ export interface operations {
                 content: {
                     "application/json": Record<string, never>;
                 };
+            };
+        };
+    };
+    ProductController_removeProduct: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };

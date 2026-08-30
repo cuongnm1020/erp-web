@@ -9,11 +9,19 @@ import { EmptyState, ListSkeleton, QueryState } from '@/components/data/states';
 import { StatusBadge } from '@/components/data/status-badge';
 import { PageHeader } from '@/components/layout/page-header';
 import { Button } from '@/components/ui/button';
+import { toast } from '@/components/ui/toaster';
+import { messageFor } from '@/lib/error-messages';
 import { formatDate, formatMoney, formatPhone } from '@/lib/format';
-import { Can } from '@/lib/permission';
+import { Can, useAbility } from '@/lib/permission';
 import { useInvalidateOn } from '@/lib/realtime';
 import { useListState } from '@/lib/url-state';
-import { customerKeys, toCustomerSort, useCustomers, type Customer } from '../api/use-customers';
+import {
+  customerKeys,
+  toCustomerSort,
+  useCustomers,
+  useDeleteCustomer,
+  type Customer,
+} from '../api/use-customers';
 import { customerTypeLabel, customerTypeTone } from '../labels';
 
 /** Mặc định khớp mặc định của API: sắp theo tên tăng dần. */
@@ -106,18 +114,38 @@ const columns: ColumnDef<Customer, unknown>[] = [
     meta: { width: 120, sortable: true },
     cell: ({ getValue }) => formatDate(getValue() as string),
   },
-  // Chưa có nút xóa: backend chưa có DELETE /customers (ngừng hợp tác = đổi trạng thái).
   {
     id: 'actions',
     header: '',
-    meta: { title: 'Thao tác', width: 60, align: 'right' },
-    cell: ({ row }) => (
-      <Can I="update" a="Customer">
-        <RowActions editHref={`/crm/customers/${row.original.id}/edit`} />
-      </Can>
-    ),
+    meta: { title: 'Thao tác', width: 90, align: 'right' },
+    cell: ({ row }) => <CustomerRowActions customer={row.original} />,
   },
 ];
+
+/** Xóa = soft delete phía API (KH chuyển Ngừng hợp tác, giữ lịch sử) — không optimistic (luật 5). */
+function CustomerRowActions({ customer }: { customer: Customer }) {
+  const ability = useAbility();
+  const del = useDeleteCustomer();
+  const canUpdate = ability.can('update', 'Customer');
+  const canDelete = ability.can('delete', 'Customer');
+  if (!canUpdate && !canDelete) return null;
+  return (
+    <RowActions
+      editHref={canUpdate ? `/crm/customers/${customer.id}/edit` : undefined}
+      onDelete={
+        canDelete
+          ? () =>
+              del.mutateAsync(customer.id).then(
+                () => toast.success(`Đã xóa khách hàng ${customer.code}`),
+                (err) => toast.error(messageFor(err)),
+              )
+          : undefined
+      }
+      itemName={`khách hàng ${customer.code}`}
+      deleteDescription="Khách chuyển sang Ngừng hợp tác — dữ liệu và lịch sử đơn / công nợ giữ nguyên."
+    />
+  );
+}
 
 export function CustomerListScreen() {
   const { state, set, skipTake } = useListState(DEFAULTS);

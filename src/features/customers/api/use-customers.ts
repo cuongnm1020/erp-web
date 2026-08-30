@@ -1,4 +1,4 @@
-import { keepPreviousData, useQuery } from '@tanstack/react-query';
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api, unwrap } from '@/lib/api/client';
 import type { components, paths } from '@/lib/api/schema';
 
@@ -79,5 +79,20 @@ export function useCustomer(id: string) {
     queryKey: customerKeys.detail(id),
     queryFn: () => unwrap(api.GET('/customers/{id}', { params: { path: { id } } })),
     enabled: id !== '',
+  });
+}
+
+/**
+ * DELETE /customers/{id} — soft delete: KH chuyển Ngừng hợp tác, dữ liệu và lịch sử giữ nguyên
+ * (dòng vẫn nằm trong danh sách với trạng thái Ngừng). Không optimistic (luật 5: dữ liệu công nợ).
+ */
+export function useDeleteCustomer() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => unwrap(api.DELETE('/customers/{id}', { params: { path: { id } } })),
+    onSuccess: (_data, id) => {
+      void qc.invalidateQueries({ queryKey: customerKeys.lists() });
+      void qc.invalidateQueries({ queryKey: customerKeys.detail(id) });
+    },
   });
 }
