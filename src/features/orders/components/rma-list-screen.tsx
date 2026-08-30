@@ -5,6 +5,7 @@
 import { ChevronDown, ChevronLeft, ChevronRight, Search, X } from 'lucide-react';
 import { useState } from 'react';
 import type { ReactNode } from 'react';
+import { RowActions } from '@/components/data/row-actions';
 import { StatusBadge, type StatusTone } from '@/components/data/status-badge';
 import { PageHeader } from '@/components/layout/page-header';
 import { Button } from '@/components/ui/button';
@@ -16,6 +17,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import { toast } from '@/components/ui/toaster';
 import { cn } from '@/lib/cn';
 import { formatDate, formatMoney } from '@/lib/format';
 
@@ -298,6 +300,9 @@ export function RmaListScreen() {
                   <TableHead className="h-8 px-2.5 text-right text-xs">Giá trị hoàn</TableHead>
                   <TableHead className="h-8 px-2.5 text-xs">Nhận hàng</TableHead>
                   <TableHead className="h-8 px-2.5 text-xs">Trạng thái</TableHead>
+                  <TableHead className="h-8 w-20 px-2.5 text-xs">
+                    <span className="sr-only">Thao tác</span>
+                  </TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -335,6 +340,16 @@ export function RmaListScreen() {
                     </TableCell>
                     <TableCell className="px-2.5 py-1.5">
                       <StatusBadge tone={r.status.tone}>{r.status.label}</StatusBadge>
+                    </TableCell>
+                    <TableCell className="px-2.5 py-1.5">
+                      {r.status.label === 'Chờ nhận hàng' ? (
+                        <RowActions
+                          onEdit={() => toast.info('UI-first — form sửa đơn hoàn chưa nối API')}
+                          onDelete={() => toast.success(`Đã xóa nháp đơn hoàn ${r.rmaNo} (mẫu)`)}
+                          deleteLabel="Xóa nháp"
+                          itemName={`đơn hoàn ${r.rmaNo}`}
+                        />
+                      ) : null}
                     </TableCell>
                   </TableRow>
                 ))}

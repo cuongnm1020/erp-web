@@ -5,7 +5,9 @@
 import { Columns3, Plus, Search } from 'lucide-react';
 import Link from 'next/link';
 import { PageHeader } from '@/components/layout/page-header';
+import { RowActions } from '@/components/data/row-actions';
 import { StatusBadge } from '@/components/data/status-badge';
+import { toast } from '@/components/ui/toaster';
 import { Button } from '@/components/ui/button';
 import {
   Table,
@@ -242,6 +244,9 @@ export function SupplierListScreen() {
                 <TableHead className="w-24 px-2.5 text-right text-xs">PO đang mở</TableHead>
                 <TableHead className="w-36 px-2.5 text-right text-xs">Phải trả</TableHead>
                 <TableHead className="w-24 px-2.5 text-xs">Trạng thái</TableHead>
+                <TableHead className="w-20 px-2.5 text-xs">
+                  <span className="sr-only">Thao tác</span>
+                </TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -278,6 +283,13 @@ export function SupplierListScreen() {
                   </TableCell>
                   <TableCell className="px-2.5 py-1.5">
                     <StatusBadge tone="ok">Hoạt động</StatusBadge>
+                  </TableCell>
+                  <TableCell className="px-2.5 py-1.5">
+                    <RowActions
+                      editHref={`/catalog/suppliers/${s.code}`}
+                      onDelete={() => toast.success(`Đã xóa nhà cung cấp ${s.code} (mẫu)`)}
+                      itemName={`nhà cung cấp ${s.code}`}
+                    />
                   </TableCell>
                 </TableRow>
               ))}

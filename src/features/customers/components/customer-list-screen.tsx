@@ -4,6 +4,7 @@ import { Plus } from 'lucide-react';
 import Link from 'next/link';
 import { useMemo } from 'react';
 import { DataTable, FilterBar, type ColumnDef } from '@/components/data/data-table';
+import { RowActions } from '@/components/data/row-actions';
 import { EmptyState, ListSkeleton, QueryState } from '@/components/data/states';
 import { StatusBadge } from '@/components/data/status-badge';
 import { PageHeader } from '@/components/layout/page-header';
@@ -104,6 +105,17 @@ const columns: ColumnDef<Customer, unknown>[] = [
     header: 'Khách từ',
     meta: { width: 120, sortable: true },
     cell: ({ getValue }) => formatDate(getValue() as string),
+  },
+  // Chưa có nút xóa: backend chưa có DELETE /customers (ngừng hợp tác = đổi trạng thái).
+  {
+    id: 'actions',
+    header: '',
+    meta: { title: 'Thao tác', width: 60, align: 'right' },
+    cell: ({ row }) => (
+      <Can I="update" a="Customer">
+        <RowActions editHref={`/crm/customers/${row.original.id}/edit`} />
+      </Can>
+    ),
   },
 ];
 

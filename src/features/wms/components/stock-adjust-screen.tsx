@@ -2,7 +2,8 @@
 
 // UI-first từ design canvas — dữ liệu mẫu, chưa nối API (nối ở phase FE-x).
 
-import { BarChart3, ChevronDown, X } from 'lucide-react';
+import { BarChart3, ChevronDown } from 'lucide-react';
+import { RowActions } from '@/components/data/row-actions';
 import { StatusBadge } from '@/components/data/status-badge';
 import { PageHeader } from '@/components/layout/page-header';
 import { Button } from '@/components/ui/button';
@@ -14,6 +15,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import { toast } from '@/components/ui/toaster';
 import { cn } from '@/lib/cn';
 import { formatMoney } from '@/lib/format';
 
@@ -237,7 +239,9 @@ export function StockAdjustScreen() {
                 <TableHead className="px-2.5 text-right">Điều chỉnh ±</TableHead>
                 <TableHead className="px-2.5 text-right">Tồn sau</TableHead>
                 <TableHead className="px-2.5 text-right">Giá trị</TableHead>
-                <TableHead className="w-8 px-2.5" />
+                <TableHead className="w-12 px-2.5">
+                  <span className="sr-only">Thao tác</span>
+                </TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -279,8 +283,13 @@ export function StockAdjustScreen() {
                   <TableCell className="px-2.5 py-1.5 text-right tabular-nums">
                     {formatMoney(l.value, { unit: '' })}
                   </TableCell>
-                  <TableCell className="px-2.5 py-1.5 text-muted-foreground">
-                    <X className="h-3.5 w-3.5" aria-hidden />
+                  <TableCell className="px-2.5 py-1.5">
+                    {/* Phiếu còn nháp — xóa được dòng; sau khi post là bất biến */}
+                    <RowActions
+                      onDelete={() => toast.success(`Đã xóa dòng ${l.sku} (mẫu)`)}
+                      deleteLabel="Xóa dòng"
+                      itemName={`dòng ${l.sku}`}
+                    />
                   </TableCell>
                 </TableRow>
               ))}

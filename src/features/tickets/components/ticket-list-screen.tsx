@@ -5,6 +5,7 @@
 import { Download, Plus, Search } from 'lucide-react';
 import Link from 'next/link';
 import { useState } from 'react';
+import { RowActions } from '@/components/data/row-actions';
 import { StatusBadge, type StatusTone } from '@/components/data/status-badge';
 import { PageHeader } from '@/components/layout/page-header';
 import { Button } from '@/components/ui/button';
@@ -344,6 +345,9 @@ export function TicketListScreen() {
               <TableHead className="h-8 px-2.5 text-xs">SLA còn lại</TableHead>
               <TableHead className="h-8 px-2.5 text-xs">Trạng thái</TableHead>
               <TableHead className="h-8 px-2.5 text-xs">Cập nhật</TableHead>
+              <TableHead className="h-8 w-11 px-2.5 text-xs">
+                <span className="sr-only">Thao tác</span>
+              </TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -379,6 +383,9 @@ export function TicketListScreen() {
                   </TableCell>
                   <TableCell className="whitespace-nowrap px-2.5 py-1.5 text-muted-foreground">
                     {formatDateTime(t.updatedAt)}
+                  </TableCell>
+                  <TableCell className="px-2.5 py-1.5">
+                    <RowActions editHref={`/crm/tickets/${t.code}`} />
                   </TableCell>
                 </TableRow>
               );

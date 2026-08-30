@@ -5,7 +5,9 @@
 import { Columns3, Filter, Search, Upload } from 'lucide-react';
 import Link from 'next/link';
 import { PageHeader } from '@/components/layout/page-header';
+import { RowActions } from '@/components/data/row-actions';
 import { StatusBadge } from '@/components/data/status-badge';
+import { toast } from '@/components/ui/toaster';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import {
@@ -384,6 +386,9 @@ export function ProductListScreen() {
                 <TableHead className="w-24 px-2.5 text-right text-xs">Khả dụng</TableHead>
                 <TableHead className="w-20 px-2.5 text-right text-xs">Barcode</TableHead>
                 <TableHead className="w-28 px-2.5 text-xs">Trạng thái</TableHead>
+                <TableHead className="w-20 px-2.5 text-xs">
+                  <span className="sr-only">Thao tác</span>
+                </TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -428,6 +433,13 @@ export function ProductListScreen() {
                     ) : (
                       <StatusBadge tone="neutral">Ngừng bán</StatusBadge>
                     )}
+                  </TableCell>
+                  <TableCell className="px-2.5 py-1.5">
+                    <RowActions
+                      editHref={`/catalog/products/${p.sku}`}
+                      onDelete={() => toast.success(`Đã xóa sản phẩm ${p.sku} (mẫu)`)}
+                      itemName={`sản phẩm ${p.sku}`}
+                    />
                   </TableCell>
                 </TableRow>
               ))}

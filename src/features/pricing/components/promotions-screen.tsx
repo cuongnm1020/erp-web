@@ -14,7 +14,9 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import { RowActions } from '@/components/data/row-actions';
 import { StatusBadge, type StatusTone } from '@/components/data/status-badge';
+import { toast } from '@/components/ui/toaster';
 import { formatMoney } from '@/lib/format';
 import { cn } from '@/lib/cn';
 
@@ -307,6 +309,9 @@ export function PromotionsScreen() {
               <TableHead className="px-2.5 text-right">Suất còn</TableHead>
               <TableHead className="px-2.5">Trạng thái</TableHead>
               <TableHead className="px-2.5 text-right">Ưu tiên</TableHead>
+              <TableHead className="w-20 px-2.5 text-xs">
+                <span className="sr-only">Thao tác</span>
+              </TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -380,6 +385,13 @@ export function PromotionsScreen() {
                   )}
                 >
                   {r.priority === null ? '—' : r.priority}
+                </TableCell>
+                <TableCell className="px-2.5 py-1.5">
+                  <RowActions
+                    onEdit={() => toast.info('UI-first — form sửa chương trình chưa nối API')}
+                    onDelete={() => toast.success(`Đã xóa chương trình ${r.code} (mẫu)`)}
+                    itemName={`chương trình ${r.code}`}
+                  />
                 </TableCell>
               </TableRow>
             ))}

@@ -97,16 +97,21 @@ function Section({ title, children }: { title: string; children: ReactNode }) {
   );
 }
 
-export function CustomerFormScreen() {
+export function CustomerFormScreen({ customerId }: { customerId?: string } = {}) {
+  const editing = Boolean(customerId);
   return (
     <>
       <PageHeader
-        title="Tạo khách hàng"
-        description="Mã KH: (tự động khi lưu) · Team Hà Nội · sẽ gán cho: Nguyễn Văn An"
+        title={editing ? 'Sửa khách hàng' : 'Tạo khách hàng'}
+        description={
+          editing
+            ? 'Đổi thông tin sẽ áp dụng ngay sau khi lưu'
+            : 'Mã KH: (tự động khi lưu) · Team Hà Nội · sẽ gán cho: Nguyễn Văn An'
+        }
         breadcrumb={[
           { label: 'Khách hàng', href: '/crm/customers' },
           { label: 'Danh sách', href: '/crm/customers' },
-          { label: 'Tạo khách hàng' },
+          { label: editing ? 'Sửa khách hàng' : 'Tạo khách hàng' },
         ]}
         actions={
           <>

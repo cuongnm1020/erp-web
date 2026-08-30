@@ -3,6 +3,7 @@
 // UI-first từ design canvas — dữ liệu mẫu, chưa nối API (nối ở phase FE-x).
 
 import { ChevronDown, Search } from 'lucide-react';
+import { RowActions } from '@/components/data/row-actions';
 import { StatusBadge, type StatusTone } from '@/components/data/status-badge';
 import { PageHeader } from '@/components/layout/page-header';
 import { Button } from '@/components/ui/button';
@@ -15,6 +16,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import { toast } from '@/components/ui/toaster';
 import { cn } from '@/lib/cn';
 import { formatQuantity } from '@/lib/format';
 
@@ -320,6 +322,9 @@ export function GdnListScreen() {
                 <TableHead className="px-2.5">Trạng thái</TableHead>
                 <TableHead className="px-2.5">Người pick</TableHead>
                 <TableHead className="px-2.5">Ngày</TableHead>
+                <TableHead className="w-20 px-2.5">
+                  <span className="sr-only">Thao tác</span>
+                </TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -353,6 +358,17 @@ export function GdnListScreen() {
                   <TableCell className="px-2.5 py-1.5 text-muted-foreground">{r.picker}</TableCell>
                   <TableCell className="px-2.5 py-1.5 text-muted-foreground">
                     {r.createdAt}
+                  </TableCell>
+                  <TableCell className="px-2.5 py-1.5">
+                    {/* Chứng từ đã post là bất biến — chỉ phiếu chờ pick mới sửa/xóa được */}
+                    {r.status === 'Chờ pick' ? (
+                      <RowActions
+                        editHref={`/wms/gdn/${r.docNo}`}
+                        onDelete={() => toast.success(`Đã xóa phiếu xuất ${r.docNo} (mẫu)`)}
+                        deleteLabel="Xóa nháp"
+                        itemName={`phiếu xuất ${r.docNo}`}
+                      />
+                    ) : null}
                   </TableCell>
                 </TableRow>
               ))}

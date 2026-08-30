@@ -3,6 +3,7 @@
 // UI-first từ design canvas — dữ liệu mẫu, chưa nối API (nối ở phase FE-1).
 import { ChevronDown, Search, X } from 'lucide-react';
 import { PageHeader } from '@/components/layout/page-header';
+import { RowActions } from '@/components/data/row-actions';
 import { StatusBadge, type StatusTone } from '@/components/data/status-badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -14,6 +15,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import { toast } from '@/components/ui/toaster';
 
 type ConsentValue = 'Đồng ý' | 'Từ chối' | 'Chưa hỏi';
 
@@ -253,7 +255,9 @@ export function MarketingConsentScreen() {
                 <TableHead className="px-2.5 text-xs">Nguồn đồng ý</TableHead>
                 <TableHead className="px-2.5 text-xs">Cập nhật</TableHead>
                 <TableHead className="px-2.5 text-xs">Bằng chứng</TableHead>
-                <TableHead className="w-11 px-2.5 text-xs" />
+                <TableHead className="w-11 px-2.5 text-xs">
+                  <span className="sr-only">Thao tác</span>
+                </TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -298,9 +302,11 @@ export function MarketingConsentScreen() {
                     )}
                   </TableCell>
                   <TableCell className="px-2.5 py-1.5">
-                    <button type="button" className="text-primary hover:underline">
-                      Sửa
-                    </button>
+                    <RowActions
+                      onEdit={() =>
+                        toast.info('UI-first — form sửa trạng thái đồng ý chưa nối API')
+                      }
+                    />
                   </TableCell>
                 </TableRow>
               ))}

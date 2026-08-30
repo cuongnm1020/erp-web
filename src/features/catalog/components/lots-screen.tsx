@@ -4,7 +4,9 @@
 
 import { Columns3, Filter, Search } from 'lucide-react';
 import { PageHeader } from '@/components/layout/page-header';
+import { RowActions } from '@/components/data/row-actions';
 import { StatusBadge } from '@/components/data/status-badge';
+import { toast } from '@/components/ui/toaster';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import {
@@ -335,7 +337,9 @@ export function LotsScreen() {
                 </TableHead>
                 <TableHead className="w-28 px-2.5 text-right text-xs">Còn lại</TableHead>
                 <TableHead className="w-28 px-2.5 text-xs">Trạng thái</TableHead>
-                <TableHead className="w-24 px-2.5 text-xs" />
+                <TableHead className="w-20 px-2.5 text-xs">
+                  <span className="sr-only">Thao tác</span>
+                </TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -370,9 +374,11 @@ export function LotsScreen() {
                     </StatusBadge>
                   </TableCell>
                   <TableCell className="px-2.5 py-1.5">
-                    <button type="button" className="text-primary hover:underline">
-                      Điều chỉnh
-                    </button>
+                    <RowActions
+                      onEdit={() => toast.info('UI-first — form sửa lô chưa nối API')}
+                      onDelete={() => toast.success(`Đã xóa lô ${r.lot} (mẫu)`)}
+                      itemName={`lô ${r.lot}`}
+                    />
                   </TableCell>
                 </TableRow>
               ))}

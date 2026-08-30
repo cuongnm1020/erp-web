@@ -3,6 +3,7 @@
 // UI-first từ design canvas — dữ liệu mẫu, chưa nối API (nối ở phase FE-x).
 
 import { Lock } from 'lucide-react';
+import { RowActions } from '@/components/data/row-actions';
 import { StatusBadge } from '@/components/data/status-badge';
 import { PageHeader } from '@/components/layout/page-header';
 import { Button } from '@/components/ui/button';
@@ -14,6 +15,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import { toast } from '@/components/ui/toaster';
 import { cn } from '@/lib/cn';
 
 interface DocSequenceRow {
@@ -222,7 +224,9 @@ export function SettingsScreen() {
                     <TableHead className="px-2.5 text-right">Số hiện tại</TableHead>
                     <TableHead className="px-2.5">Reset theo</TableHead>
                     <TableHead className="px-2.5">Kỳ hiện tại</TableHead>
-                    <TableHead className="px-2.5" />
+                    <TableHead className="w-11 px-2.5">
+                      <span className="sr-only">Thao tác</span>
+                    </TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -239,9 +243,9 @@ export function SettingsScreen() {
                         {s.period}
                       </TableCell>
                       <TableCell className="px-2.5 py-1.5">
-                        <button type="button" className="text-primary hover:underline">
-                          Sửa
-                        </button>
+                        <RowActions
+                          onEdit={() => toast.info('UI-first — form sửa dải số chưa nối API')}
+                        />
                       </TableCell>
                     </TableRow>
                   ))}

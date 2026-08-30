@@ -3,6 +3,7 @@
 // UI-first từ design canvas — dữ liệu mẫu, chưa nối API (nối ở phase FE-x).
 
 import { ChevronDown, Search } from 'lucide-react';
+import { RowActions } from '@/components/data/row-actions';
 import { StatusBadge, type StatusTone } from '@/components/data/status-badge';
 import { PageHeader } from '@/components/layout/page-header';
 import { Button } from '@/components/ui/button';
@@ -15,6 +16,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import { toast } from '@/components/ui/toaster';
 import { cn } from '@/lib/cn';
 import { formatMoney, formatQuantity } from '@/lib/format';
 
@@ -347,6 +349,9 @@ export function PoListScreen() {
                 <TableHead className="px-2.5">Ngày đặt</TableHead>
                 <TableHead className="px-2.5">Dự kiến về</TableHead>
                 <TableHead className="px-2.5">Người tạo</TableHead>
+                <TableHead className="w-20 px-2.5">
+                  <span className="sr-only">Thao tác</span>
+                </TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -396,6 +401,17 @@ export function PoListScreen() {
                   <TableCell className="px-2.5 py-1.5 text-muted-foreground">{r.eta}</TableCell>
                   <TableCell className="px-2.5 py-1.5 text-muted-foreground">
                     {r.createdBy}
+                  </TableCell>
+                  <TableCell className="px-2.5 py-1.5">
+                    {/* Chứng từ đã gửi/nhận là bất biến — chỉ PO nháp mới sửa/xóa được */}
+                    {r.status === 'Nháp' ? (
+                      <RowActions
+                        onEdit={() => toast.info('UI-first — form sửa PO chưa nối API')}
+                        onDelete={() => toast.success(`Đã xóa PO ${r.docNo} (mẫu)`)}
+                        deleteLabel="Xóa nháp"
+                        itemName={`PO ${r.docNo}`}
+                      />
+                    ) : null}
                   </TableCell>
                 </TableRow>
               ))}

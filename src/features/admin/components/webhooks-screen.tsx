@@ -3,6 +3,7 @@
 // UI-first từ design canvas — dữ liệu mẫu, chưa nối API (nối ở phase FE-x).
 
 import { ChevronDown, RefreshCw } from 'lucide-react';
+import { RowActions } from '@/components/data/row-actions';
 import { StatusBadge, type StatusTone } from '@/components/data/status-badge';
 import { PageHeader } from '@/components/layout/page-header';
 import { Button } from '@/components/ui/button';
@@ -14,6 +15,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import { toast } from '@/components/ui/toaster';
 import { cn } from '@/lib/cn';
 
 interface EndpointRow {
@@ -275,7 +277,9 @@ export function WebhooksScreen() {
                 <TableHead className="px-2.5 text-right">Thành công 30d</TableHead>
                 <TableHead className="px-2.5 text-right">Thất bại 30d</TableHead>
                 <TableHead className="px-2.5 text-right">Gọi cuối</TableHead>
-                <TableHead className="px-2.5" />
+                <TableHead className="w-32 px-2.5">
+                  <span className="sr-only">Thao tác</span>
+                </TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -301,13 +305,16 @@ export function WebhooksScreen() {
                     {e.lastCalledAt}
                   </TableCell>
                   <TableCell className="whitespace-nowrap px-2.5 py-1.5">
-                    <button type="button" className="text-primary hover:underline">
-                      Sửa
-                    </button>
-                    <span className="text-muted-foreground"> · </span>
-                    <button type="button" className="text-primary hover:underline">
-                      Gửi thử
-                    </button>
+                    <div className="flex items-center justify-end gap-2">
+                      <button type="button" className="text-primary hover:underline">
+                        Gửi thử
+                      </button>
+                      <RowActions
+                        onEdit={() => toast.info('UI-first — form sửa endpoint chưa nối API')}
+                        onDelete={() => toast.success(`Đã xóa endpoint ${e.name} (mẫu)`)}
+                        itemName={`endpoint ${e.name}`}
+                      />
+                    </div>
                   </TableCell>
                 </TableRow>
               ))}

@@ -14,7 +14,9 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import { RowActions } from '@/components/data/row-actions';
 import { StatusBadge, type StatusTone } from '@/components/data/status-badge';
+import { toast } from '@/components/ui/toaster';
 import { formatDate } from '@/lib/format';
 import { cn } from '@/lib/cn';
 
@@ -304,6 +306,9 @@ export function PriceListsScreen() {
               <TableHead className="px-2.5 text-right">Ưu tiên ▲</TableHead>
               <TableHead className="px-2.5">Trạng thái</TableHead>
               <TableHead className="px-2.5">Cập nhật</TableHead>
+              <TableHead className="w-20 px-2.5 text-xs">
+                <span className="sr-only">Thao tác</span>
+              </TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -348,6 +353,13 @@ export function PriceListsScreen() {
                   <StatusBadge tone={r.status.tone}>{r.status.label}</StatusBadge>
                 </TableCell>
                 <TableCell className="px-2.5 py-1.5 text-muted-foreground">{r.updated}</TableCell>
+                <TableCell className="px-2.5 py-1.5">
+                  <RowActions
+                    editHref={`/pricing/price-lists/${r.code}`}
+                    onDelete={() => toast.success(`Đã xóa bảng giá ${r.code} (mẫu)`)}
+                    itemName={`bảng giá ${r.code}`}
+                  />
+                </TableCell>
               </TableRow>
             ))}
           </TableBody>

@@ -3,6 +3,7 @@
 // UI-first từ design canvas — dữ liệu mẫu, chưa nối API (nối ở phase FE-x).
 
 import { AlertTriangle, ChevronDown, Search, X } from 'lucide-react';
+import { RowActions } from '@/components/data/row-actions';
 import { StatusBadge, type StatusTone } from '@/components/data/status-badge';
 import { PageHeader } from '@/components/layout/page-header';
 import { Button } from '@/components/ui/button';
@@ -16,6 +17,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import { toast } from '@/components/ui/toaster';
 import { cn } from '@/lib/cn';
 import { formatDateTime } from '@/lib/format';
 
@@ -249,6 +251,9 @@ export function PdaDevicesScreen() {
                 <TableHead className="px-2.5 text-right">Online cuối</TableHead>
                 <TableHead className="px-2.5 text-right">App</TableHead>
                 <TableHead className="px-2.5">Trạng thái</TableHead>
+                <TableHead className="w-20 px-2.5">
+                  <span className="sr-only">Thao tác</span>
+                </TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -278,6 +283,13 @@ export function PdaDevicesScreen() {
                     </TableCell>
                     <TableCell className="px-2.5 py-1.5">
                       <StatusBadge tone={s.tone}>{s.label}</StatusBadge>
+                    </TableCell>
+                    <TableCell className="px-2.5 py-1.5">
+                      <RowActions
+                        onEdit={() => toast.info('UI-first — form sửa thiết bị chưa nối API')}
+                        onDelete={() => toast.success(`Đã xóa thiết bị ${d.code} (mẫu)`)}
+                        itemName={`thiết bị ${d.code}`}
+                      />
                     </TableCell>
                   </TableRow>
                 );

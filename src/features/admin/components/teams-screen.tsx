@@ -3,6 +3,7 @@
 // UI-first từ design canvas — dữ liệu mẫu, chưa nối API (nối ở phase FE-x).
 
 import { AlertTriangle, Folder, Info, Search, Users, X } from 'lucide-react';
+import { RowActions } from '@/components/data/row-actions';
 import { StatusBadge } from '@/components/data/status-badge';
 import { PageHeader } from '@/components/layout/page-header';
 import { Button } from '@/components/ui/button';
@@ -16,6 +17,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import { toast } from '@/components/ui/toaster';
 import { cn } from '@/lib/cn';
 import { formatDate } from '@/lib/format';
 
@@ -223,7 +225,9 @@ export function TeamsScreen() {
                     <TableHead className="px-2.5">Leader</TableHead>
                     <TableHead className="px-2.5 text-right">KH được phân</TableHead>
                     <TableHead className="px-2.5 text-right">Vào team</TableHead>
-                    <TableHead className="px-2.5" />
+                    <TableHead className="w-11 px-2.5">
+                      <span className="sr-only">Thao tác</span>
+                    </TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -247,9 +251,12 @@ export function TeamsScreen() {
                         {formatDate(m.joinedAt)}
                       </TableCell>
                       <TableCell className="px-2.5 py-1.5">
-                        <button type="button" className="text-primary hover:underline">
-                          Gỡ khỏi team
-                        </button>
+                        <RowActions
+                          onDelete={() => toast.success(`Đã gỡ ${m.name} khỏi team (mẫu)`)}
+                          deleteLabel="Gỡ khỏi team"
+                          itemName={`thành viên ${m.name}`}
+                          deleteDescription="Nhân viên vẫn còn trong hệ thống, chỉ rời khỏi team này."
+                        />
                       </TableCell>
                     </TableRow>
                   ))}

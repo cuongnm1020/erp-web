@@ -4,6 +4,7 @@ import { Plus } from 'lucide-react';
 import Link from 'next/link';
 import { useMemo, useState } from 'react';
 import { DataTable, FilterBar, type ColumnDef, type FilterDef } from '@/components/data/data-table';
+import { RowActions } from '@/components/data/row-actions';
 import { EmptyState, ListSkeleton, QueryState } from '@/components/data/states';
 import { StatusBadge } from '@/components/data/status-badge';
 import { PageHeader } from '@/components/layout/page-header';
@@ -27,6 +28,7 @@ const DEFAULTS = {
 /**
  * I-01 Danh sách nhân viên — GET /users. Phân trang/tìm/sắp xếp phía server, state trên URL
  * (luật 8). Cột "Đăng nhập gần nhất" của mockup chưa có cột dữ liệu — không dựng cột giả.
+ * Chưa có nút xóa: backend chưa có DELETE /users (khóa tài khoản qua màn chi tiết).
  */
 const columns: ColumnDef<UserListItem, unknown>[] = [
   {
@@ -102,6 +104,16 @@ const columns: ColumnDef<UserListItem, unknown>[] = [
     header: 'Tạo lúc',
     meta: { width: 110, sortable: true },
     cell: ({ getValue }) => formatDate(getValue() as string),
+  },
+  {
+    id: 'actions',
+    header: '',
+    meta: { title: 'Thao tác', width: 60, align: 'right' },
+    cell: ({ row }) => (
+      <Can I="update" a="User">
+        <RowActions editHref={`/admin/users/${row.original.id}`} />
+      </Can>
+    ),
   },
 ];
 

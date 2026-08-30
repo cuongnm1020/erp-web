@@ -3,6 +3,7 @@
 // UI-first từ design canvas — dữ liệu mẫu, chưa nối API (nối ở phase FE-x).
 
 import { ChevronDown, Search, X } from 'lucide-react';
+import { RowActions } from '@/components/data/row-actions';
 import { StatusBadge, type StatusTone } from '@/components/data/status-badge';
 import { PageHeader } from '@/components/layout/page-header';
 import { Button } from '@/components/ui/button';
@@ -15,6 +16,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import { toast } from '@/components/ui/toaster';
 import { cn } from '@/lib/cn';
 
 interface ReorderRow {
@@ -370,6 +372,9 @@ export function ReorderPointsScreen() {
                 <TableHead className="px-2.5 text-right">Đang về (PO)</TableHead>
                 <TableHead className="px-2.5">Trạng thái</TableHead>
                 <TableHead className="px-2.5 text-right">Đề xuất đặt</TableHead>
+                <TableHead className="w-20 px-2.5">
+                  <span className="sr-only">Thao tác</span>
+                </TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -414,6 +419,13 @@ export function ReorderPointsScreen() {
                   </TableCell>
                   <TableCell className="px-2.5 py-1.5 text-right tabular-nums">
                     {r.suggestion}
+                  </TableCell>
+                  <TableCell className="px-2.5 py-1.5">
+                    <RowActions
+                      onEdit={() => toast.info('UI-first — form sửa hạn mức tồn chưa nối API')}
+                      onDelete={() => toast.success(`Đã xóa hạn mức tồn ${r.sku} (mẫu)`)}
+                      itemName={`hạn mức tồn ${r.sku}`}
+                    />
                   </TableCell>
                 </TableRow>
               ))}

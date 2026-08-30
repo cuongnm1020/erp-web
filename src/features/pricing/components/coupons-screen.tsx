@@ -14,7 +14,9 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import { RowActions } from '@/components/data/row-actions';
 import { StatusBadge, type StatusTone } from '@/components/data/status-badge';
+import { toast } from '@/components/ui/toaster';
 import { cn } from '@/lib/cn';
 
 interface CouponRow {
@@ -270,6 +272,9 @@ export function CouponsScreen() {
                   <TableHead className="px-2.5">Hạn dùng</TableHead>
                   <TableHead className="px-2.5">Trạng thái</TableHead>
                   <TableHead className="px-2.5">Dùng gần nhất</TableHead>
+                  <TableHead className="w-20 px-2.5 text-xs">
+                    <span className="sr-only">Thao tác</span>
+                  </TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -300,6 +305,13 @@ export function CouponsScreen() {
                     </TableCell>
                     <TableCell className="px-2.5 py-1.5 tabular-nums text-muted-foreground">
                       {r.lastUsed ?? '—'}
+                    </TableCell>
+                    <TableCell className="px-2.5 py-1.5">
+                      <RowActions
+                        onEdit={() => toast.info('UI-first — form sửa mã giảm giá chưa nối API')}
+                        onDelete={() => toast.success(`Đã xóa mã ${r.code} (mẫu)`)}
+                        itemName={`mã ${r.code}`}
+                      />
                     </TableCell>
                   </TableRow>
                 ))}

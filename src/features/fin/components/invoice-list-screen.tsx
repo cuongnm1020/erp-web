@@ -14,6 +14,8 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import { toast } from '@/components/ui/toaster';
+import { RowActions } from '@/components/data/row-actions';
 import { StatusBadge, type StatusTone } from '@/components/data/status-badge';
 import { cn } from '@/lib/cn';
 
@@ -299,6 +301,9 @@ export function InvoiceListScreen() {
               <TableHead className="px-2.5">Trạng thái</TableHead>
               <TableHead className="px-2.5">Mã CQT</TableHead>
               <TableHead className="px-2.5">Sale</TableHead>
+              <TableHead className="w-20 px-2.5">
+                <span className="sr-only">Thao tác</span>
+              </TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -358,6 +363,17 @@ export function InvoiceListScreen() {
                   )}
                 </TableCell>
                 <TableCell className="whitespace-nowrap px-2.5 py-1.5">{r.sale}</TableCell>
+                <TableCell className="px-2.5 py-1.5">
+                  {/* HĐ đã phát hành là bất biến (sửa = thay thế/hủy) — chỉ nháp mới sửa/xóa được */}
+                  {r.status.label === 'Nháp' ? (
+                    <RowActions
+                      editHref={`/fin/invoices/${r.orderNo}`}
+                      onDelete={() => toast.success(`Đã xóa hóa đơn nháp ${r.orderNo} (mẫu)`)}
+                      deleteLabel="Xóa nháp"
+                      itemName={`hóa đơn nháp của đơn ${r.orderNo}`}
+                    />
+                  ) : null}
+                </TableCell>
               </TableRow>
             ))}
           </TableBody>

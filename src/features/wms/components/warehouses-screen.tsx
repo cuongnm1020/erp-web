@@ -3,6 +3,7 @@
 // UI-first từ design canvas — dữ liệu mẫu, chưa nối API (nối ở phase FE-x).
 
 import { ChevronDown, ChevronRight } from 'lucide-react';
+import { RowActions } from '@/components/data/row-actions';
 import { StatusBadge, type StatusTone } from '@/components/data/status-badge';
 import { PageHeader } from '@/components/layout/page-header';
 import { Button } from '@/components/ui/button';
@@ -14,6 +15,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import { toast } from '@/components/ui/toaster';
 import { cn } from '@/lib/cn';
 import { formatQuantity } from '@/lib/format';
 
@@ -241,6 +243,9 @@ export function WarehousesScreen() {
                     <TableHead className="px-2.5 text-right">Số vị trí</TableHead>
                     <TableHead className="px-2.5 text-right">Nhân viên</TableHead>
                     <TableHead className="px-2.5">Trạng thái</TableHead>
+                    <TableHead className="w-20 px-2.5">
+                      <span className="sr-only">Thao tác</span>
+                    </TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -265,6 +270,13 @@ export function WarehousesScreen() {
                       <TableCell className="px-2.5 py-1.5">
                         <StatusBadge tone={w.statusTone}>{w.status}</StatusBadge>
                       </TableCell>
+                      <TableCell className="px-2.5 py-1.5">
+                        <RowActions
+                          onEdit={() => toast.info('UI-first — form sửa kho chưa nối API')}
+                          onDelete={() => toast.success(`Đã xóa kho ${w.code} (mẫu)`)}
+                          itemName={`kho ${w.code}`}
+                        />
+                      </TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
@@ -288,6 +300,9 @@ export function WarehousesScreen() {
                     <TableHead className="px-2.5">Vai trò</TableHead>
                     <TableHead className="px-2.5">Thiết bị</TableHead>
                     <TableHead className="px-2.5">Trạng thái</TableHead>
+                    <TableHead className="w-20 px-2.5">
+                      <span className="sr-only">Thao tác</span>
+                    </TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -304,6 +319,15 @@ export function WarehousesScreen() {
                         ) : (
                           <StatusBadge tone="neutral">Ngoài ca</StatusBadge>
                         )}
+                      </TableCell>
+                      <TableCell className="px-2.5 py-1.5">
+                        <RowActions
+                          onEdit={() =>
+                            toast.info('UI-first — form sửa nhân viên kho chưa nối API')
+                          }
+                          onDelete={() => toast.success(`Đã xóa nhân viên ${s.name} (mẫu)`)}
+                          itemName={`nhân viên ${s.name}`}
+                        />
                       </TableCell>
                     </TableRow>
                   ))}
