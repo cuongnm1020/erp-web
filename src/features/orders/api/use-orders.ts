@@ -1,4 +1,4 @@
-import { keepPreviousData, useQuery } from '@tanstack/react-query';
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api, unwrap } from '@/lib/api/client';
 import type { components } from '@/lib/api/schema';
 
@@ -59,5 +59,21 @@ export function useOrder(id: string) {
     queryKey: orderKeys.detail(id),
     queryFn: () => unwrap(api.GET('/sales-orders/{id}', { params: { path: { id } } })),
     enabled: id !== '',
+  });
+}
+
+/**
+ * POST /sales-orders/{id}/cancel — hủy được từ mọi trạng thái trừ CANCELLED (server giữ luật
+ * chuyển trạng thái); server tự nhả reservation. Không optimistic (luật 5: đụng tồn kho).
+ */
+export function useCancelOrder(id: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: { reason?: string }) =>
+      unwrap(api.POST('/sales-orders/{id}/cancel', { params: { path: { id } }, body: input })),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: orderKeys.detail(id) });
+      void qc.invalidateQueries({ queryKey: orderKeys.lists() });
+    },
   });
 }

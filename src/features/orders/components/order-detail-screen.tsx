@@ -2,12 +2,22 @@
 
 import { Gift, Info } from 'lucide-react';
 import Link from 'next/link';
-import type { ReactNode } from 'react';
+import { useState, type ReactNode } from 'react';
 import { KpiCard } from '@/components/data/kpi-card';
 import { DetailSkeleton, EmptyState, QueryState } from '@/components/data/states';
 import { StatusBadge } from '@/components/data/status-badge';
 import { Breadcrumb } from '@/components/layout/breadcrumb';
 import { Button } from '@/components/ui/button';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import {
   Table,
   TableBody,
@@ -16,10 +26,13 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import { toast } from '@/components/ui/toaster';
 import { isApiError } from '@/lib/api/errors';
+import { messageFor } from '@/lib/error-messages';
 import { formatDate, formatDateTime, formatMoney, formatQuantity } from '@/lib/format';
+import { Can } from '@/lib/permission';
 import { useInvalidateOn } from '@/lib/realtime';
-import { orderKeys, useOrder, type SalesOrderDetail } from '../api/use-orders';
+import { orderKeys, useCancelOrder, useOrder, type SalesOrderDetail } from '../api/use-orders';
 import { orderChannelLabel, orderStatusLabel, orderStatusTone } from '../labels';
 
 /**
@@ -37,7 +50,7 @@ import { orderChannelLabel, orderStatusLabel, orderStatusTone } from '../labels'
  * - Thẻ "Vận chuyển", "Thanh toán", "Lịch sử": chưa có endpoint/DTO cho vận đơn, thu tiền,
  *   dòng thời gian chứng từ. Luật 2 cấm tự khai shape ở frontend nên màn nói thẳng là
  *   chưa nối được, thay vì hiện số bịa cạnh một đơn thật.
- * - Nút "In" / "Hủy đơn" / "Tạo phiếu xuất": lượt này chỉ nối mặt ĐỌC, chưa nối mutation.
+ * - Nút "In" / "Tạo phiếu xuất": chưa nối mutation. "Hủy đơn" đã nối POST /:id/cancel.
  */
 const MISSING: Array<{ title: string; need: string }> = [
   { title: 'Vận chuyển', need: 'chưa có DTO vận đơn gắn với đơn bán' },
@@ -189,7 +202,70 @@ function Lines({ order }: { order: SalesOrderDetail }) {
   );
 }
 
+/**
+ * Hủy đơn — hành động không hoàn tác (server tự nhả reservation). Lý do là tùy chọn,
+ * đi vào event OrderCancelled cho đối chiếu sau này.
+ */
+function CancelOrderDialog({
+  order,
+  open,
+  onOpenChange,
+}: {
+  order: SalesOrderDetail;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+}) {
+  const cancel = useCancelOrder(order.id);
+  const [reason, setReason] = useState('');
+  const confirm = () => {
+    cancel.mutate(
+      { reason: reason.trim() || undefined },
+      {
+        onSuccess: () => {
+          toast.success(`Đã hủy đơn ${order.docNumber}`, {
+            description: 'Hàng đang giữ cho đơn này đã được nhả về khả dụng.',
+          });
+          onOpenChange(false);
+        },
+        onError: (err) => toast.error(messageFor(err)),
+      },
+    );
+  };
+  return (
+    <Dialog open={open} onOpenChange={(o) => !cancel.isPending && onOpenChange(o)}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>Hủy đơn {order.docNumber}?</DialogTitle>
+          <DialogDescription>
+            Không hoàn tác được. Hàng đang giữ cho đơn sẽ được nhả về khả dụng; muốn bán lại thì tạo
+            đơn mới.
+          </DialogDescription>
+        </DialogHeader>
+        <div className="space-y-1.5">
+          <Label htmlFor="cancel-reason">Lý do hủy (tùy chọn)</Label>
+          <Input
+            id="cancel-reason"
+            value={reason}
+            onChange={(e) => setReason(e.target.value)}
+            placeholder="Khách đổi ý, đặt nhầm…"
+            maxLength={1000}
+          />
+        </div>
+        <DialogFooter>
+          <Button variant="outline" disabled={cancel.isPending} onClick={() => onOpenChange(false)}>
+            Không hủy
+          </Button>
+          <Button variant="destructive" disabled={cancel.isPending} onClick={confirm}>
+            Hủy đơn
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 function Detail({ order }: { order: SalesOrderDetail }) {
+  const [cancelOpen, setCancelOpen] = useState(false);
   return (
     <>
       <div className="flex min-h-9 items-start justify-between gap-4">
@@ -205,10 +281,20 @@ function Detail({ order }: { order: SalesOrderDetail }) {
             {order.lineCount} dòng hàng
           </p>
         </div>
-        <Button variant="outline" size="sm" asChild>
-          <Link href="/crm/orders">Về danh sách đơn</Link>
-        </Button>
+        <div className="flex shrink-0 gap-2">
+          {order.status !== 'CANCELLED' ? (
+            <Can I="cancel" a="SalesOrder">
+              <Button variant="destructive" size="sm" onClick={() => setCancelOpen(true)}>
+                Hủy đơn
+              </Button>
+            </Can>
+          ) : null}
+          <Button variant="outline" size="sm" asChild>
+            <Link href="/crm/orders">Về danh sách đơn</Link>
+          </Button>
+        </div>
       </div>
+      <CancelOrderDialog order={order} open={cancelOpen} onOpenChange={setCancelOpen} />
 
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <KpiCard label="Tạm tính" value={money(order.subtotal)} detail="trước thuế và vận chuyển" />

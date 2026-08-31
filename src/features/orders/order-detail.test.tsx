@@ -1,6 +1,7 @@
-import { screen } from '@testing-library/react';
+import { fireEvent, screen, waitFor } from '@testing-library/react';
+import { http, HttpResponse } from 'msw';
 import { describe, expect, it, vi } from 'vitest';
-import { makeOrderDetail, makeOrders, scenario } from '@/test/msw/handlers';
+import { ME_SALE, makeOrderDetail, makeOrders, scenario } from '@/test/msw/handlers';
 import { server } from '@/test/msw/server';
 import { renderApp } from '@/test/render';
 import { OrderDetailScreen } from './components/order-detail-screen';
@@ -49,5 +50,36 @@ describe('OrderDetailScreen — GET /sales-orders/{id} (P1-12)', () => {
     server.use(scenario.orderForbidden);
     renderApp(<OrderDetailScreen orderId={ORDER.id} />);
     expect(await screen.findByText('Bạn không có quyền xem mục này')).toBeInTheDocument();
+  });
+
+  it('không có sales_order.cancel → không thấy nút Hủy đơn (luật 7)', async () => {
+    renderApp(<OrderDetailScreen orderId={ORDER.id} />, { me: ME_SALE });
+    await screen.findByRole('heading', { level: 1 });
+    expect(screen.queryByRole('button', { name: 'Hủy đơn' })).not.toBeInTheDocument();
+  });
+
+  it('Hủy đơn: xác nhận kèm lý do → POST /sales-orders/:id/cancel', async () => {
+    const calls: Array<{ id: string; reason?: string }> = [];
+    server.use(
+      http.post('/api/sales-orders/:id/cancel', async ({ params, request }) => {
+        const body = (await request.json()) as { reason?: string };
+        calls.push({ id: params.id as string, reason: body.reason });
+        return HttpResponse.json({ orderId: params.id, status: 'CANCELLED' });
+      }),
+    );
+    renderApp(<OrderDetailScreen orderId={ORDER.id} />); // ME_ADMIN mặc định: manage all
+    await screen.findByRole('heading', { level: 1 });
+    fireEvent.click(screen.getByRole('button', { name: 'Hủy đơn' }));
+    expect(await screen.findByText(`Hủy đơn ${ORDER.docNumber}?`)).toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText('Lý do hủy (tùy chọn)'), {
+      target: { value: 'Khách đổi ý' },
+    });
+    // Trong dialog nút xác nhận cũng tên "Hủy đơn" — là nút cuối
+    const buttons = screen.getAllByRole('button', { name: 'Hủy đơn' });
+    fireEvent.click(buttons[buttons.length - 1]!);
+    await waitFor(() => expect(calls).toEqual([{ id: ORDER.id, reason: 'Khách đổi ý' }]));
+    await waitFor(() =>
+      expect(screen.queryByText(`Hủy đơn ${ORDER.docNumber}?`)).not.toBeInTheDocument(),
+    );
   });
 });
