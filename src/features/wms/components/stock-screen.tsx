@@ -378,7 +378,12 @@ export function StockScreen() {
       <FilterBar<StockFilter>
         q={state.q}
         onQChange={(q) => set({ q })}
-        values={{}}
+        // KHÔNG đưa `tab` vào values: tab là chế độ xem, "Xóa lọc" không được reset nó
+        values={{
+          warehouseId: state.filters.warehouseId,
+          skuId: state.filters.skuId,
+          locationId: state.filters.locationId,
+        }}
         onFilterChange={setFilter}
         searchPlaceholder="Tìm theo mã hoặc tên SKU…"
       />

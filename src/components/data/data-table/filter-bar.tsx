@@ -127,6 +127,9 @@ export function FilterBar<F extends string = string>({
             onQChange('');
             const clear = {} as Partial<Record<F, string | undefined>>;
             for (const f of filters ?? []) clear[f.key] = undefined;
+            // Cả các filter màn hình tự vẽ ngoài FilterBar (tab trạng thái, chip khách…)
+            // miễn là có mặt trong `values` — không thì "Xóa lọc" đếm mà không xóa được.
+            for (const k of Object.keys(values) as F[]) clear[k] = undefined;
             onFilterChange(clear);
           }}
         >

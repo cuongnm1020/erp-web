@@ -200,7 +200,7 @@ export function OrderListScreen() {
       <FilterBar<OrderFilter>
         q={state.q}
         onQChange={(q) => set({ q })}
-        values={{}}
+        values={{ status: state.filters.status, customerId: state.filters.customerId }}
         onFilterChange={setFilter}
         searchPlaceholder="Tìm theo số đơn, mã hoặc tên khách…"
         right={
