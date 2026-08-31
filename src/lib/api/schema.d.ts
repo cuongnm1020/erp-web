@@ -265,6 +265,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/prices/resolve": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["PricingController_resolve"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/customers": {
         parameters: {
             query?: never;
@@ -725,6 +741,22 @@ export interface paths {
             cookie?: never;
         };
         get: operations["VariantController_filter"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/teams": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["TeamController_list"];
         put?: never;
         post?: never;
         delete?: never;
@@ -2254,6 +2286,13 @@ export interface components {
         DecisionDto: {
             comment?: string;
         };
+        ResolvedPriceDto: {
+            priceListId: string;
+            /** @description Decimal(18,4) dạng chuỗi — giá niêm yết một đơn vị theo `uomId`. */
+            listPrice: string;
+            /** @description Trần chiết khấu 0..1 dạng chuỗi; null = bảng giá không quy định. */
+            maxDiscount: string | null;
+        };
         CustomerDto: {
             id: string;
             code: string;
@@ -2598,6 +2637,14 @@ export interface components {
             baseUom?: string;
             /** @description Sinh barcode INTERNAL tự động cho mỗi SKU mới */
             generateBarcode?: boolean;
+        };
+        TeamDto: {
+            id: string;
+            code: string;
+            name: string;
+            /** @enum {string} */
+            type: "SALES" | "WAREHOUSE" | "ACCOUNTING" | "MARKETING" | "OPERATION";
+            parentId: string | null;
         };
         DepartmentCountDto: {
             members: number;
@@ -3827,6 +3874,32 @@ export interface operations {
             };
         };
     };
+    PricingController_resolve: {
+        parameters: {
+            query: {
+                skuId: string;
+                uomId: string;
+                /** @description Decimal(18,6) dạng chuỗi, theo `uomId`, > 0. */
+                qty: string;
+                customerId: string;
+                channel?: "DIRECT" | "MARKETPLACE" | "WEBSITE" | "POS";
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ResolvedPriceDto"];
+                };
+            };
+        };
+    };
     CustomerController_list: {
         parameters: {
             query: {
@@ -3871,7 +3944,9 @@ export interface operations {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["CustomerDto"];
+                };
             };
         };
     };
@@ -4797,6 +4872,25 @@ export interface operations {
                 };
                 content: {
                     "application/json": Record<string, never>[];
+                };
+            };
+        };
+    };
+    TeamController_list: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TeamDto"][];
                 };
             };
         };

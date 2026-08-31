@@ -1,11 +1,22 @@
 import { fireEvent, screen, waitFor } from '@testing-library/react';
 import { http, HttpResponse } from 'msw';
 import { describe, expect, it, vi } from 'vitest';
-import { makeOrderDetail, makeOrders } from '@/test/msw/handlers';
+import { makeCustomers, makeOrderDetail, makeOrders } from '@/test/msw/handlers';
 import { server } from '@/test/msw/server';
 import { renderApp } from '@/test/render';
 import { OrderCreateScreen } from './components/order-create-screen';
 import { toCreateOrderBody } from './schema';
+
+// Radix Select (team trong dialog Khách mới) cần ResizeObserver + scrollIntoView — jsdom không có.
+vi.stubGlobal(
+  'ResizeObserver',
+  class {
+    observe() {}
+    unobserve() {}
+    disconnect() {}
+  },
+);
+window.HTMLElement.prototype.scrollIntoView = vi.fn();
 
 const push = vi.fn();
 let search = '';
@@ -23,6 +34,7 @@ const REAL_LINES = DETAIL.lines.filter((l) => !l.isGift);
 /** GET /skus/:id trả baseUomId = uomId của dòng nguồn để form không phải đổi ĐVT. */
 function skuHandlers() {
   return [
+    http.get('/api/products', () => HttpResponse.json({ items: [], total: 0 })),
     http.get('/api/skus/:id', ({ params }) => {
       const line = DETAIL.lines.find((l) => l.skuId === params.id);
       if (!line) return new HttpResponse(null, { status: 404 });
@@ -146,5 +158,108 @@ describe('OrderCreateScreen — POST /sales-orders (D-01)', () => {
       lines: REAL_LINES.map((l) => ({ skuId: l.skuId, uomId: l.uomId, qty: l.qty })),
     });
     await waitFor(() => expect(push).toHaveBeenCalledWith('/crm/orders/new-order-1'));
+  });
+
+  it('xem trước giá: niêm yết + thành tiền từng dòng và Tạm tính cộng từ /prices/resolve', async () => {
+    search = `from=${ORDER.id}`;
+    server.use(
+      ...skuHandlers(),
+      http.get('/api/prices/resolve', () =>
+        HttpResponse.json({ priceListId: 'pl-1', listPrice: '100000', maxDiscount: '0.15' }),
+      ),
+    );
+    renderApp(<OrderCreateScreen />);
+    await waitFor(() =>
+      expect(screen.getAllByLabelText('Số lượng')).toHaveLength(REAL_LINES.length),
+    );
+    // Mỗi dòng qty (i+1)*10 (bỏ dòng quà i=2) → thành tiền qty × 100.000
+    const expectSubtotal = REAL_LINES.reduce((acc, l) => acc + Number(l.qty) * 100_000, 0);
+    await waitFor(() => {
+      expect(screen.getAllByText('100.000').length).toBeGreaterThan(0); // giá niêm yết hiện ra
+    });
+    // Tạm tính (và có thể trùng với thành tiền dòng khi chỉ 1 dòng) — chỉ cần xuất hiện
+    await waitFor(() =>
+      expect(
+        screen.getAllByText(new Intl.NumberFormat('vi-VN').format(expectSubtotal)).length,
+      ).toBeGreaterThan(0),
+    );
+  });
+
+  it('CK% vượt trần bảng giá → cảnh báo đỏ ngay tại dòng', async () => {
+    search = `from=${ORDER.id}`;
+    server.use(
+      ...skuHandlers(),
+      http.get('/api/prices/resolve', () =>
+        HttpResponse.json({ priceListId: 'pl-1', listPrice: '100000', maxDiscount: '0.15' }),
+      ),
+    );
+    renderApp(<OrderCreateScreen />);
+    await waitFor(() =>
+      expect(screen.getAllByLabelText('Số lượng')).toHaveLength(REAL_LINES.length),
+    );
+    // Chờ prefill reset xong (qty của dòng nguồn đã đổ vào) rồi mới gõ CK
+    await waitFor(() =>
+      expect(screen.getAllByLabelText('Số lượng')[0]).toHaveValue(REAL_LINES[0]!.qty),
+    );
+    fireEvent.change(screen.getAllByLabelText('Chiết khấu %')[0]!, { target: { value: '18' } });
+    expect(
+      await screen.findByText('vượt trần 15% — hệ thống sẽ chặn khi chốt'),
+    ).toBeInTheDocument();
+  });
+
+  it('?customerId=<id> chọn sẵn khách và hiện tên (nút Tạo đơn từ hồ sơ khách)', async () => {
+    const CUST = makeCustomers(1)[0]!;
+    search = `customerId=${CUST.id}`;
+    server.use(...skuHandlers());
+    renderApp(<OrderCreateScreen />);
+    // combobox đầu tiên là picker khách hàng
+    await waitFor(() => expect(screen.getAllByRole('combobox')[0]).toHaveTextContent(CUST.name));
+  });
+
+  it('Khách mới: tạo nhanh trong form → POST /customers, picker chọn ngay khách vừa tạo', async () => {
+    search = '';
+    const posted: unknown[] = [];
+    server.use(
+      http.get('/api/teams', () =>
+        HttpResponse.json([
+          {
+            id: '00000042-0000-4000-8000-000000000001',
+            code: 'SALES-HN',
+            name: 'Kinh doanh Hà Nội',
+            type: 'SALES',
+            parentId: null,
+          },
+        ]),
+      ),
+      http.post('/api/customers', async ({ request }) => {
+        const body = (await request.json()) as Record<string, unknown>;
+        posted.push(body);
+        return HttpResponse.json(
+          { id: 'new-cust-1', code: body.code, name: body.name, isActive: true },
+          { status: 201 },
+        );
+      }),
+    );
+    server.use(...skuHandlers());
+    renderApp(<OrderCreateScreen />);
+    fireEvent.click(await screen.findByRole('button', { name: 'Khách mới' }));
+    expect(await screen.findByText('Tạo nhanh khách hàng')).toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText('Tên khách hàng'), {
+      target: { value: 'Cửa hàng An Nhiên' },
+    });
+    fireEvent.change(screen.getByLabelText('Mã KH'), { target: { value: 'KH-TEST-01' } });
+    // Radix Select: mở rồi chọn team
+    fireEvent.click(screen.getByRole('combobox', { name: /Team chăm sóc/ }));
+    fireEvent.click(await screen.findByRole('option', { name: 'Kinh doanh Hà Nội' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Tạo khách hàng' }));
+    await waitFor(() => expect(posted).toHaveLength(1));
+    expect(posted[0]).toMatchObject({
+      code: 'KH-TEST-01',
+      name: 'Cửa hàng An Nhiên',
+      teamId: '00000042-0000-4000-8000-000000000001',
+    });
+    // Dialog đóng, picker hiện khách vừa tạo
+    await waitFor(() => expect(screen.queryByText('Tạo nhanh khách hàng')).not.toBeInTheDocument());
+    expect(screen.getAllByRole('combobox')[0]).toHaveTextContent('Cửa hàng An Nhiên');
   });
 });
