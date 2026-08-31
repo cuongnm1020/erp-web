@@ -22,7 +22,9 @@ const RealtimeContext = createContext<RealtimeValue>({ socket: null, connected: 
 
 /**
  * Kết nối Socket.IO (withCredentials → cookie httpOnly đi kèm; server đọc cookie để xác thực).
- * Không có server gateway (backend chưa có) → kết nối thất bại im lặng, app vẫn chạy bình thường.
+ * CHỈ kết nối khi NEXT_PUBLIC_SOCKET_URL được đặt: backend chưa có gateway, quay số vào
+ * API sẽ 404 handshake và socket.io-client retry mãi — spam console. Khi gateway lên,
+ * đặt env là realtime tự chạy, không cần đổi code.
  * Luật 9: consumer chỉ được invalidate query, không setQueryData.
  */
 export function RealtimeProvider({
@@ -36,7 +38,8 @@ export function RealtimeProvider({
   const [connected, setConnected] = useState(false);
   const real = useMemo<Socket | null>(() => {
     if (injected || typeof window === 'undefined') return null;
-    const url = publicEnv.NEXT_PUBLIC_SOCKET_URL ?? publicEnv.NEXT_PUBLIC_API_URL;
+    const url = publicEnv.NEXT_PUBLIC_SOCKET_URL;
+    if (!url) return null;
     return io(url, {
       withCredentials: true,
       autoConnect: false,
