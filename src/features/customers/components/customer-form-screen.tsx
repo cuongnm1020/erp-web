@@ -1,292 +1,478 @@
 'use client';
 
-// UI-first từ design canvas — dữ liệu mẫu, chưa nối API (nối ở phase FE-1). Form tĩnh, chưa có zod.
-import { ChevronDown, Info, Plus, X } from 'lucide-react';
-import type { ReactNode } from 'react';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { Info } from 'lucide-react';
+import Link from 'next/link';
+import { useRouter } from 'next/navigation';
+import { useEffect, useRef, type ReactNode } from 'react';
+import { useForm } from 'react-hook-form';
+import {
+  applyServerErrors,
+  Form,
+  FormControl,
+  FormDescription,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+  MoneyInput,
+} from '@/components/data/form';
+import { DetailSkeleton, EmptyState, QueryState } from '@/components/data/states';
 import { PageHeader } from '@/components/layout/page-header';
 import { Button } from '@/components/ui/button';
-import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { toast } from '@/components/ui/toaster';
+import { isApiError, type ApiError } from '@/lib/api/errors';
+import { Can } from '@/lib/permission';
+import {
+  useCreateCustomer,
+  useCustomer,
+  useUpdateCustomer,
+  type Customer,
+} from '../api/use-customers';
+import { useTeams } from '../api/use-teams';
+import { CUSTOMER_TYPE_OPTIONS } from '../labels';
+import {
+  createCustomerSchema,
+  editCustomerFormSchema,
+  toCreateCustomerBody,
+  toUpdateCustomerBody,
+  type CustomerFormValues,
+} from '../schema';
 
-interface AddressRow {
-  isDefault: boolean;
-  address: string;
-  receiver: string;
-  phone: string;
-}
-
-const SAMPLE_ADDRESSES: AddressRow[] = [
+/**
+ * B-03 Tạo / sửa khách hàng — POST /customers · PATCH /customers/{id}.
+ * Bám design canvas (luật 15) trong phạm vi API cho phép; các điểm LỆCH so với artboard:
+ * - Mã KH: canvas ghi "(tự động khi lưu)" nhưng CreateCustomerDto BẮT BUỘC `code`
+ *   → thêm ô nhập tay (font-mono). Follow-up backend: cấp mã tự động rồi bỏ ô này.
+ * - Team chăm sóc: canvas không có ô này (ngầm theo người tạo) nhưng CreateCustomerDto
+ *   bắt buộc `teamId` → Select từ GET /teams, chỉ hiện team SALES.
+ * - Loại khách: canvas là radio "Cá nhân / hộ KD | Doanh nghiệp"; API là enum
+ *   RETAIL/WHOLESALE/DISTRIBUTOR/KEY_ACCOUNT → Select với nhãn tiếng Việt từ labels.ts.
+ * - SĐT: canvas đánh dấu bắt buộc kèm "dò trùng khi lưu"; CreateCustomerDto để optional và
+ *   chưa có API dò trùng → không bắt buộc, không hứa dò trùng (bỏ cả alert dò trùng).
+ * - BỎ HẲN, không để nút chết (xem PENDING_API): nhóm/cấp độ/tag, bảng giá áp dụng,
+ *   người phụ trách, bảng địa chỉ giao hàng, đồng ý nhận marketing (PDPD).
+ * - Chế độ sửa: UpdateCustomerDto KHÔNG có code/teamId/ownerIds → mã KH hiện disabled,
+ *   team chỉ đọc (đổi ở màn Phân bổ khách hàng). isActive/priceListId tuy có trong DTO
+ *   nhưng không đặt ở đây: Ngừng hợp tác đã có luồng DELETE riêng, bảng giá chưa có
+ *   GET /price-lists khai báo kiểu response.
+ */
+const PENDING_API: Array<{ title: string; need: string }> = [
+  { title: 'Nhóm, cấp độ & tag', need: 'chưa có endpoint nhóm / cấp độ / tag khách hàng' },
+  { title: 'Bảng giá áp dụng', need: 'GET /price-lists chưa khai báo kiểu response' },
+  { title: 'Người phụ trách', need: 'chưa có danh bạ user để chọn — server tự gán người tạo' },
   {
-    isDefault: true,
-    address: 'Số 8 Nguyễn Khang, P. Yên Hòa, Cầu Giấy, Hà Nội',
-    receiver: 'Chị Nhiên',
-    phone: '0936 481 220',
+    title: 'Địa chỉ giao hàng',
+    need: 'CustomerDto chưa trả addresses, response thêm địa chỉ chưa có kiểu',
   },
-  {
-    isDefault: false,
-    address: 'Ki-ốt 12, chợ Nghĩa Tân, Cầu Giấy, Hà Nội',
-    receiver: 'Anh Toàn',
-    phone: '0975 660 138',
-  },
+  { title: 'Đồng ý nhận marketing (PDPD)', need: 'chưa có DTO consent theo khách' },
 ];
 
-function Radio({ on, label }: { on?: boolean; label?: string }) {
-  return (
-    <span className="inline-flex items-center gap-1.5">
-      <span
-        aria-hidden
-        className={
-          on
-            ? 'flex h-3.5 w-3.5 items-center justify-center rounded-full border-4 border-primary bg-background'
-            : 'h-3.5 w-3.5 rounded-full border border-input bg-background'
-        }
-      />
-      {label ? <span className="text-sm">{label}</span> : null}
-    </span>
-  );
-}
+const CREATE_FIELDS = [
+  'code',
+  'name',
+  'taxCode',
+  'phone',
+  'email',
+  'type',
+  'teamId',
+  'creditLimit',
+  'paymentTerm',
+] as const;
 
-function Field({
-  label,
-  required,
-  hint,
-  children,
-  className,
-}: {
-  label: string;
-  required?: boolean;
-  hint?: string;
-  children: ReactNode;
-  className?: string;
-}) {
-  return (
-    <div className={className ? `flex flex-col gap-1 ${className}` : 'flex flex-col gap-1'}>
-      <Label className="text-xs text-muted-foreground">
-        {label} {required ? <span className="text-destructive">*</span> : null}
-      </Label>
-      {children}
-      {hint ? <p className="text-xs text-muted-foreground">{hint}</p> : null}
-    </div>
-  );
-}
+const UPDATE_FIELDS = [
+  'name',
+  'taxCode',
+  'phone',
+  'email',
+  'type',
+  'creditLimit',
+  'paymentTerm',
+] as const;
 
-function SelectLike({ value, muted }: { value: string; muted?: boolean }) {
-  return (
-    <div className="flex h-8 items-center gap-1.5 rounded-md border border-input bg-background px-2.5 text-sm">
-      <span className={muted ? 'text-muted-foreground' : undefined}>{value}</span>
-      <ChevronDown className="ml-auto h-3.5 w-3.5 text-muted-foreground" aria-hidden />
-    </div>
-  );
+function initialValues(customer?: Customer): CustomerFormValues {
+  return {
+    code: customer?.code ?? '',
+    name: customer?.name ?? '',
+    taxCode: customer?.taxCode ?? '',
+    phone: customer?.phone ?? '',
+    email: customer?.email ?? '',
+    type: customer?.type ?? 'RETAIL',
+    teamId: customer?.teamIds[0] ?? '',
+    creditLimit: customer?.creditLimit ?? '',
+    paymentTerm: customer?.paymentTerm == null ? '' : String(customer.paymentTerm),
+  };
 }
 
 function Section({ title, children }: { title: string; children: ReactNode }) {
   return (
     <section className="rounded-md border bg-card">
       <header className="border-b px-3 py-2 text-sm font-semibold">{title}</header>
-      {children}
+      <div className="grid grid-cols-2 items-start gap-x-4 gap-y-3 px-3 py-3">{children}</div>
     </section>
   );
 }
 
-export function CustomerFormScreen({ customerId }: { customerId?: string } = {}) {
-  const editing = Boolean(customerId);
+function CustomerFormBody({ customer }: { customer?: Customer }) {
+  const editing = customer !== undefined;
+  const router = useRouter();
+  // Chỉ tải danh mục team khi tạo — form sửa không đổi được team (UpdateCustomerDto không có).
+  const teams = useTeams({ enabled: !editing });
+  const create = useCreateCustomer();
+  const update = useUpdateCustomer(customer?.id ?? '');
+  const isPending = create.isPending || update.isPending;
+
+  const form = useForm<CustomerFormValues>({
+    resolver: zodResolver(editing ? editCustomerFormSchema : createCustomerSchema),
+    defaultValues: initialValues(customer),
+  });
+
+  const save = (v: CustomerFormValues, andNew: boolean) => {
+    if (!editing) {
+      create.mutate(toCreateCustomerBody(v), {
+        onSuccess: (c) => {
+          toast.success('Đã lưu khách hàng', { description: `${c.code} · ${c.name}` });
+          if (andNew) form.reset(initialValues());
+          else router.push(`/crm/customers/${c.id}`);
+        },
+        onError: (err) => applyServerErrors(form, err as ApiError, { knownFields: CREATE_FIELDS }),
+      });
+      return;
+    }
+    const body = toUpdateCustomerBody(v, form.formState.dirtyFields);
+    if (Object.keys(body).length === 0) {
+      toast.info('Chưa có thay đổi nào để lưu');
+      return;
+    }
+    update.mutate(body, {
+      onSuccess: () => {
+        toast.success('Đã lưu thay đổi');
+        router.push(`/crm/customers/${customer.id}`);
+      },
+      onError: (err) => applyServerErrors(form, err as ApiError, { knownFields: UPDATE_FIELDS }),
+    });
+  };
+
+  const onSubmit = form.handleSubmit((v) => save(v, false));
+  const onSubmitAndNew = form.handleSubmit((v) => save(v, true));
+
+  // Alt+S = lưu (phím tắt của màn theo canvas) — qua ref để listener không phải gắn lại.
+  const submitRef = useRef<() => void>(() => {});
+  useEffect(() => {
+    submitRef.current = () => void onSubmit();
+  });
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.altKey && e.key.toLowerCase() === 's') {
+        e.preventDefault();
+        submitRef.current();
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
+
+  const cancelHref = editing ? `/crm/customers/${customer.id}` : '/crm/customers';
+  const saveLabel = editing ? 'Lưu thay đổi' : 'Lưu khách hàng';
+  const rootError = form.formState.errors.root?.server?.message;
+
+  const saveButton = (
+    <Button size="sm" type="submit" form="customer-form" disabled={isPending}>
+      {isPending ? 'Đang lưu…' : saveLabel}{' '}
+      <kbd className="rounded-sm border border-primary-foreground/50 px-1 font-mono text-xs">
+        Alt S
+      </kbd>
+    </Button>
+  );
+
   return (
-    <>
-      <PageHeader
-        title={editing ? 'Sửa khách hàng' : 'Tạo khách hàng'}
-        description={
-          editing
-            ? 'Đổi thông tin sẽ áp dụng ngay sau khi lưu'
-            : 'Mã KH: (tự động khi lưu) · Team Hà Nội · sẽ gán cho: Nguyễn Văn An'
-        }
-        breadcrumb={[
-          { label: 'Khách hàng', href: '/crm/customers' },
-          { label: 'Danh sách', href: '/crm/customers' },
-          { label: editing ? 'Sửa khách hàng' : 'Tạo khách hàng' },
-        ]}
-        actions={
-          <>
-            <Button variant="ghost" size="sm">
-              Hủy bỏ{' '}
-              <kbd className="rounded-sm border bg-muted px-1 font-mono text-xs text-muted-foreground">
-                Esc
-              </kbd>
-            </Button>
-            <Button size="sm">
-              Lưu khách hàng{' '}
-              <kbd className="rounded-sm border border-primary-foreground/50 px-1 font-mono text-xs">
-                Alt S
-              </kbd>
-            </Button>
-          </>
-        }
-      />
-
-      <div className="grid grid-cols-2 items-start gap-3">
-        <div className="flex flex-col gap-3">
-          <Section title="Thông tin chung">
-            <div className="grid grid-cols-2 gap-x-4 gap-y-3 px-3 py-3">
-              <Field label="Tên khách hàng" required className="col-span-2">
-                <Input className="h-8 text-sm" defaultValue="Cửa hàng An Nhiên" />
-              </Field>
-              <Field label="Loại khách">
-                <div className="flex h-8 items-center gap-3">
-                  <Radio on label="Cá nhân / hộ KD" />
-                  <Radio label="Doanh nghiệp" />
-                </div>
-              </Field>
-              <Field label="SĐT" required hint="Dùng để dò trùng khách khi lưu">
-                <Input className="h-8 font-mono text-sm" defaultValue="0936 481 220" />
-              </Field>
-              <Field label="Email">
-                <Input className="h-8 text-sm" placeholder="ví dụ: annhien@gmail.com" />
-              </Field>
-              <Field label="Mã số thuế">
-                <Input className="h-8 text-sm" placeholder="chỉ bắt buộc với doanh nghiệp" />
-              </Field>
-            </div>
-          </Section>
-
-          <Section title="Phân loại & bán hàng">
-            <div className="grid grid-cols-2 gap-x-4 gap-y-3 px-3 py-3">
-              <Field label="Nhóm khách hàng">
-                <SelectLike value="Bán lẻ" />
-              </Field>
-              <Field label="Cấp độ" hint="Tự nâng hạng theo doanh thu 12 tháng — xem Nhóm & cấp độ">
-                <div className="flex h-8 items-center rounded-md border bg-muted px-2.5 text-sm text-muted-foreground">
-                  Chưa xếp hạng
-                </div>
-              </Field>
-              <Field label="Tag">
-                <div className="flex min-h-8 flex-wrap items-center gap-1.5 rounded-md border border-input bg-background px-2 py-1">
-                  <span className="inline-flex h-5 items-center gap-1 rounded-md border border-input bg-card px-1.5 text-xs">
-                    Bán lẻ <X className="h-3 w-3 text-muted-foreground" aria-hidden />
-                  </span>
-                  <span className="inline-flex h-5 items-center gap-1 rounded-md border border-input bg-card px-1.5 text-xs">
-                    Cầu Giấy <X className="h-3 w-3 text-muted-foreground" aria-hidden />
-                  </span>
-                  <span className="text-sm text-muted-foreground">+ thêm tag…</span>
-                </div>
-              </Field>
-              <Field label="Bảng giá áp dụng">
-                <SelectLike value="Mặc định" />
-              </Field>
-              <Field label="Hạn mức công nợ" hint="Mặc định nhóm Bán lẻ · vượt cần leader duyệt">
-                <Input className="h-8 text-right text-sm tabular-nums" defaultValue="20.000.000" />
-              </Field>
-              <Field
-                label="Người phụ trách"
-                hint="Member chỉ tạo khách cho chính mình — leader mới gán người khác"
-              >
-                <div className="flex h-8 items-center rounded-md border bg-muted px-2.5 text-sm text-muted-foreground">
-                  Nguyễn Văn An (tôi)
-                </div>
-              </Field>
-            </div>
-          </Section>
-
-          <Section title="Đồng ý nhận marketing (PDPD)">
-            <div className="flex items-center gap-5 px-3 py-3">
-              <label className="flex items-center gap-1.5 text-sm">
-                <Checkbox defaultChecked /> Email
-              </label>
-              <label className="flex items-center gap-1.5 text-sm">
-                <Checkbox defaultChecked /> SMS
-              </label>
-              <label className="flex items-center gap-1.5 text-sm">
-                <Checkbox /> Zalo
-              </label>
-              <Field label="Nguồn đồng ý * (bắt buộc khi tích kênh)" className="flex-1">
-                <SelectLike value="Khách xác nhận qua điện thoại (có ghi âm)" />
-              </Field>
-            </div>
-          </Section>
-        </div>
-
-        <div className="flex flex-col gap-3">
-          <Section title="Địa chỉ giao hàng · 2 địa chỉ">
-            <div className="flex items-center justify-between px-3 pt-2">
-              <span className="text-xs text-muted-foreground">
-                Địa chỉ mặc định tự điền khi tạo đơn; đổi được từng đơn.
-              </span>
-              <Button variant="outline" size="sm" className="h-7 px-2 text-xs">
-                <Plus aria-hidden />
-                Thêm địa chỉ
+    <Form {...form}>
+      <form id="customer-form" onSubmit={onSubmit} noValidate>
+        <PageHeader
+          title={editing ? 'Sửa khách hàng' : 'Tạo khách hàng'}
+          description={
+            editing
+              ? `${customer.code} · thay đổi áp dụng ngay sau khi lưu`
+              : 'Điền thông tin chung; địa chỉ và phân loại chi tiết bổ sung sau'
+          }
+          breadcrumb={[
+            { label: 'Khách hàng', href: '/crm/customers' },
+            { label: 'Danh sách', href: '/crm/customers' },
+            { label: editing ? 'Sửa khách hàng' : 'Tạo khách hàng' },
+          ]}
+          actions={
+            <>
+              <Button variant="ghost" size="sm" asChild>
+                <Link href={cancelHref}>Hủy bỏ</Link>
               </Button>
-            </div>
-            <Table className="mt-2 text-sm">
-              <TableHeader>
-                <TableRow className="bg-muted hover:bg-muted">
-                  <TableHead className="w-16 px-2.5 text-center text-xs">Mặc định</TableHead>
-                  <TableHead className="px-2.5 text-xs">Địa chỉ</TableHead>
-                  <TableHead className="w-32 px-2.5 text-xs">Người nhận</TableHead>
-                  <TableHead className="w-28 px-2.5 text-xs">SĐT nhận</TableHead>
-                  <TableHead className="w-14 px-2.5 text-xs" />
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {SAMPLE_ADDRESSES.map((a) => (
-                  <TableRow key={a.address}>
-                    <TableCell className="px-2.5 py-1.5 text-center">
-                      <Radio on={a.isDefault} />
-                    </TableCell>
-                    <TableCell className="px-2.5 py-1.5">{a.address}</TableCell>
-                    <TableCell className="px-2.5 py-1.5">{a.receiver}</TableCell>
-                    <TableCell className="px-2.5 py-1.5 font-mono text-xs">{a.phone}</TableCell>
-                    <TableCell className="px-2.5 py-1.5">
-                      <button type="button" className="text-primary hover:underline">
-                        Sửa
-                      </button>
-                    </TableCell>
-                  </TableRow>
-                ))}
-                <TableRow>
-                  <TableCell className="px-2.5 py-1.5 text-center">
-                    <Radio />
-                  </TableCell>
-                  <TableCell className="px-2.5 py-1.5" colSpan={4}>
-                    <div className="flex h-8 items-center rounded-md border border-dashed border-input px-2.5 text-sm text-muted-foreground">
-                      + Nhập địa chỉ mới — Enter để thêm dòng
-                    </div>
-                  </TableCell>
-                </TableRow>
-              </TableBody>
-            </Table>
-          </Section>
+              <Can I={editing ? 'update' : 'create'} a="Customer">
+                {saveButton}
+              </Can>
+            </>
+          }
+        />
 
-          <div className="flex items-start gap-2.5 rounded-md bg-muted px-3 py-2 text-sm text-muted-foreground">
-            <Info className="mt-0.5 h-4 w-4 shrink-0" aria-hidden />
-            <p>
-              Khi lưu, hệ thống dò trùng theo SĐT trên toàn công ty. Nếu trùng sẽ báo và gợi ý gộp —
-              không tạo bản ghi thứ hai.
-            </p>
+        <div className="grid grid-cols-2 items-start gap-3">
+          <div className="flex flex-col gap-3">
+            <Section title="Thông tin chung">
+              <FormField
+                control={form.control}
+                name="name"
+                render={({ field }) => (
+                  <FormItem className="col-span-2">
+                    <FormLabel required>Tên khách hàng</FormLabel>
+                    <FormControl>
+                      <Input {...field} autoFocus placeholder="Cửa hàng An Nhiên" />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="code"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel required={!editing}>Mã KH</FormLabel>
+                    <FormControl>
+                      <Input
+                        {...field}
+                        disabled={editing}
+                        placeholder="KH-00123"
+                        className="font-mono"
+                      />
+                    </FormControl>
+                    <FormDescription>
+                      {editing
+                        ? 'Mã không đổi được sau khi tạo'
+                        : 'Backend chưa cấp mã tự động — tạm nhập tay'}
+                    </FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="type"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Loại khách</FormLabel>
+                    <Select value={field.value} onValueChange={field.onChange}>
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {CUSTOMER_TYPE_OPTIONS.map((o) => (
+                          <SelectItem key={o.value} value={o.value}>
+                            {o.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="phone"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>SĐT</FormLabel>
+                    <FormControl>
+                      <Input
+                        {...field}
+                        inputMode="tel"
+                        className="font-mono"
+                        placeholder="0936481220"
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="email"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Email</FormLabel>
+                    <FormControl>
+                      <Input {...field} type="email" placeholder="ví dụ: annhien@gmail.com" />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="taxCode"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Mã số thuế</FormLabel>
+                    <FormControl>
+                      <Input {...field} placeholder="chỉ bắt buộc với doanh nghiệp" />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </Section>
+
+            <Section title="Phân loại & bán hàng">
+              {editing ? (
+                <div className="flex flex-col gap-1">
+                  <span className="text-xs text-muted-foreground">Team chăm sóc</span>
+                  <div className="flex h-9 items-center rounded-md border bg-muted px-3 text-sm text-muted-foreground">
+                    {customer.teamIds.length} team đang chăm sóc
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    Đổi team và người phụ trách ở màn{' '}
+                    <Link href="/crm/customers/assign" className="text-primary hover:underline">
+                      Phân bổ khách hàng
+                    </Link>
+                  </p>
+                </div>
+              ) : (
+                <FormField
+                  control={form.control}
+                  name="teamId"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel required>Team chăm sóc</FormLabel>
+                      <Select value={field.value} onValueChange={field.onChange}>
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Chọn team" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          {(teams.data ?? [])
+                            .filter((t) => t.type === 'SALES')
+                            .map((t) => (
+                              <SelectItem key={t.id} value={t.id}>
+                                {t.name}
+                              </SelectItem>
+                            ))}
+                        </SelectContent>
+                      </Select>
+                      <FormDescription>Quyết định team nào thấy và chăm khách này</FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              )}
+              <FormField
+                control={form.control}
+                name="creditLimit"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Hạn mức công nợ</FormLabel>
+                    <FormControl>
+                      <MoneyInput
+                        value={field.value}
+                        onChange={field.onChange}
+                        onBlur={field.onBlur}
+                        name={field.name}
+                        ref={field.ref}
+                      />
+                    </FormControl>
+                    <FormDescription>Để trống nếu chưa đặt hạn mức</FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="paymentTerm"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Hạn thanh toán (ngày)</FormLabel>
+                    <FormControl>
+                      <Input {...field} inputMode="numeric" placeholder="vd: 30" />
+                    </FormControl>
+                    <FormDescription>Số ngày kể từ ngày xuất hóa đơn</FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </Section>
           </div>
 
-          <div className="flex justify-end gap-2">
-            <Button variant="ghost" size="sm">
-              Hủy bỏ
-            </Button>
-            <Button variant="outline" size="sm">
-              Lưu và tạo tiếp
-            </Button>
-            <Button size="sm">
-              Lưu khách hàng{' '}
-              <kbd className="rounded-sm border border-primary-foreground/50 px-1 font-mono text-xs">
-                Alt S
-              </kbd>
-            </Button>
+          <div className="flex flex-col gap-3">
+            <section className="rounded-md border bg-card">
+              <header className="flex items-center gap-1.5 border-b px-3 py-2 text-sm font-semibold">
+                <Info className="h-3.5 w-3.5 text-muted-foreground" aria-hidden />
+                Bổ sung khi API sẵn sàng
+              </header>
+              <ul className="flex flex-col gap-2 px-3 py-3 text-sm">
+                {PENDING_API.map((m) => (
+                  <li key={m.title} className="flex flex-col">
+                    <span className="font-medium">{m.title}</span>
+                    <span className="text-xs text-muted-foreground">{m.need}</span>
+                  </li>
+                ))}
+              </ul>
+              <p className="border-t px-3 py-2 text-xs text-muted-foreground">
+                Luật 2: shape response phải sinh từ OpenAPI của apps/api — backend khai báo DTO cho
+                các phần trên thì form nối được ngay, không để nút chết.
+              </p>
+            </section>
+
+            {rootError ? <p className="text-sm text-destructive">{rootError}</p> : null}
+
+            <div className="flex justify-end gap-2">
+              <Button variant="ghost" size="sm" asChild>
+                <Link href={cancelHref}>Hủy bỏ</Link>
+              </Button>
+              <Can I={editing ? 'update' : 'create'} a="Customer">
+                {!editing ? (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    disabled={isPending}
+                    onClick={() => void onSubmitAndNew()}
+                  >
+                    Lưu và tạo tiếp
+                  </Button>
+                ) : null}
+                {saveButton}
+              </Can>
+            </div>
           </div>
         </div>
-      </div>
-    </>
+      </form>
+    </Form>
+  );
+}
+
+export function CustomerFormScreen({ customerId }: { customerId?: string } = {}) {
+  const query = useCustomer(customerId ?? '');
+  if (customerId === undefined) return <CustomerFormBody />;
+  return isApiError(query.error) && query.error.isNotFound ? (
+    <EmptyState
+      title="Không tìm thấy khách hàng"
+      description="Khách này có thể đã bị gộp, hoặc đang do người khác phụ trách."
+      action={
+        <Button variant="outline" asChild>
+          <Link href="/crm/customers">Về danh sách khách hàng</Link>
+        </Button>
+      }
+    />
+  ) : (
+    <QueryState query={query} skeleton={<DetailSkeleton fields={9} />}>
+      {(c) => <CustomerFormBody customer={c} />}
+    </QueryState>
   );
 }

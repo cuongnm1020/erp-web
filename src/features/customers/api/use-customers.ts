@@ -82,6 +82,36 @@ export function useCustomer(id: string) {
   });
 }
 
+export type CreateCustomerInput = components['schemas']['CreateCustomerDto'];
+export type UpdateCustomerInput = components['schemas']['UpdateCustomerDto'];
+
+/** POST /customers — trả CustomerDto để điều hướng thẳng vào hồ sơ vừa tạo. */
+export function useCreateCustomer() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: CreateCustomerInput) => unwrap(api.POST('/customers', { body: input })),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: customerKeys.lists() });
+    },
+  });
+}
+
+/**
+ * PATCH /customers/{id} — body chỉ chứa field thay đổi (UpdateCustomerDto, mọi field optional).
+ * Không optimistic (luật 5: creditLimit/paymentTerm là dữ liệu công nợ) — chờ server rồi invalidate.
+ */
+export function useUpdateCustomer(id: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: UpdateCustomerInput) =>
+      unwrap(api.PATCH('/customers/{id}', { params: { path: { id } }, body: input })),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: customerKeys.lists() });
+      void qc.invalidateQueries({ queryKey: customerKeys.detail(id) });
+    },
+  });
+}
+
 /**
  * DELETE /customers/{id} — soft delete: KH chuyển Ngừng hợp tác, dữ liệu và lịch sử giữ nguyên
  * (dòng vẫn nằm trong danh sách với trạng thái Ngừng). Không optimistic (luật 5: dữ liệu công nợ).
