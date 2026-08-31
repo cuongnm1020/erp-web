@@ -2345,6 +2345,12 @@ export interface components {
             leadTimeDays?: number;
             isActive?: boolean;
         };
+        BrandDto: {
+            id: string;
+            code: string;
+            name: string;
+            isActive: boolean;
+        };
         CreateBrandDto: {
             code: string;
             name: string;
@@ -2352,6 +2358,12 @@ export interface components {
         UpdateBrandDto: {
             name?: string;
             isActive?: boolean;
+        };
+        ProductCategoryDto: {
+            id: string;
+            code: string;
+            name: string;
+            parentId: string | null;
         };
         CreateCategoryDto: {
             code: string;
@@ -2375,18 +2387,6 @@ export interface components {
             code: string;
             name: string;
             decimals?: number;
-        };
-        ProductCategoryDto: {
-            id: string;
-            code: string;
-            name: string;
-            parentId: string | null;
-        };
-        BrandDto: {
-            id: string;
-            code: string;
-            name: string;
-            isActive: boolean;
         };
         SkuSummaryDto: {
             id: string;
@@ -4103,7 +4103,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": Record<string, never>;
+                    "application/json": components["schemas"]["BrandDto"][];
                 };
             };
         };
@@ -4166,7 +4166,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": Record<string, never>;
+                    "application/json": components["schemas"]["ProductCategoryDto"][];
                 };
             };
         };
