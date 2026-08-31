@@ -1,426 +1,438 @@
 'use client';
 
-// UI-first từ design canvas — dữ liệu mẫu, chưa nối API (nối ở phase FE-x).
-
-import { AlertTriangle, ChevronDown, CircleAlert, Search, User, X } from 'lucide-react';
-import type { ReactNode } from 'react';
-import { StatusBadge } from '@/components/data/status-badge';
-import { Breadcrumb } from '@/components/layout/breadcrumb';
-import { Button } from '@/components/ui/button';
+import { zodResolver } from '@hookform/resolvers/zod';
+import Decimal from 'decimal.js';
+import { Plus, X } from 'lucide-react';
+import Link from 'next/link';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { useEffect, useRef } from 'react';
+import { useFieldArray, useForm, useWatch, type UseFormReturn } from 'react-hook-form';
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
-import { cn } from '@/lib/cn';
-import { formatMoney } from '@/lib/format';
+  applyServerErrors,
+  EntityPicker,
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+  MoneyInput,
+} from '@/components/data/form';
+import { PageHeader } from '@/components/layout/page-header';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { toast } from '@/components/ui/toaster';
+import { newIdempotencyKey } from '@/lib/api/client';
+import { isApiError, type ApiError } from '@/lib/api/errors';
+import { messageFor } from '@/lib/error-messages';
+import { formatQuantity } from '@/lib/format';
+import {
+  useCustomerSearch,
+  useSkuAvailability,
+  useSkuDetail,
+  useSkuSearch,
+} from '../api/use-line-entry';
+import { useCreateOrder, useOrder } from '../api/use-orders';
+import { orderChannelLabel } from '../labels';
+import {
+  createOrderSchema,
+  EMPTY_LINE,
+  ORDER_CHANNELS,
+  toCreateOrderBody,
+  type CreateOrderValues,
+} from '../schema';
 
-interface OrderLine {
-  no: number;
-  name: string;
-  sku: string;
-  unit: string;
-  qty: string;
-  qtyHint?: string;
-  listPrice: string;
-  discountPct: string;
-  discountWarn?: string;
-  amount: string;
-  available: string;
-  short?: boolean;
-  shortHint?: string;
-}
-
-const SAMPLE_LINES: OrderLine[] = [
-  {
-    no: 1,
-    name: 'Bút bi Thiên Long TL-08 xanh',
-    sku: 'TL08-BLUE',
-    unit: 'thùng',
-    qty: '2',
-    qtyHint: '= 48 cái',
-    listPrice: '180000',
-    discountPct: '5',
-    amount: '342000',
-    available: '1.240 / 1.300',
-  },
-  {
-    no: 2,
-    name: 'Giấy A4 Double A 80gsm',
-    sku: 'DA-A4-80',
-    unit: 'ream',
-    qty: '10',
-    qtyHint: '= 5.000 tờ',
-    listPrice: '72000',
-    discountPct: '18',
-    discountWarn: 'vượt trần 15%, cần duyệt',
-    amount: '590400',
-    available: '312 / 340',
-  },
-  {
-    no: 3,
-    name: 'Băng keo trong 48mm × 100y Tiến Phát',
-    sku: 'TP-BK48-100',
-    unit: 'cây',
-    qty: '60',
-    listPrice: '9500',
-    discountPct: '0',
-    amount: '570000',
-    available: '46 / 120',
-    short: true,
-    shortHint: 'thiếu 14',
-  },
-  {
-    no: 4,
-    name: 'Kẹp giấy Plus 50mm (hộp 12)',
-    sku: 'PL-KG50',
-    unit: 'hộp',
-    qty: '6',
-    qtyHint: '= 72 cái',
-    listPrice: '24000',
-    discountPct: '0',
-    amount: '144000',
-    available: '890 / 890',
-  },
-];
-
-const SAMPLE_SUMMARY = {
-  subtotal: '1690400',
-  discount: '-124000',
-  shippingFee: '30000',
-  total: '1596400',
-};
-
-const money = (v: string) => formatMoney(v, { unit: '' });
-
-function Kbd({ children, inverted }: { children: ReactNode; inverted?: boolean }) {
-  return (
-    <kbd
-      className={cn(
-        'rounded border px-1 font-mono text-xs',
-        inverted
-          ? 'border-primary-foreground/50 text-primary-foreground'
-          : 'border-input bg-muted text-muted-foreground',
-      )}
-    >
-      {children}
-    </kbd>
-  );
-}
-
-/** Ô nhập trong bảng dòng hàng — tĩnh, hiển thị giá trị như input readOnly. */
-function CellInput({
-  value,
-  align = 'left',
-  tone,
-}: {
-  value: string;
-  align?: 'left' | 'right';
-  tone?: 'warn' | 'err';
-}) {
-  return (
-    <input
-      readOnly
-      value={value}
-      className={cn(
-        'h-7 w-full rounded-md border border-input bg-background px-1.5 text-sm tabular-nums',
-        align === 'right' && 'text-right',
-        tone === 'warn' && 'border-warning',
-        tone === 'err' && 'border-destructive',
-      )}
-    />
-  );
-}
-
+/**
+ * D-01 Nhập đơn — nối POST /sales-orders. Khác bản thiết kế UI-first ở các điểm API chưa cho phép:
+ * - KHÔNG hiện giá/thành tiền/tổng trước khi chốt: client không gửi giá, server chốt qua
+ *   core.resolve_price() lúc POST (bất biến 12; luật 10 cấm tính tiền ở client). Số cuối cùng
+ *   xem ở màn chi tiết ngay sau khi tạo.
+ * - KHÔNG có "Lưu nháp": POST luôn ra APPROVED hoặc PENDING_APPROVAL, chưa có endpoint nháp.
+ * - Nút chốt không đoán trước có cần duyệt hay không (rule duyệt nằm trong DB) — toast theo
+ *   status trả về.
+ * - ?from=<orderId>: tạo lại từ đơn cũ (luồng "sửa" = hủy đơn cũ + tạo đơn mới) — đổ sẵn
+ *   khách + dòng hàng; CK% không khôi phục được (đơn cũ lưu tiền, không lưu tỉ lệ).
+ */
 export function OrderCreateScreen() {
+  const router = useRouter();
+  const fromId = useSearchParams().get('from') ?? '';
+  const source = useOrder(fromId);
+  const create = useCreateOrder();
+  // Idempotency-Key sinh lúc bấm, GIỮ NGUYÊN khi retry lỗi mạng/5xx; đổi khi người dùng sửa form.
+  const idemKey = useRef<string | null>(null);
+
+  const form = useForm<CreateOrderValues>({
+    resolver: zodResolver(createOrderSchema),
+    defaultValues: { customerId: '', channel: 'DIRECT', shippingFee: '', lines: [EMPTY_LINE] },
+  });
+  const lines = useFieldArray({ control: form.control, name: 'lines' });
+
+  const prefilled = useRef(false);
+  useEffect(() => {
+    if (prefilled.current || !source.data) return;
+    prefilled.current = true;
+    form.reset({
+      customerId: source.data.customer.id,
+      channel: source.data.channel,
+      shippingFee: source.data.shippingFee,
+      lines: source.data.lines
+        .filter((l) => !l.isGift) // dòng quà do KM sinh — engine sẽ tự sinh lại nếu còn KM
+        .map((l) => ({ skuId: l.skuId, uomId: l.uomId, qty: l.qty, discountPercent: '' })),
+    });
+  }, [source.data, form]);
+
+  useEffect(() => {
+    const sub = form.watch(() => {
+      idemKey.current = null; // form đổi = đơn khác → key mới ở lần bấm sau
+    });
+    return () => sub.unsubscribe();
+  }, [form]);
+
+  const onSubmit = form.handleSubmit((values) => {
+    idemKey.current ??= newIdempotencyKey();
+    create.mutate(
+      { body: toCreateOrderBody(values), key: idemKey.current },
+      {
+        onSuccess: (r) => {
+          if (r.status === 'PENDING_APPROVAL') {
+            toast.success(`Đã gửi duyệt đơn ${r.docNumber}`, {
+              description: 'Đơn vượt ngưỡng duyệt — chờ quản lý xác nhận.',
+            });
+          } else {
+            toast.success(`Đã chốt đơn ${r.docNumber}`, {
+              description: 'Hàng đã được giữ cho đơn này.',
+            });
+          }
+          router.push(`/crm/orders/${r.orderId}`);
+        },
+        onError: (err) => {
+          // 409 thiếu tồn / 422 vượt trần CK: gắn lỗi vào đúng dòng theo skuId trong details
+          if (isApiError(err)) {
+            const skuId = (err.details as { skuId?: string } | undefined)?.skuId;
+            const idx = skuId ? values.lines.findIndex((l) => l.skuId === skuId) : -1;
+            if (idx >= 0) {
+              const field = err.code === 'DISCOUNT_ABOVE_MAX' ? 'discountPercent' : 'qty';
+              form.setError(`lines.${idx}.${field}`, { message: messageFor(err) });
+              toast.error(messageFor(err));
+              return;
+            }
+          }
+          applyServerErrors(form, err as ApiError, {
+            knownFields: ['customerId', 'channel', 'shippingFee', 'lines'],
+          });
+          const root = form.formState.errors.root?.server?.message;
+          if (root) toast.error(root);
+        },
+      },
+    );
+  });
+
   return (
-    <div className="flex min-h-0 flex-1 flex-col">
-      <header className="mb-4 space-y-2">
-        <Breadcrumb
-          items={[
+    <Form {...form}>
+      <form id="order-create" onSubmit={onSubmit} className="flex flex-col gap-3">
+        <PageHeader
+          title={fromId ? 'Tạo lại đơn' : 'Tạo đơn hàng'}
+          description={
+            fromId && source.data
+              ? `Từ đơn ${source.data.docNumber} — kiểm tra lại rồi chốt`
+              : 'Số chứng từ cấp tự động khi chốt · giá chốt theo bảng giá của khách'
+          }
+          breadcrumb={[
             { label: 'Bán hàng' },
             { label: 'Đơn hàng', href: '/crm/orders' },
             { label: 'Tạo đơn' },
           ]}
+          actions={
+            <>
+              <Button variant="ghost" size="sm" asChild>
+                <Link href="/crm/orders">Hủy bỏ</Link>
+              </Button>
+              <Button size="sm" type="submit" form="order-create" disabled={create.isPending}>
+                {create.isPending ? 'Đang chốt…' : 'Chốt đơn'}
+              </Button>
+            </>
+          }
         />
-        <div className="flex min-h-9 items-center justify-between gap-4">
-          <div className="min-w-0">
-            <h1 className="flex items-center gap-2 text-xl font-semibold leading-tight">
-              Tạo đơn hàng <StatusBadge tone="draft">Nháp</StatusBadge>
-            </h1>
-            <p className="text-sm text-muted-foreground">
-              Số chứng từ: <span className="font-mono text-xs">(tự động khi lưu)</span> · Kho xuất:
-              Kho HN-1
-            </p>
-          </div>
-          <div className="flex shrink-0 items-center gap-2">
-            <Button variant="ghost" size="sm">
-              Hủy bỏ <Kbd>Esc</Kbd>
-            </Button>
-            <Button variant="outline" size="sm">
-              Lưu nháp <Kbd>Alt S</Kbd>
-            </Button>
-            <Button size="sm">
-              Xác nhận đơn <Kbd inverted>Alt ↵</Kbd>
-            </Button>
-          </div>
-        </div>
-      </header>
 
-      <div className="mb-3 grid grid-cols-12 gap-x-4 gap-y-3 rounded-md border bg-card px-3 py-2.5">
-        <div className="col-span-4 flex flex-col gap-1">
-          <label className="text-xs text-muted-foreground">
-            Khách hàng <span className="text-destructive">*</span>
-          </label>
-          <button
-            type="button"
-            className="flex h-8 items-center gap-1.5 rounded-md border border-input bg-background px-2 text-left text-sm"
-          >
-            <User className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden />
-            <span className="truncate font-semibold">Cửa hàng Minh Tâm</span>
-            <span className="truncate text-muted-foreground">· KH-004512 · 0912 345 678</span>
-            <ChevronDown
-              className="ml-auto h-3.5 w-3.5 shrink-0 text-muted-foreground"
-              aria-hidden
-            />
-          </button>
-          <p className="truncate text-xs text-muted-foreground">
-            Hạng Bạc · Bảng giá: Đại lý miền Bắc · Công nợ 12.400.000 / hạn mức 50.000.000
-          </p>
-        </div>
-        <div className="col-span-4 flex flex-col gap-1">
-          <label className="text-xs text-muted-foreground">Địa chỉ giao</label>
-          <button
-            type="button"
-            className="flex h-8 items-center gap-1.5 rounded-md border border-input bg-background px-2 text-left text-sm"
-          >
-            <span className="truncate">Số 12 Lê Lợi, P. Hàng Bài, Hoàn Kiếm, Hà Nội</span>
-            <ChevronDown
-              className="ml-auto h-3.5 w-3.5 shrink-0 text-muted-foreground"
-              aria-hidden
-            />
-          </button>
-          <p className="text-xs text-muted-foreground">Mặc định · 2 địa chỉ khác</p>
-        </div>
-        <div className="col-span-2 flex flex-col gap-1">
-          <label className="text-xs text-muted-foreground">Kênh bán</label>
-          <button
-            type="button"
-            className="flex h-8 items-center gap-1.5 rounded-md border border-input bg-background px-2 text-left text-sm"
-          >
-            <span className="truncate">Điện thoại</span>
-            <ChevronDown
-              className="ml-auto h-3.5 w-3.5 shrink-0 text-muted-foreground"
-              aria-hidden
-            />
-          </button>
-        </div>
-        <div className="col-span-2 flex flex-col gap-1">
-          <label className="text-xs text-muted-foreground">Ngày đơn</label>
-          <button
-            type="button"
-            className="flex h-8 items-center gap-1.5 rounded-md border border-input bg-background px-2 text-left text-sm tabular-nums"
-          >
-            <span className="truncate">23/08/2026</span>
-            <ChevronDown
-              className="ml-auto h-3.5 w-3.5 shrink-0 text-muted-foreground"
-              aria-hidden
-            />
-          </button>
-        </div>
-      </div>
+        <div className="grid items-start gap-3 lg:grid-cols-3">
+          <section className="rounded-md border bg-card lg:col-span-2">
+            <header className="border-b px-3 py-2 text-sm font-semibold">Thông tin đơn</header>
+            <div className="grid gap-3 px-3 py-3 sm:grid-cols-3">
+              <FormField
+                control={form.control}
+                name="customerId"
+                render={({ field }) => (
+                  <FormItem className="sm:col-span-2">
+                    <FormLabel>Khách hàng</FormLabel>
+                    <FormControl>
+                      <EntityPicker
+                        value={field.value}
+                        onChange={field.onChange}
+                        useSearch={useCustomerSearch}
+                        selectedLabel={
+                          fromId && source.data?.customer.id === field.value
+                            ? source.data.customer.name
+                            : undefined
+                        }
+                        placeholder="Tìm theo tên, mã, SĐT…"
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="channel"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Kênh bán</FormLabel>
+                    <Select value={field.value} onValueChange={field.onChange}>
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {ORDER_CHANNELS.map((c) => (
+                          <SelectItem key={c} value={c}>
+                            {orderChannelLabel(c)}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+          </section>
 
-      <div className="flex min-h-0 flex-1 items-start gap-3">
-        <div className="flex min-h-0 min-w-0 flex-1 flex-col self-stretch rounded-md border bg-card">
-          <div className="flex items-center justify-between border-b px-3 py-2">
+          <section className="rounded-md border bg-card">
+            <header className="border-b px-3 py-2 text-sm font-semibold">Thanh toán</header>
+            <div className="flex flex-col gap-3 px-3 py-3">
+              <FormField
+                control={form.control}
+                name="shippingFee"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Phí vận chuyển</FormLabel>
+                    <FormControl>
+                      <MoneyInput value={field.value ?? ''} onChange={field.onChange} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <p className="text-xs text-muted-foreground">
+                Giá bán, chiết khấu KM và tổng tiền do hệ thống chốt theo bảng giá của khách khi bấm
+                Chốt đơn — xem con số cuối ở màn chi tiết. Đơn vượt ngưỡng sẽ tự chuyển chờ duyệt.
+              </p>
+            </div>
+          </section>
+        </div>
+
+        <section className="rounded-md border bg-card">
+          <header className="flex items-center justify-between border-b px-3 py-2">
             <span className="text-sm font-semibold">
               Dòng hàng{' '}
-              <span className="font-normal text-muted-foreground">
-                · 4 dòng · 1 dòng thiếu hàng
-              </span>
+              <span className="font-normal text-muted-foreground">· {lines.fields.length}</span>
             </span>
-            <Button variant="outline" size="sm" className="h-6 px-2 text-xs">
-              Thêm dòng <Kbd>Alt N</Kbd>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => lines.append(EMPTY_LINE)}
+            >
+              <Plus aria-hidden />
+              Thêm dòng
             </Button>
+          </header>
+          <div className="flex flex-col divide-y">
+            {lines.fields.map((f, i) => (
+              <LineRow
+                key={f.id}
+                form={form}
+                index={i}
+                onRemove={lines.fields.length > 1 ? () => lines.remove(i) : undefined}
+              />
+            ))}
           </div>
-          <div className="min-h-0 flex-1 overflow-auto">
-            <Table>
-              <TableHeader>
-                <TableRow className="bg-muted hover:bg-muted">
-                  <TableHead className="h-8 w-8 px-2.5 text-xs">#</TableHead>
-                  <TableHead className="h-8 px-2.5 text-xs">Sản phẩm</TableHead>
-                  <TableHead className="h-8 w-24 px-2.5 text-xs">ĐVT</TableHead>
-                  <TableHead className="h-8 w-24 px-2.5 text-right text-xs">SL</TableHead>
-                  <TableHead className="h-8 w-28 px-2.5 text-right text-xs">Giá niêm yết</TableHead>
-                  <TableHead className="h-8 w-20 px-2.5 text-right text-xs">CK%</TableHead>
-                  <TableHead className="h-8 w-28 px-2.5 text-right text-xs">Thành tiền</TableHead>
-                  <TableHead className="h-8 w-28 px-2.5 text-right text-xs">Khả dụng</TableHead>
-                  <TableHead className="h-8 w-8 px-2.5" />
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {SAMPLE_LINES.map((l) => (
-                  <TableRow
-                    key={l.no}
-                    className={cn(l.short && 'bg-destructive/10 hover:bg-destructive/10')}
-                  >
-                    <TableCell className="px-2.5 py-1.5 align-top text-muted-foreground">
-                      {l.no}
-                    </TableCell>
-                    <TableCell className="px-2.5 py-1.5 align-top">
-                      <div className="font-semibold">{l.name}</div>
-                      <div className="font-mono text-xs text-muted-foreground">{l.sku}</div>
-                    </TableCell>
-                    <TableCell className="px-2.5 py-1.5 align-top">
-                      <button
-                        type="button"
-                        className="flex h-7 w-full items-center gap-1 rounded-md border border-input bg-background px-1.5 text-sm"
-                      >
-                        {l.unit}
-                        <ChevronDown
-                          className="ml-auto h-3.5 w-3.5 text-muted-foreground"
-                          aria-hidden
-                        />
-                      </button>
-                    </TableCell>
-                    <TableCell className="px-2.5 py-1.5 align-top">
-                      <CellInput value={l.qty} align="right" tone={l.short ? 'err' : undefined} />
-                      {l.qtyHint ? (
-                        <div className="text-right text-xs text-muted-foreground">{l.qtyHint}</div>
-                      ) : null}
-                      {l.shortHint ? (
-                        <div className="text-right text-xs text-destructive">{l.shortHint}</div>
-                      ) : null}
-                    </TableCell>
-                    <TableCell className="px-2.5 py-1.5 text-right align-top tabular-nums">
-                      {money(l.listPrice)}
-                    </TableCell>
-                    <TableCell className="px-2.5 py-1.5 align-top">
-                      <CellInput
-                        value={l.discountPct}
-                        align="right"
-                        tone={l.discountWarn ? 'warn' : undefined}
-                      />
-                      {l.discountWarn ? (
-                        <div className="text-right text-xs text-warning">{l.discountWarn}</div>
-                      ) : null}
-                    </TableCell>
-                    <TableCell className="px-2.5 py-1.5 text-right align-top font-semibold tabular-nums">
-                      {money(l.amount)}
-                    </TableCell>
-                    <TableCell
-                      className={cn(
-                        'px-2.5 py-1.5 text-right align-top tabular-nums',
-                        l.short && 'font-semibold text-destructive',
-                      )}
-                    >
-                      {l.available}
-                    </TableCell>
-                    <TableCell className="px-2.5 py-1.5 align-top">
-                      <button
-                        type="button"
-                        className="text-muted-foreground hover:text-destructive"
-                        aria-label={`Xóa dòng ${l.no}`}
-                      >
-                        <X className="h-3.5 w-3.5" aria-hidden />
-                      </button>
-                    </TableCell>
-                  </TableRow>
-                ))}
-                <TableRow>
-                  <TableCell className="px-2.5 py-1.5 text-muted-foreground">5</TableCell>
-                  <TableCell className="px-2.5 py-1.5" colSpan={8}>
-                    <div className="flex h-7 w-96 items-center gap-1.5 rounded-md border border-input bg-background px-1.5 text-sm text-muted-foreground">
-                      <Search className="h-3.5 w-3.5" aria-hidden />
-                      <span>Tìm theo mã SKU, tên, mọi barcode…</span>
-                    </div>
-                  </TableCell>
-                </TableRow>
-              </TableBody>
-            </Table>
-          </div>
-          <div className="mt-auto flex gap-4 border-t px-3 py-2 text-xs text-muted-foreground">
-            <span>
-              Phím tắt: <Kbd>Alt N</Kbd> dòng mới · <Kbd>↵</Kbd> ở ô SL → dòng mới · <Kbd>Esc</Kbd>{' '}
-              đóng gợi ý · <Kbd>?</Kbd> xem tất cả
-            </span>
-            <span className="ml-auto">Khả dụng = khả dụng / tồn thực tại Kho HN-1</span>
-          </div>
-        </div>
-
-        <aside className="sticky top-4 flex w-96 shrink-0 flex-col gap-3">
-          <div className="rounded-md border bg-card px-3.5 py-3">
-            <div className="flex justify-between py-1 text-sm">
-              <span className="text-muted-foreground">Tạm tính</span>
-              <span className="tabular-nums">{money(SAMPLE_SUMMARY.subtotal)}</span>
-            </div>
-            <div className="flex justify-between py-1 text-sm">
-              <span className="text-muted-foreground">
-                Chiết khấu{' '}
-                <button type="button" className="text-xs text-primary hover:underline">
-                  · Áp mã
-                </button>
-              </span>
-              <span className="tabular-nums">{money(SAMPLE_SUMMARY.discount)}</span>
-            </div>
-            <div className="flex justify-between py-1 text-sm">
-              <span className="text-muted-foreground">Thuế (VAT)</span>
-              <span className="text-muted-foreground">chưa cấu hình</span>
-            </div>
-            <div className="flex justify-between py-1 text-sm">
-              <span className="text-muted-foreground">Phí vận chuyển</span>
-              <span className="tabular-nums">{money(SAMPLE_SUMMARY.shippingFee)}</span>
-            </div>
-            <div className="mt-1 flex justify-between border-t pt-2.5 text-xl font-semibold">
-              <span>Tổng cộng</span>
-              <span className="tabular-nums">{money(SAMPLE_SUMMARY.total)}</span>
-            </div>
-          </div>
-
-          <div className="rounded-md border bg-card">
-            <div className="border-b px-3 py-2 text-sm font-semibold">Khuyến mãi đang áp</div>
-            <div className="flex flex-wrap gap-1.5 px-3 py-2.5">
-              <span className="inline-flex h-6 items-center gap-1.5 rounded-md border border-input bg-background px-2 text-xs">
-                Mua 10 ream tặng 1 <X className="h-3 w-3 text-muted-foreground" aria-hidden />
-              </span>
-              <span className="inline-flex h-6 items-center gap-1.5 rounded-md border border-input bg-background px-2 text-xs">
-                CK 5% đại lý Bạc <X className="h-3 w-3 text-muted-foreground" aria-hidden />
-              </span>
-            </div>
-          </div>
-
-          <div className="flex items-start gap-2.5 rounded-md border border-warning/50 bg-warning/10 px-3 py-2 text-sm text-warning">
-            <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden />
-            <div>
-              <span className="font-semibold">Đơn sẽ vào chờ duyệt.</span> Dòng 2 chiết khấu 18%
-              vượt trần 15%. Người duyệt: Trần Thị Bình (leader).
-            </div>
-          </div>
-          <div className="flex items-start gap-2.5 rounded-md border border-destructive/50 bg-destructive/10 px-3 py-2 text-sm text-destructive">
-            <CircleAlert className="mt-0.5 h-4 w-4 shrink-0" aria-hidden />
-            <div>
-              <span className="font-semibold">Không đủ tồn cho 1 sản phẩm.</span> Dòng 3 thiếu 14
-              cây. Giảm số lượng hoặc chọn kho khác.
-            </div>
-          </div>
-
-          <div className="mt-1 flex flex-col gap-2">
-            <Button variant="outline">
-              Lưu nháp <Kbd>Alt S</Kbd>
-            </Button>
-            <Button size="lg" className="px-4">
-              Gửi duyệt <Kbd inverted>Alt ↵</Kbd>
-            </Button>
-            <p className="text-center text-xs text-muted-foreground">
-              Nút đổi từ &ldquo;Xác nhận đơn&rdquo; thành &ldquo;Gửi duyệt&rdquo; vì có dòng vượt
-              trần
+          {form.formState.errors.lines?.root?.message || form.formState.errors.lines?.message ? (
+            <p className="border-t px-3 py-2 text-sm text-destructive">
+              {form.formState.errors.lines.root?.message ?? form.formState.errors.lines.message}
             </p>
-          </div>
-        </aside>
+          ) : null}
+        </section>
+      </form>
+    </Form>
+  );
+}
+
+/** Một dòng hàng: SKU → ĐVT (base + quy đổi) → SL (kèm quy đổi cơ sở) → CK% → khả dụng. */
+function LineRow({
+  form,
+  index,
+  onRemove,
+}: {
+  form: UseFormReturn<CreateOrderValues>;
+  index: number;
+  onRemove?: () => void;
+}) {
+  const skuId = useWatch({ control: form.control, name: `lines.${index}.skuId` });
+  const uomId = useWatch({ control: form.control, name: `lines.${index}.uomId` });
+  const qty = useWatch({ control: form.control, name: `lines.${index}.qty` });
+  const sku = useSkuDetail(skuId);
+  const stock = useSkuAvailability(sku.data?.code ?? '');
+
+  // SKU vừa chọn (hoặc đổi): mặc định ĐVT cơ sở; ĐVT cũ không thuộc SKU mới thì thay
+  useEffect(() => {
+    if (!sku.data) return;
+    const valid = [sku.data.baseUomId, ...sku.data.uomConversions.map((c) => c.uomId)];
+    if (!uomId || !valid.includes(uomId)) {
+      form.setValue(`lines.${index}.uomId`, sku.data.baseUomId);
+    }
+  }, [sku.data, uomId, form, index]);
+
+  const factor =
+    sku.data && uomId !== sku.data.baseUomId
+      ? sku.data.uomConversions.find((c) => c.uomId === uomId)?.factor
+      : null;
+  const baseHint =
+    factor && qty && /^\d/.test(qty)
+      ? `= ${formatQuantity(new Decimal(qty).mul(factor).toString())} ${sku.data?.baseUom.code}`
+      : null;
+  const low =
+    stock.data && qty
+      ? new Decimal(stock.data.available).lessThan(
+          factor ? new Decimal(qty).mul(factor) : new Decimal(qty || '0'),
+        )
+      : false;
+
+  return (
+    <div className="grid items-start gap-2 px-3 py-2 sm:grid-cols-[minmax(220px,2fr)_140px_120px_100px_minmax(120px,1fr)_32px]">
+      <FormField
+        control={form.control}
+        name={`lines.${index}.skuId`}
+        render={({ field }) => (
+          <FormItem>
+            <FormLabel className="sr-only">Sản phẩm</FormLabel>
+            <FormControl>
+              <EntityPicker
+                value={field.value}
+                onChange={field.onChange}
+                useSearch={useSkuSearch}
+                selectedLabel={sku.data ? sku.data.name : undefined}
+                placeholder="Tìm mã SKU, tên, barcode…"
+              />
+            </FormControl>
+            <FormMessage />
+          </FormItem>
+        )}
+      />
+      <FormField
+        control={form.control}
+        name={`lines.${index}.uomId`}
+        render={({ field }) => (
+          <FormItem>
+            <FormLabel className="sr-only">Đơn vị</FormLabel>
+            <Select value={field.value} onValueChange={field.onChange} disabled={!sku.data}>
+              <FormControl>
+                <SelectTrigger aria-label="Đơn vị tính">
+                  <SelectValue placeholder="ĐVT" />
+                </SelectTrigger>
+              </FormControl>
+              <SelectContent>
+                {sku.data ? (
+                  <>
+                    <SelectItem value={sku.data.baseUomId}>{sku.data.baseUom.code}</SelectItem>
+                    {sku.data.uomConversions.map((c) => (
+                      <SelectItem key={c.uomId} value={c.uomId}>
+                        {c.uom.code} (= {formatQuantity(c.factor)} {sku.data!.baseUom.code})
+                      </SelectItem>
+                    ))}
+                  </>
+                ) : null}
+              </SelectContent>
+            </Select>
+            <FormMessage />
+          </FormItem>
+        )}
+      />
+      <FormField
+        control={form.control}
+        name={`lines.${index}.qty`}
+        render={({ field }) => (
+          <FormItem>
+            <FormLabel className="sr-only">Số lượng</FormLabel>
+            <FormControl>
+              <Input
+                inputMode="decimal"
+                aria-label="Số lượng"
+                className="text-right tabular-nums"
+                {...field}
+              />
+            </FormControl>
+            {baseHint ? <p className="text-xs text-muted-foreground">{baseHint}</p> : null}
+            <FormMessage />
+          </FormItem>
+        )}
+      />
+      <FormField
+        control={form.control}
+        name={`lines.${index}.discountPercent`}
+        render={({ field }) => (
+          <FormItem>
+            <FormLabel className="sr-only">Chiết khấu %</FormLabel>
+            <FormControl>
+              <Input
+                inputMode="decimal"
+                aria-label="Chiết khấu %"
+                placeholder="CK %"
+                className="text-right tabular-nums"
+                {...field}
+                value={field.value ?? ''}
+              />
+            </FormControl>
+            <FormMessage />
+          </FormItem>
+        )}
+      />
+      <div className="pt-2 text-right text-sm tabular-nums">
+        {skuId === '' ? null : stock.isPending ? (
+          <span className="text-muted-foreground">Đang xem tồn…</span>
+        ) : stock.data ? (
+          <span className={low ? 'font-semibold text-destructive' : 'text-muted-foreground'}>
+            Khả dụng {formatQuantity(stock.data.available)} / {formatQuantity(stock.data.onHand)}{' '}
+            {stock.data.baseUomCode}
+            {low ? ' — thiếu hàng' : ''}
+          </span>
+        ) : (
+          <span className="text-muted-foreground">Chưa có tồn</span>
+        )}
       </div>
+      {onRemove ? (
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon"
+          className="h-8 w-8"
+          aria-label="Xóa dòng"
+          title="Xóa dòng"
+          onClick={onRemove}
+        >
+          <X aria-hidden />
+        </Button>
+      ) : (
+        <span />
+      )}
     </div>
   );
 }

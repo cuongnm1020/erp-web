@@ -2364,10 +2364,98 @@ export interface components {
             /** Format: uuid */
             parentId?: string | null;
         };
+        UomDto: {
+            id: string;
+            code: string;
+            name: string;
+            /** @description Số lẻ cho phép khi nhập lượng theo đơn vị này (0 = số nguyên). */
+            decimals: number;
+        };
         CreateUomDto: {
             code: string;
             name: string;
             decimals?: number;
+        };
+        ProductCategoryDto: {
+            id: string;
+            code: string;
+            name: string;
+            parentId: string | null;
+        };
+        BrandDto: {
+            id: string;
+            code: string;
+            name: string;
+            isActive: boolean;
+        };
+        SkuSummaryDto: {
+            id: string;
+            productId: string;
+            code: string;
+            name: string;
+            /** @description ĐVT lưu kho — mọi tồn quy về đây. */
+            baseUomId: string;
+            isActive: boolean;
+        };
+        ProductListItemDto: {
+            id: string;
+            code: string;
+            name: string;
+            categoryId: string | null;
+            brandId: string | null;
+            /** @enum {string} */
+            trackingMode: "NONE" | "LOT" | "SERIAL";
+            shelfLifeDays: number | null;
+            isActive: boolean;
+            category: components["schemas"]["ProductCategoryDto"] | null;
+            brand: components["schemas"]["BrandDto"] | null;
+            /** @description Chỉ SKU đang active. */
+            skus: components["schemas"]["SkuSummaryDto"][];
+        };
+        ProductListResponseDto: {
+            items: components["schemas"]["ProductListItemDto"][];
+            total: number;
+        };
+        SkuBarcodeDto: {
+            id: string;
+            code: string;
+            uomId: string;
+            /** @enum {string} */
+            type: "EAN13" | "CODE128" | "QR" | "INTERNAL";
+            uom: components["schemas"]["UomDto"];
+        };
+        SkuUomConversionDto: {
+            id: string;
+            uomId: string;
+            /** @description Decimal(18,6) dạng chuỗi — 1 uom = factor × ĐVT cơ sở. */
+            factor: string;
+            uom: components["schemas"]["UomDto"];
+        };
+        ProductSkuDetailDto: {
+            id: string;
+            productId: string;
+            code: string;
+            name: string;
+            /** @description ĐVT lưu kho — mọi tồn quy về đây. */
+            baseUomId: string;
+            isActive: boolean;
+            baseUom: components["schemas"]["UomDto"];
+            barcodes: components["schemas"]["SkuBarcodeDto"][];
+            uomConversions: components["schemas"]["SkuUomConversionDto"][];
+        };
+        ProductDetailDto: {
+            id: string;
+            code: string;
+            name: string;
+            categoryId: string | null;
+            brandId: string | null;
+            /** @enum {string} */
+            trackingMode: "NONE" | "LOT" | "SERIAL";
+            shelfLifeDays: number | null;
+            isActive: boolean;
+            category: components["schemas"]["ProductCategoryDto"] | null;
+            brand: components["schemas"]["BrandDto"] | null;
+            skus: components["schemas"]["ProductSkuDetailDto"][];
         };
         CreateProductDto: {
             code: string;
@@ -2413,11 +2501,51 @@ export interface components {
             barcodes?: components["schemas"]["BarcodeDto"][];
             conversions?: components["schemas"]["UomConversionDto"][];
         };
+        SkuDetailDto: {
+            id: string;
+            productId: string;
+            code: string;
+            name: string;
+            /** @description ĐVT lưu kho — mọi tồn quy về đây. */
+            baseUomId: string;
+            isActive: boolean;
+            product: components["schemas"]["ProductListItemDto"];
+            baseUom: components["schemas"]["UomDto"];
+            barcodes: components["schemas"]["SkuBarcodeDto"][];
+            uomConversions: components["schemas"]["SkuUomConversionDto"][];
+        };
         UpdateSkuDto: {
             name?: string;
             weightKg?: string;
             volumeM3?: string;
             isActive?: boolean;
+        };
+        BarcodeLookupSkuDto: {
+            id: string;
+            code: string;
+            name: string;
+            productCode: string;
+            /** @enum {string} */
+            trackingMode: "NONE" | "LOT" | "SERIAL";
+        };
+        BarcodeLookupUomDto: {
+            id: string;
+            code: string;
+            name: string;
+        };
+        BarcodeLookupBaseUomDto: {
+            id: string;
+            code: string;
+        };
+        BarcodeLookupDto: {
+            barcode: string;
+            /** @enum {string} */
+            type: "EAN13" | "CODE128" | "QR" | "INTERNAL";
+            sku: components["schemas"]["BarcodeLookupSkuDto"];
+            uom: components["schemas"]["BarcodeLookupUomDto"];
+            baseUom: components["schemas"]["BarcodeLookupBaseUomDto"];
+            /** @description Decimal(18,6) dạng chuỗi — '1' khi barcode gắn trên ĐVT cơ sở. */
+            factor: string;
         };
         CreateWarehouseDto: {
             code: string;
@@ -2750,13 +2878,79 @@ export interface components {
             idempotencyKey?: string;
             lines: components["schemas"]["CreateOrderLineDto"][];
         };
+        OrderLineResultDto: {
+            lineId: string;
+            lineNo: number;
+            skuId: string;
+            uomId: string;
+            /** @description Decimal(18,6) dạng chuỗi — theo `uomId`. */
+            qty: string;
+            /** @description Decimal(18,6) dạng chuỗi — quy về ĐVT cơ sở. */
+            qtyBase: string;
+            priceListId: string | null;
+            /** @description Decimal(18,4) dạng chuỗi. */
+            listPrice: string;
+            /** @description Decimal(18,4) dạng chuỗi. */
+            unitPrice: string;
+            /** @description Decimal(18,4) dạng chuỗi. */
+            discount: string;
+            /** @description Decimal(18,4) dạng chuỗi. */
+            lineTotal: string;
+            promotionId: string | null;
+            isGift: boolean;
+        };
+        OrderReservationResultDto: {
+            reservationId: string;
+            lineNo: number;
+            skuId: string;
+            locationId: string;
+            lotId: string | null;
+            /** @description Decimal(18,6) dạng chuỗi — ĐVT cơ sở. */
+            qty: string;
+        };
+        CreateOrderResultDto: {
+            orderId: string;
+            docNumber: string;
+            /** @enum {string} */
+            status: "DRAFT" | "PENDING_APPROVAL" | "APPROVED" | "POSTED" | "CANCELLED";
+            /** @description Decimal(18,4) dạng chuỗi. Đã gồm chiết khấu tay từng dòng. */
+            subtotal: string;
+            /** @description Decimal(18,4) dạng chuỗi. Giảm trừ từ khuyến mãi. */
+            discount: string;
+            /** @description Decimal(18,4) dạng chuỗi. */
+            taxAmount: string;
+            /** @description Decimal(18,4) dạng chuỗi. */
+            shippingFee: string;
+            /** @description Decimal(18,4) dạng chuỗi. */
+            total: string;
+            lines: components["schemas"]["OrderLineResultDto"][];
+            reservations: components["schemas"]["OrderReservationResultDto"][];
+            appliedPromotionIds: string[];
+            /** @description Rule duyệt đã khớp — null = không cần duyệt, đơn chốt thẳng. */
+            approvalRuleId: string | null;
+        };
         CancelOrderDto: {
             reason?: string;
+        };
+        CancelOrderResultDto: {
+            orderId: string;
+            docNumber: string;
+            /** @enum {string} */
+            status: "DRAFT" | "PENDING_APPROVAL" | "APPROVED" | "POSTED" | "CANCELLED";
+            releasedReservationIds: string[];
         };
         OrderDecisionDto: {
             /** Format: uuid */
             requestId: string;
             comment?: string;
+        };
+        ApproveOrderResultDto: {
+            orderId: string;
+            docNumber: string;
+            /** @enum {string} */
+            status: "DRAFT" | "PENDING_APPROVAL" | "APPROVED" | "POSTED" | "CANCELLED";
+            /** @description true = đã qua bước duyệt cuối → đơn sang APPROVED và event đã emit. */
+            completed: boolean;
         };
         TaskRowDto: {
             id: string;
@@ -4035,7 +4229,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": Record<string, never>;
+                    "application/json": components["schemas"]["UomDto"][];
                 };
             };
         };
@@ -4078,7 +4272,9 @@ export interface operations {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["ProductListResponseDto"];
+                };
             };
         };
     };
@@ -4119,7 +4315,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": Record<string, never>;
+                    "application/json": components["schemas"]["ProductDetailDto"];
                 };
             };
         };
@@ -4207,7 +4403,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": Record<string, never>;
+                    "application/json": components["schemas"]["SkuDetailDto"];
                 };
             };
         };
@@ -4316,7 +4512,9 @@ export interface operations {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["BarcodeLookupDto"];
+                };
             };
         };
     };
@@ -5358,7 +5556,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": Record<string, never>;
+                    "application/json": components["schemas"]["CreateOrderResultDto"];
                 };
             };
         };
@@ -5404,7 +5602,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": Record<string, never>;
+                    "application/json": components["schemas"]["CancelOrderResultDto"];
                 };
             };
         };
@@ -5429,7 +5627,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": Record<string, never>;
+                    "application/json": components["schemas"]["ApproveOrderResultDto"];
                 };
             };
         };
@@ -5454,7 +5652,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": Record<string, never>;
+                    "application/json": components["schemas"]["ApproveOrderResultDto"];
                 };
             };
         };

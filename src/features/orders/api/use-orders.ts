@@ -1,5 +1,5 @@
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { api, unwrap } from '@/lib/api/client';
+import { api, idempotency, unwrap } from '@/lib/api/client';
 import type { components } from '@/lib/api/schema';
 
 /** Luật 2: shape response chỉ lấy từ schema.d.ts sinh bởi OpenAPI, không khai lại. */
@@ -59,6 +59,30 @@ export function useOrder(id: string) {
     queryKey: orderKeys.detail(id),
     queryFn: () => unwrap(api.GET('/sales-orders/{id}', { params: { path: { id } } })),
     enabled: id !== '',
+  });
+}
+
+export type CreateOrderBody = components['schemas']['CreateOrderDto'];
+export type CreateOrderResult = components['schemas']['CreateOrderResultDto'];
+
+/**
+ * POST /sales-orders — giá do server chốt qua core.resolve_price(), client không gửi giá.
+ * Idempotency-Key sinh LÚC BẤM (luật 4), giữ nguyên khi retry; server dedupe 24h qua Redis.
+ */
+export function useCreateOrder() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ body, key }: { body: CreateOrderBody; key: string }) =>
+      unwrap(
+        api.POST('/sales-orders', {
+          params: { header: { 'idempotency-key': key } },
+          headers: idempotency(key),
+          body,
+        }),
+      ),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: orderKeys.lists() });
+    },
   });
 }
 

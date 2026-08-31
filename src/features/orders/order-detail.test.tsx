@@ -6,9 +6,11 @@ import { server } from '@/test/msw/server';
 import { renderApp } from '@/test/render';
 import { OrderDetailScreen } from './components/order-detail-screen';
 
+const push = vi.fn();
+
 vi.mock('next/navigation', () => ({
   usePathname: () => '/crm/orders/x',
-  useRouter: () => ({ push: vi.fn(), replace: vi.fn(), refresh: vi.fn() }),
+  useRouter: () => ({ push, replace: vi.fn(), refresh: vi.fn() }),
   useSearchParams: () => new URLSearchParams(''),
 }));
 
@@ -81,5 +83,22 @@ describe('OrderDetailScreen — GET /sales-orders/{id} (P1-12)', () => {
     await waitFor(() =>
       expect(screen.queryByText(`Hủy đơn ${ORDER.docNumber}?`)).not.toBeInTheDocument(),
     );
+  });
+
+  it('Sửa = hủy & tạo lại: xác nhận → cancel rồi chuyển sang form tạo đơn ?from=<id>', async () => {
+    push.mockClear();
+    server.use(
+      http.post('/api/sales-orders/:id/cancel', ({ params }) =>
+        HttpResponse.json({ orderId: params.id, status: 'CANCELLED' }),
+      ),
+    );
+    renderApp(<OrderDetailScreen orderId={ORDER.id} />);
+    await screen.findByRole('heading', { level: 1 });
+    fireEvent.click(screen.getByRole('button', { name: 'Sửa (hủy & tạo lại)' }));
+    expect(
+      await screen.findByText(`Sửa đơn ${ORDER.docNumber} — hủy & tạo lại?`),
+    ).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Hủy & tạo lại' }));
+    await waitFor(() => expect(push).toHaveBeenCalledWith(`/crm/orders/new?from=${ORDER.id}`));
   });
 });

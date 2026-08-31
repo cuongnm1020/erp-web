@@ -2,6 +2,7 @@
 
 import { Gift, Info } from 'lucide-react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { useState, type ReactNode } from 'react';
 import { KpiCard } from '@/components/data/kpi-card';
 import { DetailSkeleton, EmptyState, QueryState } from '@/components/data/states';
@@ -30,7 +31,7 @@ import { toast } from '@/components/ui/toaster';
 import { isApiError } from '@/lib/api/errors';
 import { messageFor } from '@/lib/error-messages';
 import { formatDate, formatDateTime, formatMoney, formatQuantity } from '@/lib/format';
-import { Can } from '@/lib/permission';
+import { Can, useAbility } from '@/lib/permission';
 import { useInvalidateOn } from '@/lib/realtime';
 import { orderKeys, useCancelOrder, useOrder, type SalesOrderDetail } from '../api/use-orders';
 import { orderChannelLabel, orderStatusLabel, orderStatusTone } from '../labels';
@@ -205,27 +206,33 @@ function Lines({ order }: { order: SalesOrderDetail }) {
 /**
  * Hủy đơn — hành động không hoàn tác (server tự nhả reservation). Lý do là tùy chọn,
  * đi vào event OrderCancelled cho đối chiếu sau này.
+ * `recreate`: luồng "sửa đơn" = hủy & tạo lại — hủy xong chuyển sang form tạo đơn đổ sẵn nội dung
+ * (chứng từ đã chốt là bất biến nên không có sửa tại chỗ).
  */
 function CancelOrderDialog({
   order,
   open,
+  recreate,
   onOpenChange,
 }: {
   order: SalesOrderDetail;
   open: boolean;
+  recreate: boolean;
   onOpenChange: (open: boolean) => void;
 }) {
+  const router = useRouter();
   const cancel = useCancelOrder(order.id);
   const [reason, setReason] = useState('');
   const confirm = () => {
     cancel.mutate(
-      { reason: reason.trim() || undefined },
+      { reason: reason.trim() || (recreate ? 'Sửa đơn — hủy & tạo lại' : undefined) },
       {
         onSuccess: () => {
           toast.success(`Đã hủy đơn ${order.docNumber}`, {
             description: 'Hàng đang giữ cho đơn này đã được nhả về khả dụng.',
           });
           onOpenChange(false);
+          if (recreate) router.push(`/crm/orders/new?from=${order.id}`);
         },
         onError: (err) => toast.error(messageFor(err)),
       },
@@ -235,10 +242,15 @@ function CancelOrderDialog({
     <Dialog open={open} onOpenChange={(o) => !cancel.isPending && onOpenChange(o)}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>Hủy đơn {order.docNumber}?</DialogTitle>
+          <DialogTitle>
+            {recreate
+              ? `Sửa đơn ${order.docNumber} — hủy & tạo lại?`
+              : `Hủy đơn ${order.docNumber}?`}
+          </DialogTitle>
           <DialogDescription>
-            Không hoàn tác được. Hàng đang giữ cho đơn sẽ được nhả về khả dụng; muốn bán lại thì tạo
-            đơn mới.
+            {recreate
+              ? 'Đơn đã chốt không sửa tại chỗ được. Đơn này sẽ bị hủy (hàng đang giữ được nhả), rồi mở form tạo đơn mới đổ sẵn nội dung cũ để chỉnh và chốt lại — số chứng từ sẽ cấp mới.'
+              : 'Không hoàn tác được. Hàng đang giữ cho đơn sẽ được nhả về khả dụng; muốn bán lại thì tạo đơn mới.'}
           </DialogDescription>
         </DialogHeader>
         <div className="space-y-1.5">
@@ -256,7 +268,7 @@ function CancelOrderDialog({
             Không hủy
           </Button>
           <Button variant="destructive" disabled={cancel.isPending} onClick={confirm}>
-            Hủy đơn
+            {recreate ? 'Hủy & tạo lại' : 'Hủy đơn'}
           </Button>
         </DialogFooter>
       </DialogContent>
@@ -265,7 +277,9 @@ function CancelOrderDialog({
 }
 
 function Detail({ order }: { order: SalesOrderDetail }) {
-  const [cancelOpen, setCancelOpen] = useState(false);
+  const [dialog, setDialog] = useState<'cancel' | 'recreate' | null>(null);
+  const ability = useAbility();
+  const canRecreate = ability.can('cancel', 'SalesOrder') && ability.can('create', 'SalesOrder');
   return (
     <>
       <div className="flex min-h-9 items-start justify-between gap-4">
@@ -283,18 +297,36 @@ function Detail({ order }: { order: SalesOrderDetail }) {
         </div>
         <div className="flex shrink-0 gap-2">
           {order.status !== 'CANCELLED' ? (
-            <Can I="cancel" a="SalesOrder">
-              <Button variant="destructive" size="sm" onClick={() => setCancelOpen(true)}>
-                Hủy đơn
+            <>
+              {canRecreate ? (
+                <Button variant="outline" size="sm" onClick={() => setDialog('recreate')}>
+                  Sửa (hủy & tạo lại)
+                </Button>
+              ) : null}
+              <Can I="cancel" a="SalesOrder">
+                <Button variant="destructive" size="sm" onClick={() => setDialog('cancel')}>
+                  Hủy đơn
+                </Button>
+              </Can>
+            </>
+          ) : (
+            <Can I="create" a="SalesOrder">
+              <Button variant="outline" size="sm" asChild>
+                <Link href={`/crm/orders/new?from=${order.id}`}>Tạo lại đơn</Link>
               </Button>
             </Can>
-          ) : null}
+          )}
           <Button variant="outline" size="sm" asChild>
             <Link href="/crm/orders">Về danh sách đơn</Link>
           </Button>
         </div>
       </div>
-      <CancelOrderDialog order={order} open={cancelOpen} onOpenChange={setCancelOpen} />
+      <CancelOrderDialog
+        order={order}
+        open={dialog !== null}
+        recreate={dialog === 'recreate'}
+        onOpenChange={(o) => setDialog(o ? dialog : null)}
+      />
 
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <KpiCard label="Tạm tính" value={money(order.subtotal)} detail="trước thuế và vận chuyển" />

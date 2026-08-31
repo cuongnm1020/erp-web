@@ -18,6 +18,17 @@ const MESSAGES: Record<string, string> = {
   SERVER_ERROR: 'Máy chủ gặp lỗi. Thử lại; nếu vẫn lỗi, gửi mã truy vết cho IT.',
   UPSTREAM_INVALID: 'API trả về phản hồi không hợp lệ. Kiểm tra API đang chạy và cấu hình API_URL.',
   BAD_REQUEST: 'Yêu cầu không hợp lệ. Tải lại trang rồi thử lại.',
+  // Lên đơn (POST /sales-orders)
+  INSUFFICIENT_STOCK: 'Không đủ tồn kho cho sản phẩm trong đơn. Giảm số lượng hoặc bỏ dòng thiếu.',
+  DISCOUNT_ABOVE_MAX: 'Chiết khấu vượt trần của bảng giá. Giảm CK% rồi chốt lại.',
+  SKU_NOT_SELLABLE: 'Sản phẩm đã ngừng bán. Bỏ dòng này khỏi đơn.',
+  UOM_CONVERSION_MISSING: 'Đơn vị tính chưa có quy đổi về đơn vị cơ sở. Chọn đơn vị khác.',
+  EMPTY_ORDER: 'Đơn chưa có dòng hàng nào. Thêm ít nhất một sản phẩm.',
+  INVALID_ORDER_INPUT: 'Một số trường của đơn chưa hợp lệ. Kiểm tra các ô được đánh dấu.',
+  PRICE_NOT_FOUND:
+    'Chưa có giá cho sản phẩm này với khách đang chọn. Báo quản lý cập nhật bảng giá.',
+  INVALID_STATUS_TRANSITION:
+    'Trạng thái chứng từ đã đổi, thao tác này không còn hợp lệ. Tải lại trang.',
 };
 
 const BY_STATUS: Record<number, string> = {
