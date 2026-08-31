@@ -242,6 +242,28 @@ export function visibleModules(can: CanFn): NavModule[] {
   );
 }
 
+/**
+ * Route → quyền cần có để MỞ trang (gate URL trực tiếp, không chỉ ẩn menu).
+ * Khớp tiền tố dài nhất trên href của nav ('/' chỉ khớp chính xác); mục con cùng href
+ * với module thắng module (>=) — module không gắn ability nhưng con có thì vẫn gate.
+ * Không khớp mục nào / mục không có ability → null = ai đăng nhập cũng mở được.
+ */
+export function requiredAbilityFor(pathname: string): NavAbility | null {
+  let best: { href: string; ability?: NavAbility } | null = null;
+  const consider = (item: { href: string; ability?: NavAbility }) => {
+    const match =
+      item.href === '/'
+        ? pathname === '/'
+        : pathname === item.href || pathname.startsWith(`${item.href}/`);
+    if (match && (!best || item.href.length >= best.href.length)) best = item;
+  };
+  for (const m of NAV_MODULES) {
+    consider(m);
+    for (const c of m.children ?? []) consider(c);
+  }
+  return (best as { href: string; ability?: NavAbility } | null)?.ability ?? null;
+}
+
 /** Nhãn breadcrumb theo segment đường dẫn. Màn hình có thể override qua PageHeader. */
 export const SEGMENT_LABELS: Record<string, string> = {
   crm: 'CRM',

@@ -1,7 +1,7 @@
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { AbilityProvider } from '@/lib/permission';
-import { visibleModules } from '@/lib/navigation';
+import { requiredAbilityFor, visibleModules } from '@/lib/navigation';
 import { crumbsFromPath } from './breadcrumb';
 import { Sidebar } from './sidebar';
 
@@ -44,6 +44,39 @@ describe('visibleModules', () => {
 
   it('admin thấy đủ 8 module', () => {
     expect(visibleModules(() => true)).toHaveLength(8);
+  });
+});
+
+describe('requiredAbilityFor — quyền mở trang theo URL', () => {
+  it('khớp tiền tố dài nhất, gồm cả route con ([id], /edit)', () => {
+    expect(requiredAbilityFor('/catalog/products')).toEqual({
+      action: 'read',
+      subject: 'Product',
+    });
+    expect(requiredAbilityFor('/catalog/products/abc-123')).toEqual({
+      action: 'read',
+      subject: 'Product',
+    });
+    expect(requiredAbilityFor('/crm/customers/abc/edit')).toEqual({
+      action: 'read',
+      subject: 'Customer',
+    });
+    expect(requiredAbilityFor('/crm/orders/new')).toEqual({
+      action: 'create',
+      subject: 'SalesOrder',
+    });
+  });
+
+  it('module không gắn ability nhưng mục con cùng href có → vẫn gate (Kho, Sản phẩm)', () => {
+    expect(requiredAbilityFor('/wms/stock')).toEqual({ action: 'read', subject: 'Stock' });
+    expect(requiredAbilityFor('/wms/shipping')).toEqual({ action: 'read', subject: 'Shipment' });
+  });
+
+  it("route ngoài nav hoặc chưa có quyền backend → null ('/' chỉ khớp chính xác)", () => {
+    expect(requiredAbilityFor('/')).toBeNull();
+    expect(requiredAbilityFor('/me')).toBeNull();
+    expect(requiredAbilityFor('/pricing/promotions')).toBeNull();
+    expect(requiredAbilityFor('/crm/returns')).toBeNull();
   });
 });
 

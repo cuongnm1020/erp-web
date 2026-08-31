@@ -3,6 +3,7 @@
 import type { ReactNode } from 'react';
 import { AppShell } from '@/components/layout/app-shell';
 import { useLogout } from '../api/use-logout';
+import { RouteAbilityGate } from './route-ability-gate';
 import { SessionProvider, useSession } from './session-provider';
 
 function ShellWithSession({ children }: { children: ReactNode }) {
@@ -18,11 +19,13 @@ function ShellWithSession({ children }: { children: ReactNode }) {
   );
 }
 
-/** Bọc mọi route trong app/(app): tải /auth/me → ability → shell. */
+/** Bọc mọi route trong app/(app): tải /auth/me → ability → shell → gate quyền theo route. */
 export function AuthenticatedShell({ children }: { children: ReactNode }) {
   return (
     <SessionProvider>
-      <ShellWithSession>{children}</ShellWithSession>
+      <ShellWithSession>
+        <RouteAbilityGate>{children}</RouteAbilityGate>
+      </ShellWithSession>
     </SessionProvider>
   );
 }
