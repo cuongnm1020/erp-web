@@ -1,9 +1,9 @@
 'use client';
 
-// UI-first từ design canvas — dữ liệu mẫu, chưa nối API (nối ở phase FE-x).
-
-import { BarChart3, Lock } from 'lucide-react';
-import { StatusBadge } from '@/components/data/status-badge';
+import { Lock } from 'lucide-react';
+import { useRouter } from 'next/navigation';
+import { DetailSkeleton, QueryState } from '@/components/data/states';
+import { StatusBadge, type StatusTone } from '@/components/data/status-badge';
 import { PageHeader } from '@/components/layout/page-header';
 import { Button } from '@/components/ui/button';
 import {
@@ -14,317 +14,271 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { formatMoney } from '@/lib/format';
+import { toast } from '@/components/ui/toaster';
+import { messageFor } from '@/lib/error-messages';
+import { formatDate, formatDateTime, formatMoney, formatQuantity } from '@/lib/format';
+import { useAbility } from '@/lib/permission';
+import {
+  useCancelReceipt,
+  usePostReceipt,
+  useReceipt,
+  useReceiptMovements,
+  type ReceiptDetail,
+  type ReceiptStatus,
+} from '../api/use-receipts';
 
-interface GrnLine {
-  no: number;
-  productName: string;
-  sku: string;
-  unit: string;
-  qtyPacked: string;
-  baseEquivalent: string;
-  lot: string;
-  expiry: string;
-  bin: string;
-  /** string decimal */
-  unitPrice: string;
-  /** string decimal */
-  amount: string;
-}
+/**
+ * Chi tiết phiếu nhập (design GrnDetailPosted) — GET /goods-receipts/:id.
+ * Phiếu NHÁP: post / hủy tại đây. Phiếu ĐÃ POST là bất biến (bất biến 5) — mọi
+ * trường chỉ đọc + bảng "Chuyển động tồn đã ghi" từ GET :id/movements.
+ *
+ * Khác design: chưa có "Tạo phiếu điều chỉnh" (chưa có chứng từ điều chỉnh) và
+ * "In phiếu"; hủy phiếu đã post bị 409 đúng nghĩa — không có đường xóa ledger.
+ */
+const STATUS_LABEL: Record<ReceiptStatus, { label: string; tone: StatusTone }> = {
+  DRAFT: { label: 'Nháp', tone: 'draft' },
+  PENDING_APPROVAL: { label: 'Chờ duyệt', tone: 'warn' },
+  APPROVED: { label: 'Đã duyệt', tone: 'brand' },
+  POSTED: { label: 'Đã post', tone: 'ok' },
+  CANCELLED: { label: 'Hủy', tone: 'err' },
+};
 
-const SAMPLE_LINES: GrnLine[] = [
-  {
-    no: 1,
-    productName: 'Giấy A4 Double A 80gsm',
-    sku: 'DA-A4-80',
-    unit: 'thùng',
-    qtyPacked: '50',
-    baseEquivalent: '= 250 ream',
-    lot: 'L2608',
-    expiry: '—',
-    bin: 'B-01-01-A',
-    unitPrice: '340000',
-    amount: '17000000',
-  },
-  {
-    no: 2,
-    productName: 'Giấy A4 Double A 70gsm',
-    sku: 'DA-A4-70',
-    unit: 'thùng',
-    qtyPacked: '20',
-    baseEquivalent: '= 100 ream',
-    lot: 'L2608',
-    expiry: '—',
-    bin: 'B-01-03-D',
-    unitPrice: '305000',
-    amount: '6100000',
-  },
-  {
-    no: 3,
-    productName: 'Giấy A4 IK Plus 70gsm',
-    sku: 'IK-A4-70',
-    unit: 'thùng',
-    qtyPacked: '12',
-    baseEquivalent: '= 60 ream',
-    lot: 'L2608',
-    expiry: '—',
-    bin: 'B-02-02-C',
-    unitPrice: '282500',
-    amount: '3390000',
-  },
-  {
-    no: 4,
-    productName: 'Giấy note 3M Post-it 76×76 vàng',
-    sku: '3M-NOTE76',
-    unit: 'thùng',
-    qtyPacked: '5',
-    baseEquivalent: '= 120 tập',
-    lot: 'L2608',
-    expiry: '05/2028',
-    bin: 'A-02-01-C',
-    unitPrice: '504000',
-    amount: '2520000',
-  },
-  {
-    no: 5,
-    productName: 'Giấy in ảnh HP A4 180gsm (20 tờ)',
-    sku: 'HP-PH180',
-    unit: 'thùng',
-    qtyPacked: '3',
-    baseEquivalent: '= 60 tập',
-    lot: 'L2608',
-    expiry: '05/2028',
-    bin: 'C-01-02-A',
-    unitPrice: '1160000',
-    amount: '3480000',
-  },
-];
+const MOVEMENT_LABEL: Record<string, string> = {
+  RECEIPT: '+ Nhập',
+  PUT_AWAY: 'Cất hàng',
+};
 
-interface MovementRow {
-  time: string;
-  movement: string;
-  sku: string;
-  lot: string;
-  bin: string;
-  qtyDelta: string;
-  balanceAfter: string;
-  user: string;
-}
-
-const SAMPLE_MOVEMENTS: MovementRow[] = [
-  {
-    time: '23/08/2026 10:12:04',
-    movement: 'MV-8842171',
-    sku: 'DA-A4-80',
-    lot: 'L2608',
-    bin: 'B-01-01-A',
-    qtyDelta: '+250',
-    balanceAfter: '1.250',
-    user: 'Trần Văn Bảo',
-  },
-  {
-    time: '23/08/2026 10:12:04',
-    movement: 'MV-8842172',
-    sku: 'DA-A4-70',
-    lot: 'L2608',
-    bin: 'B-01-03-D',
-    qtyDelta: '+100',
-    balanceAfter: '412',
-    user: 'Trần Văn Bảo',
-  },
-  {
-    time: '23/08/2026 10:12:04',
-    movement: 'MV-8842173',
-    sku: 'IK-A4-70',
-    lot: 'L2608',
-    bin: 'B-02-02-C',
-    qtyDelta: '+60',
-    balanceAfter: '318',
-    user: 'Trần Văn Bảo',
-  },
-  {
-    time: '23/08/2026 10:12:05',
-    movement: 'MV-8842174',
-    sku: '3M-NOTE76',
-    lot: 'L2608',
-    bin: 'A-02-01-C',
-    qtyDelta: '+120',
-    balanceAfter: '364',
-    user: 'Trần Văn Bảo',
-  },
-  {
-    time: '23/08/2026 10:12:05',
-    movement: 'MV-8842175',
-    sku: 'HP-PH180',
-    lot: 'L2608',
-    bin: 'C-01-02-A',
-    qtyDelta: '+60',
-    balanceAfter: '214',
-    user: 'Trần Văn Bảo',
-  },
-];
-
-function RoField({ label, value, mono }: { label: string; value: string; mono?: boolean }) {
+function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
-    <div className="flex flex-col gap-1">
-      <span className="text-xs text-muted-foreground">{label}</span>
-      <div className="flex h-8 items-center rounded-md bg-muted px-2 text-sm text-muted-foreground">
-        <span className={mono ? 'font-mono text-xs' : undefined}>{value}</span>
-      </div>
+    <div>
+      <div className="text-xs text-muted-foreground">{label}</div>
+      <div className="mt-0.5 text-sm">{children}</div>
     </div>
   );
 }
 
-export function GrnDetailScreen({ id }: { id?: string }) {
-  const docNo = id && id !== 'sample' ? id : 'GRN-2608-00087';
+function Movements({ id }: { id: string }) {
+  const query = useReceiptMovements(id, true);
+  return (
+    <section className="overflow-hidden rounded-md border bg-card">
+      <header className="border-b px-3 py-2 text-sm font-semibold">
+        Chuyển động tồn đã ghi (sổ cái · chỉ đọc · append-only)
+      </header>
+      <QueryState
+        query={query}
+        skeleton={<div className="p-3 text-sm text-muted-foreground">Đang tải sổ cái…</div>}
+        isEmpty={(d) => d.length === 0}
+        empty={<p className="p-3 text-sm text-muted-foreground">Chưa có movement nào.</p>}
+      >
+        {(rows) => (
+          <div className="overflow-x-auto">
+            <Table>
+              <TableHeader>
+                <TableRow className="bg-muted hover:bg-muted">
+                  <TableHead className="px-2.5 text-xs">Thời gian</TableHead>
+                  <TableHead className="px-2.5 text-xs">Loại</TableHead>
+                  <TableHead className="px-2.5 text-xs">SKU</TableHead>
+                  <TableHead className="px-2.5 text-xs">Lô</TableHead>
+                  <TableHead className="px-2.5 text-xs">Vị trí</TableHead>
+                  <TableHead className="px-2.5 text-right text-xs">+/− SL</TableHead>
+                  <TableHead className="px-2.5 text-xs">Người thao tác</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {rows.map((m) => (
+                  <TableRow key={m.id}>
+                    <TableCell className="px-2.5 py-1.5 text-muted-foreground">
+                      {formatDateTime(m.createdAt, { seconds: true })}
+                    </TableCell>
+                    <TableCell className="px-2.5 py-1.5">
+                      <StatusBadge tone={m.qtyDelta.startsWith('-') ? 'warn' : 'ok'}>
+                        {MOVEMENT_LABEL[m.movementType] ?? m.movementType}
+                      </StatusBadge>
+                    </TableCell>
+                    <TableCell className="px-2.5 py-1.5 font-mono text-xs">{m.skuCode}</TableCell>
+                    <TableCell className="px-2.5 py-1.5 font-mono text-xs">
+                      {m.lotNumber ?? '—'}
+                    </TableCell>
+                    <TableCell className="px-2.5 py-1.5 font-mono text-xs">
+                      {m.locationCode}
+                    </TableCell>
+                    <TableCell className="px-2.5 py-1.5 text-right tabular-nums">
+                      {m.qtyDelta.startsWith('-') ? '' : '+'}
+                      {formatQuantity(m.qtyDelta)}
+                    </TableCell>
+                    <TableCell className="px-2.5 py-1.5 text-muted-foreground">
+                      {m.actorName ?? '—'}
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+        )}
+      </QueryState>
+    </section>
+  );
+}
 
+function DetailBody({ receipt }: { receipt: ReceiptDetail }) {
   return (
     <div className="flex flex-col gap-3">
+      {receipt.status === 'POSTED' ? (
+        <p className="flex items-center gap-2 rounded-md border border-success/30 bg-success/10 px-3 py-2 text-sm">
+          <Lock className="h-3.5 w-3.5" aria-hidden />
+          <span>
+            <b>
+              Đã post{receipt.postedAt ? ` lúc ${formatDateTime(receipt.postedAt)}` : ''}
+              {receipt.postedByName ? ` bởi ${receipt.postedByName}` : ''}.
+            </b>{' '}
+            Chứng từ bất biến — mọi trường chỉ đọc. Sai sót → tạo phiếu điều chỉnh (chưa có trên
+            web).
+          </span>
+        </p>
+      ) : null}
+
+      <div className="grid gap-3 rounded-md border bg-card p-3 sm:grid-cols-4">
+        <Field label="Số phiếu">
+          <span className="font-mono">{receipt.docNumber}</span>
+        </Field>
+        <Field label="Kho nhận">{receipt.warehouseName}</Field>
+        <Field label="Nhà cung cấp">{receipt.supplierName ?? '— (nhập tự do)'}</Field>
+        <Field label="Tham chiếu PO">
+          {receipt.poNumber ? <span className="font-mono">{receipt.poNumber}</span> : '—'}
+        </Field>
+        <Field label="Ngày nhập">{formatDate(receipt.receivedAt)}</Field>
+        <Field label="Người tạo">{receipt.createdByName ?? '—'}</Field>
+        <Field label="Tổng giá trị">
+          <b className="tabular-nums">{formatMoney(receipt.totalValue)}</b>
+        </Field>
+        <Field label="Ghi chú">{receipt.note ?? '—'}</Field>
+      </div>
+
+      <section className="overflow-hidden rounded-md border bg-card">
+        <header className="border-b px-3 py-2 text-sm font-semibold">
+          Dòng nhập · {receipt.lineCount} dòng · {formatQuantity(receipt.totalQty)} đơn vị cơ bản
+        </header>
+        <div className="overflow-x-auto">
+          <Table>
+            <TableHeader>
+              <TableRow className="bg-muted hover:bg-muted">
+                <TableHead className="w-8 px-2.5 text-xs">#</TableHead>
+                <TableHead className="px-2.5 text-xs">Sản phẩm</TableHead>
+                <TableHead className="px-2.5 text-xs">ĐVT</TableHead>
+                <TableHead className="px-2.5 text-right text-xs">SL</TableHead>
+                <TableHead className="px-2.5 text-xs">Lô</TableHead>
+                <TableHead className="px-2.5 text-xs">HSD</TableHead>
+                <TableHead className="px-2.5 text-right text-xs">Đơn giá</TableHead>
+                <TableHead className="px-2.5 text-right text-xs">Thành tiền</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {receipt.lines.map((l) => (
+                <TableRow key={l.id}>
+                  <TableCell className="px-2.5 py-1.5 text-muted-foreground">{l.lineNo}</TableCell>
+                  <TableCell className="px-2.5 py-1.5">
+                    <div className="font-semibold">{l.skuName}</div>
+                    <div className="font-mono text-xs text-muted-foreground">{l.skuCode}</div>
+                  </TableCell>
+                  <TableCell className="px-2.5 py-1.5 text-muted-foreground">
+                    {l.baseUomCode}
+                  </TableCell>
+                  <TableCell className="px-2.5 py-1.5 text-right tabular-nums">
+                    {formatQuantity(l.qtyBase)}
+                  </TableCell>
+                  <TableCell className="px-2.5 py-1.5 font-mono text-xs">
+                    {l.lotNumber ?? '—'}
+                  </TableCell>
+                  <TableCell className="px-2.5 py-1.5 text-muted-foreground">
+                    {l.expiryDate ? formatDate(l.expiryDate) : '—'}
+                  </TableCell>
+                  <TableCell className="px-2.5 py-1.5 text-right tabular-nums">
+                    {l.unitCost ? formatMoney(l.unitCost) : '—'}
+                  </TableCell>
+                  <TableCell className="px-2.5 py-1.5 text-right tabular-nums font-semibold">
+                    {l.lineValue ? formatMoney(l.lineValue) : '—'}
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </div>
+      </section>
+
+      {receipt.status === 'POSTED' ? <Movements id={receipt.id} /> : null}
+    </div>
+  );
+}
+
+export function GrnDetailScreen({ id }: { id: string }) {
+  const router = useRouter();
+  const query = useReceipt(id);
+  const post = usePostReceipt();
+  const cancel = useCancelReceipt();
+  const ability = useAbility();
+  const canReceive = ability.can('receive', 'Stock');
+  const receipt = query.data;
+  const st = receipt ? STATUS_LABEL[receipt.status] : null;
+
+  return (
+    <>
       <PageHeader
-        title={docNo}
-        description="Tạo bởi Trần Văn Bảo · 23/08/2026 09:41 · Kho HN-1"
-        breadcrumb={[{ label: 'Kho' }, { label: 'Nhập kho', href: '/wms/grn' }, { label: docNo }]}
+        title={receipt?.docNumber ?? 'Phiếu nhập kho'}
+        description={
+          receipt
+            ? `Tạo bởi ${receipt.createdByName ?? '—'} · ${formatDateTime(receipt.receivedAt)} · ${receipt.warehouseName}`
+            : 'Đang tải…'
+        }
+        breadcrumb={[
+          { label: 'Kho' },
+          { label: 'Nhập kho', href: '/wms/grn' },
+          { label: receipt?.docNumber ?? '…' },
+        ]}
         actions={
-          <>
-            <StatusBadge tone="ok">Đã post</StatusBadge>
-            <StatusBadge tone="neutral">Từ PO</StatusBadge>
-            <Button variant="outline" size="sm">
-              In phiếu
-            </Button>
-            <Button size="sm">Tạo phiếu điều chỉnh</Button>
-            <Button
-              variant="outline"
-              size="sm"
-              className="border-destructive text-destructive hover:bg-destructive/10 hover:text-destructive"
-            >
-              Hủy
-            </Button>
-          </>
+          receipt && canReceive && receipt.status === 'DRAFT' ? (
+            <>
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={cancel.isPending || post.isPending}
+                onClick={() =>
+                  cancel
+                    .mutateAsync(receipt.id)
+                    .then(() => {
+                      toast.success(`Đã hủy phiếu nhập ${receipt.docNumber}`);
+                      router.push('/wms/grn');
+                    })
+                    .catch((err) => toast.error(messageFor(err)))
+                }
+              >
+                Hủy phiếu
+              </Button>
+              <Button
+                size="sm"
+                disabled={post.isPending || cancel.isPending}
+                onClick={() =>
+                  post
+                    .mutateAsync(receipt.id)
+                    .then(() => toast.success(`Đã post phiếu ${receipt.docNumber}`))
+                    .catch((err) => toast.error(messageFor(err)))
+                }
+              >
+                {post.isPending ? 'Đang post…' : 'Post phiếu'}
+              </Button>
+            </>
+          ) : undefined
         }
       />
+      {st ? (
+        <div className="mb-3 flex items-center gap-2">
+          <StatusBadge tone={st.tone}>{st.label}</StatusBadge>
+          <StatusBadge tone="neutral">{receipt?.poNumber ? 'Từ PO' : 'Nhập khác'}</StatusBadge>
+        </div>
+      ) : null}
 
-      <div className="flex items-start gap-2 rounded-md border border-success/50 bg-success/10 px-3 py-2 text-sm">
-        <Lock className="mt-0.5 h-4 w-4 shrink-0 text-success" aria-hidden />
-        <div>
-          <b className="font-semibold">Đã post lúc 10:12 bởi Trần Văn Bảo.</b> Chứng từ bất biến —
-          mọi trường chỉ đọc. Sai sót → tạo phiếu điều chỉnh; hủy sẽ sinh phiếu đảo toàn bộ chuyển
-          động, không xóa dữ liệu.
-        </div>
-      </div>
-
-      <div className="rounded-md border bg-card px-3 py-2.5">
-        <div className="grid gap-x-4 gap-y-3 md:grid-cols-2 xl:grid-cols-4">
-          <RoField label="Số phiếu" value={docNo} mono />
-          <RoField label="Kho nhận" value="Kho HN-1" />
-          <RoField label="Nhà cung cấp" value="Công ty TNHH Giấy Double A VN" />
-          <RoField label="Tham chiếu PO" value="PO-2608-00041" mono />
-          <RoField label="Ngày nhập" value="23/08/2026" />
-          <RoField label="Số chứng từ NCC" value="HD-08-4472" mono />
-          <RoField label="Tổng giá trị" value={formatMoney('31630000', { unit: '' })} />
-          <RoField label="Ghi chú" value="Xe 29H-512.44 · giao đủ, thùng nguyên đai" />
-        </div>
-      </div>
-
-      <div className="overflow-hidden rounded-md border bg-card">
-        <div className="border-b px-3 py-2 text-sm font-semibold">
-          Dòng nhập · 5 dòng · 90 kiện = 790 đơn vị cơ bản
-        </div>
-        <div className="overflow-x-auto">
-          <Table>
-            <TableHeader>
-              <TableRow className="bg-muted hover:bg-muted">
-                <TableHead className="w-8 px-2.5">#</TableHead>
-                <TableHead className="px-2.5">Sản phẩm</TableHead>
-                <TableHead className="px-2.5">ĐVT</TableHead>
-                <TableHead className="px-2.5 text-right">SL</TableHead>
-                <TableHead className="px-2.5 text-right">Quy đổi</TableHead>
-                <TableHead className="px-2.5">Lô</TableHead>
-                <TableHead className="px-2.5">HSD</TableHead>
-                <TableHead className="px-2.5">Vị trí cất</TableHead>
-                <TableHead className="px-2.5 text-right">Đơn giá</TableHead>
-                <TableHead className="px-2.5 text-right">Thành tiền</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {SAMPLE_LINES.map((l) => (
-                <TableRow key={l.no}>
-                  <TableCell className="px-2.5 py-1.5 text-muted-foreground">{l.no}</TableCell>
-                  <TableCell className="px-2.5 py-1.5">
-                    <div className="font-semibold">{l.productName}</div>
-                    <div className="font-mono text-xs text-muted-foreground">{l.sku}</div>
-                  </TableCell>
-                  <TableCell className="px-2.5 py-1.5 text-muted-foreground">{l.unit}</TableCell>
-                  <TableCell className="px-2.5 py-1.5 text-right tabular-nums">
-                    {l.qtyPacked}
-                  </TableCell>
-                  <TableCell className="px-2.5 py-1.5 text-right tabular-nums text-muted-foreground">
-                    {l.baseEquivalent}
-                  </TableCell>
-                  <TableCell className="px-2.5 py-1.5 font-mono text-xs">{l.lot}</TableCell>
-                  <TableCell className="px-2.5 py-1.5">{l.expiry}</TableCell>
-                  <TableCell className="px-2.5 py-1.5 font-mono text-xs">{l.bin}</TableCell>
-                  <TableCell className="px-2.5 py-1.5 text-right tabular-nums">
-                    {formatMoney(l.unitPrice, { unit: '' })}
-                  </TableCell>
-                  <TableCell className="px-2.5 py-1.5 text-right font-semibold tabular-nums">
-                    {formatMoney(l.amount, { unit: '' })}
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </div>
-      </div>
-
-      <div className="overflow-hidden rounded-md border bg-card">
-        <div className="flex items-center justify-between border-b px-3 py-2 text-sm font-semibold">
-          <span className="flex items-center gap-2">
-            <BarChart3 className="h-4 w-4 text-muted-foreground" aria-hidden />
-            Chuyển động tồn đã ghi (sổ cái · chỉ đọc · append-only)
-          </span>
-          <span className="text-xs font-normal text-primary">Mở sổ cái tồn</span>
-        </div>
-        <div className="overflow-x-auto">
-          <Table>
-            <TableHeader>
-              <TableRow className="bg-muted hover:bg-muted">
-                <TableHead className="px-2.5">Thời gian</TableHead>
-                <TableHead className="px-2.5">Movement</TableHead>
-                <TableHead className="px-2.5">Loại</TableHead>
-                <TableHead className="px-2.5">SKU</TableHead>
-                <TableHead className="px-2.5">Lô</TableHead>
-                <TableHead className="px-2.5">Vị trí</TableHead>
-                <TableHead className="px-2.5 text-right">+/− SL (cơ bản)</TableHead>
-                <TableHead className="px-2.5 text-right">Tồn sau</TableHead>
-                <TableHead className="px-2.5">Người</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {SAMPLE_MOVEMENTS.map((m) => (
-                <TableRow key={m.movement}>
-                  <TableCell className="px-2.5 py-1.5 text-muted-foreground">{m.time}</TableCell>
-                  <TableCell className="px-2.5 py-1.5 font-mono text-xs">{m.movement}</TableCell>
-                  <TableCell className="px-2.5 py-1.5">
-                    <StatusBadge tone="ok">+ Nhập</StatusBadge>
-                  </TableCell>
-                  <TableCell className="px-2.5 py-1.5 font-mono text-xs text-primary">
-                    {m.sku}
-                  </TableCell>
-                  <TableCell className="px-2.5 py-1.5 font-mono text-xs">{m.lot}</TableCell>
-                  <TableCell className="px-2.5 py-1.5 font-mono text-xs">{m.bin}</TableCell>
-                  <TableCell className="px-2.5 py-1.5 text-right font-semibold tabular-nums text-success">
-                    {m.qtyDelta}
-                  </TableCell>
-                  <TableCell className="px-2.5 py-1.5 text-right tabular-nums">
-                    {m.balanceAfter}
-                  </TableCell>
-                  <TableCell className="px-2.5 py-1.5 text-muted-foreground">{m.user}</TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </div>
-      </div>
-    </div>
+      <QueryState query={query} skeleton={<DetailSkeleton />}>
+        {(r) => <DetailBody receipt={r} />}
+      </QueryState>
+    </>
   );
 }

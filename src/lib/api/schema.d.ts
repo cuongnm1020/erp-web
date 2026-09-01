@@ -1518,6 +1518,24 @@ export interface paths {
         get: operations["ReceivingController_get"];
         put?: never;
         post?: never;
+        /** Hủy phiếu NHÁP (idempotent). Phiếu đã POST → 409, phải ra phiếu điều chỉnh. */
+        delete: operations["ReceivingController_cancel"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/goods-receipts/{id}/movements": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Sổ cái tồn của phiếu — các movement RECEIPT/PUT_AWAY mang ref phiếu này. */
+        get: operations["ReceivingController_movements"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -3287,6 +3305,82 @@ export interface components {
             taskLineId: string;
             idempotencyKey: string;
         };
+        ReceiptListRowDto: {
+            id: string;
+            docNumber: string;
+            /** @enum {string} */
+            status: "DRAFT" | "PENDING_APPROVAL" | "APPROVED" | "POSTED" | "CANCELLED";
+            warehouseId: string;
+            warehouseName: string;
+            poNumber: string | null;
+            supplierName: string | null;
+            receivedAt: string;
+            createdByName: string | null;
+            lineCount: number;
+            totalQty: string;
+        };
+        ReceiptStatusCountsDto: {
+            DRAFT: number;
+            POSTED: number;
+            CANCELLED: number;
+        };
+        ReceiptListResponseDto: {
+            items: components["schemas"]["ReceiptListRowDto"][];
+            total: number;
+            statusCounts: components["schemas"]["ReceiptStatusCountsDto"];
+        };
+        ReceiptLineDto: {
+            id: string;
+            lineNo: number;
+            skuId: string;
+            skuCode: string;
+            skuName: string;
+            baseUomCode: string;
+            lotNumber: string | null;
+            /** @description ISO date — null nếu không theo dõi HSD. */
+            expiryDate: string | null;
+            /** @description Decimal(18,6) dạng chuỗi — ĐVT cơ sở. */
+            qtyBase: string;
+            qtyRejected: string;
+            /** @description Decimal(18,4) dạng chuỗi. */
+            unitCost: string | null;
+            /** @description qtyBase × unitCost — Decimal(18,4) dạng chuỗi, null khi thiếu giá. */
+            lineValue: string | null;
+        };
+        ReceiptDetailDto: {
+            id: string;
+            docNumber: string;
+            /** @enum {string} */
+            status: "DRAFT" | "PENDING_APPROVAL" | "APPROVED" | "POSTED" | "CANCELLED";
+            warehouseId: string;
+            warehouseName: string;
+            poId: string | null;
+            poNumber: string | null;
+            supplierName: string | null;
+            receivedAt: string;
+            postedAt: string | null;
+            postedByName: string | null;
+            createdByName: string | null;
+            note: string | null;
+            lineCount: number;
+            /** @description Tổng qtyBase — Decimal(18,6) dạng chuỗi. */
+            totalQty: string;
+            /** @description Tổng qtyBase × unitCost — Decimal(18,4) dạng chuỗi. */
+            totalValue: string;
+            lines: components["schemas"]["ReceiptLineDto"][];
+        };
+        ReceiptMovementDto: {
+            /** @description BigInt → string (JSON không mang BigInt). */
+            id: string;
+            createdAt: string;
+            movementType: string;
+            skuCode: string;
+            lotNumber: string | null;
+            locationCode: string;
+            /** @description Âm = xuất, dương = nhập — Decimal(18,6) dạng chuỗi. */
+            qtyDelta: string;
+            actorName: string | null;
+        };
         CreateReceiptLineDto: {
             /** Format: uuid */
             skuId: string;
@@ -3325,6 +3419,13 @@ export interface components {
              */
             idempotencyKey?: string;
             lines: components["schemas"]["CreateReceiptLineDto"][];
+        };
+        CreateReceiptResponseDto: {
+            receiptId: string;
+            docNumber: string;
+            /** @enum {string} */
+            status: "DRAFT" | "PENDING_APPROVAL" | "APPROVED" | "POSTED" | "CANCELLED";
+            warehouseId: string;
         };
         PostReceiptDto: {
             /**
@@ -6257,6 +6358,11 @@ export interface operations {
                 poId?: string;
                 warehouseId?: string;
                 status?: "DRAFT" | "PENDING_APPROVAL" | "APPROVED" | "POSTED" | "CANCELLED";
+                /** @description Tìm theo số phiếu (contains, không phân biệt hoa thường). */
+                q?: string;
+                /** @description Lọc theo receivedAt — ISO date, from ≤ receivedAt < to+1d. */
+                from?: string;
+                to?: string;
                 take: number;
                 skip: number;
             };
@@ -6270,7 +6376,9 @@ export interface operations {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["ReceiptListResponseDto"];
+                };
             };
         };
     };
@@ -6294,7 +6402,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": Record<string, never>;
+                    "application/json": components["schemas"]["CreateReceiptResponseDto"];
                 };
             };
         };
@@ -6315,7 +6423,47 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": Record<string, never>;
+                    "application/json": components["schemas"]["ReceiptDetailDto"];
+                };
+            };
+        };
+    };
+    ReceivingController_cancel: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    ReceivingController_movements: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReceiptMovementDto"][];
                 };
             };
         };
