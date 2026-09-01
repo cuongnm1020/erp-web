@@ -1721,6 +1721,107 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/cycle-counts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["StocktakeController_list"];
+        put?: never;
+        /** Mở phiên — snapshot tồn sổ ngay lúc này làm cột "Tồn sổ" của phiên. */
+        post: operations["StocktakeController_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/cycle-counts/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["StocktakeController_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/cycle-counts/{id}/lines/{lineId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Ghi số đếm một dòng (chỉ khi phiên DRAFT). */
+        patch: operations["StocktakeController_recordCount"];
+        trace?: never;
+    };
+    "/cycle-counts/{id}/submit": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Chốt đếm → chờ duyệt. Còn dòng chưa đếm → 422. */
+        post: operations["StocktakeController_submit"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/cycle-counts/{id}/approve": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Duyệt chênh lệch → ghi COUNT_GAIN/COUNT_LOSS vào sổ cái, phiên POSTED. */
+        post: operations["StocktakeController_approve"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/cycle-counts/{id}/reject": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Từ chối → trả về đếm lại (DRAFT), tồn sổ giữ nguyên. */
+        post: operations["StocktakeController_reject"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/carriers": {
         parameters: {
             query?: never;
@@ -3524,6 +3625,91 @@ export interface components {
              * @enum {string}
              */
             status: "PENDING" | "PICKED_UP" | "IN_TRANSIT" | "DELIVERED" | "FAILED" | "RETURNED";
+        };
+        CycleCountListRowDto: {
+            id: string;
+            docNumber: string;
+            /** @enum {string} */
+            status: "DRAFT" | "PENDING_APPROVAL" | "APPROVED" | "POSTED" | "CANCELLED";
+            warehouseId: string;
+            warehouseName: string;
+            createdAt: string;
+            createdByName: string | null;
+            countedAt: string | null;
+            lineCount: number;
+            countedLineCount: number;
+            varianceLineCount: number;
+        };
+        CycleCountStatusCountsDto: {
+            DRAFT: number;
+            PENDING_APPROVAL: number;
+            POSTED: number;
+            CANCELLED: number;
+        };
+        CycleCountListResponseDto: {
+            items: components["schemas"]["CycleCountListRowDto"][];
+            total: number;
+            statusCounts: components["schemas"]["CycleCountStatusCountsDto"];
+        };
+        CycleCountLineDto: {
+            id: string;
+            skuId: string;
+            skuCode: string;
+            skuName: string;
+            locationCode: string;
+            lotNumber: string | null;
+            /** @description Decimal(18,6) dạng chuỗi. */
+            qtySystem: string;
+            qtyCounted: string | null;
+            variance: string | null;
+            note: string | null;
+            countedByName: string | null;
+        };
+        CycleCountDetailDto: {
+            id: string;
+            docNumber: string;
+            /** @enum {string} */
+            status: "DRAFT" | "PENDING_APPROVAL" | "APPROVED" | "POSTED" | "CANCELLED";
+            warehouseId: string;
+            warehouseName: string;
+            createdAt: string;
+            createdByName: string | null;
+            countedAt: string | null;
+            lineCount: number;
+            countedLineCount: number;
+            /** @description Số dòng lệch (variance ≠ 0) trong các dòng đã đếm. */
+            varianceLineCount: number;
+            lines: components["schemas"]["CycleCountLineDto"][];
+        };
+        CreateCycleCountDto: {
+            /** Format: uuid */
+            warehouseId: string;
+            /** @description Giới hạn phiên trong các vị trí này (khu/kệ) — bỏ trống = cả kho. */
+            locationIds?: string[];
+        };
+        CreateCycleCountResultDto: {
+            countId: string;
+            docNumber: string;
+            status: string;
+            lineCount: number;
+        };
+        RecordCountDto: {
+            /** @description Số đếm thực — Decimal(18,6) dạng chuỗi, không âm. */
+            qtyCounted: string;
+            /** @description Lý do lệch — bắt buộc (ở bước duyệt) khi variance ≠ 0. */
+            note?: string;
+        };
+        CycleCountStateResultDto: {
+            countId: string;
+            docNumber: string;
+            /** @enum {string} */
+            status: "DRAFT" | "PENDING_APPROVAL" | "APPROVED" | "POSTED" | "CANCELLED";
+        };
+        ApproveCycleCountResultDto: {
+            countId: string;
+            docNumber: string;
+            status: string;
+            adjustedLineCount: number;
         };
         CarrierAddressDto: {
             provinceCode?: string;
@@ -6765,6 +6951,161 @@ export interface operations {
                 };
                 content: {
                     "application/json": Record<string, never>;
+                };
+            };
+        };
+    };
+    StocktakeController_list: {
+        parameters: {
+            query: {
+                warehouseId?: string;
+                status?: "DRAFT" | "PENDING_APPROVAL" | "APPROVED" | "POSTED" | "CANCELLED";
+                take: number;
+                skip: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CycleCountListResponseDto"];
+                };
+            };
+        };
+    };
+    StocktakeController_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateCycleCountDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CreateCycleCountResultDto"];
+                };
+            };
+        };
+    };
+    StocktakeController_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CycleCountDetailDto"];
+                };
+            };
+        };
+    };
+    StocktakeController_recordCount: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+                lineId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RecordCountDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    StocktakeController_submit: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CycleCountStateResultDto"];
+                };
+            };
+        };
+    };
+    StocktakeController_approve: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApproveCycleCountResultDto"];
+                };
+            };
+        };
+    };
+    StocktakeController_reject: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CycleCountStateResultDto"];
                 };
             };
         };
