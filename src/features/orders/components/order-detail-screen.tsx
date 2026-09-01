@@ -5,9 +5,10 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useState, type ReactNode } from 'react';
 import { KpiCard } from '@/components/data/kpi-card';
-import { DetailSkeleton, EmptyState, QueryState } from '@/components/data/states';
+import { DetailSkeleton, QueryState } from '@/components/data/states';
 import { StatusBadge } from '@/components/data/status-badge';
 import { Breadcrumb } from '@/components/layout/breadcrumb';
+import { NotFoundCard } from '@/components/layout/not-found-screen';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -33,7 +34,13 @@ import { messageFor } from '@/lib/error-messages';
 import { formatDate, formatDateTime, formatMoney, formatQuantity } from '@/lib/format';
 import { Can, useAbility } from '@/lib/permission';
 import { useInvalidateOn } from '@/lib/realtime';
-import { orderKeys, useCancelOrder, useOrder, type SalesOrderDetail } from '../api/use-orders';
+import {
+  orderKeys,
+  useCancelOrder,
+  useOrder,
+  useOrders,
+  type SalesOrderDetail,
+} from '../api/use-orders';
 import { orderChannelLabel, orderStatusLabel, orderStatusTone } from '../labels';
 
 /**
@@ -392,6 +399,45 @@ function Detail({ order }: { order: SalesOrderDetail }) {
   );
 }
 
+/**
+ * 404 theo design/404.png: mã lỗi + đường dẫn, giải thích, gợi ý "có phải bạn tìm" CHỈ từ
+ * đơn TRONG scope (API đã scope sẵn — bản ghi ngoài scope trả 404 chứ không 403, không lộ
+ * là đơn tồn tại), lối về danh sách + tìm toàn cục.
+ */
+function OrderNotFound({ orderId }: { orderId: string }) {
+  const recent = useOrders({ take: 2, skip: 0 });
+  return (
+    <NotFoundCard
+      title="Không có đơn hàng này"
+      path={`/crm/orders/${orderId}`}
+      description="Số đơn có thể gõ sai, đơn đã bị xóa nháp, hoặc đơn thuộc khách hàng không trong phạm vi phụ trách của bạn."
+      backHref="/crm/orders"
+      backLabel="Về danh sách Đơn hàng"
+    >
+      {recent.data && recent.data.items.length > 0 ? (
+        <div className="mt-4">
+          <p className="text-xs text-muted-foreground">Có phải bạn tìm:</p>
+          <ul className="mt-1 space-y-1">
+            {recent.data.items.map((o) => (
+              <li key={o.id} className="flex items-baseline gap-2 text-sm">
+                <Link
+                  href={`/crm/orders/${o.id}`}
+                  className="shrink-0 font-mono text-xs text-primary hover:underline"
+                >
+                  {o.docNumber}
+                </Link>
+                <span className="truncate text-muted-foreground">
+                  {o.customer.name} · {formatDate(o.orderDate)} · {money(o.total)}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
+    </NotFoundCard>
+  );
+}
+
 export function OrderDetailScreen({ orderId }: { orderId: string }) {
   const query = useOrder(orderId);
   useInvalidateOn('order.updated', [orderKeys.detail(orderId)], {
@@ -408,15 +454,7 @@ export function OrderDetailScreen({ orderId }: { orderId: string }) {
         ]}
       />
       {isApiError(query.error) && query.error.isNotFound ? (
-        <EmptyState
-          title="Không tìm thấy đơn hàng"
-          description="Đơn này có thể đã bị xóa, hoặc thuộc khách do người khác phụ trách."
-          action={
-            <Button variant="outline" asChild>
-              <Link href="/crm/orders">Về danh sách đơn</Link>
-            </Button>
-          }
-        />
+        <OrderNotFound orderId={orderId} />
       ) : (
         <QueryState query={query} skeleton={<DetailSkeleton fields={9} />}>
           {(order) => <Detail order={order} />}

@@ -1,13 +1,55 @@
 import type { LucideIcon } from 'lucide-react';
 import {
+  ArrowDownUp,
+  ArrowLeftRight,
+  ArrowUp,
+  Barcode,
+  BarChart3,
+  Boxes,
+  CalendarClock,
+  CheckCheck,
+  ClipboardList,
+  Coins,
+  Columns3,
+  CreditCard,
+  Gift,
   LayoutDashboard,
   Landmark,
+  List,
+  MailCheck,
+  MapPin,
+  Merge,
+  Network,
   Package,
+  PackageCheck,
+  PackageMinus,
+  PackagePlus,
   Percent,
+  Plus,
+  ReceiptText,
+  Repeat,
+  ScrollText,
   Settings,
+  ShieldCheck,
   ShoppingCart,
+  SlidersHorizontal,
+  Smartphone,
+  Star,
+  Table2,
+  Tag,
+  Tags,
+  Ticket,
+  TicketPercent,
+  TrendingDown,
+  TrendingUp,
+  Truck,
+  Undo2,
+  UserCog,
+  UserRound,
   Users,
+  UsersRound,
   Warehouse,
+  Webhook,
 } from 'lucide-react';
 
 export interface NavAbility {
@@ -20,6 +62,8 @@ export interface NavItem {
   href: string;
   /** Mục chỉ hiện khi ability.can(action, subject). Không có = ai đăng nhập cũng thấy. */
   ability?: NavAbility;
+  /** Icon của mục — sidebar thu gọn chỉ còn icon nên mọi mục con đều phải có. */
+  icon?: LucideIcon;
   /** Phím tắt hiển thị trong command palette, ví dụ 'g k' */
   shortcut?: string;
 }
@@ -34,6 +78,8 @@ export interface NavModule extends NavItem {
  * (tồn tại ở /auth/me) phải gắn ability; chỉ mục chưa có quyền backend tương ứng
  * (Giá & KM, RMA…) mới để trống — siết nốt khi backend thêm subject.
  * Module không gắn ability sẽ tự ẩn khi mọi mục con của nó bị ẩn.
+ * Sidebar vẽ module có children thành NHÃN NHÓM (không phải link) + các mục con
+ * phẳng bên dưới (design/hide-sidebar.png, 404.png).
  */
 export const NAV_MODULES: NavModule[] = [
   {
@@ -52,19 +98,22 @@ export const NAV_MODULES: NavModule[] = [
       {
         label: 'Đơn hàng',
         href: '/crm/orders',
+        icon: ShoppingCart,
         ability: { action: 'read', subject: 'SalesOrder' },
       },
       {
         label: 'Tạo đơn',
         href: '/crm/orders/new',
+        icon: Plus,
         ability: { action: 'create', subject: 'SalesOrder' },
       },
       {
         label: 'Chờ duyệt',
         href: '/crm/orders/approvals',
+        icon: ArrowUp,
         ability: { action: 'read', subject: 'SalesOrder' },
       },
-      { label: 'Đơn hoàn / RMA', href: '/crm/returns' },
+      { label: 'Đơn hoàn / RMA', href: '/crm/returns', icon: Undo2 },
     ],
   },
   {
@@ -77,15 +126,17 @@ export const NAV_MODULES: NavModule[] = [
       {
         label: 'Danh sách khách hàng',
         href: '/crm/customers',
+        icon: UserRound,
         ability: { action: 'read', subject: 'Customer' },
       },
-      { label: 'Phân công', href: '/crm/customers/assign' },
-      { label: 'Nhóm · cấp độ · tag', href: '/crm/segments' },
-      { label: 'Gộp khách trùng', href: '/crm/customers/duplicates' },
-      { label: 'Đồng ý marketing', href: '/crm/customers/consent' },
+      { label: 'Phân công', href: '/crm/customers/assign', icon: UsersRound },
+      { label: 'Nhóm · cấp độ · tag', href: '/crm/segments', icon: Tags },
+      { label: 'Gộp khách trùng', href: '/crm/customers/duplicates', icon: Merge },
+      { label: 'Đồng ý marketing', href: '/crm/customers/consent', icon: MailCheck },
       {
         label: 'Ticket CSKH',
         href: '/crm/tickets',
+        icon: Ticket,
         ability: { action: 'read', subject: 'Ticket' },
       },
     ],
@@ -99,26 +150,31 @@ export const NAV_MODULES: NavModule[] = [
       {
         label: 'Danh sách sản phẩm',
         href: '/catalog/products',
+        icon: Package,
         ability: { action: 'read', subject: 'Product' },
       },
       {
         label: 'Danh mục · thương hiệu',
         href: '/catalog/categories',
+        icon: List,
         ability: { action: 'read', subject: 'Product' },
       },
       {
         label: 'In tem barcode',
         href: '/catalog/barcode-print',
+        icon: Barcode,
         ability: { action: 'read', subject: 'Product' },
       },
       {
         label: 'Lô & hạn dùng',
         href: '/catalog/lots',
+        icon: CalendarClock,
         ability: { action: 'read', subject: 'Stock' },
       },
       {
         label: 'Nhà cung cấp',
         href: '/catalog/suppliers',
+        icon: Truck,
         ability: { action: 'read', subject: 'Supplier' },
       },
     ],
@@ -129,44 +185,76 @@ export const NAV_MODULES: NavModule[] = [
     icon: Warehouse,
     shortcut: 'g w',
     children: [
-      { label: 'Tồn kho', href: '/wms/stock', ability: { action: 'read', subject: 'Stock' } },
+      {
+        label: 'Tồn kho',
+        href: '/wms/stock',
+        icon: Boxes,
+        ability: { action: 'read', subject: 'Stock' },
+      },
       {
         label: 'Kho & vị trí',
         href: '/wms/warehouses',
+        icon: MapPin,
         ability: { action: 'read', subject: 'Stock' },
       },
-      { label: 'Phiếu nhập kho', href: '/wms/grn', ability: { action: 'read', subject: 'Stock' } },
-      { label: 'Phiếu xuất kho', href: '/wms/gdn', ability: { action: 'read', subject: 'Stock' } },
+      {
+        label: 'Phiếu nhập kho',
+        href: '/wms/grn',
+        icon: PackagePlus,
+        ability: { action: 'read', subject: 'Stock' },
+      },
+      {
+        label: 'Phiếu xuất kho',
+        href: '/wms/gdn',
+        icon: PackageMinus,
+        ability: { action: 'read', subject: 'Stock' },
+      },
       {
         label: 'Điều phối task',
         href: '/wms/dispatch',
+        icon: Columns3,
         ability: { action: 'read', subject: 'Task' },
       },
       {
         label: 'Chuyển kho',
         href: '/wms/transfers',
+        icon: ArrowLeftRight,
         ability: { action: 'read', subject: 'Stock' },
       },
       {
         label: 'Purchase order',
         href: '/wms/po',
+        icon: ClipboardList,
         ability: { action: 'read', subject: 'PurchaseOrder' },
       },
-      { label: 'Kiểm kê', href: '/wms/stocktake', ability: { action: 'read', subject: 'Stock' } },
+      {
+        label: 'Kiểm kê',
+        href: '/wms/stocktake',
+        icon: Table2,
+        ability: { action: 'read', subject: 'Stock' },
+      },
       {
         label: 'Điều chỉnh tồn',
         href: '/wms/adjustments',
+        icon: SlidersHorizontal,
         ability: { action: 'read', subject: 'Stock' },
       },
-      { label: 'Sổ cái tồn', href: '/wms/ledger', ability: { action: 'read', subject: 'Stock' } },
+      {
+        label: 'Sổ cái tồn',
+        href: '/wms/ledger',
+        icon: BarChart3,
+        ability: { action: 'read', subject: 'Stock' },
+      },
       {
         label: 'Theo dõi giao hàng',
         href: '/wms/shipping',
+        icon: PackageCheck,
         ability: { action: 'read', subject: 'Shipment' },
       },
       {
         label: 'Điểm đặt hàng lại',
         href: '/wms/reorder-points',
+        icon: Repeat,
         ability: { action: 'read', subject: 'Stock' },
       },
     ],
@@ -177,11 +265,11 @@ export const NAV_MODULES: NavModule[] = [
     icon: Percent,
     shortcut: 'g g',
     children: [
-      { label: 'Bảng giá', href: '/pricing/price-lists' },
-      { label: 'Khuyến mãi', href: '/pricing/promotions' },
-      { label: 'Mã giảm giá', href: '/pricing/coupons' },
-      { label: 'Tích điểm', href: '/pricing/loyalty' },
-      { label: 'Hoa hồng', href: '/pricing/commission' },
+      { label: 'Bảng giá', href: '/pricing/price-lists', icon: Tag },
+      { label: 'Khuyến mãi', href: '/pricing/promotions', icon: Gift },
+      { label: 'Mã giảm giá', href: '/pricing/coupons', icon: TicketPercent },
+      { label: 'Tích điểm', href: '/pricing/loyalty', icon: Star },
+      { label: 'Hoa hồng', href: '/pricing/commission', icon: Percent },
     ],
   },
   {
@@ -191,11 +279,16 @@ export const NAV_MODULES: NavModule[] = [
     ability: { action: 'read', subject: 'Invoice' },
     shortcut: 'g h',
     children: [
-      { label: 'Hóa đơn', href: '/fin/invoices', ability: { action: 'read', subject: 'Invoice' } },
-      { label: 'Thanh toán & cấn trừ', href: '/fin/payments' },
-      { label: 'Phải thu (tuổi nợ)', href: '/fin/receivables' },
-      { label: 'Phải trả NCC', href: '/fin/payables' },
-      { label: 'Giá vốn & giá trị tồn', href: '/fin/valuation' },
+      {
+        label: 'Hóa đơn',
+        href: '/fin/invoices',
+        icon: ReceiptText,
+        ability: { action: 'read', subject: 'Invoice' },
+      },
+      { label: 'Thanh toán & cấn trừ', href: '/fin/payments', icon: CreditCard },
+      { label: 'Phải thu (tuổi nợ)', href: '/fin/receivables', icon: TrendingUp },
+      { label: 'Phải trả NCC', href: '/fin/payables', icon: TrendingDown },
+      { label: 'Giá vốn & giá trị tồn', href: '/fin/valuation', icon: Coins },
     ],
   },
   {
@@ -205,23 +298,30 @@ export const NAV_MODULES: NavModule[] = [
     ability: { action: 'read', subject: 'User' },
     shortcut: 'g q',
     children: [
-      { label: 'Nhân viên', href: '/admin/users', ability: { action: 'read', subject: 'User' } },
-      { label: 'Phòng ban & team', href: '/admin/teams' },
+      {
+        label: 'Nhân viên',
+        href: '/admin/users',
+        icon: UserCog,
+        ability: { action: 'read', subject: 'User' },
+      },
+      { label: 'Phòng ban & team', href: '/admin/teams', icon: Network },
       {
         label: 'Vai trò & quyền',
         href: '/admin/roles',
+        icon: ShieldCheck,
         ability: { action: 'read', subject: 'Role' },
       },
-      { label: 'Thiết bị PDA', href: '/admin/pda-devices' },
+      { label: 'Thiết bị PDA', href: '/admin/pda-devices', icon: Smartphone },
       {
         label: 'Nhật ký audit',
         href: '/admin/audit',
+        icon: ScrollText,
         ability: { action: 'read', subject: 'Audit' },
       },
-      { label: 'Cấu hình hệ thống', href: '/admin/settings' },
-      { label: 'Quy tắc duyệt', href: '/admin/approval-rules' },
-      { label: 'Import / Export', href: '/admin/import' },
-      { label: 'Webhook & tích hợp', href: '/admin/webhooks' },
+      { label: 'Cấu hình hệ thống', href: '/admin/settings', icon: Settings },
+      { label: 'Quy tắc duyệt', href: '/admin/approval-rules', icon: CheckCheck },
+      { label: 'Import / Export', href: '/admin/import', icon: ArrowDownUp },
+      { label: 'Webhook & tích hợp', href: '/admin/webhooks', icon: Webhook },
     ],
   },
 ];

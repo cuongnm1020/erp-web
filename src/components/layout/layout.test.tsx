@@ -1,9 +1,20 @@
-import { render, screen } from '@testing-library/react';
-import { describe, expect, it, vi } from 'vitest';
+import { fireEvent, render, screen } from '@testing-library/react';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { TooltipProvider } from '@/components/ui/tooltip';
 import { AbilityProvider } from '@/lib/permission';
 import { requiredAbilityFor, visibleModules } from '@/lib/navigation';
 import { crumbsFromPath } from './breadcrumb';
 import { Sidebar } from './sidebar';
+
+function renderSidebar(me: { permissions: string[]; hasGlobalAccess: boolean }) {
+  return render(
+    <AbilityProvider me={me}>
+      <TooltipProvider>
+        <Sidebar />
+      </TooltipProvider>
+    </AbilityProvider>,
+  );
+}
 
 vi.mock('next/navigation', () => ({
   usePathname: () => '/crm/customers',
@@ -81,29 +92,28 @@ describe('requiredAbilityFor — quyền mở trang theo URL', () => {
 });
 
 describe('<Sidebar>', () => {
-  it('ẩn mục không có quyền, đánh dấu mục đang mở', () => {
-    render(
-      <AbilityProvider me={SALE}>
-        <Sidebar />
-      </AbilityProvider>,
-    );
-    expect(screen.getByRole('link', { name: 'Khách hàng' })).toHaveAttribute(
+  beforeEach(() => {
+    localStorage.clear();
+  });
+
+  it('nhóm là nhãn (không phải link), mục con là link; ẩn theo quyền; đánh dấu mục đang mở', () => {
+    renderSidebar(SALE);
+    // Module có children giờ là nhãn nhóm, không còn là link
+    expect(screen.queryByRole('link', { name: 'Khách hàng' })).not.toBeInTheDocument();
+    expect(screen.getByText('Khách hàng')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Danh sách khách hàng' })).toHaveAttribute(
       'aria-current',
       'page',
     );
-    expect(screen.getByRole('link', { name: 'Bán hàng' })).toBeInTheDocument();
-    expect(screen.queryByRole('link', { name: 'Quản trị' })).not.toBeInTheDocument();
-    expect(screen.queryByRole('link', { name: 'Tài chính' })).not.toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Đơn hàng' })).toBeInTheDocument();
+    expect(screen.queryByText('Quản trị')).not.toBeInTheDocument();
+    expect(screen.queryByText('Tài chính')).not.toBeInTheDocument();
   });
 
-  it('admin thấy 8 module', () => {
-    render(
-      <AbilityProvider me={ADMIN}>
-        <Sidebar />
-      </AbilityProvider>,
-    );
+  it('admin thấy đủ 8 nhóm/mục', () => {
+    renderSidebar(ADMIN);
+    expect(screen.getByRole('link', { name: 'Tổng quan' })).toBeInTheDocument();
     for (const l of [
-      'Tổng quan',
       'Bán hàng',
       'Khách hàng',
       'Sản phẩm',
@@ -112,8 +122,41 @@ describe('<Sidebar>', () => {
       'Tài chính',
       'Quản trị',
     ]) {
-      expect(screen.getByRole('link', { name: l })).toBeInTheDocument();
+      expect(screen.getByText(l)).toBeInTheDocument();
     }
+  });
+
+  it('thu gọn: chỉ icon (tên vào aria-label), nhớ vào localStorage, phím [ bật lại', () => {
+    renderSidebar(SALE);
+    fireEvent.click(screen.getByRole('button', { name: 'Thu gọn thanh điều hướng' }));
+    // Nhãn nhóm biến mất, link vẫn truy cập được qua aria-label
+    expect(screen.queryByText('Danh sách khách hàng')).not.toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Danh sách khách hàng' })).toHaveAttribute(
+      'aria-current',
+      'page',
+    );
+    expect(localStorage.getItem('erp.sidebar.collapsed')).toBe('1');
+    // Phím [ mở rộng lại
+    fireEvent.keyDown(window, { key: '[' });
+    expect(screen.getByText('Danh sách khách hàng')).toBeInTheDocument();
+    expect(localStorage.getItem('erp.sidebar.collapsed')).toBe('0');
+  });
+
+  it('trạng thái thu gọn sống qua F5 (đọc lại từ localStorage khi mount)', () => {
+    localStorage.setItem('erp.sidebar.collapsed', '1');
+    renderSidebar(SALE);
+    expect(screen.queryByText('Danh sách khách hàng')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Mở rộng thanh điều hướng' })).toBeInTheDocument();
+  });
+
+  it('phím [ không ăn khi đang gõ trong ô nhập', () => {
+    renderSidebar(SALE);
+    const input = document.createElement('input');
+    document.body.appendChild(input);
+    input.focus();
+    fireEvent.keyDown(input, { key: '[' });
+    expect(screen.getByText('Danh sách khách hàng')).toBeInTheDocument(); // vẫn mở rộng
+    input.remove();
   });
 });
 

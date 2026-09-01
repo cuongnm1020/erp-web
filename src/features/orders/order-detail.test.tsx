@@ -37,8 +37,12 @@ describe('OrderDetailScreen — GET /sales-orders/{id} (P1-12)', () => {
   it('404: một lối thoát về danh sách, không phải màn lỗi đỏ', async () => {
     server.use(scenario.orderNotFound);
     renderApp(<OrderDetailScreen orderId={ORDER.id} />);
-    expect(await screen.findByText('Không tìm thấy đơn hàng')).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'Về danh sách đơn' })).toBeInTheDocument();
+    expect(await screen.findByText('Không có đơn hàng này')).toBeInTheDocument();
+    expect(screen.getByText(`Mã lỗi 404 · /crm/orders/${ORDER.id}`)).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Về danh sách Đơn hàng' })).toBeInTheDocument();
+    // "Có phải bạn tìm": gợi ý từ danh sách TRONG scope (GET /sales-orders mặc định)
+    expect(await screen.findByText('Có phải bạn tìm:')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: ORDER.docNumber })).toBeInTheDocument();
   });
 
   it('error 500: ErrorState có traceId', async () => {
