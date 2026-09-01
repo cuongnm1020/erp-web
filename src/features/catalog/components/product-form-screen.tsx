@@ -10,14 +10,17 @@ import {
   applyServerErrors,
   Form,
   FormControl,
+  FormDescription,
   FormField,
   FormItem,
   FormLabel,
   FormMessage,
+  MoneyInput,
 } from '@/components/data/form';
 import { DetailSkeleton, EmptyState, QueryState } from '@/components/data/states';
 import { PageHeader } from '@/components/layout/page-header';
 import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import {
   Select,
@@ -42,9 +45,16 @@ import {
   useUpdateProduct,
   useUpdateSku,
   useUploadProductImage,
+  useWarehouses,
   type ProductDetail,
 } from '../api/use-products';
-import { EMPTY_SKU_ROW, productFormSchema, type ProductFormValues } from '../schema';
+import {
+  EMPTY_SKU_ROW,
+  gramsToKg,
+  kgToGrams,
+  productFormSchema,
+  type ProductFormValues,
+} from '../schema';
 import { ImageDropzone, ProductGallery, SkuImageCell } from './product-images';
 
 /**
@@ -93,6 +103,10 @@ function initialValues(p?: ProductDetail): ProductFormValues {
     brandId: p?.brandId ?? '',
     trackingMode: p?.trackingMode ?? 'NONE',
     shelfLifeDays: p?.shelfLifeDays == null ? '' : String(p.shelfLifeDays),
+    defaultWarehouseId: p?.defaultWarehouseId ?? '',
+    description: p?.description ?? '',
+    internalNote: p?.internalNote ?? '',
+    allowNegativeStock: p?.allowNegativeStock ?? false,
     baseUom: p?.skus[0]?.baseUom.code ?? 'PCS',
     skus: p
       ? p.skus.map((s) => ({
@@ -102,6 +116,10 @@ function initialValues(p?: ProductDetail): ProductFormValues {
           barcode: '',
           isActive: s.isActive,
           existingBarcode: s.barcodes[0]?.code ?? '',
+          purchasePrice: s.purchasePrice ?? '',
+          salePrice: s.salePrice ?? '',
+          weightG: s.weightKg ? kgToGrams(s.weightKg) : '',
+          openingQty: '',
         }))
       : [{ ...EMPTY_SKU_ROW }],
   };
@@ -131,6 +149,7 @@ function ProductFormBody({ product }: { product?: ProductDetail }) {
   const categories = useCategories();
   const brands = useBrands();
   const uoms = useUoms();
+  const warehouses = useWarehouses();
   const createProduct = useCreateProduct();
   const updateProduct = useUpdateProduct(product?.id ?? '');
   const createSku = useCreateSku();
@@ -190,6 +209,10 @@ function ProductFormBody({ product }: { product?: ProductDetail }) {
         ...(v.brandId ? { brandId: v.brandId } : {}),
         trackingMode: v.trackingMode,
         ...(v.shelfLifeDays ? { shelfLifeDays: Number.parseInt(v.shelfLifeDays, 10) } : {}),
+        ...(v.defaultWarehouseId ? { defaultWarehouseId: v.defaultWarehouseId } : {}),
+        ...(v.description ? { description: v.description } : {}),
+        ...(v.internalNote ? { internalNote: v.internalNote } : {}),
+        allowNegativeStock: v.allowNegativeStock,
       };
       if (!pid) {
         try {
@@ -225,16 +248,26 @@ function ProductFormBody({ product }: { product?: ProductDetail }) {
                 name: row.name,
                 baseUom: v.baseUom,
                 ...(row.barcode ? { barcodes: [{ code: row.barcode }] } : {}),
+                ...(row.purchasePrice ? { purchasePrice: row.purchasePrice } : {}),
+                ...(row.salePrice ? { salePrice: row.salePrice } : {}),
+                ...(row.weightG ? { weightKg: gramsToKg(row.weightG) } : {}),
+                ...(row.openingQty ? { openingQty: row.openingQty } : {}),
               },
             });
             created.current?.doneRows.add(i);
           } else if (row.skuId) {
             const dirty = form.formState.dirtyFields.skus?.[i];
-            if (dirty?.name || dirty?.isActive) {
-              await updateSku.mutateAsync({
-                skuId: row.skuId,
-                body: { name: row.name, isActive: row.isActive },
-              });
+            const patch = {
+              ...(dirty?.name ? { name: row.name } : {}),
+              ...(dirty?.isActive ? { isActive: row.isActive } : {}),
+              ...(dirty?.purchasePrice && row.purchasePrice
+                ? { purchasePrice: row.purchasePrice }
+                : {}),
+              ...(dirty?.salePrice && row.salePrice ? { salePrice: row.salePrice } : {}),
+              ...(dirty?.weightG && row.weightG ? { weightKg: gramsToKg(row.weightG) } : {}),
+            };
+            if (Object.keys(patch).length > 0) {
+              await updateSku.mutateAsync({ skuId: row.skuId, body: patch });
             }
             if (row.barcode && !row.existingBarcode) {
               await addBarcode.mutateAsync({ skuId: row.skuId, code: row.barcode });
@@ -518,6 +551,78 @@ function ProductFormBody({ product }: { product?: ProductDetail }) {
               <FormLabel>Nhóm thuế</FormLabel>
               <Input value="Chưa cấu hình" disabled />
             </FormItem>
+            <FormField
+              control={form.control}
+              name="defaultWarehouseId"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Kho mặc định</FormLabel>
+                  <Select
+                    value={field.value || 'none'}
+                    onValueChange={(x) => field.onChange(x === 'none' ? '' : x)}
+                  >
+                    <FormControl>
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      <SelectItem value="none">Chưa chọn</SelectItem>
+                      {(warehouses.data ?? []).map((w) => (
+                        <SelectItem key={w.id} value={w.id}>
+                          {w.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <FormDescription>Tồn đầu kỳ của biến thể mới ghi vào kho này</FormDescription>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="description"
+              render={({ field }) => (
+                <FormItem className="sm:col-span-2 lg:col-span-2">
+                  <FormLabel>Mô tả</FormLabel>
+                  <FormControl>
+                    <Input placeholder="Ngòi bi, mực dầu, viết êm…" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="internalNote"
+              render={({ field }) => (
+                <FormItem className="sm:col-span-2 lg:col-span-2">
+                  <FormLabel>Ghi chú nội bộ</FormLabel>
+                  <FormControl>
+                    <Input placeholder="Chỉ nội bộ thấy — không đưa ra kênh bán" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="allowNegativeStock"
+              render={({ field }) => (
+                <FormItem className="flex flex-row items-start gap-2 pt-6">
+                  <FormControl>
+                    <Checkbox checked={field.value} onCheckedChange={field.onChange} />
+                  </FormControl>
+                  <div className="space-y-0.5 leading-none">
+                    <FormLabel>Cho phép bán tồn kho âm</FormLabel>
+                    <FormDescription>
+                      Mới là cờ dữ liệu — chưa áp vào giữ hàng khi chốt đơn
+                    </FormDescription>
+                  </div>
+                </FormItem>
+              )}
+            />
           </div>
         </section>
 
@@ -663,61 +768,158 @@ function SkuRow({
   const saved = skuId !== '';
 
   return (
-    <div className="grid items-start gap-2 px-3 py-2 sm:grid-cols-[110px_150px_minmax(180px,1fr)_170px_150px_32px]">
-      {saved ? (
-        <SkuImageCell skuId={skuId} image={skuImage} canEdit={canEditImages} />
-      ) : (
-        <span
-          className="pt-2 text-xs text-muted-foreground"
-          title="Ảnh biến thể thêm được sau khi lưu"
-        >
-          —
-        </span>
-      )}
-      <FormField
-        control={form.control}
-        name={`skus.${index}.code`}
-        render={({ field }) => (
-          <FormItem>
-            <FormLabel className="sr-only">Mã SKU</FormLabel>
-            <FormControl>
-              <Input placeholder="TL08-BLUE-05" className="font-mono" disabled={saved} {...field} />
-            </FormControl>
-            <FormMessage />
-          </FormItem>
+    <div className="flex flex-col gap-2 px-3 py-2">
+      <div className="grid items-start gap-2 sm:grid-cols-[110px_150px_minmax(180px,1fr)_170px_150px_32px]">
+        {saved ? (
+          <SkuImageCell skuId={skuId} image={skuImage} canEdit={canEditImages} />
+        ) : (
+          <span
+            className="pt-2 text-xs text-muted-foreground"
+            title="Ảnh biến thể thêm được sau khi lưu"
+          >
+            —
+          </span>
         )}
-      />
-      <FormField
-        control={form.control}
-        name={`skus.${index}.name`}
-        render={({ field }) => (
-          <FormItem>
-            <FormLabel className="sr-only">Tên biến thể</FormLabel>
-            <FormControl>
-              <Input placeholder="Bút bi Thiên Long TL-08 xanh 0.5" {...field} />
-            </FormControl>
-            <FormMessage />
-          </FormItem>
-        )}
-      />
-      {existingBarcode ? (
-        <div
-          className="pt-2 font-mono text-sm text-muted-foreground"
-          title="Quản lý barcode đầy đủ ở màn chi tiết"
-        >
-          {existingBarcode}
-        </div>
-      ) : (
         <FormField
           control={form.control}
-          name={`skus.${index}.barcode`}
+          name={`skus.${index}.code`}
           render={({ field }) => (
             <FormItem>
-              <FormLabel className="sr-only">Barcode lẻ</FormLabel>
+              <FormLabel className="sr-only">Mã SKU</FormLabel>
               <FormControl>
                 <Input
-                  placeholder="quét hoặc nhập"
+                  placeholder="TL08-BLUE-05"
                   className="font-mono"
+                  disabled={saved}
+                  {...field}
+                />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+        <FormField
+          control={form.control}
+          name={`skus.${index}.name`}
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel className="sr-only">Tên biến thể</FormLabel>
+              <FormControl>
+                <Input placeholder="Bút bi Thiên Long TL-08 xanh 0.5" {...field} />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+        {existingBarcode ? (
+          <div
+            className="pt-2 font-mono text-sm text-muted-foreground"
+            title="Quản lý barcode đầy đủ ở màn chi tiết"
+          >
+            {existingBarcode}
+          </div>
+        ) : (
+          <FormField
+            control={form.control}
+            name={`skus.${index}.barcode`}
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel className="sr-only">Barcode lẻ</FormLabel>
+                <FormControl>
+                  <Input
+                    placeholder="quét hoặc nhập"
+                    className="font-mono"
+                    {...field}
+                    value={field.value ?? ''}
+                  />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+        )}
+        {editing && saved ? (
+          <FormField
+            control={form.control}
+            name={`skus.${index}.isActive`}
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel className="sr-only">Trạng thái</FormLabel>
+                <Select
+                  value={field.value ? 'active' : 'inactive'}
+                  onValueChange={(v) => field.onChange(v === 'active')}
+                >
+                  <FormControl>
+                    <SelectTrigger aria-label="Trạng thái">
+                      <SelectValue />
+                    </SelectTrigger>
+                  </FormControl>
+                  <SelectContent>
+                    <SelectItem value="active">Đang bán</SelectItem>
+                    <SelectItem value="inactive">Ngừng bán</SelectItem>
+                  </SelectContent>
+                </Select>
+              </FormItem>
+            )}
+          />
+        ) : (
+          <div className="pt-2 text-sm text-muted-foreground">Đang bán</div>
+        )}
+        {onRemove ? (
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            className="h-8 w-8"
+            aria-label="Xóa dòng"
+            title="Xóa dòng (chỉ dòng chưa lưu)"
+            onClick={onRemove}
+          >
+            <X aria-hidden />
+          </Button>
+        ) : (
+          <span />
+        )}
+      </div>
+      {/* Dòng 2: giá nhập / giá bán / trọng lượng (gram → kg lúc gửi) / tồn đầu kỳ (chỉ dòng mới) */}
+      <div className="grid items-start gap-2 sm:grid-cols-4 lg:max-w-3xl">
+        <FormField
+          control={form.control}
+          name={`skus.${index}.purchasePrice`}
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel className="text-xs text-muted-foreground">Giá nhập</FormLabel>
+              <FormControl>
+                <MoneyInput value={field.value ?? ''} onChange={field.onChange} />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+        <FormField
+          control={form.control}
+          name={`skus.${index}.salePrice`}
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel className="text-xs text-muted-foreground">Giá bán</FormLabel>
+              <FormControl>
+                <MoneyInput value={field.value ?? ''} onChange={field.onChange} />
+              </FormControl>
+              <FormDescription className="text-[11px]">Ghi vào bảng giá mặc định</FormDescription>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+        <FormField
+          control={form.control}
+          name={`skus.${index}.weightG`}
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel className="text-xs text-muted-foreground">Trọng lượng (g)</FormLabel>
+              <FormControl>
+                <Input
+                  inputMode="decimal"
+                  className="text-right tabular-nums"
                   {...field}
                   value={field.value ?? ''}
                 />
@@ -726,49 +928,38 @@ function SkuRow({
             </FormItem>
           )}
         />
-      )}
-      {editing && saved ? (
-        <FormField
-          control={form.control}
-          name={`skus.${index}.isActive`}
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel className="sr-only">Trạng thái</FormLabel>
-              <Select
-                value={field.value ? 'active' : 'inactive'}
-                onValueChange={(v) => field.onChange(v === 'active')}
-              >
+        {saved ? (
+          <FormItem>
+            <FormLabel className="text-xs text-muted-foreground">Tồn kho</FormLabel>
+            <p className="pt-2 text-sm text-muted-foreground">
+              Xem ở danh sách — nhập/xuất qua chứng từ
+            </p>
+          </FormItem>
+        ) : (
+          <FormField
+            control={form.control}
+            name={`skus.${index}.openingQty`}
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel className="text-xs text-muted-foreground">Tồn đầu kỳ</FormLabel>
                 <FormControl>
-                  <SelectTrigger aria-label="Trạng thái">
-                    <SelectValue />
-                  </SelectTrigger>
+                  <Input
+                    inputMode="decimal"
+                    className="text-right tabular-nums"
+                    placeholder="0"
+                    {...field}
+                    value={field.value ?? ''}
+                  />
                 </FormControl>
-                <SelectContent>
-                  <SelectItem value="active">Đang bán</SelectItem>
-                  <SelectItem value="inactive">Ngừng bán</SelectItem>
-                </SelectContent>
-              </Select>
-            </FormItem>
-          )}
-        />
-      ) : (
-        <div className="pt-2 text-sm text-muted-foreground">Đang bán</div>
-      )}
-      {onRemove ? (
-        <Button
-          type="button"
-          variant="ghost"
-          size="icon"
-          className="h-8 w-8"
-          aria-label="Xóa dòng"
-          title="Xóa dòng (chỉ dòng chưa lưu)"
-          onClick={onRemove}
-        >
-          <X aria-hidden />
-        </Button>
-      ) : (
-        <span />
-      )}
+                <FormDescription className="text-[11px]">
+                  Ghi movement OPENING vào kho mặc định, giá vốn = giá nhập
+                </FormDescription>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+        )}
+      </div>
     </div>
   );
 }

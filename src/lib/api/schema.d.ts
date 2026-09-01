@@ -2519,6 +2519,10 @@ export interface components {
             /** @description ĐVT lưu kho — mọi tồn quy về đây. */
             baseUomId: string;
             isActive: boolean;
+            /** @description Giá nhập THAM KHẢO Decimal(18,4) chuỗi — giá vốn thật vẫn FIFO (bất biến 11). */
+            purchasePrice: string | null;
+            /** @description Decimal(12,4) kg dạng chuỗi — form hiển thị theo gram. */
+            weightKg: string | null;
         };
         ProductListItemDto: {
             id: string;
@@ -2572,11 +2576,17 @@ export interface components {
             /** @description ĐVT lưu kho — mọi tồn quy về đây. */
             baseUomId: string;
             isActive: boolean;
+            /** @description Giá nhập THAM KHẢO Decimal(18,4) chuỗi — giá vốn thật vẫn FIFO (bất biến 11). */
+            purchasePrice: string | null;
+            /** @description Decimal(12,4) kg dạng chuỗi — form hiển thị theo gram. */
+            weightKg: string | null;
             baseUom: components["schemas"]["UomDto"];
             barcodes: components["schemas"]["SkuBarcodeDto"][];
             uomConversions: components["schemas"]["SkuUomConversionDto"][];
             /** @description Ảnh riêng của biến thể (ảnh chính đứng đầu). */
             images: components["schemas"]["ProductImageDto"][];
+            /** @description Giá bán trong BẢNG GIÁ MẶC ĐỊNH (minQty 0) — null = chưa đặt giá. */
+            salePrice: string | null;
         };
         ProductDetailDto: {
             id: string;
@@ -2590,6 +2600,10 @@ export interface components {
             isActive: boolean;
             category: components["schemas"]["ProductCategoryDto"] | null;
             brand: components["schemas"]["BrandDto"] | null;
+            defaultWarehouseId: string | null;
+            description: string | null;
+            internalNote: string | null;
+            allowNegativeStock: boolean;
             skus: components["schemas"]["ProductSkuDetailDto"][];
             /** @description Gallery của sản phẩm cha, ảnh chính đứng đầu. */
             images: components["schemas"]["ProductImageDto"][];
@@ -2604,6 +2618,16 @@ export interface components {
             /** @enum {string} */
             trackingMode?: "NONE" | "LOT" | "SERIAL";
             shelfLifeDays?: number;
+            /**
+             * Format: uuid
+             * @description Kho mặc định — tồn đầu kỳ của SKU mới ghi vào kho này.
+             */
+            defaultWarehouseId?: string;
+            description?: string;
+            /** @description Ghi chú nội bộ — không đưa ra kênh bán/khách. */
+            internalNote?: string;
+            /** @description Cờ master data — reserve/pick CHƯA đọc (chờ chốt vận hành). */
+            allowNegativeStock?: boolean;
         };
         ProductCoreDto: {
             id: string;
@@ -2615,6 +2639,13 @@ export interface components {
             trackingMode: "NONE" | "LOT" | "SERIAL";
             shelfLifeDays: number | null;
             isActive: boolean;
+            /** @description Kho mặc định (wms.Warehouse.id) — tồn đầu kỳ SKU mới ghi vào đây. */
+            defaultWarehouseId: string | null;
+            description: string | null;
+            /** @description Ghi chú nội bộ — không đưa ra kênh bán/khách. */
+            internalNote: string | null;
+            /** @description Cờ master data — reserve/pick CHƯA đọc (chờ chốt vận hành). */
+            allowNegativeStock: boolean;
         };
         UpdateProductDto: {
             name?: string;
@@ -2626,6 +2657,11 @@ export interface components {
             trackingMode?: "NONE" | "LOT" | "SERIAL";
             shelfLifeDays?: number;
             isActive?: boolean;
+            /** Format: uuid */
+            defaultWarehouseId?: string;
+            description?: string;
+            internalNote?: string;
+            allowNegativeStock?: boolean;
         };
         BarcodeDto: {
             code: string;
@@ -2644,6 +2680,12 @@ export interface components {
             name: string;
             /** @description Mã Uom cơ sở, mặc định PCS */
             baseUom?: string;
+            /** @description Giá nhập tham khảo Decimal(18,4) chuỗi — cũng là unitCost của tồn đầu kỳ. */
+            purchasePrice?: string;
+            /** @description Giá bán Decimal(18,4) chuỗi → ghi vào BẢNG GIÁ MẶC ĐỊNH (bất biến 12), không nằm trên Sku. */
+            salePrice?: string;
+            /** @description Tồn đầu kỳ (ĐVT cơ sở) — ghi movement OPENING + CostLayer vào kho mặc định của sản phẩm. */
+            openingQty?: string;
             weightKg?: string;
             volumeM3?: string;
             barcodes?: components["schemas"]["BarcodeDto"][];
@@ -2657,12 +2699,18 @@ export interface components {
             /** @description ĐVT lưu kho — mọi tồn quy về đây. */
             baseUomId: string;
             isActive: boolean;
+            /** @description Giá nhập THAM KHẢO Decimal(18,4) chuỗi — giá vốn thật vẫn FIFO (bất biến 11). */
+            purchasePrice: string | null;
+            /** @description Decimal(12,4) kg dạng chuỗi — form hiển thị theo gram. */
+            weightKg: string | null;
             product: components["schemas"]["ProductListItemDto"];
             baseUom: components["schemas"]["UomDto"];
             barcodes: components["schemas"]["SkuBarcodeDto"][];
             uomConversions: components["schemas"]["SkuUomConversionDto"][];
             /** @description Ảnh biến thể (ảnh chính đứng đầu) — chỉ có ở GET /skus/{id}, KHÔNG có trong nested create. */
             images?: components["schemas"]["ProductImageDto"][];
+            /** @description Giá bán bảng mặc định — chỉ có ở GET /skus/{id}. */
+            salePrice?: string | null;
         };
         SkuListRowDto: {
             skuId: string;
@@ -2691,6 +2739,9 @@ export interface components {
         };
         UpdateSkuDto: {
             name?: string;
+            purchasePrice?: string;
+            /** @description Giá bán → upsert vào bảng giá mặc định. */
+            salePrice?: string;
             weightKg?: string;
             volumeM3?: string;
             isActive?: boolean;
@@ -2721,6 +2772,11 @@ export interface components {
             baseUom: components["schemas"]["BarcodeLookupBaseUomDto"];
             /** @description Decimal(18,6) dạng chuỗi — '1' khi barcode gắn trên ĐVT cơ sở. */
             factor: string;
+        };
+        WarehouseSummaryDto: {
+            id: string;
+            code: string;
+            name: string;
         };
         CreateWarehouseDto: {
             code: string;
@@ -4870,7 +4926,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": Record<string, never>;
+                    "application/json": components["schemas"]["WarehouseSummaryDto"][];
                 };
             };
         };

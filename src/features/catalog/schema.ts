@@ -1,5 +1,6 @@
+import Decimal from 'decimal.js';
 import { z } from 'zod';
-import { codeSchema } from '@/lib/shared';
+import { codeSchema, moneySchema, quantitySchema } from '@/lib/shared';
 
 /**
  * Khớp CreateProductDto của apps/api (luật 11 — không chặt/lỏng hơn DTO).
@@ -13,6 +14,10 @@ export const createProductSchema = z.object({
   brandId: z.string().optional(),
   trackingMode: z.enum(['NONE', 'LOT', 'SERIAL']),
   shelfLifeDays: z.string().trim().regex(/^\d*$/, 'Nhập số nguyên ngày, không âm'),
+  defaultWarehouseId: z.string().optional(),
+  description: z.string().trim().max(2000, 'Tối đa 2000 ký tự'),
+  internalNote: z.string().trim().max(2000, 'Tối đa 2000 ký tự'),
+  allowNegativeStock: z.boolean(),
 });
 
 export type CreateProductValues = z.infer<typeof createProductSchema>;
@@ -30,6 +35,9 @@ export type UpdateProductValues = z.infer<typeof updateProductSchema>;
  * - barcode: một barcode lẻ, khớp BarcodeDto ([A-Za-z0-9-]{4,64}); SKU sẵn có mà thêm
  *   barcode mới → POST /skus/:id/barcodes.
  * - existingBarcode: barcode đầu tiên đã có (chỉ đọc — quản lý đầy đủ ở màn chi tiết).
+ * - purchasePrice/salePrice: string decimal (luật 10). salePrice ghi vào BẢNG GIÁ MẶC ĐỊNH.
+ * - weightG: nhập theo GRAM cho dễ gõ — API nhận weightKg, quy đổi lúc submit (decimal.js).
+ * - openingQty: tồn đầu kỳ, CHỈ dòng mới (tồn là ledger — đã có SKU thì nhập/xuất qua chứng từ).
  */
 export const skuRowSchema = z.object({
   skuId: z.string(),
@@ -43,12 +51,50 @@ export const skuRowSchema = z.object({
     .or(z.literal('')),
   isActive: z.boolean(),
   existingBarcode: z.string(),
+  purchasePrice: moneySchema.optional().or(z.literal('')),
+  salePrice: moneySchema.optional().or(z.literal('')),
+  weightG: z
+    .string()
+    .trim()
+    .regex(/^\d{1,9}(\.\d{1,4})?$/, 'Trọng lượng gram không hợp lệ')
+    .optional()
+    .or(z.literal('')),
+  openingQty: quantitySchema.optional().or(z.literal('')),
 });
 
-export const productFormSchema = createProductSchema.extend({
-  baseUom: z.string().min(1, 'Chọn ĐVT cơ bản'),
-  skus: z.array(skuRowSchema).min(1, 'Sản phẩm cần ít nhất một biến thể / SKU'),
-});
+export const productFormSchema = createProductSchema
+  .extend({
+    baseUom: z.string().min(1, 'Chọn ĐVT cơ bản'),
+    skus: z.array(skuRowSchema).min(1, 'Sản phẩm cần ít nhất một biến thể / SKU'),
+  })
+  .superRefine((v, ctx) => {
+    // Ràng buộc tồn đầu kỳ — khớp luật server (422): cần giá nhập + kho mặc định
+    v.skus.forEach((row, i) => {
+      const qty = row.openingQty && !new Decimal(row.openingQty).isZero();
+      if (!qty) return;
+      if (!row.purchasePrice) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['skus', i, 'purchasePrice'],
+          message: 'Nhập giá nhập để ghi giá vốn cho tồn đầu kỳ',
+        });
+      }
+      if (!v.defaultWarehouseId) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['defaultWarehouseId'],
+          message: 'Chọn kho mặc định để ghi tồn đầu kỳ',
+        });
+      }
+      if (v.trackingMode !== 'NONE') {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['skus', i, 'openingQty'],
+          message: 'Hàng theo lô/serial: nhập tồn đầu kỳ qua Import (cần số lô/HSD)',
+        });
+      }
+    });
+  });
 
 export type SkuRowValues = z.infer<typeof skuRowSchema>;
 export type ProductFormValues = z.infer<typeof productFormSchema>;
@@ -60,4 +106,18 @@ export const EMPTY_SKU_ROW: SkuRowValues = {
   barcode: '',
   isActive: true,
   existingBarcode: '',
+  purchasePrice: '',
+  salePrice: '',
+  weightG: '',
+  openingQty: '',
 };
+
+/** Gram (form) → kg (API, Decimal(12,4) chuỗi) — chỉ ở lớp hiển thị/submit (luật 10). */
+export function gramsToKg(g: string): string {
+  return new Decimal(g).div(1000).toDecimalPlaces(4).toString();
+}
+
+/** Kg (API) → gram (form). */
+export function kgToGrams(kg: string): string {
+  return new Decimal(kg).mul(1000).toDecimalPlaces(1).toString();
+}

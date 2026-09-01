@@ -33,6 +33,9 @@ function baseHandlers() {
     http.get('/api/uoms', () => HttpResponse.json(UOMS)),
     http.get('/api/brands', () => HttpResponse.json([])),
     http.get('/api/categories', () => HttpResponse.json([])),
+    http.get('/api/warehouses', () =>
+      HttpResponse.json([{ id: 'wh-1', code: 'WH01', name: 'Kho HN-1' }]),
+    ),
   ];
 }
 
@@ -153,6 +156,96 @@ describe('ProductFormScreen — tạo (design/Products/ProductForm)', () => {
     await waitFor(() => expect(push).toHaveBeenCalledWith('/catalog/products'));
     expect(productPosts).toBe(1);
     expect(skuPosts).toBe(2);
+  });
+
+  it('trường mới: kho mặc định + mô tả + tồn âm vào body product; giá nhập/bán + gram→kg + tồn đầu kỳ vào body SKU', async () => {
+    push.mockClear();
+    const bodies: { product?: unknown; sku?: unknown } = {};
+    server.use(
+      ...baseHandlers(),
+      http.post('/api/products', async ({ request }) => {
+        bodies.product = await request.json();
+        return HttpResponse.json(
+          {
+            id: 'p-4',
+            code: 'TL11',
+            name: 'x',
+            categoryId: null,
+            brandId: null,
+            trackingMode: 'NONE',
+            shelfLifeDays: null,
+            isActive: true,
+            defaultWarehouseId: 'wh-1',
+            description: 'Mô tả',
+            internalNote: null,
+            allowNegativeStock: true,
+          },
+          { status: 201 },
+        );
+      }),
+      http.post('/api/products/:id/skus', async ({ request }) => {
+        bodies.sku = await request.json();
+        return HttpResponse.json({}, { status: 201 });
+      }),
+    );
+    renderApp(<ProductFormScreen />);
+    fill('Tên sản phẩm *', 'Bút TL-11');
+    fill('Mã cha *', 'TL11');
+    fill('Mô tả', 'Mô tả bán hàng');
+    fill('Ghi chú nội bộ', 'Ghi chú riêng');
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Cho phép bán tồn kho âm' }));
+    fireEvent.click(screen.getByRole('combobox', { name: 'Kho mặc định' }));
+    fireEvent.click(await screen.findByRole('option', { name: 'Kho HN-1' }));
+
+    fill('Mã SKU', 'TL11-A');
+    fill('Tên biến thể', 'Bút TL-11 A');
+    fill('Giá nhập', '12000');
+    fill('Giá bán', '19000');
+    fill('Trọng lượng (g)', '250');
+    fill('Tồn đầu kỳ', '50');
+    fireEvent.click(screen.getByRole('button', { name: /Lưu sản phẩm/ }));
+
+    await waitFor(() => expect(bodies.sku).toBeDefined());
+    expect(bodies.product).toMatchObject({
+      code: 'TL11',
+      defaultWarehouseId: 'wh-1',
+      description: 'Mô tả bán hàng',
+      internalNote: 'Ghi chú riêng',
+      allowNegativeStock: true,
+    });
+    expect(bodies.sku).toEqual({
+      code: 'TL11-A',
+      name: 'Bút TL-11 A',
+      baseUom: 'PCS',
+      purchasePrice: '12000',
+      salePrice: '19000',
+      weightKg: '0.25', // 250g → kg qua decimal.js
+      openingQty: '50',
+    });
+    await waitFor(() => expect(push).toHaveBeenCalledWith('/catalog/products'));
+  });
+
+  it('tồn đầu kỳ thiếu giá nhập / thiếu kho mặc định → chặn ngay ở client, không gọi API', async () => {
+    const posts: unknown[] = [];
+    server.use(
+      ...baseHandlers(),
+      http.post('/api/products', () => {
+        posts.push(1);
+        return HttpResponse.json({});
+      }),
+    );
+    renderApp(<ProductFormScreen />);
+    fill('Tên sản phẩm *', 'Bút TL-12');
+    fill('Mã cha *', 'TL12');
+    fill('Mã SKU', 'TL12-A');
+    fill('Tên biến thể', 'Bút TL-12 A');
+    fill('Tồn đầu kỳ', '10'); // không giá nhập, không kho mặc định
+    fireEvent.click(screen.getByRole('button', { name: /Lưu sản phẩm/ }));
+    expect(
+      await screen.findByText('Nhập giá nhập để ghi giá vốn cho tồn đầu kỳ'),
+    ).toBeInTheDocument();
+    expect(screen.getByText('Chọn kho mặc định để ghi tồn đầu kỳ')).toBeInTheDocument();
+    expect(posts).toHaveLength(0);
   });
 
   it('upload zone: kéo thả ảnh vào hàng chờ (ảnh đầu = Ảnh chính), bỏ bớt được, lưu xong tự tải lên sản phẩm mới', async () => {
@@ -276,10 +369,8 @@ describe('ProductFormScreen — sửa', () => {
     fireEvent.click(await screen.findByRole('option', { name: 'Ngừng bán' }));
     fireEvent.click(screen.getByRole('button', { name: /Lưu thay đổi/ }));
     await waitFor(() => expect(patches).toHaveLength(1));
-    expect(patches[0]).toEqual({
-      skuId: 's-1',
-      body: { name: 'Bút bi TL-08 xanh', isActive: false },
-    });
+    // Chỉ gửi field dirty — tên không đổi thì không nằm trong PATCH
+    expect(patches[0]).toEqual({ skuId: 's-1', body: { isActive: false } });
     await waitFor(() => expect(push).toHaveBeenCalledWith('/catalog/products'));
   });
 

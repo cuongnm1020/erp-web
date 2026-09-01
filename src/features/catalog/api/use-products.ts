@@ -64,6 +64,17 @@ export function useSkus(params: SkuListParams) {
   });
 }
 
+export type WarehouseSummary = components['schemas']['WarehouseSummaryDto'];
+
+/** GET /warehouses — select "Kho mặc định". Lưu ý: cần stock.read (quyền kho, không phải product). */
+export function useWarehouses() {
+  return useQuery({
+    queryKey: ['catalog', 'warehouses'] as const,
+    queryFn: () => unwrap(api.GET('/warehouses')),
+    staleTime: 60 * 1000,
+  });
+}
+
 /** GET /uoms — danh mục ĐVT cho select "ĐVT cơ bản" của form sản phẩm. */
 export function useUoms() {
   return useQuery({
