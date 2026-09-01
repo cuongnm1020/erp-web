@@ -39,6 +39,11 @@ function baseHandlers() {
 const fill = (label: string, value: string) =>
   fireEvent.change(screen.getByLabelText(label), { target: { value } });
 
+// jsdom không có object URL — stub cho hàng chờ ảnh của upload zone
+let objectUrlSeq = 0;
+URL.createObjectURL = vi.fn(() => `blob:preview-${(objectUrlSeq += 1)}`);
+URL.revokeObjectURL = vi.fn();
+
 describe('ProductFormScreen — tạo (design/Products/ProductForm)', () => {
   it('validate chặn submit rỗng, KHÔNG gọi API', async () => {
     const posts: unknown[] = [];
@@ -148,6 +153,61 @@ describe('ProductFormScreen — tạo (design/Products/ProductForm)', () => {
     await waitFor(() => expect(push).toHaveBeenCalledWith('/catalog/products'));
     expect(productPosts).toBe(1);
     expect(skuPosts).toBe(2);
+  });
+
+  it('upload zone: kéo thả ảnh vào hàng chờ (ảnh đầu = Ảnh chính), bỏ bớt được, lưu xong tự tải lên sản phẩm mới', async () => {
+    push.mockClear();
+    const imagePosts: Array<{ productId: string; size: number | null }> = [];
+    server.use(
+      ...baseHandlers(),
+      http.post('/api/products', () =>
+        HttpResponse.json(
+          {
+            id: 'p-3',
+            code: 'TL10',
+            name: 'x',
+            categoryId: null,
+            brandId: null,
+            trackingMode: 'NONE',
+            shelfLifeDays: null,
+            isActive: true,
+          },
+          { status: 201 },
+        ),
+      ),
+      http.post('/api/products/:id/skus', () => HttpResponse.json({}, { status: 201 })),
+      http.post('/api/products/:id/images', async ({ request, params }) => {
+        const fd = await request.formData();
+        const f = fd.get('file') as { size?: number } | null;
+        imagePosts.push({ productId: params.id as string, size: f?.size ?? null });
+        return HttpResponse.json({}, { status: 201 });
+      }),
+    );
+    renderApp(<ProductFormScreen />);
+
+    const dropzone = screen.getByRole('button', { name: 'Kéo thả ảnh vào đây hoặc bấm để chọn' });
+    const a = new File([new Uint8Array([1, 2, 3, 4])], 'a.png', { type: 'image/png' });
+    const b = new File([new Uint8Array([5, 6])], 'b.png', { type: 'image/png' });
+    const bad = new File([new Uint8Array([7])], 'c.gif', { type: 'image/gif' });
+    fireEvent.drop(dropzone, { dataTransfer: { files: [a, b, bad] } });
+
+    // gif bị loại kèm toast; 2 ảnh hợp lệ vào hàng chờ, ảnh đầu gắn badge Ảnh chính
+    expect(await screen.findByText('2 ảnh chờ', { exact: false })).toBeInTheDocument();
+    expect(screen.getByText('Ảnh chính')).toBeInTheDocument();
+    expect(screen.getByAltText('a.png')).toBeInTheDocument();
+
+    // Bỏ ảnh b khỏi hàng chờ
+    fireEvent.click(screen.getByRole('button', { name: 'Bỏ ảnh khỏi hàng chờ: b.png' }));
+    expect(screen.queryByAltText('b.png')).not.toBeInTheDocument();
+
+    fill('Tên sản phẩm *', 'Bút TL-10');
+    fill('Mã cha *', 'TL10');
+    fill('Mã SKU', 'TL10-A');
+    fill('Tên biến thể', 'Bút TL-10 A');
+    fireEvent.click(screen.getByRole('button', { name: /Lưu sản phẩm/ }));
+    // Sau khi tạo sản phẩm + SKU, ảnh còn trong hàng chờ tự POST lên đúng productId mới
+    await waitFor(() => expect(imagePosts).toEqual([{ productId: 'p-3', size: 4 }]));
+    await waitFor(() => expect(push).toHaveBeenCalledWith('/catalog/products'));
   });
 });
 

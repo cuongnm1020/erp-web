@@ -28,6 +28,7 @@ import {
 } from '@/components/ui/select';
 import { toast } from '@/components/ui/toaster';
 import { type ApiError } from '@/lib/api/errors';
+import { cn } from '@/lib/cn';
 import { messageFor } from '@/lib/error-messages';
 import { Can, useAbility } from '@/lib/permission';
 import {
@@ -40,10 +41,11 @@ import {
   useUoms,
   useUpdateProduct,
   useUpdateSku,
+  useUploadProductImage,
   type ProductDetail,
 } from '../api/use-products';
 import { EMPTY_SKU_ROW, productFormSchema, type ProductFormValues } from '../schema';
-import { ProductGallery, SkuImageCell } from './product-images';
+import { ImageDropzone, ProductGallery, SkuImageCell } from './product-images';
 
 /**
  * C-02 Tạo / sửa sản phẩm — full page theo design/Products/ProductForm@2x.png.
@@ -134,6 +136,34 @@ function ProductFormBody({ product }: { product?: ProductDetail }) {
   const createSku = useCreateSku();
   const updateSku = useUpdateSku();
   const addBarcode = useAddBarcode();
+  const uploadImage = useUploadProductImage();
+
+  /**
+   * Upload zone ở form TẠO: sản phẩm chưa tồn tại nên ảnh xếp hàng chờ (preview bằng
+   * object URL), lưu xong tự tải tuần tự lên S3 — ảnh đầu hàng thành ảnh chính.
+   * Ảnh lỗi ở lại hàng chờ, form đứng lại trang để thử lưu tiếp (cùng cơ chế created ref).
+   */
+  const [pendingImages, setPendingImages] = useState<Array<{ file: File; url: string }>>([]);
+  const addPending = (files: File[]) =>
+    setPendingImages((prev) => [
+      ...prev,
+      ...files.map((file) => ({ file, url: URL.createObjectURL(file) })),
+    ]);
+  const removePending = (url: string) =>
+    setPendingImages((prev) => {
+      URL.revokeObjectURL(url);
+      return prev.filter((p) => p.url !== url);
+    });
+  useEffect(
+    () => () => {
+      // Rời trang: nhả hết object URL còn trong hàng chờ
+      setPendingImages((prev) => {
+        for (const p of prev) URL.revokeObjectURL(p.url);
+        return prev;
+      });
+    },
+    [],
+  );
 
   const form = useForm<ProductFormValues>({
     resolver: zodResolver(productFormSchema),
@@ -222,6 +252,28 @@ function ProductFormBody({ product }: { product?: ProductDetail }) {
         focusSkuCode(errors[0]!.index);
         return;
       }
+
+      // 3. Ảnh xếp hàng từ upload zone (form tạo) — tải tuần tự để ảnh đầu thành ảnh chính
+      if (pendingImages.length > 0) {
+        const failed: Array<{ file: File; url: string }> = [];
+        for (const item of pendingImages) {
+          try {
+            await uploadImage.mutateAsync({ productId: pid, file: item.file });
+            URL.revokeObjectURL(item.url);
+          } catch (err) {
+            toast.error(`Ảnh ${item.file.name}: ${messageFor(err)}`);
+            failed.push(item);
+          }
+        }
+        setPendingImages(failed);
+        if (failed.length > 0) {
+          toast.error(
+            `${failed.length} ảnh chưa tải được — sản phẩm ĐÃ lưu, bấm Lưu để thử lại ảnh.`,
+          );
+          return;
+        }
+      }
+
       toast.success(editing ? 'Đã lưu thay đổi' : 'Đã lưu sản phẩm', {
         description: `${v.code} · ${v.skus.length} biến thể`,
       });
@@ -472,9 +524,54 @@ function ProductFormBody({ product }: { product?: ProductDetail }) {
         {editing ? (
           <ProductGallery productId={product.id} images={product.images} canEdit={canEditImages} />
         ) : (
-          <p className="rounded-md border border-dashed px-3 py-2 text-xs text-muted-foreground">
-            Ảnh sản phẩm và ảnh từng biến thể thêm được sau khi lưu (ảnh lưu trên S3).
-          </p>
+          <section className="rounded-md border bg-card">
+            <header className="border-b px-3 py-2 text-sm font-semibold">
+              Ảnh sản phẩm{' '}
+              <span className="font-normal text-muted-foreground">
+                · {pendingImages.length > 0 ? `${pendingImages.length} ảnh chờ` : 'tải lên khi lưu'}
+              </span>
+            </header>
+            <div className="flex flex-col gap-3 px-3 py-3">
+              <ImageDropzone onFiles={addPending} disabled={saving} />
+              {pendingImages.length > 0 ? (
+                <ul className="flex flex-wrap gap-3">
+                  {pendingImages.map((p, i) => (
+                    <li key={p.url} className="relative">
+                      {/* eslint-disable-next-line @next/next/no-img-element -- preview object URL cục bộ */}
+                      <img
+                        src={p.url}
+                        alt={p.file.name}
+                        className={cn(
+                          'h-24 w-24 rounded-md border object-cover',
+                          i === 0 && 'ring-2 ring-primary',
+                        )}
+                      />
+                      {i === 0 ? (
+                        <span className="absolute left-1 top-1 rounded bg-primary px-1 text-[10px] font-medium text-primary-foreground">
+                          Ảnh chính
+                        </span>
+                      ) : null}
+                      <Button
+                        type="button"
+                        size="icon"
+                        variant="secondary"
+                        className="absolute bottom-1 right-1 h-6 w-6 hover:text-destructive"
+                        aria-label={`Bỏ ảnh khỏi hàng chờ: ${p.file.name}`}
+                        title="Bỏ khỏi hàng chờ"
+                        onClick={() => removePending(p.url)}
+                      >
+                        <X aria-hidden />
+                      </Button>
+                    </li>
+                  ))}
+                </ul>
+              ) : null}
+              <p className="text-xs text-muted-foreground">
+                Ảnh nằm trong hàng chờ, bấm Lưu sản phẩm sẽ tải lên S3 — ảnh đầu tiên thành ảnh
+                chính. Ảnh từng biến thể thêm ở màn sửa sau khi lưu.
+              </p>
+            </div>
+          </section>
         )}
 
         <section className="rounded-md border bg-card">

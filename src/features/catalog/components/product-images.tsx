@@ -16,6 +16,95 @@ import {
 } from '../api/use-products';
 
 const ACCEPT = 'image/jpeg,image/png,image/webp';
+const ALLOWED = new Set(['image/jpeg', 'image/png', 'image/webp']);
+const MAX_BYTES = 5 * 1024 * 1024;
+
+/** Lọc file hợp lệ (jpg/png/webp ≤5MB) — file bị loại báo toast theo tên, phần hợp lệ vẫn nhận. */
+export function acceptImageFiles(list: FileList | File[] | null): File[] {
+  const ok: File[] = [];
+  for (const f of Array.from(list ?? [])) {
+    if (!ALLOWED.has(f.type)) {
+      toast.error(`${f.name}: chỉ nhận ảnh jpg / png / webp`);
+      continue;
+    }
+    if (f.size > MAX_BYTES) {
+      toast.error(`${f.name}: ảnh tối đa 5MB`);
+      continue;
+    }
+    ok.push(f);
+  }
+  return ok;
+}
+
+/**
+ * Vùng kéo-thả ảnh (upload zone): thả nhiều file hoặc bấm/Enter để chọn.
+ * Chỉ lo nhận file — upload/hàng chờ do màn hình gọi quyết định.
+ */
+export function ImageDropzone({
+  onFiles,
+  disabled,
+  label = 'Kéo thả ảnh vào đây hoặc bấm để chọn',
+  hint = 'jpg / png / webp · tối đa 5MB mỗi ảnh',
+}: {
+  onFiles: (files: File[]) => void;
+  disabled?: boolean;
+  label?: string;
+  hint?: string;
+}) {
+  const inputRef = useRef<HTMLInputElement>(null);
+  const [over, setOver] = useState(false);
+  const take = (list: FileList | null) => {
+    const ok = acceptImageFiles(list);
+    if (ok.length > 0) onFiles(ok);
+  };
+  return (
+    <div
+      role="button"
+      tabIndex={disabled ? -1 : 0}
+      aria-label={label}
+      aria-disabled={disabled || undefined}
+      className={cn(
+        'flex cursor-pointer flex-col items-center justify-center gap-1 rounded-md border-2 border-dashed px-4 py-6 text-center text-sm text-muted-foreground transition-colors',
+        over && 'border-primary bg-primary/5 text-primary',
+        disabled && 'pointer-events-none opacity-50',
+      )}
+      onClick={() => inputRef.current?.click()}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          inputRef.current?.click();
+        }
+      }}
+      onDragOver={(e) => {
+        e.preventDefault();
+        setOver(true);
+      }}
+      onDragLeave={() => setOver(false)}
+      onDrop={(e) => {
+        e.preventDefault();
+        setOver(false);
+        take(e.dataTransfer.files);
+      }}
+    >
+      <ImagePlus className="h-5 w-5" aria-hidden />
+      <span className="font-medium">{label}</span>
+      <span className="text-xs">{hint}</span>
+      <input
+        ref={inputRef}
+        type="file"
+        accept={ACCEPT}
+        multiple
+        className="sr-only"
+        aria-label="Chọn file ảnh"
+        tabIndex={-1}
+        onChange={(e) => {
+          take(e.target.files);
+          e.target.value = '';
+        }}
+      />
+    </div>
+  );
+}
 
 /**
  * Gallery ảnh sản phẩm cha: lưới thumbnail + tải lên (jpg/png/webp ≤ 5MB, lưu S3),
@@ -46,6 +135,20 @@ export function ProductGallery({
         onError: (err) => toast.error(messageFor(err)),
       },
     );
+  };
+
+  /** Upload zone nhận nhiều file — tải TUẦN TỰ để thứ tự (và ảnh chính đầu tiên) ổn định. */
+  const onDropFiles = async (files: File[]) => {
+    let ok = 0;
+    for (const file of files) {
+      try {
+        await upload.mutateAsync({ productId, file });
+        ok += 1;
+      } catch (err) {
+        toast.error(`${file.name}: ${messageFor(err)}`);
+      }
+    }
+    if (ok > 0) toast.success(`Đã thêm ${ok} ảnh sản phẩm`);
   };
 
   return (
@@ -80,6 +183,11 @@ export function ProductGallery({
           </>
         ) : null}
       </header>
+      {canEdit ? (
+        <div className="px-3 pt-3">
+          <ImageDropzone onFiles={(files) => void onDropFiles(files)} disabled={upload.isPending} />
+        </div>
+      ) : null}
       {images.length === 0 ? (
         <p className="px-3 py-3 text-sm text-muted-foreground">
           Chưa có ảnh — ảnh chính sẽ hiện ở danh sách sản phẩm và khi lên đơn.
