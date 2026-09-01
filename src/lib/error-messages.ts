@@ -36,6 +36,7 @@ const BY_STATUS: Record<number, string> = {
   403: MESSAGES.FORBIDDEN!,
   404: MESSAGES.NOT_FOUND!,
   409: MESSAGES.CONFLICT!,
+  413: 'File quá lớn — ảnh tối đa 5MB.',
   422: MESSAGES.VALIDATION!,
 };
 

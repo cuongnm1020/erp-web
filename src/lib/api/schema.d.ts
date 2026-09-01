@@ -589,6 +589,73 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/products/{id}/images": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["ProductController_uploadProductImage"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/skus/{id}/images": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Ảnh của một biến thể / SKU. */
+        post: operations["ProductController_uploadSkuImage"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/product-images/{id}/primary": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Đặt làm ảnh chính trong nhóm (product hoặc sku) của ảnh đó. */
+        put: operations["ProductController_setPrimaryImage"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/product-images/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Xóa ảnh (S3 + DB); ảnh chính bị xóa thì ảnh cũ nhất còn lại lên thay. */
+        delete: operations["ProductController_removeImage"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/barcodes/{code}": {
         parameters: {
             query?: never;
@@ -2487,6 +2554,16 @@ export interface components {
             factor: string;
             uom: components["schemas"]["UomDto"];
         };
+        ProductImageDto: {
+            id: string;
+            /** @description Presigned URL — đừng lưu lâu, hết hạn thì gọi lại API đọc. */
+            url: string;
+            fileName: string;
+            mimeType: string;
+            sizeBytes: number;
+            isPrimary: boolean;
+            createdAt: string;
+        };
         ProductSkuDetailDto: {
             id: string;
             productId: string;
@@ -2498,6 +2575,8 @@ export interface components {
             baseUom: components["schemas"]["UomDto"];
             barcodes: components["schemas"]["SkuBarcodeDto"][];
             uomConversions: components["schemas"]["SkuUomConversionDto"][];
+            /** @description Ảnh riêng của biến thể (ảnh chính đứng đầu). */
+            images: components["schemas"]["ProductImageDto"][];
         };
         ProductDetailDto: {
             id: string;
@@ -2512,6 +2591,8 @@ export interface components {
             category: components["schemas"]["ProductCategoryDto"] | null;
             brand: components["schemas"]["BrandDto"] | null;
             skus: components["schemas"]["ProductSkuDetailDto"][];
+            /** @description Gallery của sản phẩm cha, ảnh chính đứng đầu. */
+            images: components["schemas"]["ProductImageDto"][];
         };
         CreateProductDto: {
             code: string;
@@ -2580,6 +2661,8 @@ export interface components {
             baseUom: components["schemas"]["UomDto"];
             barcodes: components["schemas"]["SkuBarcodeDto"][];
             uomConversions: components["schemas"]["SkuUomConversionDto"][];
+            /** @description Ảnh biến thể (ảnh chính đứng đầu) — chỉ có ở GET /skus/{id}, KHÔNG có trong nested create. */
+            images?: components["schemas"]["ProductImageDto"][];
         };
         SkuListRowDto: {
             skuId: string;
@@ -2593,6 +2676,8 @@ export interface components {
             baseUomCode: string;
             barcodeCount: number;
             isActive: boolean;
+            /** @description Ảnh chính của SKU (rơi về ảnh chính sản phẩm cha) — presigned URL, null = chưa có ảnh. */
+            thumbnailUrl: string | null;
             /** @description Decimal(18,6) dạng chuỗi — ĐVT cơ sở, gộp mọi kho. */
             onHand: string;
             /** @description Decimal(18,6) dạng chuỗi. */
@@ -4647,6 +4732,102 @@ export interface operations {
         };
         responses: {
             201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    ProductController_uploadProductImage: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": {
+                    /** Format: binary */
+                    file: string;
+                };
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProductImageDto"];
+                };
+            };
+        };
+    };
+    ProductController_uploadSkuImage: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": {
+                    /** Format: binary */
+                    file: string;
+                };
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProductImageDto"];
+                };
+            };
+        };
+    };
+    ProductController_setPrimaryImage: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProductImageDto"];
+                };
+            };
+        };
+    };
+    ProductController_removeImage: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            204: {
                 headers: {
                     [name: string]: unknown;
                 };

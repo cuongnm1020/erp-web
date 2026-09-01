@@ -163,6 +163,17 @@ describe('ProductFormScreen — sửa', () => {
     isActive: true,
     category: null,
     brand: null,
+    images: [
+      {
+        id: 'img-1',
+        url: 'https://s3.local/erp-images/products/p-9/a.jpg?sig=x',
+        fileName: 'a.jpg',
+        mimeType: 'image/jpeg',
+        sizeBytes: 1234,
+        isPrimary: true,
+        createdAt: '2026-09-01T00:00:00.000Z',
+      },
+    ],
     skus: [
       {
         id: 's-1',
@@ -176,6 +187,7 @@ describe('ProductFormScreen — sửa', () => {
           { id: 'b1', code: '8934567801234', uomId: 'u-pcs', type: 'EAN13', uom: UOMS[0] },
         ],
         uomConversions: [],
+        images: [],
       },
     ],
   };
@@ -209,5 +221,49 @@ describe('ProductFormScreen — sửa', () => {
       body: { name: 'Bút bi TL-08 xanh', isActive: false },
     });
     await waitFor(() => expect(push).toHaveBeenCalledWith('/catalog/products'));
+  });
+
+  it('ảnh: gallery cha hiện ảnh chính; upload ảnh cha + ảnh biến thể gửi multipart field "file" lên S3 API', async () => {
+    const uploads: Array<{ url: string; size: number | null }> = [];
+    const NEW_IMG = {
+      id: 'img-2',
+      url: 'https://s3.local/erp-images/x.png?sig=y',
+      fileName: 'x.png',
+      mimeType: 'image/png',
+      sizeBytes: 10,
+      isPrimary: false,
+      createdAt: '2026-09-01T00:00:00.000Z',
+    };
+    server.use(
+      ...baseHandlers(),
+      http.get('/api/products/:id', () => HttpResponse.json(DETAIL)),
+      // jsdom File → undici mất filename (thành 'blob') — môi trường test; browser thật giữ tên.
+      // Vì vậy khẳng định theo SIZE, còn multipart field 'file' + content-type do msw parse được.
+      http.post('/api/products/:id/images', async ({ request }) => {
+        const fd = await request.formData();
+        const f = fd.get('file') as { size?: number } | null;
+        uploads.push({ url: 'product', size: f?.size ?? null });
+        return HttpResponse.json(NEW_IMG, { status: 201 });
+      }),
+      http.post('/api/skus/:id/images', async ({ request }) => {
+        const fd = await request.formData();
+        const f = fd.get('file') as { size?: number } | null;
+        uploads.push({ url: 'sku', size: f?.size ?? null });
+        return HttpResponse.json(NEW_IMG, { status: 201 });
+      }),
+    );
+    renderApp(<ProductFormScreen productId="p-9" />);
+    await screen.findByDisplayValue('Bút bi TL-08 xanh');
+    // Gallery cha: ảnh chính có badge
+    expect(screen.getByText('Ảnh chính')).toBeInTheDocument();
+    expect(screen.getByAltText('a.jpg')).toBeInTheDocument();
+
+    const png = new File([new Uint8Array([1, 2, 3])], 'new.png', { type: 'image/png' });
+    fireEvent.change(screen.getByLabelText('Chọn ảnh sản phẩm'), { target: { files: [png] } });
+    await waitFor(() => expect(uploads).toContainEqual({ url: 'product', size: 3 }));
+
+    const skuPng = new File([new Uint8Array([4, 5])], 'sku.png', { type: 'image/png' });
+    fireEvent.change(screen.getByLabelText('Chọn ảnh biến thể'), { target: { files: [skuPng] } });
+    await waitFor(() => expect(uploads).toContainEqual({ url: 'sku', size: 2 }));
   });
 });

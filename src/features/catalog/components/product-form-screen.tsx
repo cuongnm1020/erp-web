@@ -29,7 +29,7 @@ import {
 import { toast } from '@/components/ui/toaster';
 import { type ApiError } from '@/lib/api/errors';
 import { messageFor } from '@/lib/error-messages';
-import { Can } from '@/lib/permission';
+import { Can, useAbility } from '@/lib/permission';
 import {
   useAddBarcode,
   useBrands,
@@ -43,6 +43,7 @@ import {
   type ProductDetail,
 } from '../api/use-products';
 import { EMPTY_SKU_ROW, productFormSchema, type ProductFormValues } from '../schema';
+import { ProductGallery, SkuImageCell } from './product-images';
 
 /**
  * C-02 Tạo / sửa sản phẩm — full page theo design/Products/ProductForm@2x.png.
@@ -124,6 +125,7 @@ export function ProductFormScreen({ productId }: { productId?: string }) {
 function ProductFormBody({ product }: { product?: ProductDetail }) {
   const editing = product !== undefined;
   const router = useRouter();
+  const canEditImages = useAbility().can('update', 'Product');
   const categories = useCategories();
   const brands = useBrands();
   const uoms = useUoms();
@@ -467,6 +469,14 @@ function ProductFormBody({ product }: { product?: ProductDetail }) {
           </div>
         </section>
 
+        {editing ? (
+          <ProductGallery productId={product.id} images={product.images} canEdit={canEditImages} />
+        ) : (
+          <p className="rounded-md border border-dashed px-3 py-2 text-xs text-muted-foreground">
+            Ảnh sản phẩm và ảnh từng biến thể thêm được sau khi lưu (ảnh lưu trên S3).
+          </p>
+        )}
+
         <section className="rounded-md border bg-card">
           <header className="flex items-center justify-between border-b px-3 py-2">
             <span className="text-sm font-semibold">
@@ -492,6 +502,10 @@ function ProductFormBody({ product }: { product?: ProductDetail }) {
                 form={form}
                 index={i}
                 editing={editing}
+                canEditImages={canEditImages}
+                skuImage={
+                  product?.skus.find((s) => s.id === form.getValues(`skus.${i}.skuId`))?.images[0]
+                }
                 onRemove={
                   // Design: chỉ xóa dòng CHƯA lưu; biến thể đã có chỉ "Ngừng bán"
                   !form.getValues(`skus.${i}.skuId`) && rows.fields.length > 1
@@ -531,16 +545,20 @@ function ProductFormBody({ product }: { product?: ProductDetail }) {
   );
 }
 
-/** Một dòng biến thể: mã (khóa khi đã lưu) · tên · barcode lẻ · trạng thái (khi sửa). */
+/** Một dòng biến thể: ảnh (SKU đã lưu) · mã (khóa khi đã lưu) · tên · barcode lẻ · trạng thái (khi sửa). */
 function SkuRow({
   form,
   index,
   editing,
+  canEditImages,
+  skuImage,
   onRemove,
 }: {
   form: UseFormReturn<ProductFormValues>;
   index: number;
   editing: boolean;
+  canEditImages: boolean;
+  skuImage?: ProductDetail['skus'][number]['images'][number];
   onRemove?: () => void;
 }) {
   const skuId = form.getValues(`skus.${index}.skuId`);
@@ -548,7 +566,17 @@ function SkuRow({
   const saved = skuId !== '';
 
   return (
-    <div className="grid items-start gap-2 px-3 py-2 sm:grid-cols-[150px_minmax(180px,1fr)_170px_150px_32px]">
+    <div className="grid items-start gap-2 px-3 py-2 sm:grid-cols-[110px_150px_minmax(180px,1fr)_170px_150px_32px]">
+      {saved ? (
+        <SkuImageCell skuId={skuId} image={skuImage} canEdit={canEditImages} />
+      ) : (
+        <span
+          className="pt-2 text-xs text-muted-foreground"
+          title="Ảnh biến thể thêm được sau khi lưu"
+        >
+          —
+        </span>
+      )}
       <FormField
         control={form.control}
         name={`skus.${index}.code`}

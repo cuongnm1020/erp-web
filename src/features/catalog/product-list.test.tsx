@@ -45,6 +45,7 @@ const ROWS = [
     baseUomCode: 'cái',
     barcodeCount: 3,
     isActive: true,
+    thumbnailUrl: 'https://s3.local/erp-images/skus/tl08-blue.jpg?sig=abc',
     onHand: '31200.000000',
     reserved: '1240.000000',
     available: '29960.000000',
@@ -61,6 +62,7 @@ const ROWS = [
     baseUomCode: 'cây',
     barcodeCount: 2,
     isActive: true,
+    thumbnailUrl: null,
     // Khả dụng ÂM: đã giữ cho đơn nhiều hơn tồn thực → phải hiện chữ đỏ.
     onHand: '46.000000',
     reserved: '60.000000',
@@ -78,6 +80,7 @@ const ROWS = [
     baseUomCode: 'cuốn',
     barcodeCount: 1,
     isActive: false,
+    thumbnailUrl: null,
     onHand: '0.000000',
     reserved: '0.000000',
     available: '0.000000',
@@ -129,6 +132,10 @@ describe('ProductListScreen — GET /skus (design/Products/ProductList)', () => 
     expect(screen.getByTitle(FIRST.name)).toBeInTheDocument();
     // Tên sản phẩm cha hiện dòng phụ khi khác tên SKU.
     expect(screen.getByText(FIRST.productName)).toBeInTheDocument();
+    // Thumbnail: dòng có thumbnailUrl hiện <img> presigned; dòng không có → ô placeholder
+    const imgs = document.querySelectorAll('img');
+    expect(imgs).toHaveLength(1);
+    expect(imgs[0]!.getAttribute('src')).toContain('s3.local/erp-images');
   });
 
   it('khả dụng âm hiện chữ đỏ (giữ nhiều hơn tồn thực)', async () => {

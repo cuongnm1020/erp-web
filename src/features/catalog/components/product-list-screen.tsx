@@ -47,6 +47,23 @@ function parseStatus(v: string | undefined): SkuStatus | undefined {
 }
 
 const columns: ColumnDef<SkuListRow, unknown>[] = [
+  // Ô vuông ảnh cạnh SKU như design — thumbnailUrl là presigned S3 (ảnh SKU, rơi về ảnh cha)
+  {
+    id: 'thumbnail',
+    header: '',
+    meta: { title: 'Ảnh', width: 44 },
+    cell: ({ row }) =>
+      row.original.thumbnailUrl ? (
+        // eslint-disable-next-line @next/next/no-img-element -- presigned URL S3, không qua next/image
+        <img
+          src={row.original.thumbnailUrl}
+          alt=""
+          className="h-7 w-7 rounded border object-cover"
+        />
+      ) : (
+        <span aria-hidden className="block h-7 w-7 rounded border border-dashed bg-muted/40" />
+      ),
+  },
   {
     id: 'code',
     accessorKey: 'code',

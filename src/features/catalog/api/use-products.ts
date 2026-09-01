@@ -99,6 +99,86 @@ export function useUpdateSku() {
   });
 }
 
+export type ProductImage = components['schemas']['ProductImageDto'];
+
+function imageForm(file: File): FormData {
+  const fd = new FormData();
+  fd.append('file', file);
+  return fd;
+}
+
+/** Serializer giữ nguyên FormData — để browser tự đặt boundary multipart. */
+const asFormData = (body: unknown) => body as FormData;
+
+/**
+ * Upload ảnh (multipart 'file', jpg/png/webp ≤ 5MB) cho sản phẩm cha hoặc một SKU.
+ * `url` trả về là presigned S3 hết hạn ~1h — hiển thị ngay, đừng cất lâu.
+ */
+export function useUploadProductImage() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ productId, file }: { productId: string; file: File }) =>
+      unwrap(
+        api.POST('/products/{id}/images', {
+          params: { path: { id: productId } },
+          body: imageForm(file) as never,
+          bodySerializer: asFormData,
+          // Bỏ Content-Type mặc định (json) để browser tự đặt multipart boundary
+          headers: { 'Content-Type': null },
+        }),
+      ),
+    onSuccess: (_d, { productId }) => {
+      void qc.invalidateQueries({ queryKey: productKeys.detail(productId) });
+      void qc.invalidateQueries({ queryKey: productKeys.skuLists() });
+    },
+  });
+}
+
+export function useUploadSkuImage() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ skuId, file }: { skuId: string; file: File }) =>
+      unwrap(
+        api.POST('/skus/{id}/images', {
+          params: { path: { id: skuId } },
+          body: imageForm(file) as never,
+          bodySerializer: asFormData,
+          headers: { 'Content-Type': null },
+        }),
+      ),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: productKeys.details() });
+      void qc.invalidateQueries({ queryKey: productKeys.skuLists() });
+    },
+  });
+}
+
+/** PUT /product-images/{id}/primary — đặt ảnh chính trong nhóm của ảnh đó. */
+export function useSetPrimaryImage() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (imageId: string) =>
+      unwrap(api.PUT('/product-images/{id}/primary', { params: { path: { id: imageId } } })),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: productKeys.details() });
+      void qc.invalidateQueries({ queryKey: productKeys.skuLists() });
+    },
+  });
+}
+
+/** DELETE /product-images/{id} — xóa cả S3 lẫn DB; ảnh chính bị xóa thì ảnh cũ nhất lên thay. */
+export function useDeleteImage() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (imageId: string) =>
+      unwrap(api.DELETE('/product-images/{id}', { params: { path: { id: imageId } } })),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: productKeys.details() });
+      void qc.invalidateQueries({ queryKey: productKeys.skuLists() });
+    },
+  });
+}
+
 /** POST /skus/{id}/barcodes — bổ sung barcode cho SKU đã có. */
 export function useAddBarcode() {
   const qc = useQueryClient();
