@@ -44,8 +44,8 @@ const loc = (
   pickSequence: null,
   isPickable: true,
   isActive: true,
-  fixedSkuId: null,
-  fixedSku: null,
+  fixedSkuIds: [],
+  fixedSkus: [],
   children,
   ...extra,
 });
@@ -55,8 +55,8 @@ const TREE = [
     loc('a-01', 'A01', 'AISLE', [
       loc('b-01', 'A01-01', 'BIN', [], {
         barcode: 'LOC-A01-01',
-        fixedSkuId: 'sku-1',
-        fixedSku: { id: 'sku-1', code: 'P001-1', name: 'Bút bi xanh' },
+        fixedSkuIds: ['sku-1'],
+        fixedSkus: [{ id: 'sku-1', code: 'P001-1', name: 'Bút bi xanh' }],
       }),
     ]),
   ]),
@@ -176,7 +176,7 @@ describe('LocationsPanel — cây vị trí kho + CRUD', () => {
       expect(patches).toEqual([
         {
           id: 'z-a',
-          body: { barcode: 'LOC-ZONE-A', isPickable: false, isActive: true, fixedSkuId: null },
+          body: { barcode: 'LOC-ZONE-A', isPickable: false, isActive: true, fixedSkuIds: [] },
         },
       ]),
     );
@@ -187,11 +187,13 @@ describe('LocationsPanel — cây vị trí kho + CRUD', () => {
     await screen.findByText('Vị trí kho WH01');
     await screen.findByText('A01');
     fireEvent.click(screen.getByRole('button', { name: 'Mở rộng A01' }));
-    expect(screen.getByText('P001-1')).toBeInTheDocument();
-    expect(screen.getByText('Bút bi xanh')).toBeInTheDocument();
+    const cell = screen.getByText('P001-1');
+    expect(cell).toBeInTheDocument();
+    // Tên đầy đủ nằm ở title (tooltip) — cột chỉ hiện mã cho gọn
+    expect(cell).toHaveAttribute('title', 'P001-1 — Bút bi xanh');
   });
 
-  it('gán SKU cho bin: sửa BIN → chọn SKU từ picker → PATCH gửi fixedSkuId', async () => {
+  it('gán nhiều SKU cho bin: chip prefill, thêm từ picker, bỏ chip → PATCH gửi fixedSkuIds', async () => {
     const patches: Array<{ id: string; body: unknown }> = [];
     server.use(
       http.get('/api/skus', () => HttpResponse.json(SKU_LIST)),
@@ -208,17 +210,53 @@ describe('LocationsPanel — cây vị trí kho + CRUD', () => {
     // Dòng bin A01-01 là dòng thứ 3 trong panel (A, A01, A01-01, ST) — nút Sửa index 2
     fireEvent.click(within(panel).getAllByRole('button', { name: 'Sửa' })[2]!);
     const dialog = await screen.findByRole('dialog');
-    // Picker prefill SKU đang gán
-    const picker = within(dialog).getByRole('combobox', { name: 'SKU cố định' });
-    expect(picker).toHaveTextContent('Bút bi xanh (P001-1)');
-    fireEvent.click(picker);
+    // SKU đang gán hiện thành chip
+    expect(within(dialog).getByText('Bút bi xanh (P001-1)')).toBeInTheDocument();
+    // Thêm SKU thứ hai từ picker
+    fireEvent.click(within(dialog).getByRole('combobox', { name: 'SKU cố định' }));
     fireEvent.click(await screen.findByText('Bút bi đỏ'));
+    expect(within(dialog).getByText('Bút bi đỏ')).toBeInTheDocument();
+    // Lưu → gửi cả hai id
     fireEvent.click(within(dialog).getByRole('button', { name: 'Lưu thay đổi' }));
     await waitFor(() =>
       expect(patches).toEqual([
         {
           id: 'b-01',
-          body: { barcode: 'LOC-A01-01', isPickable: true, isActive: true, fixedSkuId: 'sku-2' },
+          body: {
+            barcode: 'LOC-A01-01',
+            isPickable: true,
+            isActive: true,
+            fixedSkuIds: ['sku-1', 'sku-2'],
+          },
+        },
+      ]),
+    );
+  });
+
+  it('bỏ chip SKU rồi lưu → PATCH gửi danh sách không còn SKU đó', async () => {
+    const patches: Array<{ id: string; body: unknown }> = [];
+    server.use(
+      http.get('/api/skus', () => HttpResponse.json(SKU_LIST)),
+      http.patch('/api/warehouses/locations/:locationId', async ({ request, params }) => {
+        patches.push({ id: params.locationId as string, body: await request.json() });
+        return HttpResponse.json(loc('b-01', 'A01-01', 'BIN'));
+      }),
+    );
+    renderApp(<WarehousesScreen />);
+    await screen.findByText('Vị trí kho WH01');
+    await screen.findByText('A01');
+    fireEvent.click(screen.getByRole('button', { name: 'Mở rộng A01' }));
+    const panel = screen.getByText('Vị trí kho WH01').closest('section')!;
+    fireEvent.click(within(panel).getAllByRole('button', { name: 'Sửa' })[2]!);
+    const dialog = await screen.findByRole('dialog');
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Bỏ Bút bi xanh (P001-1)' }));
+    expect(within(dialog).queryByText('Bút bi xanh (P001-1)')).not.toBeInTheDocument();
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Lưu thay đổi' }));
+    await waitFor(() =>
+      expect(patches).toEqual([
+        {
+          id: 'b-01',
+          body: { barcode: 'LOC-A01-01', isPickable: true, isActive: true, fixedSkuIds: [] },
         },
       ]),
     );

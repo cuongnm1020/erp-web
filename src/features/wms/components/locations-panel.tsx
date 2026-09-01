@@ -1,7 +1,7 @@
 'use client';
 
 import { zodResolver } from '@hookform/resolvers/zod';
-import { ChevronDown, ChevronRight, Plus } from 'lucide-react';
+import { ChevronDown, ChevronRight, Plus, X } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
@@ -78,8 +78,8 @@ const locationSchema = z.object({
   pickSequence: z.string().trim().regex(/^\d*$/, 'Nhập số nguyên không âm'),
   isPickable: z.boolean(),
   isActive: z.boolean(),
-  /** SKU cố định (slotting) — '' = không gán; server chỉ nhận cho BIN. */
-  fixedSkuId: z.string(),
+  /** SKU cố định (slotting), nhiều SKU — label chỉ để render chip; server nhận mảng id. */
+  fixedSkus: z.array(z.object({ id: z.string(), label: z.string() })),
 });
 type LocationValues = z.infer<typeof locationSchema>;
 
@@ -110,7 +110,8 @@ function LocationFormDialog({
       pickSequence: location?.pickSequence != null ? String(location.pickSequence) : '',
       isPickable: location?.isPickable ?? true,
       isActive: location?.isActive ?? true,
-      fixedSkuId: location?.fixedSkuId ?? '',
+      fixedSkus:
+        location?.fixedSkus.map((s) => ({ id: s.id, label: `${s.name} (${s.code})` })) ?? [],
     },
   });
   const isBin = form.watch('type') === 'BIN';
@@ -122,7 +123,7 @@ function LocationFormDialog({
     };
     const fail = (err: unknown) =>
       applyServerErrors(form, err as ApiError, {
-        knownFields: ['code', 'type', 'barcode', 'pickSequence', 'fixedSkuId'],
+        knownFields: ['code', 'type', 'barcode', 'pickSequence', 'fixedSkuIds'],
       });
     const pickSequence = v.pickSequence === '' ? undefined : Number(v.pickSequence);
     if (editing && location) {
@@ -134,8 +135,8 @@ function LocationFormDialog({
             ...(pickSequence !== undefined ? { pickSequence } : {}),
             isPickable: v.isPickable,
             isActive: v.isActive,
-            // '' = bỏ gán → gửi null; chỉ BIN có picker nên loại khác luôn là null (vô hại)
-            fixedSkuId: v.fixedSkuId === '' ? null : v.fixedSkuId,
+            // THAY toàn bộ danh sách; mảng rỗng = bỏ gán hết (loại khác BIN luôn rỗng — vô hại)
+            fixedSkuIds: v.fixedSkus.map((s) => s.id),
           },
         },
         { onSuccess: () => done('Đã lưu thay đổi'), onError: fail },
@@ -149,7 +150,9 @@ function LocationFormDialog({
           ...(v.barcode ? { barcode: v.barcode } : {}),
           ...(pickSequence !== undefined ? { pickSequence } : {}),
           isPickable: v.isPickable,
-          ...(v.fixedSkuId && v.type === 'BIN' ? { fixedSkuId: v.fixedSkuId } : {}),
+          ...(v.fixedSkus.length && v.type === 'BIN'
+            ? { fixedSkuIds: v.fixedSkus.map((s) => s.id) }
+            : {}),
         },
         { onSuccess: () => done('Đã thêm vị trí'), onError: fail },
       );
@@ -248,24 +251,48 @@ function LocationFormDialog({
             {isBin ? (
               <FormField
                 control={form.control}
-                name="fixedSkuId"
+                name="fixedSkus"
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>SKU cố định</FormLabel>
                     <FormControl>
                       <EntityPicker
-                        value={field.value}
-                        onChange={field.onChange}
+                        value=""
+                        onChange={(id, option) => {
+                          if (!id || !option) return;
+                          if (field.value.some((s) => s.id === id)) return;
+                          field.onChange([...field.value, { id, label: option.label }]);
+                        }}
                         useSearch={useSkuSearch}
-                        selectedLabel={
-                          location?.fixedSku && field.value === location.fixedSku.id
-                            ? `${location.fixedSku.name} (${location.fixedSku.code})`
-                            : undefined
+                        clearable={false}
+                        placeholder={
+                          field.value.length === 0 ? 'Không gán — bin dùng chung' : 'Thêm SKU…'
                         }
-                        placeholder="Không gán — bin dùng chung"
                         searchPlaceholder="Tìm theo mã / tên SKU / barcode…"
                       />
                     </FormControl>
+                    {field.value.length > 0 ? (
+                      <ul className="flex flex-wrap gap-1.5">
+                        {field.value.map((s) => (
+                          <li
+                            key={s.id}
+                            className="flex items-center gap-1 rounded-sm bg-muted px-1.5 py-0.5 text-xs"
+                          >
+                            <span>{s.label}</span>
+                            <button
+                              type="button"
+                              aria-label={`Bỏ ${s.label}`}
+                              className="text-muted-foreground hover:text-foreground"
+                              onClick={() =>
+                                field.onChange(field.value.filter((x) => x.id !== s.id))
+                              }
+                            >
+                              <X className="h-3 w-3" aria-hidden />
+                            </button>
+                          </li>
+                        ))}
+                      </ul>
+                    ) : null}
                     <FormMessage />
                   </FormItem>
                 )}
@@ -447,10 +474,12 @@ export function LocationsPanel({
                       {TYPE_LABEL[node.type]}
                     </TableCell>
                     <TableCell className="max-w-56 px-2.5 py-1.5">
-                      {node.fixedSku ? (
-                        <span className="block truncate" title={node.fixedSku.name}>
-                          <span className="font-mono text-xs">{node.fixedSku.code}</span>{' '}
-                          <span className="text-muted-foreground">{node.fixedSku.name}</span>
+                      {node.fixedSkus.length > 0 ? (
+                        <span
+                          className="block truncate font-mono text-xs"
+                          title={node.fixedSkus.map((s) => `${s.code} — ${s.name}`).join('\n')}
+                        >
+                          {node.fixedSkus.map((s) => s.code).join(', ')}
                         </span>
                       ) : (
                         <span className="text-muted-foreground">—</span>
