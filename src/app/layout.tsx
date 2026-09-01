@@ -11,7 +11,10 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
     <html lang="vi" suppressHydrationWarning>
-      <body>
+      {/* suppressHydrationWarning: extension trình duyệt (ColorZilla…) chèn attribute vào
+          <body> trước khi React hydrate (vd cz-shortcut-listen) → cảnh báo giả. Chỉ tắt
+          cảnh báo cho attribute của CHÍNH thẻ body, mismatch bên trong vẫn báo bình thường. */}
+      <body suppressHydrationWarning>
         <Providers>{children}</Providers>
       </body>
     </html>
