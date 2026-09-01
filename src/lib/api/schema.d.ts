@@ -1432,6 +1432,57 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/tasks/assignees": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Danh bạ người nhận việc (user active role WAREHOUSE) cho ô "Gán cho…". */
+        get: operations["TaskEngineController_assignees"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/tasks/{id}/assign": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Gán việc cho nhân viên kho — chỉ task PENDING; user phải active. */
+        post: operations["TaskEngineController_assign"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/tasks/{id}/unassign": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Trả task về hàng đợi (ASSIGNED → PENDING) — dùng khi đổi người / nghỉ ca. */
+        post: operations["TaskEngineController_unassign"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/pda/tasks": {
         parameters: {
             query?: never;
@@ -3290,6 +3341,25 @@ export interface components {
         TaskListResponseDto: {
             items: components["schemas"]["TaskRowDto"][];
             total: number;
+        };
+        TaskAssigneeDto: {
+            id: string;
+            code: string;
+            fullName: string;
+        };
+        AssignTaskDto: {
+            /**
+             * Format: uuid
+             * @description Nhân viên kho nhận việc — phải tồn tại và đang active.
+             */
+            userId: string;
+        };
+        TaskStateResultDto: {
+            taskId: string;
+            docNumber: string;
+            /** @enum {string} */
+            status: "CANCELLED" | "PENDING" | "ASSIGNED" | "IN_PROGRESS" | "COMPLETED" | "EXCEPTION";
+            assignedTo: string | null;
         };
         ScanDto: {
             /** Format: uuid */
@@ -6283,6 +6353,71 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["TaskListResponseDto"];
+                };
+            };
+        };
+    };
+    TaskEngineController_assignees: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TaskAssigneeDto"][];
+                };
+            };
+        };
+    };
+    TaskEngineController_assign: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AssignTaskDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TaskStateResultDto"];
+                };
+            };
+        };
+    };
+    TaskEngineController_unassign: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TaskStateResultDto"];
                 };
             };
         };

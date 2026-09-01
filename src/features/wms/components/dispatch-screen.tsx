@@ -19,7 +19,21 @@ import { cn } from '@/lib/cn';
 import { formatDateTime, formatQuantity } from '@/lib/format';
 import { useInvalidateOn, useRealtime } from '@/lib/realtime';
 import { useListState } from '@/lib/url-state';
-import { taskKeys, useTasks, type Task, type TaskStatus, type TaskType } from '../api/use-tasks';
+import { toast } from '@/components/ui/toaster';
+import { messageFor } from '@/lib/error-messages';
+import { useAbility } from '@/lib/permission';
+import {
+  taskKeys,
+  useAssignTask,
+  useTasks,
+  useUnassignTask,
+  useWarehouseStaff,
+  type Task,
+  type TaskStatus,
+  type TaskType,
+  type WarehouseStaff,
+} from '../api/use-tasks';
+import { useWarehouses } from '../api/use-warehouses';
 import {
   TASK_TYPE_OPTIONS,
   formatMinutes,
@@ -48,9 +62,10 @@ import {
  *   từ; hiện link "Đơn bán" theo id thay vì bịa một số chứng từ.
  * - "Ưu tiên Cao/TB/Thấp": `priority` là số nguyên, không có thang bậc nào được định nghĩa;
  *   hiện đúng con số.
- * - Kéo thả để gán việc: chưa có endpoint giao việc.
- * - Chọn kho: `GET /warehouses` chưa khai kiểu response nên chưa dựng được danh sách chọn;
- *   `warehouseId` và `assignedTo` vẫn đọc từ URL để dán link được (luật 8).
+ *
+ * Gán việc: thẻ PENDING có ô "Gán cho…" (POST /tasks/:id/assign), thẻ ASSIGNED có
+ * "Trả về hàng đợi" (POST /tasks/:id/unassign) — chỉ hiện khi có task.assign; danh bạ
+ * người nhận lấy từ GET /tasks/assignees. Kéo thả chưa làm — chọn từ ô là đủ dùng.
  */
 const LANE_SIZE = 20;
 const DEFAULTS = { size: LANE_SIZE, filterKeys: ['type', 'warehouseId', 'assignedTo'] as const };
@@ -82,8 +97,13 @@ function useLane(status: TaskStatus, p: LaneParams) {
   });
 }
 
-function TaskCard({ task }: { task: Task }) {
+function TaskCard({ task, staff }: { task: Task; staff: WarehouseStaff[] | null }) {
   const idleWord = task.status === 'PENDING' ? 'chờ' : 'đứng yên';
+  const assign = useAssignTask();
+  const unassign = useUnassignTask();
+  const assigneeName = task.assigneeId
+    ? (staff?.find((s) => s.id === task.assigneeId)?.fullName ?? null)
+    : null;
   return (
     <article className="flex flex-col gap-1 rounded-md border bg-card px-2.5 py-2">
       <div className="flex items-center gap-2">
@@ -104,6 +124,7 @@ function TaskCard({ task }: { task: Task }) {
             </Link>
           </>
         ) : null}
+        {assigneeName ? ` · ${assigneeName}` : null}
       </div>
       <div className="flex items-center justify-between gap-2 text-xs text-muted-foreground">
         <span>Ưu tiên {task.priority}</span>
@@ -111,6 +132,44 @@ function TaskCard({ task }: { task: Task }) {
           {idleWord} {formatMinutes(task.idleMinutes)} · tuổi {formatMinutes(task.ageMinutes)}
         </span>
       </div>
+      {staff && task.status === 'PENDING' ? (
+        <Select
+          value=""
+          onValueChange={(userId) =>
+            assign
+              .mutateAsync({ taskId: task.id, userId })
+              .then(() => toast.success(`Đã gán ${task.docNumber}`))
+              .catch((err) => toast.error(messageFor(err)))
+          }
+          disabled={assign.isPending}
+        >
+          <SelectTrigger className="h-7 text-xs" aria-label={`Gán ${task.docNumber}`}>
+            <SelectValue placeholder={assign.isPending ? 'Đang gán…' : 'Gán cho…'} />
+          </SelectTrigger>
+          <SelectContent>
+            {staff.map((s) => (
+              <SelectItem key={s.id} value={s.id}>
+                {s.fullName}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      ) : null}
+      {staff && task.status === 'ASSIGNED' ? (
+        <button
+          type="button"
+          className="self-start text-xs text-primary hover:underline disabled:opacity-50"
+          disabled={unassign.isPending}
+          onClick={() =>
+            unassign
+              .mutateAsync(task.id)
+              .then(() => toast.success(`Đã trả ${task.docNumber} về hàng đợi`))
+              .catch((err) => toast.error(messageFor(err)))
+          }
+        >
+          {unassign.isPending ? 'Đang trả…' : 'Trả về hàng đợi'}
+        </button>
+      ) : null}
     </article>
   );
 }
@@ -152,11 +211,13 @@ function Lane({
   hint,
   status,
   params,
+  staff,
 }: {
   title: string;
   hint: string;
   status: TaskStatus;
   params: LaneParams;
+  staff: WarehouseStaff[] | null;
 }) {
   const query = useLane(status, params);
   return (
@@ -178,7 +239,7 @@ function Lane({
         {(data) => (
           <div className="flex flex-col gap-2 p-2">
             {data.items.map((t) => (
-              <TaskCard key={t.id} task={t} />
+              <TaskCard key={t.id} task={t} staff={staff} />
             ))}
             {data.total > data.items.length ? (
               <p className="px-1 pb-1 text-xs text-muted-foreground">
@@ -201,6 +262,11 @@ export function DispatchScreen() {
     () => ({ type, warehouseId, assignedTo }),
     [type, warehouseId, assignedTo],
   );
+  const ability = useAbility();
+  const canAssign = ability.can('assign', 'Task');
+  const staffQuery = useWarehouseStaff(canAssign);
+  const staff = canAssign ? (staffQuery.data ?? null) : null;
+  const warehouses = useWarehouses();
 
   // Luật 9: sự kiện việc chỉ invalidate prefix ['wms','tasks'], không vá cache bằng payload.
   useInvalidateOn(
@@ -248,10 +314,44 @@ export function DispatchScreen() {
             ))}
           </SelectContent>
         </Select>
-        <span className="text-xs text-muted-foreground">
-          Lọc theo kho và theo người nhận việc đọc từ URL (`warehouseId`, `assignedTo`) — chưa có
-          danh sách chọn vì API kho và danh bạ user chưa khai kiểu.
-        </span>
+        <Select
+          value={warehouseId || ALL_TYPES}
+          onValueChange={(v) =>
+            set({ filters: { ...state.filters, warehouseId: v === ALL_TYPES ? undefined : v } })
+          }
+        >
+          <SelectTrigger className="h-9 w-52" aria-label="Kho">
+            <SelectValue placeholder="Kho" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value={ALL_TYPES}>Kho: tất cả</SelectItem>
+            {(warehouses.data ?? []).map((w) => (
+              <SelectItem key={w.id} value={w.id}>
+                {w.name}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        {staff ? (
+          <Select
+            value={assignedTo || ALL_TYPES}
+            onValueChange={(v) =>
+              set({ filters: { ...state.filters, assignedTo: v === ALL_TYPES ? undefined : v } })
+            }
+          >
+            <SelectTrigger className="h-9 w-52" aria-label="Người nhận việc">
+              <SelectValue placeholder="Người nhận việc" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value={ALL_TYPES}>Người nhận: tất cả</SelectItem>
+              {staff.map((s) => (
+                <SelectItem key={s.id} value={s.id}>
+                  {s.fullName}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        ) : null}
       </div>
 
       <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
@@ -262,7 +362,14 @@ export function DispatchScreen() {
 
       <div className="grid items-start gap-3 md:grid-cols-2 xl:grid-cols-4">
         {LANES.map((l) => (
-          <Lane key={l.status} title={l.title} hint={l.hint} status={l.status} params={params} />
+          <Lane
+            key={l.status}
+            title={l.title}
+            hint={l.hint}
+            status={l.status}
+            params={params}
+            staff={staff}
+          />
         ))}
       </div>
 

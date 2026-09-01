@@ -458,6 +458,14 @@ export const handlers = [
     return HttpResponse.json({ items: all.slice(skip, skip + take), total: all.length });
   }),
 
+  // Danh bạ người nhận việc của bảng điều phối (GET /tasks/assignees)
+  http.get('/api/tasks/assignees', () =>
+    HttpResponse.json([
+      { id: 'staff-1', code: 'wh.1', fullName: 'Phạm Thị Hoa' },
+      { id: 'staff-2', code: 'wh.2', fullName: 'Trần Văn Bảo' },
+    ]),
+  ),
+
   // ── Quản trị: users / roles / permissions / departments ──
   http.get('/api/users', async ({ request }) => {
     const url = new URL(request.url);

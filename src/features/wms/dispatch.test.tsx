@@ -1,9 +1,21 @@
-import { screen, waitFor } from '@testing-library/react';
+import { fireEvent, screen, waitFor } from '@testing-library/react';
+import { http, HttpResponse } from 'msw';
 import { describe, expect, it, vi } from 'vitest';
 import { makeTasks, scenario } from '@/test/msw/handlers';
 import { server } from '@/test/msw/server';
 import { makeTestQueryClient, renderApp } from '@/test/render';
 import { DispatchScreen } from './components/dispatch-screen';
+
+// Radix Select cần ResizeObserver khi mở — jsdom không có
+vi.stubGlobal(
+  'ResizeObserver',
+  class {
+    observe() {}
+    unobserve() {}
+    disconnect() {}
+  },
+);
+window.HTMLElement.prototype.scrollIntoView = vi.fn();
 
 const replace = vi.fn();
 let search = '';
@@ -89,5 +101,49 @@ describe('DispatchScreen — GET /tasks (P1-12)', () => {
     expect(spy).toHaveBeenCalledWith({ queryKey: ['wms', 'tasks'] });
     expect(setSpy).not.toHaveBeenCalled();
     expect(screen.queryByText('GIẢ MẠO')).not.toBeInTheDocument();
+  });
+});
+
+describe('DispatchScreen — gán / trả việc (POST /tasks/:id/assign|unassign)', () => {
+  it('thẻ PENDING có ô "Gán cho…" → chọn người → POST assign đúng body', async () => {
+    search = '';
+    const assigned: Array<{ id: string; body: unknown }> = [];
+    server.use(
+      http.post('/api/tasks/:id/assign', async ({ request, params }) => {
+        assigned.push({ id: params.id as string, body: await request.json() });
+        return HttpResponse.json({
+          taskId: params.id,
+          docNumber: 'x',
+          status: 'ASSIGNED',
+          assignedTo: 'staff-1',
+        });
+      }),
+    );
+    renderApp(<DispatchScreen />);
+    const first = PENDING[0]!;
+    await screen.findByText(first.docNumber);
+    fireEvent.click(screen.getByRole('combobox', { name: `Gán ${first.docNumber}` }));
+    fireEvent.click(await screen.findByRole('option', { name: 'Phạm Thị Hoa' }));
+    await waitFor(() => expect(assigned).toEqual([{ id: first.id, body: { userId: 'staff-1' } }]));
+  });
+
+  it('thẻ ASSIGNED có "Trả về hàng đợi" → POST unassign', async () => {
+    search = '';
+    const unassigned: string[] = [];
+    server.use(
+      http.post('/api/tasks/:id/unassign', ({ params }) => {
+        unassigned.push(params.id as string);
+        return HttpResponse.json({
+          taskId: params.id,
+          docNumber: 'x',
+          status: 'PENDING',
+          assignedTo: null,
+        });
+      }),
+    );
+    renderApp(<DispatchScreen />);
+    const buttons = await screen.findAllByRole('button', { name: 'Trả về hàng đợi' });
+    fireEvent.click(buttons[0]!);
+    await waitFor(() => expect(unassigned).toHaveLength(1));
   });
 });

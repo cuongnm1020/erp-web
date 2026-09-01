@@ -1,4 +1,4 @@
-import { keepPreviousData, useQuery } from '@tanstack/react-query';
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api, unwrap } from '@/lib/api/client';
 import type { components } from '@/lib/api/schema';
 
@@ -6,6 +6,7 @@ import type { components } from '@/lib/api/schema';
 export type Task = components['schemas']['TaskRowDto'];
 export type TaskStatus = Task['status'];
 export type TaskType = Task['type'];
+export type WarehouseStaff = components['schemas']['TaskAssigneeDto'];
 
 export interface TaskListParams {
   status?: TaskStatus;
@@ -50,5 +51,40 @@ export function useTasks(params: TaskListParams) {
         }),
       ),
     placeholderData: keepPreviousData,
+  });
+}
+
+/**
+ * Danh bạ người nhận việc — GET /tasks/assignees (cần task.assign, KHÔNG cần
+ * user.read: supervisor kho không có quyền danh bạ chung).
+ */
+export function useWarehouseStaff(enabled: boolean) {
+  return useQuery({
+    queryKey: [...taskKeys.all, 'assignees'] as const,
+    queryFn: () => unwrap(api.GET('/tasks/assignees')),
+    enabled,
+    staleTime: 60_000,
+  });
+}
+
+/** POST /tasks/:id/assign — PENDING → ASSIGNED; server chặn user khóa / việc đang làm. */
+export function useAssignTask() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ taskId, userId }: { taskId: string; userId: string }) =>
+      unwrap(
+        api.POST('/tasks/{id}/assign', { params: { path: { id: taskId } }, body: { userId } }),
+      ),
+    onSuccess: () => void qc.invalidateQueries({ queryKey: taskKeys.all }),
+  });
+}
+
+/** POST /tasks/:id/unassign — ASSIGNED → PENDING (đổi người / nghỉ ca). */
+export function useUnassignTask() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (taskId: string) =>
+      unwrap(api.POST('/tasks/{id}/unassign', { params: { path: { id: taskId } } })),
+    onSuccess: () => void qc.invalidateQueries({ queryKey: taskKeys.all }),
   });
 }
