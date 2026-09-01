@@ -764,7 +764,8 @@ export interface paths {
         get?: never;
         put?: never;
         post?: never;
-        delete?: never;
+        /** Soft delete vị trí — chặn khi còn vị trí con đang dùng (422). */
+        delete: operations["WarehouseController_removeLocation"];
         options?: never;
         head?: never;
         patch: operations["WarehouseController_updateLocation"];
@@ -2791,6 +2792,19 @@ export interface components {
             address?: string;
             isActive?: boolean;
         };
+        LocationTreeNodeDto: {
+            children: components["schemas"]["LocationTreeNodeDto"][];
+            id: string;
+            warehouseId: string;
+            parentId: string | null;
+            code: string;
+            /** @enum {string} */
+            type: "ZONE" | "AISLE" | "RACK" | "BIN" | "STAGING" | "DOCK";
+            barcode: string | null;
+            pickSequence: number | null;
+            isPickable: boolean;
+            isActive: boolean;
+        };
         CreateLocationDto: {
             code: string;
             /** @enum {string} */
@@ -2800,6 +2814,18 @@ export interface components {
             barcode?: string;
             pickSequence?: number;
             isPickable?: boolean;
+        };
+        LocationDto: {
+            id: string;
+            warehouseId: string;
+            parentId: string | null;
+            code: string;
+            /** @enum {string} */
+            type: "ZONE" | "AISLE" | "RACK" | "BIN" | "STAGING" | "DOCK";
+            barcode: string | null;
+            pickSequence: number | null;
+            isPickable: boolean;
+            isActive: boolean;
         };
         UpdateLocationDto: {
             barcode?: string;
@@ -5057,7 +5083,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": Record<string, never>[];
+                    "application/json": components["schemas"]["LocationTreeNodeDto"][];
                 };
             };
         };
@@ -5078,6 +5104,27 @@ export interface operations {
         };
         responses: {
             201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LocationDto"];
+                };
+            };
+        };
+    };
+    WarehouseController_removeLocation: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                locationId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            204: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -5104,7 +5151,9 @@ export interface operations {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["LocationDto"];
+                };
             };
         };
     };

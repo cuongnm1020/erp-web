@@ -2,6 +2,7 @@
 
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Info, Plus } from 'lucide-react';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
@@ -48,20 +49,16 @@ import {
   useWarehouses,
   type Warehouse,
 } from '../api/use-warehouses';
+import { LocationsPanel } from './locations-panel';
 
 /**
- * G-02 Kho & vị trí — mặt kho nối API thật: GET/POST/PATCH/DELETE /warehouses.
+ * G-02 Kho & vị trí — nối API thật: GET/POST/PATCH/DELETE /warehouses; chọn một kho
+ * (searchParam ?wh= — luật 8, F5 giữ nguyên) mở cây vị trí bên dưới (LocationsPanel).
  * Xóa = soft delete (kho chuyển Ngừng dùng — tồn, chứng từ, vị trí giữ nguyên).
  * Quyền: đọc cần stock.read (đã gate ở nav/route); tạo/sửa/xóa cần stock.adjust
  * → Can I="adjust" a="Stock" (backend cũng chặn 403).
- * Phần CHƯA nối (endpoint cây vị trí chưa khai kiểu response — luật 2): cây vị trí
- * ZONE/AISLE/BIN, nhân sự kho, tồn theo ô kệ của bản UI-first cũ.
  */
 const PENDING_API: Array<{ title: string; need: string }> = [
-  {
-    title: 'Cây vị trí (zone / aisle / bin)',
-    need: 'GET /warehouses/:id/locations/tree chưa khai kiểu response',
-  },
   { title: 'Nhân sự kho, tồn theo ô kệ', need: 'chưa có endpoint tương ứng' },
 ];
 
@@ -203,6 +200,18 @@ export function WarehousesScreen() {
   const ability = useAbility();
   const canAdjust = ability.can('adjust', 'Stock');
   const [dialog, setDialog] = useState<{ open: boolean; warehouse?: Warehouse }>({ open: false });
+  const router = useRouter();
+  const pathname = usePathname();
+  const search = useSearchParams();
+  const selectedId = search.get('wh');
+  const selected = query.data?.find((w) => w.id === selectedId);
+  const selectWarehouse = (id: string) => {
+    const params = new URLSearchParams(search);
+    if (id === selectedId) params.delete('wh');
+    else params.set('wh', id);
+    const qs = params.toString();
+    router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
+  };
 
   return (
     <>
@@ -256,7 +265,12 @@ export function WarehousesScreen() {
                 </TableHeader>
                 <TableBody>
                   {warehouses.map((w) => (
-                    <TableRow key={w.id}>
+                    <TableRow
+                      key={w.id}
+                      className="cursor-pointer"
+                      data-state={w.id === selectedId ? 'selected' : undefined}
+                      onClick={() => selectWarehouse(w.id)}
+                    >
                       <TableCell className="px-2.5 py-1.5 font-mono text-xs">{w.code}</TableCell>
                       <TableCell className="px-2.5 py-1.5 font-semibold">{w.name}</TableCell>
                       <TableCell className="px-2.5 py-1.5 text-muted-foreground">
@@ -292,6 +306,14 @@ export function WarehousesScreen() {
           </div>
         )}
       </QueryState>
+
+      {selected ? (
+        <LocationsPanel warehouse={selected} canAdjust={canAdjust} />
+      ) : query.data && query.data.length > 0 ? (
+        <p className="mt-3 text-sm text-muted-foreground">
+          Chọn một kho trong bảng để xem và quản lý vị trí (khu / dãy / kệ / ô kệ).
+        </p>
+      ) : null}
 
       <section className="mt-3 rounded-md border bg-card">
         <header className="flex items-center gap-1.5 border-b px-3 py-2 text-sm font-semibold">
