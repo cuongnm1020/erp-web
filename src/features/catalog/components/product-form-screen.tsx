@@ -1,306 +1,649 @@
 'use client';
 
-// UI-first từ design canvas — dữ liệu mẫu, chưa nối API (nối ở phase FE-x).
-
-import { Plus } from 'lucide-react';
-import { PageHeader } from '@/components/layout/page-header';
-import { StatusBadge } from '@/components/data/status-badge';
-import { Button } from '@/components/ui/button';
-import { Checkbox } from '@/components/ui/checkbox';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { Info, Plus, X } from 'lucide-react';
+import Link from 'next/link';
+import { useRouter } from 'next/navigation';
+import { useEffect, useRef, useState } from 'react';
+import { useFieldArray, useForm, type UseFormReturn } from 'react-hook-form';
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
-import { cn } from '@/lib/cn';
+  applyServerErrors,
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from '@/components/data/form';
+import { DetailSkeleton, EmptyState, QueryState } from '@/components/data/states';
+import { PageHeader } from '@/components/layout/page-header';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { toast } from '@/components/ui/toaster';
+import { type ApiError } from '@/lib/api/errors';
+import { messageFor } from '@/lib/error-messages';
+import { Can } from '@/lib/permission';
+import {
+  useAddBarcode,
+  useBrands,
+  useCategories,
+  useCreateProduct,
+  useCreateSku,
+  useProduct,
+  useUoms,
+  useUpdateProduct,
+  useUpdateSku,
+  type ProductDetail,
+} from '../api/use-products';
+import { EMPTY_SKU_ROW, productFormSchema, type ProductFormValues } from '../schema';
 
-interface VariantMatrixRow {
-  color: string;
-  tip: string;
-  sku: string;
-  barcode: string | null;
-  price: string;
-}
-
-const SAMPLE_MATRIX: VariantMatrixRow[] = [
-  { color: 'Xanh', tip: '0.5', sku: 'TL08-BLUE-05', barcode: '8934567801234', price: '3.750' },
-  { color: 'Xanh', tip: '0.7', sku: 'TL08-BLUE-07', barcode: '8934567801241', price: '3.750' },
-  { color: 'Đỏ', tip: '0.5', sku: 'TL08-RED-05', barcode: '8934567801258', price: '3.750' },
-  { color: 'Đỏ', tip: '0.7', sku: 'TL08-RED-07', barcode: null, price: '3.750' },
-  { color: 'Đen', tip: '0.5', sku: 'TL08-BLACK-05', barcode: '8934567801272', price: '3.900' },
-  { color: 'Đen', tip: '0.7', sku: 'TL08-BLACK-07', barcode: null, price: '3.900' },
+/**
+ * C-02 Tạo / sửa sản phẩm — full page theo design/Products/ProductForm@2x.png.
+ * Điểm LỆCH so với artboard (API chưa cho phép — ghi ở thẻ PENDING_API):
+ * - Ma trận thuộc tính sinh biến thể (Màu × Ngòi): chưa có API thuộc tính → bảng SKU
+ *   nhập tay, nút "Thêm biến thể"; tên dòng mới mặc định = tên sản phẩm (sửa được).
+ * - Giá niêm yết theo biến thể: giá nằm ở bảng giá (PriceList), không phải trên SKU.
+ * - Mô tả ngắn / NCC chính / Ngưỡng đặt lại: Product chưa có trường tương ứng.
+ * - Nhóm thuế: hiện "Chưa cấu hình" đúng design (P3-01 chưa chốt cách tính thuế).
+ * Giữ đúng design: banner lỗi 422 trên đầu "N trường chưa hợp lệ — chưa lưu", lỗi map
+ * vào đúng dòng, dữ liệu đã nhập giữ nguyên; xóa dòng chỉ với biến thể CHƯA lưu, biến
+ * thể đã có chỉ "Ngừng bán"; Ctrl+S lưu, Esc hủy.
+ *
+ * Lưu KHÔNG atomic (API tách product / từng SKU): tạo cha xong mà một dòng SKU lỗi thì
+ * cha + các dòng trước đã vào DB — form nhớ lại (created ref), sửa dòng lỗi bấm Lưu
+ * tiếp sẽ chỉ gửi phần còn thiếu, không tạo trùng.
+ */
+const PENDING_API: Array<{ title: string; need: string }> = [
+  { title: 'Ma trận thuộc tính sinh biến thể', need: 'chưa có API thuộc tính sản phẩm' },
+  { title: 'Giá niêm yết theo biến thể', need: 'giá thuộc bảng giá — màn Bảng giá quản lý' },
+  { title: 'Mô tả ngắn, NCC chính, ngưỡng đặt lại', need: 'Product chưa có trường tương ứng' },
 ];
 
-function Kbd({ children, inverted }: { children: string; inverted?: boolean }) {
+const TRACKING_OPTIONS = [
+  { value: 'NONE', label: 'Không theo dõi' },
+  { value: 'LOT', label: 'Theo lô + hạn dùng (FEFO)' },
+  { value: 'SERIAL', label: 'Theo serial' },
+] as const;
+
+interface RowError {
+  index: number;
+  message: string;
+}
+
+/** Ghi chú design: focus nhảy tới ô sai đầu tiên — tìm theo name của RHF, không phá id của Form kit. */
+function focusSkuCode(index: number) {
+  document.querySelector<HTMLInputElement>(`input[name="skus.${index}.code"]`)?.focus();
+}
+
+function initialValues(p?: ProductDetail): ProductFormValues {
+  return {
+    code: p?.code ?? '',
+    name: p?.name ?? '',
+    categoryId: p?.categoryId ?? '',
+    brandId: p?.brandId ?? '',
+    trackingMode: p?.trackingMode ?? 'NONE',
+    shelfLifeDays: p?.shelfLifeDays == null ? '' : String(p.shelfLifeDays),
+    baseUom: p?.skus[0]?.baseUom.code ?? 'PCS',
+    skus: p
+      ? p.skus.map((s) => ({
+          skuId: s.id,
+          code: s.code,
+          name: s.name,
+          barcode: '',
+          isActive: s.isActive,
+          existingBarcode: s.barcodes[0]?.code ?? '',
+        }))
+      : [{ ...EMPTY_SKU_ROW }],
+  };
+}
+
+export function ProductFormScreen({ productId }: { productId?: string }) {
+  const editing = productId !== undefined && productId !== '';
+  const query = useProduct(productId ?? '');
+  if (!editing) return <ProductFormBody />;
   return (
-    <kbd
-      className={cn(
-        'rounded border px-1 font-mono text-xs',
-        inverted
-          ? 'border-primary-foreground/50 text-primary-foreground'
-          : 'border-input bg-muted text-muted-foreground',
-      )}
-    >
-      {children}
-    </kbd>
+    <QueryState query={query} skeleton={<DetailSkeleton fields={8} />}>
+      {(p) =>
+        p ? (
+          <ProductFormBody product={p} />
+        ) : (
+          <EmptyState title="Không tìm thấy sản phẩm" description="Sản phẩm có thể đã bị xóa." />
+        )
+      }
+    </QueryState>
   );
 }
 
-function Field({
-  label,
-  required,
-  hint,
-  children,
-}: {
-  label: string;
-  required?: boolean;
-  hint?: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <div className="flex flex-col gap-1">
-      <span className="text-xs text-muted-foreground">
-        {label} {required ? <span className="text-destructive">*</span> : null}
-      </span>
-      {children}
-      {hint ? <span className="text-xs text-muted-foreground">{hint}</span> : null}
-    </div>
-  );
-}
+function ProductFormBody({ product }: { product?: ProductDetail }) {
+  const editing = product !== undefined;
+  const router = useRouter();
+  const categories = useCategories();
+  const brands = useBrands();
+  const uoms = useUoms();
+  const createProduct = useCreateProduct();
+  const updateProduct = useUpdateProduct(product?.id ?? '');
+  const createSku = useCreateSku();
+  const updateSku = useUpdateSku();
+  const addBarcode = useAddBarcode();
 
-function FakeInput({
-  value,
-  placeholder,
-  select,
-  readOnly,
-  focus,
-  mono,
-  right,
-  muted,
-}: {
-  value?: string;
-  placeholder?: string;
-  select?: boolean;
-  readOnly?: boolean;
-  focus?: boolean;
-  mono?: boolean;
-  right?: boolean;
-  muted?: boolean;
-}) {
-  return (
-    <div
-      className={cn(
-        'flex h-8 items-center gap-1 rounded-md border bg-background px-2 text-sm',
-        focus ? 'border-primary ring-1 ring-primary' : 'border-input',
-        readOnly && 'bg-muted',
-        mono && 'font-mono text-xs',
-        right && 'justify-end tabular-nums',
-      )}
-    >
-      <span className={cn('truncate', (placeholder ?? muted) && 'text-muted-foreground')}>
-        {value ?? placeholder}
-      </span>
-      {select ? <span className="ml-auto text-muted-foreground">▾</span> : null}
-    </div>
-  );
-}
+  const form = useForm<ProductFormValues>({
+    resolver: zodResolver(productFormSchema),
+    defaultValues: initialValues(product),
+  });
+  const rows = useFieldArray({ control: form.control, name: 'skus' });
+  const [rowErrors, setRowErrors] = useState<RowError[]>([]);
+  const [saving, setSaving] = useState(false);
+  /** Tạo cha xong mà dòng SKU lỗi → nhớ để lần Lưu sau không tạo trùng (lưu không atomic). */
+  const created = useRef<{ productId: string; doneRows: Set<number> } | null>(null);
 
-function AttrChip({ dashed, children }: { dashed?: boolean; children: React.ReactNode }) {
-  return (
-    <span
-      className={cn(
-        'inline-flex h-7 items-center gap-1.5 rounded-md border border-input bg-card px-2 text-sm',
-        dashed && 'border-dashed text-muted-foreground',
-      )}
-    >
-      {children}
-    </span>
-  );
-}
+  const trackingMode = form.watch('trackingMode');
 
-const HEAD = 'px-2.5 text-xs';
-
-export function ProductFormScreen() {
-  return (
-    <div className="flex min-h-full flex-col">
-      <PageHeader
-        title="Sửa sản phẩm"
-        description="Sản phẩm cha TL08 · 6 biến thể · Tạo 02/03/2025 · Sửa lần cuối 21/08/2026"
-        breadcrumb={[
-          { label: 'Sản phẩm', href: '/catalog/products' },
-          { label: 'Danh sách', href: '/catalog/products' },
-          { label: 'Bút bi Thiên Long TL-08' },
-          { label: 'Sửa' },
-        ]}
-        actions={
-          <>
-            <StatusBadge tone="draft">Đang sửa</StatusBadge>
-            <Button variant="ghost" size="sm">
-              Hủy <Kbd>Esc</Kbd>
-            </Button>
-            <Button size="sm">
-              Lưu thay đổi <Kbd inverted>Ctrl S</Kbd>
-            </Button>
-          </>
+  const onSubmit = form.handleSubmit(async (v) => {
+    setSaving(true);
+    setRowErrors([]);
+    const errors: RowError[] = [];
+    try {
+      // 1. Sản phẩm cha
+      let pid = editing ? product.id : created.current?.productId;
+      const headerBody = {
+        name: v.name,
+        ...(v.categoryId ? { categoryId: v.categoryId } : {}),
+        ...(v.brandId ? { brandId: v.brandId } : {}),
+        trackingMode: v.trackingMode,
+        ...(v.shelfLifeDays ? { shelfLifeDays: Number.parseInt(v.shelfLifeDays, 10) } : {}),
+      };
+      if (!pid) {
+        try {
+          const p = await createProduct.mutateAsync({ code: v.code, ...headerBody });
+          pid = p.id;
+          created.current = { productId: p.id, doneRows: new Set() };
+        } catch (err) {
+          applyServerErrors(form, err as ApiError, {
+            knownFields: ['code', 'name', 'categoryId', 'brandId', 'trackingMode'],
+          });
+          return;
         }
-      />
+      } else if (editing) {
+        try {
+          await updateProduct.mutateAsync(headerBody);
+        } catch (err) {
+          applyServerErrors(form, err as ApiError, {
+            knownFields: ['name', 'categoryId', 'brandId', 'trackingMode'],
+          });
+          return;
+        }
+      }
 
-      <div className="mb-3 rounded-md border bg-card p-3">
-        <div className="grid grid-cols-[2fr_1.2fr_1fr_0.8fr_0.8fr] gap-3">
-          <Field
-            label="Tên sản phẩm"
-            required
-            hint={'Tên biến thể tự ghép: Tên + thuộc tính (ví dụ "… xanh 0.5")'}
+      // 2. Từng dòng biến thể — lỗi dòng nào ghi dòng đó, các dòng khác vẫn lưu
+      for (let i = 0; i < v.skus.length; i += 1) {
+        const row = v.skus[i]!;
+        try {
+          if (!row.skuId && !created.current?.doneRows.has(i)) {
+            await createSku.mutateAsync({
+              productId: pid,
+              body: {
+                code: row.code,
+                name: row.name,
+                baseUom: v.baseUom,
+                ...(row.barcode ? { barcodes: [{ code: row.barcode }] } : {}),
+              },
+            });
+            created.current?.doneRows.add(i);
+          } else if (row.skuId) {
+            const dirty = form.formState.dirtyFields.skus?.[i];
+            if (dirty?.name || dirty?.isActive) {
+              await updateSku.mutateAsync({
+                skuId: row.skuId,
+                body: { name: row.name, isActive: row.isActive },
+              });
+            }
+            if (row.barcode && !row.existingBarcode) {
+              await addBarcode.mutateAsync({ skuId: row.skuId, code: row.barcode });
+            }
+          }
+        } catch (err) {
+          const msg = messageFor(err);
+          errors.push({ index: i, message: msg });
+          form.setError(`skus.${i}.code`, { message: msg });
+        }
+      }
+
+      if (errors.length > 0) {
+        setRowErrors(errors);
+        focusSkuCode(errors[0]!.index);
+        return;
+      }
+      toast.success(editing ? 'Đã lưu thay đổi' : 'Đã lưu sản phẩm', {
+        description: `${v.code} · ${v.skus.length} biến thể`,
+      });
+      router.push('/catalog/products');
+    } finally {
+      setSaving(false);
+    }
+  });
+
+  // Ctrl+S lưu (design) — qua ref để listener gắn một lần
+  const submitRef = useRef<() => void>(() => {});
+  useEffect(() => {
+    submitRef.current = () => void onSubmit();
+  });
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') {
+        e.preventDefault();
+        submitRef.current();
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
+
+  const saveLabel = editing ? 'Lưu thay đổi' : 'Lưu sản phẩm';
+  const newRowCount = form.getValues('skus').filter((r) => !r.skuId).length;
+
+  return (
+    <Form {...form}>
+      <form id="product-form" onSubmit={onSubmit} noValidate className="flex flex-col gap-3">
+        <PageHeader
+          title={editing ? 'Sửa sản phẩm' : 'Tạo sản phẩm'}
+          description={
+            editing
+              ? `Sản phẩm cha ${product.code} · ${product.skus.length} biến thể`
+              : 'Sản phẩm cha + các biến thể / SKU — lưu xong bổ sung quy đổi ĐVT ở màn chi tiết'
+          }
+          breadcrumb={[
+            { label: 'Sản phẩm', href: '/catalog/products' },
+            { label: 'Danh sách', href: '/catalog/products' },
+            { label: editing ? 'Sửa' : 'Tạo sản phẩm' },
+          ]}
+          actions={
+            <>
+              <Button variant="ghost" size="sm" asChild>
+                <Link href="/catalog/products">Hủy bỏ</Link>
+              </Button>
+              <Can I={editing ? 'update' : 'create'} a="Product">
+                <Button size="sm" type="submit" form="product-form" disabled={saving}>
+                  {saving ? 'Đang lưu…' : saveLabel}{' '}
+                  <kbd className="rounded-sm border border-primary-foreground/50 px-1 font-mono text-xs">
+                    Ctrl S
+                  </kbd>
+                </Button>
+              </Can>
+            </>
+          }
+        />
+
+        {rowErrors.length > 0 ? (
+          <div
+            role="alert"
+            className="rounded-md border border-destructive/40 bg-destructive/5 px-3 py-2 text-sm"
           >
-            <FakeInput value="Bút bi Thiên Long TL-08" focus />
-          </Field>
-          <Field label="Danh mục" required>
-            <FakeInput value="Bút viết / Bút bi" select />
-          </Field>
-          <Field label="Thương hiệu">
-            <FakeInput value="Thiên Long" select />
-          </Field>
-          <Field label="ĐVT cơ bản" required>
-            <FakeInput value="cái" select />
-          </Field>
-          <Field label="Nhóm thuế">
-            <FakeInput placeholder="Chưa cấu hình" select />
-          </Field>
-        </div>
-        <div className="mt-3 grid grid-cols-[2fr_1.2fr_1fr_0.8fr_0.8fr] gap-3">
-          <Field label="Mô tả ngắn">
-            <FakeInput value="Ngòi bi, mực dầu, viết êm, nắp đậy cùng màu mực" muted />
-          </Field>
-          <Field label="NCC chính">
-            <FakeInput value="Thiên Long Group" select />
-          </Field>
-          <Field label="Theo dõi lô / HSD">
-            <div className="flex h-8 items-center gap-2 text-sm">
-              <Checkbox aria-label="Theo dõi lô / HSD" checked />
-              <span>Có · HSD 36 tháng</span>
-            </div>
-          </Field>
-          <Field label="Ngưỡng đặt lại">
-            <FakeInput value="5.000" right />
-          </Field>
-          <Field label="Mã cha">
-            <FakeInput value="TL08" readOnly mono />
-          </Field>
-        </div>
-      </div>
+            <span className="font-semibold text-destructive">
+              {rowErrors.length} dòng chưa hợp lệ — chưa lưu hết.
+            </span>{' '}
+            Dữ liệu bạn nhập vẫn được giữ nguyên; phần hợp lệ đã lưu.{' '}
+            {rowErrors.map((e) => (
+              <button
+                key={e.index}
+                type="button"
+                className="mr-2 text-destructive underline"
+                onClick={() => focusSkuCode(e.index)}
+              >
+                Dòng {e.index + 1}: {e.message}
+              </button>
+            ))}
+          </div>
+        ) : null}
 
-      <div className="overflow-hidden rounded-md border bg-card">
-        <div className="flex items-center justify-between border-b px-3 py-2">
-          <span className="text-sm font-semibold">
-            Thuộc tính sinh biến thể{' '}
-            <span className="font-normal text-muted-foreground">
-              · 2 thuộc tính → 3 × 2 = 6 biến thể
+        <section className="rounded-md border bg-card">
+          <header className="border-b px-3 py-2 text-sm font-semibold">Thông tin chung</header>
+          <div className="grid gap-x-4 gap-y-3 px-3 py-3 sm:grid-cols-2 lg:grid-cols-5">
+            <FormField
+              control={form.control}
+              name="name"
+              render={({ field }) => (
+                <FormItem className="lg:col-span-2">
+                  <FormLabel>Tên sản phẩm *</FormLabel>
+                  <FormControl>
+                    <Input autoFocus={!editing} placeholder="Bút bi Thiên Long TL-08" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="categoryId"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Danh mục</FormLabel>
+                  <Select
+                    value={field.value || 'none'}
+                    onValueChange={(x) => field.onChange(x === 'none' ? '' : x)}
+                  >
+                    <FormControl>
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      <SelectItem value="none">Không phân loại</SelectItem>
+                      {(categories.data ?? []).map((c) => (
+                        <SelectItem key={c.id} value={c.id}>
+                          {c.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="brandId"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Thương hiệu</FormLabel>
+                  <Select
+                    value={field.value || 'none'}
+                    onValueChange={(x) => field.onChange(x === 'none' ? '' : x)}
+                  >
+                    <FormControl>
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      <SelectItem value="none">Không thương hiệu</SelectItem>
+                      {(brands.data ?? []).map((b) => (
+                        <SelectItem key={b.id} value={b.id}>
+                          {b.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="baseUom"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>ĐVT cơ bản *</FormLabel>
+                  <Select value={field.value} onValueChange={field.onChange} disabled={editing}>
+                    <FormControl>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Chọn ĐVT" />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      {(uoms.data ?? []).map((u) => (
+                        <SelectItem key={u.id} value={u.code}>
+                          {u.code} — {u.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  {editing ? (
+                    <p className="text-xs text-muted-foreground">
+                      ĐVT lưu kho không đổi sau khi tạo
+                    </p>
+                  ) : null}
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="trackingMode"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Theo dõi lô / HSD</FormLabel>
+                  <Select value={field.value} onValueChange={field.onChange}>
+                    <FormControl>
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      {TRACKING_OPTIONS.map((o) => (
+                        <SelectItem key={o.value} value={o.value}>
+                          {o.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            {trackingMode === 'LOT' ? (
+              <FormField
+                control={form.control}
+                name="shelfLifeDays"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Hạn dùng (ngày)</FormLabel>
+                    <FormControl>
+                      <Input
+                        inputMode="numeric"
+                        placeholder="1080"
+                        className="text-right tabular-nums"
+                        {...field}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            ) : null}
+            <FormField
+              control={form.control}
+              name="code"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Mã cha *</FormLabel>
+                  <FormControl>
+                    <Input placeholder="TL08" className="font-mono" disabled={editing} {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormItem>
+              <FormLabel>Nhóm thuế</FormLabel>
+              <Input value="Chưa cấu hình" disabled />
+            </FormItem>
+          </div>
+        </section>
+
+        <section className="rounded-md border bg-card">
+          <header className="flex items-center justify-between border-b px-3 py-2">
+            <span className="text-sm font-semibold">
+              Biến thể / SKU{' '}
+              <span className="font-normal text-muted-foreground">
+                · {rows.fields.length} dòng{newRowCount > 0 ? ` · ${newRowCount} mới` : ''}
+              </span>
             </span>
-          </span>
-          <Button variant="outline" size="sm" className="h-7">
-            <Plus /> Thêm thuộc tính
-          </Button>
-        </div>
-        <div className="grid grid-cols-2 gap-x-6 gap-y-3 border-b p-3">
-          <Field label="Màu">
-            <div className="flex flex-wrap gap-1.5">
-              <AttrChip>
-                Xanh <span className="text-muted-foreground">✕</span>
-              </AttrChip>
-              <AttrChip>
-                Đỏ <span className="text-muted-foreground">✕</span>
-              </AttrChip>
-              <AttrChip>
-                Đen <span className="text-muted-foreground">✕</span>
-              </AttrChip>
-              <AttrChip dashed>+ giá trị</AttrChip>
-            </div>
-          </Field>
-          <Field label="Ngòi (mm)">
-            <div className="flex flex-wrap gap-1.5">
-              <AttrChip>
-                0.5 <span className="text-muted-foreground">✕</span>
-              </AttrChip>
-              <AttrChip>
-                0.7 <span className="text-muted-foreground">✕</span>
-              </AttrChip>
-              <AttrChip dashed>+ giá trị</AttrChip>
-            </div>
-          </Field>
-        </div>
-        <div className="flex items-center gap-1.5 border-b px-3 py-1.5 text-xs text-muted-foreground">
-          <span className="font-semibold text-foreground">Ma trận biến thể</span>
-          <span>· 6 dòng, tích để tạo</span>
-          <span className="ml-auto">
-            Áp cho tất cả: <span className="text-primary">giá</span> ·{' '}
-            <span className="text-primary">trạng thái</span>
-          </span>
-        </div>
-        <div className="overflow-x-auto">
-          <Table>
-            <TableHeader>
-              <TableRow className="bg-muted hover:bg-muted">
-                <TableHead className="w-8 px-2.5">
-                  <Checkbox aria-label="Chọn tất cả biến thể" checked />
-                </TableHead>
-                <TableHead className={cn(HEAD, 'w-24')}>Màu</TableHead>
-                <TableHead className={cn(HEAD, 'w-24')}>Ngòi</TableHead>
-                <TableHead className={cn(HEAD, 'w-56')}>SKU (gợi ý, sửa được)</TableHead>
-                <TableHead className={cn(HEAD, 'w-52')}>Barcode lẻ</TableHead>
-                <TableHead className={cn(HEAD, 'w-32 text-right')}>Giá niêm yết</TableHead>
-                <TableHead className={cn(HEAD, 'w-36')}>Trạng thái</TableHead>
-                <TableHead className={cn(HEAD, 'w-8')} />
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {SAMPLE_MATRIX.map((v) => (
-                <TableRow key={v.sku}>
-                  <TableCell className="px-2.5 py-1.5">
-                    <Checkbox aria-label={`Tạo ${v.sku}`} checked />
-                  </TableCell>
-                  <TableCell className="px-2.5 py-1.5">{v.color}</TableCell>
-                  <TableCell className="px-2.5 py-1.5">{v.tip}</TableCell>
-                  <TableCell className="px-2.5 py-1.5">
-                    <FakeInput value={v.sku} mono />
-                  </TableCell>
-                  <TableCell className="px-2.5 py-1.5">
-                    {v.barcode ? (
-                      <FakeInput value={v.barcode} mono />
-                    ) : (
-                      <FakeInput placeholder="quét hoặc nhập" mono />
-                    )}
-                  </TableCell>
-                  <TableCell className="px-2.5 py-1.5">
-                    <FakeInput value={v.price} right />
-                  </TableCell>
-                  <TableCell className="px-2.5 py-1.5">
-                    <FakeInput value="Đang bán" select />
-                  </TableCell>
-                  <TableCell className="px-2.5 py-1.5 text-muted-foreground">✕</TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </div>
-      </div>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => rows.append({ ...EMPTY_SKU_ROW, name: form.getValues('name') })}
+            >
+              <Plus aria-hidden />
+              Thêm biến thể
+            </Button>
+          </header>
+          <div className="flex flex-col divide-y">
+            {rows.fields.map((f, i) => (
+              <SkuRow
+                key={f.id}
+                form={form}
+                index={i}
+                editing={editing}
+                onRemove={
+                  // Design: chỉ xóa dòng CHƯA lưu; biến thể đã có chỉ "Ngừng bán"
+                  !form.getValues(`skus.${i}.skuId`) && rows.fields.length > 1
+                    ? () => rows.remove(i)
+                    : undefined
+                }
+              />
+            ))}
+          </div>
+          <p className="border-t px-3 py-2 text-xs text-muted-foreground">
+            Biến thể chưa có barcode bổ sung được sau. Mã SKU đã dùng không đổi được sau khi có
+            chứng từ; biến thể đã lưu không xóa — chỉ Ngừng bán.
+          </p>
+          {form.formState.errors.skus?.root?.message || form.formState.errors.skus?.message ? (
+            <p className="border-t px-3 py-2 text-sm text-destructive">
+              {form.formState.errors.skus.root?.message ?? form.formState.errors.skus.message}
+            </p>
+          ) : null}
+        </section>
 
-      <div className="sticky bottom-0 mt-3 flex items-center gap-2 rounded-md border bg-card px-3 py-2 shadow-sm">
-        <span className="text-sm text-muted-foreground">
-          6 biến thể · 2 chưa có barcode (có thể bổ sung sau) · Số SKU đã dùng không đổi được sau
-          khi có chứng từ
-        </span>
-        <div className="ml-auto flex items-center gap-2">
-          <Button variant="ghost" size="sm">
-            Hủy <Kbd>Esc</Kbd>
-          </Button>
-          <Button size="sm">
-            Lưu thay đổi <Kbd inverted>Ctrl S</Kbd>
-          </Button>
+        <section className="rounded-md border bg-card">
+          <header className="flex items-center gap-1.5 border-b px-3 py-2 text-sm font-semibold">
+            <Info className="h-3.5 w-3.5 text-muted-foreground" aria-hidden />
+            Bổ sung khi API sẵn sàng
+          </header>
+          <ul className="flex flex-col gap-1.5 px-3 py-2 text-sm">
+            {PENDING_API.map((m) => (
+              <li key={m.title}>
+                <span className="font-medium">{m.title}</span>{' '}
+                <span className="text-xs text-muted-foreground">— {m.need}</span>
+              </li>
+            ))}
+          </ul>
+        </section>
+      </form>
+    </Form>
+  );
+}
+
+/** Một dòng biến thể: mã (khóa khi đã lưu) · tên · barcode lẻ · trạng thái (khi sửa). */
+function SkuRow({
+  form,
+  index,
+  editing,
+  onRemove,
+}: {
+  form: UseFormReturn<ProductFormValues>;
+  index: number;
+  editing: boolean;
+  onRemove?: () => void;
+}) {
+  const skuId = form.getValues(`skus.${index}.skuId`);
+  const existingBarcode = form.getValues(`skus.${index}.existingBarcode`);
+  const saved = skuId !== '';
+
+  return (
+    <div className="grid items-start gap-2 px-3 py-2 sm:grid-cols-[150px_minmax(180px,1fr)_170px_150px_32px]">
+      <FormField
+        control={form.control}
+        name={`skus.${index}.code`}
+        render={({ field }) => (
+          <FormItem>
+            <FormLabel className="sr-only">Mã SKU</FormLabel>
+            <FormControl>
+              <Input placeholder="TL08-BLUE-05" className="font-mono" disabled={saved} {...field} />
+            </FormControl>
+            <FormMessage />
+          </FormItem>
+        )}
+      />
+      <FormField
+        control={form.control}
+        name={`skus.${index}.name`}
+        render={({ field }) => (
+          <FormItem>
+            <FormLabel className="sr-only">Tên biến thể</FormLabel>
+            <FormControl>
+              <Input placeholder="Bút bi Thiên Long TL-08 xanh 0.5" {...field} />
+            </FormControl>
+            <FormMessage />
+          </FormItem>
+        )}
+      />
+      {existingBarcode ? (
+        <div
+          className="pt-2 font-mono text-sm text-muted-foreground"
+          title="Quản lý barcode đầy đủ ở màn chi tiết"
+        >
+          {existingBarcode}
         </div>
-      </div>
+      ) : (
+        <FormField
+          control={form.control}
+          name={`skus.${index}.barcode`}
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel className="sr-only">Barcode lẻ</FormLabel>
+              <FormControl>
+                <Input
+                  placeholder="quét hoặc nhập"
+                  className="font-mono"
+                  {...field}
+                  value={field.value ?? ''}
+                />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+      )}
+      {editing && saved ? (
+        <FormField
+          control={form.control}
+          name={`skus.${index}.isActive`}
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel className="sr-only">Trạng thái</FormLabel>
+              <Select
+                value={field.value ? 'active' : 'inactive'}
+                onValueChange={(v) => field.onChange(v === 'active')}
+              >
+                <FormControl>
+                  <SelectTrigger aria-label="Trạng thái">
+                    <SelectValue />
+                  </SelectTrigger>
+                </FormControl>
+                <SelectContent>
+                  <SelectItem value="active">Đang bán</SelectItem>
+                  <SelectItem value="inactive">Ngừng bán</SelectItem>
+                </SelectContent>
+              </Select>
+            </FormItem>
+          )}
+        />
+      ) : (
+        <div className="pt-2 text-sm text-muted-foreground">Đang bán</div>
+      )}
+      {onRemove ? (
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon"
+          className="h-8 w-8"
+          aria-label="Xóa dòng"
+          title="Xóa dòng (chỉ dòng chưa lưu)"
+          onClick={onRemove}
+        >
+          <X aria-hidden />
+        </Button>
+      ) : (
+        <span />
+      )}
     </div>
   );
 }

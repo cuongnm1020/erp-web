@@ -508,6 +508,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/skus": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Danh sách SKU phẳng cho màn Sản phẩm — kèm tồn gộp (design/Products/ProductList). */
+        get: operations["ProductController_listSkus"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/skus/{id}": {
         parameters: {
             query?: never;
@@ -683,6 +700,57 @@ export interface paths {
         options?: never;
         head?: never;
         patch: operations["WarehouseController_updateLocation"];
+        trace?: never;
+    };
+    "/stock": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Tồn gộp theo SKU — ba con số onHand / reserved / available tách riêng. */
+        get: operations["InventoryController_list"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/stock/by-location": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Bóc theo vị trí, sắp theo thứ tự đi trong kho. */
+        get: operations["InventoryController_byLocation"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/stock/by-lot": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Bóc theo lô, sắp theo hạn dùng tăng dần (FEFO). */
+        get: operations["InventoryController_byLot"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
         trace?: never;
     };
     "/attributes": {
@@ -1175,57 +1243,6 @@ export interface paths {
             cookie?: never;
         };
         get: operations["ExportController_download"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/stock": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Tồn gộp theo SKU — ba con số onHand / reserved / available tách riêng. */
-        get: operations["InventoryController_list"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/stock/by-location": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Bóc theo vị trí, sắp theo thứ tự đi trong kho. */
-        get: operations["InventoryController_byLocation"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/stock/by-lot": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Bóc theo lô, sắp theo hạn dùng tăng dần (FEFO). */
-        get: operations["InventoryController_byLot"];
         put?: never;
         post?: never;
         delete?: never;
@@ -2507,6 +2524,17 @@ export interface components {
             trackingMode?: "NONE" | "LOT" | "SERIAL";
             shelfLifeDays?: number;
         };
+        ProductCoreDto: {
+            id: string;
+            code: string;
+            name: string;
+            categoryId: string | null;
+            brandId: string | null;
+            /** @enum {string} */
+            trackingMode: "NONE" | "LOT" | "SERIAL";
+            shelfLifeDays: number | null;
+            isActive: boolean;
+        };
         UpdateProductDto: {
             name?: string;
             /** Format: uuid */
@@ -2552,6 +2580,29 @@ export interface components {
             baseUom: components["schemas"]["UomDto"];
             barcodes: components["schemas"]["SkuBarcodeDto"][];
             uomConversions: components["schemas"]["SkuUomConversionDto"][];
+        };
+        SkuListRowDto: {
+            skuId: string;
+            code: string;
+            name: string;
+            productId: string;
+            productCode: string;
+            productName: string;
+            categoryName: string | null;
+            brandName: string | null;
+            baseUomCode: string;
+            barcodeCount: number;
+            isActive: boolean;
+            /** @description Decimal(18,6) dạng chuỗi — ĐVT cơ sở, gộp mọi kho. */
+            onHand: string;
+            /** @description Decimal(18,6) dạng chuỗi. */
+            reserved: string;
+            /** @description `onHand - reserved` — có thể ÂM khi giữ cho đơn nhiều hơn tồn thực. */
+            available: string;
+        };
+        SkuListResponseDto: {
+            items: components["schemas"]["SkuListRowDto"][];
+            total: number;
         };
         UpdateSkuDto: {
             name?: string;
@@ -2611,6 +2662,63 @@ export interface components {
             pickSequence?: number;
             isPickable?: boolean;
             isActive?: boolean;
+        };
+        StockRowDto: {
+            skuId: string;
+            skuCode: string;
+            skuName: string;
+            /** @description Đơn vị lưu kho — mọi con số dưới đây tính theo đơn vị này. */
+            baseUomId: string;
+            baseUomCode: string;
+            isActive: boolean;
+            /** @description Decimal(18,6) dạng chuỗi. */
+            onHand: string;
+            /** @description Decimal(18,6) dạng chuỗi. */
+            reserved: string;
+            /** @description `onHand - reserved`, Decimal(18,6) dạng chuỗi. Có thể âm nếu tồn bị lệch. */
+            available: string;
+        };
+        StockListResponseDto: {
+            items: components["schemas"]["StockRowDto"][];
+            total: number;
+        };
+        StockByLocationRowDto: {
+            skuId: string;
+            skuCode: string;
+            skuName: string;
+            warehouseId: string;
+            warehouseCode: string;
+            locationId: string;
+            locationCode: string;
+            /** @enum {string} */
+            locationType: "ZONE" | "AISLE" | "RACK" | "BIN" | "STAGING" | "DOCK" | "QUARANTINE";
+            isPickable: boolean;
+            pickSequence: number | null;
+            onHand: string;
+            reserved: string;
+            available: string;
+        };
+        StockByLocationResponseDto: {
+            items: components["schemas"]["StockByLocationRowDto"][];
+            total: number;
+        };
+        StockByLotRowDto: {
+            skuId: string;
+            skuCode: string;
+            skuName: string;
+            /** @description null = tồn không theo lô. */
+            lotId: string | null;
+            lotNumber: string | null;
+            /** @description Hạn dùng, ISO date — sắp xếp tăng dần chính là thứ tự FEFO. */
+            expiryDate: string | null;
+            mfgDate: string | null;
+            onHand: string;
+            reserved: string;
+            available: string;
+        };
+        StockByLotResponseDto: {
+            items: components["schemas"]["StockByLotRowDto"][];
+            total: number;
         };
         AttributeValueDto: {
             code: string;
@@ -2743,63 +2851,6 @@ export interface components {
                 [key: string]: string;
             };
             dryRun?: boolean;
-        };
-        StockRowDto: {
-            skuId: string;
-            skuCode: string;
-            skuName: string;
-            /** @description Đơn vị lưu kho — mọi con số dưới đây tính theo đơn vị này. */
-            baseUomId: string;
-            baseUomCode: string;
-            isActive: boolean;
-            /** @description Decimal(18,6) dạng chuỗi. */
-            onHand: string;
-            /** @description Decimal(18,6) dạng chuỗi. */
-            reserved: string;
-            /** @description `onHand - reserved`, Decimal(18,6) dạng chuỗi. Có thể âm nếu tồn bị lệch. */
-            available: string;
-        };
-        StockListResponseDto: {
-            items: components["schemas"]["StockRowDto"][];
-            total: number;
-        };
-        StockByLocationRowDto: {
-            skuId: string;
-            skuCode: string;
-            skuName: string;
-            warehouseId: string;
-            warehouseCode: string;
-            locationId: string;
-            locationCode: string;
-            /** @enum {string} */
-            locationType: "ZONE" | "AISLE" | "RACK" | "BIN" | "STAGING" | "DOCK" | "QUARANTINE";
-            isPickable: boolean;
-            pickSequence: number | null;
-            onHand: string;
-            reserved: string;
-            available: string;
-        };
-        StockByLocationResponseDto: {
-            items: components["schemas"]["StockByLocationRowDto"][];
-            total: number;
-        };
-        StockByLotRowDto: {
-            skuId: string;
-            skuCode: string;
-            skuName: string;
-            /** @description null = tồn không theo lô. */
-            lotId: string | null;
-            lotNumber: string | null;
-            /** @description Hạn dùng, ISO date — sắp xếp tăng dần chính là thứ tự FEFO. */
-            expiryDate: string | null;
-            mfgDate: string | null;
-            onHand: string;
-            reserved: string;
-            available: string;
-        };
-        StockByLotResponseDto: {
-            items: components["schemas"]["StockByLotRowDto"][];
-            total: number;
         };
         SalesOrderCustomerDto: {
             id: string;
@@ -4370,7 +4421,9 @@ export interface operations {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["ProductCoreDto"];
+                };
             };
         };
     };
@@ -4433,7 +4486,9 @@ export interface operations {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["ProductCoreDto"];
+                };
             };
         };
     };
@@ -4457,7 +4512,32 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": Record<string, never>;
+                    "application/json": components["schemas"]["SkuDetailDto"];
+                };
+            };
+        };
+    };
+    ProductController_listSkus: {
+        parameters: {
+            query: {
+                q?: string;
+                /** @description Lọc theo trạng thái bán — bỏ trống = cả hai. */
+                status?: "active" | "inactive";
+                take: number;
+                skip: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SkuListResponseDto"];
                 };
             };
         };
@@ -4502,7 +4582,9 @@ export interface operations {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["SkuSummaryDto"];
+                };
             };
         };
     };
@@ -4760,6 +4842,88 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+        };
+    };
+    InventoryController_list: {
+        parameters: {
+            query: {
+                /** @description Lọc theo mã / tên SKU (không phân biệt hoa thường). */
+                q?: string;
+                /** @description Chỉ tính tồn trong kho này (lọc qua `Location.warehouseId`). */
+                warehouseId?: string;
+                take: number;
+                skip: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StockListResponseDto"];
+                };
+            };
+        };
+    };
+    InventoryController_byLocation: {
+        parameters: {
+            query: {
+                /** @description Lọc theo mã / tên SKU (không phân biệt hoa thường). */
+                q?: string;
+                /** @description Chỉ tính tồn trong kho này (lọc qua `Location.warehouseId`). */
+                warehouseId?: string;
+                take: number;
+                skip: number;
+                skuId?: string;
+                locationId?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StockByLocationResponseDto"];
+                };
+            };
+        };
+    };
+    InventoryController_byLot: {
+        parameters: {
+            query: {
+                /** @description Lọc theo mã / tên SKU (không phân biệt hoa thường). */
+                q?: string;
+                /** @description Chỉ tính tồn trong kho này (lọc qua `Location.warehouseId`). */
+                warehouseId?: string;
+                take: number;
+                skip: number;
+                skuId?: string;
+                locationId?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StockByLotResponseDto"];
+                };
             };
         };
     };
@@ -5519,88 +5683,6 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
-            };
-        };
-    };
-    InventoryController_list: {
-        parameters: {
-            query: {
-                /** @description Lọc theo mã / tên SKU (không phân biệt hoa thường). */
-                q?: string;
-                /** @description Chỉ tính tồn trong kho này (lọc qua `Location.warehouseId`). */
-                warehouseId?: string;
-                take: number;
-                skip: number;
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["StockListResponseDto"];
-                };
-            };
-        };
-    };
-    InventoryController_byLocation: {
-        parameters: {
-            query: {
-                /** @description Lọc theo mã / tên SKU (không phân biệt hoa thường). */
-                q?: string;
-                /** @description Chỉ tính tồn trong kho này (lọc qua `Location.warehouseId`). */
-                warehouseId?: string;
-                take: number;
-                skip: number;
-                skuId?: string;
-                locationId?: string;
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["StockByLocationResponseDto"];
-                };
-            };
-        };
-    };
-    InventoryController_byLot: {
-        parameters: {
-            query: {
-                /** @description Lọc theo mã / tên SKU (không phân biệt hoa thường). */
-                q?: string;
-                /** @description Chỉ tính tồn trong kho này (lọc qua `Location.warehouseId`). */
-                warehouseId?: string;
-                take: number;
-                skip: number;
-                skuId?: string;
-                locationId?: string;
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["StockByLotResponseDto"];
-                };
             };
         };
     };

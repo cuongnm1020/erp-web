@@ -1,38 +1,60 @@
 'use client';
 
-import { Plus } from 'lucide-react';
+import { Download, Plus, Upload } from 'lucide-react';
 import Link from 'next/link';
 import { useMemo, useState } from 'react';
-import { DataTable, FilterBar, type ColumnDef } from '@/components/data/data-table';
+import {
+  DataTable,
+  FilterBar,
+  type ColumnDef,
+  type RowSelectionState,
+} from '@/components/data/data-table';
+import { ConfirmDialog } from '@/components/data/confirm-dialog';
 import { RowActions } from '@/components/data/row-actions';
 import { EmptyState, ListSkeleton, QueryState } from '@/components/data/states';
 import { StatusBadge } from '@/components/data/status-badge';
 import { PageHeader } from '@/components/layout/page-header';
 import { Button } from '@/components/ui/button';
 import { toast } from '@/components/ui/toaster';
+import { cn } from '@/lib/cn';
 import { messageFor } from '@/lib/error-messages';
-import { Can, useAbility } from '@/lib/permission';
+import { formatQuantity } from '@/lib/format';
+import { Can } from '@/lib/permission';
 import { useListState } from '@/lib/url-state';
-import { useDeleteProduct, useProducts, type ProductListItem } from '../api/use-products';
-import { ProductFormDialog } from './product-form-dialog';
-
-/** GET /products không nhận sortBy/sortDir → không cột nào sortable, mặc định không sort. */
-const DEFAULTS = { size: 50, sort: null };
+import { useSkus, useUpdateSku, type SkuListRow } from '../api/use-products';
 
 /**
- * C-01 Danh sách sản phẩm — GET /products (đã nối API, thay mockup).
- * Phân trang / tìm nhanh nằm trên URL (luật 8); q được backend khớp cả mã SKU và barcode.
- * API chưa có lọc theo danh mục / thương hiệu / trạng thái nên chưa dựng các bộ lọc đó.
+ * C-01 Danh sách sản phẩm — GET /skus, theo design/Products/ProductList@2x.png:
+ * mỗi dòng một SKU kèm tồn thực / đang giữ / khả dụng gộp mọi kho.
+ *
+ * Sắp cố định theo mã SKU — API không nhận sort nên không cột nào sortable (không hứa hão).
+ * Kích thước trang 50 theo quy ước chung của app (design vẽ 40).
+ *
+ * Khác design vì API chưa có (bổ sung sau khi backend sẵn sàng):
+ * - "7 dưới ngưỡng" trên tiêu đề + chip lọc "Dưới ngưỡng": chưa có API ngưỡng đặt lại (reorder point).
+ * - Chip lọc tồn "Còn hàng / Hết hàng": GET /skus chưa nhận filter theo tồn.
+ * - Bộ lọc đã lưu ("Đã lưu: …") và chọn cột ("Cột"): chưa có API saved view.
+ * - Cột "Giá niêm yết": SkuListRowDto chưa có giá.
+ * - Bulk "Cập nhật giá" / "In tem": chưa có API — chỉ còn bulk "Ngừng bán".
  */
-const columns: ColumnDef<ProductListItem, unknown>[] = [
+const DEFAULTS = { size: 50, filterKeys: ['status'] as const };
+
+type ProductFilter = (typeof DEFAULTS.filterKeys)[number];
+type SkuStatus = 'active' | 'inactive';
+
+function parseStatus(v: string | undefined): SkuStatus | undefined {
+  return v === 'active' || v === 'inactive' ? v : undefined;
+}
+
+const columns: ColumnDef<SkuListRow, unknown>[] = [
   {
     id: 'code',
     accessorKey: 'code',
-    header: 'Mã SP',
-    meta: { width: 130 },
+    header: 'SKU',
+    meta: { width: 140 },
     cell: ({ row }) => (
       <Link
-        href={`/catalog/products/${row.original.id}`}
+        href={`/catalog/products/${row.original.productId}`}
         className="font-mono text-xs text-primary hover:underline"
       >
         {row.original.code}
@@ -44,147 +66,252 @@ const columns: ColumnDef<ProductListItem, unknown>[] = [
     accessorKey: 'name',
     header: 'Tên sản phẩm',
     meta: { width: 300 },
+    // Design: tên dài cắt bằng … ở 300px, hover (title) hiện đủ — không xuống dòng.
     cell: ({ row }) => (
-      <span className="flex items-center gap-2">
-        <span className="truncate font-semibold" title={row.original.name}>
+      <span className="block max-w-[300px]">
+        <span className="block truncate font-semibold" title={row.original.name}>
           {row.original.name}
         </span>
-        {row.original.isActive ? null : <StatusBadge tone="neutral">Ngừng bán</StatusBadge>}
+        {row.original.productName !== row.original.name ? (
+          <span className="block truncate text-xs text-muted-foreground">
+            {row.original.productName}
+          </span>
+        ) : null}
       </span>
     ),
   },
   {
     id: 'category',
     header: 'Danh mục',
-    meta: { width: 170 },
+    meta: { width: 150 },
     cell: ({ row }) => (
-      <span className="text-muted-foreground">{row.original.category?.name ?? '—'}</span>
+      <span className="text-muted-foreground">{row.original.categoryName ?? '—'}</span>
     ),
   },
   {
     id: 'brand',
     header: 'Thương hiệu',
-    meta: { width: 140 },
-    cell: ({ row }) => row.original.brand?.name ?? '—',
-  },
-  {
-    id: 'skuCount',
-    header: 'SKU',
-    meta: { align: 'right', width: 70 },
-    cell: ({ row }) => row.original.skus.length,
-  },
-  {
-    id: 'trackingMode',
-    header: 'Theo dõi',
     meta: { width: 130 },
+    cell: ({ row }) => row.original.brandName ?? '—',
+  },
+  {
+    id: 'uom',
+    header: 'ĐVT',
+    meta: { width: 70 },
+    cell: ({ row }) => row.original.baseUomCode,
+  },
+  {
+    id: 'onHand',
+    header: 'Tồn thực',
+    meta: { align: 'right', width: 100 },
+    cell: ({ row }) => formatQuantity(row.original.onHand),
+  },
+  {
+    id: 'reserved',
+    header: 'Đang giữ',
+    meta: { align: 'right', width: 100 },
+    cell: ({ row }) => formatQuantity(row.original.reserved),
+  },
+  {
+    id: 'available',
+    header: 'Khả dụng',
+    meta: { align: 'right', width: 100 },
+    // Khả dụng ÂM = đã giữ cho đơn nhiều hơn tồn thực → chữ đỏ (theo design).
+    cell: ({ row }) => (
+      <span
+        className={cn(row.original.available.startsWith('-') && 'font-semibold text-destructive')}
+      >
+        {formatQuantity(row.original.available)}
+      </span>
+    ),
+  },
+  {
+    id: 'barcodeCount',
+    header: 'Barcode',
+    meta: { align: 'right', width: 80 },
+    cell: ({ row }) => row.original.barcodeCount,
+  },
+  {
+    id: 'status',
+    header: 'Trạng thái',
+    meta: { width: 110 },
     cell: ({ row }) =>
-      row.original.trackingMode === 'NONE' ? (
-        '—'
+      row.original.isActive ? (
+        <StatusBadge tone="ok">Đang bán</StatusBadge>
       ) : (
-        <StatusBadge tone="draft">
-          {row.original.trackingMode === 'LOT' ? 'Theo lô' : 'Theo serial'}
-        </StatusBadge>
+        <StatusBadge tone="neutral">Ngừng bán</StatusBadge>
       ),
   },
   {
     id: 'actions',
     header: '',
-    meta: { title: 'Thao tác', width: 90, align: 'right' },
-    cell: ({ row }) => <ProductRowActions product={row.original} />,
+    meta: { title: 'Thao tác', width: 60, align: 'right' },
+    // Sửa dẫn tới trang form sản phẩm; không có xóa từng dòng — dùng bulk "Ngừng bán".
+    cell: ({ row }) => (
+      <Can I="update" a="Product">
+        <RowActions editHref={`/catalog/products/${row.original.productId}/edit`} />
+      </Can>
+    ),
   },
 ];
 
+function StatusTabs({
+  value,
+  onChange,
+}: {
+  value: SkuStatus | undefined;
+  onChange: (v: SkuStatus | undefined) => void;
+}) {
+  const tabs: Array<{ key: SkuStatus | undefined; label: string }> = [
+    { key: undefined, label: 'Tất cả' },
+    { key: 'active', label: 'Đang bán' },
+    { key: 'inactive', label: 'Ngừng bán' },
+  ];
+  return (
+    <div className="mb-3 flex border-b" role="tablist" aria-label="Trạng thái SKU">
+      {tabs.map((t) => (
+        <button
+          key={t.key ?? '__all__'}
+          type="button"
+          role="tab"
+          aria-selected={value === t.key}
+          onClick={() => onChange(t.key)}
+          className={cn(
+            '-mb-px flex h-9 items-center border-b-2 px-3 text-sm',
+            value === t.key
+              ? 'border-primary font-semibold text-primary'
+              : 'border-transparent text-muted-foreground hover:text-foreground',
+          )}
+        >
+          {t.label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
 /**
- * Sửa mở dialog tại chỗ; Xóa = soft delete phía API (sản phẩm + SKU chuyển Ngừng bán,
- * tồn kho và chứng từ cũ giữ nguyên) — không optimistic (luật 5).
+ * Bulk "Ngừng bán": xác nhận rồi PATCH /skus/{id} từng SKU đã chọn.
+ * Không optimistic (luật 5: đụng tồn/bán hàng) — chờ server xong mới báo và bỏ chọn.
  */
-function ProductRowActions({ product }: { product: ProductListItem }) {
-  const ability = useAbility();
-  const del = useDeleteProduct();
-  const [editOpen, setEditOpen] = useState(false);
-  const canUpdate = ability.can('update', 'Product');
-  const canDelete = ability.can('delete', 'Product');
-  if (!canUpdate && !canDelete) return null;
+function BulkStopSelling({ ids, onDone }: { ids: string[]; onDone: () => void }) {
+  const [confirming, setConfirming] = useState(false);
+  const update = useUpdateSku();
   return (
     <>
-      <RowActions
-        onEdit={canUpdate ? () => setEditOpen(true) : undefined}
-        onDelete={
-          canDelete
-            ? () =>
-                del.mutateAsync(product.id).then(
-                  () => toast.success(`Đã xóa sản phẩm ${product.code}`),
-                  (err) => toast.error(messageFor(err)),
-                )
-            : undefined
-        }
-        itemName={`sản phẩm ${product.code}`}
-        deleteDescription="Sản phẩm và toàn bộ SKU chuyển Ngừng bán — tồn kho và chứng từ cũ giữ nguyên."
+      <Button size="sm" variant="outline" onClick={() => setConfirming(true)}>
+        Ngừng bán
+      </Button>
+      <ConfirmDialog
+        open={confirming}
+        onOpenChange={setConfirming}
+        title={`Ngừng bán ${ids.length} SKU?`}
+        description="SKU chuyển Ngừng bán — tồn kho và chứng từ giữ nguyên."
+        confirmLabel="Ngừng bán"
+        onConfirm={async () => {
+          try {
+            await Promise.all(
+              ids.map((skuId) => update.mutateAsync({ skuId, body: { isActive: false } })),
+            );
+            toast.success(`Đã ngừng bán ${ids.length} SKU`);
+            onDone();
+          } catch (err) {
+            toast.error(messageFor(err));
+          }
+        }}
       />
-      {canUpdate ? (
-        <ProductFormDialog
-          mode="edit"
-          product={product}
-          open={editOpen}
-          onOpenChange={setEditOpen}
-        />
-      ) : null}
     </>
   );
 }
 
 export function ProductListScreen() {
-  const { state, set, skipTake } = useListState(DEFAULTS);
-  const [createOpen, setCreateOpen] = useState(false);
-  const params = useMemo(() => ({ q: state.q, ...skipTake }), [state.q, skipTake]);
-  const query = useProducts(params);
+  const { state, set, skipTake } = useListState<ProductFilter>(DEFAULTS);
+  const [selected, setSelected] = useState<RowSelectionState>({});
+  const status = parseStatus(state.filters.status);
+  const params = useMemo(() => ({ q: state.q, status, ...skipTake }), [state.q, status, skipTake]);
+  const query = useSkus(params);
+  // Hai query đếm tí hon (take 1) cho dòng mô tả "X SKU đang bán · Y ngừng bán".
+  const activeCount = useSkus({ status: 'active', take: 1, skip: 0 });
+  const inactiveCount = useSkus({ status: 'inactive', take: 1, skip: 0 });
+
+  const setFilter = (patch: Partial<Record<ProductFilter, string | undefined>>) =>
+    set({ filters: { ...state.filters, ...patch } });
+
+  const hasFilter = state.q !== '' || status !== undefined;
 
   return (
     <>
       <PageHeader
         title="Sản phẩm"
-        description={query.data ? `${query.data.total} sản phẩm` : 'Đang đếm…'}
+        description={
+          activeCount.data && inactiveCount.data
+            ? `${activeCount.data.total} SKU đang bán · ${inactiveCount.data.total} ngừng bán`
+            : 'Đang đếm…'
+        }
         breadcrumb={[{ label: 'Sản phẩm', href: '/catalog/products' }, { label: 'Danh sách' }]}
         actions={
-          <Can I="create" a="Product">
-            <Button size="sm" onClick={() => setCreateOpen(true)}>
-              <Plus aria-hidden />
-              Thêm sản phẩm
+          <>
+            <Button size="sm" variant="outline" asChild>
+              <Link href="/admin/import">
+                <Upload aria-hidden />
+                Import từ file
+              </Link>
             </Button>
-          </Can>
+            <Button size="sm" variant="outline" asChild>
+              {/* Endpoint tải file, không phải page: anchor thật để cookie httpOnly
+                  đi kèm và trình duyệt tự tải — <Link> sẽ client-navigate, hỏng download. */}
+              {/* eslint-disable-next-line @next/next/no-html-link-for-pages */}
+              <a href="/api/exports/skus?format=csv">
+                <Download aria-hidden />
+                Xuất CSV
+              </a>
+            </Button>
+            <Can I="create" a="Product">
+              <Button size="sm" asChild>
+                <Link href="/catalog/products/new">
+                  <Plus aria-hidden />
+                  Thêm sản phẩm
+                </Link>
+              </Button>
+            </Can>
+          </>
         }
       />
 
-      <FilterBar
+      <StatusTabs value={status} onChange={(v) => setFilter({ status: v })} />
+
+      <FilterBar<ProductFilter>
         q={state.q}
         onQChange={(q) => set({ q })}
-        values={{}}
-        onFilterChange={() => undefined}
-        searchPlaceholder="Tìm theo tên, mã SP, mã SKU, barcode…"
+        values={{ status: state.filters.status }}
+        onFilterChange={setFilter}
+        searchPlaceholder="Tìm theo SKU, tên, barcode…"
       />
 
       <QueryState
         query={query}
-        skeleton={<ListSkeleton rows={12} columns={7} />}
+        skeleton={<ListSkeleton rows={12} columns={11} />}
         isEmpty={(d) => d.items.length === 0}
         empty={
           <EmptyState
-            title={state.q ? 'Không có sản phẩm khớp' : 'Chưa có sản phẩm nào'}
+            title={hasFilter ? 'Không có SKU khớp' : 'Chưa có sản phẩm nào'}
             description={
-              state.q
+              hasFilter
                 ? 'Thử từ khóa khác — tìm được cả theo mã SKU và barcode.'
                 : 'Thêm sản phẩm đầu tiên để bắt đầu quản lý danh mục hàng.'
             }
             action={
-              state.q ? (
-                <Button variant="outline" onClick={() => set({ q: '' })}>
+              hasFilter ? (
+                <Button variant="outline" onClick={() => set({ q: '', filters: {} })}>
                   Xóa lọc
                 </Button>
               ) : (
                 <Can I="create" a="Product">
-                  <Button onClick={() => setCreateOpen(true)}>
-                    <Plus aria-hidden />
-                    Thêm sản phẩm
+                  <Button asChild>
+                    <Link href="/catalog/products/new">
+                      <Plus aria-hidden />
+                      Thêm sản phẩm
+                    </Link>
                   </Button>
                 </Can>
               )
@@ -193,24 +320,31 @@ export function ProductListScreen() {
         }
       >
         {(data) => (
-          <DataTable
-            columns={columns}
-            rows={data.items}
-            getRowId={(r) => r.id}
-            total={data.total}
-            page={state.page}
-            size={state.size}
-            sort={state.sort}
-            onPageChange={(page) => set({ page })}
-            onSizeChange={(size) => set({ size })}
-            onSortChange={(sort) => set({ sort })}
-          />
+          <>
+            <DataTable
+              columns={columns}
+              rows={data.items}
+              getRowId={(r) => r.skuId}
+              total={data.total}
+              page={state.page}
+              size={state.size}
+              sort={state.sort}
+              onPageChange={(page) => set({ page })}
+              onSizeChange={(size) => set({ size })}
+              onSortChange={(sort) => set({ sort })}
+              selection={{ selected, onChange: setSelected }}
+              bulkActions={(ids) => (
+                <Can I="update" a="Product">
+                  <BulkStopSelling ids={ids} onDone={() => setSelected({})} />
+                </Can>
+              )}
+            />
+            <p className="mt-2 text-xs text-muted-foreground">
+              Khả dụng = Tồn thực − Đang giữ, gộp mọi kho
+            </p>
+          </>
         )}
       </QueryState>
-
-      <Can I="create" a="Product">
-        <ProductFormDialog mode="create" open={createOpen} onOpenChange={setCreateOpen} />
-      </Can>
     </>
   );
 }
