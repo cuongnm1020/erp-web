@@ -715,7 +715,8 @@ export interface paths {
         get: operations["WarehouseController_get"];
         put?: never;
         post?: never;
-        delete?: never;
+        /** Soft delete — ngừng dùng kho; tồn, chứng từ, vị trí giữ nguyên. */
+        delete: operations["WarehouseController_remove"];
         options?: never;
         head?: never;
         patch: operations["WarehouseController_update"];
@@ -2777,6 +2778,8 @@ export interface components {
             id: string;
             code: string;
             name: string;
+            address: string | null;
+            isActive: boolean;
         };
         CreateWarehouseDto: {
             code: string;
@@ -4948,7 +4951,9 @@ export interface operations {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["WarehouseSummaryDto"];
+                };
             };
         };
     };
@@ -4992,6 +4997,25 @@ export interface operations {
             };
         };
     };
+    WarehouseController_remove: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
     WarehouseController_update: {
         parameters: {
             query?: never;
@@ -5011,7 +5035,9 @@ export interface operations {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["WarehouseSummaryDto"];
+                };
             };
         };
     };
