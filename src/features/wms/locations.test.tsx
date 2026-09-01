@@ -44,16 +44,47 @@ const loc = (
   pickSequence: null,
   isPickable: true,
   isActive: true,
+  fixedSkuId: null,
+  fixedSku: null,
   children,
   ...extra,
 });
 
 const TREE = [
   loc('z-a', 'A', 'ZONE', [
-    loc('a-01', 'A01', 'AISLE', [loc('b-01', 'A01-01', 'BIN', [], { barcode: 'LOC-A01-01' })]),
+    loc('a-01', 'A01', 'AISLE', [
+      loc('b-01', 'A01-01', 'BIN', [], {
+        barcode: 'LOC-A01-01',
+        fixedSkuId: 'sku-1',
+        fixedSku: { id: 'sku-1', code: 'P001-1', name: 'Bút bi xanh' },
+      }),
+    ]),
   ]),
   loc('st-1', 'ST', 'STAGING', [], { isActive: false }),
 ];
+
+const SKU_LIST = {
+  items: [
+    {
+      skuId: 'sku-2',
+      code: 'P002-1',
+      name: 'Bút bi đỏ',
+      productId: 'p-2',
+      productCode: 'P002',
+      productName: 'Bút bi',
+      categoryName: null,
+      brandName: null,
+      baseUomCode: 'PCS',
+      barcodeCount: 0,
+      isActive: true,
+      thumbnailUrl: null,
+      onHand: '0',
+      reserved: '0',
+      available: '0',
+    },
+  ],
+  total: 1,
+};
 
 describe('LocationsPanel — cây vị trí kho + CRUD', () => {
   beforeEach(() => {
@@ -143,7 +174,52 @@ describe('LocationsPanel — cây vị trí kho + CRUD', () => {
     fireEvent.click(within(dialog).getByRole('button', { name: 'Lưu thay đổi' }));
     await waitFor(() =>
       expect(patches).toEqual([
-        { id: 'z-a', body: { barcode: 'LOC-ZONE-A', isPickable: false, isActive: true } },
+        {
+          id: 'z-a',
+          body: { barcode: 'LOC-ZONE-A', isPickable: false, isActive: true, fixedSkuId: null },
+        },
+      ]),
+    );
+  });
+
+  it('cột SKU cố định: bin đã gán hiện mã + tên SKU', async () => {
+    renderApp(<WarehousesScreen />);
+    await screen.findByText('Vị trí kho WH01');
+    await screen.findByText('A01');
+    fireEvent.click(screen.getByRole('button', { name: 'Mở rộng A01' }));
+    expect(screen.getByText('P001-1')).toBeInTheDocument();
+    expect(screen.getByText('Bút bi xanh')).toBeInTheDocument();
+  });
+
+  it('gán SKU cho bin: sửa BIN → chọn SKU từ picker → PATCH gửi fixedSkuId', async () => {
+    const patches: Array<{ id: string; body: unknown }> = [];
+    server.use(
+      http.get('/api/skus', () => HttpResponse.json(SKU_LIST)),
+      http.patch('/api/warehouses/locations/:locationId', async ({ request, params }) => {
+        patches.push({ id: params.locationId as string, body: await request.json() });
+        return HttpResponse.json(loc('b-01', 'A01-01', 'BIN'));
+      }),
+    );
+    renderApp(<WarehousesScreen />);
+    await screen.findByText('Vị trí kho WH01');
+    await screen.findByText('A01');
+    fireEvent.click(screen.getByRole('button', { name: 'Mở rộng A01' }));
+    const panel = screen.getByText('Vị trí kho WH01').closest('section')!;
+    // Dòng bin A01-01 là dòng thứ 3 trong panel (A, A01, A01-01, ST) — nút Sửa index 2
+    fireEvent.click(within(panel).getAllByRole('button', { name: 'Sửa' })[2]!);
+    const dialog = await screen.findByRole('dialog');
+    // Picker prefill SKU đang gán
+    const picker = within(dialog).getByRole('combobox', { name: 'SKU cố định' });
+    expect(picker).toHaveTextContent('Bút bi xanh (P001-1)');
+    fireEvent.click(picker);
+    fireEvent.click(await screen.findByText('Bút bi đỏ'));
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Lưu thay đổi' }));
+    await waitFor(() =>
+      expect(patches).toEqual([
+        {
+          id: 'b-01',
+          body: { barcode: 'LOC-A01-01', isPickable: true, isActive: true, fixedSkuId: 'sku-2' },
+        },
       ]),
     );
   });

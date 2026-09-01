@@ -2792,7 +2792,13 @@ export interface components {
             address?: string;
             isActive?: boolean;
         };
+        LocationFixedSkuDto: {
+            id: string;
+            code: string;
+            name: string;
+        };
         LocationTreeNodeDto: {
+            fixedSku: components["schemas"]["LocationFixedSkuDto"] | null;
             children: components["schemas"]["LocationTreeNodeDto"][];
             id: string;
             warehouseId: string;
@@ -2804,6 +2810,8 @@ export interface components {
             pickSequence: number | null;
             isPickable: boolean;
             isActive: boolean;
+            /** @description SKU cố định của bin (slotting) — null nếu chưa gán. */
+            fixedSkuId: string | null;
         };
         CreateLocationDto: {
             code: string;
@@ -2814,6 +2822,11 @@ export interface components {
             barcode?: string;
             pickSequence?: number;
             isPickable?: boolean;
+            /**
+             * Format: uuid
+             * @description SKU cố định của bin (slotting) — chỉ nhận khi type = BIN.
+             */
+            fixedSkuId?: string;
         };
         LocationDto: {
             id: string;
@@ -2826,12 +2839,19 @@ export interface components {
             pickSequence: number | null;
             isPickable: boolean;
             isActive: boolean;
+            /** @description SKU cố định của bin (slotting) — null nếu chưa gán. */
+            fixedSkuId: string | null;
         };
         UpdateLocationDto: {
             barcode?: string;
             pickSequence?: number;
             isPickable?: boolean;
             isActive?: boolean;
+            /**
+             * Format: uuid
+             * @description SKU cố định của bin — null để bỏ gán.
+             */
+            fixedSkuId?: string | null;
         };
         StockRowDto: {
             skuId: string;

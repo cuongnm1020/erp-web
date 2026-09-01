@@ -1,4 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import type { EntityOption, EntitySearchResult } from '@/components/data/form';
 import { api, unwrap } from '@/lib/api/client';
 import type { components } from '@/lib/api/schema';
 import { warehouseKeys } from './use-warehouses';
@@ -12,7 +13,31 @@ export type UpdateLocationInput = components['schemas']['UpdateLocationDto'];
 export const locationKeys = {
   tree: (warehouseId: string) =>
     [...warehouseKeys.all, 'detail', warehouseId, 'locations', 'tree'] as const,
+  skuSearch: (q: string) => ['wms', 'locations', 'sku-search', q] as const,
 };
+
+/**
+ * Tìm SKU đang bán cho EntityPicker gán SKU cố định — GET /skus (q ăn mã/tên SKU và barcode).
+ * Bản riêng của wms: luật 12 cấm import hook từ features/orders.
+ */
+export function useSkuSearch(q: string): EntitySearchResult {
+  const query = useQuery({
+    queryKey: locationKeys.skuSearch(q),
+    queryFn: () =>
+      unwrap(
+        api.GET('/skus', {
+          params: { query: { q: q || undefined, status: 'active', take: 20, skip: 0 } },
+        }),
+      ),
+    staleTime: 30_000,
+  });
+  const options: EntityOption[] | undefined = query.data?.items.map((s) => ({
+    id: s.skuId,
+    label: s.name,
+    hint: `${s.code} · ${s.productName}`,
+  }));
+  return { options, isPending: query.isPending, error: query.error };
+}
 
 /** GET /warehouses/{id}/locations/tree — cây ZONE/AISLE/RACK/BIN; cần stock.read. */
 export function useLocationTree(warehouseId: string | null) {

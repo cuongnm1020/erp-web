@@ -7,6 +7,7 @@ import { useForm } from 'react-hook-form';
 import { z } from 'zod';
 import {
   applyServerErrors,
+  EntityPicker,
   Form,
   FormControl,
   FormField,
@@ -51,6 +52,7 @@ import {
   useCreateLocation,
   useDeleteLocation,
   useLocationTree,
+  useSkuSearch,
   useUpdateLocation,
   type LocationNode,
   type LocationType,
@@ -76,6 +78,8 @@ const locationSchema = z.object({
   pickSequence: z.string().trim().regex(/^\d*$/, 'Nhập số nguyên không âm'),
   isPickable: z.boolean(),
   isActive: z.boolean(),
+  /** SKU cố định (slotting) — '' = không gán; server chỉ nhận cho BIN. */
+  fixedSkuId: z.string(),
 });
 type LocationValues = z.infer<typeof locationSchema>;
 
@@ -106,8 +110,10 @@ function LocationFormDialog({
       pickSequence: location?.pickSequence != null ? String(location.pickSequence) : '',
       isPickable: location?.isPickable ?? true,
       isActive: location?.isActive ?? true,
+      fixedSkuId: location?.fixedSkuId ?? '',
     },
   });
+  const isBin = form.watch('type') === 'BIN';
 
   const onSubmit = form.handleSubmit((v) => {
     const done = (msg: string) => {
@@ -116,7 +122,7 @@ function LocationFormDialog({
     };
     const fail = (err: unknown) =>
       applyServerErrors(form, err as ApiError, {
-        knownFields: ['code', 'type', 'barcode', 'pickSequence'],
+        knownFields: ['code', 'type', 'barcode', 'pickSequence', 'fixedSkuId'],
       });
     const pickSequence = v.pickSequence === '' ? undefined : Number(v.pickSequence);
     if (editing && location) {
@@ -128,6 +134,8 @@ function LocationFormDialog({
             ...(pickSequence !== undefined ? { pickSequence } : {}),
             isPickable: v.isPickable,
             isActive: v.isActive,
+            // '' = bỏ gán → gửi null; chỉ BIN có picker nên loại khác luôn là null (vô hại)
+            fixedSkuId: v.fixedSkuId === '' ? null : v.fixedSkuId,
           },
         },
         { onSuccess: () => done('Đã lưu thay đổi'), onError: fail },
@@ -141,6 +149,7 @@ function LocationFormDialog({
           ...(v.barcode ? { barcode: v.barcode } : {}),
           ...(pickSequence !== undefined ? { pickSequence } : {}),
           isPickable: v.isPickable,
+          ...(v.fixedSkuId && v.type === 'BIN' ? { fixedSkuId: v.fixedSkuId } : {}),
         },
         { onSuccess: () => done('Đã thêm vị trí'), onError: fail },
       );
@@ -236,6 +245,32 @@ function LocationFormDialog({
                 )}
               />
             </div>
+            {isBin ? (
+              <FormField
+                control={form.control}
+                name="fixedSkuId"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>SKU cố định</FormLabel>
+                    <FormControl>
+                      <EntityPicker
+                        value={field.value}
+                        onChange={field.onChange}
+                        useSearch={useSkuSearch}
+                        selectedLabel={
+                          location?.fixedSku && field.value === location.fixedSku.id
+                            ? `${location.fixedSku.name} (${location.fixedSku.code})`
+                            : undefined
+                        }
+                        placeholder="Không gán — bin dùng chung"
+                        searchPlaceholder="Tìm theo mã / tên SKU / barcode…"
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            ) : null}
             <FormField
               control={form.control}
               name="isPickable"
@@ -366,6 +401,7 @@ export function LocationsPanel({
                 <TableRow className="bg-muted hover:bg-muted">
                   <TableHead className="px-2.5 text-xs">Mã vị trí</TableHead>
                   <TableHead className="w-24 px-2.5 text-xs">Loại</TableHead>
+                  <TableHead className="px-2.5 text-xs">SKU cố định</TableHead>
                   <TableHead className="w-36 px-2.5 text-xs">Barcode</TableHead>
                   <TableHead className="w-24 px-2.5 text-xs">Thứ tự pick</TableHead>
                   <TableHead className="w-28 px-2.5 text-xs">Trạng thái</TableHead>
@@ -409,6 +445,16 @@ export function LocationsPanel({
                     </TableCell>
                     <TableCell className="px-2.5 py-1.5 text-muted-foreground">
                       {TYPE_LABEL[node.type]}
+                    </TableCell>
+                    <TableCell className="max-w-56 px-2.5 py-1.5">
+                      {node.fixedSku ? (
+                        <span className="block truncate" title={node.fixedSku.name}>
+                          <span className="font-mono text-xs">{node.fixedSku.code}</span>{' '}
+                          <span className="text-muted-foreground">{node.fixedSku.name}</span>
+                        </span>
+                      ) : (
+                        <span className="text-muted-foreground">—</span>
+                      )}
                     </TableCell>
                     <TableCell className="px-2.5 py-1.5 font-mono text-xs text-muted-foreground">
                       {node.barcode ?? '—'}
