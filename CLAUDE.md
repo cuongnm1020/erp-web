@@ -156,7 +156,7 @@ Màn hình trống là lời mời hành động, không phải lời than.
 
 - **Cấm heredoc** (`cat > file <<'EOF'`) để tạo/sửa file — dùng Write/Edit tool.
 - Không gộp lệnh bằng `&&`; chạy từng lệnh riêng.
-- Một màn hình một phiên, một branch `task/FE-xx-<slug>`.
+- Làm việc trên nhánh `develop` — checkout trước khi code. Một màn hình một phiên, một task = một commit trên `develop`; KHÔNG tự merge vào `main` (chỉ merge `develop` → `main` khi được yêu cầu).
 - Trước khi viết code màn hình: đọc `SCREEN-SPEC` của màn đó. Không có spec thì hỏi, không tự bịa.
 - Sau khi xong: `pnpm typecheck && pnpm lint && pnpm test` phải sạch. Không commit khi còn `any`,
   còn `@ts-expect-error` không kèm lý do, hoặc còn `console.log`.
