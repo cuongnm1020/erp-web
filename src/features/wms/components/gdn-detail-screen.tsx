@@ -1,11 +1,11 @@
 'use client';
 
-// UI-first từ design canvas — dữ liệu mẫu, chưa nối API (nối ở phase FE-x).
-
-import { AlertTriangle, UserRound } from 'lucide-react';
-import { StatusBadge, type StatusTone } from '@/components/data/status-badge';
+import Decimal from 'decimal.js';
+import { AlertTriangle, Lock } from 'lucide-react';
+import Link from 'next/link';
+import { DetailSkeleton, QueryState } from '@/components/data/states';
+import { StatusBadge } from '@/components/data/status-badge';
 import { PageHeader } from '@/components/layout/page-header';
-import { Button } from '@/components/ui/button';
 import {
   Table,
   TableBody,
@@ -14,362 +14,179 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { cn } from '@/lib/cn';
+import { formatDateTime, formatQuantity } from '@/lib/format';
+import {
+  GDN_KIND_LABEL,
+  gdnStage,
+  useGoodsIssue,
+  type GoodsIssueDetail,
+} from '../api/use-goods-issues';
+import { taskStatusLabel } from '../labels';
 
-interface PickLine {
-  no: number;
-  productName: string;
-  sku: string;
-  bin: string;
-  assignedLot: string;
-  /** lô thực pick khác lô chỉ định (sai lô có lý do) */
-  pickedLot?: string;
-  lotWarnReason?: string;
-  expiry: string;
-  unit: string;
-  picked: number;
-  required: number;
-  status: string;
-  statusTone: StatusTone;
+/**
+ * Chi tiết phiếu xuất kho (design GdnDetail) — GET /goods-issues/:id. CHỈ ĐỌC:
+ * mọi chuyển động của phiếu do luồng pick→pack quyết định; POSTED = đóng gói
+ * xong (điểm trừ tồn duy nhất, PLAN-gdn-transfer).
+ *
+ * Khác design (backend chưa mô tả được): không có tiến độ realtime của người
+ * đang pick (dòng hiện tại, SLA giao vận), không có "In phiếu pick" / "Gán lại
+ * người pick" — hai việc đó nằm ở bảng điều phối; panel "Tồn của phiếu" rút gọn
+ * còn ghi chú reserve/trừ tồn (API không trả số reservation).
+ */
+function Field({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div>
+      <div className="text-xs text-muted-foreground">{label}</div>
+      <div className="mt-0.5 text-sm">{children}</div>
+    </div>
+  );
 }
 
-const SAMPLE_PICK_LINES: PickLine[] = [
-  {
-    no: 1,
-    productName: 'Bút bi Thiên Long TL-08 xanh',
-    sku: 'TL08-BLUE',
-    bin: 'A-03-02-B',
-    assignedLot: 'L2605',
-    expiry: '10/2028',
-    unit: 'cái',
-    picked: 48,
-    required: 48,
-    status: 'Đã lấy',
-    statusTone: 'ok',
-  },
-  {
-    no: 2,
-    productName: 'Bút bi Thiên Long TL-08 đỏ',
-    sku: 'TL08-RED',
-    bin: 'A-03-02-B',
-    assignedLot: 'L2607',
-    expiry: '12/2028',
-    unit: 'cái',
-    picked: 24,
-    required: 24,
-    status: 'Đã lấy',
-    statusTone: 'ok',
-  },
-  {
-    no: 3,
-    productName: 'Giấy A4 Double A 80gsm',
-    sku: 'DA-A4-80',
-    bin: 'B-01-01-A',
-    assignedLot: 'L2608',
-    expiry: '—',
-    unit: 'ream',
-    picked: 60,
-    required: 60,
-    status: 'Đã lấy',
-    statusTone: 'ok',
-  },
-  {
-    no: 4,
-    productName: 'Giấy A4 Double A 70gsm',
-    sku: 'DA-A4-70',
-    bin: 'B-01-03-D',
-    assignedLot: 'L2608',
-    expiry: '—',
-    unit: 'ream',
-    picked: 20,
-    required: 20,
-    status: 'Đã lấy',
-    statusTone: 'ok',
-  },
-  {
-    no: 5,
-    productName: 'Băng keo trong 48mm × 100y Tiến Phát',
-    sku: 'TP-BK48-100',
-    bin: 'B-02-02-C',
-    assignedLot: 'L2605',
-    pickedLot: 'L2607',
-    lotWarnReason: 'Sai lô có lý do: lô L2605 không còn ở vị trí — đã ghi log, chờ kiểm ô',
-    expiry: '08/2028',
-    unit: 'cây',
-    picked: 36,
-    required: 36,
-    status: 'Đã lấy',
-    statusTone: 'ok',
-  },
-  {
-    no: 6,
-    productName: 'Sổ tay Campus A5 120 trang',
-    sku: 'CP-A5-120',
-    bin: 'A-01-02-B',
-    assignedLot: 'L2608',
-    expiry: '—',
-    unit: 'cuốn',
-    picked: 40,
-    required: 40,
-    status: 'Đã lấy',
-    statusTone: 'ok',
-  },
-  {
-    no: 7,
-    productName: 'Keo dán giấy UHU Stic 21g',
-    sku: 'UHU-21',
-    bin: 'A-02-01-C',
-    assignedLot: 'L2601',
-    expiry: '15/09/2026',
-    unit: 'cây',
-    picked: 12,
-    required: 12,
-    status: 'Đã lấy',
-    statusTone: 'ok',
-  },
-  {
-    no: 8,
-    productName: 'Kẹp giấy Plus 50mm (hộp 12)',
-    sku: 'PL-KG50',
-    bin: 'A-02-01-C',
-    assignedLot: 'L2607',
-    expiry: '—',
-    unit: 'hộp',
-    picked: 4,
-    required: 10,
-    status: 'Đang lấy',
-    statusTone: 'brand',
-  },
-  {
-    no: 9,
-    productName: 'Bấm kim Deli 0326 số 10',
-    sku: 'DL-0326',
-    bin: 'C-02-03-B',
-    assignedLot: 'L2606',
-    expiry: '—',
-    unit: 'cái',
-    picked: 0,
-    required: 6,
-    status: 'Chờ',
-    statusTone: 'neutral',
-  },
-  {
-    no: 10,
-    productName: 'Mực in HP 305 đen',
-    sku: 'HP-305-BK',
-    bin: 'C-01-01-A',
-    assignedLot: 'L2606',
-    expiry: '03/2028',
-    unit: 'hộp',
-    picked: 0,
-    required: 4,
-    status: 'Chờ',
-    statusTone: 'neutral',
-  },
-  {
-    no: 11,
-    productName: 'Giấy note 3M Post-it 76×76 vàng',
-    sku: '3M-NOTE76',
-    bin: 'A-02-01-C',
-    assignedLot: 'L2512',
-    expiry: '31/08/2026',
-    unit: 'tập',
-    picked: 0,
-    required: 10,
-    status: 'Chờ',
-    statusTone: 'neutral',
-  },
-  {
-    no: 12,
-    productName: 'Bìa lá Kokuyo A4 xanh dương',
-    sku: 'KK-BL-A4',
-    bin: 'D-01-01-A',
-    assignedLot: 'L2604',
-    expiry: '—',
-    unit: 'cái',
-    picked: 0,
-    required: 30,
-    status: 'Chờ',
-    statusTone: 'neutral',
-  },
-];
-
-export function GdnDetailScreen({ id }: { id?: string }) {
-  const docNo = id && id !== 'sample' ? id : 'GDN-2608-01192';
+function DetailBody({ issue }: { issue: GoodsIssueDetail }) {
+  const totalPlanned = issue.lines.reduce((acc, l) => acc.plus(l.qtyPlanned), new Decimal(0));
+  const totalDone = issue.lines.reduce((acc, l) => acc.plus(l.qtyDone), new Decimal(0));
+  const exceptions = issue.lines.filter((l) => l.exceptionNote !== null);
 
   return (
     <div className="flex flex-col gap-3">
-      <PageHeader
-        title={docNo}
-        description="Đơn SO-2608-01234 · Cửa hàng Minh Tâm · Kho HN-1 · Wave W-0823-03"
-        breadcrumb={[{ label: 'Kho' }, { label: 'Xuất kho', href: '/wms/gdn' }, { label: docNo }]}
-        actions={
-          <>
-            <StatusBadge tone="brand">Đang pick</StatusBadge>
-            <StatusBadge tone="neutral">Bán hàng</StatusBadge>
-            <Button variant="outline" size="sm">
-              In phiếu pick
-            </Button>
-            <Button variant="outline" size="sm">
-              Gán lại người pick
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              className="border-destructive text-destructive hover:bg-destructive/10 hover:text-destructive"
-            >
-              Dừng pick
-            </Button>
-          </>
-        }
-      />
+      {issue.status === 'POSTED' ? (
+        <p className="flex items-center gap-2 rounded-md border border-success/30 bg-success/10 px-3 py-2 text-sm">
+          <Lock className="h-3.5 w-3.5" aria-hidden />
+          <span>
+            <b>
+              Đã post{issue.postedAt ? ` lúc ${formatDateTime(issue.postedAt)}` : ''}
+              {issue.postedByName ? ` bởi ${issue.postedByName}` : ''}.
+            </b>{' '}
+            Tồn đã trừ trong chính transaction đóng gói — chứng từ bất biến.
+          </span>
+        </p>
+      ) : (
+        <p className="rounded-md border bg-muted/50 px-3 py-2 text-sm text-muted-foreground">
+          Giữ chỗ (reserve) tạo lúc xác nhận đơn; tồn thực chỉ trừ khi đóng gói xong — phiếu sẽ tự
+          post tại thời điểm đó. Hai bước tách biệt (bất biến 3).
+        </p>
+      )}
 
-      <div className="flex items-start gap-2 rounded-md border bg-muted px-3 py-2 text-sm text-muted-foreground">
-        <UserRound className="mt-0.5 h-4 w-4 shrink-0" aria-hidden />
-        <div className="text-foreground">
-          <b className="font-semibold">Phạm Thị Hoa đang pick</b> trên PDA-07 · bắt đầu 09:41 · dòng
-          hiện tại: 8/12 · 1 cảnh báo sai lô có lý do.
-        </div>
-        <span className="ml-auto whitespace-nowrap font-semibold text-foreground">
-          7/12 dòng xong
-        </span>
+      {exceptions.length > 0 ? (
+        <p className="flex items-center gap-2 rounded-md border border-warning/40 bg-warning/10 px-3 py-2 text-sm">
+          <AlertTriangle className="h-3.5 w-3.5 text-warning" aria-hidden />
+          <span>
+            {exceptions.length} dòng ngoại lệ (thiếu tồn khi điều phối) — phần thiếu không được
+            xuất, xử lý ở bảng điều phối.
+          </span>
+        </p>
+      ) : null}
+
+      <div className="grid gap-3 rounded-md border bg-card p-3 sm:grid-cols-4">
+        <Field label="Số phiếu">
+          <span className="font-mono">{issue.docNumber}</span>
+        </Field>
+        <Field label="Kho xuất">{issue.warehouseName}</Field>
+        <Field label="Tham chiếu">
+          {issue.refType === 'SalesOrder' && issue.refId ? (
+            <Link href={`/crm/orders/${issue.refId}`} className="text-primary hover:underline">
+              Đơn bán
+            </Link>
+          ) : (
+            '—'
+          )}
+        </Field>
+        <Field label="Ngày tạo">{formatDateTime(issue.createdAt)}</Field>
+        <Field label="Task pick">
+          {issue.pickStatus ? taskStatusLabel(issue.pickStatus) : '—'}
+        </Field>
+        <Field label="Task đóng gói">
+          {issue.packStatus ? taskStatusLabel(issue.packStatus) : '—'}
+        </Field>
+        <Field label="SL kế hoạch">
+          <span className="tabular-nums">{formatQuantity(totalPlanned.toString())}</span>
+        </Field>
+        <Field label="SL đã xuất">
+          <b className="tabular-nums">
+            {issue.status === 'POSTED' ? formatQuantity(totalDone.toString()) : '—'}
+          </b>
+        </Field>
       </div>
 
-      <div className="grid gap-3 xl:grid-cols-[1fr_300px]">
-        <div className="overflow-hidden rounded-md border bg-card">
-          <div className="overflow-x-auto">
-            <Table>
-              <TableHeader>
-                <TableRow className="bg-muted hover:bg-muted">
-                  <TableHead className="w-8 px-2.5">#</TableHead>
-                  <TableHead className="px-2.5">Sản phẩm</TableHead>
-                  <TableHead className="px-2.5">Vị trí</TableHead>
-                  <TableHead className="px-2.5">Lô hệ thống chỉ định</TableHead>
-                  <TableHead className="px-2.5">HSD</TableHead>
-                  <TableHead className="px-2.5">ĐVT</TableHead>
-                  <TableHead className="px-2.5 text-right">Đã lấy / Cần lấy</TableHead>
-                  <TableHead className="px-2.5">Trạng thái</TableHead>
+      <section className="overflow-hidden rounded-md border bg-card">
+        <header className="border-b px-3 py-2 text-sm font-semibold">
+          Dòng xuất · {issue.lineCount} dòng
+        </header>
+        <div className="overflow-x-auto">
+          <Table>
+            <TableHeader>
+              <TableRow className="bg-muted hover:bg-muted">
+                <TableHead className="w-8 px-2.5 text-xs">#</TableHead>
+                <TableHead className="px-2.5 text-xs">Sản phẩm</TableHead>
+                <TableHead className="w-28 px-2.5 text-xs">Vị trí lấy</TableHead>
+                <TableHead className="w-24 px-2.5 text-xs">Lô</TableHead>
+                <TableHead className="w-28 px-2.5 text-right text-xs">SL kế hoạch</TableHead>
+                <TableHead className="w-28 px-2.5 text-right text-xs">SL đã xuất</TableHead>
+                <TableHead className="px-2.5 text-xs">Ghi chú</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {issue.lines.map((l) => (
+                <TableRow key={l.id} className={l.exceptionNote ? 'bg-warning/5' : undefined}>
+                  <TableCell className="px-2.5 py-1.5 text-muted-foreground">{l.lineNo}</TableCell>
+                  <TableCell className="px-2.5 py-1.5">
+                    <div className="font-semibold">{l.skuName}</div>
+                    <div className="font-mono text-xs text-muted-foreground">{l.skuCode}</div>
+                  </TableCell>
+                  <TableCell className="px-2.5 py-1.5 font-mono text-xs">
+                    {l.locationCode ?? '—'}
+                  </TableCell>
+                  <TableCell className="px-2.5 py-1.5 font-mono text-xs">
+                    {l.lotNumber ?? '—'}
+                  </TableCell>
+                  <TableCell className="px-2.5 py-1.5 text-right tabular-nums">
+                    {formatQuantity(l.qtyPlanned)}
+                  </TableCell>
+                  <TableCell className="px-2.5 py-1.5 text-right tabular-nums font-semibold">
+                    {issue.status === 'POSTED' ? formatQuantity(l.qtyDone) : '—'}
+                  </TableCell>
+                  <TableCell className="px-2.5 py-1.5 text-muted-foreground">
+                    {l.exceptionNote ?? '—'}
+                  </TableCell>
                 </TableRow>
-              </TableHeader>
-              <TableBody>
-                {SAMPLE_PICK_LINES.map((l) => (
-                  <TableRow
-                    key={l.no}
-                    className={l.pickedLot ? 'bg-warning/10 hover:bg-warning/10' : undefined}
-                  >
-                    <TableCell className="px-2.5 py-1.5 text-muted-foreground">{l.no}</TableCell>
-                    <TableCell className="px-2.5 py-1.5">
-                      <div className="font-semibold">{l.productName}</div>
-                      <div className="font-mono text-xs text-muted-foreground">{l.sku}</div>
-                    </TableCell>
-                    <TableCell className="px-2.5 py-1.5 font-mono text-xs">{l.bin}</TableCell>
-                    <TableCell className="px-2.5 py-1.5">
-                      {l.pickedLot ? (
-                        <>
-                          <span className="font-mono text-xs text-muted-foreground line-through">
-                            {l.assignedLot}
-                          </span>{' '}
-                          →{' '}
-                          <span className="font-mono text-xs font-semibold text-warning">
-                            {l.pickedLot}
-                          </span>
-                          <div className="text-xs text-warning">{l.lotWarnReason}</div>
-                        </>
-                      ) : (
-                        <span className="font-mono text-xs">{l.assignedLot}</span>
-                      )}
-                    </TableCell>
-                    <TableCell className="px-2.5 py-1.5">{l.expiry}</TableCell>
-                    <TableCell className="px-2.5 py-1.5 text-muted-foreground">{l.unit}</TableCell>
-                    <TableCell className="px-2.5 py-1.5 text-right tabular-nums">
-                      <span
-                        className={cn(
-                          'font-semibold',
-                          l.picked === l.required && l.required > 0 && 'text-success',
-                          l.picked === 0 && 'font-normal text-muted-foreground',
-                        )}
-                      >
-                        {l.picked}
-                      </span>{' '}
-                      / {l.required}
-                    </TableCell>
-                    <TableCell className="px-2.5 py-1.5">
-                      <StatusBadge tone={l.statusTone}>{l.status}</StatusBadge>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </div>
-          <div className="flex items-center gap-3 border-t px-3 py-1.5 text-xs text-muted-foreground">
-            <span>Lộ trình pick tối ưu theo vị trí: Khu A → B → C → D</span>
-            <span className="ml-auto">
-              Tổng: <b className="font-semibold text-foreground">204 / 300</b> đơn vị
-            </span>
-          </div>
+              ))}
+            </TableBody>
+          </Table>
         </div>
-
-        <div className="flex flex-col gap-3">
-          <div className="rounded-md border bg-card">
-            <div className="border-b px-3 py-2 text-sm font-semibold">Tiến độ</div>
-            <div className="flex flex-col gap-2.5 px-3 py-2.5 text-sm">
-              <div>
-                <div className="flex items-center justify-between">
-                  <span className="text-muted-foreground">Dòng đã xong</span>
-                  <span className="font-semibold tabular-nums">7/12</span>
-                </div>
-                <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-muted">
-                  <div className="h-full w-7/12 bg-primary" />
-                </div>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-muted-foreground">Bắt đầu</span>
-                <span className="tabular-nums">09:41</span>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-muted-foreground">Dự kiến xong</span>
-                <span className="tabular-nums">10:35</span>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-muted-foreground">SLA giao vận</span>
-                <span className="font-semibold text-warning">11:00 · còn 32 phút</span>
-              </div>
-            </div>
-          </div>
-
-          <div className="rounded-md border bg-card">
-            <div className="border-b px-3 py-2 text-sm font-semibold">Tồn của phiếu này</div>
-            <div className="flex flex-col gap-1.5 px-3 py-2.5 text-sm">
-              <div className="flex items-center justify-between">
-                <span className="text-muted-foreground">Đang giữ (reserve)</span>
-                <span className="font-semibold tabular-nums">300</span>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-muted-foreground">Sẽ trừ tồn thực khi</span>
-                <span>Post phiếu</span>
-              </div>
-              <p className="text-xs text-muted-foreground">
-                Giữ chỗ tạo lúc xác nhận đơn; tồn thực chỉ trừ khi phiếu xuất post xong. Hai bước
-                tách biệt.
-              </p>
-            </div>
-          </div>
-
-          <div className="rounded-md border bg-card">
-            <div className="border-b px-3 py-2 text-sm font-semibold">Cảnh báo</div>
-            <div className="px-3 py-2.5">
-              <div className="flex items-start gap-2 rounded-md border border-warning/50 bg-warning/10 px-2 py-1.5 text-sm">
-                <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-warning" aria-hidden />
-                <div>
-                  Dòng 5 pick lô <span className="font-mono text-xs">L2607</span> thay vì{' '}
-                  <span className="font-mono text-xs">L2605</span> (FEFO). Lý do đã ghi.{' '}
-                  <span className="text-primary">Tạo kiểm kê ô B-02-02-C</span>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
+      </section>
     </div>
+  );
+}
+
+export function GdnDetailScreen({ id }: { id: string }) {
+  const query = useGoodsIssue(id);
+  const issue = query.data;
+  const stage = issue ? gdnStage(issue) : null;
+  const kind = issue ? GDN_KIND_LABEL[issue.kind] : null;
+
+  return (
+    <>
+      <PageHeader
+        title={issue?.docNumber ?? 'Phiếu xuất kho'}
+        description={
+          issue ? `${issue.warehouseName} · tạo ${formatDateTime(issue.createdAt)}` : 'Đang tải…'
+        }
+        breadcrumb={[
+          { label: 'Kho' },
+          { label: 'Xuất kho', href: '/wms/gdn' },
+          { label: issue?.docNumber ?? '…' },
+        ]}
+      />
+      {stage && kind ? (
+        <div className="mb-3 flex items-center gap-2">
+          <StatusBadge tone={stage.tone}>{stage.label}</StatusBadge>
+          <StatusBadge tone={kind.tone}>{kind.label}</StatusBadge>
+        </div>
+      ) : null}
+
+      <QueryState query={query} skeleton={<DetailSkeleton />}>
+        {(i) => <DetailBody issue={i} />}
+      </QueryState>
+    </>
   );
 }

@@ -1483,6 +1483,38 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/goods-issues": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["GoodsIssueController_list"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/goods-issues/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["GoodsIssueController_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/pda/tasks": {
         parameters: {
             query?: never;
@@ -3461,6 +3493,78 @@ export interface components {
             /** @enum {string} */
             status: "CANCELLED" | "PENDING" | "ASSIGNED" | "IN_PROGRESS" | "COMPLETED" | "EXCEPTION";
             assignedTo: string | null;
+        };
+        GoodsIssueListRowDto: {
+            id: string;
+            docNumber: string;
+            /** @enum {string} */
+            kind: "SALES" | "OTHER" | "TRANSFER" | "RETURN_TO_SUPPLIER";
+            /** @enum {string} */
+            status: "DRAFT" | "PENDING_APPROVAL" | "APPROVED" | "POSTED" | "CANCELLED";
+            warehouseId: string;
+            warehouseName: string;
+            refType: string | null;
+            refId: string | null;
+            lineCount: number;
+            totalQtyPlanned: string;
+            totalQtyDone: string;
+            /** @enum {string|null} */
+            pickStatus: "CANCELLED" | "PENDING" | "ASSIGNED" | "IN_PROGRESS" | "COMPLETED" | "EXCEPTION" | null;
+            /** @enum {string|null} */
+            packStatus: "CANCELLED" | "PENDING" | "ASSIGNED" | "IN_PROGRESS" | "COMPLETED" | "EXCEPTION" | null;
+            createdAt: string;
+            postedAt: string | null;
+        };
+        GoodsIssueStatusCountsDto: {
+            DRAFT: number;
+            POSTED: number;
+            CANCELLED: number;
+        };
+        GoodsIssueListResponseDto: {
+            items: components["schemas"]["GoodsIssueListRowDto"][];
+            total: number;
+            statusCounts: components["schemas"]["GoodsIssueStatusCountsDto"];
+        };
+        GoodsIssueLineDto: {
+            id: string;
+            lineNo: number;
+            skuId: string;
+            skuCode: string;
+            skuName: string;
+            lotNumber: string | null;
+            /** @description Vị trí lấy hàng (từ dòng task PICK phản chiếu) — null với dòng thiếu tồn. */
+            locationCode: string | null;
+            /** @description Decimal(18,6) dạng chuỗi. */
+            qtyPlanned: string;
+            /** @description Chốt lúc POST từ dòng task PICK — 0 với dòng thiếu tồn. */
+            qtyDone: string;
+            /** @description Ghi chú EXCEPTION của dòng task (thiếu tồn…) — null nếu bình thường. */
+            exceptionNote: string | null;
+        };
+        GoodsIssueDetailDto: {
+            id: string;
+            docNumber: string;
+            /** @enum {string} */
+            kind: "SALES" | "OTHER" | "TRANSFER" | "RETURN_TO_SUPPLIER";
+            /** @enum {string} */
+            status: "DRAFT" | "PENDING_APPROVAL" | "APPROVED" | "POSTED" | "CANCELLED";
+            warehouseId: string;
+            warehouseName: string;
+            refType: string | null;
+            refId: string | null;
+            note: string | null;
+            createdAt: string;
+            postedAt: string | null;
+            postedByName: string | null;
+            /**
+             * @description Trạng thái task PICK cùng ref — nguồn của nhãn "Chờ pick / Đang pick".
+             * @enum {string|null}
+             */
+            pickStatus: "CANCELLED" | "PENDING" | "ASSIGNED" | "IN_PROGRESS" | "COMPLETED" | "EXCEPTION" | null;
+            /** @enum {string|null} */
+            packStatus: "CANCELLED" | "PENDING" | "ASSIGNED" | "IN_PROGRESS" | "COMPLETED" | "EXCEPTION" | null;
+            lineCount: number;
+            lines: components["schemas"]["GoodsIssueLineDto"][];
         };
         ScanDto: {
             /** Format: uuid */
@@ -6604,6 +6708,54 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["TaskStateResultDto"];
+                };
+            };
+        };
+    };
+    GoodsIssueController_list: {
+        parameters: {
+            query: {
+                warehouseId?: string;
+                kind?: "SALES" | "OTHER" | "TRANSFER" | "RETURN_TO_SUPPLIER";
+                status?: "DRAFT" | "PENDING_APPROVAL" | "APPROVED" | "POSTED" | "CANCELLED";
+                /** @description Tìm theo số phiếu (contains, không phân biệt hoa thường). */
+                q?: string;
+                take: number;
+                skip: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GoodsIssueListResponseDto"];
+                };
+            };
+        };
+    };
+    GoodsIssueController_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GoodsIssueDetailDto"];
                 };
             };
         };
