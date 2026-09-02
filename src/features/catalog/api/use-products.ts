@@ -17,6 +17,15 @@ export type UpdateSkuInput = components['schemas']['UpdateSkuDto'];
 
 export interface ProductListParams {
   q?: string;
+  /** Lọc theo danh mục — server gộp CẢ danh mục con (recursive CTE). */
+  categoryId?: string;
+  brandId?: string;
+  isActive?: boolean;
+  trackingMode?: TrackingMode;
+  /** true = chỉ sản phẩm còn ít nhất một SKU có tồn (onHand > 0). */
+  hasStock?: boolean;
+  sortBy?: 'createdAt' | 'name' | 'code';
+  sortDir?: 'asc' | 'desc';
   take: number;
   skip: number;
 }
@@ -204,8 +213,9 @@ export function useAddBarcode() {
 }
 
 /**
- * GET /products — q khớp tên/mã sản phẩm, mã/tên SKU và barcode (backend tìm hộ, luật 8).
- * API không nhận sortBy/sortDir — màn hình không đánh cột sortable, không hứa hão.
+ * GET /products — q khớp tên/mã sản phẩm, tên dân dã (searchAliases), mã/tên SKU và
+ * barcode (backend tìm hộ, luật 8). Filter danh mục/thương hiệu/theo dõi lô/còn tồn và
+ * sort (code/name/createdAt) đều phía server.
  */
 export function useProducts(params: ProductListParams) {
   return useQuery({
@@ -214,7 +224,18 @@ export function useProducts(params: ProductListParams) {
       unwrap(
         api.GET('/products', {
           params: {
-            query: { q: params.q || undefined, take: params.take, skip: params.skip },
+            query: {
+              q: params.q || undefined,
+              categoryId: params.categoryId,
+              brandId: params.brandId,
+              isActive: params.isActive,
+              trackingMode: params.trackingMode,
+              hasStock: params.hasStock,
+              sortBy: params.sortBy,
+              sortDir: params.sortDir,
+              take: params.take,
+              skip: params.skip,
+            },
           },
         }),
       ),

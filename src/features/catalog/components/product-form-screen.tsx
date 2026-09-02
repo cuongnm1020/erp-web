@@ -52,19 +52,27 @@ import {
   EMPTY_SKU_ROW,
   gramsToKg,
   kgToGrams,
+  parseAliases,
   productFormSchema,
   type ProductFormValues,
 } from '../schema';
 import { ImageDropzone, ProductGallery, SkuImageCell } from './product-images';
 
 /**
- * C-02 Tạo / sửa sản phẩm — full page theo design/Products/ProductForm@2x.png.
- * Điểm LỆCH so với artboard (API chưa cho phép — ghi ở thẻ PENDING_API):
- * - Ma trận thuộc tính sinh biến thể (Màu × Ngòi): chưa có API thuộc tính → bảng SKU
- *   nhập tay, nút "Thêm biến thể"; tên dòng mới mặc định = tên sản phẩm (sửa được).
+ * C-02 Tạo / sửa sản phẩm — full page theo design/Products/ProductForm@2x.png,
+ * nối API product mới (prompt-product-api 2026-09-02):
+ * - Mã sản phẩm KHÔNG bắt buộc — bỏ trống backend tự sinh `{categoryCode|SP}-{seq}`;
+ *   sửa được cả khi edit (server trả 409 nếu sản phẩm đã có chứng từ).
+ * - Tên gọi khác (searchAliases): một ô, phân tách phẩy — ô tìm sản phẩm ăn các tên này.
+ * - PATCH product/SKU bắt buộc `version` (optimistic locking) — 409 khi người khác vừa
+ *   sửa: banner root.server + nút tải lại, KHÔNG retry tự động (luật 6).
+ * Điểm LỆCH còn lại so với artboard (ghi ở thẻ PENDING_API):
+ * - Ma trận thuộc tính sinh biến thể (Màu × Ngòi): API /attributes đã có nhưng màn ma
+ *   trận là task riêng → bảng SKU nhập tay, nút "Thêm biến thể".
  * - Giá niêm yết theo biến thể: giá nằm ở bảng giá (PriceList), không phải trên SKU.
- * - Mô tả ngắn / NCC chính / Ngưỡng đặt lại: Product chưa có trường tương ứng.
- * - Nhóm thuế: hiện "Chưa cấu hình" đúng design (P3-01 chưa chốt cách tính thuế).
+ * - NCC chính / Ngưỡng đặt lại: Product chưa có trường tương ứng.
+ * - Nhóm thuế: taxRateId đã lưu được theo SKU nhưng fin.TaxRate chưa có API danh mục
+ *   (chờ chốt cách tính thuế với kế toán) → vẫn hiện "Chưa cấu hình".
  * Giữ đúng design: banner lỗi 422 trên đầu "N trường chưa hợp lệ — chưa lưu", lỗi map
  * vào đúng dòng, dữ liệu đã nhập giữ nguyên; xóa dòng chỉ với biến thể CHƯA lưu, biến
  * thể đã có chỉ "Ngừng bán"; Ctrl+S lưu, Esc hủy.
@@ -74,9 +82,12 @@ import { ImageDropzone, ProductGallery, SkuImageCell } from './product-images';
  * tiếp sẽ chỉ gửi phần còn thiếu, không tạo trùng.
  */
 const PENDING_API: Array<{ title: string; need: string }> = [
-  { title: 'Ma trận thuộc tính sinh biến thể', need: 'chưa có API thuộc tính sản phẩm' },
+  {
+    title: 'Ma trận thuộc tính sinh biến thể',
+    need: 'API /attributes đã có — màn ma trận làm sau',
+  },
   { title: 'Giá niêm yết theo biến thể', need: 'giá thuộc bảng giá — màn Bảng giá quản lý' },
-  { title: 'Mô tả ngắn, NCC chính, ngưỡng đặt lại', need: 'Product chưa có trường tương ứng' },
+  { title: 'Nhóm thuế theo SKU', need: 'chờ chốt cách tính thuế — chưa có danh mục thuế suất' },
 ];
 
 const TRACKING_OPTIONS = [
@@ -106,6 +117,7 @@ function initialValues(p?: ProductDetail): ProductFormValues {
     defaultWarehouseId: p?.defaultWarehouseId ?? '',
     description: p?.description ?? '',
     internalNote: p?.internalNote ?? '',
+    searchAliases: (p?.searchAliases ?? []).join(', '),
     allowNegativeStock: p?.allowNegativeStock ?? false,
     baseUom: p?.skus[0]?.baseUom.code ?? 'PCS',
     skus: p
@@ -199,7 +211,10 @@ function ProductFormBody({ product }: { product?: ProductDetail }) {
   const onSubmit = form.handleSubmit(async (v) => {
     setSaving(true);
     setRowErrors([]);
+    form.clearErrors('root.server');
     const errors: RowError[] = [];
+    // Mã hiển thị trong toast — code bỏ trống thì backend tự sinh, lấy từ response.
+    let savedCode = v.code || product?.code || '';
     try {
       // 1. Sản phẩm cha
       let pid = editing ? product.id : created.current?.productId;
@@ -212,25 +227,36 @@ function ProductFormBody({ product }: { product?: ProductDetail }) {
         ...(v.defaultWarehouseId ? { defaultWarehouseId: v.defaultWarehouseId } : {}),
         ...(v.description ? { description: v.description } : {}),
         ...(v.internalNote ? { internalNote: v.internalNote } : {}),
+        searchAliases: parseAliases(v.searchAliases),
         allowNegativeStock: v.allowNegativeStock,
       };
       if (!pid) {
         try {
-          const p = await createProduct.mutateAsync({ code: v.code, ...headerBody });
+          const p = await createProduct.mutateAsync({
+            ...(v.code ? { code: v.code } : {}),
+            ...headerBody,
+          });
           pid = p.id;
+          savedCode = p.code;
           created.current = { productId: p.id, doneRows: new Set() };
         } catch (err) {
           applyServerErrors(form, err as ApiError, {
-            knownFields: ['code', 'name', 'categoryId', 'brandId', 'trackingMode'],
+            knownFields: ['code', 'name', 'categoryId', 'brandId', 'trackingMode', 'searchAliases'],
           });
           return;
         }
       } else if (editing) {
         try {
-          await updateProduct.mutateAsync(headerBody);
+          // Optimistic locking: version từ ProductDetailDto — lệch (người khác vừa sửa) → 409.
+          await updateProduct.mutateAsync({
+            version: product.version,
+            ...headerBody,
+            // code chỉ gửi khi người dùng thật sự đổi — server chặn 409 nếu đã có chứng từ.
+            ...(form.formState.dirtyFields.code && v.code ? { code: v.code } : {}),
+          });
         } catch (err) {
           applyServerErrors(form, err as ApiError, {
-            knownFields: ['name', 'categoryId', 'brandId', 'trackingMode'],
+            knownFields: ['code', 'name', 'categoryId', 'brandId', 'trackingMode', 'searchAliases'],
           });
           return;
         }
@@ -267,7 +293,12 @@ function ProductFormBody({ product }: { product?: ProductDetail }) {
               ...(dirty?.weightG && row.weightG ? { weightKg: gramsToKg(row.weightG) } : {}),
             };
             if (Object.keys(patch).length > 0) {
-              await updateSku.mutateAsync({ skuId: row.skuId, body: patch });
+              // version của từng SKU lấy từ ProductDetailDto — PATCH bắt buộc (optimistic locking).
+              const skuVersion = product?.skus.find((s) => s.id === row.skuId)?.version ?? 0;
+              await updateSku.mutateAsync({
+                skuId: row.skuId,
+                body: { version: skuVersion, ...patch },
+              });
             }
             if (row.barcode && !row.existingBarcode) {
               await addBarcode.mutateAsync({ skuId: row.skuId, code: row.barcode });
@@ -308,7 +339,7 @@ function ProductFormBody({ product }: { product?: ProductDetail }) {
       }
 
       toast.success(editing ? 'Đã lưu thay đổi' : 'Đã lưu sản phẩm', {
-        description: `${v.code} · ${v.skus.length} biến thể`,
+        description: `${savedCode} · ${v.skus.length} biến thể`,
       });
       router.push('/catalog/products');
     } finally {
@@ -389,9 +420,32 @@ function ProductFormBody({ product }: { product?: ProductDetail }) {
           </div>
         ) : null}
 
+        {form.formState.errors.root?.server ? (
+          /* Lỗi không gắn được vào field — nổi bật nhất là 409 optimistic locking:
+             người khác vừa sửa, phải tải lại rồi nhập lại, không retry tự động (luật 6). */
+          <div
+            role="alert"
+            className="flex items-center gap-3 rounded-md border border-destructive/40 bg-destructive/5 px-3 py-2 text-sm"
+          >
+            <span className="font-semibold text-destructive">
+              {form.formState.errors.root.server.message}
+            </span>
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              className="ml-auto"
+              onClick={() => window.location.reload()}
+            >
+              Tải lại dữ liệu
+            </Button>
+          </div>
+        ) : null}
+
+        {/* Nhóm 1: nhận diện sản phẩm — tên, mã, phân loại, các tên gọi phục vụ tìm kiếm. */}
         <section className="rounded-md border bg-card">
           <header className="border-b px-3 py-2 text-sm font-semibold">Thông tin chung</header>
-          <div className="grid gap-x-4 gap-y-3 px-3 py-3 sm:grid-cols-2 lg:grid-cols-5">
+          <div className="grid gap-x-4 gap-y-3 px-3 py-3 sm:grid-cols-2 lg:grid-cols-4">
             <FormField
               control={form.control}
               name="name"
@@ -401,6 +455,28 @@ function ProductFormBody({ product }: { product?: ProductDetail }) {
                   <FormControl>
                     <Input autoFocus={!editing} placeholder="Bút bi Thiên Long TL-08" {...field} />
                   </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="code"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Mã sản phẩm</FormLabel>
+                  <FormControl>
+                    <Input
+                      placeholder={editing ? 'TL08' : 'Để trống — tự sinh theo danh mục'}
+                      className="font-mono"
+                      {...field}
+                    />
+                  </FormControl>
+                  <FormDescription>
+                    {editing
+                      ? 'Đổi mã chỉ được khi chưa phát sinh chứng từ'
+                      : 'Bỏ trống hệ thống tự sinh, ví dụ BVTV-0012'}
+                  </FormDescription>
                   <FormMessage />
                 </FormItem>
               )}
@@ -463,6 +539,58 @@ function ProductFormBody({ product }: { product?: ProductDetail }) {
             />
             <FormField
               control={form.control}
+              name="searchAliases"
+              render={({ field }) => (
+                <FormItem className="sm:col-span-2 lg:col-span-3">
+                  <FormLabel>Tên gọi khác</FormLabel>
+                  <FormControl>
+                    <Input placeholder="thuốc bật chồi, thuốc trĩ, cheshaland" {...field} />
+                  </FormControl>
+                  <FormDescription>
+                    Tên dân dã / viết tắt, phân tách bằng dấu phẩy — ô tìm sản phẩm ăn cả các tên
+                    này
+                  </FormDescription>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="description"
+              render={({ field }) => (
+                <FormItem className="sm:col-span-2 lg:col-span-2">
+                  <FormLabel>Mô tả</FormLabel>
+                  <FormControl>
+                    <Input placeholder="Ngòi bi, mực dầu, viết êm…" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="internalNote"
+              render={({ field }) => (
+                <FormItem className="sm:col-span-2 lg:col-span-2">
+                  <FormLabel>Ghi chú nội bộ</FormLabel>
+                  <FormControl>
+                    <Input placeholder="Chỉ nội bộ thấy — không đưa ra kênh bán" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+          </div>
+        </section>
+
+        {/* Nhóm 2: quy tắc kho vận — ĐVT, theo dõi lô, kho mặc định, thuế, tồn âm. */}
+        <section className="rounded-md border bg-card">
+          <header className="border-b px-3 py-2 text-sm font-semibold">
+            Kho vận &amp; theo dõi
+          </header>
+          <div className="grid gap-x-4 gap-y-3 px-3 py-3 sm:grid-cols-2 lg:grid-cols-4">
+            <FormField
+              control={form.control}
               name="baseUom"
               render={({ field }) => (
                 <FormItem>
@@ -510,6 +638,11 @@ function ProductFormBody({ product }: { product?: ProductDetail }) {
                       ))}
                     </SelectContent>
                   </Select>
+                  {editing ? (
+                    <p className="text-xs text-muted-foreground">
+                      Đổi bị chặn khi SKU đã có phát sinh kho
+                    </p>
+                  ) : null}
                   <FormMessage />
                 </FormItem>
               )}
@@ -534,23 +667,6 @@ function ProductFormBody({ product }: { product?: ProductDetail }) {
                 )}
               />
             ) : null}
-            <FormField
-              control={form.control}
-              name="code"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Mã cha *</FormLabel>
-                  <FormControl>
-                    <Input placeholder="TL08" className="font-mono" disabled={editing} {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            <FormItem>
-              <FormLabel>Nhóm thuế</FormLabel>
-              <Input value="Chưa cấu hình" disabled />
-            </FormItem>
             <FormField
               control={form.control}
               name="defaultWarehouseId"
@@ -580,37 +696,16 @@ function ProductFormBody({ product }: { product?: ProductDetail }) {
                 </FormItem>
               )}
             />
-            <FormField
-              control={form.control}
-              name="description"
-              render={({ field }) => (
-                <FormItem className="sm:col-span-2 lg:col-span-2">
-                  <FormLabel>Mô tả</FormLabel>
-                  <FormControl>
-                    <Input placeholder="Ngòi bi, mực dầu, viết êm…" {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            <FormField
-              control={form.control}
-              name="internalNote"
-              render={({ field }) => (
-                <FormItem className="sm:col-span-2 lg:col-span-2">
-                  <FormLabel>Ghi chú nội bộ</FormLabel>
-                  <FormControl>
-                    <Input placeholder="Chỉ nội bộ thấy — không đưa ra kênh bán" {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+            <FormItem>
+              <FormLabel>Nhóm thuế</FormLabel>
+              <Input value="Chưa cấu hình" disabled />
+              <FormDescription>Chờ chốt cách tính thuế với kế toán</FormDescription>
+            </FormItem>
             <FormField
               control={form.control}
               name="allowNegativeStock"
               render={({ field }) => (
-                <FormItem className="flex flex-row items-start gap-2 pt-6">
+                <FormItem className="flex flex-row items-start gap-2 pt-6 sm:col-span-2">
                   <FormControl>
                     <Checkbox checked={field.value} onCheckedChange={field.onChange} />
                   </FormControl>

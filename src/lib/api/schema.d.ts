@@ -2783,18 +2783,14 @@ export interface components {
             name: string;
             decimals?: number;
         };
-        SkuSummaryDto: {
+        UomCodeDto: {
+            code: string;
+        };
+        ProductListSkuDto: {
             id: string;
-            productId: string;
             code: string;
             name: string;
-            /** @description ĐVT lưu kho — mọi tồn quy về đây. */
-            baseUomId: string;
-            isActive: boolean;
-            /** @description Giá nhập THAM KHẢO Decimal(18,4) chuỗi — giá vốn thật vẫn FIFO (bất biến 11). */
-            purchasePrice: string | null;
-            /** @description Decimal(12,4) kg dạng chuỗi — form hiển thị theo gram. */
-            weightKg: string | null;
+            baseUom: components["schemas"]["UomCodeDto"];
         };
         ProductListItemDto: {
             id: string;
@@ -2809,7 +2805,17 @@ export interface components {
             category: components["schemas"]["ProductCategoryDto"] | null;
             brand: components["schemas"]["BrandDto"] | null;
             /** @description Chỉ SKU đang active. */
-            skus: components["schemas"]["SkuSummaryDto"][];
+            skus: components["schemas"]["ProductListSkuDto"][];
+            /** @description Tổng số SKU (kể cả ngừng bán) — `skus` ở trên chỉ chứa SKU active. */
+            skuCount: number;
+            /** @description Tên dân dã / viết tắt / tên cũ — ô tìm sản phẩm ăn cả các alias này. */
+            searchAliases: string[];
+            /** @description Optimistic locking — client giữ nguyên và gửi lại trong PATCH; lệch → 409. */
+            version: number;
+            createdAt: string;
+            updatedAt: string;
+            /** @description Khác null = đã xóa mềm — chỉ xuất hiện khi query `includeDeleted=true`. */
+            deletedAt: string | null;
         };
         ProductListResponseDto: {
             items: components["schemas"]["ProductListItemDto"][];
@@ -2841,6 +2847,25 @@ export interface components {
             createdAt: string;
         };
         ProductSkuDetailDto: {
+            baseUom: components["schemas"]["UomDto"];
+            barcodes: components["schemas"]["SkuBarcodeDto"][];
+            uomConversions: components["schemas"]["SkuUomConversionDto"][];
+            /**
+             * @description Bỏ trống lúc tạo = thừa kế Product.trackingMode (denormalize, tránh join cross-schema).
+             * @enum {string}
+             */
+            trackingMode: "NONE" | "LOT" | "SERIAL";
+            /** @description Hạn dùng riêng của SKU — null = dùng Product.shelfLifeDays. */
+            shelfLifeDays: number | null;
+            /** @description fin.TaxRate.id — chỉ lưu, chưa tính thuế (chờ kế toán). */
+            taxRateId: string | null;
+            /** @description ĐVT bán mặc định — null = dùng baseUom. */
+            salesUomId: string | null;
+            salesUom: components["schemas"]["UomDto"] | null;
+            /** @description Ảnh riêng của biến thể (ảnh chính đứng đầu). */
+            images: components["schemas"]["ProductImageDto"][];
+            /** @description Giá bán trong BẢNG GIÁ MẶC ĐỊNH (minQty 0) — null = chưa đặt giá. */
+            salePrice: string | null;
             id: string;
             productId: string;
             code: string;
@@ -2852,13 +2877,8 @@ export interface components {
             purchasePrice: string | null;
             /** @description Decimal(12,4) kg dạng chuỗi — form hiển thị theo gram. */
             weightKg: string | null;
-            baseUom: components["schemas"]["UomDto"];
-            barcodes: components["schemas"]["SkuBarcodeDto"][];
-            uomConversions: components["schemas"]["SkuUomConversionDto"][];
-            /** @description Ảnh riêng của biến thể (ảnh chính đứng đầu). */
-            images: components["schemas"]["ProductImageDto"][];
-            /** @description Giá bán trong BẢNG GIÁ MẶC ĐỊNH (minQty 0) — null = chưa đặt giá. */
-            salePrice: string | null;
+            /** @description Optimistic locking — gửi lại trong PATCH /skus/:id; lệch → 409. */
+            version: number;
         };
         ProductDetailDto: {
             id: string;
@@ -2876,12 +2896,23 @@ export interface components {
             description: string | null;
             internalNote: string | null;
             allowNegativeStock: boolean;
+            /** @description Tên dân dã / viết tắt / tên cũ — ô tìm sản phẩm ăn cả các alias này. */
+            searchAliases: string[];
+            /** @description Optimistic locking — form sửa giữ nguyên và gửi lại trong PATCH; lệch → 409. */
+            version: number;
+            createdAt: string;
+            updatedAt: string;
             skus: components["schemas"]["ProductSkuDetailDto"][];
             /** @description Gallery của sản phẩm cha, ảnh chính đứng đầu. */
             images: components["schemas"]["ProductImageDto"][];
         };
+        AttributeLinkDto: {
+            /** Format: uuid */
+            valueId: string;
+        };
         CreateProductDto: {
-            code: string;
+            /** @description Bỏ trống → sinh tự động `{categoryCode|SP}-{seq}` (KHÔNG dùng next_doc_number — product không phải chứng từ). */
+            code?: string;
             name: string;
             /** Format: uuid */
             categoryId?: string;
@@ -2900,6 +2931,10 @@ export interface components {
             internalNote?: string;
             /** @description Cờ master data — reserve/pick CHƯA đọc (chờ chốt vận hành). */
             allowNegativeStock?: boolean;
+            /** @description Tên dân dã / viết tắt / tên cũ cho search. */
+            searchAliases?: string[];
+            /** @description Attribute value MÔ TẢ (isVariant=false) — value sinh biến thể bị từ chối 422. */
+            attributes?: components["schemas"]["AttributeLinkDto"][];
         };
         ProductCoreDto: {
             id: string;
@@ -2918,14 +2953,28 @@ export interface components {
             internalNote: string | null;
             /** @description Cờ master data — reserve/pick CHƯA đọc (chờ chốt vận hành). */
             allowNegativeStock: boolean;
+            /** @description Tên dân dã / viết tắt / tên cũ — ô tìm sản phẩm ăn cả các alias này. */
+            searchAliases: string[];
+            /** @description Optimistic locking — client giữ nguyên và gửi lại trong PATCH; lệch → 409. */
+            version: number;
         };
         UpdateProductDto: {
+            /**
+             * @description Optimistic locking BẮT BUỘC — version hiện tại client đang cầm.
+             *     Lệch → 409 kèm danh sách field đã đổi, không silent overwrite.
+             */
+            version: number;
+            /** @description Chỉ đổi được khi product chưa xuất hiện trong đơn bán/mua/movement — ngược lại 409. */
+            code?: string;
             name?: string;
             /** Format: uuid */
             categoryId?: string | null;
             /** Format: uuid */
             brandId?: string | null;
-            /** @enum {string} */
+            /**
+             * @description Đổi = cascade xuống SKU chưa có movement; SKU đã có movement → 409 kèm danh sách.
+             * @enum {string}
+             */
             trackingMode?: "NONE" | "LOT" | "SERIAL";
             shelfLifeDays?: number;
             isActive?: boolean;
@@ -2934,6 +2983,9 @@ export interface components {
             description?: string;
             internalNote?: string;
             allowNegativeStock?: boolean;
+            searchAliases?: string[];
+            /** @description Có mặt = THAY TOÀN BỘ danh sách link attribute mô tả. */
+            attributes?: components["schemas"]["AttributeLinkDto"][];
         };
         BarcodeDto: {
             code: string;
@@ -2952,6 +3004,22 @@ export interface components {
             name: string;
             /** @description Mã Uom cơ sở, mặc định PCS */
             baseUom?: string;
+            /** @description Mã Uom bán mặc định — phải là baseUom hoặc có conversion. Bỏ trống = baseUom. */
+            salesUom?: string;
+            /**
+             * Format: uuid
+             * @description fin.TaxRate.id — chỉ LƯU, chưa tính thuế (chờ kế toán).
+             */
+            taxRateId?: string;
+            /**
+             * @description Bỏ trống → copy Product.trackingMode (denormalize, bất biến cross-schema).
+             * @enum {string}
+             */
+            trackingMode?: "NONE" | "LOT" | "SERIAL";
+            /** @description Hạn dùng riêng của SKU — bỏ trống hiểu là dùng Product.shelfLifeDays. */
+            shelfLifeDays?: number;
+            /** @description Attribute value SINH BIẾN THỂ (isVariant=true) — service tính variantKey chống trùng tổ hợp. */
+            attributeValueIds?: string[];
             /** @description Giá nhập tham khảo Decimal(18,4) chuỗi — cũng là unitCost của tồn đầu kỳ. */
             purchasePrice?: string;
             /** @description Giá bán Decimal(18,4) chuỗi → ghi vào BẢNG GIÁ MẶC ĐỊNH (bất biến 12), không nằm trên Sku. */
@@ -2964,6 +3032,27 @@ export interface components {
             conversions?: components["schemas"]["UomConversionDto"][];
         };
         SkuDetailDto: {
+            /** @description Product cha dạng core (runtime chỉ include bản ghi trần, không kéo category/brand). */
+            product: components["schemas"]["ProductCoreDto"];
+            baseUom: components["schemas"]["UomDto"];
+            barcodes: components["schemas"]["SkuBarcodeDto"][];
+            uomConversions: components["schemas"]["SkuUomConversionDto"][];
+            /**
+             * @description Bỏ trống lúc tạo = thừa kế Product.trackingMode (denormalize, tránh join cross-schema).
+             * @enum {string}
+             */
+            trackingMode: "NONE" | "LOT" | "SERIAL";
+            /** @description Hạn dùng riêng của SKU — null = dùng Product.shelfLifeDays. */
+            shelfLifeDays: number | null;
+            /** @description fin.TaxRate.id — chỉ lưu, chưa tính thuế (chờ kế toán). */
+            taxRateId: string | null;
+            /** @description ĐVT bán mặc định — null = dùng baseUom. */
+            salesUomId: string | null;
+            salesUom: components["schemas"]["UomDto"] | null;
+            /** @description Ảnh biến thể (ảnh chính đứng đầu) — chỉ có ở GET /skus/{id}, KHÔNG có trong nested create. */
+            images?: components["schemas"]["ProductImageDto"][];
+            /** @description Giá bán bảng mặc định — chỉ có ở GET /skus/{id}. */
+            salePrice?: string | null;
             id: string;
             productId: string;
             code: string;
@@ -2975,14 +3064,8 @@ export interface components {
             purchasePrice: string | null;
             /** @description Decimal(12,4) kg dạng chuỗi — form hiển thị theo gram. */
             weightKg: string | null;
-            product: components["schemas"]["ProductListItemDto"];
-            baseUom: components["schemas"]["UomDto"];
-            barcodes: components["schemas"]["SkuBarcodeDto"][];
-            uomConversions: components["schemas"]["SkuUomConversionDto"][];
-            /** @description Ảnh biến thể (ảnh chính đứng đầu) — chỉ có ở GET /skus/{id}, KHÔNG có trong nested create. */
-            images?: components["schemas"]["ProductImageDto"][];
-            /** @description Giá bán bảng mặc định — chỉ có ở GET /skus/{id}. */
-            salePrice?: string | null;
+            /** @description Optimistic locking — gửi lại trong PATCH /skus/:id; lệch → 409. */
+            version: number;
         };
         SkuListRowDto: {
             skuId: string;
@@ -2996,6 +3079,8 @@ export interface components {
             baseUomCode: string;
             barcodeCount: number;
             isActive: boolean;
+            /** @description Optimistic locking — bulk PATCH /skus/:id (ví dụ Ngừng bán) dùng thẳng, khỏi gọi chi tiết. */
+            version: number;
             /** @description Ảnh chính của SKU (rơi về ảnh chính sản phẩm cha) — presigned URL, null = chưa có ảnh. */
             thumbnailUrl: string | null;
             /** @description Decimal(18,6) dạng chuỗi — ĐVT cơ sở, gộp mọi kho. */
@@ -3010,6 +3095,8 @@ export interface components {
             total: number;
         };
         UpdateSkuDto: {
+            /** @description Optimistic locking bắt buộc — cùng cơ chế UpdateProductDto. */
+            version: number;
             name?: string;
             purchasePrice?: string;
             /** @description Giá bán → upsert vào bảng giá mặc định. */
@@ -3017,6 +3104,31 @@ export interface components {
             weightKg?: string;
             volumeM3?: string;
             isActive?: boolean;
+            /** @description Mã Uom bán mặc định — null = quay về baseUom. */
+            salesUom?: string | null;
+            /** Format: uuid */
+            taxRateId?: string | null;
+            /**
+             * @description Đổi bị chặn (409) khi SKU đã có movement. baseUom KHÔNG BAO GIỜ đổi được qua API.
+             * @enum {string}
+             */
+            trackingMode?: "NONE" | "LOT" | "SERIAL";
+            shelfLifeDays?: number | null;
+        };
+        SkuSummaryDto: {
+            id: string;
+            productId: string;
+            code: string;
+            name: string;
+            /** @description ĐVT lưu kho — mọi tồn quy về đây. */
+            baseUomId: string;
+            isActive: boolean;
+            /** @description Giá nhập THAM KHẢO Decimal(18,4) chuỗi — giá vốn thật vẫn FIFO (bất biến 11). */
+            purchasePrice: string | null;
+            /** @description Decimal(12,4) kg dạng chuỗi — form hiển thị theo gram. */
+            weightKg: string | null;
+            /** @description Optimistic locking — gửi lại trong PATCH /skus/:id; lệch → 409. */
+            version: number;
         };
         BarcodeLookupSkuDto: {
             id: string;
@@ -5216,6 +5328,18 @@ export interface operations {
                 q?: string;
                 take: number;
                 skip: number;
+                /** @description Lọc theo category — bao gồm CẢ category con (đệ quy bằng recursive CTE). */
+                categoryId?: string;
+                brandId?: string;
+                isActive?: boolean;
+                trackingMode?: "NONE" | "LOT" | "SERIAL";
+                /** @description true = chỉ product có ít nhất một SKU còn tồn (onHand > 0). */
+                hasStock?: boolean;
+                /** @description Mặc định false — bản ghi xóa mềm ẩn khỏi mọi list. */
+                includeDeleted?: boolean;
+                /** @description Bỏ trống → `code` (giữ thứ tự cũ cho client hiện tại). */
+                sortBy?: "createdAt" | "name" | "code";
+                sortDir?: "asc" | "desc";
             };
             header?: never;
             path?: never;

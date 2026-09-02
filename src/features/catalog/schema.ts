@@ -4,11 +4,14 @@ import { codeSchema, moneySchema, quantitySchema } from '@/lib/shared';
 
 /**
  * Khớp CreateProductDto của apps/api (luật 11 — không chặt/lỏng hơn DTO).
- * shelfLifeDays nhập dạng chuỗi số (input text/numeric), submit mới đổi sang number
- * (Number.parseInt — số nguyên ngày, không phải decimal); rỗng = không gửi.
+ * - code bỏ trống → backend tự sinh `{categoryCode|SP}-{seq}`.
+ * - shelfLifeDays nhập dạng chuỗi số (input text/numeric), submit mới đổi sang number
+ *   (Number.parseInt — số nguyên ngày, không phải decimal); rỗng = không gửi.
+ * - searchAliases nhập MỘT ô, phân tách bằng dấu phẩy — submit mới tách thành mảng
+ *   (parseAliases); backend nhận string[].
  */
 export const createProductSchema = z.object({
-  code: codeSchema,
+  code: codeSchema.optional().or(z.literal('')),
   name: z.string().trim().min(1, 'Nhập tên sản phẩm').max(300, 'Tối đa 300 ký tự'),
   categoryId: z.string().optional(),
   brandId: z.string().optional(),
@@ -17,17 +20,34 @@ export const createProductSchema = z.object({
   defaultWarehouseId: z.string().optional(),
   description: z.string().trim().max(2000, 'Tối đa 2000 ký tự'),
   internalNote: z.string().trim().max(2000, 'Tối đa 2000 ký tự'),
+  searchAliases: z.string().trim().max(500, 'Tối đa 500 ký tự'),
   allowNegativeStock: z.boolean(),
 });
 
 export type CreateProductValues = z.infer<typeof createProductSchema>;
 
-/** Khớp UpdateProductDto — không đổi mã sau khi tạo; thêm được isActive (Đang bán / Ngừng bán). */
-export const updateProductSchema = createProductSchema.omit({ code: true }).extend({
+/**
+ * Khớp UpdateProductDto — code đổi ĐƯỢC (server chặn 409 khi đã phát sinh chứng từ);
+ * thêm isActive (Đang bán / Ngừng bán). `version` không nằm trong form — lấy từ
+ * ProductDetailDto lúc submit (optimistic locking).
+ */
+export const updateProductSchema = createProductSchema.extend({
   isActive: z.boolean(),
 });
 
 export type UpdateProductValues = z.infer<typeof updateProductSchema>;
+
+/** "thuốc trĩ, cheshaland" → ['thuốc trĩ','cheshaland'] — bỏ phần tử rỗng, không trùng. */
+export function parseAliases(raw: string): string[] {
+  return [
+    ...new Set(
+      raw
+        .split(',')
+        .map((s) => s.trim())
+        .filter(Boolean),
+    ),
+  ];
+}
 
 /**
  * Một dòng biến thể trên form sản phẩm (design/Products/ProductForm).

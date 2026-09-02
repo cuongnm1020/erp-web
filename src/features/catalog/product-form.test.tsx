@@ -90,7 +90,7 @@ describe('ProductFormScreen — tạo (design/Products/ProductForm)', () => {
     );
     renderApp(<ProductFormScreen />);
     fill('Tên sản phẩm *', 'Bút bi TL-08');
-    fill('Mã cha *', 'TL08');
+    fill('Mã sản phẩm', 'TL08');
     fill('Mã SKU', 'TL08-BLUE');
     fill('Tên biến thể', 'Bút bi TL-08 xanh');
     fill('Barcode lẻ', '8934567801234');
@@ -105,6 +105,43 @@ describe('ProductFormScreen — tạo (design/Products/ProductForm)', () => {
         barcodes: [{ code: '8934567801234' }],
       },
     });
+    await waitFor(() => expect(push).toHaveBeenCalledWith('/catalog/products'));
+  });
+
+  it('bỏ trống mã → POST không có code (backend tự sinh); tên gọi khác tách theo phẩy, bỏ trùng/rỗng', async () => {
+    push.mockClear();
+    let productBody: Record<string, unknown> | undefined;
+    server.use(
+      ...baseHandlers(),
+      http.post('/api/products', async ({ request }) => {
+        productBody = (await request.json()) as Record<string, unknown>;
+        return HttpResponse.json(
+          {
+            id: 'p-5',
+            code: 'SP-0001',
+            name: 'Thuốc bật chồi X',
+            categoryId: null,
+            brandId: null,
+            trackingMode: 'NONE',
+            shelfLifeDays: null,
+            isActive: true,
+            searchAliases: ['thuốc bật chồi', 'cheshaland'],
+            version: 0,
+          },
+          { status: 201 },
+        );
+      }),
+      http.post('/api/products/:id/skus', () => HttpResponse.json({}, { status: 201 })),
+    );
+    renderApp(<ProductFormScreen />);
+    fill('Tên sản phẩm *', 'Thuốc bật chồi X');
+    fill('Tên gọi khác', 'thuốc bật chồi, cheshaland, , thuốc bật chồi');
+    fill('Mã SKU', 'X-100ML');
+    fill('Tên biến thể', 'Chai 100ml');
+    fireEvent.click(screen.getByRole('button', { name: /Lưu sản phẩm/ }));
+    await waitFor(() => expect(productBody).toBeDefined());
+    expect(productBody).not.toHaveProperty('code');
+    expect(productBody!.searchAliases).toEqual(['thuốc bật chồi', 'cheshaland']);
     await waitFor(() => expect(push).toHaveBeenCalledWith('/catalog/products'));
   });
 
@@ -143,7 +180,7 @@ describe('ProductFormScreen — tạo (design/Products/ProductForm)', () => {
     );
     renderApp(<ProductFormScreen />);
     fill('Tên sản phẩm *', 'Bút bi TL-09');
-    fill('Mã cha *', 'TL09');
+    fill('Mã sản phẩm', 'TL09');
     fill('Mã SKU', 'TL09-DUP');
     fill('Tên biến thể', 'Bút TL-09');
     fireEvent.click(screen.getByRole('button', { name: /Lưu sản phẩm/ }));
@@ -190,7 +227,7 @@ describe('ProductFormScreen — tạo (design/Products/ProductForm)', () => {
     );
     renderApp(<ProductFormScreen />);
     fill('Tên sản phẩm *', 'Bút TL-11');
-    fill('Mã cha *', 'TL11');
+    fill('Mã sản phẩm', 'TL11');
     fill('Mô tả', 'Mô tả bán hàng');
     fill('Ghi chú nội bộ', 'Ghi chú riêng');
     fireEvent.click(screen.getByRole('checkbox', { name: 'Cho phép bán tồn kho âm' }));
@@ -236,7 +273,7 @@ describe('ProductFormScreen — tạo (design/Products/ProductForm)', () => {
     );
     renderApp(<ProductFormScreen />);
     fill('Tên sản phẩm *', 'Bút TL-12');
-    fill('Mã cha *', 'TL12');
+    fill('Mã sản phẩm', 'TL12');
     fill('Mã SKU', 'TL12-A');
     fill('Tên biến thể', 'Bút TL-12 A');
     fill('Tồn đầu kỳ', '10'); // không giá nhập, không kho mặc định
@@ -294,7 +331,7 @@ describe('ProductFormScreen — tạo (design/Products/ProductForm)', () => {
     expect(screen.queryByAltText('b.png')).not.toBeInTheDocument();
 
     fill('Tên sản phẩm *', 'Bút TL-10');
-    fill('Mã cha *', 'TL10');
+    fill('Mã sản phẩm', 'TL10');
     fill('Mã SKU', 'TL10-A');
     fill('Tên biến thể', 'Bút TL-10 A');
     fireEvent.click(screen.getByRole('button', { name: /Lưu sản phẩm/ }));
@@ -316,6 +353,10 @@ describe('ProductFormScreen — sửa', () => {
     isActive: true,
     category: null,
     brand: null,
+    searchAliases: ['bút tl'],
+    version: 7,
+    createdAt: '2026-09-01T00:00:00.000Z',
+    updatedAt: '2026-09-01T00:00:00.000Z',
     images: [
       {
         id: 'img-1',
@@ -335,6 +376,12 @@ describe('ProductFormScreen — sửa', () => {
         name: 'Bút bi TL-08 xanh',
         baseUomId: 'u-pcs',
         isActive: true,
+        version: 5,
+        trackingMode: 'NONE',
+        shelfLifeDays: null,
+        taxRateId: null,
+        salesUomId: null,
+        salesUom: null,
         baseUom: UOMS[0],
         barcodes: [
           { id: 'b1', code: '8934567801234', uomId: 'u-pcs', type: 'EAN13', uom: UOMS[0] },
@@ -345,13 +392,17 @@ describe('ProductFormScreen — sửa', () => {
     ],
   };
 
-  it('prefill từ GET /products/:id; đổi Ngừng bán → PATCH /skus/:id; barcode đã có chỉ đọc', async () => {
+  it('prefill từ GET /products/:id; đổi Ngừng bán → PATCH /skus/:id kèm version; barcode đã có chỉ đọc', async () => {
     push.mockClear();
     const patches: unknown[] = [];
+    const productPatches: unknown[] = [];
     server.use(
       ...baseHandlers(),
       http.get('/api/products/:id', () => HttpResponse.json(DETAIL)),
-      http.patch('/api/products/:id', () => HttpResponse.json({})),
+      http.patch('/api/products/:id', async ({ request }) => {
+        productPatches.push(await request.json());
+        return HttpResponse.json({});
+      }),
       http.patch('/api/skus/:id', async ({ request, params }) => {
         patches.push({ skuId: params.id, body: await request.json() });
         return HttpResponse.json({});
@@ -359,19 +410,48 @@ describe('ProductFormScreen — sửa', () => {
     );
     renderApp(<ProductFormScreen productId="p-9" />);
     expect(await screen.findByDisplayValue('Bút bi TL-08 xanh')).toBeInTheDocument();
+    // Alias prefill vào ô "Tên gọi khác".
+    expect(screen.getByDisplayValue('bút tl')).toBeInTheDocument();
     // Barcode sẵn có hiển thị chỉ đọc, không phải input
     expect(screen.queryByLabelText('Barcode lẻ')).not.toBeInTheDocument();
     expect(screen.getByText('8934567801234')).toBeInTheDocument();
-    // Mã SKU đã lưu bị khóa
+    // Mã SKU đã lưu bị khóa; mã SẢN PHẨM thì sửa được (server chặn 409 khi đã có chứng từ)
     expect(screen.getByDisplayValue('TL08-BLUE')).toBeDisabled();
+    expect(screen.getByDisplayValue('TL08')).toBeEnabled();
 
     fireEvent.click(screen.getByRole('combobox', { name: 'Trạng thái' }));
     fireEvent.click(await screen.findByRole('option', { name: 'Ngừng bán' }));
     fireEvent.click(screen.getByRole('button', { name: /Lưu thay đổi/ }));
     await waitFor(() => expect(patches).toHaveLength(1));
-    // Chỉ gửi field dirty — tên không đổi thì không nằm trong PATCH
-    expect(patches[0]).toEqual({ skuId: 's-1', body: { isActive: false } });
+    // PATCH product mang version của detail (optimistic locking); code không dirty → không gửi
+    expect(productPatches[0]).toMatchObject({ version: 7, searchAliases: ['bút tl'] });
+    expect(productPatches[0]).not.toHaveProperty('code');
+    // Chỉ gửi field dirty — tên không đổi thì không nằm trong PATCH; version luôn kèm
+    expect(patches[0]).toEqual({ skuId: 's-1', body: { version: 5, isActive: false } });
     await waitFor(() => expect(push).toHaveBeenCalledWith('/catalog/products'));
+  });
+
+  it('409 version lệch (người khác vừa sửa) → banner xung đột + nút tải lại, KHÔNG điều hướng', async () => {
+    push.mockClear();
+    server.use(
+      ...baseHandlers(),
+      http.get('/api/products/:id', () => HttpResponse.json(DETAIL)),
+      http.patch('/api/products/:id', () =>
+        HttpResponse.json(
+          { code: 'CONFLICT', message: 'đã bị sửa', details: [], traceId: 't1' },
+          { status: 409 },
+        ),
+      ),
+    );
+    renderApp(<ProductFormScreen productId="p-9" />);
+    await screen.findByDisplayValue('Bút bi TL-08 xanh');
+    fireEvent.click(screen.getByRole('button', { name: /Lưu thay đổi/ }));
+    // Câu từ bộ dịch (luật 6) — không render message thô của server.
+    expect(
+      await screen.findByText('Dữ liệu đã thay đổi ở nơi khác. Tải lại rồi thao tác lại.'),
+    ).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Tải lại dữ liệu' })).toBeInTheDocument();
+    expect(push).not.toHaveBeenCalled();
   });
 
   it('ảnh: gallery cha hiện ảnh chính; upload ảnh cha + ảnh biến thể gửi multipart field "file" lên S3 API', async () => {
