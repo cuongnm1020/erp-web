@@ -42,7 +42,7 @@ import { formatMoney } from '@/lib/format';
 import { dateKeySchema, moneySchema, quantitySchema } from '@/lib/shared';
 import { useSkuSearch } from '../api/use-locations';
 import { useCreateReceipt, usePostReceipt } from '../api/use-receipts';
-import { useWarehouses } from '../api/use-warehouses';
+import { isOperationalWarehouse, useWarehouses } from '../api/use-warehouses';
 
 /**
  * Tạo phiếu nhập kho (design GrnCreate) — POST /goods-receipts (DRAFT), nút
@@ -222,13 +222,11 @@ export function GrnCreateScreen() {
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>
-                      {(warehouses.data ?? [])
-                        .filter((w) => w.isActive)
-                        .map((w) => (
-                          <SelectItem key={w.id} value={w.id}>
-                            {w.name}
-                          </SelectItem>
-                        ))}
+                      {(warehouses.data ?? []).filter(isOperationalWarehouse).map((w) => (
+                        <SelectItem key={w.id} value={w.id}>
+                          {w.name}
+                        </SelectItem>
+                      ))}
                     </SelectContent>
                   </Select>
                   <FormMessage />

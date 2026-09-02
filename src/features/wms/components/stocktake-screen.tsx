@@ -50,7 +50,7 @@ import {
   type CycleCountLine,
   type CycleCountStatus,
 } from '../api/use-stocktake';
-import { useWarehouses } from '../api/use-warehouses';
+import { isOperationalWarehouse, useWarehouses } from '../api/use-warehouses';
 
 /**
  * Kiểm kê định kỳ (P2-07, design Stocktake) — /cycle-counts.
@@ -89,13 +89,11 @@ function CreateDialog({ open, onClose }: { open: boolean; onClose: (id?: string)
             <SelectValue placeholder="Chọn kho" />
           </SelectTrigger>
           <SelectContent>
-            {(warehouses.data ?? [])
-              .filter((w) => w.isActive)
-              .map((w) => (
-                <SelectItem key={w.id} value={w.id}>
-                  {w.name}
-                </SelectItem>
-              ))}
+            {(warehouses.data ?? []).filter(isOperationalWarehouse).map((w) => (
+              <SelectItem key={w.id} value={w.id}>
+                {w.name}
+              </SelectItem>
+            ))}
           </SelectContent>
         </Select>
         <DialogFooter>

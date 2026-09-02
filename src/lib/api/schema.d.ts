@@ -1753,6 +1753,74 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/transfers": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["TransferController_list"];
+        put?: never;
+        /** Soạn phiếu (DRAFT) — chưa chạm sổ. */
+        post: operations["TransferController_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/transfers/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["TransferController_get"];
+        put?: never;
+        post?: never;
+        /** Hủy phiếu NHÁP chưa xuất (idempotent). Đã xuất → 409. */
+        delete: operations["TransferController_cancel"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/transfers/{id}/dispatch": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Bước 1 — xuất khỏi kho đi: movement bin→IN-TRANSIT + GDN chân xuất, một transaction. */
+        post: operations["TransferController_dispatch"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/transfers/{id}/receive": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Bước 2 — nhận tại kho đến: movement IN-TRANSIT→đích theo SL thực nhận + GRN chân nhận. */
+        post: operations["TransferController_receive"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/cycle-counts": {
         parameters: {
             query?: never;
@@ -3729,6 +3797,122 @@ export interface components {
              * @enum {string}
              */
             status: "PENDING" | "PICKED_UP" | "IN_TRANSIT" | "DELIVERED" | "FAILED" | "RETURNED";
+        };
+        TransferListRowDto: {
+            id: string;
+            docNumber: string;
+            /** @enum {string} */
+            status: "DRAFT" | "PENDING_APPROVAL" | "APPROVED" | "POSTED" | "CANCELLED";
+            /** @enum {string} */
+            stage: "DRAFT" | "POSTED" | "CANCELLED" | "IN_TRANSIT";
+            fromWarehouseName: string;
+            toWarehouseName: string;
+            lineCount: number;
+            totalQtyShipped: string;
+            /** @description Số dòng nhận thiếu (chỉ > 0 sau khi nhận). */
+            discrepancyLineCount: number;
+            createdAt: string;
+            dispatchedAt: string | null;
+            postedAt: string | null;
+        };
+        TransferStageCountsDto: {
+            DRAFT: number;
+            IN_TRANSIT: number;
+            POSTED: number;
+            CANCELLED: number;
+        };
+        TransferListResponseDto: {
+            items: components["schemas"]["TransferListRowDto"][];
+            total: number;
+            stageCounts: components["schemas"]["TransferStageCountsDto"];
+        };
+        TransferLineDto: {
+            id: string;
+            lineNo: number;
+            skuId: string;
+            skuCode: string;
+            skuName: string;
+            lotNumber: string | null;
+            fromLocationCode: string;
+            toLocationCode: string | null;
+            /** @description Decimal(18,6) dạng chuỗi. */
+            qtyShipped: string;
+            qtyReceived: string | null;
+            /** @description qtyShipped − qtyReceived, chỉ khác '0' khi đã nhận thiếu. */
+            discrepancy: string | null;
+            discrepancyNote: string | null;
+        };
+        TransferDetailDto: {
+            id: string;
+            docNumber: string;
+            /** @enum {string} */
+            status: "DRAFT" | "PENDING_APPROVAL" | "APPROVED" | "POSTED" | "CANCELLED";
+            /** @enum {string} */
+            stage: "DRAFT" | "POSTED" | "CANCELLED" | "IN_TRANSIT";
+            fromWarehouseId: string;
+            fromWarehouseName: string;
+            toWarehouseId: string;
+            toWarehouseName: string;
+            issueDocNumber: string | null;
+            receiptDocNumber: string | null;
+            expectedAt: string | null;
+            note: string | null;
+            createdAt: string;
+            createdByName: string | null;
+            dispatchedAt: string | null;
+            dispatchedByName: string | null;
+            postedAt: string | null;
+            postedByName: string | null;
+            lineCount: number;
+            /** @description Tổng SL xuất — Decimal dạng chuỗi. */
+            totalQtyShipped: string;
+            totalQtyReceived: string | null;
+            lines: components["schemas"]["TransferLineDto"][];
+        };
+        CreateTransferLineDto: {
+            /** Format: uuid */
+            skuId: string;
+            /** Format: uuid */
+            lotId?: string;
+            /**
+             * Format: uuid
+             * @description Bin nguồn ở kho đi — phần KHẢ DỤNG (onHand − reserved) mới chuyển được.
+             */
+            fromLocationId: string;
+            /** @description Decimal(18,6) dạng chuỗi. */
+            qty: string;
+        };
+        CreateTransferDto: {
+            /** Format: uuid */
+            fromWarehouseId: string;
+            /** Format: uuid */
+            toWarehouseId: string;
+            expectedAt?: string;
+            note?: string;
+            lines: components["schemas"]["CreateTransferLineDto"][];
+        };
+        TransferActionResultDto: {
+            transferId: string;
+            docNumber: string;
+            /** @enum {string} */
+            stage: "DRAFT" | "POSTED" | "CANCELLED" | "IN_TRANSIT";
+            /** @description Chứng từ chân vừa post (GDN lúc dispatch, GRN lúc receive). */
+            legDocNumber: string | null;
+        };
+        ReceiveTransferLineDto: {
+            /** Format: uuid */
+            lineId: string;
+            /** @description SL thực nhận — ≤ SL xuất; thiếu thì bắt buộc discrepancyNote. */
+            qtyReceived: string;
+            /**
+             * Format: uuid
+             * @description Vị trí đích ở kho đến — bắt buộc khi qtyReceived > 0.
+             */
+            toLocationId?: string;
+            discrepancyNote?: string;
+        };
+        ReceiveTransferDto: {
+            lines: components["schemas"]["ReceiveTransferLineDto"][];
         };
         CycleCountListRowDto: {
             id: string;
@@ -7103,6 +7287,142 @@ export interface operations {
                 };
                 content: {
                     "application/json": Record<string, never>;
+                };
+            };
+        };
+    };
+    TransferController_list: {
+        parameters: {
+            query: {
+                /** @description Khớp kho đi HOẶC kho đến. */
+                warehouseId?: string;
+                /** @description Bước hiển thị (suy từ status + hai chân) — không phải cột DB. */
+                stage?: "DRAFT" | "IN_TRANSIT" | "POSTED" | "CANCELLED";
+                q?: string;
+                take: number;
+                skip: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TransferListResponseDto"];
+                };
+            };
+        };
+    };
+    TransferController_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateTransferDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TransferActionResultDto"];
+                };
+            };
+        };
+    };
+    TransferController_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TransferDetailDto"];
+                };
+            };
+        };
+    };
+    TransferController_cancel: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    TransferController_dispatch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TransferActionResultDto"];
+                };
+            };
+        };
+    };
+    TransferController_receive: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReceiveTransferDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TransferActionResultDto"];
                 };
             };
         };

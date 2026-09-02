@@ -6,6 +6,18 @@ export type Warehouse = components['schemas']['WarehouseSummaryDto'];
 export type CreateWarehouseInput = components['schemas']['CreateWarehouseDto'];
 export type UpdateWarehouseInput = components['schemas']['UpdateWarehouseDto'];
 
+/**
+ * Kho trung chuyển ẢO (PLAN-gdn-transfer bước 4) — tồn "đang trên xe" giữa hai
+ * bước của phiếu chuyển kho. Hiện ở màn Tồn kho / Kho & vị trí, nhưng KHÔNG bao
+ * giờ là lựa chọn cho nhập kho / kiểm kê / điểm đi-đến của phiếu chuyển.
+ */
+export const TRANSIT_WAREHOUSE_CODE = 'TRANSIT';
+
+/** Kho vận hành được (chọn trong form nhập/kiểm kê/chuyển): active và không phải kho ảo. */
+export function isOperationalWarehouse(w: Pick<Warehouse, 'isActive' | 'code'>): boolean {
+  return w.isActive && w.code !== TRANSIT_WAREHOUSE_CODE;
+}
+
 /** Phễu key (luật 3): ['wms','warehouses', ...]. */
 export const warehouseKeys = {
   all: ['wms', 'warehouses'] as const,
