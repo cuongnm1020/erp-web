@@ -37,6 +37,7 @@ import { Can, useAbility } from '@/lib/permission';
 import {
   useAddBarcode,
   useBrands,
+  useSetConversion,
   useCategories,
   useCreateProduct,
   useCreateSku,
@@ -57,6 +58,7 @@ import {
   type ProductFormValues,
 } from '../schema';
 import { ImageDropzone, ProductGallery, SkuImageCell } from './product-images';
+import { UomManagerDialog } from './uom-manager-dialog';
 
 /**
  * C-02 Tạo / sửa sản phẩm — full page theo design/Products/ProductForm@2x.png,
@@ -132,6 +134,13 @@ function initialValues(p?: ProductDetail): ProductFormValues {
           salePrice: s.salePrice ?? '',
           weightG: s.weightKg ? kgToGrams(s.weightKg) : '',
           openingQty: '',
+          // F3 — alt* để TRỐNG trên SKU đã lưu (khai = thêm quy đổi mới);
+          // quy đổi sẵn có hiển thị dạng chip, xóa ở API riêng khi cần.
+          altUom: '',
+          altFactor: '',
+          altBarcode: '',
+          salesUom: s.salesUom?.code ?? '',
+          existingConvUoms: s.uomConversions.map((c) => c.uom.code),
         }))
       : [{ ...EMPTY_SKU_ROW }],
   };
@@ -190,6 +199,7 @@ function ProductFormBody({ product }: { product?: ProductDetail }) {
   const createSku = useCreateSku();
   const updateSku = useUpdateSku();
   const addBarcode = useAddBarcode();
+  const setConversion = useSetConversion();
   const uploadImage = useUploadProductImage();
 
   /**
@@ -226,6 +236,7 @@ function ProductFormBody({ product }: { product?: ProductDetail }) {
   const rows = useFieldArray({ control: form.control, name: 'skus' });
   const [rowErrors, setRowErrors] = useState<RowError[]>([]);
   const [saving, setSaving] = useState(false);
+  const [uomManagerOpen, setUomManagerOpen] = useState(false);
   /** Tạo cha xong mà dòng SKU lỗi → nhớ để lần Lưu sau không tạo trùng (lưu không atomic). */
   const created = useRef<{ productId: string; doneRows: Set<number> } | null>(null);
 
@@ -296,7 +307,21 @@ function ProductFormBody({ product }: { product?: ProductDetail }) {
                 code: row.code,
                 name: row.name,
                 baseUom: v.baseUom,
-                ...(row.barcode ? { barcodes: [{ code: row.barcode }] } : {}),
+                // F3 — ĐVT phụ khai trên dòng: conversion + barcode theo ĐVT + ĐVT bán
+                ...(row.altUom && row.altFactor
+                  ? { conversions: [{ uom: row.altUom, factor: row.altFactor }] }
+                  : {}),
+                ...(row.salesUom ? { salesUom: row.salesUom } : {}),
+                ...(row.barcode || (row.altBarcode && row.altUom)
+                  ? {
+                      barcodes: [
+                        ...(row.barcode ? [{ code: row.barcode }] : []),
+                        ...(row.altBarcode && row.altUom
+                          ? [{ code: row.altBarcode, uom: row.altUom }]
+                          : []),
+                      ],
+                    }
+                  : {}),
                 ...(row.purchasePrice ? { purchasePrice: row.purchasePrice } : {}),
                 ...(row.salePrice ? { salePrice: row.salePrice } : {}),
                 ...(row.weightG ? { weightKg: gramsToKg(row.weightG) } : {}),
@@ -314,6 +339,8 @@ function ProductFormBody({ product }: { product?: ProductDetail }) {
                 : {}),
               ...(dirty?.salePrice && row.salePrice ? { salePrice: row.salePrice } : {}),
               ...(dirty?.weightG && row.weightG ? { weightKg: gramsToKg(row.weightG) } : {}),
+              // F3 — đổi ĐVT bán ('' = quay về ĐVT cơ sở → gửi null)
+              ...(dirty?.salesUom ? { salesUom: row.salesUom || null } : {}),
             };
             if (Object.keys(patch).length > 0) {
               // version của từng SKU lấy từ ProductDetailDto — PATCH bắt buộc (optimistic locking).
@@ -323,8 +350,24 @@ function ProductFormBody({ product }: { product?: ProductDetail }) {
                 body: { version: skuVersion, ...patch },
               });
             }
+            // F3 — quy đổi mới khai trên SKU đã lưu: POST conversion TRƯỚC barcode
+            // (trg_barcode_uom_valid đòi conversion có trước).
+            if (row.altUom && row.altFactor) {
+              await setConversion.mutateAsync({
+                skuId: row.skuId,
+                uom: row.altUom,
+                factor: row.altFactor,
+              });
+            }
             if (row.barcode && !row.existingBarcode) {
               await addBarcode.mutateAsync({ skuId: row.skuId, code: row.barcode });
+            }
+            if (row.altBarcode && row.altUom) {
+              await addBarcode.mutateAsync({
+                skuId: row.skuId,
+                code: row.altBarcode,
+                uom: row.altUom,
+              });
             }
           }
         } catch (err) {
@@ -806,15 +849,25 @@ function ProductFormBody({ product }: { product?: ProductDetail }) {
                 · {rows.fields.length} dòng{newRowCount > 0 ? ` · ${newRowCount} mới` : ''}
               </span>
             </span>
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={() => rows.append({ ...EMPTY_SKU_ROW, name: form.getValues('name') })}
-            >
-              <Plus aria-hidden />
-              Thêm biến thể
-            </Button>
+            <span className="flex items-center gap-1.5">
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={() => setUomManagerOpen(true)}
+              >
+                Quản lý ĐVT
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => rows.append({ ...EMPTY_SKU_ROW, name: form.getValues('name') })}
+              >
+                <Plus aria-hidden />
+                Thêm biến thể
+              </Button>
+            </span>
           </header>
           <div className="flex flex-col divide-y">
             {rows.fields.map((f, i) => (
@@ -824,6 +877,7 @@ function ProductFormBody({ product }: { product?: ProductDetail }) {
                 index={i}
                 editing={editing}
                 canEditImages={canEditImages}
+                uoms={uoms.data ?? []}
                 skuImage={
                   product?.skus.find((s) => s.id === form.getValues(`skus.${i}.skuId`))?.images[0]
                 }
@@ -862,6 +916,13 @@ function ProductFormBody({ product }: { product?: ProductDetail }) {
           </ul>
         </section>
       </form>
+      {uomManagerOpen ? (
+        <UomManagerDialog
+          open={uomManagerOpen}
+          onOpenChange={setUomManagerOpen}
+          canEdit={canEditImages}
+        />
+      ) : null}
     </Form>
   );
 }
@@ -873,6 +934,7 @@ function SkuRow({
   editing,
   canEditImages,
   skuImage,
+  uoms,
   onRemove,
 }: {
   form: UseFormReturn<ProductFormValues>;
@@ -880,11 +942,18 @@ function SkuRow({
   editing: boolean;
   canEditImages: boolean;
   skuImage?: ProductDetail['skus'][number]['images'][number];
+  uoms: Array<{ id: string; code: string; name: string }>;
   onRemove?: () => void;
 }) {
   const skuId = form.getValues(`skus.${index}.skuId`);
   const existingBarcode = form.getValues(`skus.${index}.existingBarcode`);
   const saved = skuId !== '';
+  // F3 — đa ĐVT trên dòng: ĐVT phụ ngoài ĐVT cơ sở; ĐVT bán = cơ sở/phụ/đã có quy đổi
+  const baseUom = form.watch('baseUom');
+  const altUom = form.watch(`skus.${index}.altUom`);
+  const existingConvUoms = form.getValues(`skus.${index}.existingConvUoms`);
+  const altOptions = uoms.filter((u) => u.code !== baseUom);
+  const NONE = '__none__';
 
   return (
     <div className="flex flex-col gap-2 px-3 py-2">
@@ -1078,6 +1147,116 @@ function SkuRow({
             )}
           />
         )}
+      </div>
+      {/* F3 — hàng 3: đa ĐVT. SKU đã lưu hiện quy đổi sẵn có dạng chip; khai thêm ở các ô bên cạnh. */}
+      <div className="grid items-start gap-2 sm:grid-cols-4 lg:max-w-3xl">
+        <FormField
+          control={form.control}
+          name={`skus.${index}.altUom`}
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel className="text-xs text-muted-foreground">
+                {saved ? 'Thêm ĐVT phụ' : 'ĐVT phụ'}
+              </FormLabel>
+              <Select
+                value={field.value === '' ? NONE : field.value}
+                onValueChange={(x) => field.onChange(x === NONE ? '' : x)}
+              >
+                <FormControl>
+                  <SelectTrigger aria-label="ĐVT phụ">
+                    <SelectValue placeholder="Không" />
+                  </SelectTrigger>
+                </FormControl>
+                <SelectContent>
+                  <SelectItem value={NONE}>Không</SelectItem>
+                  {altOptions
+                    .filter((u) => !existingConvUoms.includes(u.code))
+                    .map((u) => (
+                      <SelectItem key={u.id} value={u.code}>
+                        {u.code} — {u.name}
+                      </SelectItem>
+                    ))}
+                </SelectContent>
+              </Select>
+              {existingConvUoms.length > 0 ? (
+                <FormDescription className="text-[11px]">
+                  Đã có: {existingConvUoms.join(', ')}
+                </FormDescription>
+              ) : null}
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+        <FormField
+          control={form.control}
+          name={`skus.${index}.altFactor`}
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel className="text-xs text-muted-foreground">Hệ số quy đổi</FormLabel>
+              <FormControl>
+                <Input
+                  inputMode="decimal"
+                  className="text-right tabular-nums"
+                  placeholder="24"
+                  disabled={!altUom}
+                  {...field}
+                  value={field.value ?? ''}
+                />
+              </FormControl>
+              <FormDescription className="text-[11px]">
+                1 {altUom || 'ĐVT phụ'} = ? {baseUom}
+              </FormDescription>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+        <FormField
+          control={form.control}
+          name={`skus.${index}.altBarcode`}
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel className="text-xs text-muted-foreground">Barcode ĐVT phụ</FormLabel>
+              <FormControl>
+                <Input
+                  placeholder="quét mã thùng"
+                  className="font-mono"
+                  disabled={!altUom}
+                  {...field}
+                  value={field.value ?? ''}
+                />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+        <FormField
+          control={form.control}
+          name={`skus.${index}.salesUom`}
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel className="text-xs text-muted-foreground">ĐVT bán mặc định</FormLabel>
+              <Select
+                value={field.value === '' ? NONE : field.value}
+                onValueChange={(x) => field.onChange(x === NONE ? '' : x)}
+              >
+                <FormControl>
+                  <SelectTrigger aria-label="ĐVT bán mặc định">
+                    <SelectValue />
+                  </SelectTrigger>
+                </FormControl>
+                <SelectContent>
+                  <SelectItem value={NONE}>{baseUom || 'ĐVT cơ sở'}</SelectItem>
+                  {[...new Set([...existingConvUoms, ...(altUom ? [altUom] : [])])].map((code) => (
+                    <SelectItem key={code} value={code}>
+                      {code}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
       </div>
     </div>
   );

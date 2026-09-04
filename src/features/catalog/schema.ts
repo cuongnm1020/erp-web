@@ -59,16 +59,16 @@ export function parseAliases(raw: string): string[] {
  * - weightG: nhập theo GRAM cho dễ gõ — API nhận weightKg, quy đổi lúc submit (decimal.js).
  * - openingQty: tồn đầu kỳ, CHỈ dòng mới (tồn là ledger — đã có SKU thì nhập/xuất qua chứng từ).
  */
+const barcodeValue = z
+  .string()
+  .trim()
+  .regex(/^[A-Za-z0-9-]{4,64}$/, 'Barcode 4–64 ký tự chữ/số/gạch nối');
+
 export const skuRowSchema = z.object({
   skuId: z.string(),
   code: codeSchema,
   name: z.string().trim().min(1, 'Nhập tên biến thể').max(300, 'Tối đa 300 ký tự'),
-  barcode: z
-    .string()
-    .trim()
-    .regex(/^[A-Za-z0-9-]{4,64}$/, 'Barcode 4–64 ký tự chữ/số/gạch nối')
-    .optional()
-    .or(z.literal('')),
+  barcode: barcodeValue.optional().or(z.literal('')),
   isActive: z.boolean(),
   existingBarcode: z.string(),
   purchasePrice: moneySchema.optional().or(z.literal('')),
@@ -80,6 +80,16 @@ export const skuRowSchema = z.object({
     .optional()
     .or(z.literal('')),
   openingQty: quantitySchema.optional().or(z.literal('')),
+  // F3 (PLAN-master-data-lot-uom) — đa ĐVT: một ĐVT phụ khai ngay trên dòng
+  // ("BOX = 24 PCS" + barcode thùng). '' = không khai. SKU đã lưu: khai thêm
+  // → POST /skus/:id/conversions (+ barcode theo ĐVT).
+  altUom: z.string(),
+  altFactor: quantitySchema.optional().or(z.literal('')),
+  altBarcode: barcodeValue.optional().or(z.literal('')),
+  /** ĐVT bán mặc định — '' = ĐVT cơ sở; phải là ĐVT quy đổi được. */
+  salesUom: z.string(),
+  /** Mã các ĐVT đã có quy đổi (SKU đã lưu) — chỉ để validate salesUom, không sửa. */
+  existingConvUoms: z.array(z.string()),
 });
 
 export const productFormSchema = createProductSchema
@@ -114,6 +124,54 @@ export const productFormSchema = createProductSchema
         });
       }
     });
+    // F3 — ràng buộc ĐVT phụ, mirror 422 server (trg_conversion_not_base,
+    // resolveSalesUom, trg_barcode_uom_valid)
+    v.skus.forEach((row, i) => {
+      const factorFilled = row.altFactor !== undefined && row.altFactor !== '';
+      if (row.altUom && !factorFilled) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['skus', i, 'altFactor'],
+          message: 'Nhập hệ số quy đổi, ví dụ 24',
+        });
+      }
+      if (row.altUom && factorFilled && new Decimal(row.altFactor!).lte(0)) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['skus', i, 'altFactor'],
+          message: 'Hệ số phải lớn hơn 0',
+        });
+      }
+      if (!row.altUom && factorFilled) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['skus', i, 'altUom'],
+          message: 'Chọn ĐVT phụ cho hệ số này',
+        });
+      }
+      if (row.altBarcode && !row.altUom) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['skus', i, 'altUom'],
+          message: 'Barcode ĐVT phụ cần chọn ĐVT phụ',
+        });
+      }
+      if (row.altUom && row.altUom === v.baseUom) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['skus', i, 'altUom'],
+          message: 'ĐVT phụ phải khác ĐVT cơ sở',
+        });
+      }
+      const sellable = ['', v.baseUom, row.altUom, ...row.existingConvUoms];
+      if (!sellable.includes(row.salesUom)) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['skus', i, 'salesUom'],
+          message: 'ĐVT bán phải là ĐVT cơ sở hoặc ĐVT đã có quy đổi',
+        });
+      }
+    });
   });
 
 export type SkuRowValues = z.infer<typeof skuRowSchema>;
@@ -130,6 +188,11 @@ export const EMPTY_SKU_ROW: SkuRowValues = {
   salePrice: '',
   weightG: '',
   openingQty: '',
+  altUom: '',
+  altFactor: '',
+  altBarcode: '',
+  salesUom: '',
+  existingConvUoms: [],
 };
 
 /** Gram (form) → kg (API, Decimal(12,4) chuỗi) — chỉ ở lớp hiển thị/submit (luật 10). */

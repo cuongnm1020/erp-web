@@ -199,16 +199,63 @@ export function useDeleteImage() {
   });
 }
 
-/** POST /skus/{id}/barcodes — bổ sung barcode cho SKU đã có. */
+/** POST /skus/{id}/barcodes — bổ sung barcode; `uom` = mã ĐVT phụ (F3), bỏ trống = ĐVT cơ sở. */
 export function useAddBarcode() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: ({ skuId, code }: { skuId: string; code: string }) =>
-      unwrap(api.POST('/skus/{id}/barcodes', { params: { path: { id: skuId } }, body: { code } })),
+    mutationFn: ({ skuId, code, uom }: { skuId: string; code: string; uom?: string }) =>
+      unwrap(
+        api.POST('/skus/{id}/barcodes', {
+          params: { path: { id: skuId } },
+          body: { code, ...(uom ? { uom } : {}) },
+        }),
+      ),
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: productKeys.skuLists() });
       void qc.invalidateQueries({ queryKey: productKeys.details() });
     },
+  });
+}
+
+/**
+ * POST /skus/{id}/conversions — khai "1 uom = factor × ĐVT cơ sở" (F3).
+ * Server đóng băng factor khi (sku, uom) đã lên chứng từ (409 — Q5).
+ */
+export function useSetConversion() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ skuId, uom, factor }: { skuId: string; uom: string; factor: string }) =>
+      unwrap(
+        api.POST('/skus/{id}/conversions', {
+          params: { path: { id: skuId } },
+          body: { uom, factor },
+        }),
+      ),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: productKeys.details() });
+    },
+  });
+}
+
+export type UpdateUomInput = components['schemas']['UpdateUomDto'];
+export type CreateUomInput = components['schemas']['CreateUomDto'];
+
+/** POST /uoms — thêm ĐVT mới (F3, dialog Quản lý ĐVT). */
+export function useCreateUom() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (body: CreateUomInput) => unwrap(api.POST('/uoms', { body })),
+    onSuccess: () => void qc.invalidateQueries({ queryKey: ['catalog', 'uoms'] }),
+  });
+}
+
+/** PATCH /uoms/{id} — đổi tên/số lẻ, version lock; mã ĐVT bất biến. */
+export function useUpdateUom() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, body }: { id: string; body: UpdateUomInput }) =>
+      unwrap(api.PATCH('/uoms/{id}', { params: { path: { id } }, body })),
+    onSuccess: () => void qc.invalidateQueries({ queryKey: ['catalog', 'uoms'] }),
   });
 }
 
