@@ -4,7 +4,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { Info, Plus, X } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useFieldArray, useForm, type UseFormReturn } from 'react-hook-form';
 import {
   applyServerErrors,
@@ -159,6 +159,29 @@ function ProductFormBody({ product }: { product?: ProductDetail }) {
   const router = useRouter();
   const canEditImages = useAbility().can('update', 'Product');
   const categories = useCategories();
+  // F1 — picker thụt cấp theo cây: sắp DFS từ parentId, con đứng ngay dưới cha.
+  const categoryOptions = useMemo(() => {
+    const list = categories.data ?? [];
+    const byParent = new Map<string | null, typeof list>();
+    for (const c of list) {
+      const key = c.parentId ?? null;
+      byParent.set(key, [...(byParent.get(key) ?? []), c]);
+    }
+    const out: Array<{ id: string; name: string; depth: number }> = [];
+    const seen = new Set<string>();
+    const walk = (parentId: string | null, depth: number) => {
+      for (const c of byParent.get(parentId) ?? []) {
+        if (seen.has(c.id)) continue; // dữ liệu dị dạng (vòng) — không lặp vô hạn
+        seen.add(c.id);
+        out.push({ id: c.id, name: c.name, depth });
+        walk(c.id, depth + 1);
+      }
+    };
+    walk(null, 0);
+    // Node có cha bị ẩn/không tải được → vẫn hiện ở cuối, không biến mất.
+    for (const c of list) if (!seen.has(c.id)) out.push({ id: c.id, name: c.name, depth: 0 });
+    return out;
+  }, [categories.data]);
   const brands = useBrands();
   const uoms = useUoms();
   const warehouses = useWarehouses();
@@ -498,8 +521,9 @@ function ProductFormBody({ product }: { product?: ProductDetail }) {
                     </FormControl>
                     <SelectContent>
                       <SelectItem value="none">Không phân loại</SelectItem>
-                      {(categories.data ?? []).map((c) => (
+                      {categoryOptions.map((c) => (
                         <SelectItem key={c.id} value={c.id}>
+                          {' '.repeat(c.depth * 3)}
                           {c.name}
                         </SelectItem>
                       ))}
