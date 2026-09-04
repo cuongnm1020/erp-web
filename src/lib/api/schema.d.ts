@@ -405,7 +405,8 @@ export interface paths {
         get?: never;
         put?: never;
         post?: never;
-        delete?: never;
+        /** Xóa mềm — chỉ khi không còn sản phẩm; còn thì 409 gợi ý isActive=false (B2). */
+        delete: operations["ProductController_deleteBrand"];
         options?: never;
         head?: never;
         patch: operations["ProductController_updateBrand"];
@@ -427,6 +428,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/categories/tree": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["ProductController_getCategoryTree"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/categories/{id}": {
         parameters: {
             query?: never;
@@ -437,7 +454,8 @@ export interface paths {
         get?: never;
         put?: never;
         post?: never;
-        delete?: never;
+        /** Xóa mềm — chỉ khi không còn con/sản phẩm (B1); idempotent. */
+        delete: operations["ProductController_deleteCategory"];
         options?: never;
         head?: never;
         patch: operations["ProductController_updateCategory"];
@@ -457,6 +475,22 @@ export interface paths {
         options?: never;
         head?: never;
         patch?: never;
+        trace?: never;
+    };
+    "/uoms/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch: operations["ProductController_updateUom"];
         trace?: never;
     };
     "/products": {
@@ -580,10 +614,27 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get?: never;
+        get: operations["ProductController_listConversions"];
         put?: never;
         post: operations["ProductController_setConversion"];
         delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/skus/{id}/conversions/{uom}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Xóa quy đổi — 409 khi còn dòng đơn / barcode / bảng giá / salesUom tựa vào (B4). */
+        delete: operations["ProductController_deleteConversion"];
         options?: never;
         head?: never;
         patch?: never;
@@ -820,6 +871,39 @@ export interface paths {
         options?: never;
         head?: never;
         patch?: never;
+        trace?: never;
+    };
+    "/lots": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["LotController_list"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/lots/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Sửa HSD/NSX khai sai lúc nhập — cần stock.adjust (đổi HSD đổi thứ tự FEFO). */
+        patch: operations["LotController_update"];
         trace?: never;
     };
     "/attributes": {
@@ -2720,6 +2804,57 @@ export interface components {
             province: string;
             isDefault?: boolean;
         };
+        SupplierDto: {
+            id: string;
+            code: string;
+            name: string;
+            taxCode: string | null;
+            phone: string | null;
+            email: string | null;
+            isActive: boolean;
+            /** @description Hạn thanh toán (ngày). */
+            paymentTerm: number | null;
+            /** @description Lead time đặt hàng (ngày). */
+            leadTimeDays: number | null;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+        };
+        SupplierListResponseDto: {
+            items: components["schemas"]["SupplierDto"][];
+            total: number;
+        };
+        SupplierAddressDto: {
+            id: string;
+            label: string | null;
+            /** @description DB cột `contact` — nhận từ AddressDto.recipient. */
+            contact: string | null;
+            phone: string | null;
+            line1: string;
+            ward: string | null;
+            district: string | null;
+            province: string;
+            isDefault: boolean;
+        };
+        SupplierDetailDto: {
+            id: string;
+            code: string;
+            name: string;
+            taxCode: string | null;
+            phone: string | null;
+            email: string | null;
+            isActive: boolean;
+            /** @description Hạn thanh toán (ngày). */
+            paymentTerm: number | null;
+            /** @description Lead time đặt hàng (ngày). */
+            leadTimeDays: number | null;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+            addresses: components["schemas"]["SupplierAddressDto"][];
+        };
         CreateSupplierDto: {
             code: string;
             name: string;
@@ -2745,12 +2880,16 @@ export interface components {
             code: string;
             name: string;
             isActive: boolean;
+            /** @description Optimistic lock — gửi lại trong PATCH (B2). */
+            version: number;
         };
         CreateBrandDto: {
             code: string;
             name: string;
         };
         UpdateBrandDto: {
+            /** @description Optimistic locking bắt buộc — cùng cơ chế UpdateProductDto (B2). */
+            version: number;
             name?: string;
             isActive?: boolean;
         };
@@ -2759,6 +2898,16 @@ export interface components {
             code: string;
             name: string;
             parentId: string | null;
+            /** @description Optimistic lock — gửi lại trong PATCH (B1). */
+            version: number;
+        };
+        CategoryTreeNodeDto: {
+            children: components["schemas"]["CategoryTreeNodeDto"][];
+            id: string;
+            code: string;
+            name: string;
+            parentId: string | null;
+            version: number;
         };
         CreateCategoryDto: {
             code: string;
@@ -2767,6 +2916,8 @@ export interface components {
             parentId?: string;
         };
         UpdateCategoryDto: {
+            /** @description Optimistic locking bắt buộc — cùng cơ chế UpdateProductDto (B1). */
+            version: number;
             name?: string;
             /** Format: uuid */
             parentId?: string | null;
@@ -2777,10 +2928,18 @@ export interface components {
             name: string;
             /** @description Số lẻ cho phép khi nhập lượng theo đơn vị này (0 = số nguyên). */
             decimals: number;
+            /** @description Optimistic lock — gửi lại trong PATCH (B4). */
+            version: number;
         };
         CreateUomDto: {
             code: string;
             name: string;
+            decimals?: number;
+        };
+        UpdateUomDto: {
+            /** @description Optimistic locking bắt buộc (B4). `code` không đổi được — quy đổi/barcode tựa vào. */
+            version: number;
+            name?: string;
             decimals?: number;
         };
         UomCodeDto: {
@@ -3285,6 +3444,37 @@ export interface components {
         StockByLotResponseDto: {
             items: components["schemas"]["StockByLotRowDto"][];
             total: number;
+        };
+        LotRowDto: {
+            id: string;
+            lotNumber: string;
+            skuId: string;
+            skuCode: string;
+            skuName: string;
+            /** @description ISO date — null nếu không khai. */
+            mfgDate: string | null;
+            expiryDate: string | null;
+            /** @description Tồn gộp của lô (theo bộ lọc kho nếu có) — Decimal(18,6) dạng chuỗi. */
+            onHand: string;
+            reserved: string;
+            available: string;
+            createdAt: string;
+        };
+        LotListResponseDto: {
+            items: components["schemas"]["LotRowDto"][];
+            total: number;
+        };
+        UpdateLotDto: {
+            expiryDate?: string | null;
+            mfgDate?: string | null;
+        };
+        LotDto: {
+            id: string;
+            skuId: string;
+            lotNumber: string;
+            mfgDate: string | null;
+            expiryDate: string | null;
+            createdAt: string;
         };
         AttributeValueDto: {
             code: string;
@@ -3801,6 +3991,10 @@ export interface components {
             unitCost: string | null;
             /** @description qtyBase × unitCost — Decimal(18,4) dạng chuỗi, null khi thiếu giá. */
             lineValue: string | null;
+            /** @description C3 — ĐVT client đã nhập (null = ĐVT cơ sở). */
+            uomId: string | null;
+            /** @description C3 — hệ số snapshot lúc tạo (qty nhập = qtyBase / factor). */
+            factor: string | null;
         };
         ReceiptDetailDto: {
             id: string;
@@ -3839,8 +4033,13 @@ export interface components {
         CreateReceiptLineDto: {
             /** Format: uuid */
             skuId: string;
-            /** @description Decimal(18,6) dạng chuỗi — cấm number cho số lượng (CLAUDE.md). */
+            /** @description Decimal(18,6) dạng chuỗi — cấm number cho số lượng (CLAUDE.md). Theo ĐVT của `uom`. */
             qty: string;
+            /**
+             * @description C3 (Q7) — mã ĐVT nhập ("BOX"…). Bỏ trống = ĐVT cơ sở. `qty`/`qtyRejected`/
+             *     `unitCost` hiểu theo ĐVT này; server quy về base + snapshot factor.
+             */
+            uom?: string;
             /**
              * @description Decimal(18,4) dạng chuỗi — **BẮT BUỘC**, không `@IsOptional()`.
              *     Nhập kho không có giá làm mọi lần xuất sau của SKU nổ
@@ -5031,6 +5230,11 @@ export interface operations {
     SupplierController_list: {
         parameters: {
             query: {
+                /** @description Lọc trạng thái giao dịch — bỏ trống = cả hai (UI hiện cột trạng thái). */
+                isActive?: boolean;
+                /** @description Bỏ trống → `name` (giữ thứ tự cũ cho client hiện tại). */
+                sortBy?: "name" | "code" | "createdAt" | "updatedAt";
+                sortDir?: "asc" | "desc";
                 q?: string;
                 take: number;
                 skip: number;
@@ -5045,7 +5249,9 @@ export interface operations {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["SupplierListResponseDto"];
+                };
             };
         };
     };
@@ -5066,7 +5272,9 @@ export interface operations {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["SupplierDto"];
+                };
             };
         };
     };
@@ -5086,7 +5294,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": Record<string, never>;
+                    "application/json": components["schemas"]["SupplierDetailDto"];
                 };
             };
         };
@@ -5129,7 +5337,9 @@ export interface operations {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["SupplierDto"];
+                };
             };
         };
     };
@@ -5152,7 +5362,9 @@ export interface operations {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["SupplierAddressDto"];
+                };
             };
         };
     };
@@ -5192,6 +5404,27 @@ export interface operations {
                 headers: {
                     [name: string]: unknown;
                 };
+                content: {
+                    "application/json": components["schemas"]["BrandDto"];
+                };
+            };
+        };
+    };
+    ProductController_deleteBrand: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
                 content?: never;
             };
         };
@@ -5215,7 +5448,9 @@ export interface operations {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["BrandDto"];
+                };
             };
         };
     };
@@ -5255,6 +5490,46 @@ export interface operations {
                 headers: {
                     [name: string]: unknown;
                 };
+                content: {
+                    "application/json": components["schemas"]["ProductCategoryDto"];
+                };
+            };
+        };
+    };
+    ProductController_getCategoryTree: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CategoryTreeNodeDto"][];
+                };
+            };
+        };
+    };
+    ProductController_deleteCategory: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
                 content?: never;
             };
         };
@@ -5278,7 +5553,9 @@ export interface operations {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["ProductCategoryDto"];
+                };
             };
         };
     };
@@ -5318,16 +5595,40 @@ export interface operations {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["UomDto"];
+                };
+            };
+        };
+    };
+    ProductController_updateUom: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateUomDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UomDto"];
+                };
             };
         };
     };
     ProductController_listProducts: {
         parameters: {
             query: {
-                q?: string;
-                take: number;
-                skip: number;
                 /** @description Lọc theo category — bao gồm CẢ category con (đệ quy bằng recursive CTE). */
                 categoryId?: string;
                 brandId?: string;
@@ -5340,6 +5641,9 @@ export interface operations {
                 /** @description Bỏ trống → `code` (giữ thứ tự cũ cho client hiện tại). */
                 sortBy?: "createdAt" | "name" | "code";
                 sortDir?: "asc" | "desc";
+                q?: string;
+                take: number;
+                skip: number;
             };
             header?: never;
             path?: never;
@@ -5584,6 +5888,27 @@ export interface operations {
             };
         };
     };
+    ProductController_listConversions: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SkuUomConversionDto"][];
+                };
+            };
+        };
+    };
     ProductController_setConversion: {
         parameters: {
             query?: never;
@@ -5600,6 +5925,26 @@ export interface operations {
         };
         responses: {
             201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    ProductController_deleteConversion: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+                uom: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            204: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -6018,6 +6363,62 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["StockByLotResponseDto"];
+                };
+            };
+        };
+    };
+    LotController_list: {
+        parameters: {
+            query: {
+                /** @description Lọc theo số lô (không phân biệt hoa thường). */
+                q?: string;
+                skuId?: string;
+                /** @description Chỉ tính tồn trong kho này (lọc qua `Location.warehouseId`). */
+                warehouseId?: string;
+                /** @description Lô hết hạn trong N ngày tới (gồm cả đã hết hạn). Bỏ trống = mọi lô. */
+                expiringInDays?: number;
+                /** @description true = chỉ lô còn tồn (onHand > 0). */
+                hasStock?: boolean;
+                take: number;
+                skip: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LotListResponseDto"];
+                };
+            };
+        };
+    };
+    LotController_update: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateLotDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LotDto"];
                 };
             };
         };
