@@ -29,6 +29,12 @@ const MESSAGES: Record<string, string> = {
     'Chưa có giá cho sản phẩm này với khách đang chọn. Báo quản lý cập nhật bảng giá.',
   INVALID_STATUS_TRANSITION:
     'Trạng thái chứng từ đã đổi, thao tác này không còn hợp lệ. Tải lại trang.',
+  // Lô & hạn dùng (D1/A3 backend)
+  RECEIPT_LOT_REQUIRED: 'Sản phẩm theo lô — nhập số lô cho dòng này rồi lưu lại.',
+  RECEIPT_LOT_EXPIRY_CONFLICT:
+    'Lô này đã có hạn dùng khác với phiếu. Sửa hạn của lô ở màn Lô & hạn dùng nếu hạn cũ sai.',
+  RESERVATION_REPOINT_FAILED:
+    'Lô vừa nhặt đã bị đơn khác giữ mất. Tải lại nhiệm vụ và nhặt lại theo gợi ý mới.',
 };
 
 const BY_STATUS: Record<number, string> = {

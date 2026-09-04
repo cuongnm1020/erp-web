@@ -35,6 +35,8 @@ export function useSkuSearch(q: string): EntitySearchResult {
     id: s.skuId,
     label: s.name,
     hint: `${s.code} · ${s.productName}`,
+    // F4 — form GRN đòi số lô ngay khi chọn SKU theo lô
+    meta: { trackingMode: s.trackingMode },
   }));
   return { options, isPending: query.isPending, error: query.error };
 }

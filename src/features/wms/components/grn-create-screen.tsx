@@ -59,22 +59,38 @@ const lineSchema = z.object({
   skuId: z.string().min(1, 'Chọn sản phẩm'),
   /** Nhãn hiển thị của SKU đã chọn — không gửi server. */
   skuLabel: z.string(),
+  /** F4 — chế độ theo dõi của SKU đã chọn (từ meta của picker, không gửi server). */
+  tracking: z.enum(['NONE', 'LOT', 'SERIAL']),
   qty: quantitySchema,
   unitCost: moneySchema,
   lotNumber: z.string().trim().max(64, 'Tối đa 64 ký tự'),
   expiryDate: z.union([dateKeySchema, z.literal('')]),
 });
-const receiptSchema = z.object({
-  warehouseId: z.string().min(1, 'Chọn kho nhận'),
-  receivedAt: dateKeySchema,
-  note: z.string().trim().max(1000, 'Tối đa 1000 ký tự'),
-  lines: z.array(lineSchema).min(1, 'Phiếu phải có ít nhất một dòng'),
-});
+const receiptSchema = z
+  .object({
+    warehouseId: z.string().min(1, 'Chọn kho nhận'),
+    receivedAt: dateKeySchema,
+    note: z.string().trim().max(1000, 'Tối đa 1000 ký tự'),
+    lines: z.array(lineSchema).min(1, 'Phiếu phải có ít nhất một dòng'),
+  })
+  .superRefine((v, ctx) => {
+    // F4 — mirror 422 RECEIPT_LOT_REQUIRED: SKU theo lô phải có số lô ngay từ form
+    v.lines.forEach((l, i) => {
+      if (l.tracking === 'LOT' && !l.lotNumber) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['lines', i, 'lotNumber'],
+          message: 'SKU theo lô — bắt buộc số lô',
+        });
+      }
+    });
+  });
 type ReceiptValues = z.infer<typeof receiptSchema>;
 
 const EMPTY_LINE: ReceiptValues['lines'][number] = {
   skuId: '',
   skuLabel: '',
+  tracking: 'NONE',
   qty: '',
   unitCost: '',
   lotNumber: '',
@@ -307,6 +323,11 @@ export function GrnCreateScreen() {
                                   onChange={(id, option) => {
                                     field.onChange(id);
                                     form.setValue(`lines.${i}.skuLabel`, option?.label ?? '');
+                                    form.setValue(
+                                      `lines.${i}.tracking`,
+                                      (option?.meta?.trackingMode as 'NONE' | 'LOT' | 'SERIAL') ??
+                                        'NONE',
+                                    );
                                   }}
                                   useSearch={useSkuSearch}
                                   selectedLabel={form.getValues(`lines.${i}.skuLabel`) || undefined}

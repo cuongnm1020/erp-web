@@ -19,6 +19,8 @@ export interface EntityOption {
   label: string;
   /** Dòng phụ: mã, SĐT… */
   hint?: string;
+  /** Dữ liệu kèm theo cho form dùng lúc chọn (component không đọc). */
+  meta?: Record<string, string>;
 }
 
 export interface EntitySearchResult {

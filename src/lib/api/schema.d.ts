@@ -3236,6 +3236,11 @@ export interface components {
             categoryName: string | null;
             brandName: string | null;
             baseUomCode: string;
+            /**
+             * @description Chế độ theo dõi (mức SKU — nguồn sự thật): form nhập kho đòi lô khi LOT.
+             * @enum {string}
+             */
+            trackingMode: "NONE" | "LOT" | "SERIAL";
             barcodeCount: number;
             isActive: boolean;
             /** @description Optimistic locking — bulk PATCH /skus/:id (ví dụ Ngừng bán) dùng thẳng, khỏi gọi chi tiết. */
