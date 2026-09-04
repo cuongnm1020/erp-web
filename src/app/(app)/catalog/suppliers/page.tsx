@@ -1,4 +1,4 @@
-import { SupplierListScreen } from '@/features/catalog/components/supplier-list-screen';
+import { SupplierListScreen } from '@/features/supplier/components/supplier-list-screen';
 
 export const metadata = { title: 'Nhà cung cấp — ERP' };
 
