@@ -12,3 +12,19 @@ export const createUserSchema = z.object({
 });
 
 export type CreateUserValues = z.infer<typeof createUserSchema>;
+
+/**
+ * Khớp CreateDepartmentDto / UpdateDepartmentDto (luật 11). `code` chỉ nhập lúc tạo (bất biến sau đó);
+ * parentId / managerId để '' = không có → submit đổi thành undefined (tạo) hoặc null (sửa).
+ */
+export const departmentFormSchema = z.object({
+  code: z.string().trim(),
+  name: z.string().trim().min(1, 'Nhập tên phòng ban').max(200, 'Tối đa 200 ký tự'),
+  parentId: z.string(),
+  managerId: z.string(),
+  isActive: z.boolean(),
+});
+
+export const createDepartmentSchema = departmentFormSchema.extend({ code: codeSchema });
+
+export type DepartmentFormValues = z.infer<typeof departmentFormSchema>;

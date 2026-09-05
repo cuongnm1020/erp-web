@@ -19,6 +19,8 @@ export type UserSortDir = NonNullable<
 export interface UserListParams {
   q?: string;
   roleCode?: string;
+  /** Lọc theo phòng ban — màn Phòng ban & team. */
+  departmentId?: string;
   isActive?: boolean;
   sortBy?: UserSortBy;
   sortDir?: UserSortDir;
@@ -46,6 +48,7 @@ export function useUsers(params: UserListParams) {
             query: {
               q: params.q || undefined,
               roleCode: params.roleCode,
+              departmentId: params.departmentId,
               isActive: params.isActive,
               sortBy: params.sortBy,
               sortDir: params.sortDir,
