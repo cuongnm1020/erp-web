@@ -63,7 +63,17 @@ describe('ProductFormScreen — tạo (design/Products/ProductForm)', () => {
     expect(posts).toHaveLength(0);
   });
 
-  it('happy path: POST /products rồi POST từng SKU (kèm baseUom + barcode) → điều hướng về danh sách', async () => {
+  it('ô mã sản phẩm / mã SKU / barcode / trọng lượng / ĐVT phụ đang ẩn — không render input', async () => {
+    server.use(...baseHandlers());
+    renderApp(<ProductFormScreen />);
+    await screen.findByLabelText('Tên sản phẩm *');
+    for (const label of ['Mã sản phẩm', 'Mã SKU', 'Barcode lẻ', 'Trọng lượng (g)', 'ĐVT phụ']) {
+      expect(screen.queryByLabelText(label)).not.toBeInTheDocument();
+    }
+    expect(screen.queryByRole('combobox', { name: 'Theo dõi lô / HSD' })).not.toBeInTheDocument();
+  });
+
+  it('happy path: POST /products (mã tự sinh) rồi POST từng SKU với code `{mã}-{stt}` + baseUom → điều hướng về danh sách', async () => {
     push.mockClear();
     const skuBodies: unknown[] = [];
     server.use(
@@ -90,21 +100,58 @@ describe('ProductFormScreen — tạo (design/Products/ProductForm)', () => {
     );
     renderApp(<ProductFormScreen />);
     fill('Tên sản phẩm *', 'Bút bi TL-08');
-    fill('Mã sản phẩm', 'TL08');
-    fill('Mã SKU', 'TL08-BLUE');
     fill('Tên biến thể', 'Bút bi TL-08 xanh');
-    fill('Barcode lẻ', '8934567801234');
     fireEvent.click(screen.getByRole('button', { name: /Lưu sản phẩm/ }));
     await waitFor(() => expect(skuBodies).toHaveLength(1));
+    // Mã SKU ẩn → `{mã sản phẩm từ response}-{stt}`; không barcode (backend tự sinh QR = mã SKU)
     expect(skuBodies[0]).toEqual({
       productId: 'p-1',
-      body: {
-        code: 'TL08-BLUE',
-        name: 'Bút bi TL-08 xanh',
-        baseUom: 'PCS',
-        barcodes: [{ code: '8934567801234' }],
-      },
+      body: { code: 'TL08-1', name: 'Bút bi TL-08 xanh', baseUom: 'PCS' },
     });
+    await waitFor(() => expect(push).toHaveBeenCalledWith('/catalog/products'));
+  });
+
+  it('nhiều biến thể: "Thêm biến thể" copy tên sản phẩm, mã SKU đánh số theo dòng, xóa được dòng chưa lưu', async () => {
+    push.mockClear();
+    const skuCodes: string[] = [];
+    server.use(
+      ...baseHandlers(),
+      http.post('/api/products', () =>
+        HttpResponse.json(
+          {
+            id: 'p-6',
+            code: 'BVTV-0007',
+            name: 'x',
+            categoryId: null,
+            brandId: null,
+            trackingMode: 'NONE',
+            shelfLifeDays: null,
+            isActive: true,
+          },
+          { status: 201 },
+        ),
+      ),
+      http.post('/api/products/:id/skus', async ({ request }) => {
+        skuCodes.push(((await request.json()) as { code: string }).code);
+        return HttpResponse.json({}, { status: 201 });
+      }),
+    );
+    renderApp(<ProductFormScreen />);
+    fill('Tên sản phẩm *', 'Thuốc trĩ');
+    fireEvent.click(screen.getByRole('button', { name: 'Thêm biến thể' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Thêm biến thể' }));
+    expect(screen.getByText('3 dòng · 3 mới', { exact: false })).toBeInTheDocument();
+    // Dòng thêm mới đã điền sẵn tên sản phẩm
+    const names = screen.getAllByLabelText('Tên biến thể');
+    expect(names).toHaveLength(3);
+    expect(names[1]).toHaveValue('Thuốc trĩ');
+    fireEvent.change(names[0]!, { target: { value: 'Chai 100ml' } });
+    fireEvent.change(names[1]!, { target: { value: 'Chai 500ml' } });
+    // Xóa dòng 3 (chưa lưu)
+    fireEvent.click(screen.getAllByRole('button', { name: 'Xóa dòng' })[2]!);
+    expect(screen.getAllByLabelText('Tên biến thể')).toHaveLength(2);
+    fireEvent.click(screen.getByRole('button', { name: /Lưu sản phẩm/ }));
+    await waitFor(() => expect(skuCodes).toEqual(['BVTV-0007-1', 'BVTV-0007-2']));
     await waitFor(() => expect(push).toHaveBeenCalledWith('/catalog/products'));
   });
 
@@ -136,7 +183,6 @@ describe('ProductFormScreen — tạo (design/Products/ProductForm)', () => {
     renderApp(<ProductFormScreen />);
     fill('Tên sản phẩm *', 'Thuốc bật chồi X');
     fill('Tên gọi khác', 'thuốc bật chồi, cheshaland, , thuốc bật chồi');
-    fill('Mã SKU', 'X-100ML');
     fill('Tên biến thể', 'Chai 100ml');
     fireEvent.click(screen.getByRole('button', { name: /Lưu sản phẩm/ }));
     await waitFor(() => expect(productBody).toBeDefined());
@@ -180,15 +226,16 @@ describe('ProductFormScreen — tạo (design/Products/ProductForm)', () => {
     );
     renderApp(<ProductFormScreen />);
     fill('Tên sản phẩm *', 'Bút bi TL-09');
-    fill('Mã sản phẩm', 'TL09');
-    fill('Mã SKU', 'TL09-DUP');
     fill('Tên biến thể', 'Bút TL-09');
     fireEvent.click(screen.getByRole('button', { name: /Lưu sản phẩm/ }));
     expect(await screen.findByText(/1 dòng chưa hợp lệ — chưa lưu hết/)).toBeInTheDocument();
     expect(productPosts).toBe(1);
     expect(push).not.toHaveBeenCalled();
-    // Sửa mã rồi lưu lại → cha không POST lần hai, chỉ SKU đi tiếp
-    fill('Mã SKU', 'TL09-OK');
+    // Ô mã SKU ẩn → lỗi dòng gắn vào "Tên biến thể" (aria-invalid) và focus vào đó
+    const nameInput = screen.getByLabelText('Tên biến thể');
+    expect(nameInput).toHaveAttribute('aria-invalid', 'true');
+    expect(nameInput).toHaveFocus();
+    // Lưu lại → cha không POST lần hai, chỉ SKU đi tiếp
     fireEvent.click(screen.getByRole('button', { name: /Lưu sản phẩm/ }));
     await waitFor(() => expect(push).toHaveBeenCalledWith('/catalog/products'));
     expect(productPosts).toBe(1);
@@ -227,36 +274,32 @@ describe('ProductFormScreen — tạo (design/Products/ProductForm)', () => {
     );
     renderApp(<ProductFormScreen />);
     fill('Tên sản phẩm *', 'Bút TL-11');
-    fill('Mã sản phẩm', 'TL11');
     fill('Mô tả', 'Mô tả bán hàng');
     fill('Ghi chú nội bộ', 'Ghi chú riêng');
     fireEvent.click(screen.getByRole('checkbox', { name: 'Cho phép bán tồn kho âm' }));
     fireEvent.click(screen.getByRole('combobox', { name: 'Kho mặc định' }));
     fireEvent.click(await screen.findByRole('option', { name: 'Kho HN-1' }));
 
-    fill('Mã SKU', 'TL11-A');
     fill('Tên biến thể', 'Bút TL-11 A');
     fill('Giá nhập', '12000');
     fill('Giá bán', '19000');
-    fill('Trọng lượng (g)', '250');
     fill('Tồn đầu kỳ', '50');
     fireEvent.click(screen.getByRole('button', { name: /Lưu sản phẩm/ }));
 
     await waitFor(() => expect(bodies.sku).toBeDefined());
     expect(bodies.product).toMatchObject({
-      code: 'TL11',
       defaultWarehouseId: 'wh-1',
       description: 'Mô tả bán hàng',
       internalNote: 'Ghi chú riêng',
       allowNegativeStock: true,
     });
+    expect(bodies.product).not.toHaveProperty('code');
     expect(bodies.sku).toEqual({
-      code: 'TL11-A',
+      code: 'TL11-1',
       name: 'Bút TL-11 A',
       baseUom: 'PCS',
       purchasePrice: '12000',
       salePrice: '19000',
-      weightKg: '0.25', // 250g → kg qua decimal.js
       openingQty: '50',
     });
     await waitFor(() => expect(push).toHaveBeenCalledWith('/catalog/products'));
@@ -273,8 +316,6 @@ describe('ProductFormScreen — tạo (design/Products/ProductForm)', () => {
     );
     renderApp(<ProductFormScreen />);
     fill('Tên sản phẩm *', 'Bút TL-12');
-    fill('Mã sản phẩm', 'TL12');
-    fill('Mã SKU', 'TL12-A');
     fill('Tên biến thể', 'Bút TL-12 A');
     fill('Tồn đầu kỳ', '10'); // không giá nhập, không kho mặc định
     fireEvent.click(screen.getByRole('button', { name: /Lưu sản phẩm/ }));
@@ -331,8 +372,6 @@ describe('ProductFormScreen — tạo (design/Products/ProductForm)', () => {
     expect(screen.queryByAltText('b.png')).not.toBeInTheDocument();
 
     fill('Tên sản phẩm *', 'Bút TL-10');
-    fill('Mã sản phẩm', 'TL10');
-    fill('Mã SKU', 'TL10-A');
     fill('Tên biến thể', 'Bút TL-10 A');
     fireEvent.click(screen.getByRole('button', { name: /Lưu sản phẩm/ }));
     // Sau khi tạo sản phẩm + SKU, ảnh còn trong hàng chờ tự POST lên đúng productId mới
@@ -412,12 +451,13 @@ describe('ProductFormScreen — sửa', () => {
     expect(await screen.findByDisplayValue('Bút bi TL-08 xanh')).toBeInTheDocument();
     // Alias prefill vào ô "Tên gọi khác".
     expect(screen.getByDisplayValue('bút tl')).toBeInTheDocument();
-    // Barcode sẵn có hiển thị chỉ đọc, không phải input
+    // Mã sản phẩm / mã SKU / barcode đang ẩn — mã hiện ở mô tả header, không có input
+    expect(screen.getByText('Sản phẩm cha TL08 · 1 biến thể')).toBeInTheDocument();
+    expect(screen.queryByDisplayValue('TL08-BLUE')).not.toBeInTheDocument();
+    expect(screen.queryByDisplayValue('TL08')).not.toBeInTheDocument();
     expect(screen.queryByLabelText('Barcode lẻ')).not.toBeInTheDocument();
-    expect(screen.getByText('8934567801234')).toBeInTheDocument();
-    // Mã SKU đã lưu bị khóa; mã SẢN PHẨM thì sửa được (server chặn 409 khi đã có chứng từ)
-    expect(screen.getByDisplayValue('TL08-BLUE')).toBeDisabled();
-    expect(screen.getByDisplayValue('TL08')).toBeEnabled();
+    // ĐVT cơ bản khóa khi sửa
+    expect(screen.getByRole('combobox', { name: 'ĐVT cơ bản *' })).toBeDisabled();
 
     fireEvent.click(screen.getByRole('combobox', { name: 'Trạng thái' }));
     fireEvent.click(await screen.findByRole('option', { name: 'Ngừng bán' }));
@@ -454,7 +494,7 @@ describe('ProductFormScreen — sửa', () => {
     expect(push).not.toHaveBeenCalled();
   });
 
-  it('ảnh: gallery cha hiện ảnh chính; upload ảnh cha + ảnh biến thể gửi multipart field "file" lên S3 API', async () => {
+  it('ảnh: gallery cha hiện ảnh chính; upload ảnh cha gửi multipart field "file" lên S3 API (ô ảnh biến thể đang ẩn)', async () => {
     const uploads: Array<{ url: string; size: number | null }> = [];
     const NEW_IMG = {
       id: 'img-2',
@@ -493,8 +533,8 @@ describe('ProductFormScreen — sửa', () => {
     fireEvent.change(screen.getByLabelText('Chọn ảnh sản phẩm'), { target: { files: [png] } });
     await waitFor(() => expect(uploads).toContainEqual({ url: 'product', size: 3 }));
 
-    const skuPng = new File([new Uint8Array([4, 5])], 'sku.png', { type: 'image/png' });
-    fireEvent.change(screen.getByLabelText('Chọn ảnh biến thể'), { target: { files: [skuPng] } });
-    await waitFor(() => expect(uploads).toContainEqual({ url: 'sku', size: 2 }));
+    // Ô ảnh biến thể (SkuImageCell) đang ẩn trên form — không có input upload theo SKU
+    expect(screen.queryByLabelText('Chọn ảnh biến thể')).not.toBeInTheDocument();
+    expect(uploads.filter((u) => u.url === 'sku')).toHaveLength(0);
   });
 });

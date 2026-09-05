@@ -58,7 +58,7 @@ import {
   productFormSchema,
   type ProductFormValues,
 } from '../schema';
-import { ImageDropzone, ProductGallery, SkuImageCell } from './product-images';
+import { ImageDropzone, ProductGallery } from './product-images';
 import { UomManagerDialog } from './uom-manager-dialog';
 
 /**
@@ -93,20 +93,17 @@ const PENDING_API: Array<{ title: string; need: string }> = [
   { title: 'Nhóm thuế theo SKU', need: 'chờ chốt cách tính thuế — chưa có danh mục thuế suất' },
 ];
 
-const TRACKING_OPTIONS = [
-  { value: 'NONE', label: 'Không theo dõi' },
-  { value: 'LOT', label: 'Theo lô + hạn dùng (FEFO)' },
-  { value: 'SERIAL', label: 'Theo serial' },
-] as const;
-
 interface RowError {
   index: number;
   message: string;
 }
 
-/** Ghi chú design: focus nhảy tới ô sai đầu tiên — tìm theo name của RHF, không phá id của Form kit. */
-function focusSkuCode(index: number) {
-  document.querySelector<HTMLInputElement>(`input[name="skus.${index}.code"]`)?.focus();
+/**
+ * Ghi chú design: focus nhảy tới ô sai đầu tiên — tìm theo name của RHF, không phá id của
+ * Form kit. Ô mã SKU đang ẩn nên neo vào "Tên biến thể" (ô đầu tiên còn hiện của dòng).
+ */
+function focusSkuRow(index: number) {
+  document.querySelector<HTMLInputElement>(`input[name="skus.${index}.name"]`)?.focus();
 }
 
 function initialValues(p?: ProductDetail): ProductFormValues {
@@ -375,13 +372,14 @@ function ProductFormBody({ product }: { product?: ProductDetail }) {
         } catch (err) {
           const msg = messageFor(err);
           errors.push({ index: i, message: msg });
-          form.setError(`skus.${i}.code`, { message: msg });
+          // Ô mã SKU ẩn → lỗi dòng gắn vào "Tên biến thể" để FormMessage hiện đúng dòng.
+          form.setError(`skus.${i}.name`, { message: msg });
         }
       }
 
       if (errors.length > 0) {
         setRowErrors(errors);
-        focusSkuCode(errors[0]!.index);
+        focusSkuRow(errors[0]!.index);
         return;
       }
 
@@ -480,7 +478,7 @@ function ProductFormBody({ product }: { product?: ProductDetail }) {
                 key={e.index}
                 type="button"
                 className="mr-2 text-destructive underline"
-                onClick={() => focusSkuCode(e.index)}
+                onClick={() => focusSkuRow(e.index)}
               >
                 Dòng {e.index + 1}: {e.message}
               </button>
@@ -775,10 +773,6 @@ function ProductFormBody({ product }: { product?: ProductDetail }) {
               name="allowNegativeStock"
               render={({ field }) => (
                 <FormItem className="flex flex-row items-start gap-2 pt-6 sm:col-span-2">
-                   <div className="space-y-0.5 leading-none">
-
-                   </div>
-                 
                   <div className="space-y-0.5 leading-none">
                     <FormControl className="mr-2 items-center space-x-2">
                       <Checkbox checked={field.value} onCheckedChange={field.onChange} />
@@ -882,11 +876,6 @@ function ProductFormBody({ product }: { product?: ProductDetail }) {
                 form={form}
                 index={i}
                 editing={editing}
-                canEditImages={canEditImages}
-                uoms={uoms.data ?? []}
-                skuImage={
-                  product?.skus.find((s) => s.id === form.getValues(`skus.${i}.skuId`))?.images[0]
-                }
                 onRemove={
                   // Design: chỉ xóa dòng CHƯA lưu; biến thể đã có chỉ "Ngừng bán"
                   !form.getValues(`skus.${i}.skuId`) && rows.fields.length > 1
@@ -933,33 +922,24 @@ function ProductFormBody({ product }: { product?: ProductDetail }) {
   );
 }
 
-/** Một dòng biến thể: ảnh (SKU đã lưu) · mã (khóa khi đã lưu) · tên · barcode lẻ · trạng thái (khi sửa). */
+/**
+ * Một dòng biến thể: trạng thái (khi sửa) · tên · giá nhập · giá bán · tồn đầu kỳ (dòng mới).
+ * Các ô ảnh / mã SKU / barcode / trọng lượng / đa ĐVT đang tạm ẩn (JSX giữ dạng comment
+ * để bật lại) — bật lại thì nhớ đưa lại các prop `uoms`, `skuImage`, `canEditImages`.
+ */
 function SkuRow({
   form,
   index,
   editing,
-  canEditImages,
-  skuImage,
-  uoms,
   onRemove,
 }: {
   form: UseFormReturn<ProductFormValues>;
   index: number;
   editing: boolean;
-  canEditImages: boolean;
-  skuImage?: ProductDetail['skus'][number]['images'][number];
-  uoms: Array<{ id: string; code: string; name: string }>;
   onRemove?: () => void;
 }) {
   const skuId = form.getValues(`skus.${index}.skuId`);
-  const existingBarcode = form.getValues(`skus.${index}.existingBarcode`);
   const saved = skuId !== '';
-  // F3 — đa ĐVT trên dòng: ĐVT phụ ngoài ĐVT cơ sở; ĐVT bán = cơ sở/phụ/đã có quy đổi
-  const baseUom = form.watch('baseUom');
-  const altUom = form.watch(`skus.${index}.altUom`);
-  const existingConvUoms = form.getValues(`skus.${index}.existingConvUoms`);
-  const altOptions = uoms.filter((u) => u.code !== baseUom);
-  const NONE = '__none__';
 
   return (
     <div className="flex flex-col gap-2 px-3 py-2">
@@ -992,7 +972,6 @@ function SkuRow({
             </FormItem>
           )}
         /> */}
-        
         {/* {existingBarcode ? (
           <div
             className="pt-2 font-mono text-sm text-muted-foreground"

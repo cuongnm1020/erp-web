@@ -2,7 +2,6 @@ import type { LucideIcon } from 'lucide-react';
 import {
   ArrowDownUp,
   ArrowLeftRight,
-  ArrowUp,
   Barcode,
   BarChart3,
   Boxes,
@@ -43,7 +42,6 @@ import {
   TrendingDown,
   TrendingUp,
   Truck,
-  Undo2,
   UserCog,
   UserRound,
   Users,
