@@ -29,6 +29,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { Textarea } from '@/components/ui/textarea';
 import { toast } from '@/components/ui/toaster';
 import { type ApiError } from '@/lib/api/errors';
 import { cn } from '@/lib/cn';
@@ -238,7 +239,7 @@ function ProductFormBody({ product }: { product?: ProductDetail }) {
   const [saving, setSaving] = useState(false);
   const [uomManagerOpen, setUomManagerOpen] = useState(false);
   /** Tạo cha xong mà dòng SKU lỗi → nhớ để lần Lưu sau không tạo trùng (lưu không atomic). */
-  const created = useRef<{ productId: string; doneRows: Set<number> } | null>(null);
+  const created = useRef<{ productId: string; code: string; doneRows: Set<number> } | null>(null);
 
   const trackingMode = form.watch('trackingMode');
 
@@ -248,7 +249,7 @@ function ProductFormBody({ product }: { product?: ProductDetail }) {
     form.clearErrors('root.server');
     const errors: RowError[] = [];
     // Mã hiển thị trong toast — code bỏ trống thì backend tự sinh, lấy từ response.
-    let savedCode = v.code || product?.code || '';
+    let savedCode = v.code || product?.code || created.current?.code || '';
     try {
       // 1. Sản phẩm cha
       let pid = editing ? product.id : created.current?.productId;
@@ -272,7 +273,7 @@ function ProductFormBody({ product }: { product?: ProductDetail }) {
           });
           pid = p.id;
           savedCode = p.code;
-          created.current = { productId: p.id, doneRows: new Set() };
+          created.current = { productId: p.id, code: p.code, doneRows: new Set() };
         } catch (err) {
           applyServerErrors(form, err as ApiError, {
             knownFields: ['code', 'name', 'categoryId', 'brandId', 'trackingMode', 'searchAliases'],
@@ -304,7 +305,8 @@ function ProductFormBody({ product }: { product?: ProductDetail }) {
             await createSku.mutateAsync({
               productId: pid,
               body: {
-                code: row.code,
+                // Ô mã SKU đang ẩn — bỏ trống thì sinh `{mã sản phẩm}-{stt}` (CreateSkuDto bắt buộc code).
+                code: row.code || `${savedCode}-${i + 1}`,
                 name: row.name,
                 baseUom: v.baseUom,
                 // F3 — ĐVT phụ khai trên dòng: conversion + barcode theo ĐVT + ĐVT bán
@@ -525,7 +527,7 @@ function ProductFormBody({ product }: { product?: ProductDetail }) {
                 </FormItem>
               )}
             />
-            <FormField
+            {/* <FormField
               control={form.control}
               name="code"
               render={({ field }) => (
@@ -546,7 +548,7 @@ function ProductFormBody({ product }: { product?: ProductDetail }) {
                   <FormMessage />
                 </FormItem>
               )}
-            />
+            /> */}
             <FormField
               control={form.control}
               name="categoryId"
@@ -628,7 +630,7 @@ function ProductFormBody({ product }: { product?: ProductDetail }) {
                 <FormItem className="sm:col-span-2 lg:col-span-2">
                   <FormLabel>Mô tả</FormLabel>
                   <FormControl>
-                    <Input placeholder="Ngòi bi, mực dầu, viết êm…" {...field} />
+                    <Textarea placeholder="Ngòi bi, mực dầu, viết êm…" {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -641,7 +643,7 @@ function ProductFormBody({ product }: { product?: ProductDetail }) {
                 <FormItem className="sm:col-span-2 lg:col-span-2">
                   <FormLabel>Ghi chú nội bộ</FormLabel>
                   <FormControl>
-                    <Input placeholder="Chỉ nội bộ thấy — không đưa ra kênh bán" {...field} />
+                    <Textarea placeholder="Chỉ nội bộ thấy — không đưa ra kênh bán" {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -685,7 +687,7 @@ function ProductFormBody({ product }: { product?: ProductDetail }) {
                 </FormItem>
               )}
             />
-            <FormField
+            {/* <FormField
               control={form.control}
               name="trackingMode"
               render={({ field }) => (
@@ -713,7 +715,7 @@ function ProductFormBody({ product }: { product?: ProductDetail }) {
                   <FormMessage />
                 </FormItem>
               )}
-            />
+            /> */}
             {trackingMode === 'LOT' ? (
               <FormField
                 control={form.control}
@@ -763,24 +765,28 @@ function ProductFormBody({ product }: { product?: ProductDetail }) {
                 </FormItem>
               )}
             />
-            <FormItem>
+            {/* <FormItem>
               <FormLabel>Nhóm thuế</FormLabel>
               <Input value="Chưa cấu hình" disabled />
               <FormDescription>Chờ chốt cách tính thuế với kế toán</FormDescription>
-            </FormItem>
+            </FormItem> */}
             <FormField
               control={form.control}
               name="allowNegativeStock"
               render={({ field }) => (
                 <FormItem className="flex flex-row items-start gap-2 pt-6 sm:col-span-2">
-                  <FormControl>
-                    <Checkbox checked={field.value} onCheckedChange={field.onChange} />
-                  </FormControl>
+                   <div className="space-y-0.5 leading-none">
+
+                   </div>
+                 
                   <div className="space-y-0.5 leading-none">
+                    <FormControl className="mr-2 items-center space-x-2">
+                      <Checkbox checked={field.value} onCheckedChange={field.onChange} />
+                    </FormControl>
                     <FormLabel>Cho phép bán tồn kho âm</FormLabel>
-                    <FormDescription>
+                    {/* <FormDescription>
                       Mới là cờ dữ liệu — chưa áp vào giữ hàng khi chốt đơn
-                    </FormDescription>
+                    </FormDescription> */}
                   </div>
                 </FormItem>
               )}
@@ -958,7 +964,7 @@ function SkuRow({
   return (
     <div className="flex flex-col gap-2 px-3 py-2">
       <div className="grid items-start gap-2 sm:grid-cols-[110px_150px_minmax(180px,1fr)_170px_150px_32px]">
-        {saved ? (
+        {/* {saved ? (
           <SkuImageCell skuId={skuId} image={skuImage} canEdit={canEditImages} />
         ) : (
           <span
@@ -967,8 +973,8 @@ function SkuRow({
           >
             —
           </span>
-        )}
-        <FormField
+        )} */}
+        {/* <FormField
           control={form.control}
           name={`skus.${index}.code`}
           render={({ field }) => (
@@ -985,21 +991,9 @@ function SkuRow({
               <FormMessage />
             </FormItem>
           )}
-        />
-        <FormField
-          control={form.control}
-          name={`skus.${index}.name`}
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel className="sr-only">Tên biến thể</FormLabel>
-              <FormControl>
-                <Input placeholder="Bút bi Thiên Long TL-08 xanh 0.5" {...field} />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
-        {existingBarcode ? (
+        /> */}
+        
+        {/* {existingBarcode ? (
           <div
             className="pt-2 font-mono text-sm text-muted-foreground"
             title="Quản lý barcode đầy đủ ở màn chi tiết"
@@ -1025,7 +1019,7 @@ function SkuRow({
               </FormItem>
             )}
           />
-        )}
+        )} */}
         {editing && saved ? (
           <FormField
             control={form.control}
@@ -1051,7 +1045,7 @@ function SkuRow({
             )}
           />
         ) : (
-          <div className="pt-2 text-sm text-muted-foreground">Đang bán</div>
+          <div className="pt-2 text-sm text-muted-foreground"></div>
         )}
         {onRemove ? (
           <Button
@@ -1070,7 +1064,20 @@ function SkuRow({
         )}
       </div>
       {/* Dòng 2: giá nhập / giá bán / trọng lượng (gram → kg lúc gửi) / tồn đầu kỳ (chỉ dòng mới) */}
-      <div className="grid items-start gap-2 sm:grid-cols-4 lg:max-w-3xl">
+      <div className="grid items-start gap-2 sm:grid-cols-5">
+        <FormField
+          control={form.control}
+          name={`skus.${index}.name`}
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel className="text-xs text-muted-foreground">Tên biến thể</FormLabel>
+              <FormControl>
+                <Input placeholder="Bút bi Thiên Long TL-08 xanh 0.5" {...field} />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
         <FormField
           control={form.control}
           name={`skus.${index}.purchasePrice`}
@@ -1098,7 +1105,7 @@ function SkuRow({
             </FormItem>
           )}
         />
-        <FormField
+        {/* <FormField
           control={form.control}
           name={`skus.${index}.weightG`}
           render={({ field }) => (
@@ -1115,7 +1122,7 @@ function SkuRow({
               <FormMessage />
             </FormItem>
           )}
-        />
+        /> */}
         {saved ? (
           <FormItem>
             <FormLabel className="text-xs text-muted-foreground">Tồn kho</FormLabel>
@@ -1150,7 +1157,7 @@ function SkuRow({
       </div>
       {/* F3 — hàng 3: đa ĐVT. SKU đã lưu hiện quy đổi sẵn có dạng chip; khai thêm ở các ô bên cạnh. */}
       <div className="grid items-start gap-2 sm:grid-cols-4 lg:max-w-3xl">
-        <FormField
+        {/* <FormField
           control={form.control}
           name={`skus.${index}.altUom`}
           render={({ field }) => (
@@ -1256,7 +1263,7 @@ function SkuRow({
               <FormMessage />
             </FormItem>
           )}
-        />
+        /> */}
       </div>
     </div>
   );

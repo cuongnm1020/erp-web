@@ -107,13 +107,13 @@ export const NAV_MODULES: NavModule[] = [
         icon: Plus,
         ability: { action: 'create', subject: 'SalesOrder' },
       },
-      {
-        label: 'Chờ duyệt',
-        href: '/crm/orders/approvals',
-        icon: ArrowUp,
-        ability: { action: 'read', subject: 'SalesOrder' },
-      },
-      { label: 'Đơn hoàn / RMA', href: '/crm/returns', icon: Undo2 },
+      // {
+      //   label: 'Chờ duyệt',
+      //   href: '/crm/orders/approvals',
+      //   icon: ArrowUp,
+      //   ability: { action: 'read', subject: 'SalesOrder' },
+      // },
+      // { label: 'Đơn hoàn / RMA', href: '/crm/returns', icon: Undo2 },
     ],
   },
   {

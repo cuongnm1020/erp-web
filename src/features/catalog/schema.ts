@@ -66,7 +66,8 @@ const barcodeValue = z
 
 export const skuRowSchema = z.object({
   skuId: z.string(),
-  code: codeSchema,
+  /** Ô mã SKU đang ẩn trên form — bỏ trống, submit tự sinh `{mã sản phẩm}-{stt}`. */
+  code: codeSchema.optional().or(z.literal('')),
   name: z.string().trim().min(1, 'Nhập tên biến thể').max(300, 'Tối đa 300 ký tự'),
   barcode: barcodeValue.optional().or(z.literal('')),
   isActive: z.boolean(),
