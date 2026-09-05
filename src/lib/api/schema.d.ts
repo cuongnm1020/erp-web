@@ -2521,6 +2521,55 @@ export interface paths {
         patch: operations["CustomerSegmentController_setSegment"];
         trace?: never;
     };
+    "/customer-assignments/teams": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["CustomerAssignmentController_teams"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/customer-assignments/teams/{teamId}/members": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["CustomerAssignmentController_members"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/customer-assignments": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Lịch sử phân công — member cũng xem được của khách mình (customer.read + scope). */
+        get: operations["CustomerAssignmentController_history"];
+        put?: never;
+        post: operations["CustomerAssignmentController_assign"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/health": {
         parameters: {
             query?: never;
@@ -4517,6 +4566,79 @@ export interface components {
              */
             tierId?: string | null;
         };
+        TeamAssignmentSummaryDto: {
+            teamId: string;
+            code: string;
+            name: string;
+            parentId: string | null;
+            /** @description Khách đang hoạt động thuộc team (mọi owner). */
+            customersInTeam: number;
+            /** @description Khách thuộc team nhưng `ownerIds` rỗng — leader chưa chia cho ai. */
+            unassigned: number;
+        };
+        TeamMemberLoadDto: {
+            userId: string;
+            code: string;
+            fullName: string;
+            /** @enum {string} */
+            role: "LEADER" | "MEMBER";
+            joinedAt: string;
+            /** @description Số khách đang hoạt động của team mà người này là owner. */
+            holding: number;
+        };
+        CustomerAssignmentDto: {
+            id: string;
+            customerId: string;
+            customerCode: string;
+            customerName: string;
+            teamId: string;
+            teamName: string;
+            userId: string | null;
+            userName: string | null;
+            /** @enum {string} */
+            type: "PRIMARY" | "SUPPORT" | "TEMPORARY";
+            assignedBy: string;
+            assignedByName: string;
+            reason: string | null;
+            startAt: string;
+            /** @description null = đang hiệu lực. */
+            endAt: string | null;
+        };
+        CustomerAssignmentListDto: {
+            items: components["schemas"]["CustomerAssignmentDto"][];
+            total: number;
+        };
+        AssignCustomersDto: {
+            customerIds: string[];
+            /**
+             * Format: uuid
+             * @description Team nhận khách — người gọi phải là LEADER team này (hoặc team cha).
+             */
+            teamId: string;
+            /**
+             * Format: uuid
+             * @description Sale phụ trách — phải là thành viên đang hiệu lực của `teamId`.
+             *     Bỏ trống / null = trả khách về "pool" của team: `ownerIds` rỗng, member không thấy.
+             */
+            userId?: string | null;
+            /** @description Lý do (hiện ở lịch sử phân công), ví dụ "Hoàn tác". */
+            reason?: string;
+        };
+        AssignCustomerItemDto: {
+            customerId: string;
+            /** @description Trạng thái TRƯỚC khi gán — client dùng để "Hoàn tác" bằng cách gán ngược lại. */
+            previousTeamId: string | null;
+            previousUserId: string | null;
+            /** @description false = khách đã ở đúng team/owner này, không ghi thêm dòng ledger. */
+            changed: boolean;
+        };
+        AssignCustomersResultDto: {
+            teamId: string;
+            userId: string | null;
+            assigned: number;
+            unchanged: number;
+            items: components["schemas"]["AssignCustomerItemDto"][];
+        };
         HealthReportDto: {
             /** @enum {string} */
             status: "ok" | "degraded";
@@ -5103,6 +5225,12 @@ export interface operations {
                 sortBy?: "name" | "code" | "type" | "creditLimit" | "createdAt" | "updatedAt";
                 /** @description Bỏ trống → `asc`. */
                 sortDir?: "asc" | "desc";
+                teamId?: string;
+                /** @description Khách do sale này phụ trách (`ownerIds` chứa). */
+                ownerId?: string;
+                /** @description true = chưa chia cho ai (`ownerIds` rỗng); false = đã có người phụ trách. */
+                unassigned?: boolean;
+                isActive?: boolean;
                 q?: string;
                 take: number;
                 skip: number;
@@ -8988,6 +9116,95 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+        };
+    };
+    CustomerAssignmentController_teams: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TeamAssignmentSummaryDto"][];
+                };
+            };
+        };
+    };
+    CustomerAssignmentController_members: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                teamId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TeamMemberLoadDto"][];
+                };
+            };
+        };
+    };
+    CustomerAssignmentController_history: {
+        parameters: {
+            query: {
+                customerId?: string;
+                teamId?: string;
+                /** @description true = chỉ dòng đang hiệu lực (endAt null). */
+                activeOnly?: boolean;
+                take: number;
+                skip: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CustomerAssignmentListDto"];
+                };
+            };
+        };
+    };
+    CustomerAssignmentController_assign: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AssignCustomersDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AssignCustomersResultDto"];
+                };
             };
         };
     };

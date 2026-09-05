@@ -127,7 +127,13 @@ export const NAV_MODULES: NavModule[] = [
         icon: UserRound,
         ability: { action: 'read', subject: 'Customer' },
       },
-      { label: 'Phân công', href: '/crm/customers/assign', icon: UsersRound },
+      {
+        label: 'Phân công',
+        href: '/crm/customers/assign',
+        icon: UsersRound,
+        // Chỉ leader (customer.assign) — member không có mục này trong sidebar.
+        ability: { action: 'assign', subject: 'Customer' },
+      },
       { label: 'Nhóm · cấp độ · tag', href: '/crm/segments', icon: Tags },
       { label: 'Gộp khách trùng', href: '/crm/customers/duplicates', icon: Merge },
       { label: 'Đồng ý marketing', href: '/crm/customers/consent', icon: MailCheck },

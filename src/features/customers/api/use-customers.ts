@@ -17,6 +17,12 @@ export interface CustomerListParams {
   q?: string;
   sortBy?: CustomerSortBy;
   sortDir?: CustomerSortDir;
+  /** P2-04 — lọc cho màn Phân công; API luôn AND với scope của người gọi. */
+  teamId?: string;
+  ownerId?: string;
+  /** true = chưa có người phụ trách (ownerIds rỗng); false = đã phân. */
+  unassigned?: boolean;
+  isActive?: boolean;
   take: number;
   skip: number;
 }
@@ -45,6 +51,10 @@ export function useCustomers(params: CustomerListParams) {
               q: params.q || undefined,
               sortBy: params.sortBy,
               sortDir: params.sortDir,
+              teamId: params.teamId,
+              ownerId: params.ownerId,
+              unassigned: params.unassigned,
+              isActive: params.isActive,
               take: params.take,
               skip: params.skip,
             },

@@ -29,6 +29,9 @@ const MESSAGES: Record<string, string> = {
     'Chưa có giá cho sản phẩm này với khách đang chọn. Báo quản lý cập nhật bảng giá.',
   INVALID_STATUS_TRANSITION:
     'Trạng thái chứng từ đã đổi, thao tác này không còn hợp lệ. Tải lại trang.',
+  // Phân công khách hàng (P2-04)
+  NOT_TEAM_LEADER: 'Chỉ trưởng nhóm của team này mới được phân công. Chọn team bạn đang lead.',
+  USER_NOT_IN_TEAM: 'Người được chọn không còn thuộc team này. Tải lại danh sách thành viên.',
   // Lô & hạn dùng (D1/A3 backend)
   RECEIPT_LOT_REQUIRED: 'Sản phẩm theo lô — nhập số lô cho dòng này rồi lưu lại.',
   RECEIPT_LOT_EXPIRY_CONFLICT:
