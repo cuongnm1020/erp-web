@@ -45,6 +45,8 @@ const MESSAGES: Record<string, string> = {
     'Pancake không chấp nhận cấu hình này. Xem nguyên nhân ở cột Kiểm tra kết nối rồi sửa khoá hoặc mã shop.',
   PANCAKE_CONFIG_UNREADABLE:
     'Khoá đã lưu không giải mã được vì khoá mã hoá của server đã đổi. Nhập lại khoá API cho shop này.',
+  PANCAKE_WEBHOOK_UNAUTHORIZED:
+    'Webhook bị từ chối vì secret không khớp. Dán lại secret từ màn Kết nối Pancake vào cấu hình của Pancake.',
   PANCAKE_SECRET_KEY_MISSING:
     'Server chưa có APP_SECRET_KEY để mã hoá khoá API. Báo IT đặt biến môi trường rồi khởi động lại API.',
   SYNC_ACTOR_NOT_FOUND: 'Tài khoản hệ thống cho đồng bộ chưa được tạo. Báo IT chạy seed dữ liệu.',

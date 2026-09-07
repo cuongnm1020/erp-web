@@ -555,6 +555,13 @@ export const handlers = [
     });
   }),
   http.delete('/api/pancake-sync/config/:shopId', () => new HttpResponse(null, { status: 204 })),
+  http.post('/api/pancake-sync/config/:shopId/webhook-secret', ({ params }) =>
+    HttpResponse.json({
+      ...PANCAKE_SHOP_FIXTURE,
+      shopId: String(params.shopId),
+      webhookSecret: 'ffffffffffffffffffffffffffffffffffffffffffffffff',
+    }),
+  ),
   http.post('/api/pancake-sync/config/:shopId/verify', ({ params }) =>
     HttpResponse.json({
       shopId: String(params.shopId),
@@ -579,6 +586,8 @@ export const PANCAKE_SHOP_FIXTURE = {
   lastVerifyError: null,
   updatedAt: '2026-09-06T10:00:00.000Z',
   updatedBy: 'u-admin',
+  webhookPath: '/pancake-sync/webhook/407957969',
+  webhookSecret: 'a1b2c3d4e5f60718293a4b5c6d7e8f90a1b2c3d4e5f60718',
 };
 
 export const PANCAKE_CONFIG_FIXTURE = {

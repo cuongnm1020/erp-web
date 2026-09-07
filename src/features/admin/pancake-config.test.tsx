@@ -166,6 +166,30 @@ describe('PancakeConfigScreen — /pancake-sync/config', () => {
     expect(toastSuccess).not.toHaveBeenCalled();
   });
 
+  it('webhook: URL = NEXT_PUBLIC_API_URL + webhookPath, secret hiện để dán; tạo lại qua hộp xác nhận', async () => {
+    let rotated = 0;
+    server.use(
+      http.post('/api/pancake-sync/config/:shopId/webhook-secret', () => {
+        rotated++;
+        return HttpResponse.json({ ...PANCAKE_SHOP_FIXTURE, webhookSecret: 'f'.repeat(48) });
+      }),
+    );
+    renderApp(<PancakeConfigScreen />);
+    await screen.findByText('Shop chính');
+    const urls = screen.getAllByText(/\/pancake-sync\/webhook\/407957969$/);
+    expect(urls[0]).toHaveTextContent(/^https?:\/\/.+\/pancake-sync\/webhook\/407957969$/);
+    expect(screen.getAllByText(PANCAKE_SHOP_FIXTURE.webhookSecret).length).toBeGreaterThan(0);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Tạo lại secret webhook shop 407957969' }));
+    const dialog = await screen.findByRole('dialog');
+    expect(dialog).toHaveTextContent('mất hiệu lực ngay');
+    fireEvent.click(screen.getByRole('button', { name: 'Tạo lại secret' }));
+    await waitFor(() => expect(rotated).toBe(1));
+    await waitFor(() =>
+      expect(toastSuccess).toHaveBeenCalledWith('Đã tạo lại secret webhook', expect.anything()),
+    );
+  });
+
   it('kiểm tra kết nối thành công → toast nêu số kho Pancake trả về', async () => {
     renderApp(<PancakeConfigScreen />);
     await screen.findByText('Shop chính');

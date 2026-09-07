@@ -2650,6 +2650,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/pancake-sync/config/{shopId}/webhook-secret": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Xoay shared secret webhook — secret cũ mất hiệu lực ngay, dán secret mới vào Pancake. */
+        post: operations["PancakeConfigController_rotateWebhookSecret"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/pancake-sync/config/{shopId}/verify": {
         parameters: {
             query?: never;
@@ -2661,6 +2678,23 @@ export interface paths {
         put?: never;
         /** Gọi thử Pancake bằng cấu hình đang lưu; thất bại → 502 PANCAKE_VERIFY_FAILED kèm nguyên nhân. */
         post: operations["PancakeConfigController_verify"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/pancake-sync/webhook/{shopId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Một số hệ thống GET thử URL khi lưu cấu hình — trả 200 rỗng, không lộ gì. */
+        get: operations["PancakeWebhookController_ping"];
+        put?: never;
+        post: operations["PancakeWebhookController_receive"];
         delete?: never;
         options?: never;
         head?: never;
@@ -4824,6 +4858,13 @@ export interface components {
             lastVerifyError: string | null;
             updatedAt: string | null;
             updatedBy: string | null;
+            /** @description Đường nhận webhook, ghép sau URL công khai của API: `https://<api>/pancake-sync/webhook/<shopId>`. */
+            webhookPath: string;
+            /**
+             * @description Shared secret để dán vào cấu hình webhook của Pancake (header `X-Pancake-Secret` hoặc
+             *     query `?secret=`). null = chưa sinh (dòng cũ) và server không đặt PANCAKE_WEBHOOK_SECRET.
+             */
+            webhookSecret: string | null;
         };
         PancakeEnvStatusDto: {
             /** @description PANCAKE_API_KEY có trong env của server API. */
@@ -4860,6 +4901,14 @@ export interface components {
             /** @description Số kho Pancake trả về — đủ để biết khoá đúng và shop đúng. */
             warehouses: number;
             verifiedAt: string;
+        };
+        PancakeWebhookReceiptDto: {
+            receiptId: string;
+            /** @description orders | customers | products | variations_warehouses | unknown */
+            webhookType: string;
+            externalId: string | null;
+            /** @description true = đã xếp hàng gọi lại Pancake lấy bản chính thống (D-05). */
+            queued: boolean;
         };
         HealthReportDto: {
             /** @enum {string} */
@@ -9602,6 +9651,27 @@ export interface operations {
             };
         };
     };
+    PancakeConfigController_rotateWebhookSecret: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                shopId: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PancakeShopConfigDto"];
+                };
+            };
+        };
+    };
     PancakeConfigController_verify: {
         parameters: {
             query?: never;
@@ -9619,6 +9689,46 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["PancakeVerifyResultDto"];
+                };
+            };
+        };
+    };
+    PancakeWebhookController_ping: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                shopId: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    PancakeWebhookController_receive: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                shopId: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PancakeWebhookReceiptDto"];
                 };
             };
         };

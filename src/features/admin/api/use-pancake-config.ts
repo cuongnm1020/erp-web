@@ -44,6 +44,20 @@ export function useDeletePancakeConfig() {
   });
 }
 
+/** POST /pancake-sync/config/{shopId}/webhook-secret — xoay secret; secret cũ hết hiệu lực ngay. */
+export function useRotatePancakeWebhookSecret() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (shopId: number) =>
+      unwrap(
+        api.POST('/pancake-sync/config/{shopId}/webhook-secret', {
+          params: { path: { shopId } },
+        }),
+      ),
+    onSuccess: () => void qc.invalidateQueries({ queryKey: pancakeConfigKeys.all }),
+  });
+}
+
 /**
  * POST /pancake-sync/config/{shopId}/verify — gọi thử Pancake bằng cấu hình đang lưu.
  * Thất bại → 502 PANCAKE_VERIFY_FAILED; server đã ghi lastVerifyError nên vẫn invalidate.

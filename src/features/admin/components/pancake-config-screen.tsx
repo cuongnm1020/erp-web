@@ -1,7 +1,8 @@
 'use client';
 
-import { Info, PlugZap, Plus, RefreshCw } from 'lucide-react';
+import { Copy, Info, KeyRound, PlugZap, Plus, RefreshCw } from 'lucide-react';
 import { useState } from 'react';
+import { ConfirmDialog } from '@/components/data/confirm-dialog';
 import { RowActions } from '@/components/data/row-actions';
 import { EmptyState, ListSkeleton, QueryState } from '@/components/data/states';
 import { StatusBadge } from '@/components/data/status-badge';
@@ -16,12 +17,14 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { toast } from '@/components/ui/toaster';
+import { publicEnv } from '@/lib/env';
 import { messageFor } from '@/lib/error-messages';
 import { formatDateTime } from '@/lib/format/date';
 import { Can } from '@/lib/permission';
 import {
   useDeletePancakeConfig,
   usePancakeConfig,
+  useRotatePancakeWebhookSecret,
   useVerifyPancakeConfig,
   type PancakeConfigList,
   type PancakeShopConfig,
@@ -157,6 +160,7 @@ function ShopTable({ items }: { items: PancakeShopConfig[] }) {
               <TableHead>Khoá API</TableHead>
               <TableHead>Trạng thái</TableHead>
               <TableHead>Kiểm tra kết nối</TableHead>
+              <TableHead>Webhook (dán vào Pancake)</TableHead>
               <TableHead className="text-right">Giới hạn</TableHead>
               <TableHead>Cập nhật</TableHead>
               <TableHead className="w-px" />
@@ -201,6 +205,9 @@ function ShopTable({ items }: { items: PancakeShopConfig[] }) {
                     ) : (
                       <span className="text-sm text-muted-foreground">Chưa kiểm tra</span>
                     )}
+                  </TableCell>
+                  <TableCell className="max-w-sm">
+                    <WebhookCell shop={shop} canRotate={dbRow} />
                   </TableCell>
                   <TableCell className="text-right font-mono text-sm">
                     {shop.requestsPerSecond ?? '2'} req/s · burst {shop.burst ?? '4'}
@@ -254,5 +261,96 @@ function ShopTable({ items }: { items: PancakeShopConfig[] }) {
         <PancakeConfigDialog open onOpenChange={(o) => !o && setEditing(null)} config={editing} />
       ) : null}
     </>
+  );
+}
+
+/** Sao chép vào clipboard; trình duyệt không cho (http, iframe) thì báo để người dùng chọn tay. */
+async function copyText(label: string, text: string): Promise<void> {
+  try {
+    await navigator.clipboard.writeText(text);
+    toast.success(`Đã sao chép ${label}`);
+  } catch {
+    toast.error(`Không sao chép được ${label} — bôi đen rồi Ctrl+C.`);
+  }
+}
+
+/**
+ * URL + secret để dán vào cấu hình webhook của Pancake. URL = NEXT_PUBLIC_API_URL + webhookPath
+ * (API không biết hostname công khai của mình). Secret hiện thẳng vì chính người này phải
+ * dán nó sang Pancake; xoay = secret cũ mất hiệu lực ngay.
+ */
+function WebhookCell({ shop, canRotate }: { shop: PancakeShopConfig; canRotate: boolean }) {
+  const rotate = useRotatePancakeWebhookSecret();
+  const [confirming, setConfirming] = useState(false);
+  const url = `${publicEnv.NEXT_PUBLIC_API_URL.replace(/\/+$/, '')}${shop.webhookPath}`;
+
+  return (
+    <div className="space-y-1 text-xs">
+      <div className="flex items-center gap-1">
+        <code className="truncate font-mono" title={url}>
+          {url}
+        </code>
+        <Button
+          variant="ghost"
+          size="sm"
+          aria-label={`Sao chép URL webhook shop ${shop.shopId}`}
+          onClick={() => void copyText('URL webhook', url)}
+        >
+          <Copy aria-hidden />
+        </Button>
+      </div>
+      <div className="flex items-center gap-1">
+        <span className="text-muted-foreground">Secret</span>
+        {shop.webhookSecret ? (
+          <>
+            <code className="truncate font-mono" title={shop.webhookSecret}>
+              {shop.webhookSecret}
+            </code>
+            <Button
+              variant="ghost"
+              size="sm"
+              aria-label={`Sao chép secret webhook shop ${shop.shopId}`}
+              onClick={() => void copyText('secret webhook', shop.webhookSecret ?? '')}
+            >
+              <Copy aria-hidden />
+            </Button>
+          </>
+        ) : (
+          <span className="text-muted-foreground">chưa có — lưu lại cấu hình để sinh</span>
+        )}
+        {canRotate ? (
+          <Can I="config" a="Sync">
+            <Button
+              variant="ghost"
+              size="sm"
+              disabled={rotate.isPending}
+              aria-label={`Tạo lại secret webhook shop ${shop.shopId}`}
+              onClick={() => setConfirming(true)}
+            >
+              <KeyRound aria-hidden />
+              Tạo lại
+            </Button>
+          </Can>
+        ) : null}
+      </div>
+      <ConfirmDialog
+        open={confirming}
+        onOpenChange={setConfirming}
+        title={`Tạo lại secret webhook shop ${shop.shopId}?`}
+        description="Secret hiện tại mất hiệu lực ngay. Webhook từ Pancake sẽ bị từ chối cho tới khi bạn dán secret mới vào Pancake."
+        confirmLabel="Tạo lại secret"
+        destructive={false}
+        onConfirm={() =>
+          rotate
+            .mutateAsync(Number(shop.shopId))
+            .then(() =>
+              toast.success('Đã tạo lại secret webhook', {
+                description: 'Dán secret mới vào Pancake',
+              }),
+            )
+            .catch((err) => toast.error(messageFor(err)))
+        }
+      />
+    </div>
   );
 }
