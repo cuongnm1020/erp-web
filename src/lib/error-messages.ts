@@ -38,6 +38,17 @@ const MESSAGES: Record<string, string> = {
     'Lô này đã có hạn dùng khác với phiếu. Sửa hạn của lô ở màn Lô & hạn dùng nếu hạn cũ sai.',
   RESERVATION_REPOINT_FAILED:
     'Lô vừa nhặt đã bị đơn khác giữ mất. Tải lại nhiệm vụ và nhặt lại theo gợi ý mới.',
+  // Kết nối Pancake (Quản trị › Kết nối Pancake)
+  PANCAKE_NOT_CONFIGURED:
+    'Shop này chưa có khoá API đang bật. Thêm hoặc bật kết nối ở màn Kết nối Pancake.',
+  PANCAKE_VERIFY_FAILED:
+    'Pancake không chấp nhận cấu hình này. Xem nguyên nhân ở cột Kiểm tra kết nối rồi sửa khoá hoặc mã shop.',
+  PANCAKE_CONFIG_UNREADABLE:
+    'Khoá đã lưu không giải mã được vì khoá mã hoá của server đã đổi. Nhập lại khoá API cho shop này.',
+  PANCAKE_SECRET_KEY_MISSING:
+    'Server chưa có APP_SECRET_KEY để mã hoá khoá API. Báo IT đặt biến môi trường rồi khởi động lại API.',
+  SYNC_ACTOR_NOT_FOUND: 'Tài khoản hệ thống cho đồng bộ chưa được tạo. Báo IT chạy seed dữ liệu.',
+  SYNC_ACTOR_MISCONFIGURED: 'Tài khoản hệ thống cho đồng bộ đang sai cấu hình. Báo IT kiểm tra.',
 };
 
 const BY_STATUS: Record<number, string> = {

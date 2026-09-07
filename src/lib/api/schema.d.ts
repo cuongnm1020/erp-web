@@ -2570,6 +2570,103 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/pancake-sync/mapping/backlog": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["PancakeMappingController_backlog"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/pancake-sync/mapping/skus": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["PancakeMappingController_skus"];
+        put?: never;
+        post: operations["PancakeMappingController_mapSku"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/pancake-sync/mapping/actors": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["PancakeMappingController_actors"];
+        put?: never;
+        post: operations["PancakeMappingController_mapActor"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/pancake-sync/config": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["PancakeConfigController_list"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/pancake-sync/config/{shopId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put: operations["PancakeConfigController_upsert"];
+        post?: never;
+        delete: operations["PancakeConfigController_remove"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/pancake-sync/config/{shopId}/verify": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Gọi thử Pancake bằng cấu hình đang lưu; thất bại → 502 PANCAKE_VERIFY_FAILED kèm nguyên nhân. */
+        post: operations["PancakeConfigController_verify"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/health": {
         parameters: {
             query?: never;
@@ -4638,6 +4735,131 @@ export interface components {
             assigned: number;
             unchanged: number;
             items: components["schemas"]["AssignCustomerItemDto"][];
+        };
+        MappingBacklogItemDto: {
+            /** @enum {string} */
+            kind: "sku" | "actor";
+            /** @description bigint → string qua API. */
+            shopId: string;
+            externalId: string;
+            label: string | null;
+            occurrences: number;
+            /** @description Số đơn đang bị giữ vì mục này (actor luôn 0 — thiếu nhân viên không chặn đơn). */
+            blockedCount: number;
+            lastSeenAt: string;
+        };
+        UnmappedSkuDto: {
+            shopId: string;
+            externalVariationId: string;
+            externalProductId: string | null;
+            sourceSkuCode: string | null;
+            sourceBarcode: string | null;
+            sourceName: string | null;
+            /** @description Decimal(18,4) dạng string, hợp đồng liên repo #3. */
+            sourcePrice: string | null;
+            occurrences: number;
+            /** @description Mã đơn nguồn đang bị chặn. */
+            blockedOrders: string[];
+            firstSeenAt: string;
+            lastSeenAt: string;
+        };
+        MapSkuDto: {
+            shopId: number;
+            /** @description variation_id phía nguồn (UUID dạng text, giữ nguyên chuỗi). */
+            externalVariationId: string;
+            /** Format: uuid */
+            skuId: string;
+        };
+        MapSkuResultDto: {
+            externalVariationId: string;
+            skuId: string;
+            skuCode: string;
+            /** @description Số đơn được đánh thức (projected_version = NULL) để transform chạy lại. */
+            wokenOrders: number;
+        };
+        UnmappedActorDto: {
+            shopId: string;
+            fbId: string;
+            externalUserId: string | null;
+            observedName: string | null;
+            observedEmail: string | null;
+            observedPhone: string | null;
+            seenRoles: string[];
+            occurrences: number;
+            firstSeenAt: string;
+            lastSeenAt: string;
+        };
+        MapActorDto: {
+            shopId: number;
+            /** @description Facebook user id toàn cục của nhân viên (khác fb_id khách). */
+            fbId: string;
+            /** Format: uuid */
+            userId: string;
+        };
+        MapActorResultDto: {
+            fbId: string;
+            userId: string;
+            userCode: string;
+        };
+        PancakeShopConfigDto: {
+            /** @description bigint → string qua API. */
+            shopId: string;
+            shopName: string | null;
+            /** @description 4 ký tự cuối của khoá đang dùng, vd "…a9f2". */
+            apiKeyHint: string;
+            /**
+             * @description `env` = server đang lấy khoá từ biến môi trường PANCAKE_API_KEY (thắng DB);
+             *     `db` = dùng khoá nhập ở màn này.
+             * @enum {string}
+             */
+            source: "db" | "env";
+            /** @description false = khoá trong DB không giải mã được (APP_SECRET_KEY đã đổi) — phải nhập lại. */
+            keyReadable: boolean;
+            baseUrl: string | null;
+            requestsPerSecond: number | null;
+            burst: number | null;
+            isActive: boolean;
+            lastVerifiedAt: string | null;
+            /** @description Lỗi của lần kiểm tra kết nối gần nhất (đã che khoá); null nếu lần đó thành công. */
+            lastVerifyError: string | null;
+            updatedAt: string | null;
+            updatedBy: string | null;
+        };
+        PancakeEnvStatusDto: {
+            /** @description PANCAKE_API_KEY có trong env của server API. */
+            hasApiKey: boolean;
+            /** @description PANCAKE_SHOP_ID nếu đặt; null = khoá env áp cho MỌI shop. */
+            shopId: string | null;
+        };
+        PancakeConfigListDto: {
+            items: components["schemas"]["PancakeShopConfigDto"][];
+            env: components["schemas"]["PancakeEnvStatusDto"];
+        };
+        UpsertPancakeConfigDto: {
+            /** @description Tên gợi nhớ hiển thị trên màn hình (không bắt buộc). */
+            shopName?: string | null;
+            /**
+             * @description Khoá API Pancake (Cài đặt › API key trên pos.pages.fm). Bắt buộc khi thêm
+             *     shop mới; bỏ trống khi sửa = giữ khoá đang lưu. Không bao giờ được trả lại.
+             */
+            apiKey?: string;
+            /**
+             * Format: uri
+             * @description Mặc định https://pos.pages.fm/api/v1 — chỉ đổi khi Pancake cấp endpoint riêng.
+             */
+            baseUrl?: string | null;
+            /** @description Số request/giây tối đa (điểm xuất phát WRK-007). Bỏ trống = mặc định của client (2). */
+            requestsPerSecond?: number | null;
+            /** @description Kích thước burst token bucket. Bỏ trống = mặc định (4). */
+            burst?: number | null;
+            /** @description Tắt = giữ cấu hình nhưng mọi lệnh gọi Pancake cho shop này báo chưa cấu hình. */
+            isActive?: boolean;
+        };
+        PancakeVerifyResultDto: {
+            shopId: string;
+            /** @description Số kho Pancake trả về — đủ để biết khoá đúng và shop đúng. */
+            warehouses: number;
+            verifiedAt: string;
         };
         HealthReportDto: {
             /** @enum {string} */
@@ -9204,6 +9426,199 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["AssignCustomersResultDto"];
+                };
+            };
+        };
+    };
+    PancakeMappingController_backlog: {
+        parameters: {
+            query: {
+                shopId: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MappingBacklogItemDto"][];
+                };
+            };
+        };
+    };
+    PancakeMappingController_skus: {
+        parameters: {
+            query: {
+                shopId: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UnmappedSkuDto"][];
+                };
+            };
+        };
+    };
+    PancakeMappingController_mapSku: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MapSkuDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MapSkuResultDto"];
+                };
+            };
+        };
+    };
+    PancakeMappingController_actors: {
+        parameters: {
+            query: {
+                shopId: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UnmappedActorDto"][];
+                };
+            };
+        };
+    };
+    PancakeMappingController_mapActor: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MapActorDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MapActorResultDto"];
+                };
+            };
+        };
+    };
+    PancakeConfigController_list: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PancakeConfigListDto"];
+                };
+            };
+        };
+    };
+    PancakeConfigController_upsert: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                shopId: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpsertPancakeConfigDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PancakeShopConfigDto"];
+                };
+            };
+        };
+    };
+    PancakeConfigController_remove: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                shopId: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    PancakeConfigController_verify: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                shopId: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PancakeVerifyResultDto"];
                 };
             };
         };

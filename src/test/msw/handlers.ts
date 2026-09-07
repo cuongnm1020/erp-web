@@ -541,7 +541,61 @@ export const handlers = [
     HttpResponse.json({ ...STATUS_LOG_FIXTURE, shipmentId: params.id }),
   ),
   http.get('/api/departments', () => HttpResponse.json(DEPARTMENTS_FIXTURE)),
+
+  // ── Quản trị: kết nối Pancake ──
+  http.get('/api/pancake-sync/config', () => HttpResponse.json(PANCAKE_CONFIG_FIXTURE)),
+  http.put('/api/pancake-sync/config/:shopId', async ({ params, request }) => {
+    const body = (await request.json()) as Record<string, unknown>;
+    const apiKey = typeof body.apiKey === 'string' ? body.apiKey : null;
+    return HttpResponse.json({
+      ...PANCAKE_SHOP_FIXTURE,
+      shopId: String(params.shopId),
+      shopName: (body.shopName as string | null) ?? null,
+      apiKeyHint: apiKey ? `…${apiKey.slice(-4)}` : PANCAKE_SHOP_FIXTURE.apiKeyHint,
+    });
+  }),
+  http.delete('/api/pancake-sync/config/:shopId', () => new HttpResponse(null, { status: 204 })),
+  http.post('/api/pancake-sync/config/:shopId/verify', ({ params }) =>
+    HttpResponse.json({
+      shopId: String(params.shopId),
+      warehouses: 3,
+      verifiedAt: '2026-09-07T08:00:00.000Z',
+    }),
+  ),
 ];
+
+/** Đúng shape `PancakeShopConfigDto` trong openapi.json — không có trường nào chứa khoá. */
+export const PANCAKE_SHOP_FIXTURE = {
+  shopId: '407957969',
+  shopName: 'Shop chính',
+  apiKeyHint: '…a9f2',
+  source: 'db' as const,
+  keyReadable: true,
+  baseUrl: null,
+  requestsPerSecond: null,
+  burst: null,
+  isActive: true,
+  lastVerifiedAt: '2026-09-06T10:15:00.000Z',
+  lastVerifyError: null,
+  updatedAt: '2026-09-06T10:00:00.000Z',
+  updatedBy: 'u-admin',
+};
+
+export const PANCAKE_CONFIG_FIXTURE = {
+  items: [
+    PANCAKE_SHOP_FIXTURE,
+    {
+      ...PANCAKE_SHOP_FIXTURE,
+      shopId: '123456',
+      shopName: 'Shop test',
+      apiKeyHint: '…zz01',
+      isActive: false,
+      lastVerifiedAt: null,
+      lastVerifyError: 'Pancake từ chối khoá API (401/403) — kiểm tra lại khoá.',
+    },
+  ],
+  env: { hasApiKey: false, shopId: null },
+};
 
 /** Bộ handler trạng thái — story "error" / "empty" / "forbidden" dùng. */
 export const scenario = {
@@ -559,6 +613,30 @@ export const scenario = {
 
   usersEmpty: http.get('/api/users', () => HttpResponse.json({ items: [], total: 0 })),
   usersError: http.get('/api/users', () => errorEnvelope(500, 'DB_ERROR')),
+
+  pancakeEmpty: http.get('/api/pancake-sync/config', () =>
+    HttpResponse.json({ items: [], env: { hasApiKey: false, shopId: null } }),
+  ),
+  pancakeEnvOnly: http.get('/api/pancake-sync/config', () =>
+    HttpResponse.json({
+      items: [
+        {
+          ...PANCAKE_SHOP_FIXTURE,
+          source: 'env',
+          apiKeyHint: '…env1',
+          shopName: null,
+          updatedAt: null,
+          updatedBy: null,
+          lastVerifiedAt: null,
+        },
+      ],
+      env: { hasApiKey: true, shopId: PANCAKE_SHOP_FIXTURE.shopId },
+    }),
+  ),
+  pancakeError: http.get('/api/pancake-sync/config', () => errorEnvelope(500, 'DB_ERROR')),
+  pancakeVerifyFailed: http.post('/api/pancake-sync/config/:shopId/verify', () =>
+    errorEnvelope(502, 'PANCAKE_VERIFY_FAILED', 'x', { upstreamStatus: 401 }),
+  ),
   userCreate422: http.post('/api/users', () =>
     errorEnvelope(422, 'VALIDATION', 'x', { missing: ['NOPE'] }),
   ),
