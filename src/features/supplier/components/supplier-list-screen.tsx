@@ -25,8 +25,8 @@ import { SupplierFormDialog } from './supplier-form-dialog';
  * "Xuất CSV" chờ endpoint — ghi ở thẻ PENDING_API, không hiển thị số bịa.
  */
 const PENDING_API: Array<{ title: string; need: string }> = [
-  { title: 'PO đang mở / tổng phải trả theo NCC', need: 'chưa có endpoint tổng hợp mua hàng' },
-  { title: 'Xuất CSV', need: 'chưa có endpoint export' },
+  // { title: 'PO đang mở / tổng phải trả theo NCC', need: 'chưa có endpoint tổng hợp mua hàng' },
+  // { title: 'Xuất CSV', need: 'chưa có endpoint export' },
 ];
 
 const DEFAULTS = { size: 40, filterKeys: ['status'] as const };
