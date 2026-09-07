@@ -1,0 +1,109 @@
+# Deploy apps/web lên server Ubuntu qua GHCR + SSH. Stack compose + script deploy-web.sh do
+# repo api chép lên /opt/erp (deploy api TRƯỚC lần đầu). Xem apps/api deploy/README.md.
+#
+# push main  → check → build & push image (inline NEXT_PUBLIC_API_URL) → deploy-web.sh
+# workflow_dispatch → như trên, hoặc chỉ deploy lại một tag có sẵn (rollback).
+name: Deploy
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Deploy lại tag có sẵn (vd sha-1a2b3c4). Bỏ trống = build từ ref hiện tại.'
+        required: false
+        default: ''
+
+concurrency:
+  group: deploy-web
+  cancel-in-progress: false
+
+env:
+  IMAGE: ghcr.io/${{ github.repository }}
+
+jobs:
+  check:
+    name: Typecheck + lint + test
+    if: ${{ github.event.inputs.tag == '' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm typecheck
+      - run: pnpm lint
+      - run: pnpm test
+
+  build:
+    name: Build & push image
+    if: ${{ github.event.inputs.tag == '' }}
+    needs: check
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    outputs:
+      tag: ${{ steps.meta.outputs.tag }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Require NEXT_PUBLIC_API_URL (repo variable)
+        run: |
+          test -n "${{ vars.NEXT_PUBLIC_API_URL }}" || { echo "Thiếu repository variable NEXT_PUBLIC_API_URL (vd https://api.erp.example.com)" >&2; exit 1; }
+      - id: meta
+        run: |
+          echo "image=$(echo '${{ env.IMAGE }}' | tr '[:upper:]' '[:lower:]')" >> "$GITHUB_OUTPUT"
+          echo "tag=sha-${GITHUB_SHA::7}" >> "$GITHUB_OUTPUT"
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          build-args: |
+            NEXT_PUBLIC_API_URL=${{ vars.NEXT_PUBLIC_API_URL }}
+          tags: |
+            ${{ steps.meta.outputs.image }}:${{ steps.meta.outputs.tag }}
+            ${{ steps.meta.outputs.image }}:main
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          provenance: false
+
+  deploy:
+    name: Deploy to server
+    if: ${{ always() && (needs.build.result == 'success' || github.event.inputs.tag != '') }}
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: read
+    environment: production
+    env:
+      TAG: ${{ github.event.inputs.tag != '' && github.event.inputs.tag || needs.build.outputs.tag }}
+    steps:
+      - name: SSH key
+        run: |
+          mkdir -p ~/.ssh && chmod 700 ~/.ssh
+          printf '%s\n' "${{ secrets.DEPLOY_SSH_KEY }}" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh-keyscan -p "${{ secrets.DEPLOY_PORT || '22' }}" -H "${{ secrets.DEPLOY_HOST }}" >> ~/.ssh/known_hosts 2>/dev/null
+          cat > ~/.ssh/config <<EOF
+          Host erp
+            HostName ${{ secrets.DEPLOY_HOST }}
+            User ${{ secrets.DEPLOY_USER }}
+            Port ${{ secrets.DEPLOY_PORT || '22' }}
+            IdentityFile ~/.ssh/deploy_key
+            IdentitiesOnly yes
+          EOF
+      - name: Deploy ${{ env.TAG }}
+        run: |
+          ssh erp "test -x /opt/erp/bin/deploy-web.sh || { echo 'Chưa có /opt/erp/bin/deploy-web.sh — deploy repo api trước' >&2; exit 1; }"
+          ssh erp "echo '${{ secrets.GITHUB_TOKEN }}' | docker login ghcr.io -u '${{ github.actor }}' --password-stdin >/dev/null && /opt/erp/bin/deploy-web.sh '${{ env.TAG }}'; rc=\$?; docker logout ghcr.io >/dev/null; exit \$rc"

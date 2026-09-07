@@ -1,0 +1,15 @@
+node_modules
+.next
+out
+storybook-static
+coverage
+design
+docs
+.git
+.github
+.env
+.env.*
+*.log
+*.tsbuildinfo
+CLAUDE.md
+WEB-PROGRESS.md
