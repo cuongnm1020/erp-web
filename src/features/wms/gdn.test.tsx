@@ -150,7 +150,7 @@ describe('GdnDetailScreen — GET /goods-issues/:id', () => {
     expect(screen.getByText('Phạm Thị Hoa', { exact: false })).toBeInTheDocument();
   });
 
-  it('phiếu DRAFT: ghi chú reserve/trừ-khi-đóng-gói, cột SL đã xuất là — (chưa trừ)', async () => {
+  it('phiếu DRAFT: không có banner post, trạng thái Đang đóng gói (chưa trừ tồn)', async () => {
     server.use(
       http.get('/api/goods-issues/:id', () =>
         HttpResponse.json({
@@ -165,7 +165,6 @@ describe('GdnDetailScreen — GET /goods-issues/:id', () => {
     );
     renderApp(<GdnDetailScreen id="gi-4" />);
     await screen.findByText('Bút bi Thiên Long TL-08 xanh');
-    expect(screen.getByText(/tồn thực chỉ trừ khi đóng gói xong/)).toBeInTheDocument();
     expect(screen.getByText('Đang đóng gói')).toBeInTheDocument();
     // Chưa post → không khoe số đã xuất
     expect(screen.queryByText(/Tồn đã trừ trong chính transaction/)).not.toBeInTheDocument();

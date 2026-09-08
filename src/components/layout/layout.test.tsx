@@ -47,10 +47,20 @@ describe('visibleModules', () => {
     expect(visibleModules(() => false).map((m) => m.label)).toEqual(['Tổng quan', 'Giá & KM']);
   });
 
-  it('chỉ có shipment.read → module Kho hiện đúng một mục Theo dõi giao hàng', () => {
+  it('chỉ có shipment.read → module Kho ẩn (Theo dõi giao hàng đã rút khỏi menu, commit 45e2880)', () => {
     const mods = visibleModules((a, s) => a === 'read' && s === 'Shipment');
+    expect(mods.map((m) => m.label)).not.toContain('Kho');
+  });
+
+  it('chỉ có stock.read → module Kho hiện đúng các mục gắn Stock', () => {
+    const mods = visibleModules((a, s) => a === 'read' && s === 'Stock');
     const wms = mods.find((m) => m.label === 'Kho');
-    expect(wms?.children?.map((c) => c.label)).toEqual(['Theo dõi giao hàng']);
+    expect(wms?.children?.map((c) => c.label)).toEqual([
+      'Tồn kho',
+      'Kho & vị trí',
+      'Phiếu nhập kho',
+      'Phiếu bán hàng',
+    ]);
   });
 
   it('admin thấy đủ 8 module', () => {
@@ -80,7 +90,11 @@ describe('requiredAbilityFor — quyền mở trang theo URL', () => {
 
   it('module không gắn ability nhưng mục con cùng href có → vẫn gate (Kho, Sản phẩm)', () => {
     expect(requiredAbilityFor('/wms/stock')).toEqual({ action: 'read', subject: 'Stock' });
-    expect(requiredAbilityFor('/wms/shipping')).toEqual({ action: 'read', subject: 'Shipment' });
+    expect(requiredAbilityFor('/catalog/products')).toEqual({ action: 'read', subject: 'Product' });
+  });
+
+  it('route đã rút khỏi menu (/wms/shipping) → không còn gate phía web; API vẫn chặn', () => {
+    expect(requiredAbilityFor('/wms/shipping')).toBeNull();
   });
 
   it("route ngoài nav hoặc chưa có quyền backend → null ('/' chỉ khớp chính xác)", () => {

@@ -60,12 +60,7 @@ function DetailBody({ issue }: { issue: GoodsIssueDetail }) {
             Tồn đã trừ trong chính transaction đóng gói — chứng từ bất biến.
           </span>
         </p>
-      ) : (
-        <p className="rounded-md border bg-muted/50 px-3 py-2 text-sm text-muted-foreground">
-          {/* Giữ chỗ (reserve) tạo lúc xác nhận đơn; tồn thực chỉ trừ khi đóng gói xong — phiếu sẽ tự
-          post tại thời điểm đó. Hai bước tách biệt (bất biến 3). */}
-        </p>
-      )}
+      ) : null}
 
       {exceptions.length > 0 ? (
         <p className="flex items-center gap-2 rounded-md border border-warning/40 bg-warning/10 px-3 py-2 text-sm">
