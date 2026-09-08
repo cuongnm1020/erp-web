@@ -130,7 +130,9 @@ const productColumns: ColumnDef<ProductListItem, unknown>[] = [
     // skuCount đếm cả SKU ngừng bán; chips chỉ liệt kê SKU đang bán (skus của DTO).
     cell: ({ row }) => (
       <span className="block max-w-[220px]">
-        <span className="block text-sm">{row.original.skuCount} SKU</span>
+        <span className="block text-sm">
+          {row.original.hasVariants ? `${row.original.skuCount} biến thể` : 'Sản phẩm đơn'}
+        </span>
         <span
           className="block truncate font-mono text-xs text-muted-foreground"
           title={row.original.skus.map((s) => s.code).join(', ')}

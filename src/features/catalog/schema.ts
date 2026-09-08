@@ -68,7 +68,8 @@ export const skuRowSchema = z.object({
   skuId: z.string(),
   /** Ô mã SKU đang ẩn trên form — bỏ trống, submit tự sinh `{mã sản phẩm}-{stt}`. */
   code: codeSchema.optional().or(z.literal('')),
-  name: z.string().trim().min(1, 'Nhập tên biến thể').max(300, 'Tối đa 300 ký tự'),
+  /** Sản phẩm có biến thể: bắt buộc (kiểm ở superRefine). Sản phẩm đơn: ẩn, server lấy tên sản phẩm. */
+  name: z.string().trim().max(300, 'Tối đa 300 ký tự'),
   barcode: barcodeValue.optional().or(z.literal('')),
   isActive: z.boolean(),
   existingBarcode: z.string(),
@@ -96,9 +97,25 @@ export const skuRowSchema = z.object({
 export const productFormSchema = createProductSchema
   .extend({
     baseUom: z.string().min(1, 'Chọn ĐVT cơ bản'),
+    /**
+     * false = sản phẩm đơn: đúng MỘT SKU thừa kế mã + tên sản phẩm (API tự điền khi bỏ trống).
+     * true = nhiều biến thể nhập tay, mỗi dòng phải có tên.
+     */
+    hasVariants: z.boolean(),
     skus: z.array(skuRowSchema).min(1, 'Sản phẩm cần ít nhất một biến thể / SKU'),
   })
   .superRefine((v, ctx) => {
+    if (v.hasVariants) {
+      v.skus.forEach((row, i) => {
+        if (!row.name) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            path: ['skus', i, 'name'],
+            message: 'Nhập tên biến thể',
+          });
+        }
+      });
+    }
     // Ràng buộc tồn đầu kỳ — khớp luật server (422): cần giá nhập + kho mặc định
     v.skus.forEach((row, i) => {
       const qty = row.openingQty && !new Decimal(row.openingQty).isZero();

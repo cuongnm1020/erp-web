@@ -103,7 +103,10 @@ interface RowError {
  * Form kit. Ô mã SKU đang ẩn nên neo vào "Tên biến thể" (ô đầu tiên còn hiện của dòng).
  */
 function focusSkuRow(index: number) {
-  document.querySelector<HTMLInputElement>(`input[name="skus.${index}.name"]`)?.focus();
+  (
+    document.querySelector<HTMLInputElement>(`input[name="skus.${index}.name"]`) ??
+    document.querySelector<HTMLInputElement>(`input[name^="skus.${index}."]`)
+  )?.focus();
 }
 
 function initialValues(p?: ProductDetail): ProductFormValues {
@@ -119,6 +122,12 @@ function initialValues(p?: ProductDetail): ProductFormValues {
     internalNote: p?.internalNote ?? '',
     searchAliases: (p?.searchAliases ?? []).join(', '),
     allowNegativeStock: p?.allowNegativeStock ?? false,
+    // Sản phẩm mới mặc định là sản phẩm đơn; sửa thì theo cờ API. Dữ liệu cũ chưa có cờ:
+    // nhiều SKU, hoặc một SKU mang tên khác tên sản phẩm (nhập như biến thể) → có biến thể.
+    hasVariants: p
+      ? (p.hasVariants ??
+        (p.skus.length > 1 || (p.skus[0] !== undefined && p.skus[0].name !== p.name)))
+      : false,
     baseUom: p?.skus[0]?.baseUom.code ?? 'PCS',
     skus: p
       ? p.skus.map((s) => ({
@@ -239,6 +248,17 @@ function ProductFormBody({ product }: { product?: ProductDetail }) {
   const created = useRef<{ productId: string; code: string; doneRows: Set<number> } | null>(null);
 
   const trackingMode = form.watch('trackingMode');
+  const hasVariants = form.watch('hasVariants');
+  /** Sản phẩm đã có nhiều SKU lưu rồi thì không gộp về đơn được (SKU đã lưu không xóa). */
+  const variantsLocked = editing && product.skus.length > 1;
+  const toggleVariants = (on: boolean) => {
+    form.setValue('hasVariants', on, { shouldDirty: true });
+    if (!on && rows.fields.length > 1) {
+      // Về sản phẩm đơn: giữ đúng một dòng (dòng đầu — dòng đã lưu nếu có).
+      const first = form.getValues('skus')[0]!;
+      rows.replace([first]);
+    }
+  };
 
   const onSubmit = form.handleSubmit(async (v) => {
     setSaving(true);
@@ -302,9 +322,11 @@ function ProductFormBody({ product }: { product?: ProductDetail }) {
             await createSku.mutateAsync({
               productId: pid,
               body: {
-                // Ô mã SKU đang ẩn — bỏ trống thì sinh `{mã sản phẩm}-{stt}` (CreateSkuDto bắt buộc code).
-                code: row.code || `${savedCode}-${i + 1}`,
-                name: row.name,
+                // Sản phẩm đơn: KHÔNG gửi code/name — API thừa kế mã + tên sản phẩm.
+                // Có biến thể: ô mã đang ẩn → `{mã sản phẩm}-{stt}`, tên nhập tay từng dòng.
+                ...(v.hasVariants
+                  ? { code: row.code || `${savedCode}-${i + 1}`, name: row.name }
+                  : {}),
                 baseUom: v.baseUom,
                 // F3 — ĐVT phụ khai trên dòng: conversion + barcode theo ĐVT + ĐVT bán
                 ...(row.altUom && row.altFactor
@@ -331,7 +353,7 @@ function ProductFormBody({ product }: { product?: ProductDetail }) {
           } else if (row.skuId) {
             const dirty = form.formState.dirtyFields.skus?.[i];
             const patch = {
-              ...(dirty?.name ? { name: row.name } : {}),
+              ...(dirty?.name && v.hasVariants ? { name: row.name } : {}),
               ...(dirty?.isActive ? { isActive: row.isActive } : {}),
               ...(dirty?.purchasePrice && row.purchasePrice
                 ? { purchasePrice: row.purchasePrice }
@@ -372,8 +394,11 @@ function ProductFormBody({ product }: { product?: ProductDetail }) {
         } catch (err) {
           const msg = messageFor(err);
           errors.push({ index: i, message: msg });
-          // Ô mã SKU ẩn → lỗi dòng gắn vào "Tên biến thể" để FormMessage hiện đúng dòng.
-          form.setError(`skus.${i}.name`, { message: msg });
+          // Ô mã SKU ẩn → lỗi dòng gắn vào "Tên biến thể" (có biến thể) hoặc "Giá nhập"
+          // (sản phẩm đơn — ô tên cũng ẩn) để FormMessage hiện đúng dòng.
+          form.setError(v.hasVariants ? `skus.${i}.name` : `skus.${i}.purchasePrice`, {
+            message: msg,
+          });
         }
       }
 
@@ -405,7 +430,7 @@ function ProductFormBody({ product }: { product?: ProductDetail }) {
       }
 
       toast.success(editing ? 'Đã lưu thay đổi' : 'Đã lưu sản phẩm', {
-        description: `${savedCode} · ${v.skus.length} biến thể`,
+        description: `${savedCode} · ${v.hasVariants ? `${v.skus.length} biến thể` : 'sản phẩm đơn'}`,
       });
       router.push('/catalog/products');
     } finally {
@@ -522,6 +547,29 @@ function ProductFormBody({ product }: { product?: ProductDetail }) {
                     <Input autoFocus={!editing} placeholder="Bút bi Thiên Long TL-08" {...field} />
                   </FormControl>
                   <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="hasVariants"
+              render={({ field }) => (
+                <FormItem className="flex flex-row items-start gap-2 pt-6 lg:col-span-2">
+                  <div className="space-y-0.5 leading-none">
+                    <FormControl className="mr-2 items-center space-x-2">
+                      <Checkbox
+                        checked={field.value}
+                        disabled={variantsLocked}
+                        onCheckedChange={(v) => toggleVariants(v === true)}
+                      />
+                    </FormControl>
+                    <FormLabel>Sản phẩm có nhiều biến thể (màu, size, quy cách…)</FormLabel>
+                    <FormDescription>
+                      {variantsLocked
+                        ? 'Đã có nhiều SKU — không gộp về sản phẩm đơn được'
+                        : 'Bỏ chọn = sản phẩm đơn: một SKU mang đúng mã và tên sản phẩm'}
+                    </FormDescription>
+                  </div>
                 </FormItem>
               )}
             />
@@ -844,10 +892,21 @@ function ProductFormBody({ product }: { product?: ProductDetail }) {
         <section className="rounded-md border bg-card">
           <header className="flex items-center justify-between border-b px-3 py-2">
             <span className="text-sm font-semibold">
-              Biến thể / SKU{' '}
-              <span className="font-normal text-muted-foreground">
-                · {rows.fields.length} dòng{newRowCount > 0 ? ` · ${newRowCount} mới` : ''}
-              </span>
+              {hasVariants ? (
+                <>
+                  Biến thể / SKU{' '}
+                  <span className="font-normal text-muted-foreground">
+                    · {rows.fields.length} dòng{newRowCount > 0 ? ` · ${newRowCount} mới` : ''}
+                  </span>
+                </>
+              ) : (
+                <>
+                  Giá & tồn kho{' '}
+                  <span className="font-normal text-muted-foreground">
+                    · sản phẩm đơn, một SKU trùng mã sản phẩm
+                  </span>
+                </>
+              )}
             </span>
             <span className="flex items-center gap-1.5">
               <Button
@@ -858,15 +917,17 @@ function ProductFormBody({ product }: { product?: ProductDetail }) {
               >
                 Quản lý ĐVT
               </Button>
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={() => rows.append({ ...EMPTY_SKU_ROW, name: form.getValues('name') })}
-              >
-                <Plus aria-hidden />
-                Thêm biến thể
-              </Button>
+              {hasVariants ? (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => rows.append({ ...EMPTY_SKU_ROW, name: form.getValues('name') })}
+                >
+                  <Plus aria-hidden />
+                  Thêm biến thể
+                </Button>
+              ) : null}
             </span>
           </header>
           <div className="flex flex-col divide-y">
@@ -876,6 +937,7 @@ function ProductFormBody({ product }: { product?: ProductDetail }) {
                 form={form}
                 index={i}
                 editing={editing}
+                simple={!hasVariants}
                 onRemove={
                   // Design: chỉ xóa dòng CHƯA lưu; biến thể đã có chỉ "Ngừng bán"
                   !form.getValues(`skus.${i}.skuId`) && rows.fields.length > 1
@@ -886,8 +948,9 @@ function ProductFormBody({ product }: { product?: ProductDetail }) {
             ))}
           </div>
           <p className="border-t px-3 py-2 text-xs text-muted-foreground">
-            Biến thể chưa có barcode bổ sung được sau. Mã SKU đã dùng không đổi được sau khi có
-            chứng từ; biến thể đã lưu không xóa — chỉ Ngừng bán.
+            {hasVariants
+              ? 'Biến thể chưa có barcode bổ sung được sau. Mã SKU đã dùng không đổi được sau khi có chứng từ; biến thể đã lưu không xóa — chỉ Ngừng bán.'
+              : 'Mã SKU = mã sản phẩm, barcode QR nội bộ tự sinh. Sau này cần thêm quy cách thì bật "có nhiều biến thể" và thêm dòng.'}
           </p>
           {form.formState.errors.skus?.root?.message || form.formState.errors.skus?.message ? (
             <p className="border-t px-3 py-2 text-sm text-destructive">
@@ -931,11 +994,14 @@ function SkuRow({
   form,
   index,
   editing,
+  simple,
   onRemove,
 }: {
   form: UseFormReturn<ProductFormValues>;
   index: number;
   editing: boolean;
+  /** Sản phẩm đơn: ẩn ô tên (server lấy tên sản phẩm), không có nút xóa dòng. */
+  simple: boolean;
   onRemove?: () => void;
 }) {
   const skuId = form.getValues(`skus.${index}.skuId`);
@@ -1026,7 +1092,7 @@ function SkuRow({
         ) : (
           <div className="pt-2 text-sm text-muted-foreground"></div>
         )}
-        {onRemove ? (
+        {onRemove && !simple ? (
           <Button
             type="button"
             variant="ghost"
@@ -1044,19 +1110,21 @@ function SkuRow({
       </div>
       {/* Dòng 2: giá nhập / giá bán / trọng lượng (gram → kg lúc gửi) / tồn đầu kỳ (chỉ dòng mới) */}
       <div className="grid items-start gap-2 sm:grid-cols-5">
-        <FormField
-          control={form.control}
-          name={`skus.${index}.name`}
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel className="text-xs text-muted-foreground">Tên biến thể</FormLabel>
-              <FormControl>
-                <Input placeholder="Bút bi Thiên Long TL-08 xanh 0.5" {...field} />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
+        {simple ? null : (
+          <FormField
+            control={form.control}
+            name={`skus.${index}.name`}
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel className="text-xs text-muted-foreground">Tên biến thể</FormLabel>
+                <FormControl>
+                  <Input placeholder="Bút bi Thiên Long TL-08 xanh 0.5" {...field} />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+        )}
         <FormField
           control={form.control}
           name={`skus.${index}.purchasePrice`}

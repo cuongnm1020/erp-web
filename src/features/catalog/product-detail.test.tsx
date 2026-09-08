@@ -88,6 +88,7 @@ const PRODUCT = {
   category: CATEGORY,
   brand: BRAND,
   defaultWarehouseId: WAREHOUSE.id,
+  hasVariants: true,
   description: 'Ngòi bi 0.8mm, mực dầu.',
   internalNote: null,
   allowNegativeStock: false,

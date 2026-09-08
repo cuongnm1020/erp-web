@@ -1449,7 +1449,12 @@ export interface paths {
         delete?: never;
         options?: never;
         head?: never;
-        patch?: never;
+        /**
+         * Sửa đơn: trạng thái + hãng vận chuyển. `sales_order.update` (ADMIN, SALES_LEADER,
+         *     SALES_MEMBER theo seed; superadmin luôn qua). Chuyển trạng thái cần thêm quyền
+         *     approve/post/cancel tương ứng — kiểm trong service vì tuỳ giá trị gửi lên.
+         */
+        patch: operations["SalesOrderController_update"];
         trace?: never;
     };
     "/sales-orders/{id}/cancel": {
@@ -2701,6 +2706,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/pancake-sync/transform/orders": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Ingest + chiếu ngay một payload đơn. 200 kể cả khi blocked/failed — kết quả nằm trong body. */
+        post: operations["PancakeTransformController_replayOrder"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/pancake-sync/transform/run": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Quét ngay (thay vì chờ job mỗi phút) — sau khi gán SKU / nhân viên hàng loạt. */
+        post: operations["PancakeTransformController_run"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/health": {
         parameters: {
             query?: never;
@@ -3129,6 +3168,8 @@ export interface components {
             id: string;
             code: string;
             name: string;
+            /** @description null = SKU không mang tổ hợp thuộc tính (sản phẩm đơn hoặc biến thể nhập tay). */
+            variantKey: string | null;
             baseUom: components["schemas"]["UomCodeDto"];
         };
         ProductListItemDto: {
@@ -3147,6 +3188,8 @@ export interface components {
             skus: components["schemas"]["ProductListSkuDto"][];
             /** @description Tổng số SKU (kể cả ngừng bán) — `skus` ở trên chỉ chứa SKU active. */
             skuCount: number;
+            /** @description false = sản phẩm đơn: đúng một SKU, không tổ hợp thuộc tính. UI đổi nhãn Biến thể ↔ SKU. */
+            hasVariants: boolean;
             /** @description Tên dân dã / viết tắt / tên cũ — ô tìm sản phẩm ăn cả các alias này. */
             searchAliases: string[];
             /** @description Optimistic locking — client giữ nguyên và gửi lại trong PATCH; lệch → 409. */
@@ -3216,6 +3259,8 @@ export interface components {
             purchasePrice: string | null;
             /** @description Decimal(12,4) kg dạng chuỗi — form hiển thị theo gram. */
             weightKg: string | null;
+            /** @description null = không tổ hợp thuộc tính (sản phẩm đơn). */
+            variantKey: string | null;
             /** @description Optimistic locking — gửi lại trong PATCH /skus/:id; lệch → 409. */
             version: number;
         };
@@ -3241,6 +3286,8 @@ export interface components {
             version: number;
             createdAt: string;
             updatedAt: string;
+            /** @description false = sản phẩm đơn (một SKU, không thuộc tính). */
+            hasVariants: boolean;
             skus: components["schemas"]["ProductSkuDetailDto"][];
             /** @description Gallery của sản phẩm cha, ảnh chính đứng đầu. */
             images: components["schemas"]["ProductImageDto"][];
@@ -3339,8 +3386,13 @@ export interface components {
             factor: string;
         };
         CreateSkuDto: {
-            code: string;
-            name: string;
+            /**
+             * @description Bỏ trống = thừa kế: SKU đầu tiên lấy đúng mã sản phẩm (sản phẩm KHÔNG biến thể),
+             *     các SKU sau `{mã sản phẩm}-{n}`. Sản phẩm có biến thể nên đặt mã tường minh.
+             */
+            code?: string;
+            /** @description Bỏ trống = tên sản phẩm (sản phẩm không biến thể chỉ có một SKU trùng tên). */
+            name?: string;
             /** @description Mã Uom cơ sở, mặc định PCS */
             baseUom?: string;
             /** @description Mã Uom bán mặc định — phải là baseUom hoặc có conversion. Bỏ trống = baseUom. */
@@ -3403,6 +3455,8 @@ export interface components {
             purchasePrice: string | null;
             /** @description Decimal(12,4) kg dạng chuỗi — form hiển thị theo gram. */
             weightKg: string | null;
+            /** @description null = không tổ hợp thuộc tính (sản phẩm đơn). */
+            variantKey: string | null;
             /** @description Optimistic locking — gửi lại trong PATCH /skus/:id; lệch → 409. */
             version: number;
         };
@@ -3471,6 +3525,8 @@ export interface components {
             purchasePrice: string | null;
             /** @description Decimal(12,4) kg dạng chuỗi — form hiển thị theo gram. */
             weightKg: string | null;
+            /** @description null = không tổ hợp thuộc tính (sản phẩm đơn). */
+            variantKey: string | null;
             /** @description Optimistic locking — gửi lại trong PATCH /skus/:id; lệch → 409. */
             version: number;
         };
@@ -3823,12 +3879,21 @@ export interface components {
             /** @description Snapshot chủ sở hữu lúc tạo đơn — null = đơn của team, chưa chia cho ai. */
             ownerId: string | null;
             teamId: string | null;
+            /** @description Hãng vận chuyển chọn khi sửa đơn (wms.Carrier.id) — phiếu giao tạo sau lấy sẵn. */
+            carrierId: string | null;
+            /** @description ISO datetime — chỉ có khi đơn POSTED. */
+            postedAt: string | null;
             createdAt: string;
             updatedAt: string;
         };
         SalesOrderListResponseDto: {
             items: components["schemas"]["SalesOrderHeaderDto"][];
             total: number;
+        };
+        SalesOrderCarrierDto: {
+            id: string;
+            code: string;
+            name: string;
         };
         SalesOrderLineDto: {
             id: string;
@@ -3884,8 +3949,14 @@ export interface components {
             /** @description Snapshot chủ sở hữu lúc tạo đơn — null = đơn của team, chưa chia cho ai. */
             ownerId: string | null;
             teamId: string | null;
+            /** @description Hãng vận chuyển chọn khi sửa đơn (wms.Carrier.id) — phiếu giao tạo sau lấy sẵn. */
+            carrierId: string | null;
+            /** @description ISO datetime — chỉ có khi đơn POSTED. */
+            postedAt: string | null;
             createdAt: string;
             updatedAt: string;
+            /** @description Hãng đã chọn (tra theo carrierId) — null = chưa chọn hoặc hãng đã tắt. */
+            carrier: components["schemas"]["SalesOrderCarrierDto"] | null;
             lines: components["schemas"]["SalesOrderLineDto"][];
         };
         CreateOrderLineDto: {
@@ -3967,6 +4038,26 @@ export interface components {
             appliedPromotionIds: string[];
             /** @description Rule duyệt đã khớp — null = không cần duyệt, đơn chốt thẳng. */
             approvalRuleId: string | null;
+        };
+        UpdateOrderDto: {
+            /** @enum {string} */
+            status?: "DRAFT" | "PENDING_APPROVAL" | "APPROVED" | "POSTED" | "CANCELLED";
+            /**
+             * Format: uuid
+             * @description wms.Carrier.id đang hoạt động; `null` = bỏ chọn hãng.
+             */
+            carrierId?: string | null;
+            /** @description Lý do (khi hủy) — ghi vào event OrderCancelled. */
+            reason?: string;
+        };
+        UpdateOrderResultDto: {
+            orderId: string;
+            docNumber: string;
+            /** @enum {string} */
+            status: "DRAFT" | "PENDING_APPROVAL" | "APPROVED" | "POSTED" | "CANCELLED";
+            carrierId: string | null;
+            /** @description Trường đã đổi thật ('status' | 'carrierId'); rỗng = không có gì thay đổi. */
+            changed: string[];
         };
         CancelOrderDto: {
             reason?: string;
@@ -4495,6 +4586,18 @@ export interface components {
             status: string;
             adjustedLineCount: number;
         };
+        CarrierDto: {
+            id: string;
+            code: string;
+            name: string;
+            isActive: boolean;
+            /** @description false = rơi về LocalCarrierAdapter (mã vận đơn nội bộ, không gọi mạng). */
+            hasAdapter: boolean;
+            operations: string[];
+            /** @description true = đủ token trong env để gọi ra hãng. */
+            configured: boolean;
+            webhook: boolean;
+        };
         CarrierAddressDto: {
             provinceCode?: string;
             districtCode?: string;
@@ -4909,6 +5012,17 @@ export interface components {
             externalId: string | null;
             /** @description true = đã xếp hàng gọi lại Pancake lấy bản chính thống (D-05). */
             queued: boolean;
+        };
+        ReplayOrderDto: {
+            shopId: number;
+            /** @description Payload đơn nguyên bản — validate nghiệp vụ nằm ở mapper, không ở DTO. */
+            order: {
+                [key: string]: unknown;
+            };
+        };
+        RunTransformDto: {
+            shopId: number;
+            limit?: number;
         };
         HealthReportDto: {
             /** @enum {string} */
@@ -7658,6 +7772,31 @@ export interface operations {
             };
         };
     };
+    SalesOrderController_update: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateOrderDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UpdateOrderResultDto"];
+                };
+            };
+        };
+    };
     SalesOrderController_cancel: {
         parameters: {
             query?: never;
@@ -8525,7 +8664,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": Record<string, never>[];
+                    "application/json": components["schemas"]["CarrierDto"][];
                 };
             };
         };
@@ -9729,6 +9868,52 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["PancakeWebhookReceiptDto"];
+                };
+            };
+        };
+    };
+    PancakeTransformController_replayOrder: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReplayOrderDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+        };
+    };
+    PancakeTransformController_run: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RunTransformDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
                 };
             };
         };

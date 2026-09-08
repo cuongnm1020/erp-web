@@ -73,7 +73,7 @@ describe('ProductFormScreen — tạo (design/Products/ProductForm)', () => {
     expect(screen.queryByRole('combobox', { name: 'Theo dõi lô / HSD' })).not.toBeInTheDocument();
   });
 
-  it('happy path: POST /products (mã tự sinh) rồi POST từng SKU với code `{mã}-{stt}` + baseUom → điều hướng về danh sách', async () => {
+  it('happy path (sản phẩm đơn, mặc định): POST /products rồi POST một SKU KHÔNG code/name (API thừa kế mã + tên) → điều hướng về danh sách', async () => {
     push.mockClear();
     const skuBodies: unknown[] = [];
     server.use(
@@ -100,14 +100,14 @@ describe('ProductFormScreen — tạo (design/Products/ProductForm)', () => {
     );
     renderApp(<ProductFormScreen />);
     fill('Tên sản phẩm *', 'Bút bi TL-08');
-    fill('Tên biến thể', 'Bút bi TL-08 xanh');
+    // Sản phẩm đơn: không có ô "Tên biến thể", không có nút "Thêm biến thể"
+    expect(screen.queryByLabelText('Tên biến thể')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Thêm biến thể' })).not.toBeInTheDocument();
+    expect(screen.getByText('Giá & tồn kho', { exact: false })).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: /Lưu sản phẩm/ }));
     await waitFor(() => expect(skuBodies).toHaveLength(1));
-    // Mã SKU ẩn → `{mã sản phẩm từ response}-{stt}`; không barcode (backend tự sinh QR = mã SKU)
-    expect(skuBodies[0]).toEqual({
-      productId: 'p-1',
-      body: { code: 'TL08-1', name: 'Bút bi TL-08 xanh', baseUom: 'PCS' },
-    });
+    // Không gửi code/name — API lấy mã + tên sản phẩm; không barcode (backend tự sinh QR = mã SKU)
+    expect(skuBodies[0]).toEqual({ productId: 'p-1', body: { baseUom: 'PCS' } });
     await waitFor(() => expect(push).toHaveBeenCalledWith('/catalog/products'));
   });
 
@@ -138,6 +138,8 @@ describe('ProductFormScreen — tạo (design/Products/ProductForm)', () => {
     );
     renderApp(<ProductFormScreen />);
     fill('Tên sản phẩm *', 'Thuốc trĩ');
+    fireEvent.click(screen.getByRole('checkbox', { name: /Sản phẩm có nhiều biến thể/ }));
+    expect(await screen.findByLabelText('Tên biến thể')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Thêm biến thể' }));
     fireEvent.click(screen.getByRole('button', { name: 'Thêm biến thể' }));
     expect(screen.getByText('3 dòng · 3 mới', { exact: false })).toBeInTheDocument();
@@ -183,7 +185,6 @@ describe('ProductFormScreen — tạo (design/Products/ProductForm)', () => {
     renderApp(<ProductFormScreen />);
     fill('Tên sản phẩm *', 'Thuốc bật chồi X');
     fill('Tên gọi khác', 'thuốc bật chồi, cheshaland, , thuốc bật chồi');
-    fill('Tên biến thể', 'Chai 100ml');
     fireEvent.click(screen.getByRole('button', { name: /Lưu sản phẩm/ }));
     await waitFor(() => expect(productBody).toBeDefined());
     expect(productBody).not.toHaveProperty('code');
@@ -226,6 +227,7 @@ describe('ProductFormScreen — tạo (design/Products/ProductForm)', () => {
     );
     renderApp(<ProductFormScreen />);
     fill('Tên sản phẩm *', 'Bút bi TL-09');
+    fireEvent.click(screen.getByRole('checkbox', { name: /Sản phẩm có nhiều biến thể/ }));
     fill('Tên biến thể', 'Bút TL-09');
     fireEvent.click(screen.getByRole('button', { name: /Lưu sản phẩm/ }));
     expect(await screen.findByText(/1 dòng chưa hợp lệ — chưa lưu hết/)).toBeInTheDocument();
@@ -280,7 +282,6 @@ describe('ProductFormScreen — tạo (design/Products/ProductForm)', () => {
     fireEvent.click(screen.getByRole('combobox', { name: 'Kho mặc định' }));
     fireEvent.click(await screen.findByRole('option', { name: 'Kho HN-1' }));
 
-    fill('Tên biến thể', 'Bút TL-11 A');
     fill('Giá nhập', '12000');
     fill('Giá bán', '19000');
     fill('Tồn đầu kỳ', '50');
@@ -295,8 +296,6 @@ describe('ProductFormScreen — tạo (design/Products/ProductForm)', () => {
     });
     expect(bodies.product).not.toHaveProperty('code');
     expect(bodies.sku).toEqual({
-      code: 'TL11-1',
-      name: 'Bút TL-11 A',
       baseUom: 'PCS',
       purchasePrice: '12000',
       salePrice: '19000',
@@ -316,7 +315,6 @@ describe('ProductFormScreen — tạo (design/Products/ProductForm)', () => {
     );
     renderApp(<ProductFormScreen />);
     fill('Tên sản phẩm *', 'Bút TL-12');
-    fill('Tên biến thể', 'Bút TL-12 A');
     fill('Tồn đầu kỳ', '10'); // không giá nhập, không kho mặc định
     fireEvent.click(screen.getByRole('button', { name: /Lưu sản phẩm/ }));
     expect(
@@ -372,7 +370,6 @@ describe('ProductFormScreen — tạo (design/Products/ProductForm)', () => {
     expect(screen.queryByAltText('b.png')).not.toBeInTheDocument();
 
     fill('Tên sản phẩm *', 'Bút TL-10');
-    fill('Tên biến thể', 'Bút TL-10 A');
     fireEvent.click(screen.getByRole('button', { name: /Lưu sản phẩm/ }));
     // Sau khi tạo sản phẩm + SKU, ảnh còn trong hàng chờ tự POST lên đúng productId mới
     await waitFor(() => expect(imagePosts).toEqual([{ productId: 'p-3', size: 4 }]));
@@ -407,6 +404,7 @@ describe('ProductFormScreen — sửa', () => {
         createdAt: '2026-09-01T00:00:00.000Z',
       },
     ],
+    hasVariants: true,
     skus: [
       {
         id: 's-1',

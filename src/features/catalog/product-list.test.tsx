@@ -113,6 +113,7 @@ const PRODUCTS = [
       { id: uuid(4), code: 'TL08-RED', name: 'TL-08 đỏ', baseUom: { code: 'cái' } },
     ],
     skuCount: 3,
+    hasVariants: true,
     searchAliases: ['bút thiên long', 'tl08'],
     version: 2,
     createdAt: '2026-09-01T03:00:00.000Z',
@@ -132,6 +133,7 @@ const PRODUCTS = [
     brand: null,
     skus: [{ id: uuid(2), code: 'TP-BK48-100', name: 'BK 48', baseUom: { code: 'cây' } }],
     skuCount: 1,
+    hasVariants: false,
     searchAliases: [],
     version: 0,
     createdAt: '2026-08-20T03:00:00.000Z',
@@ -191,8 +193,9 @@ describe('ProductListScreen — góc nhìn Sản phẩm (mặc định, GET /pro
     expect(link).toHaveAttribute('href', `/catalog/products/${FIRST_PRODUCT.id}`);
     // Tên dân dã (searchAliases) hiện dòng phụ dưới tên.
     expect(screen.getByText('bút thiên long, tl08')).toBeInTheDocument();
-    // Đếm biến thể + chip mã SKU đang bán.
-    expect(screen.getByText('3 SKU')).toBeInTheDocument();
+    // Đếm biến thể + chip mã SKU đang bán; sản phẩm đơn nói rõ là "Sản phẩm đơn".
+    expect(screen.getByText('3 biến thể')).toBeInTheDocument();
+    expect(screen.getByText('Sản phẩm đơn')).toBeInTheDocument();
     expect(screen.getByText('TL08-BLUE, TL08-RED')).toBeInTheDocument();
     // Đếm trên tiêu đề vẫn từ hai query take=1.
     expect(await screen.findByText('312 SKU đang bán · 18 ngừng bán')).toBeInTheDocument();

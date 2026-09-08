@@ -83,7 +83,12 @@ function DetailBody({ product }: { product: ProductDetail }) {
 
   const tabs: Array<{ key: TabKey; label: string; count?: string }> = [
     { key: 'info', label: 'Thông tin' },
-    { key: 'variants', label: 'Biến thể', count: String(skus.length) },
+    // Sản phẩm đơn: tab vẫn có (giá/ĐVT/trạng thái của SKU duy nhất) nhưng không gọi là "biến thể".
+    {
+      key: 'variants',
+      label: product.hasVariants ? 'Biến thể' : 'SKU',
+      count: String(skus.length),
+    },
     { key: 'barcodes', label: 'Barcode', count: String(barcodeCount) },
     { key: 'units', label: 'Đơn vị & quy đổi', count: String(unitCount) },
     { key: 'stock', label: 'Tồn theo kho' },
@@ -93,7 +98,7 @@ function DetailBody({ product }: { product: ProductDetail }) {
     <>
       <PageHeader
         title={product.name}
-        description={`Mã ${product.code} · ${skus.length} biến thể · Cập nhật ${formatDateTime(product.updatedAt)}`}
+        description={`Mã ${product.code} · ${product.hasVariants ? `${skus.length} biến thể` : 'sản phẩm đơn'} · Cập nhật ${formatDateTime(product.updatedAt)}`}
         breadcrumb={[
           { label: 'Sản phẩm', href: '/catalog/products' },
           { label: 'Danh sách', href: '/catalog/products' },
