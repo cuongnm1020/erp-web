@@ -375,6 +375,18 @@ function Detail({ order }: { order: SalesOrderDetail }) {
             <Field label="Phân công">
               {order.ownerId ? 'đã có người phụ trách' : 'đơn của team, chưa chia cho ai'}
             </Field>
+            <Field label="Kho lấy hàng">
+              {order.warehouse ? (
+                <>
+                  {order.warehouse.name}{' '}
+                  <span className="font-mono text-xs text-muted-foreground">
+                    ({order.warehouse.code})
+                  </span>
+                </>
+              ) : (
+                <span className="text-muted-foreground">chưa chọn kho — chọn ở trang Sửa đơn</span>
+              )}
+            </Field>
             <Field label="Hãng vận chuyển">
               {order.carrier ? (
                 <>

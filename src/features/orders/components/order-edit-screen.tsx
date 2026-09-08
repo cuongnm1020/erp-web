@@ -25,6 +25,7 @@ import { useAbility } from '@/lib/permission';
 import { useCarriers } from '@/features/wms/api/use-shipping';
 import {
   useOrder,
+  usePickupWarehouses,
   useShippingQuote,
   useUpdateOrder,
   type SalesOrderDetail,
@@ -53,6 +54,7 @@ import {
  * Phím: Ctrl+S lưu, Esc quay về chi tiết.
  */
 const NO_CARRIER = '__none__';
+const NO_WAREHOUSE = '__none__';
 const money = (v: string) => formatMoney(v, { unit: '' });
 
 function Card({
@@ -107,9 +109,11 @@ function Editor({ order }: { order: SalesOrderDetail }) {
   const canUpdate = ability.can('update', 'SalesOrder');
   const update = useUpdateOrder(order.id);
   const carriers = useCarriers();
+  const warehouses = usePickupWarehouses();
 
   const [status, setStatus] = useState<SalesOrderStatus>(order.status);
   const [carrierId, setCarrierId] = useState<string>(order.carrierId ?? NO_CARRIER);
+  const [warehouseId, setWarehouseId] = useState<string>(order.warehouseId ?? NO_WAREHOUSE);
   const [reason, setReason] = useState('');
 
   const targets = manualStatusTargets(order.status, (a) => ability.can(a, 'SalesOrder'));
@@ -120,14 +124,18 @@ function Editor({ order }: { order: SalesOrderDetail }) {
   );
 
   const nextCarrier = carrierId === NO_CARRIER ? null : carrierId;
+  const nextWarehouse = warehouseId === NO_WAREHOUSE ? null : warehouseId;
+  const selectedWarehouse = (warehouses.data ?? []).find((w) => w.id === nextWarehouse) ?? null;
   // Hãng có bảng cước (GHTK, GHN…) → hỏi cước ngay khi chọn để sale thấy trước khi lưu.
   // Hãng nội bộ (MANUAL) không có `quote` → không hỏi, không hiện dòng cước.
+  // Kho lấy hàng đang chọn đi kèm (chưa cần lưu) → hãng tính cước từ đúng địa chỉ kho đó.
   const selectedCarrier = activeCarriers.find((c) => c.id === nextCarrier) ?? null;
   const canQuote = Boolean(selectedCarrier?.operations.includes('quote'));
-  const quote = useShippingQuote(order.id, canQuote ? nextCarrier : null);
+  const quote = useShippingQuote(order.id, canQuote ? nextCarrier : null, nextWarehouse);
   const statusChanged = status !== order.status;
   const carrierChanged = nextCarrier !== (order.carrierId ?? null);
-  const dirty = statusChanged || carrierChanged;
+  const warehouseChanged = nextWarehouse !== (order.warehouseId ?? null);
+  const dirty = statusChanged || carrierChanged || warehouseChanged;
 
   const detailHref = `/crm/orders/${order.id}`;
   const totalQty = order.lines.reduce(
@@ -146,6 +154,7 @@ function Editor({ order }: { order: SalesOrderDetail }) {
       {
         ...(statusChanged ? { status } : {}),
         ...(carrierChanged ? { carrierId: nextCarrier } : {}),
+        ...(warehouseChanged ? { warehouseId: nextWarehouse } : {}),
         ...(statusChanged && status === 'CANCELLED' && reason.trim()
           ? { reason: reason.trim() }
           : {}),
@@ -155,7 +164,11 @@ function Editor({ order }: { order: SalesOrderDetail }) {
           toast.success('Đã lưu thay đổi', {
             description: `${order.docNumber} · ${r.changed
               .map((c) =>
-                c === 'status' ? `trạng thái → ${orderStatusLabel(r.status)}` : 'hãng vận chuyển',
+                c === 'status'
+                  ? `trạng thái → ${orderStatusLabel(r.status)}`
+                  : c === 'warehouseId'
+                    ? 'kho lấy hàng'
+                    : 'hãng vận chuyển',
               )
               .join(', ')}`,
           });
@@ -398,6 +411,39 @@ function Editor({ order }: { order: SalesOrderDetail }) {
 
           <Card title="Vận chuyển">
             <div className="py-1">
+              <Field label="Kho lấy hàng">
+                <Select
+                  value={warehouseId}
+                  onValueChange={setWarehouseId}
+                  disabled={!carrierEditable || warehouses.isPending}
+                >
+                  <SelectTrigger aria-label="Kho lấy hàng" className="h-8">
+                    <SelectValue placeholder="Chưa chọn" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value={NO_WAREHOUSE}>— Chưa chọn —</SelectItem>
+                    {(warehouses.data ?? []).map((w) => (
+                      <SelectItem key={w.id} value={w.id}>
+                        {w.name} ({w.code}){w.pickupReady ? '' : ' — chưa khai địa chỉ'}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </Field>
+              {selectedWarehouse ? (
+                <p className="px-3 pb-1 text-xs text-muted-foreground">
+                  {selectedWarehouse.pickupReady
+                    ? `Điểm lấy hàng gửi hãng: ${[
+                        selectedWarehouse.address,
+                        selectedWarehouse.ward,
+                        selectedWarehouse.district,
+                        selectedWarehouse.province,
+                      ]
+                        .filter(Boolean)
+                        .join(', ')}`
+                    : 'Kho này chưa khai tỉnh/huyện/xã hoặc số điện thoại — hãng sẽ nhận điểm lấy mặc định của server. Khai ở Kho › Sửa kho.'}
+                </p>
+              ) : null}
               <Field label="ĐVVC">
                 <Select
                   value={carrierId}
@@ -428,7 +474,8 @@ function Editor({ order }: { order: SalesOrderDetail }) {
                           ? `${money(quote.data.fee)} ${quote.data.currency}` +
                             (quote.data.weightKg === '0.0000'
                               ? ' · SKU chưa khai cân nặng'
-                              : ` · ${quote.data.weightKg} kg`)
+                              : ` · ${quote.data.weightKg} kg`) +
+                            ` · lấy tại ${quote.data.pickupSummary}`
                           : null}
                   </span>
                 </Field>

@@ -8,6 +8,7 @@ export type SalesOrderDetail = components['schemas']['SalesOrderDetailDto'];
 export type SalesOrderLine = components['schemas']['SalesOrderLineDto'];
 export type SalesOrderListResponse = components['schemas']['SalesOrderListResponseDto'];
 export type ShippingQuote = components['schemas']['ShippingQuoteResultDto'];
+export type PickupWarehouse = components['schemas']['PickupWarehouseDto'];
 export type SalesOrderStatus = SalesOrder['status'];
 export type SalesOrderChannel = SalesOrder['channel'];
 
@@ -26,8 +27,9 @@ export const orderKeys = {
   list: (p: OrderListParams) => [...orderKeys.lists(), p] as const,
   details: () => [...orderKeys.all, 'detail'] as const,
   detail: (id: string) => [...orderKeys.details(), id] as const,
-  shippingQuote: (id: string, carrierId: string | null) =>
-    [...orderKeys.detail(id), 'shipping-quote', carrierId] as const,
+  shippingQuote: (id: string, carrierId: string | null, warehouseId: string | null) =>
+    [...orderKeys.detail(id), 'shipping-quote', carrierId, warehouseId] as const,
+  pickupWarehouses: () => [...orderKeys.all, 'pickup-warehouses'] as const,
 };
 
 /**
@@ -131,17 +133,36 @@ export function useUpdateOrder(id: string) {
  * chọn trên màn sửa (gọi hãng thật, chỉ đọc). `carrierId` null = chưa chọn → không gọi.
  * Không retry: hãng lỗi (502) hay đơn thiếu địa chỉ (422) thì hiện thông điệp, gọi lại vô ích.
  */
-export function useShippingQuote(orderId: string, carrierId: string | null) {
+export function useShippingQuote(
+  orderId: string,
+  carrierId: string | null,
+  warehouseId: string | null,
+) {
   return useQuery({
-    queryKey: orderKeys.shippingQuote(orderId, carrierId),
+    queryKey: orderKeys.shippingQuote(orderId, carrierId, warehouseId),
     queryFn: () =>
       unwrap(
         api.GET('/sales-orders/{id}/shipping-quote', {
-          params: { path: { id: orderId }, query: { carrierId: carrierId as string } },
+          params: {
+            path: { id: orderId },
+            query: { carrierId: carrierId as string, ...(warehouseId ? { warehouseId } : {}) },
+          },
         }),
       ),
     enabled: carrierId !== null,
     retry: false,
     staleTime: 60_000,
+  });
+}
+
+/**
+ * GET /pickup-warehouses — kho chọn được làm KHO LẤY HÀNG trên đơn (quyền đơn bán, không cần
+ * stock.read như GET /warehouses). Danh mục ít đổi → cache 10 phút.
+ */
+export function usePickupWarehouses() {
+  return useQuery({
+    queryKey: orderKeys.pickupWarehouses(),
+    queryFn: () => unwrap(api.GET('/pickup-warehouses')),
+    staleTime: 10 * 60_000,
   });
 }

@@ -77,6 +77,7 @@ export function makeOrders(n: number) {
     ownerId: i % 3 === 0 ? null : 'u-sale',
     teamId: 't-hn',
     carrierId: null,
+    warehouseId: null,
     postedAt:
       ORDER_STATUSES[i % ORDER_STATUSES.length] === 'POSTED' ? '2026-08-24T02:00:00.000Z' : null,
     createdAt: new Date(Date.UTC(2026, 7, 23) - i * 3_600_000).toISOString(),
@@ -108,8 +109,36 @@ export function makeOrderDetail(id: string) {
     reservedQty: String((i + 1) * 10),
     pickedQty: i === 0 ? String((i + 1) * 10) : '0',
   }));
-  return { ...header, carrier: null, lines };
+  return { ...header, carrier: null, warehouse: null, lines };
 }
+
+/** Đúng shape `PickupWarehouseDto` (GET /pickup-warehouses). */
+export const PICKUP_WAREHOUSES = [
+  {
+    id: 'wh-hcm',
+    code: 'WH01',
+    name: 'Kho trung tâm',
+    address: 'Lô A1 KCN Tân Tạo',
+    ward: 'Phường Tân Tạo A',
+    district: 'Quận Bình Tân',
+    province: 'Hồ Chí Minh',
+    contactName: 'Kho trung tâm',
+    phone: '0900000000',
+    pickupReady: true,
+  },
+  {
+    id: 'wh-bare',
+    code: 'WH02',
+    name: 'Kho chưa khai',
+    address: null,
+    ward: null,
+    district: null,
+    province: null,
+    contactName: null,
+    phone: null,
+    pickupReady: false,
+  },
+];
 
 /** Đúng shape `CarrierDto` (GET /carriers). */
 export const CARRIERS = [
@@ -170,6 +199,8 @@ export function makeShippingQuote(orderId: string, carrierId: string) {
     estimatedDeliveryAt: null,
     weightKg: '0.7500',
     codAmount: '1250000.0000',
+    pickupWarehouseId: 'wh-hcm',
+    pickupSummary: 'Hồ Chí Minh · Quận Bình Tân',
   };
 }
 
@@ -433,6 +464,7 @@ export const STATUS_LOG_FIXTURE = {
 
 export const handlers = [
   http.get('/api/carriers', () => HttpResponse.json(CARRIERS)),
+  http.get('/api/pickup-warehouses', () => HttpResponse.json(PICKUP_WAREHOUSES)),
   http.get('/api/sales-orders/:id/shipping-quote', ({ params, request }) => {
     const carrierId = new URL(request.url).searchParams.get('carrierId') ?? '';
     return HttpResponse.json(makeShippingQuote(params.id as string, carrierId));

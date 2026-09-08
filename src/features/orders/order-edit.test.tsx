@@ -7,6 +7,7 @@ import {
   makeOrderDetail,
   makeOrders,
   makeShippingQuote,
+  PICKUP_WAREHOUSES,
   scenario,
 } from '@/test/msw/handlers';
 import { server } from '@/test/msw/server';
@@ -107,7 +108,11 @@ describe('OrderEditScreen — trang sửa đơn (D-05, PATCH /sales-orders/{id})
     fireEvent.click(picker);
     fireEvent.click(await screen.findByRole('option', { name: `${CARRIERS[3]!.name} (GHTK)` }));
     expect(await screen.findByText('Cước hãng báo')).toBeInTheDocument();
-    await waitFor(() => expect(screen.getByText(/28\.000 VND · 0\.7500 kg/)).toBeInTheDocument());
+    await waitFor(() =>
+      expect(
+        screen.getByText(/28\.000 VND · 0\.7500 kg · lấy tại Hồ Chí Minh · Quận Bình Tân/),
+      ).toBeInTheDocument(),
+    );
     expect(asked).toEqual([`${ORDER.id}?c-ghtk`]);
 
     // GHN trong mock không có `quote` → dòng cước biến mất, không gọi thêm.
@@ -115,6 +120,56 @@ describe('OrderEditScreen — trang sửa đơn (D-05, PATCH /sales-orders/{id})
     fireEvent.click(await screen.findByRole('option', { name: `${CARRIERS[1]!.name} (GHN)` }));
     await waitFor(() => expect(screen.queryByText('Cước hãng báo')).not.toBeInTheDocument());
     expect(asked).toEqual([`${ORDER.id}?c-ghtk`]);
+  });
+
+  it('chọn kho lấy hàng → hỏi cước kèm warehouseId, hiện địa chỉ điểm lấy; lưu → PATCH warehouseId', async () => {
+    push.mockClear();
+    const asked: string[] = [];
+    const bodies: Record<string, unknown>[] = [];
+    server.use(
+      http.get('/api/sales-orders/:id/shipping-quote', ({ params, request }) => {
+        const q = new URL(request.url).searchParams;
+        asked.push(`${q.get('carrierId')}@${q.get('warehouseId') ?? '-'}`);
+        return HttpResponse.json(makeShippingQuote(params.id as string, q.get('carrierId') ?? ''));
+      }),
+      http.patch('/api/sales-orders/:id', async ({ params, request }) => {
+        const body = (await request.json()) as Record<string, unknown>;
+        bodies.push(body);
+        return HttpResponse.json({
+          orderId: params.id,
+          docNumber: ORDER.docNumber,
+          status: ORDER.status,
+          carrierId: body.carrierId ?? null,
+          warehouseId: body.warehouseId ?? null,
+          changed: Object.keys(body),
+        });
+      }),
+    );
+    renderApp(<OrderEditScreen orderId={ORDER.id} />);
+    await screen.findByRole('heading', { level: 1 });
+
+    const whPicker = screen.getByRole('combobox', { name: 'Kho lấy hàng' });
+    await waitFor(() => expect(whPicker).toBeEnabled());
+    fireEvent.click(whPicker);
+    expect((await screen.findAllByRole('option')).map((o) => o.textContent)).toEqual([
+      '— Chưa chọn —',
+      `${PICKUP_WAREHOUSES[0]!.name} (WH01)`,
+      `${PICKUP_WAREHOUSES[1]!.name} (WH02) — chưa khai địa chỉ`,
+    ]);
+    fireEvent.click(screen.getByRole('option', { name: `${PICKUP_WAREHOUSES[0]!.name} (WH01)` }));
+    expect(
+      screen.getByText(/Điểm lấy hàng gửi hãng: Lô A1 KCN Tân Tạo, Phường Tân Tạo A/),
+    ).toBeInTheDocument();
+
+    const carrierPicker = screen.getByRole('combobox', { name: 'Hãng vận chuyển' });
+    await waitFor(() => expect(carrierPicker).toBeEnabled());
+    fireEvent.click(carrierPicker);
+    fireEvent.click(await screen.findByRole('option', { name: `${CARRIERS[3]!.name} (GHTK)` }));
+    await waitFor(() => expect(asked).toEqual(['c-ghtk@wh-hcm']));
+
+    fireEvent.click(screen.getByRole('button', { name: /Lưu thay đổi/ }));
+    await waitFor(() => expect(bodies).toEqual([{ carrierId: 'c-ghtk', warehouseId: 'wh-hcm' }]));
+    await waitFor(() => expect(push).toHaveBeenCalledWith(`/crm/orders/${ORDER.id}`));
   });
 
   it('hỏi cước lỗi (đơn chưa có địa chỉ giao, 422) → hiện thông điệp lỗi tại chỗ, vẫn lưu được hãng', async () => {

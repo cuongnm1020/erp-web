@@ -1525,6 +1525,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/pickup-warehouses": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["PickupWarehouseController_list"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/carriers": {
         parameters: {
             query?: never;
@@ -3581,17 +3597,34 @@ export interface components {
             id: string;
             code: string;
             name: string;
+            /** @description Số nhà / đường. */
             address: string | null;
+            /** @description Điểm lấy hàng cho hãng vận chuyển — tên tỉnh/huyện/xã viết như hãng dùng. */
+            contactName: string | null;
+            phone: string | null;
+            ward: string | null;
+            district: string | null;
+            province: string | null;
             isActive: boolean;
         };
         CreateWarehouseDto: {
             code: string;
             name: string;
             address?: string;
+            contactName?: string;
+            phone?: string;
+            ward?: string;
+            district?: string;
+            province?: string;
         };
         UpdateWarehouseDto: {
             name?: string;
             address?: string;
+            contactName?: string | null;
+            phone?: string | null;
+            ward?: string | null;
+            district?: string | null;
+            province?: string | null;
             isActive?: boolean;
         };
         LocationFixedSkuDto: {
@@ -3901,6 +3934,8 @@ export interface components {
             teamId: string | null;
             /** @description Hãng vận chuyển chọn khi sửa đơn (wms.Carrier.id) — phiếu giao tạo sau lấy sẵn. */
             carrierId: string | null;
+            /** @description Kho lấy hàng chọn khi sửa đơn (wms.Warehouse.id) — điểm lấy khi tra cước hãng. */
+            warehouseId: string | null;
             /** @description ISO datetime — chỉ có khi đơn POSTED. */
             postedAt: string | null;
             createdAt: string;
@@ -3911,6 +3946,11 @@ export interface components {
             total: number;
         };
         SalesOrderCarrierDto: {
+            id: string;
+            code: string;
+            name: string;
+        };
+        SalesOrderWarehouseDto: {
             id: string;
             code: string;
             name: string;
@@ -3971,12 +4011,16 @@ export interface components {
             teamId: string | null;
             /** @description Hãng vận chuyển chọn khi sửa đơn (wms.Carrier.id) — phiếu giao tạo sau lấy sẵn. */
             carrierId: string | null;
+            /** @description Kho lấy hàng chọn khi sửa đơn (wms.Warehouse.id) — điểm lấy khi tra cước hãng. */
+            warehouseId: string | null;
             /** @description ISO datetime — chỉ có khi đơn POSTED. */
             postedAt: string | null;
             createdAt: string;
             updatedAt: string;
             /** @description Hãng đã chọn (tra theo carrierId) — null = chưa chọn hoặc hãng đã tắt. */
             carrier: components["schemas"]["SalesOrderCarrierDto"] | null;
+            /** @description Kho lấy hàng đã chọn (tra theo warehouseId) — null = chưa chọn. */
+            warehouse: components["schemas"]["SalesOrderWarehouseDto"] | null;
             lines: components["schemas"]["SalesOrderLineDto"][];
         };
         ShippingQuoteResultDto: {
@@ -3994,6 +4038,10 @@ export interface components {
             weightKg: string;
             /** @description Tiền thu hộ đã gửi hãng = tổng đơn, Decimal(18,4). */
             codAmount: string;
+            /** @description Kho làm điểm lấy hàng; null = kho chưa khai địa chỉ → dùng env CARRIER_<CODE>_PICK_*. */
+            pickupWarehouseId: string | null;
+            /** @description Điểm lấy đã gửi hãng, tóm tắt "tỉnh · huyện" để sale đối chiếu. */
+            pickupSummary: string;
         };
         CreateOrderLineDto: {
             /** Format: uuid */
@@ -4083,6 +4131,11 @@ export interface components {
              * @description wms.Carrier.id đang hoạt động; `null` = bỏ chọn hãng.
              */
             carrierId?: string | null;
+            /**
+             * Format: uuid
+             * @description wms.Warehouse.id đang dùng (kho lấy hàng); `null` = bỏ chọn.
+             */
+            warehouseId?: string | null;
             /** @description Lý do (khi hủy) — ghi vào event OrderCancelled. */
             reason?: string;
         };
@@ -4092,7 +4145,8 @@ export interface components {
             /** @enum {string} */
             status: "DRAFT" | "PENDING_APPROVAL" | "APPROVED" | "POSTED" | "CANCELLED";
             carrierId: string | null;
-            /** @description Trường đã đổi thật ('status' | 'carrierId'); rỗng = không có gì thay đổi. */
+            warehouseId: string | null;
+            /** @description Trường đã đổi thật ('status' | 'carrierId' | 'warehouseId'); rỗng = không có gì thay đổi. */
             changed: string[];
         };
         CancelOrderDto: {
@@ -4117,6 +4171,19 @@ export interface components {
             status: "DRAFT" | "PENDING_APPROVAL" | "APPROVED" | "POSTED" | "CANCELLED";
             /** @description true = đã qua bước duyệt cuối → đơn sang APPROVED và event đã emit. */
             completed: boolean;
+        };
+        PickupWarehouseDto: {
+            id: string;
+            code: string;
+            name: string;
+            address: string | null;
+            ward: string | null;
+            district: string | null;
+            province: string | null;
+            contactName: string | null;
+            phone: string | null;
+            /** @description true = đủ tỉnh/thành + số điện thoại để làm điểm lấy hàng cho hãng. */
+            pickupReady: boolean;
         };
         CarrierDto: {
             id: string;
@@ -7838,6 +7905,8 @@ export interface operations {
             query: {
                 /** @description wms.Carrier.id đang hoạt động. */
                 carrierId: string;
+                /** @description Kho lấy hàng đang chọn trên màn sửa (chưa lưu). Bỏ trống = kho đã lưu trên đơn → env. */
+                warehouseId?: string;
             };
             header?: never;
             path: {
@@ -7928,6 +7997,25 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ApproveOrderResultDto"];
+                };
+            };
+        };
+    };
+    PickupWarehouseController_list: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PickupWarehouseDto"][];
                 };
             };
         };

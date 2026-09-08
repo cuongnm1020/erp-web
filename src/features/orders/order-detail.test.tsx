@@ -128,11 +128,14 @@ describe('OrderDetailScreen — GET /sales-orders/{id} (P1-12)', () => {
       ...makeOrderDetail(posted.id)!,
       carrierId: 'c-ghn',
       carrier: { id: 'c-ghn', code: 'GHN', name: CARRIERS[1]!.name },
+      warehouseId: 'wh-hcm',
+      warehouse: { id: 'wh-hcm', code: 'WH01', name: 'Kho trung tâm' },
     };
     server.use(http.get('/api/sales-orders/:id', () => HttpResponse.json(detail)));
     renderApp(<OrderDetailScreen orderId={posted.id} />);
     await screen.findByRole('heading', { level: 1 });
     expect(screen.getByText(CARRIERS[1]!.name)).toBeInTheDocument();
+    expect(screen.getByText('Kho trung tâm')).toBeInTheDocument();
     expect(screen.getByText('Đã chốt lúc')).toBeInTheDocument();
   });
 });

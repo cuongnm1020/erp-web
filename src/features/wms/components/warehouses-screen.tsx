@@ -67,7 +67,14 @@ const warehouseSchema = z.object({
   code: codeSchema,
   name: z.string().trim().min(1, 'Nhập tên kho').max(200, 'Tối đa 200 ký tự'),
   address: z.string().trim().max(500, 'Tối đa 500 ký tự'),
+  // Điểm lấy hàng cho hãng vận chuyển — tên tỉnh/huyện/xã viết như hãng (GHTK) dùng.
+  contactName: z.string().trim().max(200, 'Tối đa 200 ký tự'),
+  phone: z.string().trim().max(32, 'Tối đa 32 ký tự'),
+  province: z.string().trim().max(200, 'Tối đa 200 ký tự'),
+  district: z.string().trim().max(200, 'Tối đa 200 ký tự'),
+  ward: z.string().trim().max(200, 'Tối đa 200 ký tự'),
 });
+const PICKUP_FIELDS = ['contactName', 'phone', 'province', 'district', 'ward'] as const;
 type WarehouseValues = z.infer<typeof warehouseSchema>;
 
 function WarehouseFormDialog({
@@ -90,6 +97,11 @@ function WarehouseFormDialog({
       code: warehouse?.code ?? '',
       name: warehouse?.name ?? '',
       address: warehouse?.address ?? '',
+      contactName: warehouse?.contactName ?? '',
+      phone: warehouse?.phone ?? '',
+      province: warehouse?.province ?? '',
+      district: warehouse?.district ?? '',
+      ward: warehouse?.ward ?? '',
     },
   });
 
@@ -100,15 +112,25 @@ function WarehouseFormDialog({
       onOpenChange(false);
     };
     const fail = (err: unknown) =>
-      applyServerErrors(form, err as ApiError, { knownFields: ['code', 'name', 'address'] });
+      applyServerErrors(form, err as ApiError, {
+        knownFields: ['code', 'name', 'address', ...PICKUP_FIELDS],
+      });
     if (editing) {
+      // PATCH: chỉ gửi trường điểm lấy ĐÃ ĐỔI; chuỗi rỗng → null để XÓA được trường khai sai.
+      const pickup = Object.fromEntries(
+        PICKUP_FIELDS.filter((k) => (v[k] || null) !== (warehouse[k] ?? null)).map((k) => [
+          k,
+          v[k] || null,
+        ]),
+      );
       update.mutate(
-        { name: v.name, ...(v.address ? { address: v.address } : {}) },
+        { name: v.name, ...(v.address ? { address: v.address } : {}), ...pickup },
         { onSuccess: () => done('Đã lưu thay đổi'), onError: fail },
       );
     } else {
+      const pickup = Object.fromEntries(PICKUP_FIELDS.filter((k) => v[k]).map((k) => [k, v[k]]));
       create.mutate(
-        { code: v.code, name: v.name, ...(v.address ? { address: v.address } : {}) },
+        { code: v.code, name: v.name, ...(v.address ? { address: v.address } : {}), ...pickup },
         { onSuccess: () => done('Đã thêm kho'), onError: fail },
       );
     }
@@ -165,14 +187,70 @@ function WarehouseFormDialog({
               name="address"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Địa chỉ</FormLabel>
+                  <FormLabel>Số nhà, đường</FormLabel>
                   <FormControl>
-                    <Input placeholder="Số 5 KCN Quang Minh, Mê Linh, Hà Nội" {...field} />
+                    <Input placeholder="Số 5 KCN Quang Minh" {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
               )}
             />
+            <div className="grid grid-cols-3 gap-2">
+              {(
+                [
+                  ['ward', 'Phường/xã', 'Phường Tân Tạo A'],
+                  ['district', 'Quận/huyện', 'Quận Bình Tân'],
+                  ['province', 'Tỉnh/thành', 'Hồ Chí Minh'],
+                ] as const
+              ).map(([name, label, placeholder]) => (
+                <FormField
+                  key={name}
+                  control={form.control}
+                  name={name}
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>{label}</FormLabel>
+                      <FormControl>
+                        <Input placeholder={placeholder} {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              ))}
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              <FormField
+                control={form.control}
+                name="contactName"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Người liên hệ lấy hàng</FormLabel>
+                    <FormControl>
+                      <Input placeholder="Anh Nam (thủ kho)" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="phone"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>SĐT lấy hàng</FormLabel>
+                    <FormControl>
+                      <Input inputMode="tel" placeholder="0900000000" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Điểm lấy hàng gửi hãng vận chuyển (GHTK…): tên tỉnh/huyện/xã viết đúng như hãng dùng.
+              Thiếu tỉnh/thành hoặc SĐT thì đơn từ kho này dùng điểm lấy mặc định của server.
+            </p>
             {rootError ? <p className="text-sm text-destructive">{rootError}</p> : null}
             <DialogFooter>
               <Button
@@ -274,7 +352,8 @@ export function WarehousesScreen() {
                       <TableCell className="px-2.5 py-1.5 font-mono text-xs">{w.code}</TableCell>
                       <TableCell className="px-2.5 py-1.5 font-semibold">{w.name}</TableCell>
                       <TableCell className="px-2.5 py-1.5 text-muted-foreground">
-                        {w.address ?? '—'}
+                        {[w.address, w.ward, w.district, w.province].filter(Boolean).join(', ') ||
+                          '—'}
                       </TableCell>
                       <TableCell className="px-2.5 py-1.5">
                         {w.isActive ? (
