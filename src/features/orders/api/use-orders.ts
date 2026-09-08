@@ -101,3 +101,24 @@ export function useCancelOrder(id: string) {
     },
   });
 }
+
+export type UpdateOrderBody = components['schemas']['UpdateOrderDto'];
+export type UpdateOrderResult = components['schemas']['UpdateOrderResultDto'];
+
+/**
+ * PATCH /sales-orders/{id} — sửa trạng thái + hãng vận chuyển (quyền `sales_order.update`).
+ * Server giữ máy trạng thái chứng từ và quyền theo đích (approve/post/cancel); client chỉ
+ * hiện đúng các đích được phép (labels.ts `manualStatusTargets`). Không optimistic:
+ * chuyển trạng thái đụng reservation / task kho (luật 5).
+ */
+export function useUpdateOrder(id: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (body: UpdateOrderBody) =>
+      unwrap(api.PATCH('/sales-orders/{id}', { params: { path: { id } }, body })),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: orderKeys.detail(id) });
+      void qc.invalidateQueries({ queryKey: orderKeys.lists() });
+    },
+  });
+}

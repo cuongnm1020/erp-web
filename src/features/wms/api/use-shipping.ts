@@ -6,6 +6,7 @@ import type { components } from '@/lib/api/schema';
 export type StuckShipment = components['schemas']['StuckShipmentDto'];
 export type CarrierStatusLog = components['schemas']['CarrierStatusLogDto'];
 export type CarrierStatusLogList = components['schemas']['CarrierStatusLogListDto'];
+export type Carrier = components['schemas']['CarrierDto'];
 
 export interface StuckShipmentParams {
   days: number;
@@ -17,7 +18,17 @@ export const shippingKeys = {
   all: ['wms', 'shipping'] as const,
   stuck: (p: StuckShipmentParams) => [...shippingKeys.all, 'stuck', p] as const,
   statusLog: (shipmentId: string) => [...shippingKeys.all, 'status-log', shipmentId] as const,
+  carriers: () => [...shippingKeys.all, 'carriers'] as const,
 };
+
+/** GET /carriers — picker hãng vận chuyển (đơn bán chọn theo `id`). Danh mục ít đổi → cache 10 phút. */
+export function useCarriers() {
+  return useQuery({
+    queryKey: shippingKeys.carriers(),
+    queryFn: () => unwrap(api.GET('/carriers')),
+    staleTime: 10 * 60_000,
+  });
+}
 
 /** GET /carriers/stuck-shipments — đơn rời kho quá N ngày chưa terminal (BE-carrier-sync #3). */
 export function useStuckShipments(params: StuckShipmentParams) {

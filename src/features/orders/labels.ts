@@ -49,3 +49,38 @@ export function parseOrderStatus(v: string | undefined): SalesOrderStatus | unde
     ? (v as SalesOrderStatus)
     : undefined;
 }
+
+/**
+ * Đích chuyển trạng thái được sửa TAY qua PATCH /sales-orders/{id} — chép đúng
+ * MANUAL_STATUS_TARGETS của backend (SCREEN-INVENTORY ghi chú D-05: ranh giới phải khớp
+ * state machine, không để bấm rồi API từ chối). Mỗi đích cần thêm quyền của hành động đó.
+ */
+const MANUAL_STATUS_TARGETS: Record<SalesOrderStatus, readonly SalesOrderStatus[]> = {
+  DRAFT: ['APPROVED', 'CANCELLED'],
+  PENDING_APPROVAL: ['CANCELLED'],
+  APPROVED: ['POSTED', 'CANCELLED'],
+  POSTED: ['CANCELLED'],
+  CANCELLED: [],
+};
+
+/** Quyền (CASL action trên SalesOrder) cần có để đặt đích này — ngoài `update` mở cửa. */
+const STATUS_TARGET_ACTION: Partial<Record<SalesOrderStatus, 'approve' | 'post' | 'cancel'>> = {
+  APPROVED: 'approve',
+  POSTED: 'post',
+  CANCELLED: 'cancel',
+};
+
+export function manualStatusTargets(
+  from: SalesOrderStatus,
+  can: (action: 'approve' | 'post' | 'cancel') => boolean,
+): SalesOrderStatus[] {
+  return MANUAL_STATUS_TARGETS[from].filter((to) => {
+    const action = STATUS_TARGET_ACTION[to];
+    return action === undefined || can(action);
+  });
+}
+
+/** Đơn còn sửa được hãng vận chuyển / trường ERP khác — khớp ORDER_NOT_EDITABLE của backend. */
+export function orderEditable(status: SalesOrderStatus): boolean {
+  return status !== 'POSTED' && status !== 'CANCELLED';
+}

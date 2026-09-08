@@ -12,6 +12,12 @@ globalThis.fetch = ((input: RequestInfo | URL, init?: RequestInit) => {
   return nativeFetch(input, init);
 }) as typeof fetch;
 
+// jsdom không có scrollIntoView; Radix Select gọi nó trên item đang chọn khi mở → không stub
+// thì passive effect ném lỗi và React unmount cả cây (test thấy <body> trống).
+if (typeof Element.prototype.scrollIntoView !== 'function') {
+  Element.prototype.scrollIntoView = () => undefined;
+}
+
 // MSW: request không có handler → lỗi rõ ràng thay vì treo/timeout.
 beforeAll(() => server.listen({ onUnhandledRequest: 'error' }));
 afterEach(() => {

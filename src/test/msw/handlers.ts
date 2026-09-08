@@ -76,6 +76,9 @@ export function makeOrders(n: number) {
     currencyCode: 'VND',
     ownerId: i % 3 === 0 ? null : 'u-sale',
     teamId: 't-hn',
+    carrierId: null,
+    postedAt:
+      ORDER_STATUSES[i % ORDER_STATUSES.length] === 'POSTED' ? '2026-08-24T02:00:00.000Z' : null,
     createdAt: new Date(Date.UTC(2026, 7, 23) - i * 3_600_000).toISOString(),
     updatedAt: new Date(Date.UTC(2026, 7, 23) - i * 1_800_000).toISOString(),
   }));
@@ -105,8 +108,42 @@ export function makeOrderDetail(id: string) {
     reservedQty: String((i + 1) * 10),
     pickedQty: i === 0 ? String((i + 1) * 10) : '0',
   }));
-  return { ...header, lines };
+  return { ...header, carrier: null, lines };
 }
+
+/** Đúng shape `CarrierDto` (GET /carriers). */
+export const CARRIERS = [
+  {
+    id: 'c-manual',
+    code: 'MANUAL',
+    name: 'Giao thủ công (xe nhà / khách tự lấy)',
+    isActive: true,
+    hasAdapter: false,
+    operations: ['createWaybill'],
+    configured: true,
+    webhook: false,
+  },
+  {
+    id: 'c-ghn',
+    code: 'GHN',
+    name: 'Giao Hàng Nhanh',
+    isActive: true,
+    hasAdapter: true,
+    operations: ['createWaybill', 'track', 'cancel'],
+    configured: false,
+    webhook: true,
+  },
+  {
+    id: 'c-old',
+    code: 'OLD',
+    name: 'Hãng đã tắt',
+    isActive: false,
+    hasAdapter: false,
+    operations: ['createWaybill'],
+    configured: true,
+    webhook: false,
+  },
+];
 
 /** Đúng shape `StockRowDto`. */
 export function makeStockRows(n: number) {
@@ -367,6 +404,7 @@ export const STATUS_LOG_FIXTURE = {
 };
 
 export const handlers = [
+  http.get('/api/carriers', () => HttpResponse.json(CARRIERS)),
   http.get('/api/auth/me', () => HttpResponse.json(ME_ADMIN)),
   http.get('/api/health', () =>
     HttpResponse.json({ status: 'ok', db: 'ok', redis: 'ok', timestamp: new Date().toISOString() }),
