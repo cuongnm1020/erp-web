@@ -70,7 +70,7 @@ làm nghẽn API. Bắt buộc có xem trước số lượng khớp **trước*
 | D-02 | `/crm/orders?scope=mine` | Đơn của tôi | sale | P1 | FE-3 |
 | D-03 | `/crm/orders` | Tất cả đơn (theo scope quyền) | leader, quản lý | P1 | FE-3 |
 | D-04 | `/crm/orders/[id]` | Chi tiết đơn + dòng thời gian trạng thái | tất cả | P1 | FE-3 |
-| D-05 | `/crm/orders/[id]` (dialog "Sửa đơn") | Sửa đơn: trạng thái + hãng vận chuyển — PATCH /sales-orders/:id, quyền `sales_order.update`; dòng hàng vẫn đi đường hủy & tạo lại | sale, leader | P1 | FE-3 |
+| D-05 | `/crm/orders/[id]/edit` | Sửa đơn (trang riêng, hai cột như Pancake): trạng thái + hãng vận chuyển — PATCH /sales-orders/:id, quyền `sales_order.update`; dòng hàng / giá chỉ đọc, vẫn đi đường hủy & tạo lại | sale, leader | P1 | FE-3 |
 | D-06 | `/crm/orders/[id]/cancel` (dialog) | Hủy đơn — lý do bắt buộc, có thể cần duyệt | sale, leader | P1 | FE-3 |
 | D-07 | `/crm/returns/new`, `/crm/returns` | Trả hàng / đổi hàng ● | CSKH | P2 | FE-4 |
 | D-08 | `/crm/orders/drafts` | Đơn nháp đang dở | sale | P2 | FE-3 |

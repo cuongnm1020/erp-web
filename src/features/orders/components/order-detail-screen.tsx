@@ -21,13 +21,6 @@ import {
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
-import {
   Table,
   TableBody,
   TableCell,
@@ -41,23 +34,14 @@ import { messageFor } from '@/lib/error-messages';
 import { formatDate, formatDateTime, formatMoney, formatQuantity } from '@/lib/format';
 import { Can, useAbility } from '@/lib/permission';
 import { useInvalidateOn } from '@/lib/realtime';
-import { useCarriers } from '@/features/wms/api/use-shipping';
 import {
   orderKeys,
   useCancelOrder,
   useOrder,
   useOrders,
-  useUpdateOrder,
   type SalesOrderDetail,
-  type SalesOrderStatus,
 } from '../api/use-orders';
-import {
-  manualStatusTargets,
-  orderChannelLabel,
-  orderEditable,
-  orderStatusLabel,
-  orderStatusTone,
-} from '../labels';
+import { orderChannelLabel, orderStatusLabel, orderStatusTone } from '../labels';
 
 /**
  * D-04 Chi tiết đơn hàng — GET /sales-orders/{id}.
@@ -302,161 +286,8 @@ function CancelOrderDialog({
   );
 }
 
-const NO_CARRIER = '__none__';
-
-/**
- * D-05 Sửa đơn — PATCH /sales-orders/{id}: trạng thái + hãng vận chuyển. Chỉ hiện các đích
- * server cho phép sửa tay VÀ người dùng có quyền tương ứng (`manualStatusTargets`), nên không có
- * chuyện bấm rồi API từ chối. Dòng hàng / giá không sửa tại chỗ — vẫn "hủy & tạo lại".
- * Body chỉ mang trường thật sự đổi; không đổi gì thì đóng dialog, không gọi API.
- */
-function EditOrderDialog({
-  order,
-  open,
-  onOpenChange,
-}: {
-  order: SalesOrderDetail;
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-}) {
-  const ability = useAbility();
-  const update = useUpdateOrder(order.id);
-  const carriers = useCarriers();
-  const [status, setStatus] = useState<SalesOrderStatus>(order.status);
-  const [carrierId, setCarrierId] = useState<string>(order.carrierId ?? NO_CARRIER);
-  const [reason, setReason] = useState('');
-
-  const targets = manualStatusTargets(order.status, (a) => ability.can(a, 'SalesOrder'));
-  const carrierEditable = orderEditable(order.status);
-  const activeCarriers = (carriers.data ?? []).filter(
-    (c) => c.isActive || c.id === order.carrierId,
-  );
-
-  const nextCarrier = carrierId === NO_CARRIER ? null : carrierId;
-  const statusChanged = status !== order.status;
-  const carrierChanged = nextCarrier !== (order.carrierId ?? null);
-
-  const submit = () => {
-    if (!statusChanged && !carrierChanged) {
-      onOpenChange(false);
-      return;
-    }
-    update.mutate(
-      {
-        ...(statusChanged ? { status } : {}),
-        ...(carrierChanged ? { carrierId: nextCarrier } : {}),
-        ...(statusChanged && status === 'CANCELLED' && reason.trim()
-          ? { reason: reason.trim() }
-          : {}),
-      },
-      {
-        onSuccess: (r) => {
-          toast.success(`Đã lưu đơn ${order.docNumber}`, {
-            description: r.changed
-              .map((c) =>
-                c === 'status' ? `trạng thái → ${orderStatusLabel(r.status)}` : 'hãng vận chuyển',
-              )
-              .join(', '),
-          });
-          onOpenChange(false);
-        },
-        onError: (err) => toast.error(messageFor(err)),
-      },
-    );
-  };
-
-  return (
-    <Dialog open={open} onOpenChange={(o) => !update.isPending && onOpenChange(o)}>
-      <DialogContent className="sm:max-w-md">
-        <DialogHeader>
-          <DialogTitle>Sửa đơn {order.docNumber}</DialogTitle>
-          <DialogDescription>
-            Trạng thái và hãng vận chuyển sửa được tại chỗ. Dòng hàng, giá, khách hàng thuộc chứng
-            từ đã chốt — muốn đổi thì hủy & tạo lại.
-          </DialogDescription>
-        </DialogHeader>
-        <div className="space-y-3">
-          <div className="space-y-1.5">
-            <Label htmlFor="edit-status">Trạng thái</Label>
-            <Select
-              value={status}
-              onValueChange={(v) => setStatus(v as SalesOrderStatus)}
-              disabled={targets.length === 0}
-            >
-              <SelectTrigger id="edit-status" aria-label="Trạng thái">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value={order.status}>
-                  {orderStatusLabel(order.status)} (hiện tại)
-                </SelectItem>
-                {targets.map((t) => (
-                  <SelectItem key={t} value={t}>
-                    {orderStatusLabel(t)}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <p className="text-xs text-muted-foreground">
-              {targets.length === 0
-                ? order.status === 'PENDING_APPROVAL'
-                  ? 'Đơn chờ duyệt: duyệt ở hàng chờ duyệt, ở đây chỉ hủy được (cần quyền hủy).'
-                  : 'Không có bước chuyển nào bạn được phép đặt tay.'
-                : 'Chỉ hiện các bước server cho phép và bạn có quyền.'}
-            </p>
-          </div>
-          {statusChanged && status === 'CANCELLED' ? (
-            <div className="space-y-1.5">
-              <Label htmlFor="edit-reason">Lý do hủy (tùy chọn)</Label>
-              <Input
-                id="edit-reason"
-                value={reason}
-                onChange={(e) => setReason(e.target.value)}
-                maxLength={1000}
-              />
-            </div>
-          ) : null}
-          <div className="space-y-1.5">
-            <Label htmlFor="edit-carrier">Hãng vận chuyển</Label>
-            <Select
-              value={carrierId}
-              onValueChange={setCarrierId}
-              disabled={!carrierEditable || carriers.isPending}
-            >
-              <SelectTrigger id="edit-carrier" aria-label="Hãng vận chuyển">
-                <SelectValue placeholder="Chưa chọn" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value={NO_CARRIER}>— Chưa chọn —</SelectItem>
-                {activeCarriers.map((c) => (
-                  <SelectItem key={c.id} value={c.id}>
-                    {c.name} ({c.code}){c.isActive ? '' : ' — đã tắt'}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <p className="text-xs text-muted-foreground">
-              {carrierEditable
-                ? 'Phiếu giao tạo sau khi pick sẽ lấy sẵn hãng này; mã vận đơn cấp ở bàn đóng gói.'
-                : 'Đơn đã kết thúc — không đổi hãng.'}
-            </p>
-          </div>
-        </div>
-        <DialogFooter>
-          <Button variant="outline" disabled={update.isPending} onClick={() => onOpenChange(false)}>
-            Đóng
-          </Button>
-          <Button disabled={update.isPending} onClick={submit}>
-            Lưu
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
-  );
-}
-
 function Detail({ order }: { order: SalesOrderDetail }) {
-  const [dialog, setDialog] = useState<'cancel' | 'recreate' | 'edit' | null>(null);
+  const [dialog, setDialog] = useState<'cancel' | 'recreate' | null>(null);
   const ability = useAbility();
   const canRecreate = ability.can('cancel', 'SalesOrder') && ability.can('create', 'SalesOrder');
   return (
@@ -478,8 +309,8 @@ function Detail({ order }: { order: SalesOrderDetail }) {
           {order.status !== 'CANCELLED' ? (
             <>
               <Can I="update" a="SalesOrder">
-                <Button size="sm" onClick={() => setDialog('edit')}>
-                  Sửa đơn
+                <Button size="sm" asChild>
+                  <Link href={`/crm/orders/${order.id}/edit`}>Sửa đơn</Link>
                 </Button>
               </Can>
               {canRecreate ? (
@@ -507,13 +338,10 @@ function Detail({ order }: { order: SalesOrderDetail }) {
       </div>
       <CancelOrderDialog
         order={order}
-        open={dialog === 'cancel' || dialog === 'recreate'}
+        open={dialog !== null}
         recreate={dialog === 'recreate'}
         onOpenChange={(o) => setDialog(o ? dialog : null)}
       />
-      {dialog === 'edit' ? (
-        <EditOrderDialog order={order} open onOpenChange={(o) => setDialog(o ? 'edit' : null)} />
-      ) : null}
 
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <KpiCard label="Tạm tính" value={money(order.subtotal)} detail="trước thuế và vận chuyển" />
@@ -556,7 +384,7 @@ function Detail({ order }: { order: SalesOrderDetail }) {
                   </span>
                 </>
               ) : (
-                <span className="text-muted-foreground">chưa chọn — chọn ở Sửa đơn</span>
+                <span className="text-muted-foreground">chưa chọn — chọn ở trang Sửa đơn</span>
               )}
             </Field>
             {order.postedAt ? (
