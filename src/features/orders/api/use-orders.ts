@@ -7,6 +7,7 @@ export type SalesOrder = components['schemas']['SalesOrderHeaderDto'];
 export type SalesOrderDetail = components['schemas']['SalesOrderDetailDto'];
 export type SalesOrderLine = components['schemas']['SalesOrderLineDto'];
 export type SalesOrderListResponse = components['schemas']['SalesOrderListResponseDto'];
+export type ShippingQuote = components['schemas']['ShippingQuoteResultDto'];
 export type SalesOrderStatus = SalesOrder['status'];
 export type SalesOrderChannel = SalesOrder['channel'];
 
@@ -25,6 +26,8 @@ export const orderKeys = {
   list: (p: OrderListParams) => [...orderKeys.lists(), p] as const,
   details: () => [...orderKeys.all, 'detail'] as const,
   detail: (id: string) => [...orderKeys.details(), id] as const,
+  shippingQuote: (id: string, carrierId: string | null) =>
+    [...orderKeys.detail(id), 'shipping-quote', carrierId] as const,
 };
 
 /**
@@ -120,5 +123,25 @@ export function useUpdateOrder(id: string) {
       void qc.invalidateQueries({ queryKey: orderKeys.detail(id) });
       void qc.invalidateQueries({ queryKey: orderKeys.lists() });
     },
+  });
+}
+
+/**
+ * GET /sales-orders/{id}/shipping-quote?carrierId= — cước hãng báo cho đơn này với hãng đang
+ * chọn trên màn sửa (gọi hãng thật, chỉ đọc). `carrierId` null = chưa chọn → không gọi.
+ * Không retry: hãng lỗi (502) hay đơn thiếu địa chỉ (422) thì hiện thông điệp, gọi lại vô ích.
+ */
+export function useShippingQuote(orderId: string, carrierId: string | null) {
+  return useQuery({
+    queryKey: orderKeys.shippingQuote(orderId, carrierId),
+    queryFn: () =>
+      unwrap(
+        api.GET('/sales-orders/{id}/shipping-quote', {
+          params: { path: { id: orderId }, query: { carrierId: carrierId as string } },
+        }),
+      ),
+    enabled: carrierId !== null,
+    retry: false,
+    staleTime: 60_000,
   });
 }

@@ -143,7 +143,35 @@ export const CARRIERS = [
     configured: true,
     webhook: false,
   },
+  {
+    id: 'c-ghtk',
+    code: 'GHTK',
+    name: 'Giao Hàng Tiết Kiệm',
+    isActive: true,
+    hasAdapter: true,
+    operations: ['createWaybill', 'quote', 'getStatus', 'cancelWaybill'],
+    configured: true,
+    webhook: true,
+  },
 ];
+
+/** Đúng shape `ShippingQuoteResultDto` (GET /sales-orders/:id/shipping-quote). */
+export function makeShippingQuote(orderId: string, carrierId: string) {
+  const carrier = CARRIERS.find((c) => c.id === carrierId) ?? CARRIERS[3]!;
+  return {
+    orderId,
+    docNumber: `SO-2026-${orderId.slice(-4)}`,
+    carrierId: carrier.id,
+    carrierCode: carrier.code,
+    carrierName: carrier.name,
+    fee: '28000.0000',
+    currency: 'VND',
+    serviceCode: null,
+    estimatedDeliveryAt: null,
+    weightKg: '0.7500',
+    codAmount: '1250000.0000',
+  };
+}
 
 /** Đúng shape `StockRowDto`. */
 export function makeStockRows(n: number) {
@@ -405,6 +433,10 @@ export const STATUS_LOG_FIXTURE = {
 
 export const handlers = [
   http.get('/api/carriers', () => HttpResponse.json(CARRIERS)),
+  http.get('/api/sales-orders/:id/shipping-quote', ({ params, request }) => {
+    const carrierId = new URL(request.url).searchParams.get('carrierId') ?? '';
+    return HttpResponse.json(makeShippingQuote(params.id as string, carrierId));
+  }),
   http.get('/api/auth/me', () => HttpResponse.json(ME_ADMIN)),
   http.get('/api/health', () =>
     HttpResponse.json({ status: 'ok', db: 'ok', redis: 'ok', timestamp: new Date().toISOString() }),

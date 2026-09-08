@@ -49,6 +49,15 @@ const MESSAGES: Record<string, string> = {
     'Webhook bị từ chối vì secret không khớp. Dán lại secret từ màn Kết nối Pancake vào cấu hình của Pancake.',
   PANCAKE_SECRET_KEY_MISSING:
     'Server chưa có APP_SECRET_KEY để mã hoá khoá API. Báo IT đặt biến môi trường rồi khởi động lại API.',
+  // Hãng vận chuyển (tra cước ở màn sửa đơn, vận đơn ở bàn đóng gói)
+  CARRIER_WAYBILL_DATA:
+    'Đơn chưa có địa chỉ giao đủ tỉnh/thành hoặc chưa có dòng hàng. Chọn địa chỉ giao ở hồ sơ khách rồi thử lại.',
+  CARRIER_NOT_CONFIGURED:
+    'Hãng này chưa được cấu hình token/điểm lấy hàng trên server. Báo IT đặt biến môi trường CARRIER_*.',
+  CARRIER_API_ERROR: 'Hãng vận chuyển không phản hồi hoặc trả lỗi. Thử lại sau ít phút.',
+  CARRIER_OPERATION_UNSUPPORTED:
+    'Hãng này không có bảng cước để tra. Chọn hãng khác hoặc nhập phí tay.',
+  CARRIER_NOT_FOUND: 'Hãng vận chuyển không tồn tại hoặc đã tắt. Tải lại danh sách hãng.',
   SYNC_ACTOR_NOT_FOUND: 'Tài khoản hệ thống cho đồng bộ chưa được tạo. Báo IT chạy seed dữ liệu.',
   SYNC_ACTOR_MISCONFIGURED: 'Tài khoản hệ thống cho đồng bộ đang sai cấu hình. Báo IT kiểm tra.',
 };

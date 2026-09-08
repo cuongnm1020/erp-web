@@ -1,7 +1,14 @@
 import { fireEvent, screen, waitFor } from '@testing-library/react';
 import { http, HttpResponse } from 'msw';
 import { describe, expect, it, vi } from 'vitest';
-import { CARRIERS, ME_SALE, makeOrderDetail, makeOrders, scenario } from '@/test/msw/handlers';
+import {
+  CARRIERS,
+  ME_SALE,
+  makeOrderDetail,
+  makeOrders,
+  makeShippingQuote,
+  scenario,
+} from '@/test/msw/handlers';
 import { server } from '@/test/msw/server';
 import { renderApp } from '@/test/render';
 import { OrderEditScreen } from './components/order-edit-screen';
@@ -70,6 +77,7 @@ describe('OrderEditScreen — trang sửa đơn (D-05, PATCH /sales-orders/{id})
       '— Chưa chọn —',
       `${CARRIERS[0]!.name} (MANUAL)`,
       `${CARRIERS[1]!.name} (GHN)`,
+      `${CARRIERS[3]!.name} (GHTK)`,
     ]);
     fireEvent.click(screen.getByRole('option', { name: `${CARRIERS[1]!.name} (GHN)` }));
 
@@ -78,6 +86,62 @@ describe('OrderEditScreen — trang sửa đơn (D-05, PATCH /sales-orders/{id})
       expect(calls).toEqual([{ id: ORDER.id, body: { status: 'APPROVED', carrierId: 'c-ghn' } }]),
     );
     await waitFor(() => expect(push).toHaveBeenCalledWith(`/crm/orders/${ORDER.id}`));
+  });
+
+  it('chọn hãng có bảng cước (GHTK) → hỏi GET shipping-quote?carrierId và hiện cước; hãng không có quote → không hỏi', async () => {
+    const asked: string[] = [];
+    server.use(
+      http.get('/api/sales-orders/:id/shipping-quote', ({ params, request }) => {
+        const carrierId = new URL(request.url).searchParams.get('carrierId') ?? '';
+        asked.push(`${params.id as string}?${carrierId}`);
+        return HttpResponse.json(makeShippingQuote(params.id as string, carrierId));
+      }),
+    );
+    renderApp(<OrderEditScreen orderId={ORDER.id} />);
+    await screen.findByRole('heading', { level: 1 });
+    expect(screen.queryByText('Cước hãng báo')).not.toBeInTheDocument();
+
+    // Select hãng khoá tới khi GET /carriers về.
+    const picker = screen.getByRole('combobox', { name: 'Hãng vận chuyển' });
+    await waitFor(() => expect(picker).toBeEnabled());
+    fireEvent.click(picker);
+    fireEvent.click(await screen.findByRole('option', { name: `${CARRIERS[3]!.name} (GHTK)` }));
+    expect(await screen.findByText('Cước hãng báo')).toBeInTheDocument();
+    await waitFor(() => expect(screen.getByText(/28\.000 VND · 0\.7500 kg/)).toBeInTheDocument());
+    expect(asked).toEqual([`${ORDER.id}?c-ghtk`]);
+
+    // GHN trong mock không có `quote` → dòng cước biến mất, không gọi thêm.
+    fireEvent.click(screen.getByRole('combobox', { name: 'Hãng vận chuyển' }));
+    fireEvent.click(await screen.findByRole('option', { name: `${CARRIERS[1]!.name} (GHN)` }));
+    await waitFor(() => expect(screen.queryByText('Cước hãng báo')).not.toBeInTheDocument());
+    expect(asked).toEqual([`${ORDER.id}?c-ghtk`]);
+  });
+
+  it('hỏi cước lỗi (đơn chưa có địa chỉ giao, 422) → hiện thông điệp lỗi tại chỗ, vẫn lưu được hãng', async () => {
+    server.use(
+      http.get('/api/sales-orders/:id/shipping-quote', () =>
+        HttpResponse.json(
+          {
+            code: 'CARRIER_WAYBILL_DATA',
+            message:
+              'GHTK: đơn SO-1 chưa có địa chỉ giao đủ tỉnh/thành — chọn địa chỉ giao rồi tra cước lại',
+            statusCode: 422,
+          },
+          { status: 422 },
+        ),
+      ),
+    );
+    renderApp(<OrderEditScreen orderId={ORDER.id} />);
+    await screen.findByRole('heading', { level: 1 });
+    const picker = screen.getByRole('combobox', { name: 'Hãng vận chuyển' });
+    await waitFor(() => expect(picker).toBeEnabled());
+    fireEvent.click(picker);
+    fireEvent.click(await screen.findByRole('option', { name: `${CARRIERS[3]!.name} (GHTK)` }));
+    // Luật 6: không render message thô của server — câu từ bộ dịch lỗi theo `code`.
+    await waitFor(() =>
+      expect(screen.getByText(/Đơn chưa có địa chỉ giao đủ tỉnh\/thành/)).toBeInTheDocument(),
+    );
+    expect(screen.getByRole('button', { name: /Lưu thay đổi/ })).toBeEnabled();
   });
 
   it('chọn Đã hủy → hiện ô lý do, lý do đi vào body; Ctrl+S lưu', async () => {

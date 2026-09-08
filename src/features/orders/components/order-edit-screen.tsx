@@ -25,6 +25,7 @@ import { useAbility } from '@/lib/permission';
 import { useCarriers } from '@/features/wms/api/use-shipping';
 import {
   useOrder,
+  useShippingQuote,
   useUpdateOrder,
   type SalesOrderDetail,
   type SalesOrderStatus,
@@ -119,6 +120,11 @@ function Editor({ order }: { order: SalesOrderDetail }) {
   );
 
   const nextCarrier = carrierId === NO_CARRIER ? null : carrierId;
+  // Hãng có bảng cước (GHTK, GHN…) → hỏi cước ngay khi chọn để sale thấy trước khi lưu.
+  // Hãng nội bộ (MANUAL) không có `quote` → không hỏi, không hiện dòng cước.
+  const selectedCarrier = activeCarriers.find((c) => c.id === nextCarrier) ?? null;
+  const canQuote = Boolean(selectedCarrier?.operations.includes('quote'));
+  const quote = useShippingQuote(order.id, canQuote ? nextCarrier : null);
   const statusChanged = status !== order.status;
   const carrierChanged = nextCarrier !== (order.carrierId ?? null);
   const dirty = statusChanged || carrierChanged;
@@ -411,6 +417,22 @@ function Editor({ order }: { order: SalesOrderDetail }) {
                   </SelectContent>
                 </Select>
               </Field>
+              {canQuote ? (
+                <Field label="Cước hãng báo">
+                  <span role="status" aria-live="polite" className="tabular-nums">
+                    {quote.isPending
+                      ? 'Đang hỏi cước…'
+                      : quote.isError
+                        ? messageFor(quote.error)
+                        : quote.data
+                          ? `${money(quote.data.fee)} ${quote.data.currency}` +
+                            (quote.data.weightKg === '0.0000'
+                              ? ' · SKU chưa khai cân nặng'
+                              : ` · ${quote.data.weightKg} kg`)
+                          : null}
+                  </span>
+                </Field>
+              ) : null}
               <Field label="Phí thu khách">
                 {money(order.shippingFee)} {order.currencyCode}
               </Field>

@@ -1457,6 +1457,26 @@ export interface paths {
         patch: operations["SalesOrderController_update"];
         trace?: never;
     };
+    "/sales-orders/{id}/shipping-quote": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Cước hãng cho đơn này với hãng đang chọn trên màn sửa — gọi hãng thật, CHỈ ĐỌC.
+         *     Hãng không có bảng cước → 501; thiếu địa chỉ giao → 422; hãng lỗi → 502.
+         */
+        get: operations["SalesOrderController_shippingQuote"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/sales-orders/{id}/cancel": {
         parameters: {
             query?: never;
@@ -1499,6 +1519,283 @@ export interface paths {
         get?: never;
         put?: never;
         post: operations["SalesOrderController_reject"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/carriers": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Hãng nào bật, hãng nào có adapter thật, hãng nào đã đủ token trong env. */
+        get: operations["CarrierController_list"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/carriers/{code}/quote": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Tra cước trước khi tạo vận đơn. Hãng không có bảng cước → 501 rõ ràng. */
+        post: operations["CarrierController_quote"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/shipments/{id}/waybill": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Xin vận đơn từ hãng. **Hãng lỗi KHÔNG thành lỗi HTTP**: trả
+         *     `outcome: 'QUEUED'` để bàn đóng gói đi tiếp, vận đơn cấp lại qua queue.
+         *     Đây là điểm khác duy nhất so với `POST /shipments/:id/carrier` của P1-09
+         *     (đường đồng bộ, hãng lỗi thì 502).
+         */
+        post: operations["ShipmentWaybillController_request"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/shipments/{id}/tracking": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Hỏi hãng trạng thái hiện tại. CHỈ ĐỌC — không tự ghi đè `Shipment.status`. */
+        get: operations["ShipmentWaybillController_track"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/shipments/{id}/waybill/cancel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Huỷ vận đơn bên hãng. Không đụng trạng thái phiếu giao. */
+        post: operations["ShipmentWaybillController_cancel"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/carrier/webhooks/{code}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["CarrierWebhookController_receive"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/shipments/{id}/status-log": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["CarrierStatusLogController_statusLog"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/carriers/stuck-shipments": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["CarrierStatusLogController_stuck"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/shipments": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["ShippingController_list"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/shipments/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["ShippingController_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/shipments/{id}/pack": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Đóng gói xong: task PACK → COMPLETED, ghi cân nặng + tiền thu hộ. */
+        post: operations["ShippingController_pack"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/shipments/{id}/carrier": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Gán hãng vận chuyển + sinh mã vận đơn. Tích hợp thật là P1-15. */
+        post: operations["ShippingController_assignCarrier"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/shipments/{id}/ship": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Bàn giao cho hãng vận chuyển: phiếu → PICKED_UP. KHÔNG chạm tồn (hàng đã
+         *     rời sổ kho từ bước PICK) và KHÔNG post đơn bán — xem doc block của
+         *     `ShippingService`.
+         */
+        post: operations["ShippingController_ship"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/shipments/{id}/status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Cập nhật hành trình sau khi rời kho (IN_TRANSIT / DELIVERED / FAILED /
+         *     RETURNED). Webhook của hãng (P1-15) sẽ đi vào đúng đường này.
+         */
+        post: operations["ShippingController_updateStatus"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/goods-issues": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["GoodsIssueController_list"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/goods-issues/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["GoodsIssueController_get"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -1566,38 +1863,6 @@ export interface paths {
         put?: never;
         /** Trả task về hàng đợi (ASSIGNED → PENDING) — dùng khi đổi người / nghỉ ca. */
         post: operations["TaskEngineController_unassign"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/goods-issues": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get: operations["GoodsIssueController_list"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/goods-issues/{id}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get: operations["GoodsIssueController_get"];
-        put?: never;
-        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -1729,113 +1994,6 @@ export interface paths {
          *     lần hai trả `DOCUMENT_POSTED` 409 — chính nó là lưới chống trùng.
          */
         post: operations["ReceivingController_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/shipments": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get: operations["ShippingController_list"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/shipments/{id}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get: operations["ShippingController_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/shipments/{id}/pack": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** Đóng gói xong: task PACK → COMPLETED, ghi cân nặng + tiền thu hộ. */
-        post: operations["ShippingController_pack"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/shipments/{id}/carrier": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** Gán hãng vận chuyển + sinh mã vận đơn. Tích hợp thật là P1-15. */
-        post: operations["ShippingController_assignCarrier"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/shipments/{id}/ship": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Bàn giao cho hãng vận chuyển: phiếu → PICKED_UP. KHÔNG chạm tồn (hàng đã
-         *     rời sổ kho từ bước PICK) và KHÔNG post đơn bán — xem doc block của
-         *     `ShippingService`.
-         */
-        post: operations["ShippingController_ship"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/shipments/{id}/status": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Cập nhật hành trình sau khi rời kho (IN_TRANSIT / DELIVERED / FAILED /
-         *     RETURNED). Webhook của hãng (P1-15) sẽ đi vào đúng đường này.
-         */
-        post: operations["ShippingController_updateStatus"];
         delete?: never;
         options?: never;
         head?: never;
@@ -2005,144 +2163,6 @@ export interface paths {
         put?: never;
         /** Từ chối → trả về đếm lại (DRAFT), tồn sổ giữ nguyên. */
         post: operations["StocktakeController_reject"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/carriers": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Hãng nào bật, hãng nào có adapter thật, hãng nào đã đủ token trong env. */
-        get: operations["CarrierController_list"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/carriers/{code}/quote": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** Tra cước trước khi tạo vận đơn. Hãng không có bảng cước → 501 rõ ràng. */
-        post: operations["CarrierController_quote"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/shipments/{id}/waybill": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Xin vận đơn từ hãng. **Hãng lỗi KHÔNG thành lỗi HTTP**: trả
-         *     `outcome: 'QUEUED'` để bàn đóng gói đi tiếp, vận đơn cấp lại qua queue.
-         *     Đây là điểm khác duy nhất so với `POST /shipments/:id/carrier` của P1-09
-         *     (đường đồng bộ, hãng lỗi thì 502).
-         */
-        post: operations["ShipmentWaybillController_request"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/shipments/{id}/tracking": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Hỏi hãng trạng thái hiện tại. CHỈ ĐỌC — không tự ghi đè `Shipment.status`. */
-        get: operations["ShipmentWaybillController_track"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/shipments/{id}/waybill/cancel": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** Huỷ vận đơn bên hãng. Không đụng trạng thái phiếu giao. */
-        post: operations["ShipmentWaybillController_cancel"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/carrier/webhooks/{code}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post: operations["CarrierWebhookController_receive"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/shipments/{id}/status-log": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get: operations["CarrierStatusLogController_statusLog"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/carriers/stuck-shipments": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get: operations["CarrierStatusLogController_stuck"];
-        put?: never;
-        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -3959,6 +3979,22 @@ export interface components {
             carrier: components["schemas"]["SalesOrderCarrierDto"] | null;
             lines: components["schemas"]["SalesOrderLineDto"][];
         };
+        ShippingQuoteResultDto: {
+            orderId: string;
+            docNumber: string;
+            carrierId: string;
+            carrierCode: string;
+            carrierName: string;
+            /** @description Decimal(18,4) dạng chuỗi. */
+            fee: string;
+            currency: string;
+            serviceCode: string | null;
+            estimatedDeliveryAt: string | null;
+            /** @description Cân nặng đã gửi hãng (kg, Decimal(12,4)); `0.0000` = SKU chưa khai cân nặng. */
+            weightKg: string;
+            /** @description Tiền thu hộ đã gửi hãng = tổng đơn, Decimal(18,4). */
+            codAmount: string;
+        };
         CreateOrderLineDto: {
             /** Format: uuid */
             skuId: string;
@@ -4082,63 +4118,106 @@ export interface components {
             /** @description true = đã qua bước duyệt cuối → đơn sang APPROVED và event đã emit. */
             completed: boolean;
         };
-        TaskRowDto: {
-            id: string;
-            docNumber: string;
-            /** @enum {string} */
-            type: "PUT_AWAY" | "PICK" | "PACK" | "SHIP" | "TRANSFER" | "RECEIVE" | "COUNT" | "REPLENISH";
-            /** @enum {string} */
-            status: "CANCELLED" | "PENDING" | "ASSIGNED" | "IN_PROGRESS" | "COMPLETED" | "EXCEPTION";
-            /** @description Càng lớn càng gấp. */
-            priority: number;
-            /** @description `Task.assignedTo` — null = chưa giao cho ai. */
-            assigneeId: string | null;
-            warehouseId: string;
-            warehouseCode: string;
-            warehouseName: string;
-            waveId: string | null;
-            lineCount: number;
-            /** @description Tổng số lượng kế hoạch của mọi dòng — Decimal(18,6) dạng chuỗi. */
-            qtyPlanned: string;
-            /** @description Tổng số lượng đã làm — Decimal(18,6) dạng chuỗi. */
-            qtyDone: string;
-            /** @description Chứng từ nguồn ("SalesOrder", "GoodsReceipt"…). */
-            refType: string | null;
-            refId: string | null;
-            createdAt: string;
-            assignedAt: string | null;
-            startedAt: string | null;
-            completedAt: string | null;
-            /** @description Phút kể từ lúc tạo tới lúc xong (hoặc tới bây giờ nếu chưa xong). */
-            ageMinutes: number;
-            /**
-             * @description Phút việc nằm im ở trạng thái hiện tại (chưa giao: từ lúc tạo; đã giao mà
-             *     chưa bắt đầu: từ lúc giao; đang làm: từ lúc bắt đầu). 0 với việc đã kết thúc.
-             */
-            idleMinutes: number;
-        };
-        TaskListResponseDto: {
-            items: components["schemas"]["TaskRowDto"][];
-            total: number;
-        };
-        TaskAssigneeDto: {
+        CarrierDto: {
             id: string;
             code: string;
-            fullName: string;
+            name: string;
+            isActive: boolean;
+            /** @description false = rơi về LocalCarrierAdapter (mã vận đơn nội bộ, không gọi mạng). */
+            hasAdapter: boolean;
+            operations: string[];
+            /** @description true = đủ token trong env để gọi ra hãng. */
+            configured: boolean;
+            webhook: boolean;
         };
-        AssignTaskDto: {
-            /**
-             * Format: uuid
-             * @description Nhân viên kho nhận việc — phải tồn tại và đang active.
-             */
-            userId: string;
+        CarrierAddressDto: {
+            provinceCode?: string;
+            districtCode?: string;
+            wardCode?: string;
+            address?: string;
         };
-        TaskStateResultDto: {
-            taskId: string;
-            docNumber: string;
+        QuoteDto: {
+            from: components["schemas"]["CarrierAddressDto"];
+            to: components["schemas"]["CarrierAddressDto"];
+            /** @description `Decimal(12,4)` kg dạng CHUỖI — cấm `number` cho số đo (CLAUDE.md). */
+            weightKg: string;
+            /** @description Tiền thu hộ, `Decimal(18,4)` dạng chuỗi. */
+            codAmount?: string;
+            /** @description Giá trị khai giá để bảo hiểm, `Decimal(18,4)` dạng chuỗi. */
+            insuranceValue?: string;
+            /** @description Mã dịch vụ của hãng (nhanh / tiết kiệm). Bỏ trống = dịch vụ mặc định. */
+            serviceCode?: string;
+        };
+        RequestWaybillDto: {
+            /** @description `wms.Carrier.code` — hãng phải đang active. */
+            carrierCode: string;
+        };
+        CancelWaybillDto: {
+            reason?: string;
+        };
+        CarrierStatusLogDto: {
+            id: string;
             /** @enum {string} */
-            status: "CANCELLED" | "PENDING" | "ASSIGNED" | "IN_PROGRESS" | "COMPLETED" | "EXCEPTION";
-            assignedTo: string | null;
+            source: "WEBHOOK" | "POLL";
+            carrierCode: string;
+            carrierName: string;
+            trackingNo: string;
+            /** @description Mã thô của hãng. */
+            carrierStatusCode: string;
+            /** @enum {string|null} */
+            mappedStatus: "PENDING" | "PICKED_UP" | "IN_TRANSIT" | "DELIVERED" | "FAILED" | "RETURNED" | null;
+            /** @enum {string} */
+            outcome: "NOT_FOUND" | "APPLIED" | "DUPLICATE" | "REJECTED_UNMAPPED" | "REJECTED_TRANSITION";
+            note: string | null;
+            /** @description Mốc theo hãng (null = hãng không trả). */
+            occurredAt: string | null;
+            createdAt: string;
+        };
+        CarrierStatusLogListDto: {
+            shipmentId: string;
+            shipmentDocNumber: string;
+            items: components["schemas"]["CarrierStatusLogDto"][];
+        };
+        StuckShipmentDto: {
+            id: string;
+            docNumber: string;
+            orderId: string | null;
+            /** @enum {string} */
+            status: "PENDING" | "PICKED_UP" | "IN_TRANSIT" | "DELIVERED" | "FAILED" | "RETURNED";
+            carrierCode: string | null;
+            carrierName: string | null;
+            trackingNo: string | null;
+            shippedAt: string | null;
+            /** @description Lần poller hỏi hãng gần nhất. */
+            lastCarrierSyncAt: string | null;
+            /** @description Mã thô gần nhất hãng trả. */
+            carrierStatusCode: string | null;
+            daysSinceShipped: number;
+        };
+        StuckShipmentListDto: {
+            items: components["schemas"]["StuckShipmentDto"][];
+            total: number;
+        };
+        PackDto: {
+            /**
+             * @description Cân nặng kiện hàng, `Decimal(12,4)` dạng CHUỖI — cấm `number` cho số đo
+             *     (CLAUDE.md). Cân ở bàn đóng gói; bỏ trống = chưa cân.
+             */
+            weightKg?: string;
+            /** @description Tiền thu hộ, `Decimal(18,4)` dạng chuỗi. Bỏ trống = không thu hộ. */
+            codAmount?: string;
+        };
+        AssignCarrierDto: {
+            /** @description `wms.Carrier.code` — hãng phải đang active. */
+            carrierCode: string;
+        };
+        UpdateShipmentStatusDto: {
+            /**
+             * @description Trạng thái mới. PENDING không nhận ở đây: rời kho là việc của
+             *     `POST /shipments/:id/ship`, không phải một lần đổi trạng thái tuỳ ý.
+             * @enum {string}
+             */
+            status: "PENDING" | "PICKED_UP" | "IN_TRANSIT" | "DELIVERED" | "FAILED" | "RETURNED";
         };
         GoodsIssueListRowDto: {
             id: string;
@@ -4211,6 +4290,64 @@ export interface components {
             packStatus: "CANCELLED" | "PENDING" | "ASSIGNED" | "IN_PROGRESS" | "COMPLETED" | "EXCEPTION" | null;
             lineCount: number;
             lines: components["schemas"]["GoodsIssueLineDto"][];
+        };
+        TaskRowDto: {
+            id: string;
+            docNumber: string;
+            /** @enum {string} */
+            type: "PUT_AWAY" | "PICK" | "PACK" | "SHIP" | "TRANSFER" | "RECEIVE" | "COUNT" | "REPLENISH";
+            /** @enum {string} */
+            status: "CANCELLED" | "PENDING" | "ASSIGNED" | "IN_PROGRESS" | "COMPLETED" | "EXCEPTION";
+            /** @description Càng lớn càng gấp. */
+            priority: number;
+            /** @description `Task.assignedTo` — null = chưa giao cho ai. */
+            assigneeId: string | null;
+            warehouseId: string;
+            warehouseCode: string;
+            warehouseName: string;
+            waveId: string | null;
+            lineCount: number;
+            /** @description Tổng số lượng kế hoạch của mọi dòng — Decimal(18,6) dạng chuỗi. */
+            qtyPlanned: string;
+            /** @description Tổng số lượng đã làm — Decimal(18,6) dạng chuỗi. */
+            qtyDone: string;
+            /** @description Chứng từ nguồn ("SalesOrder", "GoodsReceipt"…). */
+            refType: string | null;
+            refId: string | null;
+            createdAt: string;
+            assignedAt: string | null;
+            startedAt: string | null;
+            completedAt: string | null;
+            /** @description Phút kể từ lúc tạo tới lúc xong (hoặc tới bây giờ nếu chưa xong). */
+            ageMinutes: number;
+            /**
+             * @description Phút việc nằm im ở trạng thái hiện tại (chưa giao: từ lúc tạo; đã giao mà
+             *     chưa bắt đầu: từ lúc giao; đang làm: từ lúc bắt đầu). 0 với việc đã kết thúc.
+             */
+            idleMinutes: number;
+        };
+        TaskListResponseDto: {
+            items: components["schemas"]["TaskRowDto"][];
+            total: number;
+        };
+        TaskAssigneeDto: {
+            id: string;
+            code: string;
+            fullName: string;
+        };
+        AssignTaskDto: {
+            /**
+             * Format: uuid
+             * @description Nhân viên kho nhận việc — phải tồn tại và đang active.
+             */
+            userId: string;
+        };
+        TaskStateResultDto: {
+            taskId: string;
+            docNumber: string;
+            /** @enum {string} */
+            status: "CANCELLED" | "PENDING" | "ASSIGNED" | "IN_PROGRESS" | "COMPLETED" | "EXCEPTION";
+            assignedTo: string | null;
         };
         ScanDto: {
             /** Format: uuid */
@@ -4363,27 +4500,6 @@ export interface components {
              * @description Vị trí nhận thực tế; bỏ trống thì service tự chọn DOCK/STAGING của kho.
              */
             receiveLocationId?: string;
-        };
-        PackDto: {
-            /**
-             * @description Cân nặng kiện hàng, `Decimal(12,4)` dạng CHUỖI — cấm `number` cho số đo
-             *     (CLAUDE.md). Cân ở bàn đóng gói; bỏ trống = chưa cân.
-             */
-            weightKg?: string;
-            /** @description Tiền thu hộ, `Decimal(18,4)` dạng chuỗi. Bỏ trống = không thu hộ. */
-            codAmount?: string;
-        };
-        AssignCarrierDto: {
-            /** @description `wms.Carrier.code` — hãng phải đang active. */
-            carrierCode: string;
-        };
-        UpdateShipmentStatusDto: {
-            /**
-             * @description Trạng thái mới. PENDING không nhận ở đây: rời kho là việc của
-             *     `POST /shipments/:id/ship`, không phải một lần đổi trạng thái tuỳ ý.
-             * @enum {string}
-             */
-            status: "PENDING" | "PICKED_UP" | "IN_TRANSIT" | "DELIVERED" | "FAILED" | "RETURNED";
         };
         TransferListRowDto: {
             id: string;
@@ -4585,86 +4701,6 @@ export interface components {
             docNumber: string;
             status: string;
             adjustedLineCount: number;
-        };
-        CarrierDto: {
-            id: string;
-            code: string;
-            name: string;
-            isActive: boolean;
-            /** @description false = rơi về LocalCarrierAdapter (mã vận đơn nội bộ, không gọi mạng). */
-            hasAdapter: boolean;
-            operations: string[];
-            /** @description true = đủ token trong env để gọi ra hãng. */
-            configured: boolean;
-            webhook: boolean;
-        };
-        CarrierAddressDto: {
-            provinceCode?: string;
-            districtCode?: string;
-            wardCode?: string;
-            address?: string;
-        };
-        QuoteDto: {
-            from: components["schemas"]["CarrierAddressDto"];
-            to: components["schemas"]["CarrierAddressDto"];
-            /** @description `Decimal(12,4)` kg dạng CHUỖI — cấm `number` cho số đo (CLAUDE.md). */
-            weightKg: string;
-            /** @description Tiền thu hộ, `Decimal(18,4)` dạng chuỗi. */
-            codAmount?: string;
-            /** @description Giá trị khai giá để bảo hiểm, `Decimal(18,4)` dạng chuỗi. */
-            insuranceValue?: string;
-            /** @description Mã dịch vụ của hãng (nhanh / tiết kiệm). Bỏ trống = dịch vụ mặc định. */
-            serviceCode?: string;
-        };
-        RequestWaybillDto: {
-            /** @description `wms.Carrier.code` — hãng phải đang active. */
-            carrierCode: string;
-        };
-        CancelWaybillDto: {
-            reason?: string;
-        };
-        CarrierStatusLogDto: {
-            id: string;
-            /** @enum {string} */
-            source: "WEBHOOK" | "POLL";
-            carrierCode: string;
-            carrierName: string;
-            trackingNo: string;
-            /** @description Mã thô của hãng. */
-            carrierStatusCode: string;
-            /** @enum {string|null} */
-            mappedStatus: "PENDING" | "PICKED_UP" | "IN_TRANSIT" | "DELIVERED" | "FAILED" | "RETURNED" | null;
-            /** @enum {string} */
-            outcome: "NOT_FOUND" | "APPLIED" | "DUPLICATE" | "REJECTED_UNMAPPED" | "REJECTED_TRANSITION";
-            note: string | null;
-            /** @description Mốc theo hãng (null = hãng không trả). */
-            occurredAt: string | null;
-            createdAt: string;
-        };
-        CarrierStatusLogListDto: {
-            shipmentId: string;
-            shipmentDocNumber: string;
-            items: components["schemas"]["CarrierStatusLogDto"][];
-        };
-        StuckShipmentDto: {
-            id: string;
-            docNumber: string;
-            orderId: string | null;
-            /** @enum {string} */
-            status: "PENDING" | "PICKED_UP" | "IN_TRANSIT" | "DELIVERED" | "FAILED" | "RETURNED";
-            carrierCode: string | null;
-            carrierName: string | null;
-            trackingNo: string | null;
-            shippedAt: string | null;
-            /** @description Lần poller hỏi hãng gần nhất. */
-            lastCarrierSyncAt: string | null;
-            /** @description Mã thô gần nhất hãng trả. */
-            carrierStatusCode: string | null;
-            daysSinceShipped: number;
-        };
-        StuckShipmentListDto: {
-            items: components["schemas"]["StuckShipmentDto"][];
-            total: number;
         };
         IssueInvoiceDto: {
             /** Format: uuid */
@@ -7797,6 +7833,30 @@ export interface operations {
             };
         };
     };
+    SalesOrderController_shippingQuote: {
+        parameters: {
+            query: {
+                /** @description wms.Carrier.id đang hoạt động. */
+                carrierId: string;
+            };
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ShippingQuoteResultDto"];
+                };
+            };
+        };
+    };
     SalesOrderController_cancel: {
         parameters: {
             query?: never;
@@ -7868,6 +7928,376 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ApproveOrderResultDto"];
+                };
+            };
+        };
+    };
+    CarrierController_list: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CarrierDto"][];
+                };
+            };
+        };
+    };
+    CarrierController_quote: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                code: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["QuoteDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+        };
+    };
+    ShipmentWaybillController_request: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RequestWaybillDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+        };
+    };
+    ShipmentWaybillController_track: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+        };
+    };
+    ShipmentWaybillController_cancel: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CancelWaybillDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+        };
+    };
+    CarrierWebhookController_receive: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                code: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+        };
+    };
+    CarrierStatusLogController_statusLog: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CarrierStatusLogListDto"];
+                };
+            };
+        };
+    };
+    CarrierStatusLogController_stuck: {
+        parameters: {
+            query: {
+                /** @description Treo = quá N ngày kể từ shippedAt mà chưa terminal. Quyết định #3: mặc định 5. */
+                days: number;
+                take: number;
+                skip: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StuckShipmentListDto"];
+                };
+            };
+        };
+    };
+    ShippingController_list: {
+        parameters: {
+            query?: {
+                orderId?: string;
+                status?: "PENDING" | "PICKED_UP" | "IN_TRANSIT" | "DELIVERED" | "FAILED" | "RETURNED";
+                take?: number;
+                skip?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+        };
+    };
+    ShippingController_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+        };
+    };
+    ShippingController_pack: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PackDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+        };
+    };
+    ShippingController_assignCarrier: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AssignCarrierDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+        };
+    };
+    ShippingController_ship: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+        };
+    };
+    ShippingController_updateStatus: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateShipmentStatusDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+        };
+    };
+    GoodsIssueController_list: {
+        parameters: {
+            query: {
+                warehouseId?: string;
+                kind?: "SALES" | "OTHER" | "TRANSFER" | "RETURN_TO_SUPPLIER";
+                status?: "DRAFT" | "PENDING_APPROVAL" | "APPROVED" | "POSTED" | "CANCELLED";
+                /** @description Tìm theo số phiếu (contains, không phân biệt hoa thường). */
+                q?: string;
+                take: number;
+                skip: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GoodsIssueListResponseDto"];
+                };
+            };
+        };
+    };
+    GoodsIssueController_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GoodsIssueDetailDto"];
                 };
             };
         };
@@ -7960,54 +8390,6 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["TaskStateResultDto"];
-                };
-            };
-        };
-    };
-    GoodsIssueController_list: {
-        parameters: {
-            query: {
-                warehouseId?: string;
-                kind?: "SALES" | "OTHER" | "TRANSFER" | "RETURN_TO_SUPPLIER";
-                status?: "DRAFT" | "PENDING_APPROVAL" | "APPROVED" | "POSTED" | "CANCELLED";
-                /** @description Tìm theo số phiếu (contains, không phân biệt hoa thường). */
-                q?: string;
-                take: number;
-                skip: number;
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["GoodsIssueListResponseDto"];
-                };
-            };
-        };
-    };
-    GoodsIssueController_get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["GoodsIssueDetailDto"];
                 };
             };
         };
@@ -8205,147 +8587,6 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": components["schemas"]["PostReceiptDto"];
-            };
-        };
-        responses: {
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": Record<string, never>;
-                };
-            };
-        };
-    };
-    ShippingController_list: {
-        parameters: {
-            query?: {
-                orderId?: string;
-                status?: "PENDING" | "PICKED_UP" | "IN_TRANSIT" | "DELIVERED" | "FAILED" | "RETURNED";
-                take?: number;
-                skip?: number;
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": Record<string, never>;
-                };
-            };
-        };
-    };
-    ShippingController_get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": Record<string, never>;
-                };
-            };
-        };
-    };
-    ShippingController_pack: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["PackDto"];
-            };
-        };
-        responses: {
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": Record<string, never>;
-                };
-            };
-        };
-    };
-    ShippingController_assignCarrier: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["AssignCarrierDto"];
-            };
-        };
-        responses: {
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": Record<string, never>;
-                };
-            };
-        };
-    };
-    ShippingController_ship: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": Record<string, never>;
-                };
-            };
-        };
-    };
-    ShippingController_updateStatus: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["UpdateShipmentStatusDto"];
             };
         };
         responses: {
@@ -8646,187 +8887,6 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["CycleCountStateResultDto"];
-                };
-            };
-        };
-    };
-    CarrierController_list: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["CarrierDto"][];
-                };
-            };
-        };
-    };
-    CarrierController_quote: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                code: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["QuoteDto"];
-            };
-        };
-        responses: {
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": Record<string, never>;
-                };
-            };
-        };
-    };
-    ShipmentWaybillController_request: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["RequestWaybillDto"];
-            };
-        };
-        responses: {
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": Record<string, never>;
-                };
-            };
-        };
-    };
-    ShipmentWaybillController_track: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": Record<string, never>;
-                };
-            };
-        };
-    };
-    ShipmentWaybillController_cancel: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["CancelWaybillDto"];
-            };
-        };
-        responses: {
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": Record<string, never>;
-                };
-            };
-        };
-    };
-    CarrierWebhookController_receive: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                code: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": Record<string, never>;
-                };
-            };
-        };
-    };
-    CarrierStatusLogController_statusLog: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["CarrierStatusLogListDto"];
-                };
-            };
-        };
-    };
-    CarrierStatusLogController_stuck: {
-        parameters: {
-            query: {
-                /** @description Treo = quá N ngày kể từ shippedAt mà chưa terminal. Quyết định #3: mặc định 5. */
-                days: number;
-                take: number;
-                skip: number;
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["StuckShipmentListDto"];
                 };
             };
         };
