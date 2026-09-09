@@ -54,6 +54,9 @@ const ORDER_CHANNELS = ['DIRECT', 'MARKETPLACE', 'WEBSITE', 'POS'] as const;
 const uuid = (prefix: string, i: number) =>
   `${prefix}-0000-4000-8000-${String(i).padStart(12, '0')}`;
 
+/** Σ dòng × cân nặng SKU của fixture đơn, xoay vòng 5 mức (kg, Decimal(12,4) chuỗi). */
+export const LINE_WEIGHTS = ['0.3000', '0.6000', '0.9000', '1.2000', '1.5000'] as const;
+
 /** Đúng shape `SalesOrderHeaderDto` trong openapi.json. */
 export function makeOrders(n: number) {
   return Array.from({ length: n }, (_, i) => ({
@@ -78,6 +81,10 @@ export function makeOrders(n: number) {
     teamId: 't-hn',
     carrierId: null,
     warehouseId: null,
+    // Cân nặng: đặt tay 1 kg ở mỗi đơn thứ 4; còn lại tính từ dòng 0,3 → 1,5 kg.
+    shippingWeightKg: i % 4 === 0 ? '1.0000' : null,
+    lineWeightKg: LINE_WEIGHTS[i % 5]!,
+    weightKg: i % 4 === 0 ? '1.0000' : LINE_WEIGHTS[i % 5]!,
     postedAt:
       ORDER_STATUSES[i % ORDER_STATUSES.length] === 'POSTED' ? '2026-08-24T02:00:00.000Z' : null,
     createdAt: new Date(Date.UTC(2026, 7, 23) - i * 3_600_000).toISOString(),
@@ -503,6 +510,9 @@ export const handlers = [
     const q = (url.searchParams.get('q') ?? '').toLowerCase();
     const status = url.searchParams.get('status');
     const customerId = url.searchParams.get('customerId');
+    const weightMin = url.searchParams.get('weightMin');
+    const weightMax = url.searchParams.get('weightMax');
+    const noCarrier = url.searchParams.get('noCarrier') === 'true';
     await delay(50);
     let all = makeOrders(60);
     if (q)
@@ -511,7 +521,42 @@ export const handlers = [
       );
     if (status) all = all.filter((o) => o.status === status);
     if (customerId) all = all.filter((o) => o.customer.id === customerId);
+    // Fixture thôi — so sánh bằng Number là đủ, không phải tiền.
+    if (weightMin) all = all.filter((o) => Number(o.weightKg) >= Number(weightMin));
+    if (weightMax) all = all.filter((o) => Number(o.weightKg) <= Number(weightMax));
+    if (noCarrier) all = all.filter((o) => o.carrierId === null);
     return HttpResponse.json({ items: all.slice(skip, skip + take), total: all.length });
+  }),
+  http.post('/api/sales-orders/bulk-update', async ({ request }) => {
+    const body = (await request.json()) as {
+      orderIds: string[];
+      carrierId?: string | null;
+      shippingWeightKg?: string | null;
+    };
+    await delay(30);
+    const byId = new Map(makeOrders(60).map((o) => [o.id, o]));
+    return HttpResponse.json(
+      {
+        updated: body.orderIds
+          .filter((id) => byId.has(id))
+          .map((id) => ({
+            orderId: id,
+            docNumber: byId.get(id)!.docNumber,
+            status: byId.get(id)!.status,
+            carrierId: body.carrierId === undefined ? null : body.carrierId,
+            warehouseId: null,
+            shippingWeightKg: body.shippingWeightKg ?? null,
+            changed: [
+              ...(body.carrierId !== undefined ? ['carrierId'] : []),
+              ...(body.shippingWeightKg !== undefined ? ['shippingWeightKg'] : []),
+            ],
+          })),
+        failed: body.orderIds
+          .filter((id) => !byId.has(id))
+          .map((id) => ({ orderId: id, docNumber: null, code: 'NOT_FOUND', message: 'not found' })),
+      },
+      { status: 201 },
+    );
   }),
   http.get('/api/sales-orders/:id', async ({ params }) => {
     await delay(50);

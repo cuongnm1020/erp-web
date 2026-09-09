@@ -16,6 +16,11 @@ export interface OrderListParams {
   q?: string;
   status?: SalesOrderStatus;
   customerId?: string;
+  /** Cân nặng gửi hãng hiệu lực (kg, chuỗi decimal) — cận dưới / cận trên. */
+  weightMin?: string;
+  weightMax?: string;
+  /** true = chỉ đơn chưa chọn hãng. */
+  noCarrier?: boolean;
   take: number;
   skip: number;
 }
@@ -48,6 +53,9 @@ export function useOrders(params: OrderListParams) {
               q: params.q || undefined,
               status: params.status,
               customerId: params.customerId || undefined,
+              weightMin: params.weightMin || undefined,
+              weightMax: params.weightMax || undefined,
+              noCarrier: params.noCarrier ? 'true' : undefined,
               take: params.take,
               skip: params.skip,
             },
@@ -55,6 +63,26 @@ export function useOrders(params: OrderListParams) {
         }),
       ),
     placeholderData: keepPreviousData,
+  });
+}
+
+export type BulkUpdateOrdersBody = components['schemas']['BulkUpdateOrdersDto'];
+export type BulkUpdateOrdersResult = components['schemas']['BulkUpdateOrdersResultDto'];
+
+/**
+ * POST /sales-orders/bulk-update — gán hãng / đặt cân nặng gửi hãng cho nhiều đơn chọn trên
+ * danh sách. Server sửa từng đơn một transaction; đơn hỏng (đã chốt/hủy, ngoài scope) về
+ * trong `failed`, phần còn lại vẫn lưu. Không optimistic (luật 5).
+ */
+export function useBulkUpdateOrders() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (body: BulkUpdateOrdersBody) =>
+      unwrap(api.POST('/sales-orders/bulk-update', { body })),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: orderKeys.lists() });
+      void qc.invalidateQueries({ queryKey: orderKeys.details() });
+    },
   });
 }
 

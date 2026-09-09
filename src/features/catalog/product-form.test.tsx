@@ -63,13 +63,14 @@ describe('ProductFormScreen — tạo (design/Products/ProductForm)', () => {
     expect(posts).toHaveLength(0);
   });
 
-  it('ô mã sản phẩm / mã SKU / barcode / trọng lượng / ĐVT phụ đang ẩn — không render input', async () => {
+  it('ô mã sản phẩm / mã SKU / barcode / ĐVT phụ đang ẩn — không render input; cân nặng (g) có mặt', async () => {
     server.use(...baseHandlers());
     renderApp(<ProductFormScreen />);
     await screen.findByLabelText('Tên sản phẩm *');
-    for (const label of ['Mã sản phẩm', 'Mã SKU', 'Barcode lẻ', 'Trọng lượng (g)', 'ĐVT phụ']) {
+    for (const label of ['Mã sản phẩm', 'Mã SKU', 'Barcode lẻ', 'ĐVT phụ']) {
       expect(screen.queryByLabelText(label)).not.toBeInTheDocument();
     }
+    expect(screen.getByLabelText('Cân nặng (g)')).toBeInTheDocument();
     expect(screen.queryByRole('combobox', { name: 'Theo dõi lô / HSD' })).not.toBeInTheDocument();
   });
 

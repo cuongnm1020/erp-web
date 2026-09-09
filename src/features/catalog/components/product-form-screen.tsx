@@ -1152,24 +1152,28 @@ function SkuRow({
             </FormItem>
           )}
         />
-        {/* <FormField
+        <FormField
           control={form.control}
           name={`skus.${index}.weightG`}
           render={({ field }) => (
             <FormItem>
-              <FormLabel className="text-xs text-muted-foreground">Trọng lượng (g)</FormLabel>
+              <FormLabel className="text-xs text-muted-foreground">Cân nặng (g)</FormLabel>
               <FormControl>
                 <Input
                   inputMode="decimal"
+                  placeholder="vd 250"
                   className="text-right tabular-nums"
                   {...field}
                   value={field.value ?? ''}
                 />
               </FormControl>
+              <FormDescription className="text-[11px]">
+                Tính cước hãng vận chuyển; lưu theo kg trên SKU
+              </FormDescription>
               <FormMessage />
             </FormItem>
           )}
-        /> */}
+        />
         {saved ? (
           <FormItem>
             <FormLabel className="text-xs text-muted-foreground">Tồn kho</FormLabel>

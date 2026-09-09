@@ -1477,6 +1477,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/sales-orders/bulk-update": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Gán hãng / đặt cân nặng cho nhiều đơn chọn trên danh sách (vd lọc các đơn 1,2 kg
+         *     rồi đặt 1 kg và gán GHTK một lượt). Từng đơn một transaction; đơn hỏng nằm ở `failed`.
+         */
+        post: operations["SalesOrderController_bulkUpdate"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/sales-orders/{id}/cancel": {
         parameters: {
             query?: never;
@@ -3936,6 +3956,12 @@ export interface components {
             carrierId: string | null;
             /** @description Kho lấy hàng chọn khi sửa đơn (wms.Warehouse.id) — điểm lấy khi tra cước hãng. */
             warehouseId: string | null;
+            /** @description Cân nặng đặt tay (kg, Decimal(12,4) chuỗi); null = chưa đặt. */
+            shippingWeightKg: string | null;
+            /** @description Σ qtyBase × Sku.weightKg của các dòng (kg, Decimal(12,4) chuỗi); SKU chưa khai = 0. */
+            lineWeightKg: string;
+            /** @description Cân nặng gửi hãng hiệu lực = shippingWeightKg ?? lineWeightKg. */
+            weightKg: string;
             /** @description ISO datetime — chỉ có khi đơn POSTED. */
             postedAt: string | null;
             createdAt: string;
@@ -4013,6 +4039,12 @@ export interface components {
             carrierId: string | null;
             /** @description Kho lấy hàng chọn khi sửa đơn (wms.Warehouse.id) — điểm lấy khi tra cước hãng. */
             warehouseId: string | null;
+            /** @description Cân nặng đặt tay (kg, Decimal(12,4) chuỗi); null = chưa đặt. */
+            shippingWeightKg: string | null;
+            /** @description Σ qtyBase × Sku.weightKg của các dòng (kg, Decimal(12,4) chuỗi); SKU chưa khai = 0. */
+            lineWeightKg: string;
+            /** @description Cân nặng gửi hãng hiệu lực = shippingWeightKg ?? lineWeightKg. */
+            weightKg: string;
             /** @description ISO datetime — chỉ có khi đơn POSTED. */
             postedAt: string | null;
             createdAt: string;
@@ -4136,6 +4168,8 @@ export interface components {
              * @description wms.Warehouse.id đang dùng (kho lấy hàng); `null` = bỏ chọn.
              */
             warehouseId?: string | null;
+            /** @description Cân nặng gửi hãng (kg, chuỗi decimal > 0, tối đa 4 số lẻ); `null` = về cân nặng tính từ dòng. */
+            shippingWeightKg?: string | null;
             /** @description Lý do (khi hủy) — ghi vào event OrderCancelled. */
             reason?: string;
         };
@@ -4146,8 +4180,31 @@ export interface components {
             status: "DRAFT" | "PENDING_APPROVAL" | "APPROVED" | "POSTED" | "CANCELLED";
             carrierId: string | null;
             warehouseId: string | null;
-            /** @description Trường đã đổi thật ('status' | 'carrierId' | 'warehouseId'); rỗng = không có gì thay đổi. */
+            /** @description Cân nặng đặt tay (kg, Decimal(12,4) chuỗi); null = dùng cân nặng tính từ dòng. */
+            shippingWeightKg: string | null;
+            /** @description Trường đã đổi thật ('status' | 'carrierId' | 'warehouseId' | 'shippingWeightKg'); rỗng = không có gì thay đổi. */
             changed: string[];
+        };
+        BulkUpdateOrdersDto: {
+            orderIds: string[];
+            /**
+             * Format: uuid
+             * @description wms.Carrier.id đang hoạt động; `null` = bỏ chọn hãng; bỏ trống = giữ nguyên.
+             */
+            carrierId?: string | null;
+            /** @description Cân nặng gửi hãng (kg) cho TẤT CẢ đơn đã chọn; `null` = về cân nặng tính từ dòng. */
+            shippingWeightKg?: string | null;
+        };
+        BulkUpdateFailedItemDto: {
+            orderId: string;
+            docNumber: string | null;
+            /** @description Mã lỗi nghiệp vụ (NOT_FOUND, ORDER_NOT_EDITABLE…). */
+            code: string;
+            message: string;
+        };
+        BulkUpdateOrdersResultDto: {
+            updated: components["schemas"]["UpdateOrderResultDto"][];
+            failed: components["schemas"]["BulkUpdateFailedItemDto"][];
         };
         CancelOrderDto: {
             reason?: string;
@@ -7808,6 +7865,12 @@ export interface operations {
             query: {
                 customerId?: string;
                 status?: "DRAFT" | "PENDING_APPROVAL" | "APPROVED" | "POSTED" | "CANCELLED";
+                /** @description Lọc theo cân nặng gửi hãng HIỆU LỰC (đặt tay, không thì Σ dòng) — kg, chuỗi decimal, cận dưới (≥). */
+                weightMin?: string;
+                /** @description Cận trên (≤), kg. Cùng giá trị với weightMin = lọc đúng một mức cân. */
+                weightMax?: string;
+                /** @description Chỉ đơn CHƯA chọn hãng (`true`) — gom đơn cần gán hãng. */
+                noCarrier?: string;
                 /** @description Tìm theo số chứng từ, mã hoặc tên khách (không phân biệt hoa thường). */
                 q?: string;
                 take: number;
@@ -7922,6 +7985,29 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ShippingQuoteResultDto"];
+                };
+            };
+        };
+    };
+    SalesOrderController_bulkUpdate: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BulkUpdateOrdersDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BulkUpdateOrdersResultDto"];
                 };
             };
         };

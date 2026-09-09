@@ -1,15 +1,17 @@
 'use client';
 
+import type { RowSelectionState } from '@tanstack/react-table';
 import { Plus, X } from 'lucide-react';
 import Link from 'next/link';
-import { useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { DataTable, FilterBar, type ColumnDef } from '@/components/data/data-table';
 import { EmptyState, ListSkeleton, QueryState } from '@/components/data/states';
 import { StatusBadge } from '@/components/data/status-badge';
 import { PageHeader } from '@/components/layout/page-header';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/cn';
-import { formatDate, formatMoney } from '@/lib/format';
+import { formatDate, formatMoney, formatQuantity, toDecimal } from '@/lib/format';
 import { Can } from '@/lib/permission';
 import { useInvalidateOn } from '@/lib/realtime';
 import { useListState } from '@/lib/url-state';
@@ -21,6 +23,7 @@ import {
   orderStatusTone,
   parseOrderStatus,
 } from '../labels';
+import { BulkShippingDialog } from './bulk-shipping-dialog';
 
 /**
  * D-03 Danh sách đơn hàng — GET /sales-orders.
@@ -28,16 +31,21 @@ import {
  * Dữ liệu đã được API scope theo khách hàng (bất biến 8): sale chỉ thấy đơn của khách
  * mình phụ trách. Frontend KHÔNG lọc lại theo quyền (luật 7).
  *
- * Tab trạng thái / tìm nhanh / lọc theo khách / phân trang đều nằm trên URL (luật 8).
+ * Tab trạng thái / tìm nhanh / lọc theo khách / cân nặng / chưa gán hãng / phân trang đều
+ * nằm trên URL (luật 8). Chọn nhiều dòng → "Gán hãng / cân nặng" (BulkShippingDialog) cho
+ * cả lô trước khi kho đóng gói.
  *
  * Cột bỏ so với bản UI-first vì `SalesOrderHeaderDto` không có trường tương ứng:
  * - "Sale": DTO chỉ có `ownerId` (UUID) và chưa có endpoint danh bạ user để đổi ra tên.
  * - "Thanh toán": không có trạng thái thu tiền trên đơn (nằm ở `fin`, chưa có mặt đọc).
  * - "Kho": không có trạng thái giữ hàng ở cấp đơn (chỉ có `reservedQty` từng dòng ở màn chi tiết).
- * - "Vận chuyển": không có thông tin vận đơn trên DTO đơn hàng.
+ * - "Vận chuyển": chỉ có `carrierId` (UUID) — chưa có vận đơn trên DTO đơn hàng.
  * - Số đếm trên từng tab: API không trả facet count, đếm ở frontend sẽ chỉ đúng trang hiện tại.
  */
-const DEFAULTS = { size: 50, filterKeys: ['status', 'customerId'] as const };
+const DEFAULTS = {
+  size: 50,
+  filterKeys: ['status', 'customerId', 'weightMin', 'weightMax', 'noCarrier'] as const,
+};
 
 type OrderFilter = (typeof DEFAULTS.filterKeys)[number];
 
@@ -92,6 +100,12 @@ const columns: ColumnDef<SalesOrder, unknown>[] = [
     meta: { align: 'right', width: 90 },
   },
   {
+    id: 'weight',
+    header: 'Cân nặng',
+    meta: { align: 'right', width: 110, title: 'Cân nặng gửi hãng (kg)' },
+    cell: ({ row }) => <WeightCell order={row.original} />,
+  },
+  {
     id: 'discount',
     header: 'Chiết khấu',
     meta: { align: 'right', width: 130 },
@@ -123,6 +137,39 @@ const columns: ColumnDef<SalesOrder, unknown>[] = [
     ),
   },
 ];
+
+/**
+ * Cân nặng gửi hãng hiệu lực (`weightKg` = đặt tay ?? Σ dòng × cân nặng SKU). Đặt tay có
+ * dấu ✎ và tooltip nói rõ Σ dòng là bao nhiêu; 0 = SKU chưa khai cân nặng → "—".
+ */
+function WeightCell({ order }: { order: SalesOrder }) {
+  const manual = order.shippingWeightKg !== null;
+  const zero = toDecimal(order.weightKg)?.isZero() ?? true;
+  if (zero && !manual) {
+    return (
+      <span className="text-muted-foreground" title="SKU chưa khai cân nặng">
+        —
+      </span>
+    );
+  }
+  return (
+    <span
+      className="tabular-nums"
+      title={
+        manual
+          ? `Đặt tay · tính từ dòng: ${formatQuantity(order.lineWeightKg, { unit: 'kg' })}`
+          : 'Tính từ cân nặng SKU'
+      }
+    >
+      {formatQuantity(order.weightKg, { unit: 'kg' })}
+      {manual ? (
+        <span className="ml-1 text-xs text-muted-foreground" aria-label="đặt tay">
+          ✎
+        </span>
+      ) : null}
+    </span>
+  );
+}
 
 function StatusTabs({
   value,
@@ -158,21 +205,90 @@ function StatusTabs({
   );
 }
 
+/**
+ * Khoảng cân nặng (kg): gõ xong rồi Enter / rời ô mới áp lên URL — không bắn request theo
+ * từng phím. Cùng giá trị hai ô = lọc đúng một mức cân (vd tất cả đơn 1,2 kg).
+ */
+function WeightRangeFilter({
+  min,
+  max,
+  onChange,
+}: {
+  min: string | undefined;
+  max: string | undefined;
+  onChange: (next: { weightMin: string | undefined; weightMax: string | undefined }) => void;
+}) {
+  const [draftMin, setDraftMin] = useState(min ?? '');
+  const [draftMax, setDraftMax] = useState(max ?? '');
+  useEffect(() => setDraftMin(min ?? ''), [min]);
+  useEffect(() => setDraftMax(max ?? ''), [max]);
+  const commit = () => {
+    const norm = (s: string) => {
+      const t = s.trim().replace(',', '.');
+      return t === '' || !/^\d{1,8}(\.\d{1,4})?$/.test(t) ? undefined : t;
+    };
+    const nextMin = norm(draftMin);
+    const nextMax = norm(draftMax);
+    if (nextMin === min && nextMax === max) return;
+    onChange({ weightMin: nextMin, weightMax: nextMax });
+  };
+  const onKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') commit();
+  };
+  return (
+    <div className="flex items-center gap-1 text-sm text-muted-foreground">
+      <span>Cân nặng</span>
+      <Input
+        value={draftMin}
+        onChange={(e) => setDraftMin(e.target.value)}
+        onBlur={commit}
+        onKeyDown={onKeyDown}
+        inputMode="decimal"
+        placeholder="từ"
+        aria-label="Cân nặng từ (kg)"
+        className="h-9 w-20 text-right tabular-nums"
+      />
+      <span>–</span>
+      <Input
+        value={draftMax}
+        onChange={(e) => setDraftMax(e.target.value)}
+        onBlur={commit}
+        onKeyDown={onKeyDown}
+        inputMode="decimal"
+        placeholder="đến"
+        aria-label="Cân nặng đến (kg)"
+        className="h-9 w-20 text-right tabular-nums"
+      />
+      <span>kg</span>
+    </div>
+  );
+}
+
 export function OrderListScreen() {
   const { state, set, skipTake } = useListState<OrderFilter>(DEFAULTS);
   const status = parseOrderStatus(state.filters.status);
   const customerId = state.filters.customerId ?? '';
+  const weightMin = state.filters.weightMin ?? '';
+  const weightMax = state.filters.weightMax ?? '';
+  const noCarrier = state.filters.noCarrier === 'true';
   const params = useMemo(
-    () => ({ q: state.q, status, customerId, ...skipTake }),
-    [state.q, status, customerId, skipTake],
+    () => ({ q: state.q, status, customerId, weightMin, weightMax, noCarrier, ...skipTake }),
+    [state.q, status, customerId, weightMin, weightMax, noCarrier, skipTake],
   );
   const query = useOrders(params);
   useInvalidateOn(['order.created', 'order.updated'], [orderKeys.lists()]);
+  const [selected, setSelected] = useState<RowSelectionState>({});
 
   const setFilter = (patch: Partial<Record<OrderFilter, string | undefined>>) =>
     set({ filters: { ...state.filters, ...patch } });
 
-  const hasFilter = state.q !== '' || status !== undefined || customerId !== '';
+  const hasFilter =
+    state.q !== '' ||
+    status !== undefined ||
+    customerId !== '' ||
+    weightMin !== '' ||
+    weightMax !== '' ||
+    noCarrier;
   const customerName = query.data?.items[0]?.customer.name;
 
   return (
@@ -200,7 +316,33 @@ export function OrderListScreen() {
       <FilterBar<OrderFilter>
         q={state.q}
         onQChange={(q) => set({ q })}
-        values={{ status: state.filters.status, customerId: state.filters.customerId }}
+        filters={[
+          {
+            key: 'noCarrier',
+            label: 'Hãng vận chuyển',
+            type: 'select',
+            options: [{ value: 'true', label: 'Chưa gán hãng' }],
+          },
+          {
+            key: 'weightMin',
+            label: 'Cân nặng',
+            type: 'custom',
+            render: () => (
+              <WeightRangeFilter
+                min={state.filters.weightMin}
+                max={state.filters.weightMax}
+                onChange={setFilter}
+              />
+            ),
+          },
+        ]}
+        values={{
+          status: state.filters.status,
+          customerId: state.filters.customerId,
+          weightMin: state.filters.weightMin,
+          weightMax: state.filters.weightMax,
+          noCarrier: state.filters.noCarrier,
+        }}
         onFilterChange={setFilter}
         searchPlaceholder="Tìm theo số đơn, mã hoặc tên khách…"
         right={
@@ -219,7 +361,7 @@ export function OrderListScreen() {
 
       <QueryState
         query={query}
-        skeleton={<ListSkeleton rows={12} columns={8} />}
+        skeleton={<ListSkeleton rows={12} columns={9} />}
         isEmpty={(d) => d.items.length === 0}
         empty={
           <EmptyState
@@ -260,6 +402,25 @@ export function OrderListScreen() {
             onPageChange={(page) => set({ page })}
             onSizeChange={(size) => set({ size })}
             onSortChange={(sort) => set({ sort })}
+            selection={{ selected, onChange: setSelected }}
+            bulkActions={(ids) => (
+              <>
+                <Can I="update" a="SalesOrder">
+                  <BulkShippingDialog
+                    rows={data.items.filter((r) => ids.includes(r.id))}
+                    onDone={() => setSelected({})}
+                  />
+                </Can>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="h-7 px-2 text-xs"
+                  onClick={() => setSelected({})}
+                >
+                  Bỏ chọn
+                </Button>
+              </>
+            )}
           />
         )}
       </QueryState>

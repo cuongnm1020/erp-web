@@ -20,7 +20,7 @@ import {
 import { toast } from '@/components/ui/toaster';
 import { isApiError } from '@/lib/api/errors';
 import { messageFor } from '@/lib/error-messages';
-import { formatDate, formatDateTime, formatMoney, formatQuantity } from '@/lib/format';
+import { formatDate, formatDateTime, formatMoney, formatQuantity, toDecimal } from '@/lib/format';
 import { useAbility } from '@/lib/permission';
 import { useCarriers } from '@/features/wms/api/use-shipping';
 import {
@@ -103,6 +103,18 @@ function Field({ label, children }: { label: string; children: ReactNode }) {
   );
 }
 
+/**
+ * Ô cân nặng gửi hãng: trống → null (dùng Σ dòng); "1,2" hay "1.2" → "1.2"; số ≤ 0, quá 4 số
+ * lẻ hoặc chữ → null kèm cờ không hợp lệ ở caller (khớp luật DTO `shippingWeightKg`).
+ */
+export function normalizeWeightInput(raw: string): string | null {
+  const s = raw.trim().replace(',', '.');
+  if (s === '') return null;
+  if (!/^\d{1,8}(\.\d{1,4})?$/.test(s)) return null;
+  const d = toDecimal(s);
+  return d && d.gt(0) ? d.toString() : null;
+}
+
 function Editor({ order }: { order: SalesOrderDetail }) {
   const router = useRouter();
   const ability = useAbility();
@@ -114,6 +126,8 @@ function Editor({ order }: { order: SalesOrderDetail }) {
   const [status, setStatus] = useState<SalesOrderStatus>(order.status);
   const [carrierId, setCarrierId] = useState<string>(order.carrierId ?? NO_CARRIER);
   const [warehouseId, setWarehouseId] = useState<string>(order.warehouseId ?? NO_WAREHOUSE);
+  // Cân nặng gửi hãng: ô trống = dùng cân nặng tính từ dòng (server: shippingWeightKg null).
+  const [weightKg, setWeightKg] = useState<string>(order.shippingWeightKg ?? '');
   const [reason, setReason] = useState('');
 
   const targets = manualStatusTargets(order.status, (a) => ability.can(a, 'SalesOrder'));
@@ -135,7 +149,14 @@ function Editor({ order }: { order: SalesOrderDetail }) {
   const statusChanged = status !== order.status;
   const carrierChanged = nextCarrier !== (order.carrierId ?? null);
   const warehouseChanged = nextWarehouse !== (order.warehouseId ?? null);
-  const dirty = statusChanged || carrierChanged || warehouseChanged;
+  const nextWeight = normalizeWeightInput(weightKg);
+  const weightInvalid = weightKg.trim() !== '' && nextWeight === null;
+  const weightChanged =
+    !weightInvalid &&
+    (nextWeight === null
+      ? order.shippingWeightKg !== null
+      : order.shippingWeightKg === null || !toDecimal(order.shippingWeightKg)?.eq(nextWeight));
+  const dirty = statusChanged || carrierChanged || warehouseChanged || weightChanged;
 
   const detailHref = `/crm/orders/${order.id}`;
   const totalQty = order.lines.reduce(
@@ -145,6 +166,10 @@ function Editor({ order }: { order: SalesOrderDetail }) {
 
   const save = () => {
     if (!canUpdate || update.isPending) return;
+    if (weightInvalid) {
+      toast.error('Cân nặng gửi hãng phải là số kg lớn hơn 0, tối đa 4 số lẻ');
+      return;
+    }
     if (!dirty) {
       toast.info('Không có gì thay đổi');
       router.push(detailHref);
@@ -155,6 +180,7 @@ function Editor({ order }: { order: SalesOrderDetail }) {
         ...(statusChanged ? { status } : {}),
         ...(carrierChanged ? { carrierId: nextCarrier } : {}),
         ...(warehouseChanged ? { warehouseId: nextWarehouse } : {}),
+        ...(weightChanged ? { shippingWeightKg: nextWeight } : {}),
         ...(statusChanged && status === 'CANCELLED' && reason.trim()
           ? { reason: reason.trim() }
           : {}),
@@ -168,7 +194,9 @@ function Editor({ order }: { order: SalesOrderDetail }) {
                   ? `trạng thái → ${orderStatusLabel(r.status)}`
                   : c === 'warehouseId'
                     ? 'kho lấy hàng'
-                    : 'hãng vận chuyển',
+                    : c === 'shippingWeightKg'
+                      ? 'cân nặng gửi hãng'
+                      : 'hãng vận chuyển',
               )
               .join(', ')}`,
           });
@@ -462,6 +490,23 @@ function Editor({ order }: { order: SalesOrderDetail }) {
                     ))}
                   </SelectContent>
                 </Select>
+              </Field>
+              <Field label="Cân nặng gửi hãng">
+                <span className="flex items-center gap-2">
+                  <Input
+                    value={weightKg}
+                    onChange={(e) => setWeightKg(e.target.value)}
+                    inputMode="decimal"
+                    placeholder={`Tính từ dòng: ${formatQuantity(order.lineWeightKg, { unit: 'kg' })}`}
+                    aria-label="Cân nặng gửi hãng (kg)"
+                    aria-invalid={weightInvalid || undefined}
+                    disabled={!carrierEditable}
+                    className="h-8 w-36 text-right tabular-nums"
+                  />
+                  <span className="text-xs text-muted-foreground">
+                    kg · trống = tính từ cân nặng SKU
+                  </span>
+                </span>
               </Field>
               {canQuote ? (
                 <Field label="Cước hãng báo">
