@@ -18,6 +18,17 @@ if (typeof Element.prototype.scrollIntoView !== 'function') {
   Element.prototype.scrollIntoView = () => undefined;
 }
 
+// jsdom không có ResizeObserver; Radix Popper (DatePicker / Popover) đo kích thước bằng nó
+// lúc mount → stub rỗng, kích thước không quan trọng trong test.
+if (typeof globalThis.ResizeObserver === 'undefined') {
+  class ResizeObserverStub {
+    observe() {}
+    unobserve() {}
+    disconnect() {}
+  }
+  globalThis.ResizeObserver = ResizeObserverStub as unknown as typeof ResizeObserver;
+}
+
 // MSW: request không có handler → lỗi rõ ràng thay vì treo/timeout.
 beforeAll(() => server.listen({ onUnhandledRequest: 'error' }));
 afterEach(() => {

@@ -1497,6 +1497,27 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/sales-orders/send-to-carrier": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * "Gửi sang ĐVVC": gán MỘT hãng + tuỳ chọn gửi hãng cho nhiều đơn chọn trên danh sách. Đơn
+         *     đã có phiếu giao (kho đã pick) thì xin vận đơn ngay (hãng lỗi → QUEUED, worker thử lại);
+         *     đơn chưa có phiếu → SAVED, vận đơn cấp lúc đóng gói. Đơn hỏng nằm ở `failed`.
+         */
+        post: operations["SalesOrderController_sendToCarrier"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/sales-orders/{id}/cancel": {
         parameters: {
             query?: never;
@@ -3927,6 +3948,25 @@ export interface components {
             code: string;
             name: string;
         };
+        ShippingOptionsViewDto: {
+            shopPaysFee?: boolean;
+            /** @enum {string} */
+            transport?: "road" | "fly";
+            dropAtPostOffice?: boolean;
+            allowInspection?: boolean;
+            callShopOnFailure?: boolean;
+            serviceCode?: string | null;
+            extraServices?: string[];
+            /** @enum {number|null} */
+            pickWorkShift?: 1 | 2 | 3 | null;
+            pickDate?: string | null;
+            insuranceValue?: string | null;
+            maxWeightKg?: string | null;
+            lengthCm?: number | null;
+            widthCm?: number | null;
+            heightCm?: number | null;
+            note?: string | null;
+        };
         SalesOrderHeaderDto: {
             id: string;
             docNumber: string;
@@ -3962,6 +4002,8 @@ export interface components {
             lineWeightKg: string;
             /** @description Cân nặng gửi hãng hiệu lực = shippingWeightKg ?? lineWeightKg. */
             weightKg: string;
+            /** @description Tuỳ chọn gửi hãng chọn lúc "Gửi sang ĐVVC"; null = mặc định của hãng. */
+            shippingOptions: components["schemas"]["ShippingOptionsViewDto"] | null;
             /** @description ISO datetime — chỉ có khi đơn POSTED. */
             postedAt: string | null;
             createdAt: string;
@@ -4045,6 +4087,8 @@ export interface components {
             lineWeightKg: string;
             /** @description Cân nặng gửi hãng hiệu lực = shippingWeightKg ?? lineWeightKg. */
             weightKg: string;
+            /** @description Tuỳ chọn gửi hãng chọn lúc "Gửi sang ĐVVC"; null = mặc định của hãng. */
+            shippingOptions: components["schemas"]["ShippingOptionsViewDto"] | null;
             /** @description ISO datetime — chỉ có khi đơn POSTED. */
             postedAt: string | null;
             createdAt: string;
@@ -4155,6 +4199,42 @@ export interface components {
             /** @description Rule duyệt đã khớp — null = không cần duyệt, đơn chốt thẳng. */
             approvalRuleId: string | null;
         };
+        ShippingOptionsDto: {
+            /** @description Shop trả cước cho hãng (mặc định true — phí ship thu khách đã nằm trong COD). */
+            shopPaysFee?: boolean;
+            /**
+             * @description GHTK: `road` đường bộ | `fly` đường bay.
+             * @enum {string}
+             */
+            transport?: "road" | "fly";
+            /** @description Shop mang hàng ra bưu cục thay vì hãng đến lấy. */
+            dropAtPostOffice?: boolean;
+            /** @description Cho khách xem hàng trước khi nhận. */
+            allowInspection?: boolean;
+            /** @description Shipper gọi shop khi giao không được. */
+            callShopOnFailure?: boolean;
+            /** @description Mã dịch vụ của hãng (VTP `ORDER_SERVICE`, GHTK `deliver_option`…). */
+            serviceCode?: string | null;
+            /** @description Dịch vụ bổ sung của hãng (mã theo hãng). */
+            extraServices?: string[];
+            /**
+             * @description Ca lấy hàng: 1 sáng, 2 chiều, 3 tối; null = hãng tự xếp ca.
+             * @enum {number|null}
+             */
+            pickWorkShift?: 1 | 2 | 3 | null;
+            /** @description Hẹn ngày lấy hàng `YYYY-MM-DD`. */
+            pickDate?: string | null;
+            /** @description Giá trị khai giá, Decimal(18,4) chuỗi; null = theo tiền thu hộ. */
+            insuranceValue?: string | null;
+            /** @description Trần cân nặng gửi hãng (kg, Decimal(12,4) chuỗi). */
+            maxWeightKg?: string | null;
+            /** @description Kích thước kiện (cm, số nguyên 0..10000). */
+            lengthCm?: number | null;
+            widthCm?: number | null;
+            heightCm?: number | null;
+            /** @description Ghi chú in lên vận đơn / cho shipper. */
+            note?: string | null;
+        };
         UpdateOrderDto: {
             /** @enum {string} */
             status?: "DRAFT" | "PENDING_APPROVAL" | "APPROVED" | "POSTED" | "CANCELLED";
@@ -4170,6 +4250,8 @@ export interface components {
             warehouseId?: string | null;
             /** @description Cân nặng gửi hãng (kg, chuỗi decimal > 0, tối đa 4 số lẻ); `null` = về cân nặng tính từ dòng. */
             shippingWeightKg?: string | null;
+            /** @description Tuỳ chọn gửi hãng; `null` = xoá (về mặc định hãng); bỏ trống = giữ nguyên. */
+            shippingOptions?: components["schemas"]["ShippingOptionsDto"] | null;
             /** @description Lý do (khi hủy) — ghi vào event OrderCancelled. */
             reason?: string;
         };
@@ -4182,7 +4264,9 @@ export interface components {
             warehouseId: string | null;
             /** @description Cân nặng đặt tay (kg, Decimal(12,4) chuỗi); null = dùng cân nặng tính từ dòng. */
             shippingWeightKg: string | null;
-            /** @description Trường đã đổi thật ('status' | 'carrierId' | 'warehouseId' | 'shippingWeightKg'); rỗng = không có gì thay đổi. */
+            /** @description Tuỳ chọn gửi hãng sau khi sửa; null = mặc định hãng. */
+            shippingOptions: components["schemas"]["ShippingOptionsViewDto"] | null;
+            /** @description Trường đã đổi thật ('status' | 'carrierId' | 'warehouseId' | 'shippingWeightKg' | 'shippingOptions'); rỗng = không có gì thay đổi. */
             changed: string[];
         };
         BulkUpdateOrdersDto: {
@@ -4204,6 +4288,46 @@ export interface components {
         };
         BulkUpdateOrdersResultDto: {
             updated: components["schemas"]["UpdateOrderResultDto"][];
+            failed: components["schemas"]["BulkUpdateFailedItemDto"][];
+        };
+        SendOrdersToCarrierDto: {
+            orderIds: string[];
+            /**
+             * Format: uuid
+             * @description wms.Carrier.id đang hoạt động.
+             */
+            carrierId: string;
+            /** @description Tuỳ chọn gửi hãng áp cho TẤT CẢ đơn đã chọn; bỏ trống = xoá tuỳ chọn cũ (về mặc định hãng). */
+            options?: components["schemas"]["ShippingOptionsDto"];
+            /**
+             * Format: uuid
+             * @description Kho lấy hàng (wms.Warehouse.id) cho cả lô; bỏ trống = giữ kho đã chọn trên từng đơn.
+             */
+            warehouseId?: string;
+            /** @description Cân nặng gửi hãng (kg) cho cả lô; bỏ trống = giữ nguyên từng đơn. */
+            shippingWeightKg?: string;
+        };
+        SendOrderToCarrierItemDto: {
+            orderId: string;
+            docNumber: string;
+            carrierId: string;
+            carrierCode: string;
+            /**
+             * @description `SAVED` đã gán hãng + tuỳ chọn, chưa có phiếu giao (kho chưa pick) → vận đơn cấp lúc
+             *     đóng gói; `ISSUED` hãng cấp vận đơn ngay; `ALREADY_ISSUED` phiếu đã có vận đơn của
+             *     đúng hãng này; `QUEUED` hãng lỗi → đã xếp hàng thử lại.
+             * @enum {string}
+             */
+            outcome: "QUEUED" | "ISSUED" | "ALREADY_ISSUED" | "SAVED";
+            shipmentId: string | null;
+            shipmentDocNumber: string | null;
+            trackingNo: string | null;
+            /** @description Lý do khi QUEUED (thông điệp lỗi của hãng) hoặc SAVED có phiếu đã rời kho. */
+            reason: string | null;
+        };
+        SendOrdersToCarrierResultDto: {
+            sent: components["schemas"]["SendOrderToCarrierItemDto"][];
+            /** @description Đơn không gửi được (đã post/hủy, ngoài scope, thiếu địa chỉ giao…) — phần còn lại vẫn gửi. */
             failed: components["schemas"]["BulkUpdateFailedItemDto"][];
         };
         CancelOrderDto: {
@@ -8008,6 +8132,29 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["BulkUpdateOrdersResultDto"];
+                };
+            };
+        };
+    };
+    SalesOrderController_sendToCarrier: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SendOrdersToCarrierDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SendOrdersToCarrierResultDto"];
                 };
             };
         };

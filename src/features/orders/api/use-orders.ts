@@ -43,7 +43,12 @@ export const orderKeys = {
  * được đánh `sortable`: hứa sort rồi không sort được còn tệ hơn là không hứa.
  */
 export function useOrders(params: OrderListParams) {
-  return useQuery({
+  return useQuery({ ...orderListQuery(params), placeholderData: keepPreviousData });
+}
+
+/** Key + fetcher của GET /sales-orders — dùng chung cho useOrders và tra cứu một lần (quét mã). */
+export function orderListQuery(params: OrderListParams) {
+  return {
     queryKey: orderKeys.list(params),
     queryFn: () =>
       unwrap(
@@ -62,7 +67,43 @@ export function useOrders(params: OrderListParams) {
           },
         }),
       ),
-    placeholderData: keepPreviousData,
+  };
+}
+
+/**
+ * Tra một đơn theo số chứng từ gõ/quét vào (dialog "Gửi sang ĐVVC" thêm đơn ngoài trang hiện
+ * tại). Đi qua cache của TanStack Query (luật 3) — không fetch trong component.
+ */
+export function useOrderLookup() {
+  const qc = useQueryClient();
+  return async (docNumber: string): Promise<SalesOrder | null> => {
+    const q = docNumber.trim();
+    if (!q) return null;
+    const res = await qc.fetchQuery({ ...orderListQuery({ q, take: 10, skip: 0 }), staleTime: 0 });
+    return res.items.find((o) => o.docNumber.toLowerCase() === q.toLowerCase()) ?? null;
+  };
+}
+
+export type ShippingOptions = components['schemas']['ShippingOptionsDto'];
+export type SendOrdersToCarrierBody = components['schemas']['SendOrdersToCarrierDto'];
+export type SendOrdersToCarrierResult = components['schemas']['SendOrdersToCarrierResultDto'];
+export type SendOrderToCarrierItem = components['schemas']['SendOrderToCarrierItemDto'];
+
+/**
+ * POST /sales-orders/send-to-carrier — "Gửi sang ĐVVC": một hãng + một bộ tuỳ chọn gửi hãng
+ * cho nhiều đơn. Đơn đã pick thì hãng cấp vận đơn ngay (ISSUED / QUEUED), đơn chưa pick →
+ * SAVED (cấp lúc đóng gói). Không optimistic (luật 5); gọi lại cùng lô là an toàn (server
+ * không cấp vận đơn lần hai).
+ */
+export function useSendOrdersToCarrier() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (body: SendOrdersToCarrierBody) =>
+      unwrap(api.POST('/sales-orders/send-to-carrier', { body })),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: orderKeys.lists() });
+      void qc.invalidateQueries({ queryKey: orderKeys.details() });
+    },
   });
 }
 

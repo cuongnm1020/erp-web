@@ -79,6 +79,7 @@ describe('OrderEditScreen — trang sửa đơn (D-05, PATCH /sales-orders/{id})
       `${CARRIERS[0]!.name} (MANUAL)`,
       `${CARRIERS[1]!.name} (GHN)`,
       `${CARRIERS[3]!.name} (GHTK)`,
+      `${CARRIERS[4]!.name} (VTP)`,
     ]);
     fireEvent.click(screen.getByRole('option', { name: `${CARRIERS[1]!.name} (GHN)` }));
 

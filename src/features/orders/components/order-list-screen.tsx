@@ -24,6 +24,7 @@ import {
   parseOrderStatus,
 } from '../labels';
 import { BulkShippingDialog } from './bulk-shipping-dialog';
+import { SendToCarrierMenu } from './send-to-carrier-menu';
 
 /**
  * D-03 Danh sách đơn hàng — GET /sales-orders.
@@ -32,8 +33,9 @@ import { BulkShippingDialog } from './bulk-shipping-dialog';
  * mình phụ trách. Frontend KHÔNG lọc lại theo quyền (luật 7).
  *
  * Tab trạng thái / tìm nhanh / lọc theo khách / cân nặng / chưa gán hãng / phân trang đều
- * nằm trên URL (luật 8). Chọn nhiều dòng → "Gán hãng / cân nặng" (BulkShippingDialog) cho
- * cả lô trước khi kho đóng gói.
+ * nằm trên URL (luật 8). Chọn nhiều dòng → "Gửi sang ĐVVC" (SendToCarrierMenu: chọn hãng →
+ * dialog hai cột như Pancake, POST /sales-orders/send-to-carrier) hoặc "Gán hãng / cân nặng"
+ * (BulkShippingDialog) cho cả lô trước khi kho đóng gói.
  *
  * Cột bỏ so với bản UI-first vì `SalesOrderHeaderDto` không có trường tương ứng:
  * - "Sale": DTO chỉ có `ownerId` (UUID) và chưa có endpoint danh bạ user để đổi ra tên.
@@ -406,6 +408,10 @@ export function OrderListScreen() {
             bulkActions={(ids) => (
               <>
                 <Can I="update" a="SalesOrder">
+                  <SendToCarrierMenu
+                    rows={data.items.filter((r) => ids.includes(r.id))}
+                    onDone={() => setSelected({})}
+                  />
                   <BulkShippingDialog
                     rows={data.items.filter((r) => ids.includes(r.id))}
                     onDone={() => setSelected({})}

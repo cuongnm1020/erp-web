@@ -85,6 +85,7 @@ export function makeOrders(n: number) {
     shippingWeightKg: i % 4 === 0 ? '1.0000' : null,
     lineWeightKg: LINE_WEIGHTS[i % 5]!,
     weightKg: i % 4 === 0 ? '1.0000' : LINE_WEIGHTS[i % 5]!,
+    shippingOptions: null,
     postedAt:
       ORDER_STATUSES[i % ORDER_STATUSES.length] === 'POSTED' ? '2026-08-24T02:00:00.000Z' : null,
     createdAt: new Date(Date.UTC(2026, 7, 23) - i * 3_600_000).toISOString(),
@@ -183,6 +184,16 @@ export const CARRIERS = [
     id: 'c-ghtk',
     code: 'GHTK',
     name: 'Giao Hàng Tiết Kiệm',
+    isActive: true,
+    hasAdapter: true,
+    operations: ['createWaybill', 'quote', 'getStatus', 'cancelWaybill'],
+    configured: true,
+    webhook: true,
+  },
+  {
+    id: 'c-vtp',
+    code: 'VTP',
+    name: 'Viettel Post',
     isActive: true,
     hasAdapter: true,
     operations: ['createWaybill', 'quote', 'getStatus', 'cancelWaybill'],
@@ -550,6 +561,35 @@ export const handlers = [
               ...(body.carrierId !== undefined ? ['carrierId'] : []),
               ...(body.shippingWeightKg !== undefined ? ['shippingWeightKg'] : []),
             ],
+          })),
+        failed: body.orderIds
+          .filter((id) => !byId.has(id))
+          .map((id) => ({ orderId: id, docNumber: null, code: 'NOT_FOUND', message: 'not found' })),
+      },
+      { status: 201 },
+    );
+  }),
+  http.post('/api/sales-orders/send-to-carrier', async ({ request }) => {
+    const body = (await request.json()) as { orderIds: string[]; carrierId: string };
+    await delay(30);
+    const byId = new Map(makeOrders(60).map((o) => [o.id, o]));
+    const carrier = CARRIERS.find((c) => c.id === body.carrierId);
+    if (!carrier) return errorEnvelope(404, 'NOT_FOUND');
+    return HttpResponse.json(
+      {
+        sent: body.orderIds
+          .filter((id) => byId.has(id))
+          .map((id, i) => ({
+            orderId: id,
+            docNumber: byId.get(id)!.docNumber,
+            carrierId: carrier.id,
+            carrierCode: carrier.code,
+            // Đơn đầu giả lập đã pick → cấp vận đơn ngay; còn lại lưu chờ đóng gói.
+            outcome: i === 0 ? 'ISSUED' : 'SAVED',
+            shipmentId: i === 0 ? uuid('00000009', i) : null,
+            shipmentDocNumber: i === 0 ? 'DN2609-00001' : null,
+            trackingNo: i === 0 ? `${carrier.code}0000001` : null,
+            reason: null,
           })),
         failed: body.orderIds
           .filter((id) => !byId.has(id))
