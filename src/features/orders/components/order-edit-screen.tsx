@@ -463,13 +463,13 @@ function Editor({ order }: { order: SalesOrderDetail }) {
                   {selectedWarehouse.pickupReady
                     ? `Điểm lấy hàng gửi hãng: ${[
                         selectedWarehouse.address,
+                        selectedWarehouse.hamlet,
                         selectedWarehouse.ward,
-                        selectedWarehouse.district,
                         selectedWarehouse.province,
                       ]
                         .filter(Boolean)
                         .join(', ')}`
-                    : 'Kho này chưa khai tỉnh/huyện/xã hoặc số điện thoại — hãng sẽ nhận điểm lấy mặc định của server. Khai ở Kho › Sửa kho.'}
+                    : 'Kho này chưa khai tỉnh/thành, phường/xã hoặc số điện thoại — hãng sẽ nhận điểm lấy mặc định của server. Khai ở Kho › Sửa kho.'}
                 </p>
               ) : null}
               <Field label="ĐVVC">

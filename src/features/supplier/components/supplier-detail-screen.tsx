@@ -70,8 +70,9 @@ const addressSchema = z.object({
   recipient: z.string().trim().min(1, 'Nhập người nhận').max(200),
   phone: phoneSchema,
   line1: z.string().trim().min(1, 'Nhập địa chỉ').max(300),
+  // Địa chỉ 2 cấp: thôn/xóm → phường/xã → tỉnh/thành (không còn quận/huyện).
+  hamlet: z.string().trim().max(100),
   ward: z.string().trim().max(100),
-  district: z.string().trim().max(100),
   province: z.string().trim().min(1, 'Nhập tỉnh/thành').max(100),
   isDefault: z.boolean(),
 });
@@ -94,8 +95,8 @@ function AddressDialog({
       recipient: '',
       phone: '',
       line1: '',
+      hamlet: '',
       ward: '',
-      district: '',
       province: '',
       isDefault: false,
     },
@@ -110,8 +111,8 @@ function AddressDialog({
           recipient: v.recipient,
           phone: v.phone,
           line1: v.line1,
+          ...(v.hamlet ? { hamlet: v.hamlet } : {}),
           ...(v.ward ? { ward: v.ward } : {}),
-          ...(v.district ? { district: v.district } : {}),
           province: v.province,
           isDefault: v.isDefault,
         },
@@ -123,7 +124,7 @@ function AddressDialog({
         },
         onError: (err) =>
           applyServerErrors(form, err as ApiError, {
-            knownFields: ['label', 'recipient', 'phone', 'line1', 'ward', 'district', 'province'],
+            knownFields: ['label', 'recipient', 'phone', 'line1', 'hamlet', 'ward', 'province'],
           }),
       },
     );
@@ -167,34 +168,19 @@ function AddressDialog({
                 )}
               />
             </div>
-            <div className="grid grid-cols-2 gap-3">
-              <FormField
-                control={form.control}
-                name="phone"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>SĐT</FormLabel>
-                    <FormControl>
-                      <Input placeholder="0903 112 233" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name="province"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Tỉnh / thành</FormLabel>
-                    <FormControl>
-                      <Input placeholder="TP.HCM" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            </div>
+            <FormField
+              control={form.control}
+              name="phone"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>SĐT</FormLabel>
+                  <FormControl>
+                    <Input placeholder="0903 112 233" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
             <FormField
               control={form.control}
               name="line1"
@@ -208,15 +194,16 @@ function AddressDialog({
                 </FormItem>
               )}
             />
-            <div className="grid grid-cols-2 gap-3">
+            {/* Địa chỉ 2 cấp: thôn/xóm → phường/xã → tỉnh/thành. */}
+            <div className="grid grid-cols-3 gap-3">
               <FormField
                 control={form.control}
-                name="district"
+                name="hamlet"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Quận / huyện</FormLabel>
+                    <FormLabel>Thôn / xóm</FormLabel>
                     <FormControl>
-                      <Input placeholder="Q. Bình Tân" {...field} />
+                      <Input placeholder="Khu phố 3" {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -230,6 +217,19 @@ function AddressDialog({
                     <FormLabel>Phường / xã</FormLabel>
                     <FormControl>
                       <Input placeholder="P. Tân Tạo A" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="province"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Tỉnh / thành</FormLabel>
+                    <FormControl>
+                      <Input placeholder="TP.HCM" {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -382,7 +382,7 @@ function DetailBody({ supplier }: { supplier: SupplierDetail }) {
                     <TableCell className="px-2.5 py-1.5">{a.contact ?? '—'}</TableCell>
                     <TableCell className="px-2.5 py-1.5">{a.phone ?? '—'}</TableCell>
                     <TableCell className="px-2.5 py-1.5 text-muted-foreground">
-                      {[a.line1, a.ward, a.district, a.province].filter(Boolean).join(', ')}
+                      {[a.line1, a.hamlet, a.ward, a.province].filter(Boolean).join(', ')}
                     </TableCell>
                     <TableCell className="px-2.5 py-1.5">
                       {a.isDefault ? <StatusBadge tone="brand">Mặc định</StatusBadge> : null}

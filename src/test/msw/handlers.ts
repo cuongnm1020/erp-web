@@ -127,8 +127,8 @@ export const PICKUP_WAREHOUSES = [
     code: 'WH01',
     name: 'Kho trung tâm',
     address: 'Lô A1 KCN Tân Tạo',
+    hamlet: null,
     ward: 'Phường Tân Tạo A',
-    district: 'Quận Bình Tân',
     province: 'Hồ Chí Minh',
     contactName: 'Kho trung tâm',
     phone: '0900000000',
@@ -139,8 +139,8 @@ export const PICKUP_WAREHOUSES = [
     code: 'WH02',
     name: 'Kho chưa khai',
     address: null,
+    hamlet: null,
     ward: null,
-    district: null,
     province: null,
     contactName: null,
     phone: null,
@@ -218,7 +218,7 @@ export function makeShippingQuote(orderId: string, carrierId: string) {
     weightKg: '0.7500',
     codAmount: '1250000.0000',
     pickupWarehouseId: 'wh-hcm',
-    pickupSummary: 'Hồ Chí Minh · Quận Bình Tân',
+    pickupSummary: 'Hồ Chí Minh · Phường Tân Tạo A',
   };
 }
 

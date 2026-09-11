@@ -111,7 +111,7 @@ describe('OrderEditScreen — trang sửa đơn (D-05, PATCH /sales-orders/{id})
     expect(await screen.findByText('Cước hãng báo')).toBeInTheDocument();
     await waitFor(() =>
       expect(
-        screen.getByText(/28\.000 VND · 0\.7500 kg · lấy tại Hồ Chí Minh · Quận Bình Tân/),
+        screen.getByText(/28\.000 VND · 0\.7500 kg · lấy tại Hồ Chí Minh · Phường Tân Tạo A/),
       ).toBeInTheDocument(),
     );
     expect(asked).toEqual([`${ORDER.id}?c-ghtk`]);

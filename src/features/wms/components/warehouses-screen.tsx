@@ -67,14 +67,15 @@ const warehouseSchema = z.object({
   code: codeSchema,
   name: z.string().trim().min(1, 'Nhập tên kho').max(200, 'Tối đa 200 ký tự'),
   address: z.string().trim().max(500, 'Tối đa 500 ký tự'),
-  // Điểm lấy hàng cho hãng vận chuyển — tên tỉnh/huyện/xã viết như hãng (GHTK) dùng.
+  // Điểm lấy hàng cho hãng vận chuyển — địa chỉ 2 cấp (thôn/xóm → phường/xã → tỉnh/thành),
+  // tên tỉnh/xã viết như hãng (GHTK) dùng.
   contactName: z.string().trim().max(200, 'Tối đa 200 ký tự'),
   phone: z.string().trim().max(32, 'Tối đa 32 ký tự'),
-  province: z.string().trim().max(200, 'Tối đa 200 ký tự'),
-  district: z.string().trim().max(200, 'Tối đa 200 ký tự'),
+  hamlet: z.string().trim().max(200, 'Tối đa 200 ký tự'),
   ward: z.string().trim().max(200, 'Tối đa 200 ký tự'),
+  province: z.string().trim().max(200, 'Tối đa 200 ký tự'),
 });
-const PICKUP_FIELDS = ['contactName', 'phone', 'province', 'district', 'ward'] as const;
+const PICKUP_FIELDS = ['contactName', 'phone', 'hamlet', 'ward', 'province'] as const;
 type WarehouseValues = z.infer<typeof warehouseSchema>;
 
 function WarehouseFormDialog({
@@ -99,9 +100,9 @@ function WarehouseFormDialog({
       address: warehouse?.address ?? '',
       contactName: warehouse?.contactName ?? '',
       phone: warehouse?.phone ?? '',
-      province: warehouse?.province ?? '',
-      district: warehouse?.district ?? '',
+      hamlet: warehouse?.hamlet ?? '',
       ward: warehouse?.ward ?? '',
+      province: warehouse?.province ?? '',
     },
   });
 
@@ -198,8 +199,8 @@ function WarehouseFormDialog({
             <div className="grid grid-cols-3 gap-2">
               {(
                 [
+                  ['hamlet', 'Thôn/xóm', 'Khu phố 3'],
                   ['ward', 'Phường/xã', 'Phường Tân Tạo A'],
-                  ['district', 'Quận/huyện', 'Quận Bình Tân'],
                   ['province', 'Tỉnh/thành', 'Hồ Chí Minh'],
                 ] as const
               ).map(([name, label, placeholder]) => (
@@ -248,8 +249,9 @@ function WarehouseFormDialog({
               />
             </div>
             <p className="text-xs text-muted-foreground">
-              Điểm lấy hàng gửi hãng vận chuyển (GHTK…): tên tỉnh/huyện/xã viết đúng như hãng dùng.
-              Thiếu tỉnh/thành hoặc SĐT thì đơn từ kho này dùng điểm lấy mặc định của server.
+              Điểm lấy hàng gửi hãng vận chuyển (GHTK…): tên tỉnh/thành và phường/xã viết đúng như
+              hãng dùng, thôn/xóm nếu có. Thiếu tỉnh/thành hoặc SĐT thì đơn từ kho này dùng điểm lấy
+              mặc định của server.
             </p>
             {rootError ? <p className="text-sm text-destructive">{rootError}</p> : null}
             <DialogFooter>
@@ -352,7 +354,7 @@ export function WarehousesScreen() {
                       <TableCell className="px-2.5 py-1.5 font-mono text-xs">{w.code}</TableCell>
                       <TableCell className="px-2.5 py-1.5 font-semibold">{w.name}</TableCell>
                       <TableCell className="px-2.5 py-1.5 text-muted-foreground">
-                        {[w.address, w.ward, w.district, w.province].filter(Boolean).join(', ') ||
+                        {[w.address, w.hamlet, w.ward, w.province].filter(Boolean).join(', ') ||
                           '—'}
                       </TableCell>
                       <TableCell className="px-2.5 py-1.5">

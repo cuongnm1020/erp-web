@@ -3095,8 +3095,9 @@ export interface components {
             recipient: string;
             phone: string;
             line1: string;
+            /** @description Thôn/xóm — địa chỉ 2 cấp (thôn/xóm → phường/xã → tỉnh/thành). */
+            hamlet?: string;
             ward?: string;
-            district?: string;
             province: string;
             isDefault?: boolean;
         };
@@ -3128,8 +3129,8 @@ export interface components {
             contact: string | null;
             phone: string | null;
             line1: string;
+            hamlet: string | null;
             ward: string | null;
-            district: string | null;
             province: string;
             isDefault: boolean;
         };
@@ -3640,11 +3641,11 @@ export interface components {
             name: string;
             /** @description Số nhà / đường. */
             address: string | null;
-            /** @description Điểm lấy hàng cho hãng vận chuyển — tên tỉnh/huyện/xã viết như hãng dùng. */
+            /** @description Điểm lấy hàng cho hãng vận chuyển — tên tỉnh/xã viết như hãng dùng, thôn/xóm nếu có. */
             contactName: string | null;
             phone: string | null;
+            hamlet: string | null;
             ward: string | null;
-            district: string | null;
             province: string | null;
             isActive: boolean;
         };
@@ -3654,8 +3655,8 @@ export interface components {
             address?: string;
             contactName?: string;
             phone?: string;
+            hamlet?: string;
             ward?: string;
-            district?: string;
             province?: string;
         };
         UpdateWarehouseDto: {
@@ -3663,8 +3664,8 @@ export interface components {
             address?: string;
             contactName?: string | null;
             phone?: string | null;
+            hamlet?: string | null;
             ward?: string | null;
-            district?: string | null;
             province?: string | null;
             isActive?: boolean;
         };
@@ -4116,7 +4117,7 @@ export interface components {
             codAmount: string;
             /** @description Kho làm điểm lấy hàng; null = kho chưa khai địa chỉ → dùng env CARRIER_<CODE>_PICK_*. */
             pickupWarehouseId: string | null;
-            /** @description Điểm lấy đã gửi hãng, tóm tắt "tỉnh · huyện" để sale đối chiếu. */
+            /** @description Điểm lấy đã gửi hãng, tóm tắt "tỉnh · xã" để sale đối chiếu. */
             pickupSummary: string;
         };
         CreateOrderLineDto: {
@@ -4358,8 +4359,8 @@ export interface components {
             code: string;
             name: string;
             address: string | null;
+            hamlet: string | null;
             ward: string | null;
-            district: string | null;
             province: string | null;
             contactName: string | null;
             phone: string | null;
@@ -4380,7 +4381,6 @@ export interface components {
         };
         CarrierAddressDto: {
             provinceCode?: string;
-            districtCode?: string;
             wardCode?: string;
             address?: string;
         };
