@@ -12,6 +12,10 @@ export type PdaScanResult = components['schemas']['PdaScanResultDto'];
 export type PdaCompleteResult = components['schemas']['PdaCompleteResultDto'];
 export type PdaWaybill = components['schemas']['PdaWaybillDto'];
 export type ShipmentView = components['schemas']['ShipmentViewDto'];
+export type PdaShortResult = components['schemas']['PdaShortResultDto'];
+export type PdaWave = components['schemas']['PdaWaveDto'];
+export type PdaWaveScanResult = components['schemas']['PdaWaveScanResultDto'];
+export type PdaWaveShortResult = components['schemas']['PdaWaveShortResultDto'];
 export type WaybillRequestResult = components['schemas']['WaybillRequestResultDto'];
 
 /** Phễu key: ['wms','pda', …]. */
@@ -19,6 +23,7 @@ export const pdaKeys = {
   all: ['wms', 'pda'] as const,
   task: (id: string) => [...pdaKeys.all, 'task', id] as const,
   shipment: (id: string) => [...pdaKeys.all, 'shipment', id] as const,
+  wave: (id: string) => [...pdaKeys.all, 'wave', id] as const,
 };
 
 /**
@@ -112,4 +117,77 @@ export function useRequestWaybill() {
 /** URL nhãn PDF (qua proxy Next, cookie httpOnly đi kèm) — nhúng vào iframe để in. */
 export function labelUrl(shipmentId: string, pageSize: 'A6' | 'A5'): string {
   return `/api/shipments/${encodeURIComponent(shipmentId)}/label?pageSize=${pageSize}&orientation=portrait`;
+}
+
+/**
+ * POST /pda/short — báo THIẾU HÀNG một dòng PICK: dòng → EXCEPTION với số đã lấy, phần thiếu
+ * không sang đóng gói; điều phối thấy cảnh báo trên bảng điều phối và phiếu xuất.
+ */
+export function usePdaShort() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (body: { taskLineId: string; note?: string; idempotencyKey: string }) =>
+      unwrap(api.POST('/pda/short', { body })),
+    onSuccess: () => void qc.invalidateQueries({ queryKey: taskKeys.all }),
+  });
+}
+
+// ── Lượt pick gộp trên máy quét ────────────────────────────
+
+/** POST /pda/waves/:id/claim — nhận cả lượt bằng máy quét. */
+export function useClaimWave() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (waveId: string) =>
+      unwrap(api.POST('/pda/waves/{id}/claim', { params: { path: { id: waveId } } })),
+    onSuccess: (w) => {
+      qc.setQueryData(pdaKeys.wave(w.id), w);
+      void qc.invalidateQueries({ queryKey: taskKeys.all });
+    },
+  });
+}
+
+/** GET /pda/waves/:id — dòng gộp + tiến độ từng đơn (của mình hoặc chưa ai nhận). */
+export function usePdaWave(waveId: string | null) {
+  return useQuery({
+    queryKey: pdaKeys.wave(waveId ?? ''),
+    queryFn: () => unwrap(api.GET('/pda/waves/{id}', { params: { path: { id: waveId ?? '' } } })),
+    enabled: waveId !== null && waveId !== '',
+  });
+}
+
+/** POST /pda/waves/:id/scan — quét gộp, server chia số lượng xuống từng đơn. */
+export function useWaveScan() {
+  return useMutation({
+    mutationFn: ({
+      waveId,
+      ...body
+    }: {
+      waveId: string;
+      barcode: string;
+      qty: string;
+      locationId?: string;
+      lotId?: string;
+      idempotencyKey: string;
+    }) => unwrap(api.POST('/pda/waves/{id}/scan', { params: { path: { id: waveId } }, body })),
+  });
+}
+
+/** POST /pda/waves/:id/short — báo thiếu cả nhóm (sku + vị trí + lô) của lượt. */
+export function useWaveShort() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      waveId,
+      ...body
+    }: {
+      waveId: string;
+      skuId: string;
+      locationId?: string;
+      lotId?: string;
+      note?: string;
+      idempotencyKey: string;
+    }) => unwrap(api.POST('/pda/waves/{id}/short', { params: { path: { id: waveId } }, body })),
+    onSuccess: () => void qc.invalidateQueries({ queryKey: taskKeys.all }),
+  });
 }

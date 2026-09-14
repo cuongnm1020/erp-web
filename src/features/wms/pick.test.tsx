@@ -169,6 +169,72 @@ describe('Màn pick trên PDA — quét đơn → dòng theo lối đi → quét
     expect(screen.getByRole('button', { name: 'Quét đơn kế tiếp' })).toBeInTheDocument();
   });
 
+  it('bấm "Thiếu hàng" ở dòng đang lấy → POST /pda/short → cảnh báo vàng, dòng đánh dấu thiếu, chuyển dòng kế', async () => {
+    const shorts: unknown[] = [];
+    server.use(
+      http.get('/api/pda/resolve/:code', () =>
+        HttpResponse.json({
+          kind: 'task',
+          code: 'PICK2609-00009',
+          sku: null,
+          order: null,
+          wave: null,
+          location: null,
+          shipment: null,
+          task: {
+            id: TASK_ID,
+            docNumber: 'PICK2609-00009',
+            type: 'PICK',
+            status: 'PENDING',
+            warehouseId: 'wh-1',
+            assignedTo: null,
+            assignedToMe: false,
+            lineCount: 2,
+          },
+        }),
+      ),
+      http.post('/api/pda/tasks/:id/claim', () => HttpResponse.json(PICK_TASK)),
+      http.post('/api/pda/short', async ({ request }) => {
+        const body = (await request.json()) as { taskLineId: string; note?: string };
+        shorts.push(body);
+        return HttpResponse.json({
+          taskLineId: body.taskLineId,
+          taskId: TASK_ID,
+          taskDocNumber: 'PICK2609-00009',
+          skuId: 'sku-X',
+          skuCode: 'SKU-X',
+          lineStatus: 'EXCEPTION',
+          qtyDone: '0.000000',
+          qtyPlanned: '2.000000',
+          shortageQty: '2.000000',
+          exceptionNote: body.note ?? 'Thiếu hàng',
+          taskStatus: 'IN_PROGRESS',
+          taskCompleted: false,
+          replayed: false,
+        });
+      }),
+    );
+    renderApp(<PickScreen />);
+    scan('PICK2609-00009');
+    await screen.findAllByText('A-01-03');
+    fireEvent.click(screen.getByRole('button', { name: 'Thiếu hàng' }));
+    expect(await screen.findByText(/còn thiếu 2/)).toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText('Lý do thiếu hàng'), { target: { value: 'Kệ trống' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Báo thiếu hàng' }));
+    await waitFor(() =>
+      expect(shorts).toEqual([
+        { taskLineId: LINE_1, note: 'Kệ trống', idempotencyKey: expect.any(String) },
+      ]),
+    );
+    const warn = await screen.findByRole('status', { name: 'Cảnh báo thiếu hàng' });
+    expect(warn).toHaveTextContent('Thiếu hàng 1 dòng');
+    expect(warn).toHaveTextContent('SKU-X');
+    expect(warn).toHaveTextContent('Kệ trống');
+    // Dòng kế (B-02-01) thành dòng đang lấy; dòng thiếu vẫn hiện trong danh sách với nhãn "thiếu"
+    await waitFor(() => expect(screen.getAllByText('B-02-01').length).toBeGreaterThan(1));
+    expect(screen.getByText('· thiếu')).toBeInTheDocument();
+  });
+
   it('việc của người khác → 409 hiện câu từ bộ dịch, không nhận', async () => {
     server.use(
       http.get('/api/pda/resolve/:code', () =>

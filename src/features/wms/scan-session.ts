@@ -10,8 +10,11 @@ import {
   useClaimTask,
   usePdaComplete,
   usePdaScan,
+  usePdaShort,
   useResolveCode,
   type PdaCompleteResult,
+  type PdaResolveResult,
+  type PdaShortResult,
   type PdaTask,
   type PdaTaskRef,
 } from './api/use-pda';
@@ -25,8 +28,17 @@ export interface ScanOrder {
 }
 
 export interface ScanFeedback {
-  kind: 'ok' | 'error' | 'info';
+  kind: 'ok' | 'error' | 'info' | 'warn';
   text: string;
+}
+
+/** Một dòng đã báo thiếu trong phiên — hiện cảnh báo tới khi đổi việc. */
+export interface Shortage {
+  taskLineId: string;
+  skuCode: string;
+  skuName: string;
+  shortageQty: string;
+  note: string;
 }
 
 const CLOSED = new Set(['COMPLETED', 'CANCELLED']);
@@ -48,12 +60,14 @@ export function useScanSession(kind: 'PICK' | 'PACK') {
   const claim = useClaimTask();
   const scanMut = usePdaScan();
   const completeMut = usePdaComplete();
+  const shortMut = usePdaShort();
 
   const [phase, setPhase] = useState<ScanPhase>('idle');
   const [task, setTask] = useState<PdaTask | null>(null);
   const [order, setOrder] = useState<ScanOrder>({ id: null, docNumber: null, customerName: null });
   const [feedback, setFeedback] = useState<ScanFeedback | null>(null);
   const [completion, setCompletion] = useState<PdaCompleteResult | null>(null);
+  const [shortages, setShortages] = useState<Shortage[]>([]);
   const [offline, setOffline] = useState(false);
 
   const fail = useCallback((err: unknown) => {
@@ -68,6 +82,7 @@ export function useScanSession(kind: 'PICK' | 'PACK') {
     setOrder({ id: null, docNumber: null, customerName: null });
     setFeedback(null);
     setCompletion(null);
+    setShortages([]);
   }, []);
 
   const pickTask = useCallback(
@@ -76,14 +91,14 @@ export function useScanSession(kind: 'PICK' | 'PACK') {
     [kind],
   );
 
-  const open = useCallback(
-    async (code: string) => {
+  /** Mở việc từ kết quả resolve đã có (màn pick tự resolve để rẽ sang lượt gộp). */
+  const openResolved = useCallback(
+    async (r: PdaResolveResult, code: string) => {
       setPhase('opening');
       setFeedback(null);
       setCompletion(null);
+      setShortages([]);
       try {
-        const r = await resolve.mutateAsync(code);
-        setOffline(false);
         let ref: PdaTaskRef | null = null;
         let nextOrder: ScanOrder = { id: null, docNumber: null, customerName: null };
         if (r.kind === 'order' && r.order) {
@@ -152,7 +167,82 @@ export function useScanSession(kind: 'PICK' | 'PACK') {
         fail(err);
       }
     },
-    [resolve, claim, kind, fail, pickTask],
+    [claim, kind, fail, pickTask],
+  );
+
+  const open = useCallback(
+    async (code: string) => {
+      setPhase('opening');
+      setFeedback(null);
+      setCompletion(null);
+      setShortages([]);
+      let r: PdaResolveResult;
+      try {
+        r = await resolve.mutateAsync(code);
+        setOffline(false);
+      } catch (err) {
+        setPhase('idle');
+        fail(err);
+        return;
+      }
+      await openResolved(r, code);
+    },
+    [resolve, openResolved, fail],
+  );
+
+  /**
+   * Báo THIẾU HÀNG dòng đang lấy (chỉ PICK): dòng → EXCEPTION với số đã lấy, phần thiếu
+   * không sang đóng gói; cảnh báo giữ trên màn tới khi đổi việc. Task đóng nếu hết dòng mở.
+   */
+  const short = useCallback(
+    async (taskLineId: string, note?: string): Promise<PdaShortResult | null> => {
+      if (!task) return null;
+      const line = task.lines.find((l) => l.taskLineId === taskLineId);
+      if (!line) return null;
+      try {
+        const r = await shortMut.mutateAsync({
+          taskLineId,
+          ...(note?.trim() ? { note: note.trim() } : {}),
+          idempotencyKey: newIdempotencyKey(),
+        });
+        setOffline(false);
+        setTask((cur) =>
+          cur
+            ? {
+                ...cur,
+                status: r.taskStatus,
+                lines: cur.lines.map((l) =>
+                  l.taskLineId === r.taskLineId ? { ...l, status: r.lineStatus } : l,
+                ),
+              }
+            : cur,
+        );
+        setShortages((cur) => [
+          ...cur,
+          {
+            taskLineId,
+            skuCode: line.skuCode,
+            skuName: line.skuName,
+            shortageQty: r.shortageQty,
+            note: r.exceptionNote,
+          },
+        ]);
+        beep('error');
+        setFeedback({
+          kind: 'warn',
+          text: `Đã báo thiếu ${r.shortageQty} ${line.skuCode} — điều phối sẽ xử lý. Tiếp tục dòng kế.`,
+        });
+        if (r.taskCompleted) {
+          setCompletion(null);
+          setPhase('done');
+        }
+        return r;
+      } catch (err) {
+        fail(err);
+        return null;
+      }
+    },
+    [task, shortMut, fail],
   );
 
   const scan = useCallback(
@@ -239,10 +329,18 @@ export function useScanSession(kind: 'PICK' | 'PACK') {
     order,
     feedback,
     completion,
+    shortages,
     offline,
-    busy: resolve.isPending || claim.isPending || scanMut.isPending || completeMut.isPending,
+    busy:
+      resolve.isPending ||
+      claim.isPending ||
+      scanMut.isPending ||
+      completeMut.isPending ||
+      shortMut.isPending,
     open,
+    openResolved,
     scan,
+    short,
     clear,
   };
 }

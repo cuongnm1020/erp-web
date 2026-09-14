@@ -2151,6 +2151,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/pda/waves/{id}/short": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Báo thiếu cả nhóm (sku + vị trí + lô) của lượt: dòng con → EXCEPTION, task/lượt đóng theo. */
+        post: operations["PdaController_shortWave"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/pda/short": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Báo thiếu hàng một dòng PICK: dòng → EXCEPTION với số đã lấy, phần thiếu không sang đóng gói. */
+        post: operations["PdaController_short"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/pda/scan": {
         parameters: {
             query?: never;
@@ -4829,6 +4863,8 @@ export interface components {
             warehouseName: string;
             waveId: string | null;
             lineCount: number;
+            /** @description Số dòng EXCEPTION (báo thiếu hàng khi lấy) — cảnh báo trên bảng điều phối. */
+            exceptionLineCount: number;
             /** @description Tổng số lượng kế hoạch của mọi dòng — Decimal(18,6) dạng chuỗi. */
             qtyPlanned: string;
             /** @description Tổng số lượng đã làm — Decimal(18,6) dạng chuỗi. */
@@ -4898,6 +4934,8 @@ export interface components {
             warehouseName: string;
             waveId: string | null;
             lineCount: number;
+            /** @description Số dòng EXCEPTION (báo thiếu hàng khi lấy) — cảnh báo trên bảng điều phối. */
+            exceptionLineCount: number;
             /** @description Tổng số lượng kế hoạch của mọi dòng — Decimal(18,6) dạng chuỗi. */
             qtyPlanned: string;
             /** @description Tổng số lượng đã làm — Decimal(18,6) dạng chuỗi. */
@@ -5235,6 +5273,54 @@ export interface components {
             /** @description true = mọi task con đã xong → lượt COMPLETED. */
             waveCompleted: boolean;
             replayed: boolean;
+        };
+        WaveShortDto: {
+            /** Format: uuid */
+            skuId: string;
+            /** Format: uuid */
+            locationId?: string;
+            /** Format: uuid */
+            lotId?: string;
+            note?: string;
+            idempotencyKey: string;
+        };
+        PdaShortResultDto: {
+            taskLineId: string;
+            taskId: string;
+            taskDocNumber: string;
+            skuId: string;
+            skuCode: string;
+            /** @enum {string} */
+            lineStatus: "CANCELLED" | "PENDING" | "ASSIGNED" | "IN_PROGRESS" | "COMPLETED" | "EXCEPTION";
+            qtyDone: string;
+            qtyPlanned: string;
+            /** @description Phần thiếu = kế hoạch − đã lấy. */
+            shortageQty: string;
+            exceptionNote: string;
+            /** @enum {string} */
+            taskStatus: "CANCELLED" | "PENDING" | "ASSIGNED" | "IN_PROGRESS" | "COMPLETED" | "EXCEPTION";
+            /** @description true = dòng này là dòng cuối còn mở → task đóng (PACK sinh với các dòng đã lấy đủ). */
+            taskCompleted: boolean;
+            replayed: boolean;
+        };
+        PdaWaveShortResultDto: {
+            waveId: string;
+            waveDocNumber: string;
+            skuId: string;
+            locationId: string | null;
+            lotId: string | null;
+            lines: components["schemas"]["PdaShortResultDto"][];
+            /** @enum {string} */
+            waveStatus: "CANCELLED" | "PENDING" | "ASSIGNED" | "IN_PROGRESS" | "COMPLETED" | "EXCEPTION";
+            waveCompleted: boolean;
+            replayed: boolean;
+        };
+        ShortLineDto: {
+            /** Format: uuid */
+            taskLineId: string;
+            /** @description Lý do (kệ trống, hàng hỏng…) — hiện cho điều phối; mặc định "Thiếu hàng". */
+            note?: string;
+            idempotencyKey: string;
         };
         ScanDto: {
             /** Format: uuid */
@@ -9725,6 +9811,54 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["PdaWaveScanResultDto"];
+                };
+            };
+        };
+    };
+    PdaController_shortWave: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WaveShortDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PdaWaveShortResultDto"];
+                };
+            };
+        };
+    };
+    PdaController_short: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ShortLineDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PdaShortResultDto"];
                 };
             };
         };

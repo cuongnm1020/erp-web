@@ -391,6 +391,7 @@ export function makeTasks(n: number) {
       warehouseName: 'Kho Hà Nội 1',
       waveId: null,
       lineCount: (i % 12) + 1,
+      exceptionLineCount: 0,
       qtyPlanned: String(((i % 12) + 1) * 10),
       qtyDone: done ? String(((i % 12) + 1) * 10) : String((i % 12) * 3),
       refType: i % 2 === 0 ? 'SalesOrder' : 'GoodsReceipt',
@@ -735,6 +736,9 @@ export const handlers = [
     if (docNumber) all = all.filter((t) => t.docNumber === docNumber);
     return HttpResponse.json({ items: all.slice(skip, skip + take), total: all.length });
   }),
+
+  // Lượt pick gộp (PLAN-barcode-pick-pack E3) — mặc định trống; test override khi cần.
+  http.get('/api/waves', () => HttpResponse.json({ items: [], total: 0 })),
 
   // Danh bạ người nhận việc của bảng điều phối (GET /tasks/assignees) — khai TRƯỚC /tasks/:id
   http.get('/api/tasks/assignees', () =>
