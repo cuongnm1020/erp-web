@@ -484,12 +484,18 @@ function Detail({ order }: { order: SalesOrderDetail }) {
         <Card className="lg:col-span-3" title="Thông tin đơn">
           <dl className="grid grid-cols-2 gap-x-4 gap-y-3 px-3 py-3 sm:grid-cols-3">
             <Field label="Khách hàng">
-              <Link
-                href={`/crm/customers/${order.customer.id}`}
-                className="font-semibold text-primary hover:underline"
-              >
-                {order.customer.name}
-              </Link>
+              {/* Kho mở đơn bằng sales_order.read_all nhưng không có customer.read → link
+                  sẽ 404; hiện chữ thường thay vì dẫn vào ngõ cụt. */}
+              {ability.can('read', 'Customer') ? (
+                <Link
+                  href={`/crm/customers/${order.customer.id}`}
+                  className="font-semibold text-primary hover:underline"
+                >
+                  {order.customer.name}
+                </Link>
+              ) : (
+                <span className="font-semibold">{order.customer.name}</span>
+              )}
             </Field>
             <Field label="Mã khách hàng">
               <span className="font-mono text-xs">{order.customer.code}</span>
