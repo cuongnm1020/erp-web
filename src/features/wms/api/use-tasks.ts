@@ -7,12 +7,19 @@ export type Task = components['schemas']['TaskRowDto'];
 export type TaskStatus = Task['status'];
 export type TaskType = Task['type'];
 export type WarehouseStaff = components['schemas']['TaskAssigneeDto'];
+export type TaskDetail = components['schemas']['TaskDetailDto'];
+export type TaskLine = components['schemas']['TaskLineDto'];
 
 export interface TaskListParams {
   status?: TaskStatus;
   type?: TaskType;
   warehouseId?: string;
   assignedTo?: string;
+  /** Chứng từ nguồn: "SalesOrder" + id đơn → mọi việc của một đơn. */
+  refType?: string;
+  refId?: string;
+  /** Tra đúng một số việc (PICK-…, PACK-…). */
+  docNumber?: string;
   take: number;
   skip: number;
 }
@@ -22,6 +29,8 @@ export const taskKeys = {
   all: ['wms', 'tasks'] as const,
   lists: () => [...taskKeys.all, 'list'] as const,
   list: (p: TaskListParams) => [...taskKeys.lists(), p] as const,
+  details: () => [...taskKeys.all, 'detail'] as const,
+  detail: (id: string) => [...taskKeys.details(), id] as const,
 };
 
 /**
@@ -44,6 +53,9 @@ export function useTasks(params: TaskListParams) {
               type: params.type,
               warehouseId: params.warehouseId || undefined,
               assignedTo: params.assignedTo || undefined,
+              refType: params.refType || undefined,
+              refId: params.refId || undefined,
+              docNumber: params.docNumber || undefined,
               take: params.take,
               skip: params.skip,
             },
@@ -51,6 +63,49 @@ export function useTasks(params: TaskListParams) {
         }),
       ),
     placeholderData: keepPreviousData,
+  });
+}
+
+/** GET /tasks/:id — chi tiết + dòng (đã sắp theo pickSequence) cho in phiếu pick / trạm đóng gói. */
+export function useTaskDetail(taskId: string | null) {
+  return useQuery({
+    queryKey: taskKeys.detail(taskId ?? ''),
+    queryFn: () => unwrap(api.GET('/tasks/{id}', { params: { path: { id: taskId ?? '' } } })),
+    enabled: taskId !== null && taskId !== '',
+  });
+}
+
+/**
+ * Task PICK của một đơn bán — `GET /tasks?refType=SalesOrder&refId=…&type=PICK`. Một đơn
+ * chỉ có một task PICK (task engine dedupe theo refId) nên lấy phần tử đầu; null = chưa sinh.
+ */
+export function usePickTaskOfOrder(orderId: string | null) {
+  const params: TaskListParams = {
+    refType: 'SalesOrder',
+    refId: orderId ?? '',
+    type: 'PICK',
+    take: 1,
+    skip: 0,
+  };
+  return useQuery({
+    queryKey: taskKeys.list(params),
+    queryFn: async () => {
+      const r = await unwrap(
+        api.GET('/tasks', {
+          params: {
+            query: {
+              refType: params.refType,
+              refId: params.refId,
+              type: params.type,
+              take: params.take,
+              skip: params.skip,
+            },
+          },
+        }),
+      );
+      return r.items[0] ?? null;
+    },
+    enabled: orderId !== null && orderId !== '',
   });
 }
 

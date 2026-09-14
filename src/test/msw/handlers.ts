@@ -117,7 +117,92 @@ export function makeOrderDetail(id: string) {
     reservedQty: String((i + 1) * 10),
     pickedQty: i === 0 ? String((i + 1) * 10) : '0',
   }));
-  return { ...header, carrier: null, warehouse: null, lines };
+  return { ...header, carrier: null, warehouse: null, shipment: null, lines };
+}
+
+/** Đúng shape `SalesOrderShipmentDto` — phiếu giao đã có vận đơn GHTK, chưa in nhãn. */
+export const ORDER_SHIPMENT_FIXTURE = {
+  id: uuid('0000000e', 7),
+  docNumber: 'DN2609-00007',
+  status: 'PENDING' as const,
+  carrierCode: 'GHTK',
+  trackingNo: 'S12345678.SG.A1.B2',
+  labelPrintedAt: null,
+  labelPrintCount: 0,
+};
+
+/** Đúng shape `TaskDetailDto` (GET /tasks/:id) — task PICK 2 dòng đã sắp theo pickSequence. */
+export function makeTaskDetail(id: string, over: Record<string, unknown> = {}) {
+  return {
+    id,
+    docNumber: 'PICK2609-00004',
+    type: 'PICK',
+    status: 'COMPLETED',
+    priority: 0,
+    assigneeId: 'staff-1',
+    warehouseId: 'wh-1',
+    warehouseCode: 'WH01',
+    warehouseName: 'Kho HN-1',
+    waveId: null,
+    lineCount: 2,
+    qtyPlanned: '120',
+    qtyDone: '120',
+    refType: 'SalesOrder',
+    refId: 'so-4',
+    createdAt: '2026-09-02T08:00:00.000Z',
+    assignedAt: '2026-09-02T08:05:00.000Z',
+    startedAt: '2026-09-02T08:10:00.000Z',
+    completedAt: '2026-09-02T09:00:00.000Z',
+    ageMinutes: 60,
+    idleMinutes: 0,
+    assigneeName: 'Phạm Thị Hoa',
+    refDocNumber: 'SO2609-00004',
+    lines: [
+      {
+        id: 'tl-1',
+        lineNo: 1,
+        status: 'COMPLETED',
+        skuId: 'sku-1',
+        skuCode: 'TL08-BLUE',
+        skuName: 'Bút bi Thiên Long TL-08 xanh',
+        barcodes: ['8935001800012', 'TL08-BLUE'],
+        lotId: 'lot-1',
+        lotNumber: 'L2605',
+        expiryDate: null,
+        fromLocationId: 'loc-1',
+        fromLocationCode: 'A-03-02-B',
+        toLocationId: null,
+        toLocationCode: null,
+        pickSequence: 120,
+        qtyPlanned: '48',
+        qtyDone: '48',
+        scannedBarcode: '8935001800012',
+        exceptionNote: null,
+      },
+      {
+        id: 'tl-2',
+        lineNo: 2,
+        status: 'COMPLETED',
+        skuId: 'sku-2',
+        skuCode: 'TL08-RED',
+        skuName: 'Bút bi Thiên Long TL-08 đỏ',
+        barcodes: [],
+        lotId: null,
+        lotNumber: null,
+        expiryDate: null,
+        fromLocationId: 'loc-2',
+        fromLocationCode: 'A-03-04-A',
+        toLocationId: null,
+        toLocationCode: null,
+        pickSequence: 140,
+        qtyPlanned: '72',
+        qtyDone: '72',
+        scannedBarcode: null,
+        exceptionNote: null,
+      },
+    ],
+    ...over,
+  };
 }
 
 /** Đúng shape `PickupWarehouseDto` (GET /pickup-warehouses). */
@@ -638,20 +723,27 @@ export const handlers = [
     const skip = Number(url.searchParams.get('skip') ?? 0);
     const status = url.searchParams.get('status');
     const type = url.searchParams.get('type');
+    const refType = url.searchParams.get('refType');
+    const refId = url.searchParams.get('refId');
+    const docNumber = url.searchParams.get('docNumber');
     await delay(50);
     let all = makeTasks(40);
     if (status) all = all.filter((t) => t.status === status);
     if (type) all = all.filter((t) => t.type === type);
+    if (refType) all = all.filter((t) => t.refType === refType);
+    if (refId) all = all.filter((t) => t.refId === refId);
+    if (docNumber) all = all.filter((t) => t.docNumber === docNumber);
     return HttpResponse.json({ items: all.slice(skip, skip + take), total: all.length });
   }),
 
-  // Danh bạ người nhận việc của bảng điều phối (GET /tasks/assignees)
+  // Danh bạ người nhận việc của bảng điều phối (GET /tasks/assignees) — khai TRƯỚC /tasks/:id
   http.get('/api/tasks/assignees', () =>
     HttpResponse.json([
       { id: 'staff-1', code: 'wh.1', fullName: 'Phạm Thị Hoa' },
       { id: 'staff-2', code: 'wh.2', fullName: 'Trần Văn Bảo' },
     ]),
   ),
+  http.get('/api/tasks/:id', ({ params }) => HttpResponse.json(makeTaskDetail(String(params.id)))),
 
   // ── Quản trị: users / roles / permissions / departments ──
   http.get('/api/users', async ({ request }) => {
@@ -844,6 +936,13 @@ export const scenario = {
   ordersError: http.get('/api/sales-orders', () => errorEnvelope(500, 'DB_ERROR')),
   ordersForbidden: http.get('/api/sales-orders', () => errorEnvelope(403, 'FORBIDDEN')),
   orderNotFound: http.get('/api/sales-orders/:id', () => errorEnvelope(404, 'NOT_FOUND')),
+  /** Đơn đã pick xong, phiếu giao có vận đơn GHTK → thẻ Vận đơn + nút In nhãn. */
+  orderWithShipment: http.get('/api/sales-orders/:id', ({ params }) => {
+    const found = makeOrderDetail(String(params.id));
+    return found
+      ? HttpResponse.json({ ...found, shipment: ORDER_SHIPMENT_FIXTURE })
+      : errorEnvelope(404, 'NOT_FOUND');
+  }),
   orderError: http.get('/api/sales-orders/:id', () => errorEnvelope(500, 'DB_ERROR')),
   orderForbidden: http.get('/api/sales-orders/:id', () => errorEnvelope(403, 'FORBIDDEN')),
 

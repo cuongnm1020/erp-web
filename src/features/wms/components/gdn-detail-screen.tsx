@@ -23,6 +23,7 @@ import {
   useGoodsIssue,
   type GoodsIssueDetail,
 } from '../api/use-goods-issues';
+import { usePickTaskOfOrder, useTaskDetail } from '../api/use-tasks';
 import { taskStatusLabel } from '../labels';
 import { GdnPrintSheet } from './gdn-print-sheet';
 
@@ -34,7 +35,8 @@ import { GdnPrintSheet } from './gdn-print-sheet';
  * Khác design (backend chưa mô tả được): không có tiến độ realtime của người
  * đang pick (dòng hiện tại, SLA giao vận), không có "Gán lại người pick" — việc đó
  * nằm ở bảng điều phối; panel "Tồn của phiếu" rút gọn còn ghi chú reserve/trừ tồn
- * (API không trả số reservation). "In phiếu pick" in từ chính DTO này (`GdnPrintSheet`).
+ * (API không trả số reservation). "In phiếu pick" in theo task PICK của đơn (`GET /tasks/:id`,
+ * `GdnPrintSheet`) — mã vạch to là số việc PICK để quét mở việc.
  */
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
@@ -162,6 +164,12 @@ export function GdnDetailScreen({ id }: { id: string }) {
   const stage = issue ? gdnStage(issue) : null;
   const kind = issue ? GDN_KIND_LABEL[issue.kind] : null;
   const printer = usePrint();
+  // Phiếu pick in theo task PICK thật của đơn (mã việc + pickSequence) — tra qua GET /tasks
+  // rồi GET /tasks/:id; phiếu không từ đơn bán thì in từ chính phiếu (task = null).
+  const pickTask = usePickTaskOfOrder(
+    issue?.refType === 'SalesOrder' && issue.refId ? issue.refId : null,
+  );
+  const taskDetail = useTaskDetail(pickTask.data?.id ?? null);
 
   return (
     <>
@@ -177,14 +185,21 @@ export function GdnDetailScreen({ id }: { id: string }) {
         ]}
         actions={
           issue && issue.status !== 'CANCELLED' ? (
-            <Button variant="outline" size="sm" onClick={printer.print}>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={printer.print}
+              disabled={pickTask.isLoading || taskDetail.isLoading}
+            >
               <Printer aria-hidden />
               In phiếu pick
             </Button>
           ) : undefined
         }
       />
-      {issue ? <GdnPrintSheet issue={issue} printer={printer} /> : null}
+      {issue ? (
+        <GdnPrintSheet issue={issue} task={taskDetail.data ?? null} printer={printer} />
+      ) : null}
       {stage && kind ? (
         <div className="mb-3 flex items-center gap-2">
           <StatusBadge tone={stage.tone}>{stage.label}</StatusBadge>

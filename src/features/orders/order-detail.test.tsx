@@ -1,7 +1,14 @@
 import { fireEvent, screen, waitFor } from '@testing-library/react';
 import { http, HttpResponse } from 'msw';
 import { describe, expect, it, vi } from 'vitest';
-import { CARRIERS, ME_SALE, makeOrderDetail, makeOrders, scenario } from '@/test/msw/handlers';
+import {
+  CARRIERS,
+  ME_SALE,
+  ORDER_SHIPMENT_FIXTURE,
+  makeOrderDetail,
+  makeOrders,
+  scenario,
+} from '@/test/msw/handlers';
 import { server } from '@/test/msw/server';
 import { renderApp } from '@/test/render';
 import { OrderDetailScreen } from './components/order-detail-screen';
@@ -137,5 +144,46 @@ describe('OrderDetailScreen — GET /sales-orders/{id} (P1-12)', () => {
     expect(screen.getByText(CARRIERS[1]!.name)).toBeInTheDocument();
     expect(screen.getByText('Kho trung tâm')).toBeInTheDocument();
     expect(screen.getByText('Đã chốt lúc')).toBeInTheDocument();
+  });
+
+  it('chưa có phiếu giao: thẻ Vận đơn nói rõ, không có nút In nhãn; mục "chưa nối được" không còn Vận đơn', async () => {
+    renderApp(<OrderDetailScreen orderId={ORDER.id} />);
+    await screen.findByRole('heading', { level: 1 });
+    expect(
+      screen.getByText('Chưa có phiếu giao — phiếu sinh khi kho pick xong đơn này.'),
+    ).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'In nhãn' })).not.toBeInTheDocument();
+    expect(screen.queryByText('Vận đơn / tracking')).not.toBeInTheDocument();
+  });
+
+  it('phiếu giao có vận đơn: thẻ Vận đơn từ order.shipment; In nhãn → PDF /api/shipments/:id/label (khổ A6 mặc định)', async () => {
+    server.use(scenario.orderWithShipment);
+    renderApp(<OrderDetailScreen orderId={ORDER.id} />);
+    await screen.findByRole('heading', { level: 1 });
+    expect(screen.getByText(ORDER_SHIPMENT_FIXTURE.trackingNo)).toBeInTheDocument();
+    expect(screen.getByText(ORDER_SHIPMENT_FIXTURE.docNumber)).toBeInTheDocument();
+    expect(screen.getByText('chưa in')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'In nhãn' }));
+    const frame = await screen.findByTestId('pdf-frame');
+    expect(frame).toHaveAttribute(
+      'src',
+      `/api/shipments/${ORDER_SHIPMENT_FIXTURE.id}/label?pageSize=A6&orientation=portrait`,
+    );
+    // Đổi khổ A5 → iframe nạp lại URL mới
+    fireEvent.click(screen.getByRole('button', { name: 'A5' }));
+    await waitFor(() =>
+      expect(screen.getByTestId('pdf-frame')).toHaveAttribute(
+        'src',
+        `/api/shipments/${ORDER_SHIPMENT_FIXTURE.id}/label?pageSize=A5&orientation=portrait`,
+      ),
+    );
+  });
+
+  it('không có shipment.pack → thấy vận đơn nhưng không thấy nút In nhãn (luật 7)', async () => {
+    server.use(scenario.orderWithShipment);
+    renderApp(<OrderDetailScreen orderId={ORDER.id} />, { me: ME_SALE });
+    await screen.findByRole('heading', { level: 1 });
+    expect(screen.getByText(ORDER_SHIPMENT_FIXTURE.trackingNo)).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'In nhãn' })).not.toBeInTheDocument();
   });
 });
