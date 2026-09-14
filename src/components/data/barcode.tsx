@@ -25,6 +25,22 @@ export interface BarcodeProps {
 }
 
 /**
+ * bwip-js `toSVG` chỉ cho `viewBox`, KHÔNG có `width`/`height`. SVG như vậy đặt trong
+ * hộp co theo nội dung (span inline-block, ô bảng, flex item) tính ra rộng 0 → phiếu in
+ * trống chỗ mã vạch (bug prod 2026-09-15). Gắn kích thước gốc theo viewBox (1 đơn vị = 1px
+ * ở scale đã chọn); `max-w-full` + `h-auto` ở container vẫn co lại khi hộp hẹp hơn.
+ */
+export function withIntrinsicSize(svg: string): string {
+  return svg.replace(
+    /<svg\b([^>]*?)\sviewBox="0 0 (\d+(?:\.\d+)?) (\d+(?:\.\d+)?)"/,
+    (m, attrs: string, w: string, h: string) =>
+      /\swidth=/.test(attrs)
+        ? m
+        : `<svg${attrs} width="${w}" height="${h}" viewBox="0 0 ${w} ${h}"`,
+  );
+}
+
+/**
  * Mã vạch THẬT (SVG, bwip-js) — dùng cho tem SKU, phiếu đơn, phiếu pick, và mọi chỗ cần
  * máy quét đọc được. Không phải trang trí: dải vạch giả trong mock cũ đã bỏ.
  * Mã không mã hoá được (chuỗi rỗng, ký tự ngoài bảng) → hiện chuỗi thô để không im lặng.
@@ -43,12 +59,14 @@ export function Barcode({
   const svg = useMemo(() => {
     if (!value) return null;
     try {
-      return bwipjs.toSVG({
-        bcid,
-        text: value,
-        scale,
-        ...(bcid === 'qrcode' ? {} : { height, includetext: showText, textxalign: 'center' }),
-      });
+      return withIntrinsicSize(
+        bwipjs.toSVG({
+          bcid,
+          text: value,
+          scale,
+          ...(bcid === 'qrcode' ? {} : { height, includetext: showText, textxalign: 'center' }),
+        }),
+      );
     } catch {
       return null;
     }
