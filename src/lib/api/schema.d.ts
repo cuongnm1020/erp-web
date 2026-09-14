@@ -1424,9 +1424,8 @@ export interface paths {
          *     bắt buộc ngay sẽ làm hỏng mọi client đang chạy). Siết thành bắt buộc là một
          *     quyết định vận hành, nên để lại cho task riêng.
          *
-         *     Bọc ở CONTROLLER chứ không trong service: {@link IdempotencyService.run}
-         *     cache nguyên văn thân JSON, nên lần replay trả về response giống hệt lần
-         *     đầu — Decimal đã thành chuỗi ở cả hai lần.
+         *     Dedupe nền DB (`core.IdempotencyRecord`, 2026-09-14) nằm TRONG transaction tạo đơn ở
+         *     service — bản ghi idempotency commit cùng chứng từ; replay trả thân JSON lần đầu.
          */
         post: operations["SalesOrderController_create"];
         delete?: never;
@@ -2233,9 +2232,8 @@ export interface paths {
          *
          *     `apps/web/CLAUDE.md` luật 4: mọi mutation tạo chứng từ phải mang
          *     `Idempotency-Key`. Nhận cả header lẫn trường trong body (máy PDA không phải
-         *     lúc nào cũng đặt được header tuỳ ý); header thắng khi có cả hai. Bọc ở
-         *     CONTROLLER vì {@link IdempotencyService.run} cache nguyên văn thân JSON —
-         *     lần replay trả về response giống hệt lần đầu.
+         *     lúc nào cũng đặt được header tuỳ ý); header thắng khi có cả hai. Dedupe nền DB
+         *     (`core.IdempotencyRecord`) nằm TRONG transaction tạo phiếu ở service.
          */
         post: operations["ReceivingController_create"];
         delete?: never;
@@ -4696,7 +4694,7 @@ export interface components {
             /** @enum {string|null} */
             mappedStatus: "PENDING" | "PICKED_UP" | "IN_TRANSIT" | "DELIVERED" | "FAILED" | "RETURNED" | null;
             /** @enum {string} */
-            outcome: "NOT_FOUND" | "APPLIED" | "DUPLICATE" | "REJECTED_UNMAPPED" | "REJECTED_TRANSITION";
+            outcome: "APPLIED" | "DUPLICATE" | "REJECTED_UNMAPPED" | "REJECTED_TRANSITION" | "NOT_FOUND";
             note: string | null;
             /** @description Mốc theo hãng (null = hãng không trả). */
             occurredAt: string | null;
