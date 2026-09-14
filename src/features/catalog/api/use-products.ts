@@ -1,4 +1,10 @@
-import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import {
+  keepPreviousData,
+  useMutation,
+  useQueries,
+  useQuery,
+  useQueryClient,
+} from '@tanstack/react-query';
 import { api, unwrap } from '@/lib/api/client';
 import type { components } from '@/lib/api/schema';
 
@@ -264,8 +270,9 @@ export function useUpdateUom() {
  * barcode (backend tìm hộ, luật 8). Filter danh mục/thương hiệu/theo dõi lô/còn tồn và
  * sort (code/name/createdAt) đều phía server.
  */
-export function useProducts(params: ProductListParams) {
+export function useProducts(params: ProductListParams, opts: { enabled?: boolean } = {}) {
   return useQuery({
+    enabled: opts.enabled ?? true,
     queryKey: productKeys.list(params),
     queryFn: () =>
       unwrap(
@@ -297,6 +304,25 @@ export function useProduct(id: string) {
     queryFn: () => unwrap(api.GET('/products/{id}', { params: { path: { id } } })),
     enabled: id !== '',
   });
+}
+
+/**
+ * Nhiều GET /products/{id} song song (màn in tem nhận `?productId=a,b`). Cùng key với
+ * `useProduct` nên cache dùng chung; gom trạng thái: `pending` khi còn cái đang tải,
+ * `failed` = query lỗi đầu tiên (kèm refetch), `products` = những cái đã về.
+ */
+export function useProductDetails(ids: string[]) {
+  const queries = useQueries({
+    queries: ids.map((id) => ({
+      queryKey: productKeys.detail(id),
+      queryFn: () => unwrap(api.GET('/products/{id}', { params: { path: { id } } })),
+    })),
+  });
+  return {
+    pending: queries.some((q) => q.isPending),
+    failed: queries.find((q) => q.isError) ?? null,
+    products: queries.flatMap((q) => (q.data ? [q.data] : [])),
+  };
 }
 
 /** GET /brands — danh mục nhỏ, đổi hiếm → cache 60s cho form chọn nhanh. */

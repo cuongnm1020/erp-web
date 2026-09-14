@@ -1,6 +1,6 @@
 'use client';
 
-import { Gift, Info } from 'lucide-react';
+import { Gift, Info, Printer } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useState, type ReactNode } from 'react';
@@ -33,6 +33,7 @@ import { isApiError } from '@/lib/api/errors';
 import { messageFor } from '@/lib/error-messages';
 import { formatDate, formatDateTime, formatMoney, formatQuantity } from '@/lib/format';
 import { Can, useAbility } from '@/lib/permission';
+import { usePrint } from '@/lib/print';
 import { useInvalidateOn } from '@/lib/realtime';
 import {
   orderKeys,
@@ -42,6 +43,7 @@ import {
   type SalesOrderDetail,
 } from '../api/use-orders';
 import { orderChannelLabel, orderStatusLabel, orderStatusTone } from '../labels';
+import { OrderPrintSheet } from './order-print-sheet';
 
 /**
  * D-04 Chi tiết đơn hàng — GET /sales-orders/{id}.
@@ -58,7 +60,9 @@ import { orderChannelLabel, orderStatusLabel, orderStatusTone } from '../labels'
  * - Thẻ "Vận chuyển", "Thanh toán", "Lịch sử": chưa có endpoint/DTO cho vận đơn, thu tiền,
  *   dòng thời gian chứng từ. Luật 2 cấm tự khai shape ở frontend nên màn nói thẳng là
  *   chưa nối được, thay vì hiện số bịa cạnh một đơn thật.
- * - Nút "In" / "Tạo phiếu xuất": chưa nối mutation. "Hủy đơn" đã nối POST /:id/cancel.
+ * - "Tạo phiếu xuất": chưa nối mutation. "Hủy đơn" đã nối POST /:id/cancel.
+ * - "In phiếu đơn": in A5 qua trình duyệt với mã vạch docNumber (`OrderPrintSheet`,
+ *   PLAN-barcode-pick-pack A3).
  */
 const MISSING: Array<{ title: string; need: string }> = [
   {
@@ -288,6 +292,7 @@ function CancelOrderDialog({
 
 function Detail({ order }: { order: SalesOrderDetail }) {
   const [dialog, setDialog] = useState<'cancel' | 'recreate' | null>(null);
+  const printer = usePrint();
   const ability = useAbility();
   const canRecreate = ability.can('cancel', 'SalesOrder') && ability.can('create', 'SalesOrder');
   return (
@@ -331,11 +336,16 @@ function Detail({ order }: { order: SalesOrderDetail }) {
               </Button>
             </Can>
           )}
+          <Button variant="outline" size="sm" onClick={printer.print}>
+            <Printer aria-hidden />
+            In phiếu đơn
+          </Button>
           <Button variant="outline" size="sm" asChild>
             <Link href="/crm/orders">Về danh sách đơn</Link>
           </Button>
         </div>
       </div>
+      <OrderPrintSheet order={order} printer={printer} />
       <CancelOrderDialog
         order={order}
         open={dialog !== null}

@@ -1,11 +1,12 @@
 'use client';
 
 import Decimal from 'decimal.js';
-import { AlertTriangle, Lock } from 'lucide-react';
+import { AlertTriangle, Lock, Printer } from 'lucide-react';
 import Link from 'next/link';
 import { DetailSkeleton, QueryState } from '@/components/data/states';
 import { StatusBadge } from '@/components/data/status-badge';
 import { PageHeader } from '@/components/layout/page-header';
+import { Button } from '@/components/ui/button';
 import {
   Table,
   TableBody,
@@ -15,6 +16,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { formatDateTime, formatQuantity } from '@/lib/format';
+import { usePrint } from '@/lib/print';
 import {
   GDN_KIND_LABEL,
   gdnStage,
@@ -22,6 +24,7 @@ import {
   type GoodsIssueDetail,
 } from '../api/use-goods-issues';
 import { taskStatusLabel } from '../labels';
+import { GdnPrintSheet } from './gdn-print-sheet';
 
 /**
  * Chi tiết phiếu xuất kho (design GdnDetail) — GET /goods-issues/:id. CHỈ ĐỌC:
@@ -29,9 +32,9 @@ import { taskStatusLabel } from '../labels';
  * xong (điểm trừ tồn duy nhất, PLAN-gdn-transfer).
  *
  * Khác design (backend chưa mô tả được): không có tiến độ realtime của người
- * đang pick (dòng hiện tại, SLA giao vận), không có "In phiếu pick" / "Gán lại
- * người pick" — hai việc đó nằm ở bảng điều phối; panel "Tồn của phiếu" rút gọn
- * còn ghi chú reserve/trừ tồn (API không trả số reservation).
+ * đang pick (dòng hiện tại, SLA giao vận), không có "Gán lại người pick" — việc đó
+ * nằm ở bảng điều phối; panel "Tồn của phiếu" rút gọn còn ghi chú reserve/trừ tồn
+ * (API không trả số reservation). "In phiếu pick" in từ chính DTO này (`GdnPrintSheet`).
  */
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
@@ -158,6 +161,7 @@ export function GdnDetailScreen({ id }: { id: string }) {
   const issue = query.data;
   const stage = issue ? gdnStage(issue) : null;
   const kind = issue ? GDN_KIND_LABEL[issue.kind] : null;
+  const printer = usePrint();
 
   return (
     <>
@@ -171,7 +175,16 @@ export function GdnDetailScreen({ id }: { id: string }) {
           { label: 'Xuất kho', href: '/wms/gdn' },
           { label: issue?.docNumber ?? '…' },
         ]}
+        actions={
+          issue && issue.status !== 'CANCELLED' ? (
+            <Button variant="outline" size="sm" onClick={printer.print}>
+              <Printer aria-hidden />
+              In phiếu pick
+            </Button>
+          ) : undefined
+        }
       />
+      {issue ? <GdnPrintSheet issue={issue} printer={printer} /> : null}
       {stage && kind ? (
         <div className="mb-3 flex items-center gap-2">
           <StatusBadge tone={stage.tone}>{stage.label}</StatusBadge>

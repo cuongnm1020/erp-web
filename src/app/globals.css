@@ -92,6 +92,31 @@
     @apply outline-none ring-2 ring-ring ring-offset-2 ring-offset-background;
   }
 
+  /*
+   * In qua trình duyệt (PrintSheet): khi in chỉ còn tờ in [data-print-root] — shell, sidebar,
+   * dialog, toast đều ẩn. Mỗi [data-print-page] là một trang. Đen trắng, nền trắng để máy in
+   * nhiệt / laser không tốn mực nền.
+   */
+  @media print {
+    body {
+      background: hsl(var(--card));
+    }
+    body > *:not([data-print-root]) {
+      display: none !important;
+    }
+    [data-print-root] {
+      display: block !important;
+    }
+    [data-print-page] {
+      break-after: page;
+      page-break-after: always;
+    }
+    [data-print-page]:last-child {
+      break-after: auto;
+      page-break-after: auto;
+    }
+  }
+
   /* Chất lượng nền: tôn trọng prefers-reduced-motion. */
   @media (prefers-reduced-motion: reduce) {
     *,

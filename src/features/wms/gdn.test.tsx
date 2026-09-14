@@ -1,4 +1,4 @@
-import { screen, within } from '@testing-library/react';
+import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import { http, HttpResponse } from 'msw';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { server } from '@/test/msw/server';
@@ -168,5 +168,33 @@ describe('GdnDetailScreen — GET /goods-issues/:id', () => {
     expect(screen.getByText('Đang đóng gói')).toBeInTheDocument();
     // Chưa post → không khoe số đã xuất
     expect(screen.queryByText(/Tồn đã trừ trong chính transaction/)).not.toBeInTheDocument();
+  });
+
+  it('In phiếu pick → tờ in A5: mã vạch CODE128 của số phiếu, dòng xếp theo vị trí, mã quét từng dòng', async () => {
+    server.use(http.get('/api/goods-issues/:id', () => HttpResponse.json(DETAIL)));
+    window.print = vi.fn();
+    let snapshot = { size: null as string | null, docBarcode: 0, lineBarcodes: 0, firstLoc: '' };
+    (window.print as ReturnType<typeof vi.fn>).mockImplementation(() => {
+      const root = document.querySelector('[data-print-root]');
+      snapshot = {
+        size: root?.getAttribute('data-print-size') ?? null,
+        docBarcode: root
+          ? root.querySelectorAll(`[role="img"][aria-label="Mã vạch ${DETAIL.docNumber}"] svg`)
+              .length
+          : 0,
+        lineBarcodes: root ? root.querySelectorAll('tbody [role="img"] svg').length : 0,
+        firstLoc: root?.querySelector('tbody td')?.textContent ?? '',
+      };
+    });
+    renderApp(<GdnDetailScreen id="gi-4" />);
+    await screen.findByText('Bút bi Thiên Long TL-08 xanh');
+    fireEvent.click(screen.getByRole('button', { name: 'In phiếu pick' }));
+    await waitFor(() => expect(window.print).toHaveBeenCalledTimes(1));
+    expect(snapshot.size).toBe('A5');
+    expect(snapshot.docBarcode).toBe(1);
+    expect(snapshot.lineBarcodes).toBe(2);
+    // Dòng không có vị trí (thiếu tồn) xếp trước theo chuỗi rỗng → dòng có vị trí A-03-02-B đứng sau
+    expect(snapshot.firstLoc).toBe('—');
+    expect(document.querySelector('[data-print-root]')).toBeNull();
   });
 });

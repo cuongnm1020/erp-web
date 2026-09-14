@@ -1,5 +1,6 @@
 import type { LucideIcon } from 'lucide-react';
 import {
+  Barcode,
   Boxes,
   Columns3,
   Gift,
@@ -146,12 +147,12 @@ export const NAV_MODULES: NavModule[] = [
         icon: List,
         ability: { action: 'read', subject: 'Product' },
       },
-      // {
-      //   label: 'In tem barcode',
-      //   href: '/catalog/barcode-print',
-      //   icon: Barcode,
-      //   ability: { action: 'read', subject: 'Product' },
-      // },
+      {
+        label: 'In tem barcode',
+        href: '/catalog/barcode-print',
+        icon: Barcode,
+        ability: { action: 'read', subject: 'Product' },
+      },
       // {
       //   label: 'Lô & hạn dùng',
       //   href: '/catalog/lots',
