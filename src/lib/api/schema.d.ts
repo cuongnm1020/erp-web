@@ -3648,6 +3648,8 @@ export interface components {
             ward: string | null;
             province: string | null;
             isActive: boolean;
+            /** @description Kho mặc định hệ thống — đơn đồng bộ từ Pancake giữ chỗ và gán kho này. Tối đa một kho. */
+            isDefault: boolean;
         };
         CreateWarehouseDto: {
             code: string;
@@ -3658,6 +3660,8 @@ export interface components {
             hamlet?: string;
             ward?: string;
             province?: string;
+            /** @description Kho mặc định hệ thống (đơn Pancake tự về kho này). true = thay kho mặc định hiện tại. */
+            isDefault?: boolean;
         };
         UpdateWarehouseDto: {
             name?: string;
@@ -3668,6 +3672,12 @@ export interface components {
             ward?: string | null;
             province?: string | null;
             isActive?: boolean;
+            /**
+             * @description Kho mặc định hệ thống: true = kho này thay kho mặc định hiện tại (tối đa một kho);
+             *     false = bỏ cờ (không có kho mặc định → sync rơi về kho hoạt động đầu tiên theo code).
+             *     Chỉ kho đang hoạt động, không phải TRANSIT.
+             */
+            isDefault?: boolean;
         };
         LocationFixedSkuDto: {
             id: string;
