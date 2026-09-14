@@ -10,6 +10,7 @@ import {
   MapPin,
   Network,
   Package,
+  PackageCheck,
   PackageMinus,
   PackagePlus,
   Percent,
@@ -203,6 +204,12 @@ export const NAV_MODULES: NavModule[] = [
         icon: Columns3,
         ability: { action: 'read', subject: 'Task' },
       },
+      {
+        label: 'Trạm đóng gói',
+        href: '/wms/pack',
+        icon: PackageCheck,
+        ability: { action: 'execute', subject: 'Task' },
+      },
       // {
       //   label: 'Chuyển kho',
       //   href: '/wms/transfers',
@@ -390,6 +397,7 @@ export const SEGMENT_LABELS: Record<string, string> = {
   grn: 'Phiếu nhập kho',
   gdn: 'Phiếu xuất kho',
   dispatch: 'Điều phối task',
+  pack: 'Trạm đóng gói',
   shipping: 'Theo dõi giao hàng',
   transfers: 'Chuyển kho',
   po: 'Purchase order',

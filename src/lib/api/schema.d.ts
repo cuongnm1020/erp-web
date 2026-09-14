@@ -1963,6 +1963,72 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/waves": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["WaveController_list"];
+        put?: never;
+        /** Gộp N task PICK (cùng kho, chưa ai nhận) thành một lượt; gán người luôn nếu có. */
+        post: operations["WaveController_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/waves/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Chi tiết + dòng gộp theo vị trí — in phiếu wave, xem tiến độ từng đơn. */
+        get: operations["WaveController_detail"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/waves/{id}/assign": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["WaveController_assign"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/waves/{id}/unassign": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["WaveController_unassign"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/pda/tasks": {
         parameters: {
             query?: never;
@@ -2028,6 +2094,57 @@ export interface paths {
         put?: never;
         /** Nhận việc bằng máy quét: PENDING chưa ai giữ → của tôi; người khác giữ → 409. */
         post: operations["PdaController_claim"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/pda/waves/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Lượt pick gộp: dòng gộp theo vị trí + tiến độ từng đơn — của mình hoặc chưa ai nhận. */
+        get: operations["PdaController_wave"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/pda/waves/{id}/claim": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Nhận cả lượt (mọi task con) bằng máy quét. */
+        post: operations["PdaController_claimWave"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/pda/waves/{id}/scan": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Quét gộp: server chia số lượng xuống từng đơn; đủ là tự đóng dòng / đóng task / đóng lượt. */
+        post: operations["PdaController_scanWave"];
         delete?: never;
         options?: never;
         head?: never;
@@ -4516,6 +4633,20 @@ export interface components {
             /** @description `wms.Carrier.code` — hãng phải đang active. */
             carrierCode: string;
         };
+        WaybillRequestResultDto: {
+            shipmentId: string;
+            shipmentDocNumber: string;
+            carrierCode: string;
+            /**
+             * @description ISSUED hãng cấp ngay; ALREADY_ISSUED đã có từ trước; QUEUED hãng lỗi, đã xếp hàng thử lại.
+             * @enum {string}
+             */
+            outcome: "QUEUED" | "ISSUED" | "ALREADY_ISSUED";
+            trackingNo: string | null;
+            /** @description Lý do hãng lỗi (chỉ khi QUEUED). */
+            reason: string | null;
+            jobId: string | null;
+        };
         CancelWaybillDto: {
             reason?: string;
         };
@@ -4561,6 +4692,33 @@ export interface components {
         StuckShipmentListDto: {
             items: components["schemas"]["StuckShipmentDto"][];
             total: number;
+        };
+        ShipmentPackTaskDto: {
+            taskId: string;
+            docNumber: string;
+            /** @enum {string} */
+            status: "CANCELLED" | "PENDING" | "ASSIGNED" | "IN_PROGRESS" | "COMPLETED" | "EXCEPTION";
+        };
+        ShipmentViewDto: {
+            shipmentId: string;
+            docNumber: string;
+            /** @enum {string} */
+            status: "PENDING" | "PICKED_UP" | "IN_TRANSIT" | "DELIVERED" | "FAILED" | "RETURNED";
+            orderId: string | null;
+            carrierId: string | null;
+            carrierCode: string | null;
+            /** @description Mã vận đơn hãng cấp — null = chưa cấp. */
+            trackingNo: string | null;
+            /** @description Decimal(12,4) kg chuỗi. */
+            weightKg: string | null;
+            /** @description Decimal(18,4) chuỗi. */
+            codAmount: string | null;
+            shippedAt: string | null;
+            deliveredAt: string | null;
+            /** @description Lần lấy nhãn in gần nhất (ISO) — null = chưa in. */
+            labelPrintedAt: string | null;
+            labelPrintCount: number;
+            packTask: components["schemas"]["ShipmentPackTaskDto"] | null;
         };
         PackDto: {
             /**
@@ -4779,6 +4937,110 @@ export interface components {
             status: "CANCELLED" | "PENDING" | "ASSIGNED" | "IN_PROGRESS" | "COMPLETED" | "EXCEPTION";
             assignedTo: string | null;
         };
+        WaveDto: {
+            id: string;
+            docNumber: string;
+            warehouseId: string;
+            warehouseCode: string;
+            /** @enum {string} */
+            strategy: "ZONE" | "SINGLE" | "BATCH" | "CLUSTER";
+            /** @enum {string} */
+            status: "CANCELLED" | "PENDING" | "ASSIGNED" | "IN_PROGRESS" | "COMPLETED" | "EXCEPTION";
+            assignedTo: string | null;
+            assigneeName: string | null;
+            taskCount: number;
+            /** @description Số task con đã COMPLETED. */
+            taskDoneCount: number;
+            qtyPlanned: string;
+            qtyDone: string;
+            createdAt: string;
+            assignedAt: string | null;
+            startedAt: string | null;
+            completedAt: string | null;
+        };
+        WaveListResponseDto: {
+            items: components["schemas"]["WaveDto"][];
+            total: number;
+        };
+        WaveTaskDto: {
+            id: string;
+            docNumber: string;
+            /** @enum {string} */
+            status: "CANCELLED" | "PENDING" | "ASSIGNED" | "IN_PROGRESS" | "COMPLETED" | "EXCEPTION";
+            refType: string | null;
+            refId: string | null;
+            refDocNumber: string | null;
+            lineCount: number;
+            qtyPlanned: string;
+            qtyDone: string;
+        };
+        WaveLineShareDto: {
+            taskId: string;
+            taskDocNumber: string;
+            /** @description `SalesOrder.docNumber` — mã đơn. */
+            refDocNumber: string | null;
+            taskLineId: string;
+            qtyPlanned: string;
+            qtyDone: string;
+            /** @enum {string} */
+            lineStatus: "CANCELLED" | "PENDING" | "ASSIGNED" | "IN_PROGRESS" | "COMPLETED" | "EXCEPTION";
+        };
+        WaveLineGroupDto: {
+            /** @description Khoá ổn định của nhóm: `<skuId>|<locationId|->|<lotId|->`. */
+            key: string;
+            skuId: string;
+            skuCode: string;
+            skuName: string;
+            barcodes: string[];
+            locationId: string | null;
+            locationCode: string | null;
+            pickSequence: number | null;
+            lotId: string | null;
+            lotNumber: string | null;
+            /** @description Σ kế hoạch của các dòng con — Decimal(18,6) chuỗi. */
+            qtyPlanned: string;
+            qtyDone: string;
+            qtyRemaining: string;
+            /** @description true = mọi dòng con đã COMPLETED. */
+            complete: boolean;
+            shares: components["schemas"]["WaveLineShareDto"][];
+        };
+        WaveDetailDto: {
+            id: string;
+            docNumber: string;
+            warehouseId: string;
+            warehouseCode: string;
+            /** @enum {string} */
+            strategy: "ZONE" | "SINGLE" | "BATCH" | "CLUSTER";
+            /** @enum {string} */
+            status: "CANCELLED" | "PENDING" | "ASSIGNED" | "IN_PROGRESS" | "COMPLETED" | "EXCEPTION";
+            assignedTo: string | null;
+            assigneeName: string | null;
+            taskCount: number;
+            /** @description Số task con đã COMPLETED. */
+            taskDoneCount: number;
+            qtyPlanned: string;
+            qtyDone: string;
+            createdAt: string;
+            assignedAt: string | null;
+            startedAt: string | null;
+            completedAt: string | null;
+            tasks: components["schemas"]["WaveTaskDto"][];
+            /** @description Đã sắp theo lối đi (pickSequence). */
+            lines: components["schemas"]["WaveLineGroupDto"][];
+        };
+        CreateWaveDto: {
+            taskIds: string[];
+            /**
+             * Format: uuid
+             * @description Gán ngay cho nhân viên (gán wave = gán mọi task con). Bỏ trống = để máy quét claim.
+             */
+            assignedTo?: string;
+        };
+        AssignWaveDto: {
+            /** Format: uuid */
+            userId: string;
+        };
         PdaTaskLineDto: {
             taskLineId: string;
             lineNo: number;
@@ -4868,6 +5130,8 @@ export interface components {
             status: "CANCELLED" | "PENDING" | "ASSIGNED" | "IN_PROGRESS" | "COMPLETED" | "EXCEPTION";
             warehouseId: string;
             taskCount: number;
+            assignedTo: string | null;
+            assignedToMe: boolean;
         };
         PdaResolveLocationDto: {
             id: string;
@@ -4899,6 +5163,78 @@ export interface components {
             wave: components["schemas"]["PdaResolveWaveDto"] | null;
             location: components["schemas"]["PdaResolveLocationDto"] | null;
             shipment: components["schemas"]["PdaResolveShipmentDto"] | null;
+        };
+        PdaWaveDto: {
+            id: string;
+            docNumber: string;
+            warehouseId: string;
+            warehouseCode: string;
+            /** @enum {string} */
+            strategy: "ZONE" | "SINGLE" | "BATCH" | "CLUSTER";
+            /** @enum {string} */
+            status: "CANCELLED" | "PENDING" | "ASSIGNED" | "IN_PROGRESS" | "COMPLETED" | "EXCEPTION";
+            assignedTo: string | null;
+            assigneeName: string | null;
+            taskCount: number;
+            /** @description Số task con đã COMPLETED. */
+            taskDoneCount: number;
+            qtyPlanned: string;
+            qtyDone: string;
+            createdAt: string;
+            assignedAt: string | null;
+            startedAt: string | null;
+            completedAt: string | null;
+            tasks: components["schemas"]["WaveTaskDto"][];
+            /** @description Đã sắp theo lối đi (pickSequence). */
+            lines: components["schemas"]["WaveLineGroupDto"][];
+            assignedToMe: boolean;
+        };
+        WaveScanDto: {
+            barcode: string;
+            qty: string;
+            /** Format: uuid */
+            locationId?: string;
+            /** Format: uuid */
+            lotId?: string;
+            idempotencyKey: string;
+        };
+        PdaWaveScanShareDto: {
+            taskId: string;
+            taskDocNumber: string;
+            refDocNumber: string | null;
+            taskLineId: string;
+            /** @description Số lượng (base UoM) cộng vào dòng này ở lần quét này. */
+            qtyAdded: string;
+            qtyDone: string;
+            qtyPlanned: string;
+            lineCompleted: boolean;
+            /** @description true = task con vừa hết dòng mở → COMPLETED, PickTaskCompleted đã phát (PACK sinh). */
+            taskCompleted: boolean;
+        };
+        PdaWaveScanResultDto: {
+            waveId: string;
+            waveDocNumber: string;
+            barcode: string;
+            skuId: string;
+            skuCode: string;
+            uomCode: string;
+            factor: string;
+            qtyScanned: string;
+            /** @description Tổng đã quy về base UoM, = Σ qtyAdded của `shares`. */
+            qtyBase: string;
+            /** @description Nhóm (sku, vị trí, lô) đã chia — `key` khớp `WaveLineGroupDto.key`. */
+            groupKey: string;
+            locationId: string | null;
+            lotId: string | null;
+            /** @description Còn thiếu của nhóm sau lần quét này. */
+            groupRemaining: string;
+            groupComplete: boolean;
+            shares: components["schemas"]["PdaWaveScanShareDto"][];
+            /** @enum {string} */
+            waveStatus: "CANCELLED" | "PENDING" | "ASSIGNED" | "IN_PROGRESS" | "COMPLETED" | "EXCEPTION";
+            /** @description true = mọi task con đã xong → lượt COMPLETED. */
+            waveCompleted: boolean;
+            replayed: boolean;
         };
         ScanDto: {
             /** Format: uuid */
@@ -8682,7 +9018,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": Record<string, never>;
+                    "application/json": components["schemas"]["WaybillRequestResultDto"];
                 };
             };
         };
@@ -8862,7 +9198,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": Record<string, never>;
+                    "application/json": components["schemas"]["ShipmentViewDto"];
                 };
             };
         };
@@ -9129,6 +9465,121 @@ export interface operations {
             };
         };
     };
+    WaveController_list: {
+        parameters: {
+            query: {
+                status?: "CANCELLED" | "PENDING" | "ASSIGNED" | "IN_PROGRESS" | "COMPLETED" | "EXCEPTION";
+                warehouseId?: string;
+                assignedTo?: string;
+                take: number;
+                skip: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WaveListResponseDto"];
+                };
+            };
+        };
+    };
+    WaveController_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateWaveDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WaveDetailDto"];
+                };
+            };
+        };
+    };
+    WaveController_detail: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WaveDetailDto"];
+                };
+            };
+        };
+    };
+    WaveController_assign: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AssignWaveDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WaveDetailDto"];
+                };
+            };
+        };
+    };
+    WaveController_unassign: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WaveDetailDto"];
+                };
+            };
+        };
+    };
     PdaController_tasks: {
         parameters: {
             query?: never;
@@ -9207,6 +9658,73 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["PdaTaskDto"];
+                };
+            };
+        };
+    };
+    PdaController_wave: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PdaWaveDto"];
+                };
+            };
+        };
+    };
+    PdaController_claimWave: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PdaWaveDto"];
+                };
+            };
+        };
+    };
+    PdaController_scanWave: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WaveScanDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PdaWaveScanResultDto"];
                 };
             };
         };
