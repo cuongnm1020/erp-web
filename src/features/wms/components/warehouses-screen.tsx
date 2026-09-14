@@ -272,8 +272,8 @@ function WarehouseFormDialog({
             </div>
             <p className="text-xs text-muted-foreground">
               Điểm lấy hàng gửi hãng vận chuyển (GHTK…): tên tỉnh/thành và phường/xã viết đúng như
-              hãng dùng, thôn/xóm nếu có. Thiếu tỉnh/thành hoặc SĐT thì đơn từ kho này dùng điểm lấy
-              mặc định của server.
+              hãng dùng, thôn/xóm nếu có. Thiếu tỉnh/thành, phường/xã hoặc SĐT thì đơn từ kho này
+              không tra cước và không gửi hãng được.
             </p>
             <FormField
               control={form.control}

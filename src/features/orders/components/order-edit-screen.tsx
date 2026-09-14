@@ -469,7 +469,7 @@ function Editor({ order }: { order: SalesOrderDetail }) {
                       ]
                         .filter(Boolean)
                         .join(', ')}`
-                    : 'Kho này chưa khai tỉnh/thành, phường/xã hoặc số điện thoại — hãng sẽ nhận điểm lấy mặc định của server. Khai ở Kho › Sửa kho.'}
+                    : 'Kho này chưa khai tỉnh/thành, phường/xã hoặc số điện thoại — không tra cước / gửi hãng được từ kho này. Khai ở Kho › Sửa kho.'}
                 </p>
               ) : null}
               <Field label="ĐVVC">

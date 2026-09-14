@@ -4380,8 +4380,8 @@ export interface components {
             weightKg: string;
             /** @description Tiền thu hộ đã gửi hãng = tổng đơn, Decimal(18,4). */
             codAmount: string;
-            /** @description Kho làm điểm lấy hàng; null = kho chưa khai địa chỉ → dùng env CARRIER_<CODE>_PICK_*. */
-            pickupWarehouseId: string | null;
+            /** @description Kho làm điểm lấy hàng (kho chọn trên đơn, không có thì kho mặc định hệ thống). */
+            pickupWarehouseId: string;
             /** @description Điểm lấy đã gửi hãng, tóm tắt "tỉnh · xã" để sale đối chiếu. */
             pickupSummary: string;
         };
