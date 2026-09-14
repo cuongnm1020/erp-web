@@ -110,7 +110,7 @@ function DetailBody({ product }: { product: ProductDetail }) {
               {product.isActive ? 'Đang bán' : 'Ngừng bán'}
             </StatusBadge>
             <Button variant="outline" size="sm" asChild>
-              <Link href="/catalog/barcode-print">
+              <Link href={`/catalog/barcode-print?productId=${product.id}`}>
                 <Printer /> In tem
               </Link>
             </Button>

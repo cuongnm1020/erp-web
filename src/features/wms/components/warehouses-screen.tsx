@@ -1,7 +1,7 @@
 'use client';
 
 import { zodResolver } from '@hookform/resolvers/zod';
-import { Info, Plus } from 'lucide-react';
+import { Info, Plus, Star } from 'lucide-react';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useState } from 'react';
 import { useForm } from 'react-hook-form';
@@ -10,6 +10,7 @@ import {
   applyServerErrors,
   Form,
   FormControl,
+  FormDescription,
   FormField,
   FormItem,
   FormLabel,
@@ -20,6 +21,7 @@ import { EmptyState, ListSkeleton, QueryState } from '@/components/data/states';
 import { StatusBadge } from '@/components/data/status-badge';
 import { PageHeader } from '@/components/layout/page-header';
 import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
 import {
   Dialog,
   DialogContent,
@@ -43,8 +45,10 @@ import { messageFor } from '@/lib/error-messages';
 import { useAbility } from '@/lib/permission';
 import { codeSchema } from '@/lib/shared';
 import {
+  isOperationalWarehouse,
   useCreateWarehouse,
   useDeleteWarehouse,
+  useSetDefaultWarehouse,
   useUpdateWarehouse,
   useWarehouses,
   type Warehouse,
@@ -55,6 +59,9 @@ import { LocationsPanel } from './locations-panel';
  * G-02 Kho & vị trí — nối API thật: GET/POST/PATCH/DELETE /warehouses; chọn một kho
  * (searchParam ?wh= — luật 8, F5 giữ nguyên) mở cây vị trí bên dưới (LocationsPanel).
  * Xóa = soft delete (kho chuyển Ngừng dùng — tồn, chứng từ, vị trí giữ nguyên).
+ * Kho MẶC ĐỊNH (Warehouse.isDefault, tối đa một): đơn đồng bộ từ Pancake giữ chỗ và nhận
+ * kho này lúc tạo. Đặt qua ô trong form hoặc nút "Đặt mặc định" trên dòng; kho mặc định
+ * không ngừng dùng được (server 422) → ẩn nút xóa, đổi kho mặc định trước.
  * Quyền: đọc cần stock.read (đã gate ở nav/route); tạo/sửa/xóa cần stock.adjust
  * → Can I="adjust" a="Stock" (backend cũng chặn 403).
  */
@@ -74,6 +81,8 @@ const warehouseSchema = z.object({
   hamlet: z.string().trim().max(200, 'Tối đa 200 ký tự'),
   ward: z.string().trim().max(200, 'Tối đa 200 ký tự'),
   province: z.string().trim().max(200, 'Tối đa 200 ký tự'),
+  /** Kho mặc định hệ thống — đơn Pancake tự về kho này. */
+  isDefault: z.boolean(),
 });
 const PICKUP_FIELDS = ['contactName', 'phone', 'hamlet', 'ward', 'province'] as const;
 type WarehouseValues = z.infer<typeof warehouseSchema>;
@@ -103,6 +112,7 @@ function WarehouseFormDialog({
       hamlet: warehouse?.hamlet ?? '',
       ward: warehouse?.ward ?? '',
       province: warehouse?.province ?? '',
+      isDefault: warehouse?.isDefault ?? false,
     },
   });
 
@@ -114,7 +124,7 @@ function WarehouseFormDialog({
     };
     const fail = (err: unknown) =>
       applyServerErrors(form, err as ApiError, {
-        knownFields: ['code', 'name', 'address', ...PICKUP_FIELDS],
+        knownFields: ['code', 'name', 'address', 'isDefault', ...PICKUP_FIELDS],
       });
     if (editing) {
       // PATCH: chỉ gửi trường điểm lấy ĐÃ ĐỔI; chuỗi rỗng → null để XÓA được trường khai sai.
@@ -125,13 +135,25 @@ function WarehouseFormDialog({
         ]),
       );
       update.mutate(
-        { name: v.name, ...(v.address ? { address: v.address } : {}), ...pickup },
+        {
+          name: v.name,
+          ...(v.address ? { address: v.address } : {}),
+          ...pickup,
+          // Cờ mặc định chỉ gửi khi ĐỔI — gửi false không đổi gì, gửi true = chuyển cờ từ kho cũ.
+          ...(v.isDefault !== warehouse.isDefault ? { isDefault: v.isDefault } : {}),
+        },
         { onSuccess: () => done('Đã lưu thay đổi'), onError: fail },
       );
     } else {
       const pickup = Object.fromEntries(PICKUP_FIELDS.filter((k) => v[k]).map((k) => [k, v[k]]));
       create.mutate(
-        { code: v.code, name: v.name, ...(v.address ? { address: v.address } : {}), ...pickup },
+        {
+          code: v.code,
+          name: v.name,
+          ...(v.address ? { address: v.address } : {}),
+          ...pickup,
+          ...(v.isDefault ? { isDefault: true } : {}),
+        },
         { onSuccess: () => done('Đã thêm kho'), onError: fail },
       );
     }
@@ -253,6 +275,29 @@ function WarehouseFormDialog({
               hãng dùng, thôn/xóm nếu có. Thiếu tỉnh/thành hoặc SĐT thì đơn từ kho này dùng điểm lấy
               mặc định của server.
             </p>
+            <FormField
+              control={form.control}
+              name="isDefault"
+              render={({ field }) => (
+                <FormItem className="flex flex-row items-start gap-2 rounded-md border px-3 py-2">
+                  <FormControl className="mt-0.5">
+                    <Checkbox
+                      checked={field.value}
+                      disabled={editing && !isOperationalWarehouse(warehouse)}
+                      onCheckedChange={(v) => field.onChange(v === true)}
+                    />
+                  </FormControl>
+                  <div className="space-y-0.5 leading-none">
+                    <FormLabel>Kho mặc định hệ thống</FormLabel>
+                    <FormDescription>
+                      Đơn đồng bộ từ Pancake giữ hàng và lấy hàng ở kho này. Chỉ một kho là mặc định
+                      — bật ở đây sẽ bỏ cờ của kho đang mặc định.
+                    </FormDescription>
+                    <FormMessage />
+                  </div>
+                </FormItem>
+              )}
+            />
             {rootError ? <p className="text-sm text-destructive">{rootError}</p> : null}
             <DialogFooter>
               <Button
@@ -277,6 +322,7 @@ function WarehouseFormDialog({
 export function WarehousesScreen() {
   const query = useWarehouses();
   const del = useDeleteWarehouse();
+  const setDefault = useSetDefaultWarehouse();
   const ability = useAbility();
   const canAdjust = ability.can('adjust', 'Stock');
   const [dialog, setDialog] = useState<{ open: boolean; warehouse?: Warehouse }>({ open: false });
@@ -338,7 +384,7 @@ export function WarehousesScreen() {
                     <TableHead className="px-2.5 text-xs">Tên kho</TableHead>
                     <TableHead className="px-2.5 text-xs">Địa chỉ</TableHead>
                     <TableHead className="w-28 px-2.5 text-xs">Trạng thái</TableHead>
-                    <TableHead className="w-20 px-2.5 text-xs">
+                    <TableHead className="w-44 px-2.5 text-xs">
                       <span className="sr-only">Thao tác</span>
                     </TableHead>
                   </TableRow>
@@ -352,7 +398,17 @@ export function WarehousesScreen() {
                       onClick={() => selectWarehouse(w.id)}
                     >
                       <TableCell className="px-2.5 py-1.5 font-mono text-xs">{w.code}</TableCell>
-                      <TableCell className="px-2.5 py-1.5 font-semibold">{w.name}</TableCell>
+                      <TableCell className="px-2.5 py-1.5 font-semibold">
+                        <span className="inline-flex flex-wrap items-center gap-1.5">
+                          {w.name}
+                          {w.isDefault ? (
+                            <StatusBadge tone="brand" className="font-medium">
+                              <Star className="h-3 w-3" aria-hidden />
+                              Mặc định
+                            </StatusBadge>
+                          ) : null}
+                        </span>
+                      </TableCell>
                       <TableCell className="px-2.5 py-1.5 text-muted-foreground">
                         {[w.address, w.hamlet, w.ward, w.province].filter(Boolean).join(', ') ||
                           '—'}
@@ -366,17 +422,41 @@ export function WarehousesScreen() {
                       </TableCell>
                       <TableCell className="px-2.5 py-1.5">
                         {canAdjust ? (
-                          <RowActions
-                            onEdit={() => setDialog({ open: true, warehouse: w })}
-                            onDelete={() =>
-                              del
-                                .mutateAsync(w.id)
-                                .then(() => toast.success(`Đã ngừng dùng kho ${w.code}`))
-                                .catch((err) => toast.error(messageFor(err)))
-                            }
-                            itemName={`kho ${w.code}`}
-                            deleteDescription="Kho chuyển Ngừng dùng — tồn kho, vị trí và chứng từ giữ nguyên."
-                          />
+                          <div className="flex items-center justify-end gap-1">
+                            {!w.isDefault && isOperationalWarehouse(w) ? (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-8 text-xs"
+                                disabled={setDefault.isPending}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setDefault
+                                    .mutateAsync(w.id)
+                                    .then(() => toast.success(`Đã đặt ${w.code} làm kho mặc định`))
+                                    .catch((err) => toast.error(messageFor(err)));
+                                }}
+                              >
+                                <Star aria-hidden />
+                                Đặt mặc định
+                              </Button>
+                            ) : null}
+                            <RowActions
+                              onEdit={() => setDialog({ open: true, warehouse: w })}
+                              // Kho mặc định không ngừng dùng được — đặt kho khác làm mặc định trước.
+                              onDelete={
+                                w.isDefault
+                                  ? undefined
+                                  : () =>
+                                      del
+                                        .mutateAsync(w.id)
+                                        .then(() => toast.success(`Đã ngừng dùng kho ${w.code}`))
+                                        .catch((err) => toast.error(messageFor(err)))
+                              }
+                              itemName={`kho ${w.code}`}
+                              deleteDescription="Kho chuyển Ngừng dùng — tồn kho, vị trí và chứng từ giữ nguyên."
+                            />
+                          </div>
                         ) : null}
                       </TableCell>
                     </TableRow>

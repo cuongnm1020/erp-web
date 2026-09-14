@@ -56,8 +56,31 @@ const MESSAGES: Record<string, string> = {
     'Hãng này chưa được cấu hình token/điểm lấy hàng trên server. Báo IT đặt biến môi trường CARRIER_*.',
   CARRIER_API_ERROR: 'Hãng vận chuyển không phản hồi hoặc trả lỗi. Thử lại sau ít phút.',
   CARRIER_OPERATION_UNSUPPORTED:
-    'Hãng này không có bảng cước để tra. Chọn hãng khác hoặc nhập phí tay.',
+    'Hãng này không hỗ trợ thao tác vừa gọi (tra cước / in nhãn). Chọn hãng khác hoặc làm tay.',
   CARRIER_NOT_FOUND: 'Hãng vận chuyển không tồn tại hoặc đã tắt. Tải lại danh sách hãng.',
+  CARRIER_NO_WAYBILL: 'Phiếu giao chưa có mã vận đơn. Gán hãng và xin vận đơn trước.',
+  SHIPMENT_NO_WAYBILL: 'Phiếu giao chưa có mã vận đơn. Gán hãng và xin vận đơn trước.',
+  CARRIER_LABEL_UNAVAILABLE:
+    'Hãng chưa đưa nhãn cho vận đơn này. Thử lại sau ít phút hoặc in từ cổng của hãng.',
+  // Máy quét PDA / trạm đóng gói (PLAN-barcode-pick-pack)
+  PDA_TASK_ASSIGNED_TO_OTHER:
+    'Việc này đang do người khác làm. Hỏi người đó hoặc nhờ điều phối đổi người rồi quét lại.',
+  PDA_TASK_NOT_YOURS:
+    'Việc này không được giao cho bạn. Quét mã đơn để nhận việc, hoặc nhờ điều phối.',
+  PDA_TASK_NOT_WORKABLE:
+    'Việc này đã xong, đã hủy hoặc đang chờ xử lý sự cố — không thao tác được nữa.',
+  PDA_TASK_LINE_NOT_FOUND: 'Dòng việc không còn tồn tại. Quét lại mã đơn để tải việc mới nhất.',
+  PDA_SCAN_WRONG_SKU: 'Quét sai hàng — sản phẩm này không phải dòng đang lấy. Kiểm tra lại kệ.',
+  PDA_SCAN_QTY_EXCEEDS_PLANNED:
+    'Quét quá số lượng còn lại của dòng. Bỏ bớt hàng hoặc kiểm tra lại số đã quét.',
+  PDA_LINE_NOT_FULLY_SCANNED: 'Dòng chưa quét đủ số lượng. Quét đủ rồi mới hoàn thành được.',
+  PDA_LINE_WITHOUT_LOCATION:
+    'Dòng này chưa có vị trí lấy hàng (thiếu tồn). Điều phối phải xử lý trước.',
+  PDA_NO_RESERVATION: 'Không tìm thấy giữ chỗ khớp dòng này. Báo điều phối kiểm tra lại đơn nguồn.',
+  PDA_WAVE_SKU_NOT_FOUND: 'Sản phẩm này không có trong lượt hoặc đã lấy đủ. Kiểm tra lại kệ.',
+  WAVE_NOT_FOUND: 'Lượt pick không tồn tại. Quét lại mã lượt.',
+  INVALID_WAVE_INPUT:
+    'Không gộp được lượt: chỉ gộp task lấy hàng cùng kho, chưa ai nhận, chưa thuộc lượt khác.',
   SYNC_ACTOR_NOT_FOUND: 'Tài khoản hệ thống cho đồng bộ chưa được tạo. Báo IT chạy seed dữ liệu.',
   SYNC_ACTOR_MISCONFIGURED: 'Tài khoản hệ thống cho đồng bộ đang sai cấu hình. Báo IT kiểm tra.',
 };

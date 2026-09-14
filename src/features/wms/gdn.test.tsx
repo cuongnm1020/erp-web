@@ -1,6 +1,7 @@
-import { screen, within } from '@testing-library/react';
+import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import { http, HttpResponse } from 'msw';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { makeTaskDetail } from '@/test/msw/handlers';
 import { server } from '@/test/msw/server';
 import { renderApp } from '@/test/render';
 import { GdnDetailScreen } from './components/gdn-detail-screen';
@@ -168,5 +169,89 @@ describe('GdnDetailScreen — GET /goods-issues/:id', () => {
     expect(screen.getByText('Đang đóng gói')).toBeInTheDocument();
     // Chưa post → không khoe số đã xuất
     expect(screen.queryByText(/Tồn đã trừ trong chính transaction/)).not.toBeInTheDocument();
+  });
+
+  it('In phiếu pick → tờ in A5 theo task PICK của đơn: mã vạch số việc + mã đơn, dòng theo pickSequence, mã quét = barcode SKU', async () => {
+    const task = makeTaskDetail('task-4');
+    server.use(
+      http.get('/api/goods-issues/:id', () => HttpResponse.json(DETAIL)),
+      http.get('/api/tasks', ({ request }) => {
+        const u = new URL(request.url);
+        expect(u.searchParams.get('refType')).toBe('SalesOrder');
+        expect(u.searchParams.get('refId')).toBe('so-4');
+        expect(u.searchParams.get('type')).toBe('PICK');
+        return HttpResponse.json({
+          items: [{ id: 'task-4', docNumber: task.docNumber }],
+          total: 1,
+        });
+      }),
+      http.get('/api/tasks/:id', () => HttpResponse.json(task)),
+    );
+    window.print = vi.fn();
+    let snapshot = {
+      size: null as string | null,
+      docBarcode: 0,
+      orderBarcode: 0,
+      lineBarcodes: 0,
+      firstLoc: '',
+      scanLabels: [] as string[],
+    };
+    (window.print as ReturnType<typeof vi.fn>).mockImplementation(() => {
+      const root = document.querySelector('[data-print-root]');
+      snapshot = {
+        size: root?.getAttribute('data-print-size') ?? null,
+        docBarcode: root
+          ? root.querySelectorAll(`[role="img"][aria-label="Mã vạch ${task.docNumber}"] svg`).length
+          : 0,
+        orderBarcode: root
+          ? root.querySelectorAll(`[role="img"][aria-label="Mã vạch SO2609-00004"] svg`).length
+          : 0,
+        lineBarcodes: root ? root.querySelectorAll('tbody [role="img"] svg').length : 0,
+        firstLoc: root?.querySelector('tbody td')?.textContent ?? '',
+        scanLabels: root
+          ? [...root.querySelectorAll('tbody [role="img"]')].map(
+              (el) => el.getAttribute('aria-label') ?? '',
+            )
+          : [],
+      };
+    });
+    renderApp(<GdnDetailScreen id="gi-4" />);
+    await screen.findByText('Bút bi Thiên Long TL-08 xanh');
+    const button = screen.getByRole('button', { name: 'In phiếu pick' });
+    await waitFor(() => expect(button).toBeEnabled());
+    fireEvent.click(button);
+    await waitFor(() => expect(window.print).toHaveBeenCalledTimes(1));
+    expect(snapshot.size).toBe('A5');
+    expect(snapshot.docBarcode).toBe(1);
+    expect(snapshot.orderBarcode).toBe(1);
+    expect(snapshot.lineBarcodes).toBe(2);
+    // Dòng theo thứ tự API (pickSequence): A-03-02-B trước
+    expect(snapshot.firstLoc).toBe('A-03-02-B');
+    // Mã quét = barcode đầu tiên của SKU; SKU không có barcode → mã SKU
+    expect(snapshot.scanLabels).toEqual(['Mã vạch 8935001800012', 'Mã vạch TL08-RED']);
+    expect(document.querySelector('[data-print-root]')).toBeNull();
+  });
+
+  it('phiếu không từ đơn bán → in từ chính phiếu (mã vạch số phiếu, không tra task)', async () => {
+    server.use(
+      http.get('/api/goods-issues/:id', () =>
+        HttpResponse.json({ ...DETAIL, refType: null, refId: null }),
+      ),
+      http.get('/api/tasks', () => {
+        throw new Error('không được tra task cho phiếu không từ đơn');
+      }),
+    );
+    window.print = vi.fn();
+    let docBarcode = 0;
+    (window.print as ReturnType<typeof vi.fn>).mockImplementation(() => {
+      docBarcode = document.querySelectorAll(
+        `[data-print-root] [role="img"][aria-label="Mã vạch ${DETAIL.docNumber}"] svg`,
+      ).length;
+    });
+    renderApp(<GdnDetailScreen id="gi-4" />);
+    await screen.findByText('Bút bi Thiên Long TL-08 xanh');
+    fireEvent.click(screen.getByRole('button', { name: 'In phiếu pick' }));
+    await waitFor(() => expect(window.print).toHaveBeenCalledTimes(1));
+    expect(docBarcode).toBe(1);
   });
 });

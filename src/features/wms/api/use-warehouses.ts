@@ -49,6 +49,22 @@ export function useUpdateWarehouse(id: string) {
   });
 }
 
+/**
+ * PATCH /warehouses/{id} { isDefault: true } — đặt kho MẶC ĐỊNH hệ thống (tối đa một kho;
+ * server tự bỏ cờ kho cũ). Đơn đồng bộ từ Pancake giữ chỗ và nhận kho này lúc tạo.
+ * Không optimistic (luật 5 — ảnh hưởng tồn giữ chỗ), chờ server rồi invalidate.
+ */
+export function useSetDefaultWarehouse() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) =>
+      unwrap(
+        api.PATCH('/warehouses/{id}', { params: { path: { id } }, body: { isDefault: true } }),
+      ),
+    onSuccess: () => void qc.invalidateQueries({ queryKey: warehouseKeys.all }),
+  });
+}
+
 /** DELETE /warehouses/{id} — soft delete: kho chuyển Ngừng dùng, tồn/vị trí/chứng từ giữ nguyên. */
 export function useDeleteWarehouse() {
   const qc = useQueryClient();

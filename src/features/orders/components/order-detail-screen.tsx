@@ -1,10 +1,11 @@
 'use client';
 
-import { Gift, Info } from 'lucide-react';
+import { Gift, Info, Printer } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useState, type ReactNode } from 'react';
 import { KpiCard } from '@/components/data/kpi-card';
+import { PdfPrintDialog } from '@/components/data/pdf-print-dialog';
 import { DetailSkeleton, QueryState } from '@/components/data/states';
 import { StatusBadge } from '@/components/data/status-badge';
 import { Breadcrumb } from '@/components/layout/breadcrumb';
@@ -33,6 +34,7 @@ import { isApiError } from '@/lib/api/errors';
 import { messageFor } from '@/lib/error-messages';
 import { formatDate, formatDateTime, formatMoney, formatQuantity } from '@/lib/format';
 import { Can, useAbility } from '@/lib/permission';
+import { usePrint } from '@/lib/print';
 import { useInvalidateOn } from '@/lib/realtime';
 import {
   orderKeys,
@@ -42,6 +44,7 @@ import {
   type SalesOrderDetail,
 } from '../api/use-orders';
 import { orderChannelLabel, orderStatusLabel, orderStatusTone } from '../labels';
+import { OrderPrintSheet } from './order-print-sheet';
 
 /**
  * D-04 Chi tiết đơn hàng — GET /sales-orders/{id}.
@@ -58,13 +61,134 @@ import { orderChannelLabel, orderStatusLabel, orderStatusTone } from '../labels'
  * - Thẻ "Vận chuyển", "Thanh toán", "Lịch sử": chưa có endpoint/DTO cho vận đơn, thu tiền,
  *   dòng thời gian chứng từ. Luật 2 cấm tự khai shape ở frontend nên màn nói thẳng là
  *   chưa nối được, thay vì hiện số bịa cạnh một đơn thật.
- * - Nút "In" / "Tạo phiếu xuất": chưa nối mutation. "Hủy đơn" đã nối POST /:id/cancel.
+ * - "Tạo phiếu xuất": chưa nối mutation. "Hủy đơn" đã nối POST /:id/cancel.
+ * - "In phiếu đơn": in A5 qua trình duyệt với mã vạch docNumber (`OrderPrintSheet`,
+ *   PLAN-barcode-pick-pack A3).
+ * - Thẻ "Vận đơn": `order.shipment` (phiếu giao sinh khi pick xong) — hãng, mã vận đơn, lần in
+ *   nhãn; "In nhãn" mở PDF `GET /shipments/:id/label` (PLAN-barcode-pick-pack C4).
  */
+const LABEL_SIZES = ['A6', 'A5'] as const;
+type LabelSize = (typeof LABEL_SIZES)[number];
+const LABEL_SIZE_KEY = 'erp.label.pageSize';
+
+function readLabelSize(): LabelSize {
+  try {
+    const v = window.localStorage.getItem(LABEL_SIZE_KEY);
+    return v === 'A5' ? 'A5' : 'A6';
+  } catch {
+    return 'A6';
+  }
+}
+
+const SHIPMENT_STATUS_LABEL: Record<
+  SalesOrderDetail['shipment'] extends infer S
+    ? S extends { status: infer T }
+      ? T & string
+      : never
+    : never,
+  string
+> = {
+  PENDING: 'Chờ lấy',
+  PICKED_UP: 'Đã lấy hàng',
+  IN_TRANSIT: 'Đang giao',
+  DELIVERED: 'Đã giao',
+  FAILED: 'Giao lỗi',
+  RETURNED: 'Đã hoàn',
+};
+
+/** Thẻ vận đơn — dữ liệu từ `order.shipment`; "In nhãn" nhúng PDF của hãng qua proxy /api. */
+function ShipmentCard({ order }: { order: SalesOrderDetail }) {
+  const s = order.shipment;
+  const [printing, setPrinting] = useState(false);
+  const [size, setSize] = useState<LabelSize>('A6');
+  const openPrint = () => {
+    setSize(readLabelSize());
+    setPrinting(true);
+  };
+  const changeSize = (v: LabelSize) => {
+    setSize(v);
+    try {
+      window.localStorage.setItem(LABEL_SIZE_KEY, v);
+    } catch {
+      // localStorage bị chặn — chỉ mất tiện ích nhớ khổ giấy
+    }
+  };
+  return (
+    <Card
+      title={
+        <span className="flex items-center justify-between gap-2">
+          <span>Vận đơn</span>
+          {s?.trackingNo ? (
+            <Can I="pack" a="Shipment">
+              <Button variant="outline" size="sm" onClick={openPrint}>
+                <Printer aria-hidden />
+                In nhãn
+              </Button>
+            </Can>
+          ) : null}
+        </span>
+      }
+    >
+      {s ? (
+        <dl className="grid grid-cols-2 gap-x-4 gap-y-3 px-3 py-3">
+          <Field label="Phiếu giao">
+            <span className="font-mono text-xs">{s.docNumber}</span>
+          </Field>
+          <Field label="Trạng thái giao">{SHIPMENT_STATUS_LABEL[s.status]}</Field>
+          <Field label="Hãng trên phiếu">
+            {s.carrierCode ? (
+              <span className="font-mono text-xs">{s.carrierCode}</span>
+            ) : (
+              <span className="text-muted-foreground">chưa gán — chọn khi đóng gói xong</span>
+            )}
+          </Field>
+          <Field label="Mã vận đơn">
+            {s.trackingNo ? (
+              <span className="font-mono">{s.trackingNo}</span>
+            ) : (
+              <span className="text-muted-foreground">chưa cấp — cấp khi đóng gói xong</span>
+            )}
+          </Field>
+          <Field label="Nhãn đã in">
+            {s.labelPrintedAt
+              ? `${s.labelPrintCount} lần · gần nhất ${formatDateTime(s.labelPrintedAt)}`
+              : 'chưa in'}
+          </Field>
+        </dl>
+      ) : (
+        <p className="px-3 py-3 text-sm text-muted-foreground">
+          Chưa có phiếu giao — phiếu sinh khi kho pick xong đơn này.
+        </p>
+      )}
+      {s && printing ? (
+        <PdfPrintDialog
+          open={printing}
+          onOpenChange={setPrinting}
+          url={`/api/shipments/${s.id}/label?pageSize=${size}&orientation=portrait`}
+          title={`Nhãn vận đơn ${s.trackingNo ?? ''}`}
+          description={`Phiếu giao ${s.docNumber} · hãng ${s.carrierCode ?? '—'}`}
+          extra={
+            <div className="flex items-center gap-1 text-xs">
+              <span className="text-muted-foreground">Khổ</span>
+              {LABEL_SIZES.map((v) => (
+                <Button
+                  key={v}
+                  type="button"
+                  size="sm"
+                  variant={v === size ? 'default' : 'outline'}
+                  onClick={() => changeSize(v)}
+                >
+                  {v}
+                </Button>
+              ))}
+            </div>
+          }
+        />
+      ) : null}
+    </Card>
+  );
+}
 const MISSING: Array<{ title: string; need: string }> = [
-  {
-    title: 'Vận đơn / tracking',
-    need: 'hãng đã chọn được trên đơn; mã vận đơn cấp ở bàn đóng gói, chưa có DTO gắn với đơn',
-  },
   { title: 'Thanh toán / còn phải thu', need: 'chưa có mặt đọc công nợ theo đơn' },
   { title: 'Dòng thời gian chứng từ', need: 'chưa có endpoint lịch sử trạng thái đơn' },
   { title: 'Người tạo, người phụ trách', need: 'chỉ có ownerId; chưa có danh bạ user' },
@@ -288,6 +412,7 @@ function CancelOrderDialog({
 
 function Detail({ order }: { order: SalesOrderDetail }) {
   const [dialog, setDialog] = useState<'cancel' | 'recreate' | null>(null);
+  const printer = usePrint();
   const ability = useAbility();
   const canRecreate = ability.can('cancel', 'SalesOrder') && ability.can('create', 'SalesOrder');
   return (
@@ -331,11 +456,16 @@ function Detail({ order }: { order: SalesOrderDetail }) {
               </Button>
             </Can>
           )}
+          <Button variant="outline" size="sm" onClick={printer.print}>
+            <Printer aria-hidden />
+            In phiếu đơn
+          </Button>
           <Button variant="outline" size="sm" asChild>
             <Link href="/crm/orders">Về danh sách đơn</Link>
           </Button>
         </div>
       </div>
+      <OrderPrintSheet order={order} printer={printer} />
       <CancelOrderDialog
         order={order}
         open={dialog !== null}
@@ -427,6 +557,10 @@ function Detail({ order }: { order: SalesOrderDetail }) {
             các mục trên thì nối được ngay, không cần sửa gì ở màn hình.
           </p>
         </Card>
+      </div>
+
+      <div className="grid items-start gap-3 lg:grid-cols-5">
+        <ShipmentCard order={order} />
       </div>
 
       <Lines order={order} />

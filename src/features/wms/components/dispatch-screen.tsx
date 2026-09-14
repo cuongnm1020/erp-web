@@ -1,11 +1,21 @@
 'use client';
 
-import { AlertTriangle } from 'lucide-react';
+import { AlertTriangle, Layers, Printer } from 'lucide-react';
 import Link from 'next/link';
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { KpiCard } from '@/components/data/kpi-card';
 import { QueryState } from '@/components/data/states';
 import { StatusBadge } from '@/components/data/status-badge';
+import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import { PageHeader } from '@/components/layout/page-header';
 import {
   Select,
@@ -17,6 +27,7 @@ import {
 import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/cn';
 import { formatDateTime, formatQuantity } from '@/lib/format';
+import { usePrint } from '@/lib/print';
 import { useInvalidateOn, useRealtime } from '@/lib/realtime';
 import { useListState } from '@/lib/url-state';
 import { toast } from '@/components/ui/toaster';
@@ -35,12 +46,23 @@ import {
 } from '../api/use-tasks';
 import { useWarehouses } from '../api/use-warehouses';
 import {
+  useAssignWave,
+  useCreateWave,
+  useUnassignWave,
+  useWaveDetail,
+  useWaves,
+  waveKeys,
+  type Wave,
+} from '../api/use-waves';
+import {
   TASK_TYPE_OPTIONS,
   formatMinutes,
   parseTaskType,
+  taskStatusLabel,
   taskTypeLabel,
   taskTypeTone,
 } from '../labels';
+import { WavePrintSheet } from './wave-print-sheet';
 
 /**
  * G-06 Bảng điều phối kho — GET /tasks, mỗi làn là một truy vấn theo `status`.
@@ -97,19 +119,60 @@ function useLane(status: TaskStatus, p: LaneParams) {
   });
 }
 
-function TaskCard({ task, staff }: { task: Task; staff: WarehouseStaff[] | null }) {
+interface Selection {
+  ids: Set<string>;
+  toggle: (id: string) => void;
+}
+
+function TaskCard({
+  task,
+  staff,
+  selection,
+}: {
+  task: Task;
+  staff: WarehouseStaff[] | null;
+  selection: Selection | null;
+}) {
   const idleWord = task.status === 'PENDING' ? 'chờ' : 'đứng yên';
+  // Chỉ task PICK chưa gán, chưa thuộc lượt mới gộp được (server cũng chặn — INVALID_WAVE_INPUT).
+  const selectable =
+    selection !== null && task.type === 'PICK' && task.status === 'PENDING' && task.waveId === null;
   const assign = useAssignTask();
   const unassign = useUnassignTask();
   const assigneeName = task.assigneeId
     ? (staff?.find((s) => s.id === task.assigneeId)?.fullName ?? null)
     : null;
   return (
-    <article className="flex flex-col gap-1 rounded-md border bg-card px-2.5 py-2">
+    <article
+      className={cn(
+        'flex flex-col gap-1 rounded-md border bg-card px-2.5 py-2',
+        selectable && selection.ids.has(task.id) && 'border-primary',
+      )}
+    >
       <div className="flex items-center gap-2">
+        {selectable ? (
+          <Checkbox
+            checked={selection.ids.has(task.id)}
+            onCheckedChange={() => selection.toggle(task.id)}
+            aria-label={`Chọn ${task.docNumber} để gộp lượt`}
+          />
+        ) : null}
         <span className="font-mono text-xs font-semibold">{task.docNumber}</span>
         <StatusBadge tone={taskTypeTone(task.type)}>{taskTypeLabel(task.type)}</StatusBadge>
-        {task.status === 'EXCEPTION' ? (
+        {task.waveId ? (
+          <span className="text-xs text-muted-foreground" title="Thuộc lượt pick gộp">
+            <Layers className="inline h-3.5 w-3.5" aria-hidden /> lượt
+          </span>
+        ) : null}
+        {task.exceptionLineCount > 0 ? (
+          <span
+            className="ml-auto flex items-center gap-1 rounded-sm bg-warning/15 px-1.5 text-xs font-semibold text-warning-foreground"
+            title="Nhân viên báo thiếu hàng khi lấy — phần thiếu không sang đóng gói"
+          >
+            <AlertTriangle className="h-3.5 w-3.5 text-warning" aria-hidden />
+            thiếu {task.exceptionLineCount} dòng
+          </span>
+        ) : task.status === 'EXCEPTION' ? (
           <AlertTriangle className="ml-auto h-3.5 w-3.5 text-warning" aria-hidden />
         ) : null}
       </div>
@@ -212,12 +275,14 @@ function Lane({
   status,
   params,
   staff,
+  selection,
 }: {
   title: string;
   hint: string;
   status: TaskStatus;
   params: LaneParams;
   staff: WarehouseStaff[] | null;
+  selection: Selection | null;
 }) {
   const query = useLane(status, params);
   return (
@@ -239,7 +304,7 @@ function Lane({
         {(data) => (
           <div className="flex flex-col gap-2 p-2">
             {data.items.map((t) => (
-              <TaskCard key={t.id} task={t} staff={staff} />
+              <TaskCard key={t.id} task={t} staff={staff} selection={selection} />
             ))}
             {data.total > data.items.length ? (
               <p className="px-1 pb-1 text-xs text-muted-foreground">
@@ -267,11 +332,28 @@ export function DispatchScreen() {
   const staffQuery = useWarehouseStaff(canAssign);
   const staff = canAssign ? (staffQuery.data ?? null) : null;
   const warehouses = useWarehouses();
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const selection = useMemo<Selection | null>(
+    () =>
+      canAssign
+        ? {
+            ids: selected,
+            toggle: (id) =>
+              setSelected((cur) => {
+                const next = new Set(cur);
+                if (next.has(id)) next.delete(id);
+                else next.add(id);
+                return next;
+              }),
+          }
+        : null,
+    [canAssign, selected],
+  );
 
   // Luật 9: sự kiện việc chỉ invalidate prefix ['wms','tasks'], không vá cache bằng payload.
   useInvalidateOn(
     ['task.created', 'task.assigned', 'task.started', 'task.completed', 'task.exception'],
-    [taskKeys.all],
+    [taskKeys.all, waveKeys.all],
   );
   const { connected } = useRealtime();
 
@@ -360,6 +442,14 @@ export function DispatchScreen() {
         ))}
       </div>
 
+      {selection ? (
+        <WaveToolbar
+          selectedIds={[...selected]}
+          staff={staff ?? []}
+          onDone={() => setSelected(new Set())}
+        />
+      ) : null}
+
       <div className="grid items-start gap-3 md:grid-cols-2 xl:grid-cols-4">
         {LANES.map((l) => (
           <Lane
@@ -369,9 +459,12 @@ export function DispatchScreen() {
             status={l.status}
             params={params}
             staff={staff}
+            selection={selection}
           />
         ))}
       </div>
+
+      {canAssign ? <WavePanel warehouseId={warehouseId} staff={staff ?? []} /> : null}
 
       <p className="text-xs text-muted-foreground">
         Bảng này không có cờ &ldquo;quá hạn SLA&rdquo;: bảng việc trong kho chưa có cột hạn chót
@@ -379,5 +472,216 @@ export function DispatchScreen() {
         tính từ lúc tạo — đúng như API trả về.
       </p>
     </div>
+  );
+}
+
+/**
+ * Gộp các thẻ PICK đã tick thành một lượt (PLAN-barcode-pick-pack E3): chọn người (tuỳ chọn)
+ * → POST /waves. Server kiểm cùng kho / chưa thuộc lượt; lỗi → câu từ bộ dịch.
+ */
+function WaveToolbar({
+  selectedIds,
+  staff,
+  onDone,
+}: {
+  selectedIds: string[];
+  staff: WarehouseStaff[];
+  onDone: () => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [userId, setUserId] = useState('');
+  const create = useCreateWave();
+  if (selectedIds.length === 0) return null;
+  return (
+    <div
+      role="region"
+      aria-label="Gộp lượt pick"
+      className="flex flex-wrap items-center gap-2 rounded-md border border-primary/40 bg-primary/5 px-3 py-2 text-sm"
+    >
+      <Layers className="h-4 w-4 text-primary" aria-hidden />
+      <span>
+        Đã chọn <b>{selectedIds.length}</b> việc lấy hàng
+      </span>
+      <Button size="sm" onClick={() => setOpen(true)}>
+        Gộp thành một lượt
+      </Button>
+      <Button size="sm" variant="ghost" onClick={onDone}>
+        Bỏ chọn
+      </Button>
+      <Dialog open={open} onOpenChange={setOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Gộp {selectedIds.length} việc thành một lượt lấy hàng</DialogTitle>
+            <DialogDescription>
+              Nhân viên đi một vòng kho, quét mã lượt rồi quét từng sản phẩm; hệ thống tự chia số
+              lượng về từng đơn. Hàng về bàn đóng gói được tách theo đơn khi quét đóng gói.
+            </DialogDescription>
+          </DialogHeader>
+          <Select value={userId} onValueChange={setUserId}>
+            <SelectTrigger className="h-9" aria-label="Giao lượt cho">
+              <SelectValue placeholder="Giao cho… (để trống = nhân viên tự quét nhận)" />
+            </SelectTrigger>
+            <SelectContent>
+              {staff.map((s) => (
+                <SelectItem key={s.id} value={s.id}>
+                  {s.fullName}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <DialogFooter>
+            <Button variant="outline" disabled={create.isPending} onClick={() => setOpen(false)}>
+              Hủy bỏ
+            </Button>
+            <Button
+              disabled={create.isPending}
+              onClick={() =>
+                create.mutate(
+                  { taskIds: selectedIds, ...(userId ? { assignedTo: userId } : {}) },
+                  {
+                    onSuccess: (w) => {
+                      toast.success(`Đã gộp thành lượt ${w.docNumber}`);
+                      setOpen(false);
+                      setUserId('');
+                      onDone();
+                    },
+                    onError: (err) => toast.error(messageFor(err)),
+                  },
+                )
+              }
+            >
+              {create.isPending ? 'Đang gộp…' : 'Gộp thành một lượt'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}
+
+const WAVE_TAKE = 20;
+
+/** Lượt pick gộp đang mở của kho — gán / trả về / in phiếu lượt. */
+function WavePanel({ warehouseId, staff }: { warehouseId: string; staff: WarehouseStaff[] }) {
+  const waves = useWaves({ warehouseId, take: WAVE_TAKE, skip: 0 });
+  const [printId, setPrintId] = useState<string | null>(null);
+  const printer = usePrint();
+  const detail = useWaveDetail(printId);
+  const assign = useAssignWave();
+  const unassign = useUnassignWave();
+
+  // Có chi tiết → mở tờ in đúng một lần cho lượt vừa bấm.
+  const printing = printId !== null && detail.data?.id === printId;
+  if (printing && !printer.open) printer.print();
+
+  const items = (waves.data?.items ?? []).filter((w) => w.status !== 'CANCELLED');
+  return (
+    <section className="rounded-md border bg-card">
+      <header className="flex items-center gap-2 border-b px-3 py-2 text-sm font-semibold">
+        <Layers className="h-4 w-4 text-muted-foreground" aria-hidden />
+        Lượt lấy hàng gộp
+        <span className="ml-auto text-xs font-normal text-muted-foreground">
+          {waves.data ? `${waves.data.total} lượt` : ''}
+        </span>
+      </header>
+      <QueryState
+        query={waves}
+        skeleton={<Skeleton className="m-3 h-16" />}
+        isEmpty={() => items.length === 0}
+        empty={
+          <p className="px-3 py-4 text-sm text-muted-foreground">
+            Chưa có lượt nào. Tick các thẻ &ldquo;Lấy hàng&rdquo; chưa gán rồi bấm &ldquo;Gộp thành
+            một lượt&rdquo;.
+          </p>
+        }
+      >
+        {() => (
+          <ul className="divide-y">
+            {items.map((w) => (
+              <WaveRow
+                key={w.id}
+                wave={w}
+                staff={staff}
+                onPrint={() => {
+                  printer.done();
+                  setPrintId(w.id);
+                }}
+                onAssign={(userId) =>
+                  assign
+                    .mutateAsync({ waveId: w.id, userId })
+                    .then(() => toast.success(`Đã gán lượt ${w.docNumber}`))
+                    .catch((err) => toast.error(messageFor(err)))
+                }
+                onUnassign={() =>
+                  unassign
+                    .mutateAsync(w.id)
+                    .then(() => toast.success(`Đã trả lượt ${w.docNumber} về hàng đợi`))
+                    .catch((err) => toast.error(messageFor(err)))
+                }
+              />
+            ))}
+          </ul>
+        )}
+      </QueryState>
+      {printing && detail.data ? <WavePrintSheet wave={detail.data} printer={printer} /> : null}
+    </section>
+  );
+}
+
+function WaveRow({
+  wave,
+  staff,
+  onPrint,
+  onAssign,
+  onUnassign,
+}: {
+  wave: Wave;
+  staff: WarehouseStaff[];
+  onPrint: () => void;
+  onAssign: (userId: string) => void;
+  onUnassign: () => void;
+}) {
+  const open = wave.status === 'PENDING' || wave.status === 'ASSIGNED';
+  return (
+    <li className="flex flex-wrap items-center gap-2 px-3 py-2 text-sm">
+      <span className="font-mono font-semibold">{wave.docNumber}</span>
+      <StatusBadge
+        tone={
+          wave.status === 'COMPLETED' ? 'ok' : wave.status === 'IN_PROGRESS' ? 'warn' : 'neutral'
+        }
+      >
+        {taskStatusLabel(wave.status)}
+      </StatusBadge>
+      <span className="text-muted-foreground">
+        {wave.taskDoneCount}/{wave.taskCount} đơn · {formatQuantity(wave.qtyDone)}/
+        {formatQuantity(wave.qtyPlanned)}
+        {wave.assigneeName ? ` · ${wave.assigneeName}` : ''}
+      </span>
+      <span className="ml-auto flex items-center gap-1">
+        {open ? (
+          <Select value="" onValueChange={onAssign}>
+            <SelectTrigger className="h-7 w-40 text-xs" aria-label={`Gán lượt ${wave.docNumber}`}>
+              <SelectValue placeholder={wave.assigneeName ? 'Đổi người…' : 'Gán cho…'} />
+            </SelectTrigger>
+            <SelectContent>
+              {staff.map((s) => (
+                <SelectItem key={s.id} value={s.id}>
+                  {s.fullName}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        ) : null}
+        {wave.status === 'ASSIGNED' ? (
+          <Button size="sm" variant="ghost" onClick={onUnassign}>
+            Trả về
+          </Button>
+        ) : null}
+        <Button size="sm" variant="outline" onClick={onPrint}>
+          <Printer aria-hidden />
+          In phiếu lượt
+        </Button>
+      </span>
+    </li>
   );
 }

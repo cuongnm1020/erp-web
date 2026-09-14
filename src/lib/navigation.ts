@@ -1,5 +1,6 @@
 import type { LucideIcon } from 'lucide-react';
 import {
+  Barcode,
   Boxes,
   Columns3,
   Gift,
@@ -9,6 +10,7 @@ import {
   MapPin,
   Network,
   Package,
+  PackageCheck,
   PackageMinus,
   PackagePlus,
   Percent,
@@ -146,12 +148,12 @@ export const NAV_MODULES: NavModule[] = [
         icon: List,
         ability: { action: 'read', subject: 'Product' },
       },
-      // {
-      //   label: 'In tem barcode',
-      //   href: '/catalog/barcode-print',
-      //   icon: Barcode,
-      //   ability: { action: 'read', subject: 'Product' },
-      // },
+      {
+        label: 'In tem barcode',
+        href: '/catalog/barcode-print',
+        icon: Barcode,
+        ability: { action: 'read', subject: 'Product' },
+      },
       // {
       //   label: 'Lô & hạn dùng',
       //   href: '/catalog/lots',
@@ -201,6 +203,12 @@ export const NAV_MODULES: NavModule[] = [
         href: '/wms/dispatch',
         icon: Columns3,
         ability: { action: 'read', subject: 'Task' },
+      },
+      {
+        label: 'Trạm đóng gói',
+        href: '/wms/pack',
+        icon: PackageCheck,
+        ability: { action: 'execute', subject: 'Task' },
       },
       // {
       //   label: 'Chuyển kho',
@@ -389,6 +397,7 @@ export const SEGMENT_LABELS: Record<string, string> = {
   grn: 'Phiếu nhập kho',
   gdn: 'Phiếu xuất kho',
   dispatch: 'Điều phối task',
+  pack: 'Trạm đóng gói',
   shipping: 'Theo dõi giao hàng',
   transfers: 'Chuyển kho',
   po: 'Purchase order',
