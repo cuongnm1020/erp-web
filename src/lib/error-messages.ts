@@ -58,6 +58,10 @@ const MESSAGES: Record<string, string> = {
   CARRIER_OPERATION_UNSUPPORTED:
     'Hãng này không hỗ trợ thao tác vừa gọi (tra cước / in nhãn). Chọn hãng khác hoặc làm tay.',
   CARRIER_NOT_FOUND: 'Hãng vận chuyển không tồn tại hoặc đã tắt. Tải lại danh sách hãng.',
+  PICKUP_WAREHOUSE_NOT_READY:
+    'Kho lấy hàng chưa khai tỉnh/thành, phường/xã hoặc số điện thoại. Khai ở Kho › Kho & vị trí › Sửa kho rồi thử lại.',
+  PICKUP_WAREHOUSE_MISSING:
+    'Chưa biết lấy hàng ở kho nào. Chọn kho lấy hàng trên đơn hoặc đặt kho mặc định ở Kho & vị trí.',
   CARRIER_NO_WAYBILL: 'Phiếu giao chưa có mã vận đơn. Gán hãng và xin vận đơn trước.',
   SHIPMENT_NO_WAYBILL: 'Phiếu giao chưa có mã vận đơn. Gán hãng và xin vận đơn trước.',
   CARRIER_LABEL_UNAVAILABLE:
