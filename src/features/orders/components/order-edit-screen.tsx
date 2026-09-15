@@ -23,6 +23,7 @@ import { messageFor } from '@/lib/error-messages';
 import { formatDate, formatDateTime, formatMoney, formatQuantity, toDecimal } from '@/lib/format';
 import { useAbility } from '@/lib/permission';
 import { useCarriers } from '@/features/wms/api/use-shipping';
+import { useCustomerBrief } from '../api/use-line-entry';
 import {
   useOrder,
   usePickupWarehouses,
@@ -33,6 +34,7 @@ import {
 } from '../api/use-orders';
 import {
   manualStatusTargets,
+  orderAddressLine,
   orderChannelLabel,
   orderEditable,
   orderStatusLabel,
@@ -55,6 +57,8 @@ import {
  */
 const NO_CARRIER = '__none__';
 const NO_WAREHOUSE = '__none__';
+/** Không chọn địa chỉ trên đơn → server rơi về địa chỉ mặc định / duy nhất của khách. */
+const NO_ADDRESS = '__none__';
 const money = (v: string) => formatMoney(v, { unit: '' });
 
 function Card({
@@ -126,6 +130,12 @@ function Editor({ order }: { order: SalesOrderDetail }) {
   const [status, setStatus] = useState<SalesOrderStatus>(order.status);
   const [carrierId, setCarrierId] = useState<string>(order.carrierId ?? NO_CARRIER);
   const [warehouseId, setWarehouseId] = useState<string>(order.warehouseId ?? NO_WAREHOUSE);
+  const [addressId, setAddressId] = useState<string>(order.addressId ?? NO_ADDRESS);
+  // Danh sách địa chỉ của khách chỉ tải được khi có customer.read (kho mở đơn bằng read_all
+  // thì không) — khi đó chỉ hiện địa chỉ hiệu lực server trả, không có ô chọn.
+  const canReadCustomer = ability.can('read', 'Customer');
+  const customer = useCustomerBrief(canReadCustomer ? order.customer.id : '');
+  const addresses = customer.data?.addresses ?? [];
   // Cân nặng gửi hãng: ô trống = dùng cân nặng tính từ dòng (server: shippingWeightKg null).
   const [weightKg, setWeightKg] = useState<string>(order.shippingWeightKg ?? '');
   const [reason, setReason] = useState('');
@@ -139,16 +149,31 @@ function Editor({ order }: { order: SalesOrderDetail }) {
 
   const nextCarrier = carrierId === NO_CARRIER ? null : carrierId;
   const nextWarehouse = warehouseId === NO_WAREHOUSE ? null : warehouseId;
+  const nextAddress = addressId === NO_ADDRESS ? null : addressId;
+  // Địa chỉ sẽ HIỆU LỰC sau khi lưu: đang chọn → địa chỉ đó; bỏ chọn → mặc định của khách
+  // (server quyết; khi chưa tải được danh sách thì dùng địa chỉ hiệu lực server đã trả).
+  const effectiveAddress =
+    (nextAddress ? addresses.find((a) => a.id === nextAddress) : undefined) ??
+    (nextAddress === null && addresses.length > 0
+      ? (addresses.find((a) => a.isDefault) ?? (addresses.length === 1 ? addresses[0] : undefined))
+      : undefined) ??
+    (nextAddress === (order.addressId ?? null) ? order.shippingAddress : null);
   const selectedWarehouse = (warehouses.data ?? []).find((w) => w.id === nextWarehouse) ?? null;
   // Hãng có bảng cước (GHTK, GHN…) → hỏi cước ngay khi chọn để sale thấy trước khi lưu.
   // Hãng nội bộ (MANUAL) không có `quote` → không hỏi, không hiện dòng cước.
   // Kho lấy hàng đang chọn đi kèm (chưa cần lưu) → hãng tính cước từ đúng địa chỉ kho đó.
   const selectedCarrier = activeCarriers.find((c) => c.id === nextCarrier) ?? null;
   const canQuote = Boolean(selectedCarrier?.operations.includes('quote'));
-  const quote = useShippingQuote(order.id, canQuote ? nextCarrier : null, nextWarehouse);
+  const quote = useShippingQuote(
+    order.id,
+    canQuote ? nextCarrier : null,
+    nextWarehouse,
+    nextAddress,
+  );
   const statusChanged = status !== order.status;
   const carrierChanged = nextCarrier !== (order.carrierId ?? null);
   const warehouseChanged = nextWarehouse !== (order.warehouseId ?? null);
+  const addressChanged = nextAddress !== (order.addressId ?? null);
   const nextWeight = normalizeWeightInput(weightKg);
   const weightInvalid = weightKg.trim() !== '' && nextWeight === null;
   const weightChanged =
@@ -156,7 +181,8 @@ function Editor({ order }: { order: SalesOrderDetail }) {
     (nextWeight === null
       ? order.shippingWeightKg !== null
       : order.shippingWeightKg === null || !toDecimal(order.shippingWeightKg)?.eq(nextWeight));
-  const dirty = statusChanged || carrierChanged || warehouseChanged || weightChanged;
+  const dirty =
+    statusChanged || carrierChanged || warehouseChanged || addressChanged || weightChanged;
 
   const detailHref = `/crm/orders/${order.id}`;
   const totalQty = order.lines.reduce(
@@ -180,6 +206,7 @@ function Editor({ order }: { order: SalesOrderDetail }) {
         ...(statusChanged ? { status } : {}),
         ...(carrierChanged ? { carrierId: nextCarrier } : {}),
         ...(warehouseChanged ? { warehouseId: nextWarehouse } : {}),
+        ...(addressChanged ? { addressId: nextAddress } : {}),
         ...(weightChanged ? { shippingWeightKg: nextWeight } : {}),
         ...(statusChanged && status === 'CANCELLED' && reason.trim()
           ? { reason: reason.trim() }
@@ -194,9 +221,11 @@ function Editor({ order }: { order: SalesOrderDetail }) {
                   ? `trạng thái → ${orderStatusLabel(r.status)}`
                   : c === 'warehouseId'
                     ? 'kho lấy hàng'
-                    : c === 'shippingWeightKg'
-                      ? 'cân nặng gửi hãng'
-                      : 'hãng vận chuyển',
+                    : c === 'addressId'
+                      ? 'địa chỉ giao'
+                      : c === 'shippingWeightKg'
+                        ? 'cân nặng gửi hãng'
+                        : 'hãng vận chuyển',
               )
               .join(', ')}`,
           });
@@ -430,9 +459,41 @@ function Editor({ order }: { order: SalesOrderDetail }) {
               <Field label="Mã khách">
                 <span className="font-mono text-xs">{order.customer.code}</span>
               </Field>
+              {canReadCustomer ? (
+                <Field label="Địa chỉ giao">
+                  <Select
+                    value={addressId}
+                    onValueChange={setAddressId}
+                    disabled={!carrierEditable || customer.isPending}
+                  >
+                    <SelectTrigger aria-label="Địa chỉ giao" className="h-8">
+                      <SelectValue placeholder="Mặc định của khách" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value={NO_ADDRESS}>— Mặc định của khách —</SelectItem>
+                      {addresses.map((a) => (
+                        <SelectItem key={a.id} value={a.id}>
+                          {a.label ? `${a.label} · ` : ''}
+                          {a.recipient} · {orderAddressLine(a)}
+                          {a.isDefault ? ' (mặc định)' : ''}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </Field>
+              ) : null}
               <p className="px-3 pb-1 text-xs text-muted-foreground">
-                Đổi khách, liên hệ, địa chỉ nhận hàng: sửa ở hồ sơ khách hàng; đơn không đổi khách
-                sau khi chốt.
+                {effectiveAddress
+                  ? `Giao tới: ${effectiveAddress.recipient} · ${effectiveAddress.phone} · ${orderAddressLine(effectiveAddress)}`
+                  : canReadCustomer && !customer.isPending && addresses.length === 0
+                    ? 'Khách chưa có địa chỉ giao — thêm ở hồ sơ khách hàng rồi quay lại chọn.'
+                    : canReadCustomer && !customer.isPending
+                      ? 'Khách có nhiều địa chỉ mà chưa đặt mặc định — chọn một địa chỉ để tra cước / gửi hãng.'
+                      : 'Chưa có địa chỉ giao — thêm ở hồ sơ khách hàng.'}
+              </p>
+              <p className="px-3 pb-1 text-xs text-muted-foreground">
+                Đổi khách hay sửa nội dung địa chỉ: làm ở hồ sơ khách hàng; đơn không đổi khách sau
+                khi chốt.
               </p>
             </div>
           </Card>

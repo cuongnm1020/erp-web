@@ -32,8 +32,12 @@ export const orderKeys = {
   list: (p: OrderListParams) => [...orderKeys.lists(), p] as const,
   details: () => [...orderKeys.all, 'detail'] as const,
   detail: (id: string) => [...orderKeys.details(), id] as const,
-  shippingQuote: (id: string, carrierId: string | null, warehouseId: string | null) =>
-    [...orderKeys.detail(id), 'shipping-quote', carrierId, warehouseId] as const,
+  shippingQuote: (
+    id: string,
+    carrierId: string | null,
+    warehouseId: string | null,
+    addressId: string | null = null,
+  ) => [...orderKeys.detail(id), 'shipping-quote', carrierId, warehouseId, addressId] as const,
   pickupWarehouses: () => [...orderKeys.all, 'pickup-warehouses'] as const,
 };
 
@@ -206,15 +210,21 @@ export function useShippingQuote(
   orderId: string,
   carrierId: string | null,
   warehouseId: string | null,
+  /** Địa chỉ giao đang chọn trên màn sửa (chưa lưu); null = địa chỉ hiệu lực của đơn. */
+  addressId: string | null = null,
 ) {
   return useQuery({
-    queryKey: orderKeys.shippingQuote(orderId, carrierId, warehouseId),
+    queryKey: orderKeys.shippingQuote(orderId, carrierId, warehouseId, addressId),
     queryFn: () =>
       unwrap(
         api.GET('/sales-orders/{id}/shipping-quote', {
           params: {
             path: { id: orderId },
-            query: { carrierId: carrierId as string, ...(warehouseId ? { warehouseId } : {}) },
+            query: {
+              carrierId: carrierId as string,
+              ...(warehouseId ? { warehouseId } : {}),
+              ...(addressId ? { addressId } : {}),
+            },
           },
         }),
       ),

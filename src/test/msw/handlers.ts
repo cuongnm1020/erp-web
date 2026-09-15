@@ -111,6 +111,7 @@ export function makeOrders(n: number) {
     teamId: 't-hn',
     carrierId: null,
     warehouseId: null,
+    addressId: null,
     // Cân nặng: đặt tay 1 kg ở mỗi đơn thứ 4; còn lại tính từ dòng 0,3 → 1,5 kg.
     shippingWeightKg: i % 4 === 0 ? '1.0000' : null,
     lineWeightKg: LINE_WEIGHTS[i % 5]!,
@@ -147,7 +148,14 @@ export function makeOrderDetail(id: string) {
     reservedQty: String((i + 1) * 10),
     pickedQty: i === 0 ? String((i + 1) * 10) : '0',
   }));
-  return { ...header, carrier: null, warehouse: null, shipment: null, lines };
+  return {
+    ...header,
+    shippingAddress: null,
+    carrier: null,
+    warehouse: null,
+    shipment: null,
+    lines,
+  };
 }
 
 /** Đúng shape `SalesOrderShipmentDto` — phiếu giao đã có vận đơn GHTK, chưa in nhãn. */

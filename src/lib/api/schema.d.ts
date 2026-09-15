@@ -4310,6 +4310,8 @@ export interface components {
             carrierId: string | null;
             /** @description Kho lấy hàng chọn khi sửa đơn (wms.Warehouse.id) — điểm lấy khi tra cước hãng. */
             warehouseId: string | null;
+            /** @description Địa chỉ giao GHI TRÊN ĐƠN (core.CustomerAddress.id) — null = chưa chọn; địa chỉ hiệu lực xem `shippingAddress` ở chi tiết. */
+            addressId: string | null;
             /** @description Cân nặng đặt tay (kg, Decimal(12,4) chuỗi); null = chưa đặt. */
             shippingWeightKg: string | null;
             /** @description Σ qtyBase × Sku.weightKg của các dòng (kg, Decimal(12,4) chuỗi); SKU chưa khai = 0. */
@@ -4326,6 +4328,21 @@ export interface components {
         SalesOrderListResponseDto: {
             items: components["schemas"]["SalesOrderHeaderDto"][];
             total: number;
+        };
+        SalesOrderAddressDto: {
+            id: string;
+            recipient: string;
+            phone: string;
+            line1: string;
+            hamlet: string | null;
+            ward: string | null;
+            province: string;
+            isDefault: boolean;
+            /**
+             * @description `ORDER` = chọn trên đơn; `CUSTOMER_DEFAULT` = đơn chưa chọn, rơi về địa chỉ mặc định / duy nhất của khách.
+             * @enum {string}
+             */
+            source: "ORDER" | "CUSTOMER_DEFAULT";
         };
         SalesOrderCarrierDto: {
             id: string;
@@ -4408,6 +4425,8 @@ export interface components {
             carrierId: string | null;
             /** @description Kho lấy hàng chọn khi sửa đơn (wms.Warehouse.id) — điểm lấy khi tra cước hãng. */
             warehouseId: string | null;
+            /** @description Địa chỉ giao GHI TRÊN ĐƠN (core.CustomerAddress.id) — null = chưa chọn; địa chỉ hiệu lực xem `shippingAddress` ở chi tiết. */
+            addressId: string | null;
             /** @description Cân nặng đặt tay (kg, Decimal(12,4) chuỗi); null = chưa đặt. */
             shippingWeightKg: string | null;
             /** @description Σ qtyBase × Sku.weightKg của các dòng (kg, Decimal(12,4) chuỗi); SKU chưa khai = 0. */
@@ -4420,6 +4439,8 @@ export interface components {
             postedAt: string | null;
             createdAt: string;
             updatedAt: string;
+            /** @description Địa chỉ giao hiệu lực — null = khách chưa có địa chỉ dùng được (tra cước / cấp vận đơn sẽ 422). */
+            shippingAddress: components["schemas"]["SalesOrderAddressDto"] | null;
             /** @description Hãng đã chọn (tra theo carrierId) — null = chưa chọn hoặc hãng đã tắt. */
             carrier: components["schemas"]["SalesOrderCarrierDto"] | null;
             /** @description Kho lấy hàng đã chọn (tra theo warehouseId) — null = chưa chọn. */
@@ -4577,6 +4598,11 @@ export interface components {
              * @description wms.Warehouse.id đang dùng (kho lấy hàng); `null` = bỏ chọn.
              */
             warehouseId?: string | null;
+            /**
+             * Format: uuid
+             * @description core.CustomerAddress.id của ĐÚNG khách trên đơn (địa chỉ giao); `null` = bỏ chọn (rơi về địa chỉ mặc định của khách lúc tra cước / cấp vận đơn).
+             */
+            addressId?: string | null;
             /** @description Cân nặng gửi hãng (kg, chuỗi decimal > 0, tối đa 4 số lẻ); `null` = về cân nặng tính từ dòng. */
             shippingWeightKg?: string | null;
             /** @description Tuỳ chọn gửi hãng; `null` = xoá (về mặc định hãng); bỏ trống = giữ nguyên. */
@@ -8990,6 +9016,8 @@ export interface operations {
                 carrierId: string;
                 /** @description Kho lấy hàng đang chọn trên màn sửa (chưa lưu). Bỏ trống = kho đã lưu trên đơn → env. */
                 warehouseId?: string;
+                /** @description Địa chỉ giao đang chọn trên màn sửa (chưa lưu) — phải của khách trên đơn. Bỏ trống = địa chỉ hiệu lực của đơn. */
+                addressId?: string;
             };
             header?: never;
             path: {

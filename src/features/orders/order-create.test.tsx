@@ -1,7 +1,12 @@
 import { fireEvent, screen, waitFor } from '@testing-library/react';
 import { http, HttpResponse } from 'msw';
 import { describe, expect, it, vi } from 'vitest';
-import { makeCustomers, makeOrderDetail, makeOrders } from '@/test/msw/handlers';
+import {
+  makeCustomerAddresses,
+  makeCustomers,
+  makeOrderDetail,
+  makeOrders,
+} from '@/test/msw/handlers';
 import { server } from '@/test/msw/server';
 import { renderApp } from '@/test/render';
 import { OrderCreateScreen } from './components/order-create-screen';
@@ -214,6 +219,51 @@ describe('OrderCreateScreen — POST /sales-orders (D-01)', () => {
     renderApp(<OrderCreateScreen />);
     // combobox đầu tiên là picker khách hàng
     await waitFor(() => expect(screen.getAllByRole('combobox')[0]).toHaveTextContent(CUST.name));
+  });
+
+  it('địa chỉ giao: chọn khách → tự chọn địa chỉ mặc định của khách và gửi addressId khi chốt; đổi được sang địa chỉ khác', async () => {
+    // Đơn nguồn có customer = makeCustomers[0] → dòng hàng đổ sẵn, khách chọn sẵn, addressId trống.
+    const addrs = makeCustomerAddresses(ORDER.customer.id);
+    search = `from=${ORDER.id}`;
+    const captured: unknown[] = [];
+    server.use(
+      ...skuHandlers(),
+      http.post('/api/sales-orders', async ({ request }) => {
+        captured.push(await request.json());
+        return HttpResponse.json(
+          {
+            orderId: 'new-order-2',
+            docNumber: 'SO2609-00100',
+            status: 'APPROVED',
+            subtotal: '1',
+            discount: '0',
+            taxAmount: '0',
+            shippingFee: '0',
+            total: '1',
+            lines: [],
+            reservations: [],
+            appliedPromotionIds: [],
+            approvalRuleId: null,
+          },
+          { status: 201 },
+        );
+      }),
+    );
+    renderApp(<OrderCreateScreen />);
+    await waitFor(
+      () => expect(screen.getAllByLabelText('Số lượng')).toHaveLength(REAL_LINES.length),
+      { timeout: 3000 },
+    );
+    const picker = screen.getByRole('combobox', { name: 'Địa chỉ giao' });
+    // Địa chỉ mặc định của khách được chọn sẵn sau khi tải GET /customers/{id}.
+    await waitFor(() => expect(picker).toHaveTextContent(/Nguyễn Thị Thu Hà/));
+    fireEvent.click(picker);
+    fireEvent.click(await screen.findByRole('option', { name: /Trần Văn Bình/ }));
+    expect(picker).toHaveTextContent(/Trần Văn Bình/);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Chốt đơn' }));
+    await waitFor(() => expect(captured).toHaveLength(1));
+    expect(captured[0]).toMatchObject({ customerId: ORDER.customer.id, addressId: addrs[1]!.id });
   });
 
   it('Khách mới: tạo nhanh trong form → POST /customers, picker chọn ngay khách vừa tạo', async () => {

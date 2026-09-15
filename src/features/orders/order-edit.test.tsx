@@ -4,6 +4,7 @@ import { describe, expect, it, vi } from 'vitest';
 import {
   CARRIERS,
   ME_SALE,
+  makeCustomerAddresses,
   makeOrderDetail,
   makeOrders,
   makeShippingQuote,
@@ -171,6 +172,85 @@ describe('OrderEditScreen — trang sửa đơn (D-05, PATCH /sales-orders/{id})
     fireEvent.click(screen.getByRole('button', { name: /Lưu thay đổi/ }));
     await waitFor(() => expect(bodies).toEqual([{ carrierId: 'c-ghtk', warehouseId: 'wh-hcm' }]));
     await waitFor(() => expect(push).toHaveBeenCalledWith(`/crm/orders/${ORDER.id}`));
+  });
+
+  it('địa chỉ giao: hiện địa chỉ hiệu lực (mặc định của khách); chọn địa chỉ khác → hỏi cước kèm addressId; lưu → PATCH addressId', async () => {
+    push.mockClear();
+    const asked: string[] = [];
+    const bodies: Record<string, unknown>[] = [];
+    const addrs = makeCustomerAddresses(ORDER.customer.id);
+    server.use(
+      http.get('/api/sales-orders/:id', () =>
+        HttpResponse.json({
+          ...DETAIL,
+          addressId: null,
+          shippingAddress: { ...addrs[0]!, source: 'CUSTOMER_DEFAULT' },
+        }),
+      ),
+      http.get('/api/sales-orders/:id/shipping-quote', ({ params, request }) => {
+        const q = new URL(request.url).searchParams;
+        asked.push(`${q.get('carrierId')}@${q.get('addressId') ?? '-'}`);
+        return HttpResponse.json(makeShippingQuote(params.id as string, q.get('carrierId') ?? ''));
+      }),
+      http.patch('/api/sales-orders/:id', async ({ params, request }) => {
+        const body = (await request.json()) as Record<string, unknown>;
+        bodies.push(body);
+        return HttpResponse.json({
+          orderId: params.id,
+          docNumber: ORDER.docNumber,
+          status: ORDER.status,
+          carrierId: null,
+          warehouseId: null,
+          addressId: body.addressId ?? null,
+          changed: Object.keys(body),
+        });
+      }),
+    );
+    renderApp(<OrderEditScreen orderId={ORDER.id} />);
+    await screen.findByRole('heading', { level: 1 });
+    // Địa chỉ hiệu lực server trả (mặc định của khách) hiện ngay, trước cả khi tải danh sách.
+    expect(await screen.findByText(/Giao tới: Nguyễn Thị Thu Hà · 0903112233/)).toBeInTheDocument();
+
+    const picker = screen.getByRole('combobox', { name: 'Địa chỉ giao' });
+    await waitFor(() => expect(picker).toBeEnabled());
+    fireEvent.click(picker);
+    const options = (await screen.findAllByRole('option')).map((o) => o.textContent);
+    expect(options[0]).toBe('— Mặc định của khách —');
+    expect(options).toHaveLength(3);
+    fireEvent.click(screen.getByRole('option', { name: /Trần Văn Bình/ }));
+    expect(screen.getByText(/Giao tới: Trần Văn Bình · 0912345678/)).toBeInTheDocument();
+
+    const carrierPicker = screen.getByRole('combobox', { name: 'Hãng vận chuyển' });
+    await waitFor(() => expect(carrierPicker).toBeEnabled());
+    fireEvent.click(carrierPicker);
+    fireEvent.click(await screen.findByRole('option', { name: `${CARRIERS[3]!.name} (GHTK)` }));
+    await waitFor(() => expect(asked).toEqual([`c-ghtk@${addrs[1]!.id}`]));
+
+    fireEvent.click(screen.getByRole('button', { name: /Lưu thay đổi/ }));
+    await waitFor(() => expect(bodies).toEqual([{ carrierId: 'c-ghtk', addressId: addrs[1]!.id }]));
+    await waitFor(() => expect(push).toHaveBeenCalledWith(`/crm/orders/${ORDER.id}`));
+  });
+
+  it('không có customer.read (kho mở đơn bằng read_all) → không ô chọn địa chỉ, vẫn hiện địa chỉ hiệu lực', async () => {
+    const addrs = makeCustomerAddresses(ORDER.customer.id);
+    server.use(
+      http.get('/api/sales-orders/:id', () =>
+        HttpResponse.json({
+          ...DETAIL,
+          addressId: addrs[0]!.id,
+          shippingAddress: { ...addrs[0]!, source: 'ORDER' },
+        }),
+      ),
+    );
+    renderApp(<OrderEditScreen orderId={ORDER.id} />, {
+      me: {
+        ...ME_SALE,
+        permissions: ['sales_order.read', 'sales_order.read_all', 'sales_order.update'],
+      },
+    });
+    await screen.findByRole('heading', { level: 1 });
+    expect(await screen.findByText(/Giao tới: Nguyễn Thị Thu Hà/)).toBeInTheDocument();
+    expect(screen.queryByRole('combobox', { name: 'Địa chỉ giao' })).not.toBeInTheDocument();
   });
 
   it('hỏi cước lỗi (đơn chưa có địa chỉ giao, 422) → hiện thông điệp lỗi tại chỗ, vẫn lưu được hãng', async () => {
