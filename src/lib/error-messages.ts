@@ -67,6 +67,16 @@ const MESSAGES: Record<string, string> = {
   CARRIER_LABEL_UNAVAILABLE:
     'Hãng chưa đưa nhãn cho vận đơn này. Thử lại sau ít phút hoặc in từ cổng của hãng.',
   // Máy quét PDA / trạm đóng gói (PLAN-barcode-pick-pack)
+  // Đóng pick / đóng gói tay từ màn sửa đơn (POST /sales-orders/:id/fulfil).
+  ORDER_NOT_FULFILLABLE: 'Chỉ đóng pick / đóng gói tay được đơn đã duyệt. Duyệt đơn trước.',
+  ORDER_CARRIER_REQUIRED:
+    'Đơn chưa chọn hãng vận chuyển. Chọn hãng ở ô ĐVVC rồi lưu lại — vận đơn được xin ngay khi đóng gói.',
+  PICK_TASK_NOT_READY:
+    'Đơn chưa có việc pick và không tự sinh được. Kiểm tra dòng hàng của đơn rồi thử lại.',
+  ORDER_IN_WAVE:
+    'Đơn đang nằm trong lượt pick gộp. Hoàn tất lượt trên màn quét, không đóng tay từng đơn được.',
+  ORDER_PICK_SHORTAGE:
+    'Không có dòng nào lấy được — thiếu tồn ở vị trí pick được. Nhập kho hoặc chuyển hàng vào vị trí pick rồi thử lại.',
   PDA_PICK_NEEDS_ASSIGNMENT:
     'Việc pick này chưa được giao cho bạn. Nhờ điều phối gán trên bảng điều phối rồi quét lại.',
   PDA_TASK_ASSIGNED_TO_OTHER:
