@@ -67,6 +67,8 @@ const MESSAGES: Record<string, string> = {
   CARRIER_LABEL_UNAVAILABLE:
     'Hãng chưa đưa nhãn cho vận đơn này. Thử lại sau ít phút hoặc in từ cổng của hãng.',
   // Máy quét PDA / trạm đóng gói (PLAN-barcode-pick-pack)
+  PDA_PICK_NEEDS_ASSIGNMENT:
+    'Việc pick này chưa được giao cho bạn. Nhờ điều phối gán trên bảng điều phối rồi quét lại.',
   PDA_TASK_ASSIGNED_TO_OTHER:
     'Việc này đang do người khác làm. Hỏi người đó hoặc nhờ điều phối đổi người rồi quét lại.',
   PDA_TASK_NOT_YOURS:

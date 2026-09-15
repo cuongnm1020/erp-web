@@ -343,3 +343,73 @@ describe('Trạm đóng gói — quét đơn → quét SKU → tự đóng dòng
     expect(screen.getByRole('alert')).toHaveTextContent(/không có quyền/i);
   });
 });
+
+describe('Trạm đóng gói — hàng đợi PACK + đếm đơn đã đóng hôm nay (role PACKER, 2026-09-15)', () => {
+  it('lúc chưa mở đơn: hàng đợi từ GET /pda/queue?type=PACK, bấm một dòng → mở đơn (resolve mã đơn); tiêu đề nêu số đơn đã đóng', async () => {
+    const resolved: string[] = [];
+    server.use(
+      http.get('/api/pda/queue', () =>
+        HttpResponse.json({
+          type: 'PACK',
+          warehouseId: null,
+          waiting: 2,
+          mine: 1,
+          items: [
+            {
+              taskId: 'pack-q1',
+              docNumber: 'PACK2609-00011',
+              status: 'PENDING',
+              assignedToMe: false,
+              refDocNumber: 'SO2609-00011',
+              lineCount: 3,
+              createdAt: '2026-09-15T02:00:00.000Z',
+              ageMinutes: 12,
+            },
+            {
+              taskId: 'pack-q2',
+              docNumber: 'PACK2609-00012',
+              status: 'ASSIGNED',
+              assignedToMe: true,
+              refDocNumber: 'SO2609-00012',
+              lineCount: 1,
+              createdAt: '2026-09-15T02:10:00.000Z',
+              ageMinutes: 2,
+            },
+          ],
+        }),
+      ),
+      http.get('/api/pda/stats', () =>
+        HttpResponse.json({
+          userId: 'u-admin',
+          type: 'PACK',
+          date: '2026-09-15',
+          from: '2026-09-14T17:00:00.000Z',
+          to: '2026-09-15T17:00:00.000Z',
+          completed: 7,
+          items: [
+            {
+              taskId: 'pack-d1',
+              docNumber: 'PACK2609-00001',
+              refDocNumber: 'SO2609-00001',
+              completedAt: '2026-09-15T03:00:00.000Z',
+            },
+          ],
+        }),
+      ),
+      http.get('/api/pda/resolve/:code', ({ params }) => {
+        resolved.push(String(params.code));
+        return HttpResponse.json({ kind: 'unknown' }, { status: 404 });
+      }),
+    );
+    renderApp(<PackStationScreen />);
+    const queue = await screen.findByRole('region', { name: 'Hàng đợi đóng gói' });
+    await waitFor(() => expect(queue).toHaveTextContent('2 chờ · 1 của tôi'));
+    expect(queue).toHaveTextContent('SO2609-00011');
+    expect(queue).toHaveTextContent('Chưa nhận');
+    expect(queue).toHaveTextContent('Của tôi');
+    expect(queue).toHaveTextContent(/bạn đã đóng 7 đơn/);
+    expect(await screen.findByText(/hôm nay bạn đã đóng 7 đơn · 2 đơn chờ/)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Mở SO2609-00011' }));
+    await waitFor(() => expect(resolved).toEqual(['SO2609-00011']));
+  });
+});

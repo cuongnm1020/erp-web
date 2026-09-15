@@ -202,7 +202,7 @@ export const NAV_MODULES: NavModule[] = [
         label: 'Điều phối task',
         href: '/wms/dispatch',
         icon: Columns3,
-        ability: { action: 'read', subject: 'Task' },
+        ability: { action: 'read_all', subject: 'Task' },
       },
       {
         label: 'Trạm đóng gói',

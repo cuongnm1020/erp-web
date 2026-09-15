@@ -1919,7 +1919,25 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
+        /** Mọi task của kho (bảng điều phối) — `task.read_all`; `task.read` chỉ mở việc của mình qua /pda. */
         get: operations["TaskEngineController_list"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/tasks/stats": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Danh bạ người nhận việc (user active role WAREHOUSE) cho ô "Gán cho…". */
+        get: operations["TaskEngineController_stats"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1935,7 +1953,6 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Danh bạ người nhận việc (user active role WAREHOUSE) cho ô "Gán cho…". */
         get: operations["TaskEngineController_assignees"];
         put?: never;
         post?: never;
@@ -2071,6 +2088,43 @@ export interface paths {
         };
         /** Việc của tôi trên máy này, đã sắp theo lối đi trong kho. */
         get: operations["PdaController_tasks"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/pda/queue": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Hàng đợi theo loại việc: chưa ai nhận + đang là của tôi (PACK cho bàn đóng gói; PICK chỉ
+         *     hiện việc chưa gán khi có task.assign). Quyền task.read — không lộ việc người khác đang giữ.
+         */
+        get: operations["PdaController_queue"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/pda/stats": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Việc TÔI đã đóng trong ngày (giờ VN) — "ca hôm nay bạn đã đóng N đơn". */
+        get: operations["PdaController_stats"];
         put?: never;
         post?: never;
         delete?: never;
@@ -5039,6 +5093,23 @@ export interface components {
             items: components["schemas"]["TaskRowDto"][];
             total: number;
         };
+        TaskAssigneeStatsDto: {
+            userId: string;
+            code: string;
+            fullName: string;
+            completed: number;
+        };
+        TaskStatsDto: {
+            /** @enum {string} */
+            type: "PUT_AWAY" | "PICK" | "PACK" | "SHIP" | "TRANSFER" | "RECEIVE" | "COUNT" | "REPLENISH";
+            /** @description YYYY-MM-DD (Asia/Ho_Chi_Minh). */
+            date: string;
+            from: string;
+            to: string;
+            /** @description Tổng việc đã đóng trong ngày (mọi người). */
+            completed: number;
+            byAssignee: components["schemas"]["TaskAssigneeStatsDto"][];
+        };
         TaskAssigneeDto: {
             id: string;
             code: string;
@@ -5277,6 +5348,47 @@ export interface components {
             createdAt: string;
             /** @description ĐÃ sắp theo thứ tự đi trong kho (pickSequence tăng dần). */
             lines: components["schemas"]["PdaTaskLineDto"][];
+        };
+        PdaQueueItemDto: {
+            taskId: string;
+            docNumber: string;
+            /** @enum {string} */
+            status: "CANCELLED" | "PENDING" | "ASSIGNED" | "IN_PROGRESS" | "COMPLETED" | "EXCEPTION";
+            /** @description true = đang là của tôi (đã nhận); false = chưa ai nhận. */
+            assignedToMe: boolean;
+            /** @description Số chứng từ đơn bán nguồn — quét mã này để nhận việc. */
+            refDocNumber: string | null;
+            lineCount: number;
+            createdAt: string;
+            ageMinutes: number;
+        };
+        PdaQueueDto: {
+            /** @enum {string} */
+            type: "PUT_AWAY" | "PICK" | "PACK" | "SHIP" | "TRANSFER" | "RECEIVE" | "COUNT" | "REPLENISH";
+            /** @description Kho của thiết bị (null = mọi kho). */
+            warehouseId: string | null;
+            items: components["schemas"]["PdaQueueItemDto"][];
+            /** @description Số việc chưa ai nhận. */
+            waiting: number;
+            /** @description Số việc đang là của tôi. */
+            mine: number;
+        };
+        PdaStatsItemDto: {
+            taskId: string;
+            docNumber: string;
+            refDocNumber: string | null;
+            completedAt: string | null;
+        };
+        PdaStatsDto: {
+            userId: string;
+            /** @enum {string} */
+            type: "PUT_AWAY" | "PICK" | "PACK" | "SHIP" | "TRANSFER" | "RECEIVE" | "COUNT" | "REPLENISH";
+            /** @description YYYY-MM-DD (Asia/Ho_Chi_Minh). */
+            date: string;
+            from: string;
+            to: string;
+            completed: number;
+            items: components["schemas"]["PdaStatsItemDto"][];
         };
         PdaResolveCustomerDto: {
             id: string;
@@ -9691,6 +9803,30 @@ export interface operations {
             };
         };
     };
+    TaskEngineController_stats: {
+        parameters: {
+            query: {
+                type: "PUT_AWAY" | "PICK" | "PACK" | "SHIP" | "TRANSFER" | "RECEIVE" | "COUNT" | "REPLENISH";
+                /** @description `YYYY-MM-DD` (Asia/Ho_Chi_Minh); bỏ trống = hôm nay. */
+                date?: string;
+                warehouseId?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TaskStatsDto"];
+                };
+            };
+        };
+    };
     TaskEngineController_assignees: {
         parameters: {
             query?: never;
@@ -9907,6 +10043,50 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["PdaTaskDto"][];
+                };
+            };
+        };
+    };
+    PdaController_queue: {
+        parameters: {
+            query: {
+                type: "PUT_AWAY" | "PICK" | "PACK" | "SHIP" | "TRANSFER" | "RECEIVE" | "COUNT" | "REPLENISH";
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PdaQueueDto"];
+                };
+            };
+        };
+    };
+    PdaController_stats: {
+        parameters: {
+            query: {
+                type: "PUT_AWAY" | "PICK" | "PACK" | "SHIP" | "TRANSFER" | "RECEIVE" | "COUNT" | "REPLENISH";
+                /** @description `YYYY-MM-DD` theo giờ Việt Nam; bỏ trống = hôm nay. */
+                date?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PdaStatsDto"];
                 };
             };
         };

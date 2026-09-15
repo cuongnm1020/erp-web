@@ -26,9 +26,10 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { cn } from '@/lib/cn';
-import { formatQuantity } from '@/lib/format';
+import { formatDateTime, formatQuantity } from '@/lib/format';
 import { useAbility } from '@/lib/permission';
 import { taskStatusLabel } from '../labels';
+import { usePdaQueue, usePdaStats } from '../api/use-pda';
 import { useScanSession } from '../scan-session';
 import { LabelPrintDialog } from './label-print-dialog';
 
@@ -51,6 +52,9 @@ export function PackStationScreen() {
   const [labelOpen, setLabelOpen] = useState(false);
 
   const canExecute = ability.can('execute', 'Task');
+  // Hàng đợi đóng gói (đơn đã pick xong, chưa ai nhận + của tôi) và số đơn tôi đã đóng hôm nay.
+  const queue = usePdaQueue('PACK', canExecute);
+  const stats = usePdaStats('PACK', null, canExecute);
 
   // URL → phiên: F5 hoặc dán link ?order=SO… mở lại đúng đơn.
   const urlOrder = search.get('order');
@@ -125,7 +129,7 @@ export function PackStationScreen() {
         description={
           task
             ? `${s.order.docNumber ?? task.docNumber} · ${doneLines}/${task.lines.length} dòng`
-            : 'Quét mã đơn hàng để bắt đầu'
+            : `Quét mã đơn hàng để bắt đầu · hôm nay bạn đã đóng ${stats.data?.completed ?? '…'} đơn · ${queue.data?.waiting ?? '…'} đơn chờ`
         }
         breadcrumb={[{ label: 'Kho' }, { label: 'Trạm đóng gói' }]}
         actions={
@@ -206,11 +210,63 @@ export function PackStationScreen() {
       ) : null}
 
       {!task && s.phase === 'idle' ? (
-        <EmptyState
-          className="mt-4"
-          title="Chưa có đơn nào đang đóng"
-          description="Quét mã vạch trên phiếu đơn hàng (hoặc mã việc PACK) để nhận việc và bắt đầu quét sản phẩm."
-        />
+        <div className="mt-4 grid gap-3 lg:grid-cols-3">
+          <EmptyState
+            className="lg:col-span-2"
+            title="Chưa có đơn nào đang đóng"
+            description="Quét mã vạch trên phiếu đơn hàng (hoặc mã việc PACK) để nhận việc và bắt đầu quét sản phẩm. Hoặc chọn một đơn trong hàng đợi bên cạnh."
+          />
+          <section className="rounded-md border bg-card" aria-label="Hàng đợi đóng gói">
+            <header className="flex items-center justify-between border-b px-3 py-2 text-sm">
+              <span className="font-semibold">Chờ đóng gói</span>
+              <span className="text-muted-foreground">
+                {queue.data ? `${queue.data.waiting} chờ · ${queue.data.mine} của tôi` : '…'}
+              </span>
+            </header>
+            {queue.isError ? (
+              <p className="px-3 py-3 text-xs text-destructive">Không tải được hàng đợi.</p>
+            ) : !queue.data ? (
+              <p className="px-3 py-3 text-xs text-muted-foreground">Đang tải…</p>
+            ) : queue.data.items.length === 0 ? (
+              <p className="px-3 py-3 text-xs text-muted-foreground">
+                Không có đơn nào chờ đóng gói — đơn pick xong sẽ hiện ở đây.
+              </p>
+            ) : (
+              <ul className="max-h-96 divide-y overflow-y-auto">
+                {queue.data.items.map((q) => (
+                  <li key={q.taskId}>
+                    <button
+                      type="button"
+                      className="flex w-full items-center justify-between gap-2 px-3 py-2 text-left text-sm hover:bg-muted"
+                      onClick={() => void s.open(q.refDocNumber ?? q.docNumber)}
+                      aria-label={`Mở ${q.refDocNumber ?? q.docNumber}`}
+                    >
+                      <span className="flex flex-col">
+                        <span className="font-mono font-semibold">
+                          {q.refDocNumber ?? q.docNumber}
+                        </span>
+                        <span className="text-xs text-muted-foreground">
+                          {q.lineCount} dòng · chờ {q.ageMinutes} phút
+                        </span>
+                      </span>
+                      <StatusBadge tone={q.assignedToMe ? 'brand' : 'neutral'}>
+                        {q.assignedToMe ? 'Của tôi' : 'Chưa nhận'}
+                      </StatusBadge>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+            <footer className="border-t px-3 py-2 text-xs text-muted-foreground">
+              Hôm nay ({stats.data?.date ?? '…'}) bạn đã đóng{' '}
+              <b className="text-foreground">{stats.data?.completed ?? '…'}</b> đơn
+              {stats.data?.items[0]?.completedAt
+                ? ` · gần nhất ${formatDateTime(stats.data.items[0].completedAt)}`
+                : ''}
+              .
+            </footer>
+          </section>
+        </div>
       ) : null}
 
       {task ? (

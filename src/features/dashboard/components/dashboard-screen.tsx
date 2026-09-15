@@ -19,6 +19,9 @@ import {
 } from '@/components/ui/table';
 import { cn } from '@/lib/cn';
 import { formatMoney } from '@/lib/format';
+import { useAbility } from '@/lib/permission';
+import { useRouter } from 'next/navigation';
+import { useEffect } from 'react';
 
 // ---------- Dữ liệu mẫu — góc nhìn Sale ----------
 
@@ -259,6 +262,14 @@ type ViewMode = 'sale' | 'manager';
 
 export function DashboardScreen() {
   const [view, setView] = useState<ViewMode>('sale');
+  // Nhân viên kho sàn (PICKER / PACKER, 2026-09-15) không có màn nào ở dashboard: đưa thẳng vào
+  // màn làm việc — đóng hàng (shipment.pack) → trạm đóng gói; còn lại có task.execute → màn pick.
+  const ability = useAbility();
+  const router = useRouter();
+  const floorHome = floorRoute(ability);
+  useEffect(() => {
+    if (floorHome) router.replace(floorHome);
+  }, [floorHome, router]);
 
   return (
     <>
@@ -629,4 +640,17 @@ function ManagerView() {
       </div>
     </>
   );
+}
+
+/** Trang làm việc cho người chỉ có quyền kho sàn — null = người dùng bình thường, ở lại dashboard. */
+export function floorRoute(ability: {
+  can: (action: string, subject: string) => boolean;
+}): string | null {
+  if (!ability.can('execute', 'Task')) return null;
+  const hasOffice =
+    ability.can('read', 'Customer') ||
+    ability.can('read', 'SalesOrder') ||
+    ability.can('read', 'Stock');
+  if (hasOffice) return null;
+  return ability.can('pack', 'Shipment') ? '/wms/pack' : '/pda/pick';
 }

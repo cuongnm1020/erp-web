@@ -24,6 +24,8 @@ export const pdaKeys = {
   task: (id: string) => [...pdaKeys.all, 'task', id] as const,
   shipment: (id: string) => [...pdaKeys.all, 'shipment', id] as const,
   wave: (id: string) => [...pdaKeys.all, 'wave', id] as const,
+  queue: (type: string) => [...pdaKeys.all, 'queue', type] as const,
+  stats: (type: string, date: string | null) => [...pdaKeys.all, 'stats', type, date] as const,
 };
 
 /**
@@ -189,5 +191,33 @@ export function useWaveShort() {
       idempotencyKey: string;
     }) => unwrap(api.POST('/pda/waves/{id}/short', { params: { path: { id: waveId } }, body })),
     onSuccess: () => void qc.invalidateQueries({ queryKey: taskKeys.all }),
+  });
+}
+
+export type PdaQueue = components['schemas']['PdaQueueDto'];
+export type PdaQueueItem = components['schemas']['PdaQueueItemDto'];
+export type PdaStats = components['schemas']['PdaStatsDto'];
+
+/**
+ * GET /pda/queue?type= — hàng đợi của tôi + việc chưa ai nhận (PACK: bàn đóng gói; PICK: chỉ khi
+ * có task.assign). Làm tươi 30s để bàn đóng gói thấy đơn mới pick xong mà không F5.
+ */
+export function usePdaQueue(type: 'PICK' | 'PACK', enabled = true) {
+  return useQuery({
+    queryKey: pdaKeys.queue(type),
+    queryFn: () => unwrap(api.GET('/pda/queue', { params: { query: { type } } })),
+    enabled,
+    refetchInterval: 30_000,
+  });
+}
+
+/** GET /pda/stats?type=&date= — việc TÔI đã đóng trong ngày (giờ VN); date bỏ trống = hôm nay. */
+export function usePdaStats(type: 'PICK' | 'PACK', date: string | null = null, enabled = true) {
+  return useQuery({
+    queryKey: pdaKeys.stats(type, date),
+    queryFn: () =>
+      unwrap(api.GET('/pda/stats', { params: { query: { type, ...(date ? { date } : {}) } } })),
+    enabled,
+    refetchInterval: 60_000,
   });
 }
