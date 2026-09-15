@@ -44,7 +44,7 @@ describe('ShippingMonitorScreen — đơn treo + timeline hãng (BE-carrier-sync
     expect(await screen.findByText(`Hành trình ${FIRST.docNumber}`)).toBeInTheDocument();
     expect(await screen.findByText('Webhook')).toBeInTheDocument();
     expect(screen.getByText('Đối soát')).toBeInTheDocument();
-    expect(screen.getByText('Mã lạ')).toBeInTheDocument();
+    expect(screen.getByText('Không đổi trạng thái')).toBeInTheDocument();
     expect(screen.getByText('mã trạng thái 45 chưa được ánh xạ')).toBeInTheDocument();
   });
 

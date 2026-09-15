@@ -93,3 +93,37 @@ export function formatMinutes(minutes: number): string {
   const m = minutes % 60;
   return m === 0 ? `${h} giờ` : `${h} giờ ${m} phút`;
 }
+
+// ── Nhật ký trạng thái hãng (CarrierStatusLog) — dùng chung màn Theo dõi giao hàng + chi tiết đơn ──
+
+export const CARRIER_OUTCOME: Record<string, { label: string; tone: StatusTone }> = {
+  APPLIED: { label: 'Đã áp', tone: 'ok' },
+  DUPLICATE: { label: 'Trùng', tone: 'neutral' },
+  REJECTED_UNMAPPED: { label: 'Không đổi trạng thái', tone: 'warn' },
+  REJECTED_TRANSITION: { label: 'Lệch pha', tone: 'warn' },
+  NOT_FOUND: { label: 'Không khớp đơn', tone: 'err' },
+};
+
+export const CARRIER_SOURCE: Record<string, string> = {
+  WEBHOOK: 'Webhook',
+  POLL: 'Đối soát',
+};
+
+export const SHIPMENT_STATUS_BADGE: Record<string, { label: string; tone: StatusTone }> = {
+  PENDING: { label: 'Chờ lấy', tone: 'neutral' },
+  PICKED_UP: { label: 'Đã lấy hàng', tone: 'brand' },
+  IN_TRANSIT: { label: 'Đang giao', tone: 'brand' },
+  DELIVERED: { label: 'Đã giao', tone: 'ok' },
+  FAILED: { label: 'Giao lỗi', tone: 'err' },
+  RETURNED: { label: 'Đã hoàn', tone: 'warn' },
+};
+
+export function carrierOutcome(o: string): { label: string; tone: StatusTone } {
+  return CARRIER_OUTCOME[o] ?? { label: o, tone: 'neutral' };
+}
+export function carrierSource(s: string): string {
+  return CARRIER_SOURCE[s] ?? s;
+}
+export function shipmentStatusBadge(s: string): { label: string; tone: StatusTone } {
+  return SHIPMENT_STATUS_BADGE[s] ?? { label: s, tone: 'neutral' };
+}

@@ -36,6 +36,8 @@ import { formatDate, formatDateTime, formatMoney, formatQuantity } from '@/lib/f
 import { Can, useAbility } from '@/lib/permission';
 import { usePrint } from '@/lib/print';
 import { useInvalidateOn } from '@/lib/realtime';
+import { useShipmentStatusLog } from '@/features/wms/api/use-shipping';
+import { carrierOutcome, carrierSource, shipmentStatusBadge } from '@/features/wms/labels';
 import {
   orderKeys,
   useCancelOrder,
@@ -103,6 +105,51 @@ const SHIPMENT_STATUS_LABEL: Record<
   RETURNED: 'Đã hoàn',
 };
 
+/**
+ * Hành trình từ hãng — mọi tín hiệu (webhook + đối soát) ghi ở `wms.CarrierStatusLog`, kể cả
+ * mã không đổi trạng thái (shipper báo) và mã lệch pha: người chạy thử đơn thật nhìn thấy GHTK
+ * gửi gì, lúc nào, hệ thống áp hay không. Nguồn: GET /shipments/:id/status-log (quyền
+ * shipment.read — sale có sẵn theo seed).
+ */
+function CarrierTimeline({ shipmentId }: { shipmentId: string }) {
+  const query = useShipmentStatusLog(shipmentId);
+  return (
+    <div className="border-t px-3 py-2">
+      <p className="mb-1 text-xs font-semibold text-muted-foreground">Hành trình từ hãng</p>
+      {query.isPending ? (
+        <p className="text-xs text-muted-foreground">Đang tải…</p>
+      ) : query.isError ? (
+        <p className="text-xs text-destructive">{messageFor(query.error)}</p>
+      ) : query.data.items.length === 0 ? (
+        <p className="text-xs text-muted-foreground">
+          Chưa nhận tín hiệu nào từ hãng cho phiếu này — webhook về sẽ hiện ở đây.
+        </p>
+      ) : (
+        <ol className="max-h-64 space-y-1.5 overflow-y-auto" aria-label="Hành trình từ hãng">
+          {query.data.items.map((e) => {
+            const o = carrierOutcome(e.outcome);
+            const mapped = e.mappedStatus ? shipmentStatusBadge(e.mappedStatus) : null;
+            return (
+              <li key={e.id} className="rounded-md border p-1.5 text-xs">
+                <div className="flex flex-wrap items-center gap-1.5">
+                  <span className="tabular-nums text-muted-foreground">
+                    {formatDateTime(e.occurredAt ?? e.createdAt)}
+                  </span>
+                  <StatusBadge tone="neutral">{carrierSource(e.source)}</StatusBadge>
+                  <span className="font-mono">{e.carrierStatusCode}</span>
+                  {mapped ? <StatusBadge tone={mapped.tone}>{mapped.label}</StatusBadge> : null}
+                  <StatusBadge tone={o.tone}>{o.label}</StatusBadge>
+                </div>
+                {e.note ? <p className="mt-0.5 text-muted-foreground">{e.note}</p> : null}
+              </li>
+            );
+          })}
+        </ol>
+      )}
+    </div>
+  );
+}
+
 /** Thẻ vận đơn — dữ liệu từ `order.shipment`; "In nhãn" nhúng PDF của hãng qua proxy /api. */
 function ShipmentCard({ order, autoPrint }: { order: SalesOrderDetail; autoPrint?: boolean }) {
   const s = order.shipment;
@@ -147,31 +194,34 @@ function ShipmentCard({ order, autoPrint }: { order: SalesOrderDetail; autoPrint
       }
     >
       {s ? (
-        <dl className="grid grid-cols-2 gap-x-4 gap-y-3 px-3 py-3">
-          <Field label="Phiếu giao">
-            <span className="font-mono text-xs">{s.docNumber}</span>
-          </Field>
-          <Field label="Trạng thái giao">{SHIPMENT_STATUS_LABEL[s.status]}</Field>
-          <Field label="Hãng trên phiếu">
-            {s.carrierCode ? (
-              <span className="font-mono text-xs">{s.carrierCode}</span>
-            ) : (
-              <span className="text-muted-foreground">chưa gán — chọn khi đóng gói xong</span>
-            )}
-          </Field>
-          <Field label="Mã vận đơn">
-            {s.trackingNo ? (
-              <span className="font-mono">{s.trackingNo}</span>
-            ) : (
-              <span className="text-muted-foreground">chưa cấp — cấp khi đóng gói xong</span>
-            )}
-          </Field>
-          <Field label="Nhãn đã in">
-            {s.labelPrintedAt
-              ? `${s.labelPrintCount} lần · gần nhất ${formatDateTime(s.labelPrintedAt)}`
-              : 'chưa in'}
-          </Field>
-        </dl>
+        <>
+          <dl className="grid grid-cols-2 gap-x-4 gap-y-3 px-3 py-3">
+            <Field label="Phiếu giao">
+              <span className="font-mono text-xs">{s.docNumber}</span>
+            </Field>
+            <Field label="Trạng thái giao">{SHIPMENT_STATUS_LABEL[s.status]}</Field>
+            <Field label="Hãng trên phiếu">
+              {s.carrierCode ? (
+                <span className="font-mono text-xs">{s.carrierCode}</span>
+              ) : (
+                <span className="text-muted-foreground">chưa gán — chọn khi đóng gói xong</span>
+              )}
+            </Field>
+            <Field label="Mã vận đơn">
+              {s.trackingNo ? (
+                <span className="font-mono">{s.trackingNo}</span>
+              ) : (
+                <span className="text-muted-foreground">chưa cấp — cấp khi đóng gói xong</span>
+              )}
+            </Field>
+            <Field label="Nhãn đã in">
+              {s.labelPrintedAt
+                ? `${s.labelPrintCount} lần · gần nhất ${formatDateTime(s.labelPrintedAt)}`
+                : 'chưa in'}
+            </Field>
+          </dl>
+          <CarrierTimeline shipmentId={s.id} />
+        </>
       ) : (
         <p className="px-3 py-3 text-sm text-muted-foreground">
           Chưa có phiếu giao — phiếu sinh khi kho pick xong đơn này.

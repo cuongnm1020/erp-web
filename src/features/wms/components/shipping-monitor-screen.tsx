@@ -3,7 +3,7 @@
 import { useMemo, useState } from 'react';
 import { DataTable, type ColumnDef } from '@/components/data/data-table';
 import { EmptyState, ListSkeleton, QueryState } from '@/components/data/states';
-import { StatusBadge, type StatusTone } from '@/components/data/status-badge';
+import { StatusBadge } from '@/components/data/status-badge';
 import { PageHeader } from '@/components/layout/page-header';
 import {
   Dialog,
@@ -22,37 +22,11 @@ import {
 import { Skeleton } from '@/components/ui/skeleton';
 import { formatDateTime } from '@/lib/format';
 import { useListState } from '@/lib/url-state';
-import {
-  useShipmentStatusLog,
-  useStuckShipments,
-  type CarrierStatusLog,
-  type StuckShipment,
-} from '../api/use-shipping';
-
-const SHIPMENT_STATUS: Record<string, { label: string; tone: StatusTone }> = {
-  PENDING: { label: 'Chờ lấy', tone: 'neutral' },
-  PICKED_UP: { label: 'Đã lấy hàng', tone: 'brand' },
-  IN_TRANSIT: { label: 'Đang giao', tone: 'brand' },
-  DELIVERED: { label: 'Đã giao', tone: 'ok' },
-  FAILED: { label: 'Giao lỗi', tone: 'err' },
-  RETURNED: { label: 'Đã hoàn', tone: 'warn' },
-};
-
-const OUTCOME: Record<CarrierStatusLog['outcome'], { label: string; tone: StatusTone }> = {
-  APPLIED: { label: 'Đã áp', tone: 'ok' },
-  DUPLICATE: { label: 'Trùng', tone: 'neutral' },
-  REJECTED_UNMAPPED: { label: 'Mã lạ', tone: 'warn' },
-  REJECTED_TRANSITION: { label: 'Lệch pha', tone: 'warn' },
-  NOT_FOUND: { label: 'Không khớp đơn', tone: 'err' },
-};
-
-const SOURCE: Record<CarrierStatusLog['source'], string> = {
-  WEBHOOK: 'Webhook',
-  POLL: 'Đối soát',
-};
+import { useShipmentStatusLog, useStuckShipments, type StuckShipment } from '../api/use-shipping';
+import { carrierOutcome, carrierSource, shipmentStatusBadge } from '../labels';
 
 const statusBadge = (s: string) => {
-  const m = SHIPMENT_STATUS[s] ?? { label: s, tone: 'neutral' as StatusTone };
+  const m = shipmentStatusBadge(s);
   return <StatusBadge tone={m.tone}>{m.label}</StatusBadge>;
 };
 
@@ -88,14 +62,14 @@ function StatusLogDialog({
           {(data) => (
             <ol className="max-h-96 space-y-2 overflow-y-auto">
               {data.items.map((e) => {
-                const o = OUTCOME[e.outcome];
+                const o = carrierOutcome(e.outcome);
                 return (
                   <li key={e.id} className="rounded-md border p-2 text-sm">
                     <div className="flex flex-wrap items-center gap-2">
                       <span className="tabular-nums text-xs text-muted-foreground">
                         {formatDateTime(e.createdAt)}
                       </span>
-                      <StatusBadge tone="neutral">{SOURCE[e.source]}</StatusBadge>
+                      <StatusBadge tone="neutral">{carrierSource(e.source)}</StatusBadge>
                       <span className="font-mono text-xs">{e.carrierStatusCode}</span>
                       {e.mappedStatus ? <>→ {statusBadge(e.mappedStatus)}</> : null}
                       <StatusBadge tone={o.tone}>{o.label}</StatusBadge>
