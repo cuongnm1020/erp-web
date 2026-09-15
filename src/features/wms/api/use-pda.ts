@@ -25,6 +25,7 @@ export const pdaKeys = {
   shipment: (id: string) => [...pdaKeys.all, 'shipment', id] as const,
   wave: (id: string) => [...pdaKeys.all, 'wave', id] as const,
   queue: (type: string) => [...pdaKeys.all, 'queue', type] as const,
+  myTasks: () => [...pdaKeys.all, 'my-tasks'] as const,
   stats: (type: string, date: string | null) => [...pdaKeys.all, 'stats', type, date] as const,
 };
 
@@ -206,6 +207,19 @@ export function usePdaQueue(type: 'PICK' | 'PACK', enabled = true) {
   return useQuery({
     queryKey: pdaKeys.queue(type),
     queryFn: () => unwrap(api.GET('/pda/queue', { params: { query: { type } } })),
+    enabled,
+    refetchInterval: 30_000,
+  });
+}
+
+/**
+ * GET /pda/tasks — việc ĐÃ GIAO cho tôi còn mở (ASSIGNED / IN_PROGRESS, mọi loại). Màn pick lọc
+ * PICK để hiện cột "Việc được giao"; làm tươi 30s để thấy việc điều phối vừa gán mà không F5.
+ */
+export function usePdaMyTasks(enabled = true) {
+  return useQuery({
+    queryKey: pdaKeys.myTasks(),
+    queryFn: () => unwrap(api.GET('/pda/tasks')),
     enabled,
     refetchInterval: 30_000,
   });

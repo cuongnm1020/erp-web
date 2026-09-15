@@ -791,8 +791,10 @@ export const handlers = [
   // Danh bạ người nhận việc của bảng điều phối (GET /tasks/assignees) — khai TRƯỚC /tasks/:id
   http.get('/api/tasks/assignees', () =>
     HttpResponse.json([
-      { id: 'staff-1', code: 'wh.1', fullName: 'Phạm Thị Hoa' },
-      { id: 'staff-2', code: 'wh.2', fullName: 'Trần Văn Bảo' },
+      { id: 'staff-1', code: 'wh.1', fullName: 'Phạm Thị Hoa', roles: ['WAREHOUSE'] },
+      { id: 'staff-2', code: 'wh.2', fullName: 'Trần Văn Bảo', roles: ['WAREHOUSE'] },
+      { id: 'staff-3', code: 'picker.1', fullName: 'Lê Văn Lấy', roles: ['PICKER'] },
+      { id: 'staff-4', code: 'packer.1', fullName: 'Ngô Thị Đóng', roles: ['PACKER'] },
     ]),
   ),
   http.get('/api/tasks/:id', ({ params }) => HttpResponse.json(makeTaskDetail(String(params.id)))),
@@ -868,6 +870,8 @@ export const handlers = [
     const all = makeStuckShipments(12).filter((s) => s.daysSinceShipped >= days);
     return HttpResponse.json({ items: all.slice(skip, skip + take), total: all.length });
   }),
+  // Việc đã giao cho tôi (GET /pda/tasks, màn pick cột "Việc được giao") — mặc định rỗng.
+  http.get('/api/pda/tasks', () => HttpResponse.json([])),
   // Hàng đợi + thống kê bàn đóng gói (role PACKER, 2026-09-15) — mặc định rỗng / 0.
   http.get('/api/pda/queue', ({ request }) => {
     const type = new URL(request.url).searchParams.get('type') ?? 'PACK';

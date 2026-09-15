@@ -104,6 +104,7 @@ const FULFILMENT_LABEL: Record<OrderFulfilmentStatus, string> = {
   NOT_STARTED: 'Chờ pick',
   PICKING: 'Đang pick',
   PICKED: 'Đã pick xong',
+  PACKING: 'Đang đóng gói',
   PACKED: 'Đã đóng gói',
   SHIPPED: 'Đã giao hãng',
   IN_TRANSIT: 'Đang giao',
@@ -117,6 +118,7 @@ const FULFILMENT_TONE: Record<OrderFulfilmentStatus, StatusTone> = {
   NOT_STARTED: 'neutral',
   PICKING: 'brand',
   PICKED: 'brand',
+  PACKING: 'brand',
   PACKED: 'ok',
   SHIPPED: 'ok',
   IN_TRANSIT: 'brand',
@@ -148,6 +150,7 @@ export function manualFulfilTargets(status: OrderFulfilmentStatus): FulfilTarget
     case 'PICKING':
       return ['PICKED', 'PACKED'];
     case 'PICKED':
+    case 'PACKING':
       return ['PACKED'];
     default:
       return [];

@@ -7,6 +7,7 @@ export type Task = components['schemas']['TaskRowDto'];
 export type TaskStatus = Task['status'];
 export type TaskType = Task['type'];
 export type WarehouseStaff = components['schemas']['TaskAssigneeDto'];
+export type AssignTasksBulkResult = components['schemas']['AssignTasksBulkResultDto'];
 export type TaskDetail = components['schemas']['TaskDetailDto'];
 export type TaskLine = components['schemas']['TaskLineDto'];
 
@@ -131,6 +132,19 @@ export function useAssignTask() {
         api.POST('/tasks/{id}/assign', { params: { path: { id: taskId } }, body: { userId } }),
       ),
     onSuccess: () => void qc.invalidateQueries({ queryKey: taskKeys.all }),
+  });
+}
+
+/**
+ * POST /tasks/assign — gán NHIỀU việc cho một người (chọn nhiều thẻ). Server làm từng việc,
+ * việc lỗi nằm trong `failed` kèm lý do; lô không rollback nên luôn invalidate.
+ */
+export function useAssignTasksBulk() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ taskIds, userId }: { taskIds: string[]; userId: string }) =>
+      unwrap(api.POST('/tasks/assign', { body: { taskIds, userId } })),
+    onSettled: () => void qc.invalidateQueries({ queryKey: taskKeys.all }),
   });
 }
 

@@ -36,6 +36,7 @@ import { useAbility } from '@/lib/permission';
 import {
   taskKeys,
   useAssignTask,
+  useAssignTasksBulk,
   useTasks,
   useUnassignTask,
   useWarehouseStaff,
@@ -121,7 +122,24 @@ function useLane(status: TaskStatus, p: LaneParams) {
 
 interface Selection {
   ids: Set<string>;
-  toggle: (id: string) => void;
+  toggle: (task: Task) => void;
+}
+
+/** Gợi ý vai trò cạnh tên trong ô "Gán cho…" — danh bạ giờ gồm cả nhân viên lấy / đóng hàng. */
+const ROLE_HINT: Record<string, string> = {
+  WAREHOUSE: 'kho',
+  PICKER: 'lấy hàng',
+  PACKER: 'đóng hàng',
+};
+
+export function staffLabel(s: WarehouseStaff): string {
+  const hints = s.roles.map((r) => ROLE_HINT[r]).filter((h): h is string => Boolean(h));
+  return hints.length > 0 ? `${s.fullName} · ${hints.join(', ')}` : s.fullName;
+}
+
+/** Thẻ gộp được thành lượt: PICK chưa gán, chưa thuộc lượt (server cũng chặn — INVALID_WAVE_INPUT). */
+function waveable(t: Task): boolean {
+  return t.type === 'PICK' && t.status === 'PENDING' && t.waveId === null;
 }
 
 function TaskCard({
@@ -134,9 +152,9 @@ function TaskCard({
   selection: Selection | null;
 }) {
   const idleWord = task.status === 'PENDING' ? 'chờ' : 'đứng yên';
-  // Chỉ task PICK chưa gán, chưa thuộc lượt mới gộp được (server cũng chặn — INVALID_WAVE_INPUT).
+  // Chọn nhiều để gán một người: việc chưa gán hoặc đã gán (đổi người). Đang làm thì không.
   const selectable =
-    selection !== null && task.type === 'PICK' && task.status === 'PENDING' && task.waveId === null;
+    selection !== null && (task.status === 'PENDING' || task.status === 'ASSIGNED');
   const assign = useAssignTask();
   const unassign = useUnassignTask();
   const assigneeName = task.assigneeId
@@ -153,8 +171,8 @@ function TaskCard({
         {selectable ? (
           <Checkbox
             checked={selection.ids.has(task.id)}
-            onCheckedChange={() => selection.toggle(task.id)}
-            aria-label={`Chọn ${task.docNumber} để gộp lượt`}
+            onCheckedChange={() => selection.toggle(task)}
+            aria-label={`Chọn ${task.docNumber}`}
           />
         ) : null}
         <span className="font-mono text-xs font-semibold">{task.docNumber}</span>
@@ -212,7 +230,7 @@ function TaskCard({
           <SelectContent>
             {staff.map((s) => (
               <SelectItem key={s.id} value={s.id}>
-                {s.fullName}
+                {staffLabel(s)}
               </SelectItem>
             ))}
           </SelectContent>
@@ -332,17 +350,18 @@ export function DispatchScreen() {
   const staffQuery = useWarehouseStaff(canAssign);
   const staff = canAssign ? (staffQuery.data ?? null) : null;
   const warehouses = useWarehouses();
-  const [selected, setSelected] = useState<Set<string>>(new Set());
+  // Giữ cả thẻ (không chỉ id) để thanh công cụ biết lô đang chọn gộp lượt được hay chỉ gán.
+  const [selected, setSelected] = useState<Map<string, Task>>(new Map());
   const selection = useMemo<Selection | null>(
     () =>
       canAssign
         ? {
-            ids: selected,
-            toggle: (id) =>
+            ids: new Set(selected.keys()),
+            toggle: (task) =>
               setSelected((cur) => {
-                const next = new Set(cur);
-                if (next.has(id)) next.delete(id);
-                else next.add(id);
+                const next = new Map(cur);
+                if (next.has(task.id)) next.delete(task.id);
+                else next.set(task.id, task);
                 return next;
               }),
           }
@@ -428,7 +447,7 @@ export function DispatchScreen() {
               <SelectItem value={ALL_TYPES}>Người nhận: tất cả</SelectItem>
               {staff.map((s) => (
                 <SelectItem key={s.id} value={s.id}>
-                  {s.fullName}
+                  {staffLabel(s)}
                 </SelectItem>
               ))}
             </SelectContent>
@@ -443,10 +462,10 @@ export function DispatchScreen() {
       </div>
 
       {selection ? (
-        <WaveToolbar
-          selectedIds={[...selected]}
+        <SelectionToolbar
+          selected={[...selected.values()]}
           staff={staff ?? []}
-          onDone={() => setSelected(new Set())}
+          onDone={() => setSelected(new Map())}
         />
       ) : null}
 
@@ -476,33 +495,81 @@ export function DispatchScreen() {
 }
 
 /**
- * Gộp các thẻ PICK đã tick thành một lượt (PLAN-barcode-pick-pack E3): chọn người (tuỳ chọn)
- * → POST /waves. Server kiểm cùng kho / chưa thuộc lượt; lỗi → câu từ bộ dịch.
+ * Thanh công cụ cho lô thẻ đã tick (2026-09-16):
+ *  - "Gán cho…" → POST /tasks/assign một lần cho cả lô (PENDING gán mới, ASSIGNED đổi người).
+ *    Server làm từng việc; việc lỗi báo riêng, việc còn lại vẫn về tay người đó.
+ *  - "Gộp thành một lượt" (PLAN-barcode-pick-pack E3) chỉ khi cả lô là PICK chưa gán, chưa
+ *    thuộc lượt → POST /waves.
  */
-function WaveToolbar({
-  selectedIds,
+function SelectionToolbar({
+  selected,
   staff,
   onDone,
 }: {
-  selectedIds: string[];
+  selected: Task[];
   staff: WarehouseStaff[];
   onDone: () => void;
 }) {
   const [open, setOpen] = useState(false);
   const [userId, setUserId] = useState('');
+  const [bulkUserId, setBulkUserId] = useState('');
   const create = useCreateWave();
-  if (selectedIds.length === 0) return null;
+  const assignBulk = useAssignTasksBulk();
+  const selectedIds = selected.map((t) => t.id);
+  const canWave = selected.length > 0 && selected.every(waveable);
+  if (selected.length === 0) return null;
+  const bulkAssign = () => {
+    const who = staff.find((s) => s.id === bulkUserId);
+    if (!who) return;
+    assignBulk.mutate(
+      { taskIds: selectedIds, userId: who.id },
+      {
+        onSuccess: (r) => {
+          if (r.assigned.length > 0) {
+            toast.success(`Đã gán ${r.assigned.length} việc cho ${who.fullName}`);
+          }
+          for (const f of r.failed) {
+            toast.error(`${f.docNumber ?? f.taskId}: ${f.reason}`);
+          }
+          setBulkUserId('');
+          onDone();
+        },
+        onError: (err) => toast.error(messageFor(err)),
+      },
+    );
+  };
   return (
     <div
       role="region"
-      aria-label="Gộp lượt pick"
+      aria-label="Việc đã chọn"
       className="flex flex-wrap items-center gap-2 rounded-md border border-primary/40 bg-primary/5 px-3 py-2 text-sm"
     >
       <Layers className="h-4 w-4 text-primary" aria-hidden />
       <span>
-        Đã chọn <b>{selectedIds.length}</b> việc lấy hàng
+        Đã chọn <b>{selected.length}</b> việc
       </span>
-      <Button size="sm" onClick={() => setOpen(true)}>
+      <Select value={bulkUserId} onValueChange={setBulkUserId} disabled={assignBulk.isPending}>
+        <SelectTrigger className="h-8 w-56 text-xs" aria-label="Gán việc đã chọn cho">
+          <SelectValue placeholder="Gán cho…" />
+        </SelectTrigger>
+        <SelectContent>
+          {staff.map((s) => (
+            <SelectItem key={s.id} value={s.id}>
+              {staffLabel(s)}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+      <Button size="sm" disabled={!bulkUserId || assignBulk.isPending} onClick={bulkAssign}>
+        {assignBulk.isPending ? 'Đang gán…' : `Gán ${selected.length} việc`}
+      </Button>
+      <Button
+        size="sm"
+        variant="outline"
+        disabled={!canWave}
+        title={canWave ? undefined : 'Chỉ gộp được việc lấy hàng chưa gán, chưa thuộc lượt'}
+        onClick={() => setOpen(true)}
+      >
         Gộp thành một lượt
       </Button>
       <Button size="sm" variant="ghost" onClick={onDone}>
@@ -524,7 +591,7 @@ function WaveToolbar({
             <SelectContent>
               {staff.map((s) => (
                 <SelectItem key={s.id} value={s.id}>
-                  {s.fullName}
+                  {staffLabel(s)}
                 </SelectItem>
               ))}
             </SelectContent>
@@ -666,7 +733,7 @@ function WaveRow({
             <SelectContent>
               {staff.map((s) => (
                 <SelectItem key={s.id} value={s.id}>
-                  {s.fullName}
+                  {staffLabel(s)}
                 </SelectItem>
               ))}
             </SelectContent>
