@@ -211,3 +211,16 @@ describe('OrderDetailScreen — trạng thái kho + tự mở nhãn (?printLabel
     search = '';
   });
 });
+
+describe('OrderDetailScreen — hành trình từ hãng trên thẻ Vận đơn', () => {
+  it('liệt kê GET /shipments/:id/status-log: mã hãng, nguồn, kết cục, ghi chú', async () => {
+    search = '';
+    server.use(scenario.orderWithShipment);
+    renderApp(<OrderDetailScreen orderId={ORDER.id} />);
+    await screen.findByRole('heading', { level: 1 });
+    const list = await screen.findByRole('list', { name: 'Hành trình từ hãng' });
+    expect(list).toHaveTextContent('Webhook');
+    expect(list).toHaveTextContent('Đã áp');
+    expect(list).toHaveTextContent('45');
+  });
+});
