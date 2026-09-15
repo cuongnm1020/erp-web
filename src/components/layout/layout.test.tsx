@@ -52,6 +52,16 @@ describe('visibleModules', () => {
     expect(mods.map((m) => m.label)).not.toContain('Kho');
   });
 
+  it('task.read (PICKER) không mở Bảng điều phối — cần task.read_all (2026-09-15)', () => {
+    const reader = visibleModules((a, s) => s === 'Task' && (a === 'read' || a === 'execute'));
+    const wmsReader = reader.find((m) => m.label === 'Kho');
+    expect(wmsReader?.children?.map((c) => c.label)).toEqual(['Trạm đóng gói']);
+    const all = visibleModules((a, s) => s === 'Task');
+    expect(all.find((m) => m.label === 'Kho')?.children?.map((c) => c.label)).toContain(
+      'Điều phối task',
+    );
+  });
+
   it('chỉ có stock.read → module Kho hiện đúng các mục gắn Stock', () => {
     const mods = visibleModules((a, s) => a === 'read' && s === 'Stock');
     const wms = mods.find((m) => m.label === 'Kho');

@@ -868,6 +868,23 @@ export const handlers = [
     const all = makeStuckShipments(12).filter((s) => s.daysSinceShipped >= days);
     return HttpResponse.json({ items: all.slice(skip, skip + take), total: all.length });
   }),
+  // Hàng đợi + thống kê bàn đóng gói (role PACKER, 2026-09-15) — mặc định rỗng / 0.
+  http.get('/api/pda/queue', ({ request }) => {
+    const type = new URL(request.url).searchParams.get('type') ?? 'PACK';
+    return HttpResponse.json({ type, warehouseId: null, items: [], waiting: 0, mine: 0 });
+  }),
+  http.get('/api/pda/stats', ({ request }) => {
+    const type = new URL(request.url).searchParams.get('type') ?? 'PACK';
+    return HttpResponse.json({
+      userId: 'u-admin',
+      type,
+      date: '2026-09-15',
+      from: '2026-09-14T17:00:00.000Z',
+      to: '2026-09-15T17:00:00.000Z',
+      completed: 0,
+      items: [],
+    });
+  }),
   http.get('/api/shipments/:id/status-log', ({ params }) =>
     HttpResponse.json({ ...STATUS_LOG_FIXTURE, shipmentId: params.id }),
   ),

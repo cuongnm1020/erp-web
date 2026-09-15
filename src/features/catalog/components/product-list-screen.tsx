@@ -151,6 +151,29 @@ const productColumns: ColumnDef<ProductListItem, unknown>[] = [
     ),
   },
   {
+    id: 'stock',
+    header: 'Tồn kho',
+    meta: { align: 'right', width: 110 },
+    // Gộp mọi SKU của sản phẩm (kể cả SKU ngừng bán còn hàng), mọi kho — tồn thực trên,
+    // khả dụng dưới (đỏ khi âm = giữ cho đơn nhiều hơn tồn). Chi tiết từng SKU: góc nhìn Theo SKU.
+    cell: ({ row }) => (
+      <span className="block">
+        <span className="block tabular-nums">{formatQuantity(row.original.onHand)}</span>
+        <span
+          className={cn(
+            'block text-xs tabular-nums',
+            row.original.available.startsWith('-')
+              ? 'font-semibold text-destructive'
+              : 'text-muted-foreground',
+          )}
+          title="Khả dụng = tồn thực − đang giữ cho đơn"
+        >
+          KD {formatQuantity(row.original.available)}
+        </span>
+      </span>
+    ),
+  },
+  {
     id: 'createdAt',
     accessorKey: 'createdAt',
     header: 'Ngày tạo',
@@ -676,7 +699,7 @@ function ProductView({
             />
             <p className="mt-2 text-xs text-muted-foreground">
               Lọc danh mục gộp cả danh mục con · &quot;Còn hàng&quot; = có ít nhất một SKU còn tồn ·
-              tồn chi tiết xem ở góc nhìn Theo SKU
+              Tồn kho gộp mọi SKU và mọi kho (KD = khả dụng) · tồn từng SKU xem ở góc nhìn Theo SKU
             </p>
           </>
         )}
