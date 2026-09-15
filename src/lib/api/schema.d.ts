@@ -330,6 +330,24 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/customers/{id}/addresses/{addressId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Xóa một địa chỉ. 409 CONFLICT (details.code=ADDRESS_IN_USE) khi còn đơn chưa hoàn tất trỏ vào nó. */
+        delete: operations["CustomerController_removeAddress"];
+        options?: never;
+        head?: never;
+        /** Sửa một địa chỉ của khách; `isDefault: true` hạ các địa chỉ khác. Địa chỉ không thuộc khách → 404. */
+        patch: operations["CustomerController_updateAddress"];
+        trace?: never;
+    };
     "/suppliers": {
         parameters: {
             query?: never;
@@ -3295,6 +3313,41 @@ export interface components {
             items: components["schemas"]["CustomerDto"][];
             total: number;
         };
+        CustomerAddressDto: {
+            id: string;
+            customerId: string;
+            label: string | null;
+            recipient: string;
+            phone: string;
+            line1: string;
+            hamlet: string | null;
+            ward: string | null;
+            province: string;
+            isDefault: boolean;
+        };
+        CustomerDetailDto: {
+            id: string;
+            code: string;
+            name: string;
+            taxCode: string | null;
+            phone: string | null;
+            email: string | null;
+            /** @enum {string} */
+            type: "RETAIL" | "WHOLESALE" | "DISTRIBUTOR" | "KEY_ACCOUNT";
+            groupId: string | null;
+            tierId: string | null;
+            isActive: boolean;
+            mergedIntoId: string | null;
+            teamIds: string[];
+            ownerIds: string[];
+            priceListId: string | null;
+            /** @description Decimal(18,4) dạng string */
+            creditLimit: string | null;
+            paymentTerm: number | null;
+            createdAt: string;
+            updatedAt: string;
+            addresses: components["schemas"]["CustomerAddressDto"][];
+        };
         CreateCustomerDto: {
             code: string;
             name: string;
@@ -3339,6 +3392,16 @@ export interface components {
             hamlet?: string;
             ward?: string;
             province: string;
+            isDefault?: boolean;
+        };
+        UpdateAddressDto: {
+            label?: string;
+            recipient?: string;
+            phone?: string;
+            line1?: string;
+            hamlet?: string;
+            ward?: string;
+            province?: string;
             isDefault?: boolean;
         };
         SupplierDto: {
@@ -6744,7 +6807,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["CustomerDto"];
+                    "application/json": components["schemas"]["CustomerDetailDto"];
                 };
             };
         };
@@ -6810,7 +6873,55 @@ export interface operations {
                 headers: {
                     [name: string]: unknown;
                 };
+                content: {
+                    "application/json": components["schemas"]["CustomerAddressDto"];
+                };
+            };
+        };
+    };
+    CustomerController_removeAddress: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+                addressId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
                 content?: never;
+            };
+        };
+    };
+    CustomerController_updateAddress: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+                addressId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateAddressDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CustomerAddressDto"];
+                };
             };
         };
     };

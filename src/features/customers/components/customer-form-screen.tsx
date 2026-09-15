@@ -30,14 +30,15 @@ import {
 } from '@/components/ui/select';
 import { toast } from '@/components/ui/toaster';
 import { isApiError, type ApiError } from '@/lib/api/errors';
-import { Can } from '@/lib/permission';
+import { Can, useAbility } from '@/lib/permission';
 import {
   useCreateCustomer,
   useCustomer,
   useUpdateCustomer,
-  type Customer,
+  type CustomerDetail,
 } from '../api/use-customers';
 import { useTeams } from '../api/use-teams';
+import { CustomerAddressSection } from './customer-address-section';
 import { CUSTOMER_TYPE_OPTIONS } from '../labels';
 import {
   createCustomerSchema,
@@ -59,7 +60,10 @@ import {
  * - SĐT: canvas đánh dấu bắt buộc kèm "dò trùng khi lưu"; CreateCustomerDto để optional và
  *   chưa có API dò trùng → không bắt buộc, không hứa dò trùng (bỏ cả alert dò trùng).
  * - BỎ HẲN, không để nút chết (xem PENDING_API): nhóm/cấp độ/tag, bảng giá áp dụng,
- *   người phụ trách, bảng địa chỉ giao hàng, đồng ý nhận marketing (PDPD).
+ *   người phụ trách, đồng ý nhận marketing (PDPD).
+ * - Địa chỉ giao hàng (2026-09-15): nối thật ở chế độ SỬA — `CustomerAddressSection`
+ *   (POST/PATCH/DELETE /customers/{id}/addresses…). Chế độ tạo chưa có id khách nên chỉ nhắc
+ *   "lưu rồi thêm địa chỉ".
  * - Chế độ sửa: UpdateCustomerDto KHÔNG có code/teamId/ownerIds → mã KH hiện disabled,
  *   team chỉ đọc (đổi ở màn Phân bổ khách hàng). isActive/priceListId tuy có trong DTO
  *   nhưng không đặt ở đây: Ngừng hợp tác đã có luồng DELETE riêng, bảng giá chưa có
@@ -69,10 +73,6 @@ const PENDING_API: Array<{ title: string; need: string }> = [
   { title: 'Nhóm, cấp độ & tag', need: 'chưa có endpoint nhóm / cấp độ / tag khách hàng' },
   { title: 'Bảng giá áp dụng', need: 'GET /price-lists chưa khai báo kiểu response' },
   { title: 'Người phụ trách', need: 'chưa có danh bạ user để chọn — server tự gán người tạo' },
-  {
-    title: 'Địa chỉ giao hàng',
-    need: 'CustomerDto chưa trả addresses, response thêm địa chỉ chưa có kiểu',
-  },
   { title: 'Đồng ý nhận marketing (PDPD)', need: 'chưa có DTO consent theo khách' },
 ];
 
@@ -98,7 +98,7 @@ const UPDATE_FIELDS = [
   'paymentTerm',
 ] as const;
 
-function initialValues(customer?: Customer): CustomerFormValues {
+function initialValues(customer?: CustomerDetail): CustomerFormValues {
   return {
     code: customer?.code ?? '',
     name: customer?.name ?? '',
@@ -121,9 +121,11 @@ function Section({ title, children }: { title: string; children: ReactNode }) {
   );
 }
 
-function CustomerFormBody({ customer }: { customer?: Customer }) {
+function CustomerFormBody({ customer }: { customer?: CustomerDetail }) {
   const editing = customer !== undefined;
   const router = useRouter();
+  const ability = useAbility();
+  const canUpdate = ability.can('update', 'Customer');
   // Chỉ tải danh mục team khi tạo — form sửa không đổi được team (UpdateCustomerDto không có).
   const teams = useTeams({ enabled: !editing });
   const create = useCreateCustomer();
@@ -410,6 +412,23 @@ function CustomerFormBody({ customer }: { customer?: Customer }) {
           </div>
 
           <div className="flex flex-col gap-3">
+            {editing ? (
+              <CustomerAddressSection
+                customerId={customer.id}
+                addresses={customer.addresses}
+                canUpdate={canUpdate}
+              />
+            ) : (
+              <section className="rounded-md border bg-card">
+                <header className="border-b px-3 py-2 text-sm font-semibold">
+                  Địa chỉ giao hàng
+                </header>
+                <p className="px-3 py-3 text-sm text-muted-foreground">
+                  Lưu khách hàng trước, rồi thêm địa chỉ giao hàng ở màn sửa khách.
+                </p>
+              </section>
+            )}
+
             <section className="rounded-md border bg-card">
               <header className="flex items-center gap-1.5 border-b px-3 py-2 text-sm font-semibold">
                 <Info className="h-3.5 w-3.5 text-muted-foreground" aria-hidden />
