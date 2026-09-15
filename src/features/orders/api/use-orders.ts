@@ -245,3 +245,23 @@ export function usePickupWarehouses() {
     staleTime: 10 * 60_000,
   });
 }
+
+export type FulfilOrderBody = components['schemas']['FulfilOrderDto'];
+export type FulfilOrderResult = components['schemas']['FulfilOrderResultDto'];
+
+/**
+ * POST /sales-orders/{id}/fulfil — "Đã pick xong" / "Đã đóng gói" TAY từ màn sửa đơn (quyền
+ * `sales_order.fulfil_manual`). PACKED trừ tồn + xin vận đơn hãng đã chọn trên đơn → không
+ * optimistic (luật 5), không retry (mỗi lần gọi hãng là một vận đơn thật); server tự idempotent.
+ */
+export function useFulfilOrder(id: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (body: FulfilOrderBody) =>
+      unwrap(api.POST('/sales-orders/{id}/fulfil', { params: { path: { id } }, body })),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: orderKeys.detail(id) });
+      void qc.invalidateQueries({ queryKey: orderKeys.lists() });
+    },
+  });
+}

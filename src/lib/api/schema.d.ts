@@ -1474,6 +1474,26 @@ export interface paths {
         patch: operations["SalesOrderController_update"];
         trace?: never;
     };
+    "/sales-orders/{id}/fulfil": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Cước hãng cho đơn này với hãng đang chọn trên màn sửa — gọi hãng thật, CHỈ ĐỌC.
+         *     Hãng không có bảng cước → 501; thiếu địa chỉ giao → 422; hãng lỗi → 502.
+         */
+        post: operations["SalesOrderController_fulfil"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/sales-orders/{id}/shipping-quote": {
         parameters: {
             query?: never;
@@ -1481,10 +1501,6 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /**
-         * Cước hãng cho đơn này với hãng đang chọn trên màn sửa — gọi hãng thật, CHỈ ĐỌC.
-         *     Hãng không có bảng cước → 501; thiếu địa chỉ giao → 422; hãng lỗi → 502.
-         */
         get: operations["SalesOrderController_shippingQuote"];
         put?: never;
         post?: never;
@@ -4344,6 +4360,14 @@ export interface components {
              */
             source: "ORDER" | "CUSTOMER_DEFAULT";
         };
+        OrderFulfilmentDto: {
+            /** @enum {string} */
+            status: "CANCELLED" | "IN_TRANSIT" | "DELIVERED" | "FAILED" | "RETURNED" | "PICKED" | "PACKED" | "NOT_STARTED" | "PICKING" | "SHIPPED";
+            pickTaskId: string | null;
+            pickTaskDocNumber: string | null;
+            packTaskId: string | null;
+            packTaskDocNumber: string | null;
+        };
         SalesOrderCarrierDto: {
             id: string;
             code: string;
@@ -4441,6 +4465,8 @@ export interface components {
             updatedAt: string;
             /** @description Địa chỉ giao hiệu lực — null = khách chưa có địa chỉ dùng được (tra cước / cấp vận đơn sẽ 422). */
             shippingAddress: components["schemas"]["SalesOrderAddressDto"] | null;
+            /** @description Trạng thái kho (pick / đóng gói / giao) — suy từ task + phiếu giao. */
+            fulfilment: components["schemas"]["OrderFulfilmentDto"];
             /** @description Hãng đã chọn (tra theo carrierId) — null = chưa chọn hoặc hãng đã tắt. */
             carrier: components["schemas"]["SalesOrderCarrierDto"] | null;
             /** @description Kho lấy hàng đã chọn (tra theo warehouseId) — null = chưa chọn. */
@@ -4448,6 +4474,44 @@ export interface components {
             /** @description Phiếu giao của đơn — null = kho chưa pick xong (chưa có phiếu). */
             shipment: components["schemas"]["SalesOrderShipmentDto"] | null;
             lines: components["schemas"]["SalesOrderLineDto"][];
+        };
+        FulfilOrderDto: {
+            /**
+             * @description PICKED = đóng task PICK (không trừ tồn); PACKED = đóng gói xong + vận đơn hãng đã chọn.
+             * @enum {string}
+             */
+            target: "PICKED" | "PACKED";
+            /** @description Cân nặng gửi hãng ghi lên phiếu giao (kg, chuỗi decimal > 0); bỏ trống = giữ cân nặng đã có. */
+            weightKg?: string;
+        };
+        FulfilWaybillDto: {
+            shipmentId: string;
+            shipmentDocNumber: string;
+            carrierCode: string;
+            /**
+             * @description ISSUED = hãng cấp mã ngay; ALREADY_ISSUED = đã có mã; QUEUED = hãng lỗi, worker thử lại.
+             * @enum {string}
+             */
+            outcome: "QUEUED" | "ISSUED" | "ALREADY_ISSUED";
+            trackingNo: string | null;
+            reason: string | null;
+        };
+        FulfilOrderResultDto: {
+            orderId: string;
+            docNumber: string;
+            /** @enum {string} */
+            target: "PICKED" | "PACKED";
+            pickTaskId: string;
+            pickTaskDocNumber: string;
+            /** @description true = task PICK vừa được đóng tay (không quét) trong lần gọi này. */
+            pickForced: boolean;
+            shipmentId: string | null;
+            shipmentDocNumber: string | null;
+            packTaskId: string | null;
+            /** @description true = lần gọi này đã trừ tồn (đóng gói). */
+            packed: boolean;
+            alreadyPacked: boolean;
+            waybill: components["schemas"]["FulfilWaybillDto"] | null;
         };
         ShippingQuoteResultDto: {
             orderId: string;
@@ -9005,6 +9069,31 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["UpdateOrderResultDto"];
+                };
+            };
+        };
+    };
+    SalesOrderController_fulfil: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["FulfilOrderDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FulfilOrderResultDto"];
                 };
             };
         };

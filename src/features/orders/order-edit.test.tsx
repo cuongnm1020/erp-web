@@ -382,3 +382,128 @@ describe('OrderEditScreen — trang sửa đơn (D-05, PATCH /sales-orders/{id})
     expect(screen.getByText('trace-db_error')).toBeInTheDocument();
   });
 });
+
+describe('OrderEditScreen — "Trạng thái kho" đặt tay (POST /sales-orders/{id}/fulfil)', () => {
+  const APPROVED = { ...DETAIL, status: 'APPROVED' as const };
+
+  it('chọn "Đã đóng gói" + hãng GHTK → PATCH carrierId rồi POST fulfil PACKED; vận đơn ISSUED → về chi tiết kèm ?printLabel=1', async () => {
+    push.mockClear();
+    const patched: Record<string, unknown>[] = [];
+    const fulfilled: Record<string, unknown>[] = [];
+    server.use(
+      http.get('/api/sales-orders/:id', () => HttpResponse.json(APPROVED)),
+      http.patch('/api/sales-orders/:id', async ({ params, request }) => {
+        const body = (await request.json()) as Record<string, unknown>;
+        patched.push(body);
+        return HttpResponse.json({
+          orderId: params.id,
+          docNumber: ORDER.docNumber,
+          status: 'APPROVED',
+          carrierId: body.carrierId ?? null,
+          warehouseId: null,
+          addressId: null,
+          changed: Object.keys(body),
+        });
+      }),
+      http.post('/api/sales-orders/:id/fulfil', async ({ params, request }) => {
+        const body = (await request.json()) as Record<string, unknown>;
+        fulfilled.push(body);
+        return HttpResponse.json(
+          {
+            orderId: params.id,
+            docNumber: ORDER.docNumber,
+            target: body.target,
+            pickTaskId: 'pick-1',
+            pickTaskDocNumber: 'PICK2609-00001',
+            pickForced: true,
+            shipmentId: 'ship-1',
+            shipmentDocNumber: 'DN2609-00001',
+            packTaskId: 'pack-1',
+            packed: true,
+            alreadyPacked: false,
+            waybill: {
+              shipmentId: 'ship-1',
+              shipmentDocNumber: 'DN2609-00001',
+              carrierCode: 'GHTK',
+              outcome: 'ISSUED',
+              trackingNo: 'S1.A1',
+              reason: null,
+            },
+          },
+          { status: 201 },
+        );
+      }),
+    );
+    renderApp(<OrderEditScreen orderId={ORDER.id} />);
+    await screen.findByRole('heading', { level: 1 });
+
+    const kho = screen.getByRole('combobox', { name: 'Trạng thái kho' });
+    fireEvent.click(kho);
+    expect((await screen.findAllByRole('option')).map((o) => o.textContent)).toEqual([
+      'Chờ pick (hiện tại)',
+      'Đã pick xong',
+      'Đã đóng gói',
+    ]);
+    fireEvent.click(screen.getByRole('option', { name: 'Đã đóng gói' }));
+    expect(screen.getByText(/Đóng gói KHÔNG quét/)).toBeInTheDocument();
+
+    // Chưa chọn hãng → chặn tại chỗ, không gọi API nào.
+    fireEvent.click(screen.getByRole('button', { name: /Lưu thay đổi/ }));
+    expect(patched).toHaveLength(0);
+    expect(fulfilled).toHaveLength(0);
+
+    const carrierPicker = screen.getByRole('combobox', { name: 'Hãng vận chuyển' });
+    await waitFor(() => expect(carrierPicker).toBeEnabled());
+    fireEvent.click(carrierPicker);
+    fireEvent.click(await screen.findByRole('option', { name: `${CARRIERS[3]!.name} (GHTK)` }));
+    fireEvent.click(screen.getByRole('button', { name: /Lưu thay đổi/ }));
+    await waitFor(() => expect(fulfilled).toEqual([{ target: 'PACKED' }]));
+    expect(patched).toEqual([{ carrierId: 'c-ghtk' }]);
+    await waitFor(() => expect(push).toHaveBeenCalledWith(`/crm/orders/${ORDER.id}?printLabel=1`));
+  });
+
+  it('"Đã pick xong" không cần hãng, không PATCH gì → chỉ POST fulfil PICKED rồi về chi tiết', async () => {
+    push.mockClear();
+    const fulfilled: Record<string, unknown>[] = [];
+    server.use(
+      http.get('/api/sales-orders/:id', () => HttpResponse.json(APPROVED)),
+      http.post('/api/sales-orders/:id/fulfil', async ({ params, request }) => {
+        fulfilled.push((await request.json()) as Record<string, unknown>);
+        return HttpResponse.json(
+          {
+            orderId: params.id,
+            docNumber: ORDER.docNumber,
+            target: 'PICKED',
+            pickTaskId: 'pick-1',
+            pickTaskDocNumber: 'PICK2609-00001',
+            pickForced: true,
+            shipmentId: 'ship-1',
+            shipmentDocNumber: 'DN2609-00001',
+            packTaskId: 'pack-1',
+            packed: false,
+            alreadyPacked: false,
+            waybill: null,
+          },
+          { status: 201 },
+        );
+      }),
+    );
+    renderApp(<OrderEditScreen orderId={ORDER.id} />);
+    await screen.findByRole('heading', { level: 1 });
+    fireEvent.click(screen.getByRole('combobox', { name: 'Trạng thái kho' }));
+    fireEvent.click(await screen.findByRole('option', { name: 'Đã pick xong' }));
+    fireEvent.click(screen.getByRole('button', { name: /Lưu thay đổi/ }));
+    await waitFor(() => expect(fulfilled).toEqual([{ target: 'PICKED' }]));
+    await waitFor(() => expect(push).toHaveBeenCalledWith(`/crm/orders/${ORDER.id}`));
+  });
+
+  it('không có sales_order.fulfil_manual → chỉ nhãn trạng thái kho, không ô chọn; đơn DRAFT cũng không có đích', async () => {
+    server.use(http.get('/api/sales-orders/:id', () => HttpResponse.json(APPROVED)));
+    renderApp(<OrderEditScreen orderId={ORDER.id} />, {
+      me: { ...ME_SALE, permissions: ['sales_order.read', 'sales_order.update'] },
+    });
+    await screen.findByRole('heading', { level: 1 });
+    expect(screen.queryByRole('combobox', { name: 'Trạng thái kho' })).not.toBeInTheDocument();
+    expect(screen.getByText('Chờ pick')).toBeInTheDocument();
+  });
+});

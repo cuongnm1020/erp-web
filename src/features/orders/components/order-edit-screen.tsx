@@ -25,6 +25,7 @@ import { useAbility } from '@/lib/permission';
 import { useCarriers } from '@/features/wms/api/use-shipping';
 import { useCustomerBrief } from '../api/use-line-entry';
 import {
+  useFulfilOrder,
   useOrder,
   usePickupWarehouses,
   useShippingQuote,
@@ -33,12 +34,17 @@ import {
   type SalesOrderStatus,
 } from '../api/use-orders';
 import {
+  fulfilTargetLabel,
+  fulfilmentLabel,
+  fulfilmentTone,
+  manualFulfilTargets,
   manualStatusTargets,
   orderAddressLine,
   orderChannelLabel,
   orderEditable,
   orderStatusLabel,
   orderStatusTone,
+  type FulfilTarget,
 } from '../labels';
 
 /**
@@ -59,6 +65,8 @@ const NO_CARRIER = '__none__';
 const NO_WAREHOUSE = '__none__';
 /** Không chọn địa chỉ trên đơn → server rơi về địa chỉ mặc định / duy nhất của khách. */
 const NO_ADDRESS = '__none__';
+/** "Trạng thái kho" giữ nguyên (Radix Select không nhận value rỗng). */
+const CURRENT_FULFILMENT = '__current__';
 const money = (v: string) => formatMoney(v, { unit: '' });
 
 function Card({
@@ -138,6 +146,13 @@ function Editor({ order }: { order: SalesOrderDetail }) {
   const addresses = customer.data?.addresses ?? [];
   // Cân nặng gửi hãng: ô trống = dùng cân nặng tính từ dòng (server: shippingWeightKg null).
   const [weightKg, setWeightKg] = useState<string>(order.shippingWeightKg ?? '');
+  // "Trạng thái kho" đặt tay (2026-09-15): đóng pick / đóng gói KHÔNG quét — quyền riêng
+  // sales_order.fulfil_manual (kho + admin), chỉ đơn ĐÃ DUYỆT; đích chép từ bảng của server.
+  const fulfil = useFulfilOrder(order.id);
+  const [fulfilTarget, setFulfilTarget] = useState<FulfilTarget | ''>('');
+  const canFulfil = ability.can('fulfil_manual', 'SalesOrder');
+  const fulfilTargets =
+    canFulfil && order.status === 'APPROVED' ? manualFulfilTargets(order.fulfilment.status) : [];
   const [reason, setReason] = useState('');
 
   const targets = manualStatusTargets(order.status, (a) => ability.can(a, 'SalesOrder'));
@@ -181,7 +196,7 @@ function Editor({ order }: { order: SalesOrderDetail }) {
     (nextWeight === null
       ? order.shippingWeightKg !== null
       : order.shippingWeightKg === null || !toDecimal(order.shippingWeightKg)?.eq(nextWeight));
-  const dirty =
+  const patchDirty =
     statusChanged || carrierChanged || warehouseChanged || addressChanged || weightChanged;
 
   const detailHref = `/crm/orders/${order.id}`;
@@ -190,17 +205,54 @@ function Editor({ order }: { order: SalesOrderDetail }) {
     0,
   );
 
+  /**
+   * POST /sales-orders/{id}/fulfil — chạy SAU khi PATCH đã lưu (hãng phải nằm trên đơn trước
+   * khi xin vận đơn). Vận đơn có mã → về chi tiết kèm ?printLabel=1 để mở nhãn in ngay.
+   */
+  const runFulfil = (target: FulfilTarget) => {
+    fulfil.mutate(
+      // Cân nặng chỉ gửi kèm khi người dùng vừa đổi — phiếu giao đã chép cân nặng của đơn.
+      { target, ...(weightChanged && nextWeight ? { weightKg: nextWeight } : {}) },
+      {
+        onSuccess: (r) => {
+          const w = r.waybill;
+          toast.success(`Đã chuyển ${fulfilTargetLabel(target).toLowerCase()}`, {
+            description:
+              target === 'PACKED'
+                ? w?.outcome === 'QUEUED'
+                  ? `${order.docNumber} · hãng ${w.carrierCode} chưa cấp vận đơn — hệ thống đang thử lại`
+                  : `${order.docNumber} · vận đơn ${w?.trackingNo ?? '—'} (${w?.carrierCode ?? ''})`
+                : `${order.docNumber} · phiếu giao ${r.shipmentDocNumber ?? '—'} sẵn sàng đóng gói`,
+          });
+          router.push(w?.trackingNo ? `${detailHref}?printLabel=1` : detailHref);
+        },
+        onError: (err) => toast.error(messageFor(err)),
+      },
+    );
+  };
+
   const save = () => {
-    if (!canUpdate || update.isPending) return;
+    if (update.isPending || fulfil.isPending) return;
     if (weightInvalid) {
       toast.error('Cân nặng gửi hãng phải là số kg lớn hơn 0, tối đa 4 số lẻ');
       return;
     }
-    if (!dirty) {
+    if (fulfilTarget === 'PACKED' && nextCarrier === null) {
+      toast.error(
+        'Chọn hãng vận chuyển (ĐVVC) trước khi đóng gói — vận đơn được xin ngay trong cùng thao tác',
+      );
+      return;
+    }
+    if (!patchDirty) {
+      if (fulfilTarget) {
+        runFulfil(fulfilTarget);
+        return;
+      }
       toast.info('Không có gì thay đổi');
       router.push(detailHref);
       return;
     }
+    if (!canUpdate) return;
     update.mutate(
       {
         ...(statusChanged ? { status } : {}),
@@ -229,7 +281,8 @@ function Editor({ order }: { order: SalesOrderDetail }) {
               )
               .join(', ')}`,
           });
-          router.push(detailHref);
+          if (fulfilTarget) runFulfil(fulfilTarget);
+          else router.push(detailHref);
         },
         onError: (err) => toast.error(messageFor(err)),
       },
@@ -257,11 +310,12 @@ function Editor({ order }: { order: SalesOrderDetail }) {
     return () => window.removeEventListener('keydown', onKey);
   }, [router, detailHref]);
 
-  const readOnlyReason = !canUpdate
-    ? 'Bạn chỉ có quyền xem đơn này — cần quyền sửa đơn (sales_order.update) để lưu thay đổi.'
-    : order.status === 'CANCELLED'
-      ? 'Đơn đã hủy — trạng thái cuối, không sửa được gì nữa.'
-      : null;
+  const readOnlyReason =
+    !canUpdate && !(canFulfil && fulfilTargets.length > 0)
+      ? 'Bạn chỉ có quyền xem đơn này — cần quyền sửa đơn (sales_order.update) để lưu thay đổi.'
+      : order.status === 'CANCELLED'
+        ? 'Đơn đã hủy — trạng thái cuối, không sửa được gì nữa.'
+        : null;
 
   return (
     <div className="flex flex-col gap-3">
@@ -279,13 +333,13 @@ function Editor({ order }: { order: SalesOrderDetail }) {
             <Button variant="ghost" size="sm" asChild>
               <Link href={detailHref}>Hủy bỏ</Link>
             </Button>
-            {canUpdate ? (
+            {canUpdate || canFulfil ? (
               <Button
                 size="sm"
                 onClick={save}
-                disabled={update.isPending || readOnlyReason !== null}
+                disabled={update.isPending || fulfil.isPending || readOnlyReason !== null}
               >
-                {update.isPending ? 'Đang lưu…' : 'Lưu thay đổi'}{' '}
+                {update.isPending || fulfil.isPending ? 'Đang lưu…' : 'Lưu thay đổi'}{' '}
                 <kbd className="rounded-sm border border-primary-foreground/50 px-1 font-mono text-xs">
                   Ctrl S
                 </kbd>
@@ -423,6 +477,42 @@ function Editor({ order }: { order: SalesOrderDetail }) {
                     maxLength={1000}
                   />
                 </Field>
+              ) : null}
+              <Field label="Trạng thái kho">
+                {fulfilTargets.length > 0 ? (
+                  <Select
+                    value={fulfilTarget || CURRENT_FULFILMENT}
+                    onValueChange={(v) =>
+                      setFulfilTarget(v === CURRENT_FULFILMENT ? '' : (v as FulfilTarget))
+                    }
+                    disabled={fulfil.isPending}
+                  >
+                    <SelectTrigger aria-label="Trạng thái kho" className="h-8">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value={CURRENT_FULFILMENT}>
+                        {fulfilmentLabel(order.fulfilment.status)} (hiện tại)
+                      </SelectItem>
+                      {fulfilTargets.map((t) => (
+                        <SelectItem key={t} value={t}>
+                          {fulfilTargetLabel(t)}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                ) : (
+                  <StatusBadge tone={fulfilmentTone(order.fulfilment.status)}>
+                    {fulfilmentLabel(order.fulfilment.status)}
+                  </StatusBadge>
+                )}
+              </Field>
+              {fulfilTarget ? (
+                <p className="px-3 pb-1 text-xs text-warning-foreground">
+                  {fulfilTarget === 'PACKED'
+                    ? 'Đóng gói KHÔNG quét: trừ tồn ngay, xin vận đơn của hãng đã chọn (ĐVVC) và mở nhãn in. Không hoàn tác được.'
+                    : 'Đóng việc pick KHÔNG quét: phiếu giao sinh ngay, chưa trừ tồn — trừ khi đóng gói.'}
+                </p>
               ) : null}
               <p className="px-3 pb-1 text-xs text-muted-foreground">
                 {canUpdate && targets.length === 0

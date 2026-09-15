@@ -151,6 +151,13 @@ export function makeOrderDetail(id: string) {
   return {
     ...header,
     shippingAddress: null,
+    fulfilment: {
+      status: 'NOT_STARTED',
+      pickTaskId: null,
+      pickTaskDocNumber: null,
+      packTaskId: null,
+      packTaskDocNumber: null,
+    },
     carrier: null,
     warehouse: null,
     shipment: null,
