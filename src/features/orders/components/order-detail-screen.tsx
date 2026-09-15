@@ -43,7 +43,7 @@ import {
   useOrders,
   type SalesOrderDetail,
 } from '../api/use-orders';
-import { orderChannelLabel, orderStatusLabel, orderStatusTone } from '../labels';
+import { orderAddressLine, orderChannelLabel, orderStatusLabel, orderStatusTone } from '../labels';
 import { OrderPrintSheet } from './order-print-sheet';
 
 /**
@@ -192,7 +192,7 @@ const MISSING: Array<{ title: string; need: string }> = [
   { title: 'Thanh toán / còn phải thu', need: 'chưa có mặt đọc công nợ theo đơn' },
   { title: 'Dòng thời gian chứng từ', need: 'chưa có endpoint lịch sử trạng thái đơn' },
   { title: 'Người tạo, người phụ trách', need: 'chỉ có ownerId; chưa có danh bạ user' },
-  { title: 'Địa chỉ giao, ghi chú giao', need: 'DTO khách trong đơn chỉ có mã và tên' },
+  { title: 'Ghi chú giao', need: 'đơn chưa có trường ghi chú giao hàng' },
 ];
 
 function Card({
@@ -499,6 +499,21 @@ function Detail({ order }: { order: SalesOrderDetail }) {
             </Field>
             <Field label="Mã khách hàng">
               <span className="font-mono text-xs">{order.customer.code}</span>
+            </Field>
+            <Field label="Địa chỉ giao">
+              {order.shippingAddress ? (
+                <span>
+                  {order.shippingAddress.recipient} · {order.shippingAddress.phone} ·{' '}
+                  {orderAddressLine(order.shippingAddress)}
+                  {order.shippingAddress.source === 'CUSTOMER_DEFAULT' ? (
+                    <span className="text-xs text-muted-foreground"> (mặc định của khách)</span>
+                  ) : null}
+                </span>
+              ) : (
+                <span className="text-muted-foreground">
+                  Chưa có — khách chưa có địa chỉ giao dùng được, thêm ở hồ sơ khách
+                </span>
+              )}
             </Field>
             <Field label="Số chứng từ">
               <span className="font-mono text-xs">{order.docNumber}</span>

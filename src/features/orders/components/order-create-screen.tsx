@@ -43,7 +43,10 @@ import {
   useSkuSearch,
 } from '../api/use-line-entry';
 import { useCreateOrder, useOrder } from '../api/use-orders';
-import { orderChannelLabel } from '../labels';
+import { orderAddressLine, orderChannelLabel } from '../labels';
+
+/** Giá trị Select cho "không chọn" — Radix Select không nhận value rỗng. */
+const NO_ADDRESS = '__none__';
 import { QuickCustomerDialog } from './quick-customer-dialog';
 import {
   createOrderSchema,
@@ -94,6 +97,7 @@ export function OrderCreateScreen() {
     resolver: zodResolver(createOrderSchema),
     defaultValues: {
       customerId: presetCustomerId,
+      addressId: '',
       channel: 'DIRECT',
       shippingFee: '',
       lines: [EMPTY_LINE],
@@ -103,6 +107,19 @@ export function OrderCreateScreen() {
   const customerId = useWatch({ control: form.control, name: 'customerId' });
   const channel = useWatch({ control: form.control, name: 'channel' });
   const shippingFee = useWatch({ control: form.control, name: 'shippingFee' });
+  // Địa chỉ giao của khách đã chọn (GET /customers/{id} có `addresses`): đổi khách → chọn lại
+  // địa chỉ mặc định; không có mặc định mà chỉ một địa chỉ → địa chỉ đó; còn lại để trống
+  // (server cũng tự rơi về mặc định nếu client không gửi).
+  const customerDetail = useCustomerBrief(customerId);
+  const addresses = customerDetail.data?.addresses ?? [];
+  useEffect(() => {
+    if (!customerDetail.data) return;
+    const list = customerDetail.data.addresses;
+    const current = form.getValues('addressId') ?? '';
+    if (current && list.some((a) => a.id === current)) return;
+    const preferred = list.find((a) => a.isDefault) ?? (list.length === 1 ? list[0] : undefined);
+    form.setValue('addressId', preferred?.id ?? '', { shouldDirty: false });
+  }, [customerDetail.data, form]);
 
   const subtotal = useMemo(() => {
     const ids = new Set(lines.fields.map((f) => f.id));
@@ -124,6 +141,7 @@ export function OrderCreateScreen() {
     prefilled.current = true;
     form.reset({
       customerId: source.data.customer.id,
+      addressId: source.data.addressId ?? '',
       channel: source.data.channel,
       shippingFee: source.data.shippingFee,
       lines: source.data.lines
@@ -242,6 +260,43 @@ export function OrderCreateScreen() {
                         placeholder="Tìm theo tên, mã, SĐT…"
                       />
                     </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="addressId"
+                render={({ field }) => (
+                  <FormItem className="sm:col-span-3">
+                    <FormLabel>Địa chỉ giao</FormLabel>
+                    <Select
+                      value={field.value || NO_ADDRESS}
+                      onValueChange={(v) => field.onChange(v === NO_ADDRESS ? '' : v)}
+                      disabled={!customerId || customerDetail.isPending}
+                    >
+                      <FormControl>
+                        <SelectTrigger aria-label="Địa chỉ giao">
+                          <SelectValue placeholder="Chọn khách trước" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value={NO_ADDRESS}>— Mặc định của khách —</SelectItem>
+                        {addresses.map((a) => (
+                          <SelectItem key={a.id} value={a.id}>
+                            {a.label ? `${a.label} · ` : ''}
+                            {a.recipient} · {orderAddressLine(a)}
+                            {a.isDefault ? ' (mặc định)' : ''}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    {customerId && customerDetail.data && addresses.length === 0 ? (
+                      <p className="text-xs text-muted-foreground">
+                        Khách chưa có địa chỉ giao — thêm ở hồ sơ khách (Sửa khách hàng) để tra cước
+                        và cấp vận đơn.
+                      </p>
+                    ) : null}
                     <FormMessage />
                   </FormItem>
                 )}

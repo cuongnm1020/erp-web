@@ -25,6 +25,8 @@ export const orderLineSchema = z.object({
 
 export const createOrderSchema = z.object({
   customerId: idSchema.or(z.literal('')).refine((v) => v !== '', 'Chọn khách hàng'),
+  /** Địa chỉ giao (CustomerAddress của khách đã chọn); '' = để server lấy mặc định của khách. */
+  addressId: idSchema.or(z.literal('')).optional(),
   channel: z.enum(ORDER_CHANNELS),
   shippingFee: moneySchema.optional().or(z.literal('')),
   lines: z.array(orderLineSchema).min(1, 'Đơn phải có ít nhất một dòng hàng'),
@@ -39,6 +41,7 @@ export const EMPTY_LINE: OrderLineValues = { skuId: '', uomId: '', qty: '1', dis
 export function toCreateOrderBody(v: CreateOrderValues) {
   return {
     customerId: v.customerId,
+    ...(v.addressId ? { addressId: v.addressId } : {}),
     channel: v.channel,
     ...(v.shippingFee ? { shippingFee: v.shippingFee } : {}),
     lines: v.lines.map((l) => ({

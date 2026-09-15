@@ -81,6 +81,16 @@ export function manualStatusTargets(
 }
 
 /** Đơn còn sửa được hãng vận chuyển / trường ERP khác — khớp ORDER_NOT_EDITABLE của backend. */
+/** Dòng địa chỉ 2 cấp: số nhà/đường, thôn/xóm, phường/xã, tỉnh/thành — bỏ phần trống. */
+export function orderAddressLine(a: {
+  line1: string;
+  hamlet: string | null;
+  ward: string | null;
+  province: string;
+}): string {
+  return [a.line1, a.hamlet, a.ward, a.province].filter(Boolean).join(', ');
+}
+
 export function orderEditable(status: SalesOrderStatus): boolean {
   return status !== 'POSTED' && status !== 'CANCELLED';
 }
