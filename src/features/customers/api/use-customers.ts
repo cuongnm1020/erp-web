@@ -3,6 +3,11 @@ import { api, unwrap } from '@/lib/api/client';
 import type { components, paths } from '@/lib/api/schema';
 
 export type Customer = components['schemas']['CustomerDto'];
+/** GET /customers/{id} — CustomerDto kèm `addresses` (danh sách không kèm). */
+export type CustomerDetail = components['schemas']['CustomerDetailDto'];
+export type CustomerAddress = components['schemas']['CustomerAddressDto'];
+export type AddressInput = components['schemas']['AddressDto'];
+export type UpdateAddressInput = components['schemas']['UpdateAddressDto'];
 export type CustomerListResponse = components['schemas']['CustomerListResponseDto'];
 
 /** Cột được API cho phép sắp — lấy thẳng từ union trong schema.d.ts, không tự liệt kê. */
@@ -133,6 +138,57 @@ export function useDeleteCustomer() {
     onSuccess: (_data, id) => {
       void qc.invalidateQueries({ queryKey: customerKeys.lists() });
       void qc.invalidateQueries({ queryKey: customerKeys.detail(id) });
+    },
+  });
+}
+
+// ── Địa chỉ giao hàng — ba mutation cùng invalidate detail (addresses nằm trong GET /customers/{id}).
+// Không optimistic (luật 5): địa chỉ mặc định do server chọn (isDefault=true hạ các địa chỉ khác).
+
+/** POST /customers/{id}/addresses — trả CustomerAddressDto vừa tạo. */
+export function useAddCustomerAddress(customerId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (body: AddressInput) =>
+      unwrap(api.POST('/customers/{id}/addresses', { params: { path: { id: customerId } }, body })),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: customerKeys.detail(customerId) });
+    },
+  });
+}
+
+/** PATCH /customers/{id}/addresses/{addressId} — body chỉ field đổi; 404 nếu địa chỉ không thuộc khách. */
+export function useUpdateCustomerAddress(customerId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ addressId, body }: { addressId: string; body: UpdateAddressInput }) =>
+      unwrap(
+        api.PATCH('/customers/{id}/addresses/{addressId}', {
+          params: { path: { id: customerId, addressId } },
+          body,
+        }),
+      ),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: customerKeys.detail(customerId) });
+    },
+  });
+}
+
+/**
+ * DELETE /customers/{id}/addresses/{addressId} — xóa cứng. 409 CONFLICT (details.code
+ * ADDRESS_IN_USE) khi còn đơn chưa hoàn tất trỏ vào địa chỉ — màn hình phải nói rõ, không nuốt.
+ */
+export function useDeleteCustomerAddress(customerId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (addressId: string) =>
+      unwrap(
+        api.DELETE('/customers/{id}/addresses/{addressId}', {
+          params: { path: { id: customerId, addressId } },
+        }),
+      ),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: customerKeys.detail(customerId) });
     },
   });
 }

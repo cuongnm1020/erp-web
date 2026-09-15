@@ -48,6 +48,36 @@ export function makeCustomers(n: number) {
   }));
 }
 
+/** Đúng shape `CustomerAddressDto` — hai địa chỉ, địa chỉ đầu là mặc định. */
+export function makeCustomerAddresses(customerId: string) {
+  return [
+    {
+      id: '00000077-0000-4000-8000-000000000001',
+      customerId,
+      label: 'Cửa hàng',
+      recipient: 'Nguyễn Thị Thu Hà',
+      phone: '0903112233',
+      line1: '12 Lê Thanh Nghị',
+      hamlet: null,
+      ward: 'Phường Hai Bà Trưng',
+      province: 'Hà Nội',
+      isDefault: true,
+    },
+    {
+      id: '00000077-0000-4000-8000-000000000002',
+      customerId,
+      label: null,
+      recipient: 'Trần Văn Bình',
+      phone: '0912345678',
+      line1: 'Thôn 3',
+      hamlet: 'Xóm Đông',
+      ward: 'Xã Kim Quan',
+      province: 'Hà Nội',
+      isDefault: false,
+    },
+  ];
+}
+
 const ORDER_STATUSES = ['DRAFT', 'PENDING_APPROVAL', 'APPROVED', 'POSTED', 'CANCELLED'] as const;
 const ORDER_CHANNELS = ['DIRECT', 'MARKETPLACE', 'WEBSITE', 'POS'] as const;
 
@@ -598,7 +628,10 @@ export const handlers = [
   http.get('/api/customers/:id', async ({ params }) => {
     await delay(50);
     const found = makeCustomers(237).find((c) => c.id === params.id);
-    return found ? HttpResponse.json(found) : errorEnvelope(404, 'NOT_FOUND');
+    // CustomerDetailDto = CustomerDto + addresses (danh sách không kèm).
+    return found
+      ? HttpResponse.json({ ...found, addresses: makeCustomerAddresses(found.id) })
+      : errorEnvelope(404, 'NOT_FOUND');
   }),
   http.get('/api/sales-orders', async ({ request }) => {
     const url = new URL(request.url);
