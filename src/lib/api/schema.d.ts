@@ -3649,6 +3649,14 @@ export interface components {
             updatedAt: string;
             /** @description Khác null = đã xóa mềm — chỉ xuất hiện khi query `includeDeleted=true`. */
             deletedAt: string | null;
+            /**
+             * @description Tồn kho gộp MỌI SKU của sản phẩm (kể cả SKU ngừng bán còn hàng), mọi kho — Decimal(18,6)
+             *     chuỗi, ĐVT cơ sở. Ba số tách bạch (bất biến 3): onHand ≠ reserved ≠ available.
+             */
+            onHand: string;
+            reserved: string;
+            /** @description `onHand - reserved` — có thể ÂM khi giữ cho đơn nhiều hơn tồn thực. */
+            available: string;
         };
         ProductListResponseDto: {
             items: components["schemas"]["ProductListItemDto"][];

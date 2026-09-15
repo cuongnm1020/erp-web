@@ -115,6 +115,9 @@ const PRODUCTS = [
     skuCount: 3,
     hasVariants: true,
     searchAliases: ['bút thiên long', 'tl08'],
+    onHand: '120',
+    reserved: '135',
+    available: '-15',
     version: 2,
     createdAt: '2026-09-01T03:00:00.000Z',
     updatedAt: '2026-09-02T03:00:00.000Z',
@@ -135,6 +138,9 @@ const PRODUCTS = [
     skuCount: 1,
     hasVariants: false,
     searchAliases: [],
+    onHand: '40',
+    reserved: '0',
+    available: '40',
     version: 0,
     createdAt: '2026-08-20T03:00:00.000Z',
     updatedAt: '2026-08-20T03:00:00.000Z',
@@ -191,6 +197,9 @@ describe('ProductListScreen — góc nhìn Sản phẩm (mặc định, GET /pro
     expect(await screen.findByText(FIRST_PRODUCT.code)).toBeInTheDocument();
     const link = screen.getByRole('link', { name: FIRST_PRODUCT.code });
     expect(link).toHaveAttribute('href', `/catalog/products/${FIRST_PRODUCT.id}`);
+    // Cột "Tồn kho": tồn thực + dòng phụ khả dụng (âm → đỏ) — gộp mọi SKU, mọi kho.
+    expect(screen.getAllByText('Tồn kho').length).toBeGreaterThan(0);
+    expect(screen.getByText(/KD .*15/)).toHaveClass('text-destructive');
     // Tên dân dã (searchAliases) hiện dòng phụ dưới tên.
     expect(screen.getByText('bút thiên long, tl08')).toBeInTheDocument();
     // Đếm biến thể + chip mã SKU đang bán; sản phẩm đơn nói rõ là "Sản phẩm đơn".
