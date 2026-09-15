@@ -14,11 +14,12 @@ import { renderApp } from '@/test/render';
 import { OrderDetailScreen } from './components/order-detail-screen';
 
 const push = vi.fn();
+let search = '';
 
 vi.mock('next/navigation', () => ({
   usePathname: () => '/crm/orders/x',
   useRouter: () => ({ push, replace: vi.fn(), refresh: vi.fn() }),
-  useSearchParams: () => new URLSearchParams(''),
+  useSearchParams: () => new URLSearchParams(search),
 }));
 
 const ORDER = makeOrders(1)[0]!;
@@ -185,5 +186,28 @@ describe('OrderDetailScreen — GET /sales-orders/{id} (P1-12)', () => {
     await screen.findByRole('heading', { level: 1 });
     expect(screen.getByText(ORDER_SHIPMENT_FIXTURE.trackingNo)).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'In nhãn' })).not.toBeInTheDocument();
+  });
+});
+
+describe('OrderDetailScreen — trạng thái kho + tự mở nhãn (?printLabel=1)', () => {
+  it('nhãn trạng thái kho trong tiêu đề: NOT_STARTED → "Chờ pick"; PACKED → "Đã đóng gói"', async () => {
+    search = '';
+    renderApp(<OrderDetailScreen orderId={ORDER.id} />);
+    await screen.findByRole('heading', { level: 1 });
+    expect(screen.getByText('Chờ pick')).toBeInTheDocument();
+  });
+
+  it('?printLabel=1 + phiếu giao có mã → tự mở PDF nhãn (một lần), không cần bấm In nhãn', async () => {
+    search = 'printLabel=1';
+    window.localStorage.removeItem('erp.label.pageSize'); // test trước đã chọn A5
+    server.use(scenario.orderWithShipment);
+    renderApp(<OrderDetailScreen orderId={ORDER.id} />);
+    // Dialog nhãn mở ngay khi dữ liệu về (Radix ẩn phần còn lại khỏi cây accessibility).
+    const frame = await screen.findByTestId('pdf-frame');
+    expect(frame).toHaveAttribute(
+      'src',
+      `/api/shipments/${ORDER_SHIPMENT_FIXTURE.id}/label?pageSize=A6&orientation=portrait`,
+    );
+    search = '';
   });
 });

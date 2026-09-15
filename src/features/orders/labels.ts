@@ -1,5 +1,5 @@
 import type { StatusTone } from '@/components/data/status-badge';
-import type { SalesOrderChannel, SalesOrderStatus } from './api/use-orders';
+import type { SalesOrderChannel, SalesOrderDetail, SalesOrderStatus } from './api/use-orders';
 
 /**
  * Nhãn tiếng Việt theo cái người dùng điều khiển, không theo enum của DB.
@@ -93,4 +93,63 @@ export function orderAddressLine(a: {
 
 export function orderEditable(status: SalesOrderStatus): boolean {
   return status !== 'POSTED' && status !== 'CANCELLED';
+}
+
+// ── Trạng thái KHO của đơn (fulfilment) — suy từ task PICK/PACK + phiếu giao ở server ──
+
+export type OrderFulfilmentStatus = SalesOrderDetail['fulfilment']['status'];
+export type FulfilTarget = 'PICKED' | 'PACKED';
+
+const FULFILMENT_LABEL: Record<OrderFulfilmentStatus, string> = {
+  NOT_STARTED: 'Chờ pick',
+  PICKING: 'Đang pick',
+  PICKED: 'Đã pick xong',
+  PACKED: 'Đã đóng gói',
+  SHIPPED: 'Đã giao hãng',
+  IN_TRANSIT: 'Đang giao',
+  DELIVERED: 'Đã giao',
+  FAILED: 'Giao thất bại',
+  RETURNED: 'Đã hoàn',
+  CANCELLED: 'Đã hủy việc kho',
+};
+
+const FULFILMENT_TONE: Record<OrderFulfilmentStatus, StatusTone> = {
+  NOT_STARTED: 'neutral',
+  PICKING: 'brand',
+  PICKED: 'brand',
+  PACKED: 'ok',
+  SHIPPED: 'ok',
+  IN_TRANSIT: 'brand',
+  DELIVERED: 'ok',
+  FAILED: 'err',
+  RETURNED: 'warn',
+  CANCELLED: 'neutral',
+};
+
+export function fulfilmentLabel(s: OrderFulfilmentStatus): string {
+  return FULFILMENT_LABEL[s];
+}
+export function fulfilmentTone(s: OrderFulfilmentStatus): StatusTone {
+  return FULFILMENT_TONE[s];
+}
+
+/** Nhãn đích đóng tay — trùng nhãn trạng thái tương ứng để toast/nhãn không đổi từ. */
+export function fulfilTargetLabel(t: FulfilTarget): string {
+  return FULFILMENT_LABEL[t];
+}
+
+/**
+ * Đích "Trạng thái kho" đặt TAY qua POST /sales-orders/{id}/fulfil — chép đúng
+ * `manualFulfilTargets` của backend (sales-order-fulfilment.ts): không để bấm rồi API từ chối.
+ */
+export function manualFulfilTargets(status: OrderFulfilmentStatus): FulfilTarget[] {
+  switch (status) {
+    case 'NOT_STARTED':
+    case 'PICKING':
+      return ['PICKED', 'PACKED'];
+    case 'PICKED':
+      return ['PACKED'];
+    default:
+      return [];
+  }
 }

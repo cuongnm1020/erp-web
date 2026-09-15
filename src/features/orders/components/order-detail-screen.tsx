@@ -2,8 +2,8 @@
 
 import { Gift, Info, Printer } from 'lucide-react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
-import { useState, type ReactNode } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { KpiCard } from '@/components/data/kpi-card';
 import { PdfPrintDialog } from '@/components/data/pdf-print-dialog';
 import { DetailSkeleton, QueryState } from '@/components/data/states';
@@ -43,7 +43,14 @@ import {
   useOrders,
   type SalesOrderDetail,
 } from '../api/use-orders';
-import { orderAddressLine, orderChannelLabel, orderStatusLabel, orderStatusTone } from '../labels';
+import {
+  fulfilmentLabel,
+  fulfilmentTone,
+  orderAddressLine,
+  orderChannelLabel,
+  orderStatusLabel,
+  orderStatusTone,
+} from '../labels';
 import { OrderPrintSheet } from './order-print-sheet';
 
 /**
@@ -97,7 +104,7 @@ const SHIPMENT_STATUS_LABEL: Record<
 };
 
 /** Thẻ vận đơn — dữ liệu từ `order.shipment`; "In nhãn" nhúng PDF của hãng qua proxy /api. */
-function ShipmentCard({ order }: { order: SalesOrderDetail }) {
+function ShipmentCard({ order, autoPrint }: { order: SalesOrderDetail; autoPrint?: boolean }) {
   const s = order.shipment;
   const [printing, setPrinting] = useState(false);
   const [size, setSize] = useState<LabelSize>('A6');
@@ -105,6 +112,16 @@ function ShipmentCard({ order }: { order: SalesOrderDetail }) {
     setSize(readLabelSize());
     setPrinting(true);
   };
+  // ?printLabel=1 (về từ "Đã đóng gói" tay): mở nhãn in ngay khi phiếu đã có mã vận đơn — một
+  // lần cho mỗi lần vào trang, đóng rồi không bật lại.
+  const autoOpened = useRef(false);
+  const trackingNo = s?.trackingNo ?? null;
+  useEffect(() => {
+    if (!autoPrint || !trackingNo || autoOpened.current) return;
+    autoOpened.current = true;
+    setSize(readLabelSize());
+    setPrinting(true);
+  }, [autoPrint, trackingNo]);
   const changeSize = (v: LabelSize) => {
     setSize(v);
     try {
@@ -414,6 +431,7 @@ function Detail({ order }: { order: SalesOrderDetail }) {
   const [dialog, setDialog] = useState<'cancel' | 'recreate' | null>(null);
   const printer = usePrint();
   const ability = useAbility();
+  const autoPrint = useSearchParams().get('printLabel') === '1';
   const canRecreate = ability.can('cancel', 'SalesOrder') && ability.can('create', 'SalesOrder');
   return (
     <>
@@ -423,6 +441,9 @@ function Detail({ order }: { order: SalesOrderDetail }) {
             Đơn <span className="font-mono">{order.docNumber}</span>
             <StatusBadge tone={orderStatusTone(order.status)}>
               {orderStatusLabel(order.status)}
+            </StatusBadge>
+            <StatusBadge tone={fulfilmentTone(order.fulfilment.status)}>
+              {fulfilmentLabel(order.fulfilment.status)}
             </StatusBadge>
           </h1>
           <p className="text-sm text-muted-foreground">
@@ -581,7 +602,7 @@ function Detail({ order }: { order: SalesOrderDetail }) {
       </div>
 
       <div className="grid items-start gap-3 lg:grid-cols-5">
-        <ShipmentCard order={order} />
+        <ShipmentCard order={order} autoPrint={autoPrint} />
       </div>
 
       <Lines order={order} />
