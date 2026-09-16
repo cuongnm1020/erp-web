@@ -12,6 +12,7 @@ import {
   WifiOff,
 } from 'lucide-react';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { Barcode } from '@/components/data/barcode';
 import { ScanInput, type ScanInputHandle } from '@/components/data/scan-input';
 import { ForbiddenState } from '@/components/data/states';
 import { Button } from '@/components/ui/button';
@@ -305,6 +306,7 @@ export function PickScreen() {
                 ? ` · lô ${(currentWave ?? currentTask)!.lotNumber}`
                 : ''}
             </div>
+            <SkuBarcodes barcodes={(currentWave ?? currentTask)!.barcodes} />
             <div className="mt-3 flex items-baseline gap-2">
               <span className="text-5xl font-bold tabular-nums">
                 {formatQuantity((currentWave ?? currentTask)!.qtyRemaining)}
@@ -524,5 +526,32 @@ function MyPickList({
         <ul className="max-h-80 divide-y overflow-y-auto">{children}</ul>
       )}
     </section>
+  );
+}
+
+/**
+ * Mã vạch của SKU đang lấy — người pick nhìn để đối chiếu với tem trên hàng, và khi
+ * SKU chưa có mã thì biết ngay là không quét được (phải gắn mã ở Sản phẩm trước).
+ */
+function SkuBarcodes({ barcodes }: { barcodes: string[] }) {
+  const [first, ...rest] = barcodes;
+  if (!first) {
+    return (
+      <p
+        role="status"
+        className="mt-2 flex items-center gap-2 rounded border border-warning/60 bg-warning/10 px-2 py-1.5 text-sm text-warning-foreground"
+      >
+        <AlertTriangle className="h-4 w-4 shrink-0" aria-hidden />
+        SKU chưa có mã vạch — không quét được, gắn mã ở Sản phẩm trước.
+      </p>
+    );
+  }
+  return (
+    <div className="mt-2">
+      <Barcode value={first} symbology="code128" height={8} scale={2} />
+      {rest.length ? (
+        <div className="font-mono text-xs text-muted-foreground">Mã khác: {rest.join(' · ')}</div>
+      ) : null}
+    </div>
   );
 }
