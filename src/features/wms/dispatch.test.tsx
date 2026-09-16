@@ -4,6 +4,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { makeTasks, scenario } from '@/test/msw/handlers';
 import { server } from '@/test/msw/server';
 import { makeTestQueryClient, renderApp } from '@/test/render';
+import { toast } from '@/components/ui/toaster';
 import { DispatchScreen } from './components/dispatch-screen';
 
 // Radix Select cần ResizeObserver khi mở — jsdom không có
@@ -26,7 +27,8 @@ vi.mock('next/navigation', () => ({
   useSearchParams: () => new URLSearchParams(search),
 }));
 
-const PENDING = makeTasks(40).filter((t) => t.status === 'PENDING');
+const ALL = makeTasks(40);
+const PENDING = ALL.filter((t) => t.status === 'PENDING');
 
 describe('DispatchScreen — GET /tasks (P1-12)', () => {
   it('loading → bốn làn theo trạng thái thật, đếm bằng total của API', async () => {
@@ -123,8 +125,68 @@ describe('DispatchScreen — gán / trả việc (POST /tasks/:id/assign|unassig
     const first = PENDING[0]!;
     await screen.findByText(first.docNumber);
     fireEvent.click(screen.getByRole('combobox', { name: `Gán ${first.docNumber}` }));
-    fireEvent.click(await screen.findByRole('option', { name: 'Phạm Thị Hoa' }));
+    // Danh bạ giờ kèm vai trò: WAREHOUSE → "· kho", PICKER → "· lấy hàng", PACKER → "· đóng hàng".
+    fireEvent.click(await screen.findByRole('option', { name: 'Phạm Thị Hoa · kho' }));
     await waitFor(() => expect(assigned).toEqual([{ id: first.id, body: { userId: 'staff-1' } }]));
+    fireEvent.click(screen.getByRole('combobox', { name: `Gán ${first.docNumber}` }));
+    expect(
+      await screen.findByRole('option', { name: 'Lê Văn Lấy · lấy hàng' }),
+    ).toBeInTheDocument();
+    expect(screen.getByRole('option', { name: 'Ngô Thị Đóng · đóng hàng' })).toBeInTheDocument();
+  });
+
+  it('tick nhiều thẻ (PENDING + ASSIGNED) → "Gán cho…" một người → POST /tasks/assign { taskIds, userId }; việc lỗi báo riêng', async () => {
+    search = '';
+    const success = vi.spyOn(toast, 'success').mockImplementation(() => '' as never);
+    const error = vi.spyOn(toast, 'error').mockImplementation(() => '' as never);
+    const posted: unknown[] = [];
+    server.use(
+      http.post('/api/tasks/assign', async ({ request }) => {
+        const body = (await request.json()) as { taskIds: string[]; userId: string };
+        posted.push(body);
+        return HttpResponse.json({
+          userId: body.userId,
+          assigned: body.taskIds.slice(0, 2).map((id) => ({
+            taskId: id,
+            docNumber: 'x',
+            status: 'ASSIGNED',
+            assignedTo: body.userId,
+          })),
+          failed: body.taskIds.slice(2).map((id) => ({
+            taskId: id,
+            docNumber: 'PICK-LOI',
+            code: 'TASK_INVALID_TRANSITION',
+            reason: 'đang làm dở',
+          })),
+        });
+      }),
+    );
+    renderApp(<DispatchScreen />);
+    const pending = PENDING.slice(0, 2);
+    const assignedTask = ALL.find((t) => t.status === 'ASSIGNED')!;
+    await screen.findByText(pending[0]!.docNumber);
+    for (const t of [...pending, assignedTask]) {
+      fireEvent.click(screen.getByRole('checkbox', { name: `Chọn ${t.docNumber}` }));
+    }
+    // Có thẻ ASSIGNED trong lô → không gộp lượt được, nhưng gán được.
+    const region = screen.getByRole('region', { name: 'Việc đã chọn' });
+    expect(region).toHaveTextContent('Đã chọn 3 việc');
+    expect(screen.getByRole('button', { name: 'Gộp thành một lượt' })).toBeDisabled();
+    fireEvent.click(screen.getByRole('combobox', { name: 'Gán việc đã chọn cho' }));
+    fireEvent.click(await screen.findByRole('option', { name: 'Lê Văn Lấy · lấy hàng' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Gán 3 việc' }));
+    await waitFor(() =>
+      expect(posted).toEqual([
+        { taskIds: [pending[0]!.id, pending[1]!.id, assignedTask.id], userId: 'staff-3' },
+      ]),
+    );
+    // Toaster không render trong test harness → khẳng định qua spy.
+    await waitFor(() => expect(success).toHaveBeenCalledWith('Đã gán 2 việc cho Lê Văn Lấy'));
+    expect(error).toHaveBeenCalledWith('PICK-LOI: đang làm dở');
+    // Thanh công cụ đóng sau khi gán.
+    await waitFor(() =>
+      expect(screen.queryByRole('region', { name: 'Việc đã chọn' })).not.toBeInTheDocument(),
+    );
   });
 
   it('thẻ ASSIGNED có "Trả về hàng đợi" → POST unassign', async () => {

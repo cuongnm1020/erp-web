@@ -250,7 +250,11 @@ export function PackStationScreen() {
                         </span>
                       </span>
                       <StatusBadge tone={q.assignedToMe ? 'brand' : 'neutral'}>
-                        {q.assignedToMe ? 'Của tôi' : 'Chưa nhận'}
+                        {!q.assignedToMe
+                          ? 'Chưa nhận'
+                          : q.status === 'IN_PROGRESS'
+                            ? 'Đang đóng gói'
+                            : 'Của tôi'}
                       </StatusBadge>
                     </button>
                   </li>

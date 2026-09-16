@@ -235,6 +235,60 @@ describe('Màn pick trên PDA — quét đơn → dòng theo lối đi → quét
     expect(screen.getByText('· thiếu')).toBeInTheDocument();
   });
 
+  it('màn chờ: hai cột "Việc được giao" (GET /pda/tasks, chỉ PICK) và "Đã lấy xong hôm nay" (GET /pda/stats?type=PICK); chạm việc → mở bằng mã đơn', async () => {
+    const resolved: string[] = [];
+    server.use(
+      http.get('/api/pda/tasks', () =>
+        HttpResponse.json([
+          { ...PICK_TASK, status: 'IN_PROGRESS' },
+          {
+            ...PICK_TASK,
+            taskId: 'pack-1',
+            docNumber: 'PACK2609-00001',
+            type: 'PACK',
+            refDocNumber: 'SO2609-00001',
+          },
+        ]),
+      ),
+      http.get('/api/pda/stats', () =>
+        HttpResponse.json({
+          userId: 'u-admin',
+          type: 'PICK',
+          date: '2026-09-16',
+          from: '2026-09-15T17:00:00.000Z',
+          to: '2026-09-16T17:00:00.000Z',
+          completed: 1,
+          items: [
+            {
+              taskId: 'done-1',
+              docNumber: 'PICK2609-00003',
+              refDocNumber: 'SO2609-00003',
+              completedAt: '2026-09-16T02:15:00.000Z',
+            },
+          ],
+        }),
+      ),
+      http.get('/api/pda/resolve/:code', ({ params }) => {
+        resolved.push(String(params.code));
+        return HttpResponse.json(
+          { message: 'không tìm thấy', code: 'PDA_CODE_NOT_FOUND' },
+          { status: 404 },
+        );
+      }),
+    );
+    renderApp(<PickScreen />);
+    const assigned = await screen.findByRole('region', { name: 'Việc được giao' });
+    await waitFor(() => expect(assigned).toHaveTextContent('Việc được giao · 1'));
+    expect(assigned).toHaveTextContent('SO2609-00009');
+    expect(assigned).toHaveTextContent('Đang lấy');
+    expect(assigned).not.toHaveTextContent('PACK2609-00001');
+    const done = screen.getByRole('region', { name: 'Đã lấy xong hôm nay' });
+    await waitFor(() => expect(done).toHaveTextContent('Đã lấy xong hôm nay · 1'));
+    expect(done).toHaveTextContent('SO2609-00003');
+    fireEvent.click(screen.getByRole('button', { name: 'Mở SO2609-00009' }));
+    await waitFor(() => expect(resolved).toEqual(['SO2609-00009']));
+  });
+
   it('việc của người khác → 409 hiện câu từ bộ dịch, không nhận', async () => {
     server.use(
       http.get('/api/pda/resolve/:code', () =>

@@ -142,13 +142,9 @@ describe('Bảng điều phối — gộp thẻ PICK chưa gán thành lượt (
     );
     renderApp(<DispatchScreen />);
     await screen.findByText(picks[0]!.docNumber);
-    fireEvent.click(
-      screen.getByRole('checkbox', { name: `Chọn ${picks[0]!.docNumber} để gộp lượt` }),
-    );
-    fireEvent.click(
-      screen.getByRole('checkbox', { name: `Chọn ${picks[1]!.docNumber} để gộp lượt` }),
-    );
-    expect(screen.getByRole('region', { name: 'Gộp lượt pick' })).toHaveTextContent(
+    fireEvent.click(screen.getByRole('checkbox', { name: `Chọn ${picks[0]!.docNumber}` }));
+    fireEvent.click(screen.getByRole('checkbox', { name: `Chọn ${picks[1]!.docNumber}` }));
+    expect(screen.getByRole('region', { name: 'Việc đã chọn' })).toHaveTextContent(
       'Đã chọn 2 việc',
     );
     fireEvent.click(screen.getByRole('button', { name: 'Gộp thành một lượt' }));

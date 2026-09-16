@@ -11,16 +11,16 @@ import {
   Plus,
   WifiOff,
 } from 'lucide-react';
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { ScanInput, type ScanInputHandle } from '@/components/data/scan-input';
 import { ForbiddenState } from '@/components/data/states';
 import { Button } from '@/components/ui/button';
 import { beep } from '@/lib/beep';
 import { cn } from '@/lib/cn';
 import { messageFor } from '@/lib/error-messages';
-import { formatQuantity } from '@/lib/format';
+import { formatDateTime, formatQuantity } from '@/lib/format';
 import { useAbility } from '@/lib/permission';
-import { useResolveCode } from '../api/use-pda';
+import { usePdaMyTasks, usePdaStats, useResolveCode } from '../api/use-pda';
 import { useScanSession, type ScanFeedback, type Shortage } from '../scan-session';
 import { useWaveSession } from '../wave-session';
 import { ShortPickDialog } from './short-pick-dialog';
@@ -45,8 +45,21 @@ export function PickScreen() {
   const [shortOpen, setShortOpen] = useState(false);
   const [resolving, setResolving] = useState(false);
   const [resolveError, setResolveError] = useState<string | null>(null);
+  const canExecute = ability.can('execute', 'Task');
+  // Hai cột khi chưa nhận việc: việc điều phối đã giao cho tôi + đơn tôi đã lấy xong hôm nay.
+  const myTasks = usePdaMyTasks(canExecute);
+  const doneToday = usePdaStats('PICK', null, canExecute);
+  const idle = !resolving && task.phase === 'idle' && wave.phase === 'idle';
+  useEffect(() => {
+    // Quay về màn chờ (sau "Quét đơn kế tiếp") → làm tươi hai cột ngay, không đợi 30s.
+    if (idle && canExecute) {
+      void myTasks.refetch();
+      void doneToday.refetch();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [idle, canExecute]);
 
-  if (!ability.can('execute', 'Task')) return <ForbiddenState className="m-4" />;
+  if (!canExecute) return <ForbiddenState className="m-4" />;
 
   const s = mode === 'wave' ? wave : task;
   const phase = resolving ? 'opening' : s.phase;
@@ -121,6 +134,8 @@ export function PickScreen() {
       ? `${currentTask.skuCode} · ${currentTask.skuName} tại ${currentTask.locationCode ?? '—'}`
       : '';
   const shortRemaining = currentWave?.qtyRemaining ?? currentTask?.qtyRemaining ?? '0';
+  // GET /pda/tasks trả mọi loại việc còn mở của tôi — màn này chỉ là lấy hàng.
+  const myPicks = myTasks.data?.filter((t) => t.type === 'PICK') ?? null;
 
   return (
     <div className="flex min-h-dvh flex-col bg-background text-base">
@@ -193,9 +208,77 @@ export function PickScreen() {
         ) : null}
 
         {phase === 'idle' ? (
-          <div className="flex flex-1 flex-col items-center justify-center gap-2 text-center text-muted-foreground">
-            <p className="text-lg font-medium text-foreground">Quét mã đơn để nhận việc</p>
-            <p className="text-sm">Mã trên phiếu đơn hàng, phiếu lấy hàng hoặc phiếu lượt gộp.</p>
+          <div className="flex flex-1 flex-col gap-3">
+            <div className="flex flex-col items-center gap-1 py-2 text-center text-muted-foreground">
+              <p className="text-lg font-medium text-foreground">Quét mã đơn để nhận việc</p>
+              <p className="text-sm">
+                Mã trên phiếu đơn hàng, phiếu lấy hàng hoặc phiếu lượt gộp — hoặc chạm một việc bên
+                dưới.
+              </p>
+            </div>
+            <div className="grid gap-3 md:grid-cols-2">
+              <MyPickList
+                title="Việc được giao"
+                hint="chưa lấy xong"
+                count={myPicks?.length ?? null}
+                error={myTasks.isError}
+                empty="Chưa có việc nào được giao — điều phối sẽ gán trên bảng điều phối."
+              >
+                {myPicks?.map((t) => (
+                  <li key={t.taskId}>
+                    <button
+                      type="button"
+                      className="flex min-h-14 w-full items-center justify-between gap-2 px-3 py-2 text-left hover:bg-muted"
+                      onClick={() => void openCode(t.refDocNumber ?? t.docNumber)}
+                      aria-label={`Mở ${t.refDocNumber ?? t.docNumber}`}
+                    >
+                      <span className="flex flex-col">
+                        <span className="font-mono font-semibold">
+                          {t.refDocNumber ?? t.docNumber}
+                        </span>
+                        <span className="text-xs text-muted-foreground">
+                          {t.docNumber} · {t.lines.length} dòng
+                        </span>
+                      </span>
+                      <span
+                        className={cn(
+                          'rounded-sm px-1.5 py-0.5 text-xs font-medium',
+                          t.status === 'IN_PROGRESS'
+                            ? 'bg-primary/10 text-primary'
+                            : 'bg-muted text-muted-foreground',
+                        )}
+                      >
+                        {t.status === 'IN_PROGRESS' ? 'Đang lấy' : 'Chưa bắt đầu'}
+                      </span>
+                    </button>
+                  </li>
+                ))}
+              </MyPickList>
+              <MyPickList
+                title="Đã lấy xong hôm nay"
+                hint={doneToday.data?.date ?? ''}
+                count={doneToday.data?.completed ?? null}
+                error={doneToday.isError}
+                empty="Hôm nay chưa lấy xong đơn nào."
+              >
+                {doneToday.data?.items.map((d) => (
+                  <li
+                    key={d.taskId}
+                    className="flex min-h-12 items-center justify-between gap-2 px-3 py-2"
+                  >
+                    <span className="flex flex-col">
+                      <span className="font-mono font-semibold">
+                        {d.refDocNumber ?? d.docNumber}
+                      </span>
+                      <span className="text-xs text-muted-foreground">{d.docNumber}</span>
+                    </span>
+                    <span className="text-xs text-muted-foreground">
+                      {formatDateTime(d.completedAt)}
+                    </span>
+                  </li>
+                ))}
+              </MyPickList>
+            </div>
           </div>
         ) : null}
         {phase === 'opening' ? (
@@ -402,5 +485,44 @@ export function PickScreen() {
         }
       />
     </div>
+  );
+}
+
+/** Một cột trên màn chờ của người lấy hàng: tiêu đề + đếm + danh sách chạm được. */
+function MyPickList({
+  title,
+  hint,
+  count,
+  error,
+  empty,
+  children,
+}: {
+  title: string;
+  hint: string;
+  count: number | null;
+  error: boolean;
+  empty: string;
+  children: ReactNode;
+}) {
+  const isEmpty = count === 0;
+  return (
+    <section className="rounded-lg border bg-card" aria-label={title}>
+      <header className="flex items-center justify-between border-b px-3 py-2 text-sm">
+        <span className="font-semibold">
+          {title}
+          {count !== null ? ` · ${count}` : ''}
+        </span>
+        <span className="text-xs text-muted-foreground">{hint}</span>
+      </header>
+      {error ? (
+        <p className="px-3 py-3 text-sm text-destructive">Không tải được danh sách.</p>
+      ) : count === null ? (
+        <p className="px-3 py-3 text-sm text-muted-foreground">Đang tải…</p>
+      ) : isEmpty ? (
+        <p className="px-3 py-3 text-sm text-muted-foreground">{empty}</p>
+      ) : (
+        <ul className="max-h-80 divide-y overflow-y-auto">{children}</ul>
+      )}
+    </section>
   );
 }

@@ -1979,6 +1979,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/tasks/assign": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Gán NHIỀU việc cho một người — chọn nhiều thẻ trên bảng điều phối. Từng việc một,
+         *     việc lỗi nằm trong `failed` (không rollback cả lô). Khai TRƯỚC `:id/assign`.
+         */
+        post: operations["TaskEngineController_assignBulk"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/tasks/{id}/assign": {
         parameters: {
             query?: never;
@@ -4424,7 +4444,7 @@ export interface components {
         };
         OrderFulfilmentDto: {
             /** @enum {string} */
-            status: "CANCELLED" | "IN_TRANSIT" | "DELIVERED" | "FAILED" | "RETURNED" | "PICKED" | "PACKED" | "NOT_STARTED" | "PICKING" | "SHIPPED";
+            status: "CANCELLED" | "IN_TRANSIT" | "DELIVERED" | "FAILED" | "RETURNED" | "PICKED" | "PACKED" | "NOT_STARTED" | "PICKING" | "PACKING" | "SHIPPED";
             pickTaskId: string | null;
             pickTaskDocNumber: string | null;
             packTaskId: string | null;
@@ -5122,6 +5142,8 @@ export interface components {
             id: string;
             code: string;
             fullName: string;
+            /** @description Mã role đang giữ (WAREHOUSE / PICKER / PACKER / ADMIN…) — màn hình gợi ý ai lấy, ai đóng. */
+            roles: string[];
         };
         TaskLineDto: {
             id: string;
@@ -5191,10 +5213,12 @@ export interface components {
             /** @description Đã sắp theo `pickSequence` rồi `lineNo`. */
             lines: components["schemas"]["TaskLineDto"][];
         };
-        AssignTaskDto: {
+        AssignTasksBulkDto: {
+            /** @description Việc cần gán (PENDING → gán; ASSIGNED → đổi người; đang làm / đã xong → báo lỗi từng việc). */
+            taskIds: string[];
             /**
              * Format: uuid
-             * @description Nhân viên kho nhận việc — phải tồn tại và đang active.
+             * @description Nhân viên nhận việc — phải tồn tại và đang active.
              */
             userId: string;
         };
@@ -5204,6 +5228,25 @@ export interface components {
             /** @enum {string} */
             status: "CANCELLED" | "PENDING" | "ASSIGNED" | "IN_PROGRESS" | "COMPLETED" | "EXCEPTION";
             assignedTo: string | null;
+        };
+        AssignTasksBulkFailedDto: {
+            taskId: string;
+            docNumber: string | null;
+            /** @description Mã lỗi nghiệp vụ (TASK_NOT_FOUND, TASK_INVALID_TRANSITION, INVALID_TASK_INPUT…). */
+            code: string;
+            reason: string;
+        };
+        AssignTasksBulkResultDto: {
+            userId: string;
+            assigned: components["schemas"]["TaskStateResultDto"][];
+            failed: components["schemas"]["AssignTasksBulkFailedDto"][];
+        };
+        AssignTaskDto: {
+            /**
+             * Format: uuid
+             * @description Nhân viên kho nhận việc — phải tồn tại và đang active.
+             */
+            userId: string;
         };
         WaveDto: {
             id: string;
@@ -9871,6 +9914,29 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["TaskDetailDto"];
+                };
+            };
+        };
+    };
+    TaskEngineController_assignBulk: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AssignTasksBulkDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AssignTasksBulkResultDto"];
                 };
             };
         };
