@@ -210,6 +210,12 @@ export const NAV_MODULES: NavModule[] = [
         icon: PackageCheck,
         ability: { action: 'execute', subject: 'Task' },
       },
+      {
+        label: 'Cất hàng (PDA)',
+        href: '/pda/put-away',
+        icon: PackagePlus,
+        ability: { action: 'execute', subject: 'Task' },
+      },
       // {
       //   label: 'Chuyển kho',
       //   href: '/wms/transfers',

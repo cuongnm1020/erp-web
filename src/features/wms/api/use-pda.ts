@@ -200,10 +200,10 @@ export type PdaQueueItem = components['schemas']['PdaQueueItemDto'];
 export type PdaStats = components['schemas']['PdaStatsDto'];
 
 /**
- * GET /pda/queue?type= — hàng đợi của tôi + việc chưa ai nhận (PACK: bàn đóng gói; PICK: chỉ khi
- * có task.assign). Làm tươi 30s để bàn đóng gói thấy đơn mới pick xong mà không F5.
+ * GET /pda/queue?type= — hàng đợi của tôi + việc chưa ai nhận (PACK: bàn đóng gói; PUT_AWAY: máy
+ * quét cất hàng; PICK: chỉ khi có task.assign). Làm tươi 30s để bàn đóng gói thấy đơn mới pick xong mà không F5.
  */
-export function usePdaQueue(type: 'PICK' | 'PACK', enabled = true) {
+export function usePdaQueue(type: 'PICK' | 'PACK' | 'PUT_AWAY', enabled = true) {
   return useQuery({
     queryKey: pdaKeys.queue(type),
     queryFn: () => unwrap(api.GET('/pda/queue', { params: { query: { type } } })),
@@ -226,7 +226,11 @@ export function usePdaMyTasks(enabled = true) {
 }
 
 /** GET /pda/stats?type=&date= — việc TÔI đã đóng trong ngày (giờ VN); date bỏ trống = hôm nay. */
-export function usePdaStats(type: 'PICK' | 'PACK', date: string | null = null, enabled = true) {
+export function usePdaStats(
+  type: 'PICK' | 'PACK' | 'PUT_AWAY',
+  date: string | null = null,
+  enabled = true,
+) {
   return useQuery({
     queryKey: pdaKeys.stats(type, date),
     queryFn: () =>
