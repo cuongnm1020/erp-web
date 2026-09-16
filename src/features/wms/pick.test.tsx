@@ -158,6 +158,8 @@ describe('Màn pick trên PDA — quét đơn → dòng theo lối đi → quét
     // Dòng hiện tại = vị trí có pickSequence nhỏ nhất (A-01-03), không phải lineNo 1
     expect((await screen.findAllByText('A-01-03')).length).toBeGreaterThan(0);
     expect(screen.getAllByText('Nước rửa chén').length).toBeGreaterThan(0);
+    // Mã vạch SKU đang lấy hiện để đối chiếu với tem trên hàng
+    expect(screen.getByRole('img', { name: 'Mã vạch BC-X' })).toBeInTheDocument();
 
     // Tăng số lượng lên 2 rồi quét một lần
     fireEvent.click(screen.getByRole('button', { name: 'Tăng số lượng' }));
@@ -323,5 +325,42 @@ describe('Màn pick trên PDA — quét đơn → dòng theo lối đi → quét
     scan('PICK2609-00010');
     expect(await screen.findByRole('alert')).toHaveTextContent(/đang do người khác làm/);
     expect(screen.getByText('Quét mã đơn để nhận việc')).toBeInTheDocument();
+  });
+
+  it('SKU chưa có mã vạch → dòng đang lấy cảnh báo không quét được thay vì mã vạch', async () => {
+    server.use(
+      http.get('/api/pda/resolve/:code', () =>
+        HttpResponse.json({
+          kind: 'task',
+          code: 'PICK2609-00009',
+          sku: null,
+          order: null,
+          wave: null,
+          location: null,
+          shipment: null,
+          task: {
+            id: TASK_ID,
+            docNumber: 'PICK2609-00009',
+            type: 'PICK',
+            status: 'PENDING',
+            warehouseId: 'wh-1',
+            assignedTo: null,
+            assignedToMe: false,
+            lineCount: 2,
+          },
+        }),
+      ),
+      http.post('/api/pda/tasks/:id/claim', () =>
+        HttpResponse.json({
+          ...PICK_TASK,
+          lines: PICK_TASK.lines.map((l) => (l.taskLineId === LINE_1 ? { ...l, barcodes: [] } : l)),
+        }),
+      ),
+    );
+    renderApp(<PickScreen />);
+    scan('PICK2609-00009');
+    expect((await screen.findAllByText('A-01-03')).length).toBeGreaterThan(0);
+    expect(screen.getByText(/SKU chưa có mã vạch — không quét được/)).toBeInTheDocument();
+    expect(screen.queryByRole('img', { name: /^Mã vạch / })).not.toBeInTheDocument();
   });
 });
