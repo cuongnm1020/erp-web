@@ -271,6 +271,38 @@ describe('Màn cất hàng trên PDA — hàng đợi → nhận → quét SKU �
       'Sai ô kệ: đang ở A01-05, cần cất SP-0003 vào A01-02.',
     );
     expect(completes).toEqual([LINE_1]);
+    // Mã lạ (resolve 404) → nói thẳng phải quét tem ô kệ đích, không hiện "Không tìm thấy dữ liệu"
+    server.use(
+      http.get('/api/pda/resolve/:code', ({ params }) =>
+        params.code === 'XYZ'
+          ? HttpResponse.json(
+              { statusCode: 404, code: 'NOT_FOUND', message: 'x' },
+              { status: 404, headers: { 'x-request-id': 'trace-404' } },
+            )
+          : HttpResponse.json({
+              kind: 'location',
+              code: String(params.code),
+              sku: null,
+              order: null,
+              task: null,
+              wave: null,
+              shipment: null,
+              location: {
+                id: 'loc-2',
+                code: 'A01-02',
+                type: 'BIN',
+                warehouseId: 'wh-1',
+                warehouseCode: 'WH01',
+                pickSequence: 20,
+              },
+            }),
+      ),
+    );
+    scan('XYZ');
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'Mã XYZ không phải sản phẩm trong PUT2609-00003 hay ô kệ A01-02. Quét tem trên ô kệ đích.',
+    );
+    expect(completes).toEqual([LINE_1]);
     // Barcode vị trí đúng (khác code) → resolve ra loc-2 → complete → hết dòng mở → xong việc
     scan('LOC-A01-02');
     await waitFor(() => expect(completes).toEqual([LINE_1, LINE_2]));

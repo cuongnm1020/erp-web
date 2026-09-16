@@ -39,6 +39,10 @@ export function currentPutAwayLine(task: PdaTask | null): PdaTaskLine | null {
 const sameCode = (a: string, b: string | null): boolean =>
   b !== null && a.trim().toUpperCase() === b.trim().toUpperCase();
 
+/** Mã quét ở bước xác nhận mà không phải SKU của việc, cũng không phải ô kệ nào. */
+const notBinText = (code: string, docNumber: string, cur: PdaTaskLine): string =>
+  `Mã ${code} không phải sản phẩm trong ${docNumber} hay ô kệ ${cur.toLocationCode ?? '—'}. Quét tem trên ô kệ đích.`;
+
 /**
  * Phiên cất hàng trên máy quét (task PUT_AWAY sinh khi post phiếu nhập — P1-08 gợi ý ô kệ đích).
  * Khác PICK ở bước cuối: quét đủ số lượng CHƯA đóng dòng — người cất phải quét mã ô kệ đích
@@ -288,11 +292,15 @@ export function usePutAwaySession() {
           return;
         }
         beep('error');
-        setFeedback({
-          kind: 'error',
-          text: `Mã ${code} không phải sản phẩm trong ${task.docNumber} hay ô kệ ${cur.toLocationCode ?? '—'}.`,
-        });
+        setFeedback({ kind: 'error', text: notBinText(code, task.docNumber, cur) });
       } catch (err) {
+        // Resolve không biết mã này (404) — với máy quét, câu "Không tìm thấy dữ liệu" chung
+        // không nói được phải làm gì; nói thẳng: không phải hàng trong việc, không phải ô kệ đích.
+        if (isApiError(err) && err.status === 404) {
+          beep('error');
+          setFeedback({ kind: 'error', text: notBinText(code, task.docNumber, cur) });
+          return;
+        }
         fail(err);
       }
     },
