@@ -10,7 +10,7 @@ import {
   Plus,
   WifiOff,
 } from 'lucide-react';
-import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { ScanInput, type ScanInputHandle } from '@/components/data/scan-input';
 import { ForbiddenState } from '@/components/data/states';
 import { Button } from '@/components/ui/button';
@@ -19,6 +19,7 @@ import { formatDateTime, formatQuantity } from '@/lib/format';
 import { useAbility } from '@/lib/permission';
 import { usePdaQueue, usePdaStats } from '../api/use-pda';
 import { currentPutAwayLine, isFullyScanned, usePutAwaySession } from '../put-away-session';
+import { PdaListColumn } from './pda-list-column';
 import { SkuBarcodes } from './sku-barcodes';
 
 /**
@@ -128,7 +129,7 @@ export function PutAwayScreen() {
               </p>
             </div>
             <div className="grid gap-3 md:grid-cols-2">
-              <Column
+              <PdaListColumn
                 title="Hàng đợi cất hàng"
                 hint={queue.data ? `${queue.data.waiting} chờ · ${queue.data.mine} của tôi` : ''}
                 count={queue.data?.items.length ?? null}
@@ -166,8 +167,8 @@ export function PutAwayScreen() {
                     </button>
                   </li>
                 ))}
-              </Column>
-              <Column
+              </PdaListColumn>
+              <PdaListColumn
                 title="Đã cất xong hôm nay"
                 hint={doneToday.data?.date ?? ''}
                 count={doneToday.data?.completed ?? null}
@@ -185,7 +186,7 @@ export function PutAwayScreen() {
                     </span>
                   </li>
                 ))}
-              </Column>
+              </PdaListColumn>
             </div>
           </div>
         ) : null}
@@ -353,43 +354,5 @@ export function PutAwayScreen() {
         )}
       </footer>
     </div>
-  );
-}
-
-/** Một cột trên màn chờ: tiêu đề + đếm + danh sách chạm được. */
-function Column({
-  title,
-  hint,
-  count,
-  error,
-  empty,
-  children,
-}: {
-  title: string;
-  hint: string;
-  count: number | null;
-  error: boolean;
-  empty: string;
-  children: ReactNode;
-}) {
-  return (
-    <section className="rounded-lg border bg-card" aria-label={title}>
-      <header className="flex items-center justify-between border-b px-3 py-2 text-sm">
-        <span className="font-semibold">
-          {title}
-          {count !== null ? ` · ${count}` : ''}
-        </span>
-        <span className="text-xs text-muted-foreground">{hint}</span>
-      </header>
-      {error ? (
-        <p className="px-3 py-3 text-sm text-destructive">Không tải được danh sách.</p>
-      ) : count === null ? (
-        <p className="px-3 py-3 text-sm text-muted-foreground">Đang tải…</p>
-      ) : count === 0 ? (
-        <p className="px-3 py-3 text-sm text-muted-foreground">{empty}</p>
-      ) : (
-        <ul className="max-h-80 divide-y overflow-y-auto">{children}</ul>
-      )}
-    </section>
   );
 }
