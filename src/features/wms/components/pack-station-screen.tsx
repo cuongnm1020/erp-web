@@ -1,13 +1,19 @@
 'use client';
 
-import { CheckCircle2, CircleAlert, Keyboard, PackageCheck, WifiOff } from 'lucide-react';
+import {
+  AlertTriangle,
+  CheckCircle2,
+  CircleAlert,
+  Keyboard,
+  Minus,
+  PackageCheck,
+  Plus,
+  WifiOff,
+} from 'lucide-react';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
-import { Barcode } from '@/components/data/barcode';
 import { ScanInput, type ScanInputHandle } from '@/components/data/scan-input';
-import { EmptyState, ForbiddenState } from '@/components/data/states';
-import { StatusBadge } from '@/components/data/status-badge';
-import { PageHeader } from '@/components/layout/page-header';
+import { ForbiddenState } from '@/components/data/states';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -16,29 +22,24 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { Input } from '@/components/ui/input';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
 import { cn } from '@/lib/cn';
 import { formatDateTime, formatQuantity } from '@/lib/format';
 import { useAbility } from '@/lib/permission';
-import { taskStatusLabel } from '../labels';
 import { usePdaQueue, usePdaStats } from '../api/use-pda';
 import { useScanSession } from '../scan-session';
 import { LabelPrintDialog } from './label-print-dialog';
+import { PdaListColumn } from './pda-list-column';
+import { SkuBarcodes } from './sku-barcodes';
 
 /**
- * Trạm đóng gói (PLAN-barcode-pick-pack D1) — desktop + máy quét USB (keyboard wedge).
+ * Trạm đóng gói (PLAN-barcode-pick-pack D1) — desktop + máy quét USB (keyboard wedge), cùng bố
+ * cục với màn pick PDA: header việc đang mở + tiến độ, màn chờ hai cột ("Chờ đóng gói" /
+ * "Đã đóng gói hôm nay"), thẻ dòng đang đóng to (tên, mã, mã vạch, còn bao nhiêu), danh sách
+ * dòng, chân trang dính với ô quét + số lượng + nút chính.
  * Quét mã đơn → nhận task PACK (claim) → quét từng SKU (server đối chiếu, không tin client)
  * → dòng đủ tự đóng → dòng cuối → popup nhãn vận đơn (LabelPrintDialog). Đơn đang đóng nằm
  * trên URL `?order=` (luật 8). Phím: F2 về ô quét, Esc bỏ đơn đang mở, ? trợ giúp.
- * Quyền: task.execute (quét) + shipment.pack (nhãn) — cả hai thuộc role WAREHOUSE.
+ * Quyền: task.execute (quét) + shipment.pack (nhãn) — cả hai thuộc role WAREHOUSE / PACKER.
  */
 export function PackStationScreen() {
   const ability = useAbility();
@@ -47,14 +48,23 @@ export function PackStationScreen() {
   const search = useSearchParams();
   const s = useScanSession('PACK');
   const scanRef = useRef<ScanInputHandle>(null);
-  const [qty, setQty] = useState('1');
+  const [qty, setQty] = useState(1);
   const [help, setHelp] = useState(false);
   const [labelOpen, setLabelOpen] = useState(false);
 
   const canExecute = ability.can('execute', 'Task');
-  // Hàng đợi đóng gói (đơn đã pick xong, chưa ai nhận + của tôi) và số đơn tôi đã đóng hôm nay.
+  // Hai cột khi chưa mở đơn: hàng đợi (đơn đã pick xong, chưa ai nhận + của tôi) + đơn tôi đã đóng hôm nay.
   const queue = usePdaQueue('PACK', canExecute);
-  const stats = usePdaStats('PACK', null, canExecute);
+  const doneToday = usePdaStats('PACK', null, canExecute);
+  const idle = s.phase === 'idle';
+  useEffect(() => {
+    // Quay về màn chờ (sau "Quét đơn kế tiếp") → làm tươi hai cột ngay, không đợi 30s.
+    if (idle && canExecute) {
+      void queue.refetch();
+      void doneToday.refetch();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [idle, canExecute]);
 
   // URL → phiên: F5 hoặc dán link ?order=SO… mở lại đúng đơn.
   const urlOrder = search.get('order');
@@ -88,6 +98,7 @@ export function PackStationScreen() {
     s.clear();
     opened.current = null;
     setLabelOpen(false);
+    setQty(1);
     setUrlOrder(null);
     scanRef.current?.focus();
   };
@@ -110,134 +121,106 @@ export function PackStationScreen() {
 
   const onScan = (code: string) => {
     if (s.phase === 'ready' && s.task) {
-      void s.scan(code, qty || '1');
-      setQty('1');
+      void s.scan(code, String(qty));
+      setQty(1);
     } else if (s.phase === 'idle') {
       void s.open(code);
     }
   };
 
-  if (!canExecute) return <ForbiddenState className="m-6" />;
+  if (!canExecute) return <ForbiddenState className="m-4" />;
 
-  const task = s.task;
-  const doneLines = task?.lines.filter((l) => l.status === 'COMPLETED').length ?? 0;
+  const { phase, feedback, task } = s;
+  // Dòng đang đứng — dòng đầu tiên chưa đóng (thứ tự dòng của việc).
+  const current =
+    task?.lines.find(
+      (l) => l.status !== 'COMPLETED' && l.status !== 'CANCELLED' && l.status !== 'EXCEPTION',
+    ) ?? null;
+  const heading = task ? (s.order.docNumber ?? task.docNumber) : 'Chưa nhận việc';
+  const progress = task
+    ? `${task.lines.filter((l) => l.status === 'COMPLETED').length}/${task.lines.length} dòng`
+    : null;
 
   return (
-    <>
-      <PageHeader
-        title="Trạm đóng gói"
-        description={
-          task
-            ? `${s.order.docNumber ?? task.docNumber} · ${doneLines}/${task.lines.length} dòng`
-            : `Quét mã đơn hàng để bắt đầu · hôm nay bạn đã đóng ${stats.data?.completed ?? '…'} đơn · ${queue.data?.waiting ?? '…'} đơn chờ`
-        }
-        breadcrumb={[{ label: 'Kho' }, { label: 'Trạm đóng gói' }]}
-        actions={
-          <div className="flex items-center gap-2">
-            <Button variant="ghost" size="sm" onClick={() => setHelp(true)} title="Phím tắt (?)">
-              <Keyboard aria-hidden />
-              Phím tắt
-            </Button>
-            {task ? (
-              <Button variant="outline" size="sm" onClick={clearOrder}>
-                Bỏ đơn đang mở (Esc)
-              </Button>
-            ) : null}
-          </div>
-        }
-      />
+    // -m-4 + min-h trừ header 3.5rem của shell: màn choán hết vùng nội dung để chân trang dính đáy.
+    <div className="-m-4 flex min-h-[calc(100dvh-3.5rem)] flex-col bg-background text-base">
+      <header className="flex items-center justify-between gap-3 border-b px-4 py-3">
+        <div className="min-w-0">
+          <div className="text-xs uppercase tracking-wide text-muted-foreground">Đóng gói</div>
+          <div className="truncate font-mono text-lg font-semibold">{heading}</div>
+          {task && s.order.customerName ? (
+            <div className="truncate text-sm text-muted-foreground">{s.order.customerName}</div>
+          ) : null}
+        </div>
+        <div className="flex shrink-0 items-center gap-2">
+          {progress ? (
+            <div className="text-right text-sm text-muted-foreground">{progress}</div>
+          ) : null}
+          <Button
+            variant="ghost"
+            size="icon"
+            aria-label="Phím tắt (?)"
+            title="Phím tắt (?)"
+            onClick={() => setHelp(true)}
+          >
+            <Keyboard aria-hidden />
+          </Button>
+        </div>
+      </header>
 
       {s.offline ? (
-        <p
-          role="status"
-          className="mb-3 flex items-center gap-2 rounded-md border border-warning/40 bg-warning/10 px-3 py-2 text-sm"
-        >
+        <p role="status" className="flex items-center gap-2 bg-warning/15 px-4 py-2 text-sm">
           <WifiOff className="h-4 w-4 text-warning" aria-hidden />
           Mất kết nối — lần quét vừa rồi chưa được ghi. Kiểm tra mạng rồi quét lại.
         </p>
       ) : null}
 
-      <div className="flex flex-col gap-3 md:flex-row md:items-end">
-        <ScanInput
-          ref={scanRef}
-          className="flex-1"
-          size="lg"
-          label={task ? 'Quét sản phẩm' : 'Quét mã đơn'}
-          placeholder={task ? 'Quét mã vạch sản phẩm…' : 'Quét mã đơn / mã việc / vận đơn…'}
-          onScan={onScan}
-          paused={labelOpen || help}
-          disabled={s.phase === 'opening' || s.phase === 'done'}
-        />
-        {task ? (
-          <label className="flex items-center gap-2 text-sm">
-            <span className="text-muted-foreground">Số lượng / lần quét</span>
-            <Input
-              inputMode="numeric"
-              className="h-14 w-24 text-center text-lg"
-              value={qty}
-              onChange={(e) => setQty(e.target.value.replace(/[^\d.]/g, ''))}
-              onFocus={(e) => e.target.select()}
-              aria-label="Số lượng mỗi lần quét"
-            />
-          </label>
-        ) : null}
-      </div>
-
-      {s.feedback ? (
-        <p
-          role={s.feedback.kind === 'error' ? 'alert' : 'status'}
-          className={cn(
-            'mt-3 flex items-center gap-2 rounded-md border px-3 py-2 text-sm font-medium',
-            s.feedback.kind === 'error' &&
-              'border-destructive/50 bg-destructive/10 text-destructive',
-            s.feedback.kind === 'ok' && 'border-success/50 bg-success/10 text-success',
-            s.feedback.kind === 'info' && 'border-info/50 bg-info/10 text-info',
-          )}
-        >
-          {s.feedback.kind === 'error' ? (
-            <CircleAlert className="h-4 w-4" aria-hidden />
-          ) : (
-            <CheckCircle2 className="h-4 w-4" aria-hidden />
-          )}
-          {s.feedback.text}
-        </p>
-      ) : null}
-
-      {s.phase === 'opening' ? (
-        <p className="mt-3 text-sm text-muted-foreground" role="status">
-          Đang mở việc…
-        </p>
-      ) : null}
-
-      {!task && s.phase === 'idle' ? (
-        <div className="mt-4 grid gap-3 lg:grid-cols-3">
-          <EmptyState
-            className="lg:col-span-2"
-            title="Chưa có đơn nào đang đóng"
-            description="Quét mã vạch trên phiếu đơn hàng (hoặc mã việc PACK) để nhận việc và bắt đầu quét sản phẩm. Hoặc chọn một đơn trong hàng đợi bên cạnh."
-          />
-          <section className="rounded-md border bg-card" aria-label="Hàng đợi đóng gói">
-            <header className="flex items-center justify-between border-b px-3 py-2 text-sm">
-              <span className="font-semibold">Chờ đóng gói</span>
-              <span className="text-muted-foreground">
-                {queue.data ? `${queue.data.waiting} chờ · ${queue.data.mine} của tôi` : '…'}
-              </span>
-            </header>
-            {queue.isError ? (
-              <p className="px-3 py-3 text-xs text-destructive">Không tải được hàng đợi.</p>
-            ) : !queue.data ? (
-              <p className="px-3 py-3 text-xs text-muted-foreground">Đang tải…</p>
-            ) : queue.data.items.length === 0 ? (
-              <p className="px-3 py-3 text-xs text-muted-foreground">
-                Không có đơn nào chờ đóng gói — đơn pick xong sẽ hiện ở đây.
-              </p>
+      <main className="flex flex-1 flex-col gap-3 px-4 py-3">
+        {feedback ? (
+          <p
+            role={feedback.kind === 'error' ? 'alert' : 'status'}
+            className={cn(
+              'flex items-center gap-2 rounded-md border px-3 py-3 font-medium',
+              feedback.kind === 'error' &&
+                'border-destructive/50 bg-destructive/10 text-destructive',
+              feedback.kind === 'warn' && 'border-warning/60 bg-warning/10 text-warning-foreground',
+              feedback.kind === 'ok' && 'border-success/50 bg-success/10 text-success',
+              feedback.kind === 'info' && 'border-info/50 bg-info/10 text-info',
+            )}
+          >
+            {feedback.kind === 'error' ? (
+              <CircleAlert className="h-5 w-5 shrink-0" aria-hidden />
+            ) : feedback.kind === 'warn' ? (
+              <AlertTriangle className="h-5 w-5 shrink-0" aria-hidden />
             ) : (
-              <ul className="max-h-96 divide-y overflow-y-auto">
-                {queue.data.items.map((q) => (
+              <CheckCircle2 className="h-5 w-5 shrink-0" aria-hidden />
+            )}
+            {feedback.text}
+          </p>
+        ) : null}
+
+        {phase === 'idle' ? (
+          <div className="flex flex-1 flex-col gap-3">
+            <div className="flex flex-col items-center gap-1 py-2 text-center text-muted-foreground">
+              <p className="text-lg font-medium text-foreground">Quét mã đơn để nhận việc</p>
+              <p className="text-sm">
+                Mã trên phiếu đơn hàng, phiếu đóng gói hoặc vận đơn — hoặc chạm một đơn trong hàng
+                đợi bên dưới.
+              </p>
+            </div>
+            <div className="grid gap-3 md:grid-cols-2">
+              <PdaListColumn
+                title="Chờ đóng gói"
+                hint={queue.data ? `${queue.data.waiting} chờ · ${queue.data.mine} của tôi` : ''}
+                count={queue.data?.items.length ?? null}
+                error={queue.isError}
+                empty="Không có đơn nào chờ đóng gói — đơn pick xong sẽ hiện ở đây."
+              >
+                {queue.data?.items.map((q) => (
                   <li key={q.taskId}>
                     <button
                       type="button"
-                      className="flex w-full items-center justify-between gap-2 px-3 py-2 text-left text-sm hover:bg-muted"
+                      className="flex min-h-14 w-full items-center justify-between gap-2 px-3 py-2 text-left hover:bg-muted"
                       onClick={() => void s.open(q.refDocNumber ?? q.docNumber)}
                       aria-label={`Mở ${q.refDocNumber ?? q.docNumber}`}
                     >
@@ -246,100 +229,177 @@ export function PackStationScreen() {
                           {q.refDocNumber ?? q.docNumber}
                         </span>
                         <span className="text-xs text-muted-foreground">
-                          {q.lineCount} dòng · chờ {q.ageMinutes} phút
+                          {q.docNumber} · {q.lineCount} dòng · chờ {q.ageMinutes} phút
                         </span>
                       </span>
-                      <StatusBadge tone={q.assignedToMe ? 'brand' : 'neutral'}>
+                      <span
+                        className={cn(
+                          'rounded-sm px-1.5 py-0.5 text-xs font-medium',
+                          q.assignedToMe
+                            ? 'bg-primary/10 text-primary'
+                            : 'bg-muted text-muted-foreground',
+                        )}
+                      >
                         {!q.assignedToMe
                           ? 'Chưa nhận'
                           : q.status === 'IN_PROGRESS'
                             ? 'Đang đóng gói'
                             : 'Của tôi'}
-                      </StatusBadge>
+                      </span>
                     </button>
                   </li>
                 ))}
-              </ul>
-            )}
-            <footer className="border-t px-3 py-2 text-xs text-muted-foreground">
-              Hôm nay ({stats.data?.date ?? '…'}) bạn đã đóng{' '}
-              <b className="text-foreground">{stats.data?.completed ?? '…'}</b> đơn
-              {stats.data?.items[0]?.completedAt
-                ? ` · gần nhất ${formatDateTime(stats.data.items[0].completedAt)}`
-                : ''}
-              .
-            </footer>
-          </section>
-        </div>
-      ) : null}
-
-      {task ? (
-        <div className="mt-3 overflow-hidden rounded-md border bg-card">
-          <header className="flex flex-wrap items-center justify-between gap-2 border-b px-3 py-2 text-sm">
-            <div className="flex items-center gap-2">
-              <PackageCheck className="h-4 w-4 text-muted-foreground" aria-hidden />
-              <span className="font-mono font-semibold">{s.order.docNumber ?? task.docNumber}</span>
-              {s.order.customerName ? (
-                <span className="text-muted-foreground">· {s.order.customerName}</span>
-              ) : null}
-              <StatusBadge tone={task.status === 'COMPLETED' ? 'ok' : 'brand'}>
-                {taskStatusLabel(task.status)}
-              </StatusBadge>
+              </PdaListColumn>
+              <PdaListColumn
+                title="Đã đóng gói hôm nay"
+                hint={doneToday.data?.date ?? ''}
+                count={doneToday.data?.completed ?? null}
+                error={doneToday.isError}
+                empty="Hôm nay chưa đóng gói xong đơn nào."
+              >
+                {doneToday.data?.items.map((d) => (
+                  <li
+                    key={d.taskId}
+                    className="flex min-h-12 items-center justify-between gap-2 px-3 py-2"
+                  >
+                    <span className="flex flex-col">
+                      <span className="font-mono font-semibold">
+                        {d.refDocNumber ?? d.docNumber}
+                      </span>
+                      <span className="text-xs text-muted-foreground">{d.docNumber}</span>
+                    </span>
+                    <span className="text-xs text-muted-foreground">
+                      {formatDateTime(d.completedAt)}
+                    </span>
+                  </li>
+                ))}
+              </PdaListColumn>
             </div>
-            <span className="font-mono text-xs text-muted-foreground">{task.docNumber}</span>
-          </header>
-          <div className="overflow-x-auto">
-            <Table>
-              <TableHeader>
-                <TableRow className="bg-muted hover:bg-muted">
-                  <TableHead className="px-2.5 text-xs">Sản phẩm</TableHead>
-                  <TableHead className="w-24 px-2.5 text-right text-xs">Cần</TableHead>
-                  <TableHead className="w-24 px-2.5 text-right text-xs">Đã quét</TableHead>
-                  <TableHead className="w-24 px-2.5 text-right text-xs">Còn</TableHead>
-                  <TableHead className="w-44 px-2.5 text-xs">Mã quét</TableHead>
-                  <TableHead className="w-28 px-2.5 text-xs">Trạng thái</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {task.lines.map((l) => {
-                  const done = l.status === 'COMPLETED';
-                  return (
-                    <TableRow key={l.taskLineId} className={done ? 'bg-success/5' : undefined}>
-                      <TableCell className="px-2.5 py-1.5">
-                        <div className="font-semibold">{l.skuName}</div>
-                        <div className="font-mono text-xs text-muted-foreground">{l.skuCode}</div>
-                      </TableCell>
-                      <TableCell className="px-2.5 py-1.5 text-right tabular-nums">
-                        {formatQuantity(l.qtyPlanned)}
-                      </TableCell>
-                      <TableCell className="px-2.5 py-1.5 text-right tabular-nums">
-                        {formatQuantity(l.qtyDone)}
-                      </TableCell>
-                      <TableCell className="px-2.5 py-1.5 text-right font-semibold tabular-nums">
-                        {formatQuantity(l.qtyRemaining)}
-                      </TableCell>
-                      <TableCell className="px-2.5 py-1.5">
-                        {l.barcodes[0] ? (
-                          <Barcode value={l.barcodes[0]} symbology="code128" height={6} scale={1} />
-                        ) : (
-                          '—'
-                        )}
-                      </TableCell>
-                      <TableCell className="px-2.5 py-1.5">
-                        <StatusBadge
-                          tone={done ? 'ok' : l.status === 'IN_PROGRESS' ? 'warn' : 'neutral'}
-                        >
-                          {done ? 'Đủ' : taskStatusLabel(l.status)}
-                        </StatusBadge>
-                      </TableCell>
-                    </TableRow>
-                  );
-                })}
-              </TableBody>
-            </Table>
           </div>
-        </div>
-      ) : null}
+        ) : null}
+        {phase === 'opening' ? (
+          <p role="status" className="text-center text-muted-foreground">
+            Đang nhận việc…
+          </p>
+        ) : null}
+
+        {phase === 'ready' && current ? (
+          <section className="rounded-lg border bg-card p-4" aria-label="Dòng đang đóng">
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <PackageCheck className="h-4 w-4" aria-hidden />
+              Sản phẩm
+            </div>
+            <div className="text-3xl font-bold leading-tight">{current.skuName}</div>
+            <div className="font-mono text-sm text-muted-foreground">
+              {current.skuCode}
+              {current.lotNumber ? ` · lô ${current.lotNumber}` : ''}
+            </div>
+            <SkuBarcodes barcodes={current.barcodes} />
+            <div className="mt-3 flex items-baseline gap-2">
+              <span className="text-5xl font-bold tabular-nums">
+                {formatQuantity(current.qtyRemaining)}
+              </span>
+              <span className="text-muted-foreground">
+                còn đóng · đã {formatQuantity(current.qtyDone)}/{formatQuantity(current.qtyPlanned)}
+              </span>
+            </div>
+          </section>
+        ) : null}
+
+        {phase === 'ready' && task ? (
+          <ol className="flex flex-col gap-1 text-sm">
+            {task.lines.map((l) => (
+              <li
+                key={l.taskLineId}
+                className={cn(
+                  'flex items-center justify-between rounded-md border px-3 py-2',
+                  l.status === 'COMPLETED' &&
+                    'border-success/40 bg-success/5 text-muted-foreground',
+                  l.status === 'EXCEPTION' && 'border-warning/60 bg-warning/10',
+                  l.taskLineId === current?.taskLineId && 'border-primary',
+                )}
+              >
+                <span>
+                  <span className="font-mono font-semibold">{l.skuCode}</span>{' '}
+                  <span>{l.skuName}</span>
+                  {l.status === 'COMPLETED' ? (
+                    <span className="ml-1 text-xs text-success">· đủ</span>
+                  ) : null}
+                </span>
+                <span className="tabular-nums">
+                  {formatQuantity(l.qtyDone)}/{formatQuantity(l.qtyPlanned)}
+                </span>
+              </li>
+            ))}
+          </ol>
+        ) : null}
+
+        {phase === 'done' ? (
+          <div className="flex flex-1 flex-col items-center justify-center gap-3 text-center">
+            <CheckCircle2 className="h-16 w-16 text-success" aria-hidden />
+            <p className="text-2xl font-bold">Xong đơn {heading}</p>
+            <p className="text-muted-foreground">
+              {s.completion?.waybill
+                ? 'In nhãn vận đơn rồi dán lên kiện.'
+                : 'Đơn đã đóng gói xong.'}{' '}
+              Quét đơn kế tiếp.
+            </p>
+          </div>
+        ) : null}
+      </main>
+
+      <footer className="sticky bottom-0 flex flex-col gap-3 border-t bg-background px-4 pb-4 pt-3">
+        {phase === 'ready' ? (
+          <div className="flex items-center justify-between gap-3">
+            <span className="text-sm text-muted-foreground">Số lượng mỗi lần quét</span>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                className="h-14 w-14"
+                aria-label="Giảm số lượng"
+                onClick={() => setQty((q) => Math.max(1, q - 1))}
+              >
+                <Minus aria-hidden />
+              </Button>
+              <span className="w-10 text-center text-2xl font-bold tabular-nums" aria-live="polite">
+                {qty}
+              </span>
+              <Button
+                variant="outline"
+                className="h-14 w-14"
+                aria-label="Tăng số lượng"
+                onClick={() => setQty((q) => q + 1)}
+              >
+                <Plus aria-hidden />
+              </Button>
+            </div>
+          </div>
+        ) : null}
+        <ScanInput
+          ref={scanRef}
+          size="lg"
+          label={phase === 'ready' ? 'Quét sản phẩm' : 'Quét mã đơn'}
+          placeholder={
+            phase === 'ready' ? 'Quét mã vạch sản phẩm…' : 'Quét mã đơn / mã việc / vận đơn…'
+          }
+          onScan={onScan}
+          paused={labelOpen || help}
+          disabled={phase === 'opening' || phase === 'done'}
+        />
+        {phase === 'done' ? (
+          <Button className="h-[72px] text-lg" onClick={clearOrder}>
+            Quét đơn kế tiếp
+          </Button>
+        ) : phase === 'ready' ? (
+          <Button variant="outline" className="h-14" onClick={clearOrder}>
+            Bỏ đơn đang mở (Esc)
+          </Button>
+        ) : (
+          <Button className="h-[72px] text-lg" onClick={() => scanRef.current?.focus()}>
+            Quét mã vạch (F2)
+          </Button>
+        )}
+      </footer>
 
       <LabelPrintDialog
         open={labelOpen}
@@ -366,6 +426,6 @@ export function PackStationScreen() {
           </dl>
         </DialogContent>
       </Dialog>
-    </>
+    </div>
   );
 }

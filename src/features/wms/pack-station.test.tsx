@@ -230,11 +230,15 @@ describe('Trạm đóng gói — quét đơn → quét SKU → tự đóng dòng
       http.get('/api/shipments/:id', () => HttpResponse.json(SHIPMENT('S00000001.SG.A1'))),
     );
     renderApp(<PackStationScreen />);
-    expect(screen.getByText('Chưa có đơn nào đang đóng')).toBeInTheDocument();
+    expect(screen.getByText('Quét mã đơn để nhận việc')).toBeInTheDocument();
 
     scan('SO2609-00007');
-    expect(await screen.findByText('Sản phẩm A')).toBeInTheDocument();
+    // Thẻ dòng đang đóng (to) + danh sách dòng — cùng bố cục màn pick PDA
+    expect((await screen.findAllByText('Sản phẩm A')).length).toBeGreaterThan(0);
+    expect(screen.getByRole('region', { name: 'Dòng đang đóng' })).toHaveTextContent('SKU-A');
+    expect(screen.getByRole('img', { name: 'Mã vạch BC-A' })).toBeInTheDocument();
     expect(screen.getByText('Công ty Mai Linh', { exact: false })).toBeInTheDocument();
+    expect(screen.getByText('0/2 dòng')).toBeInTheDocument();
     // URL giữ đơn đang mở (luật 8)
     await waitFor(() =>
       expect(replace).toHaveBeenCalledWith('/wms/pack?order=SO2609-00007', { scroll: false }),
@@ -242,11 +246,17 @@ describe('Trạm đóng gói — quét đơn → quét SKU → tự đóng dòng
 
     scan('BC-A');
     await waitFor(() => expect(completes).toHaveLength(1));
+    // Dòng A đủ → thẻ chuyển sang dòng B, tiến độ 1/2
+    await waitFor(() =>
+      expect(screen.getByRole('region', { name: 'Dòng đang đóng' })).toHaveTextContent('SKU-B'),
+    );
+    expect(screen.getByText('1/2 dòng')).toBeInTheDocument();
     scan('BC-B');
     await waitFor(() => expect(scans).toHaveLength(2));
     expect(completes).toHaveLength(1); // B mới 1/2 — chưa đóng dòng
     scan('BC-B');
     await waitFor(() => expect(completes).toHaveLength(2));
+    expect(await screen.findByText('Xong đơn SO2609-00007')).toBeInTheDocument();
 
     // Popup nhãn: iframe trỏ vào proxy nhãn, khổ A6 dọc
     const frame = await screen.findByTitle('Nhãn vận đơn S00000001.SG.A1');
@@ -263,7 +273,7 @@ describe('Trạm đóng gói — quét đơn → quét SKU → tự đóng dòng
     server.use(...scanFlow(WAYBILL_ISSUED));
     renderApp(<PackStationScreen />);
     scan('SO2609-00007');
-    await screen.findByText('Sản phẩm A');
+    await screen.findAllByText('Sản phẩm A');
 
     scan('BC-KHONG-CO');
     expect(await screen.findByRole('alert')).toHaveTextContent(/không thuộc SO2609-00007/);
@@ -287,7 +297,7 @@ describe('Trạm đóng gói — quét đơn → quét SKU → tự đóng dòng
     );
     renderApp(<PackStationScreen />);
     scan('SO2609-00007');
-    await screen.findByText('Sản phẩm A');
+    await screen.findAllByText('Sản phẩm A');
     scan('BC-A');
     scan('BC-B');
     await waitFor(() => expect(scans).toHaveLength(2));
@@ -324,7 +334,7 @@ describe('Trạm đóng gói — quét đơn → quét SKU → tự đóng dòng
     );
     renderApp(<PackStationScreen />);
     scan('SO2609-00007');
-    await screen.findByText('Sản phẩm A');
+    await screen.findAllByText('Sản phẩm A');
     scan('BC-A');
     scan('BC-B');
     await waitFor(() => expect(scans).toHaveLength(2));
@@ -344,8 +354,8 @@ describe('Trạm đóng gói — quét đơn → quét SKU → tự đóng dòng
   });
 });
 
-describe('Trạm đóng gói — hàng đợi PACK + đếm đơn đã đóng hôm nay (role PACKER, 2026-09-15)', () => {
-  it('lúc chưa mở đơn: hàng đợi từ GET /pda/queue?type=PACK, bấm một dòng → mở đơn (resolve mã đơn); tiêu đề nêu số đơn đã đóng', async () => {
+describe('Trạm đóng gói — màn chờ hai cột "Chờ đóng gói" / "Đã đóng gói hôm nay" (cùng bố cục màn pick PDA)', () => {
+  it('lúc chưa mở đơn: cột hàng đợi từ GET /pda/queue?type=PACK, bấm một dòng → mở đơn (resolve mã đơn); cột đã đóng từ GET /pda/stats?type=PACK', async () => {
     const resolved: string[] = [];
     server.use(
       http.get('/api/pda/queue', () =>
@@ -402,13 +412,17 @@ describe('Trạm đóng gói — hàng đợi PACK + đếm đơn đã đóng h�
       }),
     );
     renderApp(<PackStationScreen />);
-    const queue = await screen.findByRole('region', { name: 'Hàng đợi đóng gói' });
+    expect(screen.getByText('Quét mã đơn để nhận việc')).toBeInTheDocument();
+    const queue = await screen.findByRole('region', { name: 'Chờ đóng gói' });
     await waitFor(() => expect(queue).toHaveTextContent('2 chờ · 1 của tôi'));
+    expect(queue).toHaveTextContent('Chờ đóng gói · 2');
     expect(queue).toHaveTextContent('SO2609-00011');
     expect(queue).toHaveTextContent('Chưa nhận');
     expect(queue).toHaveTextContent('Của tôi');
-    expect(queue).toHaveTextContent(/bạn đã đóng 7 đơn/);
-    expect(await screen.findByText(/hôm nay bạn đã đóng 7 đơn · 2 đơn chờ/)).toBeInTheDocument();
+    const done = screen.getByRole('region', { name: 'Đã đóng gói hôm nay' });
+    await waitFor(() => expect(done).toHaveTextContent('Đã đóng gói hôm nay · 7'));
+    expect(done).toHaveTextContent('2026-09-15');
+    expect(done).toHaveTextContent('SO2609-00001');
     fireEvent.click(screen.getByRole('button', { name: 'Mở SO2609-00011' }));
     await waitFor(() => expect(resolved).toEqual(['SO2609-00011']));
   });
