@@ -2,7 +2,7 @@
 
 import { zodResolver } from '@hookform/resolvers/zod';
 import Decimal from 'decimal.js';
-import { Plus, UserPlus, X } from 'lucide-react';
+import { Boxes, Plus, UserPlus, X } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -43,6 +43,7 @@ import {
   useSkuSearch,
 } from '../api/use-line-entry';
 import { useCreateOrder, useOrder } from '../api/use-orders';
+import { collapseComboLines } from '../combo-lines';
 import { orderAddressLine, orderChannelLabel } from '../labels';
 
 /** Giá trị Select cho "không chọn" — Radix Select không nhận value rỗng. */
@@ -144,9 +145,12 @@ export function OrderCreateScreen() {
       addressId: source.data.addressId ?? '',
       channel: source.data.channel,
       shippingFee: source.data.shippingFee,
-      lines: source.data.lines
-        .filter((l) => !l.isGift) // dòng quà do KM sinh — engine sẽ tự sinh lại nếu còn KM
-        .map((l) => ({ skuId: l.skuId, uomId: l.uomId, qty: l.qty, discountPercent: '' })),
+      // Dòng quà do KM sinh — engine sẽ tự sinh lại nếu còn KM; dòng thành phần combo gộp
+      // về một dòng combo (server bung lại khi chốt).
+      lines: collapseComboLines(source.data.lines.filter((l) => !l.isGift)).map((l) => ({
+        ...l,
+        discountPercent: '',
+      })),
     });
   }, [source.data, form]);
 
@@ -465,7 +469,9 @@ function LineRow({
   const qty = useWatch({ control: form.control, name: `lines.${index}.qty` });
   const dp = useWatch({ control: form.control, name: `lines.${index}.discountPercent` }) ?? '';
   const sku = useSkuDetail(skuId);
-  const stock = useSkuAvailability(sku.data?.code ?? '');
+  const combo = sku.data?.isCombo ? (sku.data.combo ?? null) : null;
+  // Combo không có tồn riêng — khả dụng lấy từ thành phần (GET /skus/{id}.combo), không hỏi /stock.
+  const stock = useSkuAvailability(combo ? '' : (sku.data?.code ?? ''));
   const qtyValid = QTY_RE.test(qty ?? '');
   const price = useLinePrice({
     skuId,
@@ -492,8 +498,9 @@ function LineRow({
     factor && qty && /^\d/.test(qty)
       ? `= ${formatQuantity(new Decimal(qty).mul(factor).toString())} ${sku.data?.baseUom.code}`
       : null;
-  const low =
-    stock.data && qty
+  const low = combo
+    ? qtyValid && new Decimal(combo.available).lessThan(qty)
+    : stock.data && qty
       ? new Decimal(stock.data.available).lessThan(
           factor ? new Decimal(qty).mul(factor) : new Decimal(qty || '0'),
         )
@@ -538,6 +545,19 @@ function LineRow({
                 placeholder="Tìm mã SKU, tên, barcode…"
               />
             </FormControl>
+            {combo ? (
+              <p className="flex flex-wrap items-center gap-1 text-xs text-muted-foreground">
+                <span className="inline-flex items-center gap-0.5 rounded bg-primary/10 px-1 font-semibold text-primary">
+                  <Boxes className="h-3 w-3" aria-hidden />
+                  Combo
+                </span>
+                <span>
+                  gồm{' '}
+                  {combo.components.map((c) => `${formatQuantity(c.qty)} × ${c.code}`).join(', ')}
+                  {' — '}kho giữ và pick từng thành phần
+                </span>
+              </p>
+            ) : null}
             <FormMessage />
           </FormItem>
         )}
@@ -630,7 +650,12 @@ function LineRow({
         {lineTotal !== null ? formatMoney(lineTotal, { unit: '' }) : '—'}
       </div>
       <div className="pt-2 text-right text-sm tabular-nums">
-        {skuId === '' ? null : stock.isPending ? (
+        {skuId === '' ? null : combo ? (
+          <span className={low ? 'font-semibold text-destructive' : 'text-muted-foreground'}>
+            Còn bán được {formatQuantity(combo.available)} combo
+            {low ? ' — thiếu thành phần' : ''}
+          </span>
+        ) : stock.isPending ? (
           <span className="text-muted-foreground">Đang xem tồn…</span>
         ) : stock.data ? (
           <span className={low ? 'font-semibold text-destructive' : 'text-muted-foreground'}>

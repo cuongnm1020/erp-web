@@ -281,6 +281,122 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/combos": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["ComboController_list"];
+        put?: never;
+        post: operations["ComboController_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/combos/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["ComboController_get"];
+        put?: never;
+        post?: never;
+        delete: operations["ComboController_remove"];
+        options?: never;
+        head?: never;
+        patch: operations["ComboController_update"];
+        trace?: never;
+    };
+    "/stock": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Tồn gộp theo SKU — ba con số onHand / reserved / available tách riêng. */
+        get: operations["InventoryController_list"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/stock/by-location": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Bóc theo vị trí, sắp theo thứ tự đi trong kho. */
+        get: operations["InventoryController_byLocation"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/stock/by-lot": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Bóc theo lô, sắp theo hạn dùng tăng dần (FEFO). */
+        get: operations["InventoryController_byLot"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/lots": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["LotController_list"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/lots/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Sửa HSD/NSX khai sai lúc nhập — cần stock.adjust (đổi HSD đổi thứ tự FEFO). */
+        patch: operations["LotController_update"];
+        trace?: never;
+    };
     "/customers": {
         parameters: {
             query?: never;
@@ -858,90 +974,6 @@ export interface paths {
         options?: never;
         head?: never;
         patch: operations["WarehouseController_updateLocation"];
-        trace?: never;
-    };
-    "/stock": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Tồn gộp theo SKU — ba con số onHand / reserved / available tách riêng. */
-        get: operations["InventoryController_list"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/stock/by-location": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Bóc theo vị trí, sắp theo thứ tự đi trong kho. */
-        get: operations["InventoryController_byLocation"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/stock/by-lot": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Bóc theo lô, sắp theo hạn dùng tăng dần (FEFO). */
-        get: operations["InventoryController_byLot"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/lots": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get: operations["LotController_list"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/lots/{id}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        /** Sửa HSD/NSX khai sai lúc nhập — cần stock.adjust (đổi HSD đổi thứ tự FEFO). */
-        patch: operations["LotController_update"];
         trace?: never;
     };
     "/attributes": {
@@ -3414,6 +3446,203 @@ export interface components {
             /** @description Trần chiết khấu 0..1 dạng chuỗi; null = bảng giá không quy định. */
             maxDiscount: string | null;
         };
+        ComboListItemDto: {
+            /** @description core.Product.id — khoá của mọi endpoint /combos/:id. */
+            id: string;
+            /** @description core.Sku.id của SKU combo — dùng khi lên đơn (`lines[].skuId`). */
+            skuId: string;
+            code: string;
+            name: string;
+            isActive: boolean;
+            /** @description Mã ĐVT bán của combo. */
+            baseUomCode: string;
+            baseUomId: string;
+            /** @description Giá bán MỘT combo trong bảng giá mặc định — null = chưa đặt giá. */
+            salePrice: string | null;
+            componentCount: number;
+            /**
+             * @description Số combo còn bán được = min theo thành phần của floor(available / qty) — chuỗi số nguyên,
+             *     `0` khi có thành phần âm/hết. Tính từ tồn mọi kho (bất biến 2: combo không có tồn riêng).
+             */
+            available: string;
+            /** @description Optimistic locking — gửi lại trong PATCH; lệch → 409. */
+            version: number;
+            createdAt: string;
+            updatedAt: string;
+        };
+        ComboListResponseDto: {
+            items: components["schemas"]["ComboListItemDto"][];
+            total: number;
+        };
+        ComboComponentDto: {
+            skuId: string;
+            code: string;
+            name: string;
+            /** @description Mã ĐVT cơ sở của SKU thành phần — `qty` tính theo đơn vị này. */
+            baseUomCode: string;
+            /** @description Số lượng cho MỘT combo — Decimal(18,6) chuỗi. */
+            qty: string;
+            /** @description Tồn khả dụng của thành phần (onHand − reserved, mọi kho) — Decimal(18,6) chuỗi. */
+            available: string;
+            isActive: boolean;
+        };
+        ComboDetailDto: {
+            /** @description core.Product.id — khoá của mọi endpoint /combos/:id. */
+            id: string;
+            /** @description core.Sku.id của SKU combo — dùng khi lên đơn (`lines[].skuId`). */
+            skuId: string;
+            code: string;
+            name: string;
+            isActive: boolean;
+            /** @description Mã ĐVT bán của combo. */
+            baseUomCode: string;
+            baseUomId: string;
+            /** @description Giá bán MỘT combo trong bảng giá mặc định — null = chưa đặt giá. */
+            salePrice: string | null;
+            componentCount: number;
+            /**
+             * @description Số combo còn bán được = min theo thành phần của floor(available / qty) — chuỗi số nguyên,
+             *     `0` khi có thành phần âm/hết. Tính từ tồn mọi kho (bất biến 2: combo không có tồn riêng).
+             */
+            available: string;
+            /** @description Optimistic locking — gửi lại trong PATCH; lệch → 409. */
+            version: number;
+            createdAt: string;
+            updatedAt: string;
+            categoryId: string | null;
+            brandId: string | null;
+            description: string | null;
+            searchAliases: string[];
+            components: components["schemas"]["ComboComponentDto"][];
+        };
+        ComboComponentInputDto: {
+            /**
+             * Format: uuid
+             * @description core.Sku.id của SKU thường (không phải combo), đang bán.
+             */
+            skuId: string;
+            /** @description Số lượng cho MỘT combo — Decimal(18,6) dạng chuỗi, > 0, theo ĐVT cơ sở của SKU thành phần. */
+            qty: string;
+        };
+        CreateComboDto: {
+            /** @description Bỏ trống → sinh tự động `CB-{seq}`. Mã dùng chung cho Product và SKU combo. */
+            code?: string;
+            name: string;
+            /** Format: uuid */
+            categoryId?: string;
+            /** Format: uuid */
+            brandId?: string;
+            description?: string;
+            /** @description Mã ĐVT của SKU combo (mặc định PCS) — combo bán theo đơn vị này, không quy đổi. */
+            baseUom?: string;
+            /** @description Giá bán MỘT combo vào bảng giá mặc định — Decimal(18,4) chuỗi. Bỏ trống = chưa đặt giá. */
+            salePrice?: string;
+            /** @description Tên dân dã / viết tắt cho ô tìm kiếm. */
+            searchAliases?: string[];
+            components: components["schemas"]["ComboComponentInputDto"][];
+        };
+        UpdateComboDto: {
+            /** @description Optimistic locking — Product.version client đang cầm; lệch → 409. */
+            version: number;
+            name?: string;
+            /** Format: uuid */
+            categoryId?: string | null;
+            /** Format: uuid */
+            brandId?: string | null;
+            description?: string;
+            isActive?: boolean;
+            salePrice?: string;
+            searchAliases?: string[];
+            components?: components["schemas"]["ComboComponentInputDto"][];
+        };
+        StockRowDto: {
+            skuId: string;
+            skuCode: string;
+            skuName: string;
+            /** @description Đơn vị lưu kho — mọi con số dưới đây tính theo đơn vị này. */
+            baseUomId: string;
+            baseUomCode: string;
+            isActive: boolean;
+            /** @description Decimal(18,6) dạng chuỗi. */
+            onHand: string;
+            /** @description Decimal(18,6) dạng chuỗi. */
+            reserved: string;
+            /** @description `onHand - reserved`, Decimal(18,6) dạng chuỗi. Có thể âm nếu tồn bị lệch. */
+            available: string;
+        };
+        StockListResponseDto: {
+            items: components["schemas"]["StockRowDto"][];
+            total: number;
+        };
+        StockByLocationRowDto: {
+            skuId: string;
+            skuCode: string;
+            skuName: string;
+            warehouseId: string;
+            warehouseCode: string;
+            locationId: string;
+            locationCode: string;
+            /** @enum {string} */
+            locationType: "ZONE" | "AISLE" | "RACK" | "BIN" | "STAGING" | "DOCK" | "QUARANTINE";
+            isPickable: boolean;
+            pickSequence: number | null;
+            onHand: string;
+            reserved: string;
+            available: string;
+        };
+        StockByLocationResponseDto: {
+            items: components["schemas"]["StockByLocationRowDto"][];
+            total: number;
+        };
+        StockByLotRowDto: {
+            skuId: string;
+            skuCode: string;
+            skuName: string;
+            /** @description null = tồn không theo lô. */
+            lotId: string | null;
+            lotNumber: string | null;
+            /** @description Hạn dùng, ISO date — sắp xếp tăng dần chính là thứ tự FEFO. */
+            expiryDate: string | null;
+            mfgDate: string | null;
+            onHand: string;
+            reserved: string;
+            available: string;
+        };
+        StockByLotResponseDto: {
+            items: components["schemas"]["StockByLotRowDto"][];
+            total: number;
+        };
+        LotRowDto: {
+            id: string;
+            lotNumber: string;
+            skuId: string;
+            skuCode: string;
+            skuName: string;
+            /** @description ISO date — null nếu không khai. */
+            mfgDate: string | null;
+            expiryDate: string | null;
+            /** @description Tồn gộp của lô (theo bộ lọc kho nếu có) — Decimal(18,6) dạng chuỗi. */
+            onHand: string;
+            reserved: string;
+            available: string;
+            createdAt: string;
+        };
+        LotListResponseDto: {
+            items: components["schemas"]["LotRowDto"][];
+            total: number;
+        };
+        UpdateLotDto: {
+            expiryDate?: string | null;
+            mfgDate?: string | null;
+        };
+        LotDto: {
+            id: string;
+            skuId: string;
+            lotNumber: string;
+            mfgDate: string | null;
+            expiryDate: string | null;
+            createdAt: string;
+        };
         CustomerDto: {
             id: string;
             code: string;
@@ -3698,6 +3927,8 @@ export interface components {
             skuCount: number;
             /** @description false = sản phẩm đơn: đúng một SKU, không tổ hợp thuộc tính. UI đổi nhãn Biến thể ↔ SKU. */
             hasVariants: boolean;
+            /** @description true = combo: ô chọn SKU khi lên đơn hiện nhãn Combo; tồn gộp = 0 (tồn ở thành phần). */
+            isCombo: boolean;
             /** @description Tên dân dã / viết tắt / tên cũ — ô tìm sản phẩm ăn cả các alias này. */
             searchAliases: string[];
             /** @description Optimistic locking — client giữ nguyên và gửi lại trong PATCH; lệch → 409. */
@@ -3804,6 +4035,8 @@ export interface components {
             updatedAt: string;
             /** @description false = sản phẩm đơn (một SKU, không thuộc tính). */
             hasVariants: boolean;
+            /** @description true = combo — sửa ở /combos/:id, form sản phẩm chỉ đọc. */
+            isCombo: boolean;
             skus: components["schemas"]["ProductSkuDetailDto"][];
             /** @description Gallery của sản phẩm cha, ảnh chính đứng đầu. */
             images: components["schemas"]["ProductImageDto"][];
@@ -3859,6 +4092,8 @@ export interface components {
             searchAliases: string[];
             /** @description Optimistic locking — client giữ nguyên và gửi lại trong PATCH; lệch → 409. */
             version: number;
+            /** @description true = combo (một SKU, không tồn riêng; quản lý ở /combos). */
+            isCombo: boolean;
         };
         UpdateProductDto: {
             /**
@@ -3953,6 +4188,22 @@ export interface components {
             barcodes?: components["schemas"]["BarcodeDto"][];
             conversions?: components["schemas"]["UomConversionDto"][];
         };
+        SkuComboComponentDto: {
+            skuId: string;
+            code: string;
+            name: string;
+            baseUomCode: string;
+            /** @description Số lượng cho MỘT combo — Decimal(18,6) chuỗi. */
+            qty: string;
+            /** @description Tồn khả dụng thành phần (mọi kho) — Decimal(18,6) chuỗi. */
+            available: string;
+            isActive: boolean;
+        };
+        SkuComboInfoDto: {
+            components: components["schemas"]["SkuComboComponentDto"][];
+            /** @description Số combo còn bán được — chuỗi số nguyên. */
+            available: string;
+        };
         SkuDetailDto: {
             /** @description Product cha dạng core (runtime chỉ include bản ghi trần, không kéo category/brand). */
             product: components["schemas"]["ProductCoreDto"];
@@ -3975,6 +4226,10 @@ export interface components {
             images?: components["schemas"]["ProductImageDto"][];
             /** @description Giá bán bảng mặc định — chỉ có ở GET /skus/{id}. */
             salePrice?: string | null;
+            /** @description true = SKU combo — chỉ bán theo baseUom, không quy đổi; tồn = `combo.available`. */
+            isCombo?: boolean;
+            /** @description Thành phần + số combo còn bán được — chỉ có ở GET /skus/{id} khi `isCombo`. */
+            combo?: components["schemas"]["SkuComboInfoDto"] | null;
             id: string;
             productId: string;
             code: string;
@@ -4008,6 +4263,8 @@ export interface components {
             trackingMode: "NONE" | "LOT" | "SERIAL";
             barcodeCount: number;
             isActive: boolean;
+            /** @description true = SKU combo (tồn 0/0/0 — tồn nằm ở thành phần). */
+            isCombo: boolean;
             /** @description Optimistic locking — bulk PATCH /skus/:id (ví dụ Ngừng bán) dùng thẳng, khỏi gọi chi tiết. */
             version: number;
             /** @description Ảnh chính của SKU (rơi về ảnh chính sản phẩm cha) — presigned URL, null = chưa có ảnh. */
@@ -4186,94 +4443,6 @@ export interface components {
             isActive?: boolean;
             /** @description SKU cố định của bin — THAY TOÀN BỘ danh sách; mảng rỗng = bỏ gán hết. */
             fixedSkuIds?: string[];
-        };
-        StockRowDto: {
-            skuId: string;
-            skuCode: string;
-            skuName: string;
-            /** @description Đơn vị lưu kho — mọi con số dưới đây tính theo đơn vị này. */
-            baseUomId: string;
-            baseUomCode: string;
-            isActive: boolean;
-            /** @description Decimal(18,6) dạng chuỗi. */
-            onHand: string;
-            /** @description Decimal(18,6) dạng chuỗi. */
-            reserved: string;
-            /** @description `onHand - reserved`, Decimal(18,6) dạng chuỗi. Có thể âm nếu tồn bị lệch. */
-            available: string;
-        };
-        StockListResponseDto: {
-            items: components["schemas"]["StockRowDto"][];
-            total: number;
-        };
-        StockByLocationRowDto: {
-            skuId: string;
-            skuCode: string;
-            skuName: string;
-            warehouseId: string;
-            warehouseCode: string;
-            locationId: string;
-            locationCode: string;
-            /** @enum {string} */
-            locationType: "ZONE" | "AISLE" | "RACK" | "BIN" | "STAGING" | "DOCK" | "QUARANTINE";
-            isPickable: boolean;
-            pickSequence: number | null;
-            onHand: string;
-            reserved: string;
-            available: string;
-        };
-        StockByLocationResponseDto: {
-            items: components["schemas"]["StockByLocationRowDto"][];
-            total: number;
-        };
-        StockByLotRowDto: {
-            skuId: string;
-            skuCode: string;
-            skuName: string;
-            /** @description null = tồn không theo lô. */
-            lotId: string | null;
-            lotNumber: string | null;
-            /** @description Hạn dùng, ISO date — sắp xếp tăng dần chính là thứ tự FEFO. */
-            expiryDate: string | null;
-            mfgDate: string | null;
-            onHand: string;
-            reserved: string;
-            available: string;
-        };
-        StockByLotResponseDto: {
-            items: components["schemas"]["StockByLotRowDto"][];
-            total: number;
-        };
-        LotRowDto: {
-            id: string;
-            lotNumber: string;
-            skuId: string;
-            skuCode: string;
-            skuName: string;
-            /** @description ISO date — null nếu không khai. */
-            mfgDate: string | null;
-            expiryDate: string | null;
-            /** @description Tồn gộp của lô (theo bộ lọc kho nếu có) — Decimal(18,6) dạng chuỗi. */
-            onHand: string;
-            reserved: string;
-            available: string;
-            createdAt: string;
-        };
-        LotListResponseDto: {
-            items: components["schemas"]["LotRowDto"][];
-            total: number;
-        };
-        UpdateLotDto: {
-            expiryDate?: string | null;
-            mfgDate?: string | null;
-        };
-        LotDto: {
-            id: string;
-            skuId: string;
-            lotNumber: string;
-            mfgDate: string | null;
-            expiryDate: string | null;
-            createdAt: string;
         };
         AttributeValueDto: {
             code: string;
@@ -4525,6 +4694,22 @@ export interface components {
             labelPrintedAt: string | null;
             labelPrintCount: number;
         };
+        SalesOrderLineComboDto: {
+            /** @description core.Sku.id của combo. */
+            skuId: string;
+            skuCode: string;
+            skuName: string;
+            /** @description Thứ tự combo trong đơn — khoá gộp dòng. */
+            groupNo: number;
+            /** @description Số combo khách đặt — Decimal(18,6) chuỗi. */
+            qty: string;
+            /** @description Số lượng thành phần cho MỘT combo — Decimal(18,6) chuỗi. */
+            componentQty: string;
+            /** @description Giá niêm yết MỘT combo — Decimal(18,4) chuỗi. */
+            listPrice: string;
+            /** @description Giá bán MỘT combo (sau chiết khấu tay) — Decimal(18,4) chuỗi. */
+            unitPrice: string;
+        };
         SalesOrderLineDto: {
             id: string;
             lineNo: number;
@@ -4549,6 +4734,11 @@ export interface components {
             promotionId: string | null;
             /** @description true = dòng hàng tặng do khuyến mãi sinh ra (đơn giá 0). */
             isGift: boolean;
+            /**
+             * @description Combo: khác null = dòng này là THÀNH PHẦN bung ra từ một combo. Tiền combo đã phân bổ
+             *     xuống `lineTotal` các dòng cùng nhóm; UI gộp theo `groupNo` và hiện giá combo từ đây.
+             */
+            combo: components["schemas"]["SalesOrderLineComboDto"] | null;
             /** @description Đang giữ, CHƯA xuất — Decimal(18,6) dạng chuỗi theo ĐVT cơ sở (bất biến 3). */
             reservedQty: string;
             /** @description Đã pick xong (reservation FULFILLED) — Decimal(18,6) dạng chuỗi theo ĐVT cơ sở. */
@@ -4696,6 +4886,18 @@ export interface components {
             idempotencyKey?: string;
             lines: components["schemas"]["CreateOrderLineDto"][];
         };
+        OrderLineComboResultDto: {
+            skuId: string;
+            groupNo: number;
+            /** @description Decimal(18,6) chuỗi. */
+            qty: string;
+            /** @description Decimal(18,6) chuỗi. */
+            componentQty: string;
+            /** @description Decimal(18,4) chuỗi. */
+            listPrice: string;
+            /** @description Decimal(18,4) chuỗi. */
+            unitPrice: string;
+        };
         OrderLineResultDto: {
             lineId: string;
             lineNo: number;
@@ -4716,6 +4918,8 @@ export interface components {
             lineTotal: string;
             promotionId: string | null;
             isGift: boolean;
+            /** @description Khác null = dòng thành phần của combo (xem SalesOrderLineComboDto; không có mã/tên ở đây). */
+            combo: components["schemas"]["OrderLineComboResultDto"] | null;
         };
         OrderReservationResultDto: {
             reservationId: string;
@@ -7040,6 +7244,259 @@ export interface operations {
             };
         };
     };
+    ComboController_list: {
+        parameters: {
+            query: {
+                /** @description Tìm theo mã / tên combo, mã / tên SKU thành phần. */
+                q?: string;
+                isActive?: boolean;
+                sortBy?: "code" | "name" | "createdAt";
+                sortDir?: "asc" | "desc";
+                take: number;
+                skip: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ComboListResponseDto"];
+                };
+            };
+        };
+    };
+    ComboController_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateComboDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ComboDetailDto"];
+                };
+            };
+        };
+    };
+    ComboController_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ComboDetailDto"];
+                };
+            };
+        };
+    };
+    ComboController_remove: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    ComboController_update: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateComboDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ComboDetailDto"];
+                };
+            };
+        };
+    };
+    InventoryController_list: {
+        parameters: {
+            query: {
+                /** @description Lọc theo mã / tên SKU (không phân biệt hoa thường). */
+                q?: string;
+                /** @description Chỉ tính tồn trong kho này (lọc qua `Location.warehouseId`). */
+                warehouseId?: string;
+                take: number;
+                skip: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StockListResponseDto"];
+                };
+            };
+        };
+    };
+    InventoryController_byLocation: {
+        parameters: {
+            query: {
+                /** @description Lọc theo mã / tên SKU (không phân biệt hoa thường). */
+                q?: string;
+                /** @description Chỉ tính tồn trong kho này (lọc qua `Location.warehouseId`). */
+                warehouseId?: string;
+                take: number;
+                skip: number;
+                skuId?: string;
+                locationId?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StockByLocationResponseDto"];
+                };
+            };
+        };
+    };
+    InventoryController_byLot: {
+        parameters: {
+            query: {
+                /** @description Lọc theo mã / tên SKU (không phân biệt hoa thường). */
+                q?: string;
+                /** @description Chỉ tính tồn trong kho này (lọc qua `Location.warehouseId`). */
+                warehouseId?: string;
+                take: number;
+                skip: number;
+                skuId?: string;
+                locationId?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StockByLotResponseDto"];
+                };
+            };
+        };
+    };
+    LotController_list: {
+        parameters: {
+            query: {
+                /** @description Lọc theo số lô (không phân biệt hoa thường). */
+                q?: string;
+                skuId?: string;
+                /** @description Chỉ tính tồn trong kho này (lọc qua `Location.warehouseId`). */
+                warehouseId?: string;
+                /** @description Lô hết hạn trong N ngày tới (gồm cả đã hết hạn). Bỏ trống = mọi lô. */
+                expiringInDays?: number;
+                /** @description true = chỉ lô còn tồn (onHand > 0). */
+                hasStock?: boolean;
+                take: number;
+                skip: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LotListResponseDto"];
+                };
+            };
+        };
+    };
+    LotController_update: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateLotDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LotDto"];
+                };
+            };
+        };
+    };
     CustomerController_list: {
         parameters: {
             query: {
@@ -8307,144 +8764,6 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["LocationDto"];
-                };
-            };
-        };
-    };
-    InventoryController_list: {
-        parameters: {
-            query: {
-                /** @description Lọc theo mã / tên SKU (không phân biệt hoa thường). */
-                q?: string;
-                /** @description Chỉ tính tồn trong kho này (lọc qua `Location.warehouseId`). */
-                warehouseId?: string;
-                take: number;
-                skip: number;
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["StockListResponseDto"];
-                };
-            };
-        };
-    };
-    InventoryController_byLocation: {
-        parameters: {
-            query: {
-                /** @description Lọc theo mã / tên SKU (không phân biệt hoa thường). */
-                q?: string;
-                /** @description Chỉ tính tồn trong kho này (lọc qua `Location.warehouseId`). */
-                warehouseId?: string;
-                take: number;
-                skip: number;
-                skuId?: string;
-                locationId?: string;
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["StockByLocationResponseDto"];
-                };
-            };
-        };
-    };
-    InventoryController_byLot: {
-        parameters: {
-            query: {
-                /** @description Lọc theo mã / tên SKU (không phân biệt hoa thường). */
-                q?: string;
-                /** @description Chỉ tính tồn trong kho này (lọc qua `Location.warehouseId`). */
-                warehouseId?: string;
-                take: number;
-                skip: number;
-                skuId?: string;
-                locationId?: string;
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["StockByLotResponseDto"];
-                };
-            };
-        };
-    };
-    LotController_list: {
-        parameters: {
-            query: {
-                /** @description Lọc theo số lô (không phân biệt hoa thường). */
-                q?: string;
-                skuId?: string;
-                /** @description Chỉ tính tồn trong kho này (lọc qua `Location.warehouseId`). */
-                warehouseId?: string;
-                /** @description Lô hết hạn trong N ngày tới (gồm cả đã hết hạn). Bỏ trống = mọi lô. */
-                expiringInDays?: number;
-                /** @description true = chỉ lô còn tồn (onHand > 0). */
-                hasStock?: boolean;
-                take: number;
-                skip: number;
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["LotListResponseDto"];
-                };
-            };
-        };
-    };
-    LotController_update: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["UpdateLotDto"];
-            };
-        };
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["LotDto"];
                 };
             };
         };

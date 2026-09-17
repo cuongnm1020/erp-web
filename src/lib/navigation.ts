@@ -143,6 +143,12 @@ export const NAV_MODULES: NavModule[] = [
         ability: { action: 'read', subject: 'Product' },
       },
       {
+        label: 'Combo sản phẩm',
+        href: '/catalog/combos',
+        icon: Boxes,
+        ability: { action: 'read', subject: 'Product' },
+      },
+      {
         label: 'Danh mục · thương hiệu',
         href: '/catalog/categories',
         icon: List,
@@ -395,6 +401,7 @@ export const SEGMENT_LABELS: Record<string, string> = {
   valuation: 'Giá vốn & giá trị tồn',
   products: 'Sản phẩm',
   categories: 'Danh mục',
+  combos: 'Combo sản phẩm',
   'barcode-print': 'In tem barcode',
   lots: 'Lô & hạn dùng',
   suppliers: 'Nhà cung cấp',

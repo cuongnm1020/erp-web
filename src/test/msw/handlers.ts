@@ -145,6 +145,7 @@ export function makeOrderDetail(id: string) {
     priceListId: null,
     promotionId: null,
     isGift: i === 2,
+    combo: null,
     reservedQty: String((i + 1) * 10),
     pickedQty: i === 0 ? String((i + 1) * 10) : '0',
   }));
@@ -163,6 +164,74 @@ export function makeOrderDetail(id: string) {
     shipment: null,
     lines,
   };
+}
+
+/**
+ * Chi tiết đơn có MỘT combo (2 dòng thành phần, `combo.groupNo` = 1) + một dòng thường —
+ * đúng shape `SalesOrderLineDto.combo` (server bung combo, tiền đã phân bổ xuống thành phần).
+ */
+export function makeOrderDetailWithCombo(id: string) {
+  const base = makeOrderDetail(id);
+  if (!base) return null;
+  const combo = {
+    skuId: uuid('00000005', 1),
+    skuCode: 'CB-0001',
+    skuName: 'Combo A + B',
+    groupNo: 1,
+    qty: '3',
+    componentQty: '2',
+    listPrice: '150000',
+    unitPrice: '150000',
+  };
+  const lines = [
+    {
+      ...base.lines[0]!,
+      lineNo: 1,
+      skuCode: 'SKU-A',
+      skuName: 'Sản phẩm A',
+      qty: '6',
+      qtyBase: '6',
+      listPrice: '56250',
+      unitPrice: '56250',
+      discount: '0',
+      lineTotal: '337500',
+      isGift: false,
+      combo,
+    },
+    {
+      ...base.lines[0]!,
+      id: uuid('00000002', 11),
+      lineNo: 2,
+      skuId: uuid('00000003', 11),
+      skuCode: 'SKU-B',
+      skuName: 'Sản phẩm B',
+      qty: '3',
+      qtyBase: '3',
+      listPrice: '37500',
+      unitPrice: '37500',
+      discount: '0',
+      lineTotal: '112500',
+      isGift: false,
+      combo: { ...combo, componentQty: '1' },
+    },
+    {
+      ...base.lines[0]!,
+      id: uuid('00000002', 12),
+      lineNo: 3,
+      skuId: uuid('00000003', 12),
+      skuCode: 'SKU-C',
+      skuName: 'Sản phẩm C',
+      qty: '1',
+      qtyBase: '1',
+      listPrice: '60000',
+      unitPrice: '60000',
+      discount: '0',
+      lineTotal: '60000',
+      isGift: false,
+      combo: null,
+    },
+  ];
+  return { ...base, lineCount: 3, subtotal: '510000', total: '510000', lines };
 }
 
 /** Đúng shape `SalesOrderShipmentDto` — phiếu giao đã có vận đơn GHTK, chưa in nhãn. */

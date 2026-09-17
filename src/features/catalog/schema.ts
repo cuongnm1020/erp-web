@@ -222,3 +222,83 @@ export function gramsToKg(g: string): string {
 export function kgToGrams(kg: string): string {
   return new Decimal(kg).mul(1000).toDecimalPlaces(1).toString();
 }
+
+// ── Combo sản phẩm (2026-09-18) ─────────────────────────────────────────────
+
+/**
+ * Một dòng thành phần combo — khớp ComboComponentInputDto (skuId + qty); mã / tên / ĐVT /
+ * khả dụng chỉ để hiển thị (lấy từ option đã chọn hoặc từ ComboDetailDto khi sửa).
+ */
+export const comboComponentRowSchema = z.object({
+  skuId: z.string().refine((v) => v !== '', 'Chọn SKU thành phần'),
+  skuCode: z.string(),
+  skuName: z.string(),
+  baseUomCode: z.string(),
+  /** Decimal(18,6) chuỗi — tồn khả dụng thành phần lúc chọn; '' = chưa biết. */
+  available: z.string(),
+  qty: quantitySchema.refine((v) => !new Decimal(v).isZero(), 'Định mức phải lớn hơn 0'),
+});
+
+/**
+ * Khớp CreateComboDto / UpdateComboDto (luật 11). `version` không nằm trong form — lấy từ
+ * ComboDetailDto lúc submit. Giá bán ghi vào BẢNG GIÁ MẶC ĐỊNH (giá không nằm trên SKU).
+ */
+export const comboFormSchema = z
+  .object({
+    code: codeSchema.optional().or(z.literal('')),
+    name: z.string().trim().min(1, 'Nhập tên combo').max(300, 'Tối đa 300 ký tự'),
+    categoryId: z.string().optional(),
+    brandId: z.string().optional(),
+    description: z.string().trim().max(2000, 'Tối đa 2000 ký tự'),
+    searchAliases: z.string().trim().max(500, 'Tối đa 500 ký tự'),
+    salePrice: moneySchema.optional().or(z.literal('')),
+    isActive: z.boolean(),
+    components: z.array(comboComponentRowSchema).min(1, 'Combo cần ít nhất một thành phần'),
+  })
+  .superRefine((v, ctx) => {
+    // Server chặn 422 COMBO_COMPONENT_INVALID khi trùng SKU — báo ngay trên dòng sau.
+    const seen = new Set<string>();
+    v.components.forEach((row, i) => {
+      if (!row.skuId) return;
+      if (seen.has(row.skuId)) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['components', i, 'skuId'],
+          message: 'SKU này đã có ở dòng trên',
+        });
+      }
+      seen.add(row.skuId);
+    });
+  });
+
+export type ComboComponentRowValues = z.infer<typeof comboComponentRowSchema>;
+export type ComboFormValues = z.infer<typeof comboFormSchema>;
+
+export const EMPTY_COMBO_ROW: ComboComponentRowValues = {
+  skuId: '',
+  skuCode: '',
+  skuName: '',
+  baseUomCode: '',
+  available: '',
+  qty: '1',
+};
+
+/**
+ * Số combo còn bán được từ các dòng thành phần = min floor(khả dụng / định mức); dòng chưa
+ * biết tồn ('') hoặc định mức sai → null (không đoán). Cùng công thức với server (ComboService).
+ */
+export function comboAvailableFromRows(
+  rows: readonly { qty: string; available: string }[],
+): string | null {
+  if (rows.length === 0) return null;
+  let min: Decimal | null = null;
+  for (const r of rows) {
+    if (r.available === '' || !/^-?\d/.test(r.available) || !/^\d/.test(r.qty)) return null;
+    const qty = new Decimal(r.qty);
+    if (qty.lessThanOrEqualTo(0)) return null;
+    const available = new Decimal(r.available);
+    const n = available.lessThanOrEqualTo(0) ? new Decimal(0) : available.div(qty).floor();
+    if (min === null || n.lessThan(min)) min = n;
+  }
+  return min === null ? null : min.toString();
+}

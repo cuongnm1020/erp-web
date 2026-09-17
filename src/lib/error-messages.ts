@@ -29,6 +29,14 @@ const MESSAGES: Record<string, string> = {
     'Chưa có giá cho sản phẩm này với khách đang chọn. Báo quản lý cập nhật bảng giá.',
   INVALID_STATUS_TRANSITION:
     'Trạng thái chứng từ đã đổi, thao tác này không còn hợp lệ. Tải lại trang.',
+  // Combo sản phẩm (/combos + bung combo khi lên đơn)
+  COMBO_COMPONENT_INVALID:
+    'Danh sách thành phần chưa hợp lệ: thiếu, trùng SKU, SKU ngừng bán hoặc định mức bằng 0.',
+  COMBO_NESTED: 'Không dùng combo làm thành phần của combo khác. Chọn SKU thường.',
+  COMBO_EMPTY: 'Combo chưa có thành phần nên chưa bán được. Thêm thành phần ở màn Combo sản phẩm.',
+  COMBO_SINGLE_SKU: 'Sản phẩm combo chỉ có một SKU. Sửa thành phần ở màn Combo sản phẩm.',
+  COMBO_SKU_NOT_STOCKABLE:
+    'Combo không có tồn riêng. Nhập / điều chỉnh tồn trên từng SKU thành phần.',
   // Phân công khách hàng (P2-04)
   NOT_TEAM_LEADER: 'Chỉ trưởng nhóm của team này mới được phân công. Chọn team bạn đang lead.',
   USER_NOT_IN_TEAM: 'Người được chọn không còn thuộc team này. Tải lại danh sách thành viên.',
