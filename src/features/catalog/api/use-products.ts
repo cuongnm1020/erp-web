@@ -379,3 +379,22 @@ export function useDeleteProduct() {
     },
   });
 }
+
+export type BulkDeleteProductsResult = components['schemas']['BulkDeleteProductsResultDto'];
+
+/**
+ * POST /products/bulk-delete — server tự quyết từng sản phẩm: đã có đơn hoặc đã vào kho
+ * → xóa mềm (ẩn, SKU Ngừng bán, tồn/chứng từ giữ nguyên); chưa phát sinh gì → xóa hẳn.
+ * Không optimistic (luật 5). Id không thấy → `skipped`, không lỗi.
+ */
+export function useBulkDeleteProducts() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (ids: string[]) => unwrap(api.POST('/products/bulk-delete', { body: { ids } })),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: productKeys.lists() });
+      void qc.invalidateQueries({ queryKey: productKeys.skuLists() });
+      void qc.invalidateQueries({ queryKey: productKeys.details() });
+    },
+  });
+}

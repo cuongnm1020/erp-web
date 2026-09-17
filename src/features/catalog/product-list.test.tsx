@@ -23,6 +23,16 @@ const replace = vi.fn((url: string) => {
   search = i === -1 ? '' : url.slice(i + 1);
 });
 
+// Toast không render trong harness → mock để khẳng định câu chữ (luật ngôn ngữ + luật 6).
+const toastSuccess = vi.fn();
+const toastError = vi.fn();
+vi.mock('@/components/ui/toaster', () => ({
+  toast: {
+    success: (...a: unknown[]) => toastSuccess(...a),
+    error: (...a: unknown[]) => toastError(...a),
+  },
+}));
+
 vi.mock('next/navigation', () => ({
   usePathname: () => '/catalog/products',
   useRouter: () => ({ push: vi.fn(), replace, refresh: vi.fn() }),
@@ -189,6 +199,8 @@ describe('ProductListScreen — góc nhìn Sản phẩm (mặc định, GET /pro
     listCalls = [];
     productCalls = [];
     replace.mockClear();
+    toastSuccess.mockClear();
+    toastError.mockClear();
     server.use(...productHandlers);
   });
 
@@ -247,12 +259,80 @@ describe('ProductListScreen — góc nhìn Sản phẩm (mặc định, GET /pro
     );
     renderApp(<ProductListScreen />);
     await screen.findByText(FIRST_PRODUCT.code);
-    fireEvent.click(screen.getAllByRole('button', { name: 'Xóa' })[0]!);
+    // Nút Xóa của DÒNG (trong bảng) — tiêu đề còn nút "Xóa" hàng loạt, đang vô hiệu vì chưa chọn.
+    const table = screen.getByRole('table');
+    fireEvent.click(within(table).getAllByRole('button', { name: 'Xóa' })[0]!);
     expect(await screen.findByText(`Xóa sản phẩm ${FIRST_PRODUCT.code}?`)).toBeInTheDocument();
     // Nút xác nhận trong dialog trùng tên nút dòng — là nút cuối cùng.
     const buttons = screen.getAllByRole('button', { name: 'Xóa' });
     fireEvent.click(buttons[buttons.length - 1]!);
     await waitFor(() => expect(deleted).toEqual([FIRST_PRODUCT.id]));
+  });
+
+  it('xóa hàng loạt: tick dòng → nút "Xóa (n)" trên tiêu đề → xác nhận → POST /products/bulk-delete, toast gộp kết quả, bỏ chọn', async () => {
+    let body: { ids: string[] } | null = null;
+    server.use(
+      http.post('/api/products/bulk-delete', async ({ request }) => {
+        body = (await request.json()) as { ids: string[] };
+        return HttpResponse.json({
+          hardDeleted: [{ id: PRODUCTS[1]!.id, code: PRODUCTS[1]!.code }],
+          softDeleted: [{ id: FIRST_PRODUCT.id, code: FIRST_PRODUCT.code }],
+          skipped: [],
+        });
+      }),
+    );
+    renderApp(<ProductListScreen />);
+    await screen.findByText(FIRST_PRODUCT.code);
+    // Chưa chọn gì → nút tiêu đề (đứng trước bảng trong DOM) vô hiệu; các nút "Xóa" sau là của dòng.
+    expect(screen.getAllByRole('button', { name: 'Xóa' })[0]).toBeDisabled();
+
+    const boxes = screen.getAllByRole('checkbox', { name: 'Chọn dòng' });
+    expect(boxes).toHaveLength(PRODUCTS.length);
+    // Tick hai dòng liên tiếp trên CÙNG node đã lấy — DataTable không được remount cell sau mỗi tick.
+    fireEvent.click(boxes[0]!);
+    fireEvent.click(boxes[1]!);
+    const btn = await screen.findByRole('button', { name: 'Xóa (2)' });
+    expect(btn).toBeEnabled();
+    fireEvent.click(btn);
+    expect(await screen.findByText('Xóa 2 sản phẩm?')).toBeInTheDocument();
+    expect(screen.getByText(/xóa mềm.*không hoàn tác được/)).toBeInTheDocument();
+    // Nút xác nhận trong dialog (cuối cùng) trùng tên hành động.
+    const confirms = screen.getAllByRole('button', { name: 'Xóa' });
+    fireEvent.click(confirms[confirms.length - 1]!);
+
+    await waitFor(() => expect(body).not.toBeNull());
+    expect(body!.ids.sort()).toEqual([FIRST_PRODUCT.id, PRODUCTS[1]!.id].sort());
+    await waitFor(() =>
+      expect(toastSuccess).toHaveBeenCalledWith(
+        'Đã xóa sản phẩm: xóa hẳn 1, ẩn 1 đã có đơn/tồn kho',
+      ),
+    );
+    // Xong → bỏ chọn, nút quay về "Xóa" vô hiệu.
+    await waitFor(() => expect(screen.getAllByRole('button', { name: 'Xóa' })[0]).toBeDisabled());
+    expect(screen.queryByRole('button', { name: 'Xóa (2)' })).not.toBeInTheDocument();
+  });
+
+  it('xóa hàng loạt lỗi (5xx) → toast lỗi, vẫn giữ lựa chọn để thử lại', async () => {
+    server.use(
+      http.post('/api/products/bulk-delete', () =>
+        HttpResponse.json(
+          { code: 'DB_ERROR', message: 'boom', details: null, traceId: 't-1' },
+          { status: 500 },
+        ),
+      ),
+    );
+    renderApp(<ProductListScreen />);
+    await screen.findByText(FIRST_PRODUCT.code);
+    fireEvent.click(screen.getAllByRole('checkbox', { name: 'Chọn dòng' })[0]!);
+    fireEvent.click(await screen.findByRole('button', { name: 'Xóa (1)' }));
+    await screen.findByText('Xóa 1 sản phẩm?');
+    const confirms = screen.getAllByRole('button', { name: 'Xóa' });
+    fireEvent.click(confirms[confirms.length - 1]!);
+    // Lỗi đi qua bộ dịch (luật 6): câu tiếng Việt cho DB_ERROR, không phải "boom".
+    await waitFor(() => expect(toastError).toHaveBeenCalled());
+    expect(toastError.mock.calls[0]![0]).toMatch(/Máy chủ gặp lỗi khi lưu dữ liệu/);
+    expect(toastError.mock.calls[0]![0]).not.toContain('boom');
+    expect(screen.getByRole('button', { name: 'Xóa (1)' })).toBeInTheDocument();
   });
 
   it('chỉ product.read → không có nút sửa/xóa trên dòng (luật 7)', async () => {
@@ -292,6 +372,13 @@ describe('ProductListScreen — góc nhìn Theo SKU (?view=sku, GET /skus)', () 
     const imgs = document.querySelectorAll('img');
     expect(imgs).toHaveLength(1);
     expect(imgs[0]!.getAttribute('src')).toContain('s3.local/erp-images');
+  });
+
+  it('nút Xóa hàng loạt trên tiêu đề vô hiệu ở góc nhìn Theo SKU (chọn ở đây là SKU)', async () => {
+    renderApp(<ProductListScreen />);
+    await screen.findByText(FIRST.code);
+    // Góc nhìn SKU không có nút xóa dòng → nút "Xóa" duy nhất là nút tiêu đề.
+    expect(screen.getByRole('button', { name: 'Xóa' })).toBeDisabled();
   });
 
   it('khả dụng âm hiện chữ đỏ (giữ nhiều hơn tồn thực)', async () => {

@@ -89,8 +89,12 @@ export function DataTable<T>({
   maxHeight = '70vh',
   className,
 }: DataTableProps<T>) {
+  // Cột chọn chỉ dùng row/table API, không đọc `selection` — memo theo cờ bật/tắt, KHÔNG theo
+  // object prop (caller thường tạo object mới mỗi render → cột đổi identity → cell remount sau
+  // mỗi lần tick, mất focus bàn phím và node DOM đang giữ).
+  const hasSelection = !!selection;
   const columns = useMemo<ColumnDef<T, unknown>[]>(() => {
-    if (!selection) return userColumns;
+    if (!hasSelection) return userColumns;
     const selectCol: ColumnDef<T, unknown> = {
       id: '__select',
       meta: { width: 36 },
@@ -117,7 +121,7 @@ export function DataTable<T>({
       ),
     };
     return [selectCol, ...userColumns];
-  }, [userColumns, selection]);
+  }, [userColumns, hasSelection]);
 
   const table = useReactTable({
     data: rows,

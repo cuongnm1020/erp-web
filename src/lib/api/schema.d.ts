@@ -544,6 +544,26 @@ export interface paths {
         patch: operations["ProductController_updateProduct"];
         trace?: never;
     };
+    "/products/bulk-delete": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Xóa nhiều sản phẩm: SKU đã có đơn hoặc đã vào kho → xóa mềm (như DELETE /products/:id
+         *     nhưng KHÔNG chặn khi còn tồn); chưa có gì → xóa cứng. Id không thấy → `skipped`.
+         */
+        post: operations["ProductController_bulkDeleteProducts"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/products/{id}/skus": {
         parameters: {
             query?: never;
@@ -3868,6 +3888,21 @@ export interface components {
             searchAliases?: string[];
             /** @description Có mặt = THAY TOÀN BỘ danh sách link attribute mô tả. */
             attributes?: components["schemas"]["AttributeLinkDto"][];
+        };
+        BulkDeleteProductsDto: {
+            ids: string[];
+        };
+        BulkDeletedProductDto: {
+            id: string;
+            code: string;
+        };
+        BulkDeleteProductsResultDto: {
+            /** @description Xóa mềm: SKU đã có đơn (bán/mua) hoặc đã đi vào kho — giữ bản ghi cho lịch sử, ẩn khỏi danh mục. */
+            softDeleted: components["schemas"]["BulkDeletedProductDto"][];
+            /** @description Xóa cứng: chưa lên chứng từ nào, chưa vào kho — mất hẳn (SKU, barcode, quy đổi, ảnh, giá). */
+            hardDeleted: components["schemas"]["BulkDeletedProductDto"][];
+            /** @description Không tìm thấy hoặc đã xóa trước đó — bỏ qua, không lỗi (bấm hai lần vẫn 200). */
+            skipped: string[];
         };
         BarcodeDto: {
             code: string;
@@ -7713,6 +7748,29 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ProductCoreDto"];
+                };
+            };
+        };
+    };
+    ProductController_bulkDeleteProducts: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BulkDeleteProductsDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BulkDeleteProductsResultDto"];
                 };
             };
         };
