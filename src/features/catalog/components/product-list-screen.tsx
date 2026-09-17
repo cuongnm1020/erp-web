@@ -1,6 +1,6 @@
 'use client';
 
-import { Download, Plus, Upload } from 'lucide-react';
+import { Download, FileSpreadsheet, Plus, Upload } from 'lucide-react';
 import Link from 'next/link';
 import { useMemo, useState } from 'react';
 import {
@@ -514,6 +514,18 @@ export function ProductListScreen() {
               <a href="/api/exports/skus?format=csv">
                 <Download aria-hidden />
                 Xuất CSV
+              </a>
+            </Button>
+            <Button size="sm" variant="outline" asChild>
+              {/* File xlsx đúng mẫu "Import sản phẩm" của Pancake POS — tải về rồi nhập thẳng
+                  vào POS. Cùng cơ chế anchor thật như Xuất CSV. */}
+              {/* eslint-disable-next-line @next/next/no-html-link-for-pages */}
+              <a
+                href="/api/exports/pancake-products"
+                title="Tải file xlsx theo mẫu import sản phẩm của Pancake POS"
+              >
+                <FileSpreadsheet aria-hidden />
+                Xuất Pancake
               </a>
             </Button>
             <Can I="create" a="Product">
