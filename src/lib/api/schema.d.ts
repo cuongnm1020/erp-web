@@ -1406,6 +1406,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/exports/pancake-products": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Danh mục sản phẩm theo mẫu "Import sản phẩm" của Pancake POS (xlsx, 56 cột). */
+        get: operations["ExportController_downloadPancakeProducts"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/exports/{entity}": {
         parameters: {
             query?: never;
@@ -9109,6 +9126,23 @@ export interface operations {
                 content: {
                     "application/json": string[];
                 };
+            };
+        };
+    };
+    ExportController_downloadPancakeProducts: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };
