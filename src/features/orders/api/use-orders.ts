@@ -21,6 +21,11 @@ export interface OrderListParams {
   weightMax?: string;
   /** true = chỉ đơn chưa chọn hãng. */
   noCarrier?: boolean;
+  /** Đơn đã gán hãng này (wms.Carrier.id). */
+  carrierId?: string;
+  /** Khoảng orderDate — ngày `YYYY-MM-DD` (server lấy trọn ngày VN) hoặc ISO datetime. */
+  from?: string;
+  to?: string;
   take: number;
   skip: number;
 }
@@ -65,6 +70,9 @@ export function orderListQuery(params: OrderListParams) {
               weightMin: params.weightMin || undefined,
               weightMax: params.weightMax || undefined,
               noCarrier: params.noCarrier ? 'true' : undefined,
+              carrierId: params.carrierId || undefined,
+              from: params.from || undefined,
+              to: params.to || undefined,
               take: params.take,
               skip: params.skip,
             },

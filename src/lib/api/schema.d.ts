@@ -2310,6 +2310,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/waves/auto-merge": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Gộp TỰ ĐỘNG theo cấp đóng gói: đơn một SKU vừa đủ một thùng → lượt CARTON; đủ số thùng của
+         *     một pallet → lượt PALLET (tự chạy sau mỗi đơn xác nhận; bấm tay để chạy lại cho cả kho).
+         */
+        post: operations["WaveController_autoMerge"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/waves": {
         parameters: {
             query?: never;
@@ -6041,6 +6061,30 @@ export interface components {
              */
             userId: string;
         };
+        AutoWaveRunDto: {
+            /** Format: uuid */
+            warehouseId?: string;
+            /** Format: uuid */
+            skuId?: string;
+        };
+        AutoWaveCartonDto: {
+            waveId: string;
+            docNumber: string;
+            skuId: string;
+            taskCount: number;
+        };
+        AutoWavePalletDto: {
+            waveId: string;
+            docNumber: string;
+            skuId: string;
+            taskCount: number;
+            /** @description Các lượt CARTON đã gộp vào (chuyển CANCELLED, mergedIntoId = waveId). */
+            mergedWaveIds: string[];
+        };
+        AutoWaveResultDto: {
+            cartonWaves: components["schemas"]["AutoWaveCartonDto"][];
+            palletWaves: components["schemas"]["AutoWavePalletDto"][];
+        };
         WaveDto: {
             id: string;
             docNumber: string;
@@ -6061,6 +6105,15 @@ export interface components {
             assignedAt: string | null;
             startedAt: string | null;
             completedAt: string | null;
+            /**
+             * @description Lượt gộp TỰ ĐỘNG theo cấp đóng gói: CARTON (đủ một thùng) / PALLET (đủ một pallet); null = gộp tay.
+             * @enum {string|null}
+             */
+            packLevel: "CARTON" | "PALLET" | null;
+            skuId: string | null;
+            skuCode: string | null;
+            /** @description Lượt CARTON đã gộp vào lượt PALLET này (khi status CANCELLED vì gộp). */
+            mergedIntoId: string | null;
         };
         WaveListResponseDto: {
             items: components["schemas"]["WaveDto"][];
@@ -6134,6 +6187,15 @@ export interface components {
             assignedAt: string | null;
             startedAt: string | null;
             completedAt: string | null;
+            /**
+             * @description Lượt gộp TỰ ĐỘNG theo cấp đóng gói: CARTON (đủ một thùng) / PALLET (đủ một pallet); null = gộp tay.
+             * @enum {string|null}
+             */
+            packLevel: "CARTON" | "PALLET" | null;
+            skuId: string | null;
+            skuCode: string | null;
+            /** @description Lượt CARTON đã gộp vào lượt PALLET này (khi status CANCELLED vì gộp). */
+            mergedIntoId: string | null;
             tasks: components["schemas"]["WaveTaskDto"][];
             /** @description Đã sắp theo lối đi (pickSequence). */
             lines: components["schemas"]["WaveLineGroupDto"][];
@@ -6344,6 +6406,15 @@ export interface components {
             assignedAt: string | null;
             startedAt: string | null;
             completedAt: string | null;
+            /**
+             * @description Lượt gộp TỰ ĐỘNG theo cấp đóng gói: CARTON (đủ một thùng) / PALLET (đủ một pallet); null = gộp tay.
+             * @enum {string|null}
+             */
+            packLevel: "CARTON" | "PALLET" | null;
+            skuId: string | null;
+            skuCode: string | null;
+            /** @description Lượt CARTON đã gộp vào lượt PALLET này (khi status CANCELLED vì gộp). */
+            mergedIntoId: string | null;
             tasks: components["schemas"]["WaveTaskDto"][];
             /** @description Đã sắp theo lối đi (pickSequence). */
             lines: components["schemas"]["WaveLineGroupDto"][];
@@ -10524,6 +10595,14 @@ export interface operations {
                 weightMax?: string;
                 /** @description Chỉ đơn CHƯA chọn hãng (`true`) — gom đơn cần gán hãng. */
                 noCarrier?: string;
+                /** @description Đơn ĐÃ gán hãng này (wms.Carrier.id). Kết hợp được với from/to. */
+                carrierId?: string;
+                /**
+                 * @description Khoảng `orderDate` (ISO): `from` ≤ orderDate. `to` là NGÀY (`YYYY-MM-DD`) thì lấy hết ngày đó
+                 *     (< to + 1 ngày, giờ Việt Nam); là datetime thì ≤ to.
+                 */
+                from?: string;
+                to?: string;
                 /** @description Tìm theo số chứng từ, mã hoặc tên khách (không phân biệt hoa thường). */
                 q?: string;
                 take: number;
@@ -11374,10 +11453,35 @@ export interface operations {
             };
         };
     };
+    WaveController_autoMerge: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AutoWaveRunDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AutoWaveResultDto"];
+                };
+            };
+        };
+    };
     WaveController_list: {
         parameters: {
             query: {
                 status?: "CANCELLED" | "PENDING" | "ASSIGNED" | "IN_PROGRESS" | "COMPLETED" | "EXCEPTION";
+                /** @description Chỉ lượt gộp tự động cấp này (CARTON / PALLET). */
+                packLevel?: "CARTON" | "PALLET";
                 warehouseId?: string;
                 assignedTo?: string;
                 take: number;

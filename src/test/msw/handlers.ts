@@ -109,7 +109,8 @@ export function makeOrders(n: number) {
     currencyCode: 'VND',
     ownerId: i % 3 === 0 ? null : 'u-sale',
     teamId: 't-hn',
-    carrierId: null,
+    // Mỗi đơn thứ 5 (lệch 1) đã gán GHTK — để test lọc theo hãng; đơn đầu (FIRST) vẫn chưa gán.
+    carrierId: i % 5 === 1 ? 'c-ghtk' : null,
     warehouseId: null,
     addressId: null,
     // Cân nặng: đặt tay 1 kg ở mỗi đơn thứ 4; còn lại tính từ dòng 0,3 → 1,5 kg.
@@ -817,6 +818,9 @@ export const handlers = [
     const weightMin = url.searchParams.get('weightMin');
     const weightMax = url.searchParams.get('weightMax');
     const noCarrier = url.searchParams.get('noCarrier') === 'true';
+    const carrierId = url.searchParams.get('carrierId');
+    const from = url.searchParams.get('from');
+    const to = url.searchParams.get('to');
     await delay(50);
     let all = makeOrders(60);
     if (q)
@@ -829,6 +833,13 @@ export const handlers = [
     if (weightMin) all = all.filter((o) => Number(o.weightKg) >= Number(weightMin));
     if (weightMax) all = all.filter((o) => Number(o.weightKg) <= Number(weightMax));
     if (noCarrier) all = all.filter((o) => o.carrierId === null);
+    if (carrierId) all = all.filter((o) => o.carrierId === carrierId);
+    // Fixture: ngày → so sánh theo UTC là đủ (server thật lấy trọn ngày VN).
+    if (from) all = all.filter((o) => o.orderDate >= new Date(from).toISOString());
+    if (to) {
+      const end = /^\d{4}-\d{2}-\d{2}$/.test(to) ? new Date(`${to}T23:59:59.999Z`) : new Date(to);
+      all = all.filter((o) => o.orderDate <= end.toISOString());
+    }
     return HttpResponse.json({ items: all.slice(skip, skip + take), total: all.length });
   }),
   http.post('/api/sales-orders/bulk-update', async ({ request }) => {
