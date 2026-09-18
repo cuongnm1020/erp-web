@@ -1,6 +1,7 @@
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api, unwrap } from '@/lib/api/client';
 import type { components, paths } from '@/lib/api/schema';
+import { orgTreeKeys } from './use-org-tree';
 
 export type UserListItem = components['schemas']['UserListItemDto'];
 export type UserDetail = components['schemas']['UserDetailDto'];
@@ -86,6 +87,7 @@ export function useCreateUser() {
     mutationFn: (input: CreateUserInput) => unwrap(api.POST('/users', { body: input })),
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: userKeys.lists() });
+      void qc.invalidateQueries({ queryKey: orgTreeKeys.all });
     },
   });
 }
@@ -98,6 +100,7 @@ export function useUpdateUser(id: string) {
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: userKeys.lists() });
       void qc.invalidateQueries({ queryKey: userKeys.detail(id) });
+      void qc.invalidateQueries({ queryKey: orgTreeKeys.all });
     },
   });
 }

@@ -629,6 +629,95 @@ export const DEPARTMENTS_FIXTURE = [
   },
 ];
 
+/** Đúng shape `OrgTreeDto` (GET /org/tree): 2 phòng ban lồng nhau, 2 team lồng nhau, 1 người chưa có phòng ban. */
+const ORG_EMP = (i: number, departmentId: string | null, isActive = true) => ({
+  id: uuid('0000000e', i),
+  code: `NV${String(i).padStart(3, '0')}`,
+  fullName:
+    ['Nguyễn Văn Lãnh', 'Trần Thị Hoa', 'Lê Minh Tuấn', 'Đỗ Văn Kho'][i - 1] ?? `Nhân viên ${i}`,
+  email: `nv${i}@erp.local`,
+  isActive,
+  departmentId,
+});
+export const ORG_TREE_FIXTURE = {
+  departments: [
+    {
+      id: uuid('0000000c', 0),
+      code: 'SALES',
+      name: 'Kinh doanh',
+      isActive: true,
+      managerId: uuid('0000000e', 1),
+      members: [ORG_EMP(1, uuid('0000000c', 0))],
+      memberCount: 3,
+      children: [
+        {
+          id: uuid('0000000c', 1),
+          code: 'SALES-HN',
+          name: 'Kinh doanh Hà Nội',
+          isActive: true,
+          managerId: null,
+          members: [ORG_EMP(2, uuid('0000000c', 1)), ORG_EMP(3, uuid('0000000c', 1))],
+          memberCount: 2,
+          children: [],
+        },
+      ],
+    },
+  ],
+  teams: [
+    {
+      id: uuid('0000000d', 0),
+      code: 'SALES',
+      name: 'Phòng kinh doanh',
+      type: 'SALES' as const,
+      isActive: true,
+      members: [],
+      memberCount: 3,
+      children: [
+        {
+          id: uuid('0000000d', 1),
+          code: 'SALES-HN',
+          name: 'Sale Hà Nội',
+          type: 'SALES' as const,
+          isActive: true,
+          members: [
+            {
+              ...ORG_EMP(1, uuid('0000000c', 0)),
+              role: 'LEADER' as const,
+              joinedAt: '2026-01-01T00:00:00.000Z',
+            },
+            {
+              ...ORG_EMP(2, uuid('0000000c', 1)),
+              role: 'MEMBER' as const,
+              joinedAt: '2026-01-01T00:00:00.000Z',
+            },
+            {
+              ...ORG_EMP(3, uuid('0000000c', 1)),
+              role: 'MEMBER' as const,
+              joinedAt: '2026-01-01T00:00:00.000Z',
+            },
+          ],
+          memberCount: 3,
+          children: [],
+        },
+      ],
+    },
+    {
+      id: uuid('0000000d', 2),
+      code: 'WH',
+      name: 'Kho',
+      type: 'WAREHOUSE' as const,
+      isActive: true,
+      members: [
+        { ...ORG_EMP(4, null), role: 'MEMBER' as const, joinedAt: '2026-01-01T00:00:00.000Z' },
+      ],
+      memberCount: 1,
+      children: [],
+    },
+  ],
+  unassigned: [ORG_EMP(4, null)],
+  totals: { employees: 4, departments: 2, teams: 3 },
+};
+
 /** Đúng shape `StuckShipmentDto`. */
 export function makeStuckShipments(n: number) {
   return Array.from({ length: n }, (_, i) => ({
@@ -962,6 +1051,7 @@ export const handlers = [
     HttpResponse.json({ ...STATUS_LOG_FIXTURE, shipmentId: params.id }),
   ),
   http.get('/api/departments', () => HttpResponse.json(DEPARTMENTS_FIXTURE)),
+  http.get('/api/org/tree', () => HttpResponse.json(ORG_TREE_FIXTURE)),
 
   // ── Quản trị: kết nối Pancake ──
   http.get('/api/pancake-sync/config', () => HttpResponse.json(PANCAKE_CONFIG_FIXTURE)),

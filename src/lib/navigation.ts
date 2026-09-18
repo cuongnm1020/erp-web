@@ -7,6 +7,7 @@ import {
   LayoutDashboard,
   Landmark,
   List,
+  ListTree,
   MapPin,
   Network,
   Package,
@@ -312,6 +313,12 @@ export const NAV_MODULES: NavModule[] = [
         ability: { action: 'read', subject: 'User' },
       },
       { label: 'Phòng ban & team', href: '/admin/teams', icon: Network },
+      {
+        label: 'Cây nhân sự',
+        href: '/admin/org-tree',
+        icon: ListTree,
+        ability: { action: 'read', subject: 'User' },
+      },
       {
         label: 'Vai trò & quyền',
         href: '/admin/roles',
