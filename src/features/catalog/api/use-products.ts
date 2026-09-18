@@ -230,11 +230,22 @@ export function useAddBarcode() {
 export function useSetConversion() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: ({ skuId, uom, factor }: { skuId: string; uom: string; factor: string }) =>
+    mutationFn: ({
+      skuId,
+      uom,
+      factor,
+      containerType,
+    }: {
+      skuId: string;
+      uom: string;
+      factor: string;
+      /** PLAN-packaging-hierarchy B: mã loại thùng khi ĐVT này là cấp đóng gói; bỏ trống = giữ nguyên. */
+      containerType?: string | null;
+    }) =>
       unwrap(
         api.POST('/skus/{id}/conversions', {
           params: { path: { id: skuId } },
-          body: { uom, factor },
+          body: { uom, factor, ...(containerType !== undefined ? { containerType } : {}) },
         }),
       ),
     onSuccess: () => {
@@ -396,5 +407,17 @@ export function useBulkDeleteProducts() {
       void qc.invalidateQueries({ queryKey: productKeys.skuLists() });
       void qc.invalidateQueries({ queryKey: productKeys.details() });
     },
+  });
+}
+
+export type ContainerType = components['schemas']['ContainerTypeDto'];
+
+/** GET /container-types — loại thùng/kiện/pallet cho cấp đóng gói của SKU (PLAN-packaging-hierarchy B). */
+export function useContainerTypes(enabled = true) {
+  return useQuery({
+    queryKey: ['catalog', 'container-types'] as const,
+    queryFn: () => unwrap(api.GET('/container-types')),
+    enabled,
+    staleTime: 5 * 60_000,
   });
 }

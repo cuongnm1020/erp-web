@@ -87,6 +87,8 @@ export const skuRowSchema = z.object({
   // → POST /skus/:id/conversions (+ barcode theo ĐVT).
   altUom: z.string(),
   altFactor: quantitySchema.optional().or(z.literal('')),
+  /** PLAN-packaging-hierarchy B — ĐVT phụ là cấp đóng gói: mã loại thùng ('' = ĐVT thường). */
+  altContainerType: z.string(),
   altBarcode: barcodeValue.optional().or(z.literal('')),
   /** ĐVT bán mặc định — '' = ĐVT cơ sở; phải là ĐVT quy đổi được. */
   salesUom: z.string(),
@@ -208,6 +210,7 @@ export const EMPTY_SKU_ROW: SkuRowValues = {
   openingQty: '',
   altUom: '',
   altFactor: '',
+  altContainerType: '',
   altBarcode: '',
   salesUom: '',
   existingConvUoms: [],

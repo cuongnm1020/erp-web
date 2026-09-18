@@ -145,6 +145,7 @@ function initialValues(p?: ProductDetail): ProductFormValues {
           // quy đổi sẵn có hiển thị dạng chip, xóa ở API riêng khi cần.
           altUom: '',
           altFactor: '',
+          altContainerType: '',
           altBarcode: '',
           salesUom: s.salesUom?.code ?? '',
           existingConvUoms: s.uomConversions.map((c) => c.uom.code),
@@ -330,7 +331,15 @@ function ProductFormBody({ product }: { product?: ProductDetail }) {
                 baseUom: v.baseUom,
                 // F3 — ĐVT phụ khai trên dòng: conversion + barcode theo ĐVT + ĐVT bán
                 ...(row.altUom && row.altFactor
-                  ? { conversions: [{ uom: row.altUom, factor: row.altFactor }] }
+                  ? {
+                      conversions: [
+                        {
+                          uom: row.altUom,
+                          factor: row.altFactor,
+                          ...(row.altContainerType ? { containerType: row.altContainerType } : {}),
+                        },
+                      ],
+                    }
                   : {}),
                 ...(row.salesUom ? { salesUom: row.salesUom } : {}),
                 ...(row.barcode || (row.altBarcode && row.altUom)
@@ -378,6 +387,7 @@ function ProductFormBody({ product }: { product?: ProductDetail }) {
                 skuId: row.skuId,
                 uom: row.altUom,
                 factor: row.altFactor,
+                ...(row.altContainerType ? { containerType: row.altContainerType } : {}),
               });
             }
             if (row.barcode && !row.existingBarcode) {
@@ -1263,6 +1273,38 @@ function SkuRow({
               </FormControl>
               <FormDescription className="text-[11px]">
                 1 {altUom || 'ĐVT phụ'} = ? {baseUom}
+              </FormDescription>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+        <FormField
+          control={form.control}
+          name={`skus.${index}.altContainerType`}
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel className="text-xs text-muted-foreground">Cấp đóng gói</FormLabel>
+              <Select
+                value={field.value === '' ? NONE : field.value}
+                onValueChange={(x) => field.onChange(x === NONE ? '' : x)}
+                disabled={!altUom}
+              >
+                <FormControl>
+                  <SelectTrigger aria-label={`Cấp đóng gói SKU ${index + 1}`}>
+                    <SelectValue placeholder="ĐVT thường" />
+                  </SelectTrigger>
+                </FormControl>
+                <SelectContent>
+                  <SelectItem value={NONE}>ĐVT thường (không phải thùng)</SelectItem>
+                  {(containerTypes.data ?? []).map((t) => (
+                    <SelectItem key={t.id} value={t.code}>
+                      {t.name} ({t.code})
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <FormDescription className="text-[11px]">
+                Thùng / kiện / pallet — nhận hàng và lấy hàng theo cấp này
               </FormDescription>
               <FormMessage />
             </FormItem>
