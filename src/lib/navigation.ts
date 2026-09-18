@@ -206,6 +206,12 @@ export const NAV_MODULES: NavModule[] = [
         ability: { action: 'read', subject: 'Stock' },
       },
       {
+        label: 'Thùng / pallet',
+        href: '/wms/containers',
+        icon: Package,
+        ability: { action: 'read', subject: 'Stock' },
+      },
+      {
         label: 'Điều phối task',
         href: '/wms/dispatch',
         icon: Columns3,

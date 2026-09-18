@@ -770,6 +770,7 @@ export const STATUS_LOG_FIXTURE = {
 };
 
 export const handlers = [
+  http.get('/api/container-types', () => HttpResponse.json([])),
   http.get('/api/carriers', () => HttpResponse.json(CARRIERS)),
   http.get('/api/pickup-warehouses', () => HttpResponse.json(PICKUP_WAREHOUSES)),
   http.get('/api/sales-orders/:id/shipping-quote', ({ params, request }) => {
