@@ -328,3 +328,52 @@ describe('DispatchScreen — gán / trả việc (POST /tasks/:id/assign|unassig
     await waitFor(() => expect(unassigned).toHaveLength(1));
   });
 });
+
+describe('WavePanel — auto-wave theo cấp đóng gói (2026-09-19)', () => {
+  const CARTON_WAVE = {
+    id: '00000000-0000-4000-8000-00000000e701',
+    docNumber: 'WAVE2609-00031',
+    warehouseId: 'wh-1',
+    warehouseCode: 'WH01',
+    strategy: 'BATCH',
+    status: 'PENDING',
+    assignedTo: null,
+    assigneeName: null,
+    taskCount: 4,
+    taskDoneCount: 0,
+    qtyPlanned: '100.000000',
+    qtyDone: '0.000000',
+    createdAt: '2026-09-19T01:00:00.000Z',
+    assignedAt: null,
+    startedAt: null,
+    completedAt: null,
+    packLevel: 'CARTON',
+    skuId: 'sku-a',
+    skuCode: 'SKU-A',
+    mergedIntoId: null,
+  };
+
+  it('lượt CARTON hiện nhãn "Trọn thùng · SKU"; bấm "Gộp tự động" → POST /waves/auto-merge → toast tổng kết', async () => {
+    const posts: unknown[] = [];
+    server.use(
+      http.get('/api/waves', () => HttpResponse.json({ items: [CARTON_WAVE], total: 1 })),
+      http.post('/api/waves/auto-merge', async ({ request }) => {
+        posts.push(await request.json());
+        return HttpResponse.json({
+          cartonWaves: [
+            { waveId: 'w-2', docNumber: 'WAVE2609-00032', skuId: 'sku-a', taskCount: 2 },
+          ],
+          palletWaves: [],
+        });
+      }),
+    );
+    renderApp(<DispatchScreen />);
+    expect(await screen.findByText('Trọn thùng · SKU-A')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Gộp tự động thùng / pallet' }));
+    await waitFor(() => expect(posts).toHaveLength(1));
+    expect(posts[0]).toMatchObject({ warehouseId: expect.any(String) });
+    await waitFor(() =>
+      expect(toast.success).toHaveBeenCalledWith('Đã gộp tự động 1 lượt thùng, 0 lượt pallet'),
+    );
+  });
+});

@@ -48,6 +48,7 @@ import {
 import { useWarehouses } from '../api/use-warehouses';
 import {
   useAssignWave,
+  useAutoMergeWaves,
   useCreateWave,
   useUnassignWave,
   useWaveDetail,
@@ -723,6 +724,18 @@ function WavePanel({ warehouseId, staff }: { warehouseId: string; staff: Warehou
   const detail = useWaveDetail(printId);
   const assign = useAssignWave();
   const unassign = useUnassignWave();
+  const autoMerge = useAutoMergeWaves();
+  const runAutoMerge = () =>
+    autoMerge
+      .mutateAsync({ warehouseId })
+      .then((r) =>
+        toast.success(
+          r.cartonWaves.length + r.palletWaves.length === 0
+            ? 'Chưa có nhóm đơn nào vừa đủ một thùng / một pallet'
+            : `Đã gộp tự động ${r.cartonWaves.length} lượt thùng, ${r.palletWaves.length} lượt pallet`,
+        ),
+      )
+      .catch((err) => toast.error(messageFor(err)));
 
   // Có chi tiết → mở tờ in đúng một lần cho lượt vừa bấm.
   const printing = printId !== null && detail.data?.id === printId;
@@ -737,6 +750,16 @@ function WavePanel({ warehouseId, staff }: { warehouseId: string; staff: Warehou
         <span className="ml-auto text-xs font-normal text-muted-foreground">
           {waves.data ? `${waves.data.total} lượt` : ''}
         </span>
+        <Button
+          size="sm"
+          variant="outline"
+          className="h-7"
+          disabled={autoMerge.isPending}
+          onClick={() => void runAutoMerge()}
+          title="Đơn một SKU vừa đủ một thùng → lượt thùng; đủ thùng một pallet → lượt pallet"
+        >
+          {autoMerge.isPending ? 'Đang gộp…' : 'Gộp tự động thùng / pallet'}
+        </Button>
       </header>
       <QueryState
         query={waves}
@@ -806,6 +829,12 @@ function WaveRow({
       >
         {taskStatusLabel(wave.status)}
       </StatusBadge>
+      {wave.packLevel ? (
+        <StatusBadge tone="brand">
+          {wave.packLevel === 'PALLET' ? 'Trọn pallet' : 'Trọn thùng'}
+          {wave.skuCode ? ` · ${wave.skuCode}` : ''}
+        </StatusBadge>
+      ) : null}
       <span className="text-muted-foreground">
         {wave.taskDoneCount}/{wave.taskCount} đơn · {formatQuantity(wave.qtyDone)}/
         {formatQuantity(wave.qtyPlanned)}

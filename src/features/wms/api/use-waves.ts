@@ -9,10 +9,15 @@ export type WaveDetail = components['schemas']['WaveDetailDto'];
 export type WaveLineGroup = components['schemas']['WaveLineGroupDto'];
 export type WaveStatus = Wave['status'];
 
+export type WavePackLevel = NonNullable<Wave['packLevel']>;
+export type AutoWaveResult = components['schemas']['AutoWaveResultDto'];
+
 export interface WaveListParams {
   status?: WaveStatus;
   warehouseId?: string;
   assignedTo?: string;
+  /** Chỉ lượt gộp tự động cấp này. */
+  packLevel?: WavePackLevel;
   take: number;
   skip: number;
 }
@@ -37,6 +42,7 @@ export function useWaves(params: WaveListParams) {
               status: params.status,
               warehouseId: params.warehouseId || undefined,
               assignedTo: params.assignedTo || undefined,
+              packLevel: params.packLevel,
               take: params.take,
               skip: params.skip,
             },
@@ -62,6 +68,19 @@ function useInvalidateWaves() {
     void qc.invalidateQueries({ queryKey: waveKeys.all });
     void qc.invalidateQueries({ queryKey: taskKeys.all });
   };
+}
+
+/**
+ * POST /waves/auto-merge — gộp TỰ ĐỘNG theo cấp đóng gói: đơn một SKU vừa đủ một thùng → lượt
+ * CARTON; đủ số thùng một pallet → lượt PALLET. Server tự chạy sau mỗi đơn; nút này chạy lại cho cả kho.
+ */
+export function useAutoMergeWaves() {
+  const invalidate = useInvalidateWaves();
+  return useMutation({
+    mutationFn: (body: { warehouseId?: string; skuId?: string }) =>
+      unwrap(api.POST('/waves/auto-merge', { body })),
+    onSuccess: invalidate,
+  });
 }
 
 /** POST /waves — gộp N task PICK (cùng kho, chưa ai nhận) thành một lượt; gán người luôn nếu có. */
