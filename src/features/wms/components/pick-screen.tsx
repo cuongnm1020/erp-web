@@ -20,7 +20,7 @@ import { cn } from '@/lib/cn';
 import { messageFor } from '@/lib/error-messages';
 import { formatDateTime, formatQuantity } from '@/lib/format';
 import { useAbility } from '@/lib/permission';
-import { usePdaMyTasks, usePdaStats, useResolveCode } from '../api/use-pda';
+import { usePdaMyTasks, usePdaMyWaves, usePdaStats, useResolveCode } from '../api/use-pda';
 import { useScanSession, type ScanFeedback, type Shortage } from '../scan-session';
 import { useWaveSession } from '../wave-session';
 import { PdaListColumn } from './pda-list-column';
@@ -50,12 +50,14 @@ export function PickScreen() {
   const canExecute = ability.can('execute', 'Task');
   // Hai cột khi chưa nhận việc: việc điều phối đã giao cho tôi + đơn tôi đã lấy xong hôm nay.
   const myTasks = usePdaMyTasks(canExecute);
+  const myWaves = usePdaMyWaves(canExecute);
   const doneToday = usePdaStats('PICK', null, canExecute);
   const idle = !resolving && task.phase === 'idle' && wave.phase === 'idle';
   useEffect(() => {
     // Quay về màn chờ (sau "Quét đơn kế tiếp") → làm tươi hai cột ngay, không đợi 30s.
     if (idle && canExecute) {
       void myTasks.refetch();
+      void myWaves.refetch();
       void doneToday.refetch();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -137,7 +139,21 @@ export function PickScreen() {
       : '';
   const shortRemaining = currentWave?.qtyRemaining ?? currentTask?.qtyRemaining ?? '0';
   // GET /pda/tasks trả mọi loại việc còn mở của tôi — màn này chỉ là lấy hàng.
-  const myPicks = myTasks.data?.filter((t) => t.type === 'PICK') ?? null;
+  // Việc lẻ: PICK không thuộc lượt. Đơn con của lượt gộp KHÔNG rải ra đây — lượt là một mục riêng.
+  const myPicks = myTasks.data?.filter((t) => t.type === 'PICK' && !t.waveId) ?? null;
+  const myWaveItems = myWaves.data?.items ?? null;
+  const assignedCount =
+    myPicks === null && myWaveItems === null
+      ? null
+      : (myPicks?.length ?? 0) + (myWaveItems?.length ?? 0);
+
+  // Chạm mục "Lượt" → nhận cả lượt (POST /pda/waves/:id/claim), không qua resolve.
+  const openWave = async (waveId: string) => {
+    setResolveError(null);
+    setMode('wave');
+    task.clear();
+    await wave.open(waveId);
+  };
 
   return (
     <div className="flex min-h-dvh flex-col bg-background text-base">
@@ -222,10 +238,40 @@ export function PickScreen() {
               <PdaListColumn
                 title="Việc được giao"
                 hint="chưa lấy xong"
-                count={myPicks?.length ?? null}
-                error={myTasks.isError}
+                count={assignedCount}
+                error={myTasks.isError || myWaves.isError}
                 empty="Chưa có việc nào được giao — điều phối sẽ gán trên bảng điều phối."
               >
+                {myWaveItems?.map((w) => (
+                  <li key={w.id}>
+                    <button
+                      type="button"
+                      className="flex min-h-14 w-full items-center justify-between gap-2 px-3 py-2 text-left hover:bg-muted"
+                      onClick={() => void openWave(w.id)}
+                      aria-label={`Mở lượt ${w.docNumber}`}
+                    >
+                      <span className="flex flex-col">
+                        <span className="flex items-center gap-1 font-mono font-semibold">
+                          <Layers className="h-4 w-4 text-primary" aria-hidden />
+                          {w.docNumber}
+                        </span>
+                        <span className="text-xs text-muted-foreground">
+                          Lượt gộp · {w.taskDoneCount}/{w.taskCount} đơn
+                        </span>
+                      </span>
+                      <span
+                        className={cn(
+                          'rounded-sm px-1.5 py-0.5 text-xs font-medium',
+                          w.status === 'IN_PROGRESS'
+                            ? 'bg-primary/10 text-primary'
+                            : 'bg-muted text-muted-foreground',
+                        )}
+                      >
+                        {w.status === 'IN_PROGRESS' ? 'Đang lấy' : 'Chưa bắt đầu'}
+                      </span>
+                    </button>
+                  </li>
+                ))}
                 {myPicks?.map((t) => (
                   <li key={t.taskId}>
                     <button

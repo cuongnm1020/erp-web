@@ -21,6 +21,10 @@ export interface TaskListParams {
   refId?: string;
   /** Tra đúng một số việc (PICK-…, PACK-…). */
   docNumber?: string;
+  /** Đúng N dòng (mỗi dòng = một SKU tại một vị trí) — điều phối gom đơn 1 SKU / 2 SKU… */
+  lineCount?: number;
+  /** Từ N dòng trở lên ("5+"). */
+  lineCountMin?: number;
   take: number;
   skip: number;
 }
@@ -57,6 +61,8 @@ export function useTasks(params: TaskListParams) {
               refType: params.refType || undefined,
               refId: params.refId || undefined,
               docNumber: params.docNumber || undefined,
+              lineCount: params.lineCount,
+              lineCountMin: params.lineCountMin,
               take: params.take,
               skip: params.skip,
             },

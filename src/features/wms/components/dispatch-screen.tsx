@@ -91,8 +91,31 @@ import { WavePrintSheet } from './wave-print-sheet';
  * người nhận lấy từ GET /tasks/assignees. Kéo thả chưa làm — chọn từ ô là đủ dùng.
  */
 const LANE_SIZE = 20;
-const DEFAULTS = { size: LANE_SIZE, filterKeys: ['type', 'warehouseId', 'assignedTo'] as const };
+const DEFAULTS = {
+  size: LANE_SIZE,
+  filterKeys: ['type', 'warehouseId', 'assignedTo', 'lines'] as const,
+};
 const ALL_TYPES = '__all__';
+
+/**
+ * Lọc theo số dòng SKU của việc (URL `?lines=`): "1".."4" = đúng N dòng (`lineCount`),
+ * "5+" = từ 5 dòng (`lineCountMin`). Điều phối gom đơn 1 SKU để gộp lượt đi nhanh.
+ */
+const LINE_OPTIONS: Array<{ value: string; label: string }> = [
+  { value: '1', label: '1 SKU' },
+  { value: '2', label: '2 SKU' },
+  { value: '3', label: '3 SKU' },
+  { value: '4', label: '4 SKU' },
+  { value: '5+', label: '5+ SKU' },
+];
+const LINE_VALUES = new Set(LINE_OPTIONS.map((o) => o.value));
+
+function lineFilter(lines: string): { lineCount?: number; lineCountMin?: number } {
+  if (!LINE_VALUES.has(lines)) return {};
+  return lines.endsWith('+')
+    ? { lineCountMin: Number(lines.slice(0, -1)) }
+    : { lineCount: Number(lines) };
+}
 
 type DispatchFilter = (typeof DEFAULTS.filterKeys)[number];
 
@@ -100,6 +123,8 @@ interface LaneParams {
   type: TaskType | undefined;
   warehouseId: string;
   assignedTo: string;
+  /** Giá trị `?lines=` ('' = tất cả). */
+  lines: string;
 }
 
 const LANES: Array<{ status: TaskStatus; title: string; hint: string }> = [
@@ -115,6 +140,7 @@ function useLane(status: TaskStatus, p: LaneParams) {
     type: p.type,
     warehouseId: p.warehouseId,
     assignedTo: p.assignedTo,
+    ...lineFilter(p.lines),
     take: LANE_SIZE,
     skip: 0,
   });
@@ -123,6 +149,13 @@ function useLane(status: TaskStatus, p: LaneParams) {
 interface Selection {
   ids: Set<string>;
   toggle: (task: Task) => void;
+  /** Tick / bỏ tick cả một làn (checkbox "Chọn tất cả" ở đầu làn). */
+  setMany: (tasks: Task[], on: boolean) => void;
+}
+
+/** Thẻ tick được để gán / gộp: chưa gán hoặc đã gán (đổi người). Đang làm thì không. */
+function selectable(task: Task): boolean {
+  return task.status === 'PENDING' || task.status === 'ASSIGNED';
 }
 
 /** Gợi ý vai trò cạnh tên trong ô "Gán cho…" — danh bạ giờ gồm cả nhân viên lấy / đóng hàng. */
@@ -153,8 +186,7 @@ function TaskCard({
 }) {
   const idleWord = task.status === 'PENDING' ? 'chờ' : 'đứng yên';
   // Chọn nhiều để gán một người: việc chưa gán hoặc đã gán (đổi người). Đang làm thì không.
-  const selectable =
-    selection !== null && (task.status === 'PENDING' || task.status === 'ASSIGNED');
+  const canSelect = selection !== null && selectable(task);
   const assign = useAssignTask();
   const unassign = useUnassignTask();
   const assigneeName = task.assigneeId
@@ -164,11 +196,11 @@ function TaskCard({
     <article
       className={cn(
         'flex flex-col gap-1 rounded-md border bg-card px-2.5 py-2',
-        selectable && selection.ids.has(task.id) && 'border-primary',
+        canSelect && selection.ids.has(task.id) && 'border-primary',
       )}
     >
       <div className="flex items-center gap-2">
-        {selectable ? (
+        {canSelect ? (
           <Checkbox
             checked={selection.ids.has(task.id)}
             onCheckedChange={() => selection.toggle(task)}
@@ -303,9 +335,26 @@ function Lane({
   selection: Selection | null;
 }) {
   const query = useLane(status, params);
+  // "Chọn tất cả" chỉ với thẻ tick được đang hiện trong làn (tối đa LANE_SIZE) — không tick
+  // việc chưa tải, để "Đã chọn N việc" luôn đúng với những gì đang nhìn thấy.
+  const pickable = selection ? (query.data?.items ?? []).filter(selectable) : [];
+  const pickedCount = pickable.filter((t) => selection!.ids.has(t.id)).length;
+  const allChecked: boolean | 'indeterminate' =
+    pickable.length > 0 && pickedCount === pickable.length
+      ? true
+      : pickedCount > 0
+        ? 'indeterminate'
+        : false;
   return (
     <section className="flex min-h-64 flex-col rounded-md border bg-muted/50">
-      <header className="flex items-baseline gap-2 border-b px-3 py-2 text-sm font-semibold">
+      <header className="flex items-center gap-2 border-b px-3 py-2 text-sm font-semibold">
+        {selection && pickable.length > 0 ? (
+          <Checkbox
+            checked={allChecked}
+            onCheckedChange={(v) => selection.setMany(pickable, v === true)}
+            aria-label={`Chọn tất cả ${title}`}
+          />
+        ) : null}
         {title}
         <span className="ml-auto text-xs font-normal text-muted-foreground">{hint}</span>
       </header>
@@ -341,9 +390,10 @@ export function DispatchScreen() {
   const type = parseTaskType(state.filters.type);
   const warehouseId = state.filters.warehouseId ?? '';
   const assignedTo = state.filters.assignedTo ?? '';
+  const lines = LINE_VALUES.has(state.filters.lines ?? '') ? state.filters.lines! : '';
   const params = useMemo<LaneParams>(
-    () => ({ type, warehouseId, assignedTo }),
-    [type, warehouseId, assignedTo],
+    () => ({ type, warehouseId, assignedTo, lines }),
+    [type, warehouseId, assignedTo, lines],
   );
   const ability = useAbility();
   const canAssign = ability.can('assign', 'Task');
@@ -362,6 +412,15 @@ export function DispatchScreen() {
                 const next = new Map(cur);
                 if (next.has(task.id)) next.delete(task.id);
                 else next.set(task.id, task);
+                return next;
+              }),
+            setMany: (tasks, on) =>
+              setSelected((cur) => {
+                const next = new Map(cur);
+                for (const t of tasks) {
+                  if (on) next.set(t.id, t);
+                  else next.delete(t.id);
+                }
                 return next;
               }),
           }
@@ -409,6 +468,24 @@ export function DispatchScreen() {
           <SelectContent>
             <SelectItem value={ALL_TYPES}>Loại việc: tất cả</SelectItem>
             {TASK_TYPE_OPTIONS.map((o) => (
+              <SelectItem key={o.value} value={o.value}>
+                {o.label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <Select
+          value={lines || ALL_TYPES}
+          onValueChange={(v) =>
+            set({ filters: { ...state.filters, lines: v === ALL_TYPES ? undefined : v } })
+          }
+        >
+          <SelectTrigger className="h-9 w-44" aria-label="Số dòng SKU">
+            <SelectValue placeholder="Số dòng SKU" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value={ALL_TYPES}>Số SKU: tất cả</SelectItem>
+            {LINE_OPTIONS.map((o) => (
               <SelectItem key={o.value} value={o.value}>
                 {o.label}
               </SelectItem>

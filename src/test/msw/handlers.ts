@@ -933,6 +933,8 @@ export const handlers = [
     const refType = url.searchParams.get('refType');
     const refId = url.searchParams.get('refId');
     const docNumber = url.searchParams.get('docNumber');
+    const lineCount = url.searchParams.get('lineCount');
+    const lineCountMin = url.searchParams.get('lineCountMin');
     await delay(50);
     let all = makeTasks(40);
     if (status) all = all.filter((t) => t.status === status);
@@ -940,6 +942,8 @@ export const handlers = [
     if (refType) all = all.filter((t) => t.refType === refType);
     if (refId) all = all.filter((t) => t.refId === refId);
     if (docNumber) all = all.filter((t) => t.docNumber === docNumber);
+    if (lineCount) all = all.filter((t) => t.lineCount === Number(lineCount));
+    if (lineCountMin) all = all.filter((t) => t.lineCount >= Number(lineCountMin));
     return HttpResponse.json({ items: all.slice(skip, skip + take), total: all.length });
   }),
 
@@ -1030,6 +1034,8 @@ export const handlers = [
   }),
   // Việc đã giao cho tôi (GET /pda/tasks, màn pick cột "Việc được giao") — mặc định rỗng.
   http.get('/api/pda/tasks', () => HttpResponse.json([])),
+  // Lượt gộp đã giao cho tôi (GET /pda/waves) — mặc định rỗng.
+  http.get('/api/pda/waves', () => HttpResponse.json({ items: [], total: 0 })),
   // Hàng đợi + thống kê bàn đóng gói (role PACKER, 2026-09-15) — mặc định rỗng / 0.
   http.get('/api/pda/queue', ({ request }) => {
     const type = new URL(request.url).searchParams.get('type') ?? 'PACK';

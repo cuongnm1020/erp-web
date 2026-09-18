@@ -26,6 +26,7 @@ export const pdaKeys = {
   wave: (id: string) => [...pdaKeys.all, 'wave', id] as const,
   queue: (type: string) => [...pdaKeys.all, 'queue', type] as const,
   myTasks: () => [...pdaKeys.all, 'my-tasks'] as const,
+  myWaves: () => [...pdaKeys.all, 'my-waves'] as const,
   stats: (type: string, date: string | null) => [...pdaKeys.all, 'stats', type, date] as const,
 };
 
@@ -220,6 +221,21 @@ export function usePdaMyTasks(enabled = true) {
   return useQuery({
     queryKey: pdaKeys.myTasks(),
     queryFn: () => unwrap(api.GET('/pda/tasks')),
+    enabled,
+    refetchInterval: 30_000,
+  });
+}
+
+export type PdaMyWave = components['schemas']['WaveDto'];
+
+/**
+ * GET /pda/waves — lượt pick gộp ĐÃ GIAO cho tôi còn mở. Màn pick hiện mỗi lượt là MỘT mục
+ * (thay vì rải từng đơn con của /pda/tasks); chạm vào → nhận cả lượt. Làm tươi 30s như /pda/tasks.
+ */
+export function usePdaMyWaves(enabled = true) {
+  return useQuery({
+    queryKey: pdaKeys.myWaves(),
+    queryFn: () => unwrap(api.GET('/pda/waves')),
     enabled,
     refetchInterval: 30_000,
   });

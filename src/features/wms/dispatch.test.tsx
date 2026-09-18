@@ -189,6 +189,83 @@ describe('DispatchScreen — gán / trả việc (POST /tasks/:id/assign|unassig
     );
   });
 
+  it('lọc số dòng SKU: ?lines=1 → gửi lineCount=1, ?lines=5+ → lineCountMin=5; chọn ở ô → ghi URL (luật 8)', async () => {
+    const seen: URLSearchParams[] = [];
+    server.use(
+      http.get('/api/tasks', ({ request }) => {
+        const q = new URL(request.url).searchParams;
+        seen.push(q);
+        const n = q.get('lineCount');
+        const min = q.get('lineCountMin');
+        let all = ALL.filter((t) => t.status === q.get('status'));
+        if (n) all = all.filter((t) => t.lineCount === Number(n));
+        if (min) all = all.filter((t) => t.lineCount >= Number(min));
+        return HttpResponse.json({ items: all, total: all.length });
+      }),
+    );
+    search = 'lines=1';
+    const { unmount } = renderApp(<DispatchScreen />);
+    await waitFor(() =>
+      expect(screen.getByRole('combobox', { name: 'Số dòng SKU' })).toHaveTextContent('1 SKU'),
+    );
+    await waitFor(() => expect(seen.length).toBeGreaterThanOrEqual(4));
+    expect(seen.every((q) => q.get('lineCount') === '1' && q.get('lineCountMin') === null)).toBe(
+      true,
+    );
+    // Chỉ còn thẻ 1 dòng trong làn.
+    const one = PENDING.find((t) => t.lineCount === 1)!;
+    const two = PENDING.find((t) => t.lineCount === 2)!;
+    expect(await screen.findByText(one.docNumber)).toBeInTheDocument();
+    expect(screen.queryByText(two.docNumber)).not.toBeInTheDocument();
+    unmount();
+
+    seen.length = 0;
+    search = 'lines=5%2B';
+    renderApp(<DispatchScreen />);
+    await waitFor(() =>
+      expect(screen.getByRole('combobox', { name: 'Số dòng SKU' })).toHaveTextContent('5+ SKU'),
+    );
+    await waitFor(() => expect(seen.length).toBeGreaterThanOrEqual(4));
+    expect(seen.every((q) => q.get('lineCountMin') === '5' && q.get('lineCount') === null)).toBe(
+      true,
+    );
+    fireEvent.click(screen.getByRole('combobox', { name: 'Số dòng SKU' }));
+    fireEvent.click(await screen.findByRole('option', { name: '2 SKU' }));
+    await waitFor(() =>
+      expect(replace).toHaveBeenCalledWith('/wms/dispatch?lines=2', { scroll: false }),
+    );
+  });
+
+  it('"Chọn tất cả" ở đầu làn tick mọi thẻ đang hiện của làn đó; bỏ tick trả về rỗng; làn Đang làm không có ô', async () => {
+    search = '';
+    renderApp(<DispatchScreen />);
+    await screen.findByText(PENDING[0]!.docNumber);
+    const pendingShown = Math.min(PENDING.length, 20);
+    const all = await screen.findByRole('checkbox', { name: 'Chọn tất cả Chưa gán' });
+    fireEvent.click(all);
+    const region = await screen.findByRole('region', { name: 'Việc đã chọn' });
+    expect(region).toHaveTextContent(`Đã chọn ${pendingShown} việc`);
+    expect(all).toHaveAttribute('aria-checked', 'true');
+    // Bỏ tick một thẻ → ô đầu làn thành "một phần".
+    fireEvent.click(screen.getByRole('checkbox', { name: `Chọn ${PENDING[0]!.docNumber}` }));
+    expect(region).toHaveTextContent(`Đã chọn ${pendingShown - 1} việc`);
+    expect(all).toHaveAttribute('aria-checked', 'mixed');
+    // Tick cả làn Đã giao nữa → cộng dồn.
+    const assignedShown = Math.min(ALL.filter((t) => t.status === 'ASSIGNED').length, 20);
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Chọn tất cả Đã giao' }));
+    expect(region).toHaveTextContent(`Đã chọn ${pendingShown - 1 + assignedShown} việc`);
+    expect(
+      screen.queryByRole('checkbox', { name: 'Chọn tất cả Đang làm' }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('checkbox', { name: 'Chọn tất cả Ngoại lệ' }),
+    ).not.toBeInTheDocument();
+    // Bỏ tick cả làn Chưa gán → chỉ còn lô Đã giao.
+    fireEvent.click(all);
+    fireEvent.click(all);
+    expect(region).toHaveTextContent(`Đã chọn ${assignedShown} việc`);
+  });
+
   it('thẻ ASSIGNED có "Trả về hàng đợi" → POST unassign', async () => {
     search = '';
     const unassigned: string[] = [];

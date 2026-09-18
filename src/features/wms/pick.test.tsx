@@ -291,6 +291,88 @@ describe('Màn pick trên PDA — quét đơn → dòng theo lối đi → quét
     await waitFor(() => expect(resolved).toEqual(['SO2609-00009']));
   });
 
+  it('lượt gộp đã giao (GET /pda/waves) hiện MỘT mục "Lượt" trong "Việc được giao", đơn con của lượt không rải ra; chạm → nhận cả lượt', async () => {
+    const WAVE_ID = '00000000-0000-4000-8000-00000000e009';
+    const claimed: string[] = [];
+    server.use(
+      http.get('/api/pda/waves', () =>
+        HttpResponse.json({
+          items: [
+            {
+              id: WAVE_ID,
+              docNumber: 'WAVE2609-00009',
+              warehouseId: 'wh-1',
+              warehouseCode: 'WH01',
+              strategy: 'BATCH',
+              status: 'ASSIGNED',
+              assignedTo: 'u-admin',
+              assigneeName: 'Quản trị',
+              taskCount: 2,
+              taskDoneCount: 0,
+              qtyPlanned: '3.000000',
+              qtyDone: '0.000000',
+              createdAt: new Date(Date.UTC(2026, 8, 18)).toISOString(),
+              assignedAt: null,
+              startedAt: null,
+              completedAt: null,
+            },
+          ],
+          total: 1,
+        }),
+      ),
+      http.get('/api/pda/tasks', () =>
+        HttpResponse.json([
+          // Đơn con thuộc lượt → ẩn khỏi danh sách việc lẻ.
+          {
+            ...PICK_TASK,
+            taskId: 'in-wave',
+            docNumber: 'PICK2609-00021',
+            refDocNumber: 'SO2609-00021',
+            waveId: WAVE_ID,
+            waveDocNumber: 'WAVE2609-00009',
+          },
+          // Việc lẻ → vẫn hiện.
+          PICK_TASK,
+        ]),
+      ),
+      http.post('/api/pda/waves/:id/claim', ({ params }) => {
+        claimed.push(String(params.id));
+        return HttpResponse.json({
+          id: WAVE_ID,
+          docNumber: 'WAVE2609-00009',
+          warehouseId: 'wh-1',
+          warehouseCode: 'WH01',
+          strategy: 'BATCH',
+          status: 'ASSIGNED',
+          assignedTo: 'u-admin',
+          assigneeName: 'Quản trị',
+          taskCount: 2,
+          taskDoneCount: 0,
+          qtyPlanned: '3.000000',
+          qtyDone: '0.000000',
+          createdAt: new Date(Date.UTC(2026, 8, 18)).toISOString(),
+          assignedAt: null,
+          startedAt: null,
+          completedAt: null,
+          tasks: [],
+          lines: [],
+          assignedToMe: true,
+        });
+      }),
+    );
+    renderApp(<PickScreen />);
+    const assigned = await screen.findByRole('region', { name: 'Việc được giao' });
+    await waitFor(() => expect(assigned).toHaveTextContent('Việc được giao · 2'));
+    expect(assigned).toHaveTextContent('WAVE2609-00009');
+    expect(assigned).toHaveTextContent('Lượt gộp · 0/2 đơn');
+    expect(assigned).toHaveTextContent('SO2609-00009');
+    expect(assigned).not.toHaveTextContent('SO2609-00021');
+    fireEvent.click(screen.getByRole('button', { name: 'Mở lượt WAVE2609-00009' }));
+    await waitFor(() => expect(claimed).toEqual([WAVE_ID]));
+    await waitFor(() => expect(screen.getByText('Lượt lấy gộp')).toBeInTheDocument());
+    expect(screen.getByText('WAVE2609-00009')).toBeInTheDocument();
+  });
+
   it('việc của người khác → 409 hiện câu từ bộ dịch, không nhận', async () => {
     server.use(
       http.get('/api/pda/resolve/:code', () =>

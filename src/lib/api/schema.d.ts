@@ -2201,6 +2201,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/pda/waves": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Lượt pick gộp đã giao cho tôi còn mở — màn pick hiện một mục "Lượt" thay vì từng đơn con. */
+        get: operations["PdaController_waves"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/pda/queue": {
         parameters: {
             query?: never;
@@ -5723,6 +5740,9 @@ export interface components {
             refDocNumber: string | null;
             /** @description `Task.assignedTo` — null = chưa ai nhận; quét mã đơn/việc sẽ tự nhận (claim). */
             assignedTo: string | null;
+            /** @description Thuộc lượt pick gộp nào (null = việc lẻ). Máy quét gom các việc cùng lượt thành một mục "Lượt". */
+            waveId: string | null;
+            waveDocNumber: string | null;
             /** @description ISO datetime. */
             createdAt: string;
             /** @description ĐÃ sắp theo thứ tự đi trong kho (pickSequence tăng dần). */
@@ -10340,6 +10360,13 @@ export interface operations {
                 refId?: string;
                 /** @description Tra đúng một số việc (PICK-…, PACK-…) — máy quét đọc mã việc trên phiếu. */
                 docNumber?: string;
+                /**
+                 * @description Đúng N dòng (mỗi dòng = một SKU tại một vị trí) — điều phối gom đơn 1 SKU / 2 SKU… để gộp
+                 *     lượt. `TaskLine.lineNo` đánh 1..N liên tục nên lọc bằng lineNo, không cần đếm.
+                 */
+                lineCount?: number;
+                /** @description Từ N dòng trở lên ("5+ SKU"). Kết hợp với `lineCount` thì `lineCount` thắng. */
+                lineCountMin?: number;
                 take: number;
                 skip: number;
             };
@@ -10622,6 +10649,25 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["PdaTaskDto"][];
+                };
+            };
+        };
+    };
+    PdaController_waves: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WaveListResponseDto"];
                 };
             };
         };
