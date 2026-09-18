@@ -65,9 +65,10 @@ export function useClaimTask() {
 
 export interface ScanInput {
   taskLineId: string;
+  /** Mã SKU hoặc mã container (LPN / mã NCC trên thùng — PLAN-packaging-hierarchy F). */
   barcode: string;
-  /** Số lượng theo ĐVT của barcode, CHUỖI (luật 10). */
-  qty: string;
+  /** Số lượng theo ĐVT của barcode, CHUỖI (luật 10). Bỏ trống khi quét THÙNG = lấy trọn. */
+  qty?: string;
   /** Sinh lúc quét (luật 4), giữ nguyên khi retry. */
   idempotencyKey: string;
 }
@@ -168,8 +169,9 @@ export function useWaveScan() {
       ...body
     }: {
       waveId: string;
+      /** Mã SKU hoặc mã container — quét thùng thì bỏ `qty` (lấy trọn / tới đủ nhóm). */
       barcode: string;
-      qty: string;
+      qty?: string;
       locationId?: string;
       lotId?: string;
       idempotencyKey: string;

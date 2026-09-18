@@ -102,6 +102,17 @@ const MESSAGES: Record<string, string> = {
     'Dòng này chưa có vị trí lấy hàng (thiếu tồn). Điều phối phải xử lý trước.',
   PDA_NO_RESERVATION: 'Không tìm thấy giữ chỗ khớp dòng này. Báo điều phối kiểm tra lại đơn nguồn.',
   PDA_WAVE_SKU_NOT_FOUND: 'Sản phẩm này không có trong lượt hoặc đã lấy đủ. Kiểm tra lại kệ.',
+  CONTAINER_SCAN_REJECTED:
+    'Thùng này không lấy được cho dòng đang làm — kiểm tra đúng thùng ghi trên phiếu, đúng vị trí, thùng chưa bị việc khác lấy.',
+  CONTAINER_NOT_FOUND: 'Mã thùng không tồn tại. Quét lại tem trên thùng.',
+  CONTAINER_NOT_OPEN: 'Thùng đã đóng hoặc đã rỗng — không thao tác được.',
+  CONTAINER_NOT_EMPTY: 'Thùng còn hàng — không đóng được.',
+  CONTAINER_LOCATION_MISMATCH:
+    'Thùng không cùng vị trí với thùng cha — chuyển tới vị trí cha trước.',
+  CONTAINER_HAS_PARENT:
+    'Thùng đang nằm trong thùng cha — thao tác trên thùng cha hoặc tách ra trước.',
+  CONTAINER_BARCODE_TAKEN: 'Mã thùng này đã được dùng — nhập mã khác.',
+  INVALID_CONTAINER_INPUT: 'Thao tác thùng không hợp lệ. Xem chi tiết.',
   WAVE_NOT_FOUND: 'Lượt pick không tồn tại. Quét lại mã lượt.',
   INVALID_WAVE_INPUT:
     'Không gộp được lượt: chỉ gộp task lấy hàng cùng kho, chưa ai nhận, chưa thuộc lượt khác.',

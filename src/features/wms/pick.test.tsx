@@ -446,3 +446,117 @@ describe('Màn pick trên PDA — quét đơn → dòng theo lối đi → quét
     expect(screen.queryByRole('img', { name: /^Mã vạch / })).not.toBeInTheDocument();
   });
 });
+
+describe('PLAN-packaging-hierarchy F — quét mã THÙNG ở màn pick', () => {
+  const scan = (code: string) => {
+    const input = screen.getByLabelText(/Quét/);
+    fireEvent.change(input, { target: { value: code } });
+    fireEvent.keyDown(input, { key: 'Enter' });
+  };
+  const LPN = 'LPN2609-00007';
+  const TASK_WITH_BOX = {
+    ...PICK_TASK,
+    lines: [
+      {
+        ...PICK_TASK.lines[0]!,
+        qtyPlanned: '100.000000',
+        qtyRemaining: '100.000000',
+        containerId: 'ctn-7',
+        containerBarcode: LPN,
+        suggested: [
+          {
+            uomId: 'u-box',
+            uomCode: 'BOX',
+            containerTypeCode: 'CARTON',
+            factor: '100',
+            count: '1',
+          },
+        ],
+      },
+    ],
+  };
+
+  it('dòng có thùng: hiện mã thùng + gợi ý "1 BOX"; quét LPN → POST /pda/scan KHÔNG qty → lấy trọn, xong đơn', async () => {
+    const bodies: Record<string, unknown>[] = [];
+    server.use(
+      http.get('/api/pda/resolve/:code', () =>
+        HttpResponse.json({
+          kind: 'task',
+          code: 'PICK2609-00009',
+          sku: null,
+          container: null,
+          order: null,
+          wave: null,
+          location: null,
+          shipment: null,
+          task: {
+            id: TASK_ID,
+            docNumber: 'PICK2609-00009',
+            type: 'PICK',
+            status: 'PENDING',
+            warehouseId: 'wh-1',
+            assignedTo: null,
+            assignedToMe: false,
+            lineCount: 1,
+          },
+        }),
+      ),
+      http.post('/api/pda/tasks/:id/claim', () => HttpResponse.json(TASK_WITH_BOX)),
+      http.post('/api/pda/scan', async ({ request }) => {
+        const body = (await request.json()) as Record<string, unknown>;
+        bodies.push(body);
+        return HttpResponse.json({
+          taskLineId: LINE_1,
+          taskId: TASK_ID,
+          barcode: LPN,
+          skuId: 'sku-X',
+          skuCode: 'SKU-X',
+          uomCode: 'PCS',
+          factor: '1',
+          qtyScanned: '100.000000',
+          qtyBase: '100.000000',
+          qtyDone: '100.000000',
+          qtyPlanned: '100.000000',
+          qtyRemaining: '0.000000',
+          lineStatus: 'IN_PROGRESS',
+          taskStatus: 'IN_PROGRESS',
+          complete: true,
+          containerId: 'ctn-7',
+          containerBarcode: LPN,
+          containerPicked: true,
+          replayed: false,
+        });
+      }),
+      http.post('/api/pda/complete', () =>
+        HttpResponse.json({
+          taskLineId: LINE_1,
+          taskId: TASK_ID,
+          taskDocNumber: 'PICK2609-00009',
+          lineStatus: 'COMPLETED',
+          taskStatus: 'COMPLETED',
+          taskCompleted: true,
+          reservationId: null,
+          movementId: null,
+          skuId: 'sku-X',
+          locationId: null,
+          lotId: null,
+          qty: '100.000000',
+          costAmount: null,
+          replayed: false,
+          waybill: null,
+        }),
+      ),
+    );
+    renderApp(<PickScreen />);
+    scan('PICK2609-00009');
+    expect((await screen.findAllByText(LPN)).length).toBeGreaterThan(0);
+    expect(screen.getByText('Thùng đã xếp — quét mã thùng để lấy trọn')).toBeInTheDocument();
+    expect(screen.getByLabelText('Gợi ý lấy hàng')).toHaveTextContent('1 BOX (carton)');
+
+    scan(LPN);
+    await waitFor(() => expect(screen.getByText(/Xong đơn/)).toBeInTheDocument());
+    expect(bodies).toHaveLength(1);
+    expect(bodies[0]).toMatchObject({ taskLineId: LINE_1, barcode: LPN });
+    expect(bodies[0]).not.toHaveProperty('qty');
+  });
+});

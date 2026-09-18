@@ -25,6 +25,7 @@ import { useScanSession, type ScanFeedback, type Shortage } from '../scan-sessio
 import { useWaveSession } from '../wave-session';
 import { PdaListColumn } from './pda-list-column';
 import { ShortPickDialog } from './short-pick-dialog';
+import { ContainerHint } from './container-hint';
 import { SkuBarcodes } from './sku-barcodes';
 
 type Mode = 'task' | 'wave';
@@ -354,6 +355,10 @@ export function PickScreen() {
                 : ''}
             </div>
             <SkuBarcodes barcodes={(currentWave ?? currentTask)!.barcodes} />
+            <ContainerHint
+              containerBarcode={(currentWave ?? currentTask)!.containerBarcode}
+              suggested={(currentWave ?? currentTask)!.suggested}
+            />
             <div className="mt-3 flex items-baseline gap-2">
               <span className="text-5xl font-bold tabular-nums">
                 {formatQuantity((currentWave ?? currentTask)!.qtyRemaining)}
@@ -488,7 +493,11 @@ export function PickScreen() {
           ref={scanRef}
           size="lg"
           label={phase === 'ready' ? 'Quét sản phẩm' : 'Quét mã đơn'}
-          placeholder={phase === 'ready' ? 'Quét mã sản phẩm…' : 'Quét mã đơn / mã việc / mã lượt…'}
+          placeholder={
+            phase === 'ready'
+              ? 'Quét mã sản phẩm hoặc mã thùng…'
+              : 'Quét mã đơn / mã việc / mã lượt…'
+          }
           onScan={onScan}
           paused={shortOpen}
           disabled={phase === 'opening'}

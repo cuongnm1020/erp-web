@@ -16,6 +16,7 @@ import {
   type PdaResolveResult,
   type PdaShortResult,
   type PdaTask,
+  type PdaTaskLine,
   type PdaTaskRef,
 } from './api/use-pda';
 
@@ -42,6 +43,10 @@ export interface Shortage {
 }
 
 const CLOSED = new Set(['COMPLETED', 'CANCELLED']);
+
+/** So mã quét với mã thùng — máy quét có thể trả hoa/thường khác tem in. */
+export const sameCode = (a: string | null | undefined, b: string): boolean =>
+  !!a && a.trim().toUpperCase() === b.trim().toUpperCase();
 
 /**
  * Phiên quét một việc (PICK trên PDA, PACK ở trạm đóng gói) — dùng chung cho hai màn
@@ -248,18 +253,23 @@ export function useScanSession(kind: 'PICK' | 'PACK') {
   const scan = useCallback(
     async (code: string, qty: string) => {
       if (!task) return;
-      const candidates = task.lines.filter((l) => l.barcodes.includes(code));
-      const line =
-        candidates.find(
-          (l) => !CLOSED.has(l.status) && (toDecimal(l.qtyRemaining)?.gt(0) ?? false),
-        ) ?? null;
+      // PLAN-packaging-hierarchy F: mã THÙNG đã xếp cho dòng (containerBarcode) → gửi không qty =
+      // lấy trọn thùng; server kiểm 8 điều kiện §11. Mã SKU → như cũ, kèm qty.
+      const openLine = (l: PdaTaskLine) =>
+        !CLOSED.has(l.status) && (toDecimal(l.qtyRemaining)?.gt(0) ?? false);
+      const byContainer = task.lines.filter((l) => sameCode(l.containerBarcode, code));
+      const containerLine = byContainer.find(openLine) ?? null;
+      const candidates = containerLine ? [] : task.lines.filter((l) => l.barcodes.includes(code));
+      const line = containerLine ?? candidates.find(openLine) ?? null;
       if (!line) {
         beep('error');
         setFeedback({
           kind: 'error',
-          text: candidates.length
-            ? `Sản phẩm ${candidates[0]!.skuCode} đã quét đủ — không cộng thêm.`
-            : `Mã ${code} không thuộc ${order.docNumber ?? task.docNumber}. Kiểm tra lại hàng.`,
+          text: byContainer.length
+            ? `Thùng ${code} đã lấy xong — không cộng thêm.`
+            : candidates.length
+              ? `Sản phẩm ${candidates[0]!.skuCode} đã quét đủ — không cộng thêm.`
+              : `Mã ${code} không thuộc ${order.docNumber ?? task.docNumber}. Kiểm tra lại hàng.`,
         });
         return;
       }
@@ -268,7 +278,7 @@ export function useScanSession(kind: 'PICK' | 'PACK') {
         const r = await scanMut.mutateAsync({
           taskLineId: line.taskLineId,
           barcode: code,
-          qty,
+          ...(containerLine ? {} : { qty }),
           idempotencyKey,
         });
         setOffline(false);
@@ -293,7 +303,9 @@ export function useScanSession(kind: 'PICK' | 'PACK') {
         beep('ok');
         setFeedback({
           kind: 'ok',
-          text: `${r.skuCode}: ${r.qtyDone}/${r.qtyPlanned}${r.complete ? ' — đủ' : ''}`,
+          text: r.containerBarcode
+            ? `Thùng ${r.containerBarcode}${r.containerPicked ? ' — lấy trọn' : ''}: ${r.skuCode} ${r.qtyDone}/${r.qtyPlanned}${r.complete ? ' — đủ' : ''}`
+            : `${r.skuCode}: ${r.qtyDone}/${r.qtyPlanned}${r.complete ? ' — đủ' : ''}`,
         });
         if (r.complete) {
           const done = await completeMut.mutateAsync({

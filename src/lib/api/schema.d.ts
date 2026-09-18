@@ -860,6 +860,38 @@ export interface paths {
         patch: operations["WarehouseController_updateLocation"];
         trace?: never;
     };
+    "/container-types": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["ContainerTypeController_list"];
+        put?: never;
+        post: operations["ContainerTypeController_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/container-types/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["ContainerTypeController_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch: operations["ContainerTypeController_update"];
+        trace?: never;
+    };
     "/stock": {
         parameters: {
             query?: never;
@@ -1501,6 +1533,166 @@ export interface paths {
         get: operations["ExportController_download"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/containers": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["ContainerController_list"];
+        put?: never;
+        post: operations["ContainerController_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/containers/by-barcode/{barcode}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["ContainerController_byBarcode"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/containers/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["ContainerController_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/containers/{id}/history": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["ContainerController_history"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/containers/tree": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["ContainerController_createTree"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/containers/repack": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["ContainerController_repack"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/containers/{id}/nest": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["ContainerController_nest"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/containers/{id}/detach": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["ContainerController_detach"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/containers/{id}/move": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["ContainerController_move"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/containers/{id}/close": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["ContainerController_close"];
         delete?: never;
         options?: never;
         head?: never;
@@ -3459,7 +3651,7 @@ export interface components {
         };
         CreateApprovalRuleDto: {
             /** @enum {string} */
-            docType: "SALES_ORDER" | "PURCHASE_ORDER" | "GOODS_RECEIPT" | "DELIVERY_NOTE" | "STOCK_ADJUSTMENT" | "CYCLE_COUNT" | "INVOICE" | "CREDIT_NOTE" | "PAYMENT";
+            docType: "SALES_ORDER" | "PURCHASE_ORDER" | "GOODS_RECEIPT" | "DELIVERY_NOTE" | "STOCK_ADJUSTMENT" | "CYCLE_COUNT" | "INVOICE" | "CREDIT_NOTE" | "PAYMENT" | "CONTAINER";
             name: string;
             /** @description JsonLogic — vd { ">=": [{ "var": "total" }, 50000000] } */
             conditionJson: {
@@ -3799,6 +3991,8 @@ export interface components {
             uomId: string;
             /** @description Decimal(18,6) dạng chuỗi — 1 uom = factor × ĐVT cơ sở. */
             factor: string;
+            /** @description `wms.ContainerType.id` khi ĐVT này là cấp đóng gói (PLAN-packaging-hierarchy B); null = ĐVT thường. */
+            containerTypeId: string | null;
             uom: components["schemas"]["UomDto"];
         };
         ProductImageDto: {
@@ -3986,6 +4180,11 @@ export interface components {
             uom: string;
             /** @description 1 uom = factor × baseUom */
             factor: string;
+            /**
+             * @description PLAN-packaging-hierarchy B: mã `wms.ContainerType` (PALLET / PACKAGE / CARTON…) nếu ĐVT này là
+             *     một CẤP ĐÓNG GÓI của SKU; `null` = bỏ gắn; bỏ trống = giữ nguyên (idempotent với client cũ).
+             */
+            containerType?: string | null;
         };
         CreateSkuDto: {
             /**
@@ -4040,6 +4239,20 @@ export interface components {
             /** @description Số combo còn bán được — chuỗi số nguyên. */
             available: string;
         };
+        PackagingLevelDto: {
+            /** @description 1 = cấp lớn nhất. */
+            level: number;
+            uomId: string;
+            uomCode: string;
+            uomName: string;
+            /** @description Decimal(18,6) chuỗi — số ĐVT cơ sở trong MỘT đơn vị của cấp này. */
+            factor: string;
+            /** @description Số đơn vị của cấp NGAY DƯỚI trong một đơn vị cấp này (chuỗi số; "1 kiện = 10 thùng"). */
+            unitsOfNextLevel: string;
+            containerTypeId: string | null;
+            containerTypeCode: string | null;
+            containerTypeName: string | null;
+        };
         SkuDetailDto: {
             /** @description Product cha dạng core (runtime chỉ include bản ghi trần, không kéo category/brand). */
             product: components["schemas"]["ProductCoreDto"];
@@ -4066,6 +4279,8 @@ export interface components {
             isCombo?: boolean;
             /** @description Thành phần + số combo còn bán được — chỉ có ở GET /skus/{id} khi `isCombo`. */
             combo?: components["schemas"]["SkuComboInfoDto"] | null;
+            /** @description Cấp đóng gói lớn → nhỏ, luôn kết thúc bằng ĐVT cơ sở — chỉ có ở GET /skus/{id}. */
+            packagingLevels?: components["schemas"]["PackagingLevelDto"][];
             id: string;
             productId: string;
             code: string;
@@ -4279,6 +4494,29 @@ export interface components {
             isActive?: boolean;
             /** @description SKU cố định của bin — THAY TOÀN BỘ danh sách; mảng rỗng = bỏ gán hết. */
             fixedSkuIds?: string[];
+        };
+        ContainerTypeDto: {
+            id: string;
+            code: string;
+            name: string;
+            sortOrder: number;
+            isActive: boolean;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+        };
+        CreateContainerTypeDto: {
+            code: string;
+            name: string;
+            /** @description Lớn → nhỏ (pallet 10, kiện 20, thùng 30…) — chỉ để hiển thị. */
+            sortOrder?: number;
+        };
+        UpdateContainerTypeDto: {
+            name?: string;
+            sortOrder?: number;
+            /** @description false = ngừng dùng: không gắn được vào cấp mới / không tạo container mới; cái đã có giữ nguyên. */
+            isActive?: boolean;
         };
         StockRowDto: {
             skuId: string;
@@ -4665,6 +4903,202 @@ export interface components {
             };
             dryRun?: boolean;
         };
+        ContainerDto: {
+            id: string;
+            barcode: string;
+            typeId: string;
+            typeCode: string;
+            typeName: string;
+            parentId: string | null;
+            parentBarcode: string | null;
+            warehouseId: string;
+            locationId: string;
+            locationCode: string;
+            /** @enum {string} */
+            status: "OPEN" | "CLOSED" | "PICKED" | "EMPTY";
+            pickedTaskId: string | null;
+            refType: string | null;
+            refId: string | null;
+            /** @description Tổng tồn SKU của CÂY CON (Decimal(18,6) chuỗi) — không bao giờ lưu, luôn tính từ StockBalance. */
+            onHand: string;
+            reserved: string;
+            /** @description Số container con trực tiếp. */
+            childCount: number;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            closedAt: string | null;
+        };
+        ContainerListResponseDto: {
+            items: components["schemas"]["ContainerDto"][];
+            total: number;
+        };
+        ContainerRefDto: {
+            id: string;
+            barcode: string;
+            typeCode: string;
+        };
+        ContainerContentDto: {
+            skuId: string;
+            skuCode: string;
+            skuName: string;
+            lotId: string | null;
+            lotNumber: string | null;
+            onHand: string;
+            reserved: string;
+            available: string;
+            /** @description Nằm trực tiếp trong container này (không phải trong con) — Decimal chuỗi. */
+            onHandDirect: string;
+        };
+        ContainerDetailDto: {
+            id: string;
+            barcode: string;
+            typeId: string;
+            typeCode: string;
+            typeName: string;
+            parentId: string | null;
+            parentBarcode: string | null;
+            warehouseId: string;
+            locationId: string;
+            locationCode: string;
+            /** @enum {string} */
+            status: "OPEN" | "CLOSED" | "PICKED" | "EMPTY";
+            pickedTaskId: string | null;
+            refType: string | null;
+            refId: string | null;
+            /** @description Tổng tồn SKU của CÂY CON (Decimal(18,6) chuỗi) — không bao giờ lưu, luôn tính từ StockBalance. */
+            onHand: string;
+            reserved: string;
+            /** @description Số container con trực tiếp. */
+            childCount: number;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            closedAt: string | null;
+            /** @description Cha → ông → … (gần nhất trước). */
+            ancestors: components["schemas"]["ContainerRefDto"][];
+            children: components["schemas"]["ContainerDto"][];
+            contents: components["schemas"]["ContainerContentDto"][];
+        };
+        ContainerHistoryRowDto: {
+            movementId: string;
+            /** Format: date-time */
+            createdAt: string;
+            movementType: string;
+            containerId: string;
+            containerBarcode: string;
+            skuId: string;
+            skuCode: string;
+            lotId: string | null;
+            locationId: string;
+            locationCode: string;
+            qtyDelta: string;
+            refType: string | null;
+            refId: string | null;
+            taskId: string | null;
+            actorId: string | null;
+        };
+        CreateContainerDto: {
+            /** @description Mã wms.ContainerType (PALLET / PACKAGE / CARTON…). */
+            typeCode: string;
+            /** @description Mã cá thể do NCC in (SSCC…); bỏ trống = sinh LPN qua next_doc_number. */
+            barcode?: string;
+            /**
+             * Format: uuid
+             * @description Vị trí đặt — bắt buộc khi không có parentId (có cha thì lấy vị trí của cha).
+             */
+            locationId?: string;
+            /** Format: uuid */
+            parentId?: string;
+            refType?: string;
+            /** Format: uuid */
+            refId?: string;
+            /** @description PDA: client sinh (bất biến 10). */
+            idempotencyKey?: string;
+        };
+        ContainerTreeNodeDto: {
+            typeCode: string;
+            /** @description Chỉ dùng khi count = 1 (mã NCC); bỏ trống = sinh LPN. */
+            barcode?: string;
+            count?: number;
+            /** @description Mã NCC cho TỪNG bản sao (độ dài = count); bỏ trống = sinh LPN. */
+            barcodes?: string[];
+            children?: components["schemas"]["ContainerTreeNodeDto"][];
+        };
+        CreateContainerTreeDto: {
+            /** Format: uuid */
+            locationId?: string;
+            /**
+             * Format: uuid
+             * @description Gắn cả cây vào một cha có sẵn (vị trí lấy theo cha).
+             */
+            parentId?: string;
+            nodes: components["schemas"]["ContainerTreeNodeDto"][];
+            refType?: string;
+            /** Format: uuid */
+            refId?: string;
+            idempotencyKey?: string;
+        };
+        ContainerTreeCreatedDto: {
+            created: {
+                id: string;
+                barcode: string;
+                typeCode: string;
+                parentId: string | null;
+                depth: number;
+            }[];
+            roots: components["schemas"]["ContainerRefDto"][];
+        };
+        RepackDto: {
+            /** Format: uuid */
+            skuId: string;
+            /** Format: uuid */
+            lotId?: string | null;
+            /**
+             * Format: uuid
+             * @description null = từ hàng rời (cần `locationId`).
+             */
+            fromContainerId: string | null;
+            /**
+             * Format: uuid
+             * @description null = ra hàng rời.
+             */
+            toContainerId: string | null;
+            /**
+             * Format: uuid
+             * @description Bắt buộc khi cả hai đầu là hàng rời hoặc để đối chiếu; bỏ trống = vị trí của container.
+             */
+            locationId?: string;
+            /** @description Decimal(18,6) chuỗi theo ĐVT cơ sở. */
+            qty: string;
+            idempotencyKey?: string;
+        };
+        NestContainerDto: {
+            /** Format: uuid */
+            parentId: string;
+        };
+        MoveContainerDto: {
+            /** Format: uuid */
+            toLocationId: string;
+            /**
+             * @description PUT_AWAY (mặc định) khi cất từ DOCK vào bin; TRANSFER khi chuyển vị trí / kho.
+             * @enum {string}
+             */
+            movementType?: "PUT_AWAY" | "TRANSFER";
+            idempotencyKey?: string;
+        };
+        ContainerMoveResultDto: {
+            containerId: string;
+            toLocationId: string;
+            /** @description Số container trong cây đã đổi vị trí (kể cả gốc). */
+            containersMoved: number;
+            /** @description Số lát tồn chuyển theo. */
+            slicesMoved: number;
+            reservationsRepointed: number;
+        };
+        CloseContainerDto: {
+            idempotencyKey?: string;
+        };
         SalesOrderCustomerDto: {
             id: string;
             code: string;
@@ -4754,7 +5188,7 @@ export interface components {
         };
         OrderFulfilmentDto: {
             /** @enum {string} */
-            status: "CANCELLED" | "IN_TRANSIT" | "DELIVERED" | "FAILED" | "RETURNED" | "PICKED" | "PACKED" | "NOT_STARTED" | "PICKING" | "PACKING" | "SHIPPED";
+            status: "CANCELLED" | "PICKED" | "IN_TRANSIT" | "DELIVERED" | "FAILED" | "RETURNED" | "PACKED" | "NOT_STARTED" | "PICKING" | "PACKING" | "SHIPPED";
             pickTaskId: string | null;
             pickTaskDocNumber: string | null;
             packTaskId: string | null;
@@ -5490,6 +5924,15 @@ export interface components {
             /** @description Mã role đang giữ (WAREHOUSE / PICKER / PACKER / ADMIN…) — màn hình gợi ý ai lấy, ai đóng. */
             roles: string[];
         };
+        PickSuggestionDto: {
+            uomId: string;
+            uomCode: string;
+            containerTypeCode: string | null;
+            /** @description Decimal chuỗi — số ĐVT cơ sở trong một đơn vị cấp này. */
+            factor: string;
+            /** @description Số đơn vị cần lấy ở cấp này (chuỗi số). */
+            count: string;
+        };
         TaskLineDto: {
             id: string;
             lineNo: number;
@@ -5510,6 +5953,11 @@ export interface components {
             toLocationCode: string | null;
             /** @description Thứ tự đi trong kho của vị trí nguồn — nhỏ trước. */
             pickSequence: number | null;
+            /** @description PLAN-packaging-hierarchy E: thùng/kiện đã allocate (PICK trọn thùng / PUT_AWAY cả cây); null = rời. */
+            containerId: string | null;
+            containerBarcode: string | null;
+            /** @description Gợi ý tổ hợp cho phần còn lại; rỗng khi SKU không có cấp đóng gói. */
+            suggested: components["schemas"]["PickSuggestionDto"][];
             qtyPlanned: string;
             qtyDone: string;
             scannedBarcode: string | null;
@@ -5653,6 +6101,11 @@ export interface components {
             pickSequence: number | null;
             lotId: string | null;
             lotNumber: string | null;
+            /** @description PLAN-packaging-hierarchy E: thùng/kiện đã allocate cho nhóm — quét mã này là lấy cả nhóm. */
+            containerId: string | null;
+            containerBarcode: string | null;
+            /** @description Gợi ý tổ hợp cho phần còn lại ("2 PKG + 3 BOX + 50 PCS"); rỗng khi SKU không có cấp đóng gói. */
+            suggested: components["schemas"]["PickSuggestionDto"][];
             /** @description Σ kế hoạch của các dòng con — Decimal(18,6) chuỗi. */
             qtyPlanned: string;
             qtyDone: string;
@@ -5718,6 +6171,11 @@ export interface components {
             toLocationCode: string | null;
             /** @description Khoá sắp xếp lối đi — nhỏ chạy trước. null = dòng chưa có vị trí. */
             pickSequence: number | null;
+            /** @description PLAN-packaging-hierarchy E: thùng đã allocate — quét mã thùng thay vì từng SKU; null = rời. */
+            containerId: string | null;
+            containerBarcode: string | null;
+            /** @description Gợi ý tổ hợp cho phần còn lại ("2 PKG + 3 BOX + 50 PCS"). */
+            suggested: components["schemas"]["PickSuggestionDto"][];
             /** @description Decimal(18,6) dạng chuỗi. */
             qtyPlanned: string;
             qtyDone: string;
@@ -5854,10 +6312,12 @@ export interface components {
         };
         PdaResolveResultDto: {
             /** @enum {string} */
-            kind: "sku" | "location" | "task" | "wave" | "shipment" | "order";
+            kind: "sku" | "location" | "container" | "task" | "wave" | "shipment" | "order";
             /** @description Mã đã quét, nguyên văn. */
             code: string;
             sku: components["schemas"]["BarcodeLookupDto"] | null;
+            /** @description PLAN-packaging-hierarchy F: mã container (LPN / mã NCC) → cây + nội dung + trạng thái. */
+            container: components["schemas"]["ContainerDetailDto"] | null;
             order: components["schemas"]["PdaResolveOrderDto"] | null;
             task: components["schemas"]["PdaTaskRefDto"] | null;
             wave: components["schemas"]["PdaResolveWaveDto"] | null;
@@ -5890,8 +6350,10 @@ export interface components {
             assignedToMe: boolean;
         };
         WaveScanDto: {
+            /** @description Mã SKU hoặc mã container (quét thùng/kiện = chia cả số hàng trong đó cho các đơn trong lượt). */
             barcode: string;
-            qty: string;
+            /** @description Bắt buộc với mã SKU; mã container bỏ trống = lấy trọn, khai = lấy một phần. */
+            qty?: string;
             /** Format: uuid */
             locationId?: string;
             /** Format: uuid */
@@ -5929,6 +6391,10 @@ export interface components {
             /** @description Còn thiếu của nhóm sau lần quét này. */
             groupRemaining: string;
             groupComplete: boolean;
+            /** @description PLAN-packaging-hierarchy F: quét container → nhóm = mọi dòng con nằm trong thùng (và thùng con). */
+            containerId: string | null;
+            containerBarcode: string | null;
+            containerPicked: boolean;
             shares: components["schemas"]["PdaWaveScanShareDto"][];
             /** @enum {string} */
             waveStatus: "CANCELLED" | "PENDING" | "ASSIGNED" | "IN_PROGRESS" | "COMPLETED" | "EXCEPTION";
@@ -5987,10 +6453,17 @@ export interface components {
         ScanDto: {
             /** Format: uuid */
             taskLineId: string;
-            /** @description Barcode vừa quét — bất kỳ mã nào của SKU (thùng / lẻ / mã NCC). */
+            /**
+             * @description Barcode vừa quét — mã SKU (thùng / lẻ / mã NCC) HOẶC mã container (LPN / mã NCC dán trên
+             *     thùng, PLAN-packaging-hierarchy F). Server phân loại: mã container → nhận cả số hàng của SKU
+             *     trong thùng (và các thùng con) cho dòng này.
+             */
             barcode: string;
-            /** @description Số lượng theo ĐVT của barcode, dạng chuỗi — cấm `number` cho số lượng. */
-            qty: string;
+            /**
+             * @description Số lượng theo ĐVT của barcode, dạng chuỗi — cấm `number`. BẮT BUỘC với mã SKU; với mã
+             *     container bỏ trống = lấy trọn (hoặc tới đủ dòng), khai = lấy một phần (mở thùng, §14).
+             */
+            qty?: string;
             idempotencyKey: string;
         };
         PdaScanResultDto: {
@@ -6015,6 +6488,11 @@ export interface components {
             taskStatus: "CANCELLED" | "PENDING" | "ASSIGNED" | "IN_PROGRESS" | "COMPLETED" | "EXCEPTION";
             /** @description true = dòng đã quét đủ, bấm hoàn thành được. */
             complete: boolean;
+            /** @description PLAN-packaging-hierarchy F: mã vừa quét là container → id/mã thùng; SKU → null. */
+            containerId: string | null;
+            containerBarcode: string | null;
+            /** @description true = lấy TRỌN thùng (mọi hàng trong đó) → thùng chuyển PICKED; false = lấy một phần / SKU. */
+            containerPicked: boolean;
             /** @description true = kết quả trả lại từ lần gọi trước (cùng idempotencyKey). */
             replayed: boolean;
         };
@@ -6084,6 +6562,18 @@ export interface components {
             total: number;
             statusCounts: components["schemas"]["ReceiptStatusCountsDto"];
         };
+        ReceiptPackagingContainerDto: {
+            id: string;
+            barcode: string;
+        };
+        ReceiptLinePackagingDto: {
+            containerType: string;
+            /** @description Decimal(18,6) chuỗi — ĐVT cơ sở trong một container. */
+            qtyPerContainer: string;
+            count: number;
+            wrapper: components["schemas"]["ReceiptPackagingContainerDto"] | null;
+            containers: components["schemas"]["ReceiptPackagingContainerDto"][];
+        };
         ReceiptLineDto: {
             id: string;
             lineNo: number;
@@ -6105,6 +6595,8 @@ export interface components {
             uomId: string | null;
             /** @description C3 — hệ số snapshot lúc tạo (qty nhập = qtyBase / factor). */
             factor: string | null;
+            /** @description PLAN-packaging-hierarchy D — vỏ thùng/pallet đã tạo cho dòng (in tem LPN); null = hàng rời. */
+            packaging: components["schemas"]["ReceiptLinePackagingDto"] | null;
         };
         ReceiptDetailDto: {
             id: string;
@@ -6140,9 +6632,27 @@ export interface components {
             qtyDelta: string;
             actorName: string | null;
         };
+        ReceiptPackagingWrapDto: {
+            containerType: string;
+            barcode?: string;
+        };
+        ReceiptPackagingDto: {
+            /** @description Mã wms.ContainerType (CARTON / PACKAGE / PALLET…). */
+            containerType: string;
+            /** @description Decimal(18,6) chuỗi — số ĐVT cơ sở trong MỘT container. */
+            qtyPerContainer: string;
+            /** @description Bỏ trống = qtyBase / qtyPerContainer (phải chia hết). */
+            count?: number;
+            /** @description Mã NCC cho từng container (độ dài = count); bỏ trống = sinh LPN. */
+            barcodes?: string[];
+            /** @description Bọc tất cả vào một container cha (pallet). */
+            wrapIn?: components["schemas"]["ReceiptPackagingWrapDto"];
+        };
         CreateReceiptLineDto: {
             /** Format: uuid */
             skuId: string;
+            /** @description Đóng gói lúc nhận — vỏ tạo ngay khi lưu phiếu (in tem), tồn vào từng thùng lúc POST. */
+            packaging?: components["schemas"]["ReceiptPackagingDto"];
             /** @description Decimal(18,6) dạng chuỗi — cấm number cho số lượng (CLAUDE.md). Theo ĐVT của `uom`. */
             qty: string;
             /**
@@ -8607,6 +9117,96 @@ export interface operations {
             };
         };
     };
+    ContainerTypeController_list: {
+        parameters: {
+            query?: {
+                includeInactive?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ContainerTypeDto"][];
+                };
+            };
+        };
+    };
+    ContainerTypeController_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateContainerTypeDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ContainerTypeDto"];
+                };
+            };
+        };
+    };
+    ContainerTypeController_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ContainerTypeDto"];
+                };
+            };
+        };
+    };
+    ContainerTypeController_update: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateContainerTypeDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ContainerTypeDto"];
+                };
+            };
+        };
+    };
     InventoryController_list: {
         parameters: {
             query: {
@@ -9655,6 +10255,261 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+        };
+    };
+    ContainerController_list: {
+        parameters: {
+            query: {
+                warehouseId?: string;
+                locationId?: string;
+                status?: "OPEN" | "CLOSED" | "PICKED" | "EMPTY";
+                /** @description Tìm theo mã container (prefix, không phân biệt hoa thường). */
+                q?: string;
+                /** @description `true` = chỉ container gốc (không có cha). */
+                rootOnly?: string;
+                take: number;
+                skip: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ContainerListResponseDto"];
+                };
+            };
+        };
+    };
+    ContainerController_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateContainerDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ContainerDto"];
+                };
+            };
+        };
+    };
+    ContainerController_byBarcode: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                barcode: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ContainerDetailDto"];
+                };
+            };
+        };
+    };
+    ContainerController_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ContainerDetailDto"];
+                };
+            };
+        };
+    };
+    ContainerController_history: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ContainerHistoryRowDto"][];
+                };
+            };
+        };
+    };
+    ContainerController_createTree: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateContainerTreeDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ContainerTreeCreatedDto"];
+                };
+            };
+        };
+    };
+    ContainerController_repack: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RepackDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    ContainerController_nest: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["NestContainerDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ContainerDto"];
+                };
+            };
+        };
+    };
+    ContainerController_detach: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ContainerDto"];
+                };
+            };
+        };
+    };
+    ContainerController_move: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MoveContainerDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ContainerMoveResultDto"];
+                };
+            };
+        };
+    };
+    ContainerController_close: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CloseContainerDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ContainerDto"];
+                };
             };
         };
     };
