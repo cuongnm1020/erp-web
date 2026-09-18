@@ -40,6 +40,7 @@ import type { ApiError } from '@/lib/api/errors';
 import { messageFor } from '@/lib/error-messages';
 import { formatMoney } from '@/lib/format';
 import { dateKeySchema, moneySchema, quantitySchema } from '@/lib/shared';
+import { useContainerTypes } from '../api/use-containers';
 import { useSkuSearch } from '../api/use-locations';
 import { useCreateReceipt, usePostReceipt } from '../api/use-receipts';
 import { isOperationalWarehouse, useWarehouses } from '../api/use-warehouses';
@@ -65,6 +66,12 @@ const lineSchema = z.object({
   unitCost: moneySchema,
   lotNumber: z.string().trim().max(64, 'Tối đa 64 ký tự'),
   expiryDate: z.union([dateKeySchema, z.literal('')]),
+  /** PLAN-packaging-hierarchy D — đóng thùng lúc nhận: loại thùng ('' = hàng rời). */
+  packType: z.string(),
+  /** Số ĐVT cơ sở trong MỘT thùng — bắt buộc khi có packType; SL dòng phải chia hết. */
+  packQtyPer: z.union([quantitySchema, z.literal('')]),
+  /** Bọc tất cả thùng vào một cha (pallet) — '' = không bọc. */
+  packWrapIn: z.string(),
 });
 const receiptSchema = z
   .object({
@@ -83,6 +90,25 @@ const receiptSchema = z
           message: 'SKU theo lô — bắt buộc số lô',
         });
       }
+      // D — mirror 422 của api: count × qtyPerContainer = qtyBase (chia hết).
+      if (l.packType) {
+        if (!l.packQtyPer) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            path: ['lines', i, 'packQtyPer'],
+            message: 'Nhập số lượng mỗi thùng',
+          });
+        } else if (/^\d{1,12}(\.\d{1,6})?$/.test(l.qty)) {
+          const per = new Decimal(l.packQtyPer);
+          if (per.lte(0) || !new Decimal(l.qty).div(per).isInteger()) {
+            ctx.addIssue({
+              code: z.ZodIssueCode.custom,
+              path: ['lines', i, 'packQtyPer'],
+              message: `SL dòng (${l.qty}) phải chia hết cho SL mỗi thùng`,
+            });
+          }
+        }
+      }
     });
   });
 type ReceiptValues = z.infer<typeof receiptSchema>;
@@ -95,7 +121,12 @@ const EMPTY_LINE: ReceiptValues['lines'][number] = {
   unitCost: '',
   lotNumber: '',
   expiryDate: '',
+  packType: '',
+  packQtyPer: '',
+  packWrapIn: '',
 };
+
+const NONE = '__none__';
 
 function todayKey(): string {
   return new Date().toISOString().slice(0, 10);
@@ -113,6 +144,23 @@ function LineValue({ form, index }: { form: UseFormReturn<ReceiptValues>; index:
   );
 }
 
+/** Số thùng sẽ tạo từ SL dòng / SL mỗi thùng — chỉ hiển thị (server tự tính lại). */
+function PackCount({ form, index }: { form: UseFormReturn<ReceiptValues>; index: number }) {
+  const qty = useWatch({ control: form.control, name: `lines.${index}.qty` });
+  const per = useWatch({ control: form.control, name: `lines.${index}.packQtyPer` });
+  const ok =
+    /^\d{1,12}(\.\d{1,6})?$/.test(qty) &&
+    /^\d{1,12}(\.\d{1,6})?$/.test(per) &&
+    !new Decimal(per).isZero();
+  if (!ok) return <span className="text-muted-foreground">— thùng</span>;
+  const n = new Decimal(qty).div(per);
+  return (
+    <span className={n.isInteger() ? 'tabular-nums' : 'tabular-nums text-destructive'}>
+      {n.isInteger() ? `${n.toFixed(0)} thùng` : 'không chia hết'}
+    </span>
+  );
+}
+
 function TotalValue({ form }: { form: UseFormReturn<ReceiptValues> }) {
   const lines = useWatch({ control: form.control, name: 'lines' });
   const sum = (lines ?? []).reduce((acc, l) => {
@@ -125,6 +173,7 @@ function TotalValue({ form }: { form: UseFormReturn<ReceiptValues> }) {
 export function GrnCreateScreen() {
   const router = useRouter();
   const warehouses = useWarehouses();
+  const containerTypes = useContainerTypes();
   const create = useCreateReceipt();
   const post = usePostReceipt();
   const isPending = create.isPending || post.isPending;
@@ -155,6 +204,16 @@ export function GrnCreateScreen() {
           unitCost: l.unitCost,
           ...(l.lotNumber ? { lotNumber: l.lotNumber } : {}),
           ...(l.expiryDate ? { expiryDate: l.expiryDate } : {}),
+          // D — vỏ thùng tạo ngay khi lưu nháp (in tem trước khi post), tồn vào thùng lúc post.
+          ...(l.packType
+            ? {
+                packaging: {
+                  containerType: l.packType,
+                  qtyPerContainer: l.packQtyPer,
+                  ...(l.packWrapIn ? { wrapIn: { containerType: l.packWrapIn } } : {}),
+                },
+              }
+            : {}),
         })),
       };
       try {
@@ -309,112 +368,14 @@ export function GrnCreateScreen() {
                 </TableHeader>
                 <TableBody>
                   {fields.map((f, i) => (
-                    <TableRow key={f.id}>
-                      <TableCell className="px-2.5 py-1.5 text-muted-foreground">{i + 1}</TableCell>
-                      <TableCell className="px-2.5 py-1.5">
-                        <FormField
-                          control={form.control}
-                          name={`lines.${i}.skuId`}
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormControl>
-                                <EntityPicker
-                                  value={field.value}
-                                  onChange={(id, option) => {
-                                    field.onChange(id);
-                                    form.setValue(`lines.${i}.skuLabel`, option?.label ?? '');
-                                    form.setValue(
-                                      `lines.${i}.tracking`,
-                                      (option?.meta?.trackingMode as 'NONE' | 'LOT' | 'SERIAL') ??
-                                        'NONE',
-                                    );
-                                  }}
-                                  useSearch={useSkuSearch}
-                                  selectedLabel={form.getValues(`lines.${i}.skuLabel`) || undefined}
-                                  placeholder="Tìm SKU…"
-                                  searchPlaceholder="Mã / tên SKU / barcode…"
-                                  clearable={false}
-                                />
-                              </FormControl>
-                              <FormMessage />
-                            </FormItem>
-                          )}
-                        />
-                      </TableCell>
-                      <TableCell className="px-2.5 py-1.5">
-                        <FormField
-                          control={form.control}
-                          name={`lines.${i}.qty`}
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormControl>
-                                <Input inputMode="decimal" placeholder="0" {...field} />
-                              </FormControl>
-                              <FormMessage />
-                            </FormItem>
-                          )}
-                        />
-                      </TableCell>
-                      <TableCell className="px-2.5 py-1.5">
-                        <FormField
-                          control={form.control}
-                          name={`lines.${i}.lotNumber`}
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormControl>
-                                <Input placeholder="L2608" className="font-mono" {...field} />
-                              </FormControl>
-                              <FormMessage />
-                            </FormItem>
-                          )}
-                        />
-                      </TableCell>
-                      <TableCell className="px-2.5 py-1.5">
-                        <FormField
-                          control={form.control}
-                          name={`lines.${i}.expiryDate`}
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormControl>
-                                <Input type="date" {...field} />
-                              </FormControl>
-                              <FormMessage />
-                            </FormItem>
-                          )}
-                        />
-                      </TableCell>
-                      <TableCell className="px-2.5 py-1.5">
-                        <FormField
-                          control={form.control}
-                          name={`lines.${i}.unitCost`}
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormControl>
-                                <Input inputMode="decimal" placeholder="0" {...field} />
-                              </FormControl>
-                              <FormMessage />
-                            </FormItem>
-                          )}
-                        />
-                      </TableCell>
-                      <TableCell className="px-2.5 py-1.5 text-right">
-                        <LineValue form={form} index={i} />
-                      </TableCell>
-                      <TableCell className="px-2.5 py-1.5">
-                        {fields.length > 1 ? (
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="icon"
-                            className="h-8 w-8"
-                            aria-label={`Xóa dòng ${i + 1}`}
-                            onClick={() => remove(i)}
-                          >
-                            <X aria-hidden />
-                          </Button>
-                        ) : null}
-                      </TableCell>
-                    </TableRow>
+                    <LineRows
+                      key={f.id}
+                      form={form}
+                      i={i}
+                      canRemove={fields.length > 1}
+                      remove={() => remove(i)}
+                      containerTypes={containerTypes.data ?? []}
+                    />
                   ))}
                 </TableBody>
               </Table>
@@ -428,6 +389,229 @@ export function GrnCreateScreen() {
           </section>
         </form>
       </Form>
+    </>
+  );
+}
+
+/** Một dòng nhập = hàng chính + hàng "Đóng gói" (PLAN-packaging-hierarchy D). */
+function LineRows({
+  form,
+  i,
+  canRemove,
+  remove,
+  containerTypes,
+}: {
+  form: UseFormReturn<ReceiptValues>;
+  i: number;
+  canRemove: boolean;
+  remove: () => void;
+  containerTypes: { id: string; code: string; name: string }[];
+}) {
+  const packType = useWatch({ control: form.control, name: `lines.${i}.packType` });
+  return (
+    <>
+      <TableRow>
+        <TableCell className="px-2.5 py-1.5 text-muted-foreground">{i + 1}</TableCell>
+        <TableCell className="px-2.5 py-1.5">
+          <FormField
+            control={form.control}
+            name={`lines.${i}.skuId`}
+            render={({ field }) => (
+              <FormItem>
+                <FormControl>
+                  <EntityPicker
+                    value={field.value}
+                    onChange={(id, option) => {
+                      field.onChange(id);
+                      form.setValue(`lines.${i}.skuLabel`, option?.label ?? '');
+                      form.setValue(
+                        `lines.${i}.tracking`,
+                        (option?.meta?.trackingMode as 'NONE' | 'LOT' | 'SERIAL') ?? 'NONE',
+                      );
+                    }}
+                    useSearch={useSkuSearch}
+                    selectedLabel={form.getValues(`lines.${i}.skuLabel`) || undefined}
+                    placeholder="Tìm SKU…"
+                    searchPlaceholder="Mã / tên SKU / barcode…"
+                    clearable={false}
+                  />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+        </TableCell>
+        <TableCell className="px-2.5 py-1.5">
+          <FormField
+            control={form.control}
+            name={`lines.${i}.qty`}
+            render={({ field }) => (
+              <FormItem>
+                <FormControl>
+                  <Input inputMode="decimal" placeholder="0" {...field} />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+        </TableCell>
+        <TableCell className="px-2.5 py-1.5">
+          <FormField
+            control={form.control}
+            name={`lines.${i}.lotNumber`}
+            render={({ field }) => (
+              <FormItem>
+                <FormControl>
+                  <Input placeholder="L2608" className="font-mono" {...field} />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+        </TableCell>
+        <TableCell className="px-2.5 py-1.5">
+          <FormField
+            control={form.control}
+            name={`lines.${i}.expiryDate`}
+            render={({ field }) => (
+              <FormItem>
+                <FormControl>
+                  <Input type="date" {...field} />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+        </TableCell>
+        <TableCell className="px-2.5 py-1.5">
+          <FormField
+            control={form.control}
+            name={`lines.${i}.unitCost`}
+            render={({ field }) => (
+              <FormItem>
+                <FormControl>
+                  <Input inputMode="decimal" placeholder="0" {...field} />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+        </TableCell>
+        <TableCell className="px-2.5 py-1.5 text-right">
+          <LineValue form={form} index={i} />
+        </TableCell>
+        <TableCell className="px-2.5 py-1.5">
+          {canRemove ? (
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              className="h-8 w-8"
+              aria-label={`Xóa dòng ${i + 1}`}
+              onClick={remove}
+            >
+              <X aria-hidden />
+            </Button>
+          ) : null}
+        </TableCell>
+      </TableRow>
+      <TableRow className="bg-muted/30 hover:bg-muted/30">
+        <TableCell className="px-2.5 py-1" />
+        <TableCell colSpan={7} className="px-2.5 py-1">
+          <div className="flex flex-wrap items-center gap-2 text-xs">
+            <span className="text-muted-foreground">Đóng gói</span>
+            <FormField
+              control={form.control}
+              name={`lines.${i}.packType`}
+              render={({ field }) => (
+                <FormItem className="min-w-36">
+                  <Select
+                    value={field.value || NONE}
+                    onValueChange={(v) => field.onChange(v === NONE ? '' : v)}
+                  >
+                    <FormControl>
+                      <SelectTrigger
+                        className="h-8 text-xs"
+                        aria-label={`Loại thùng dòng ${i + 1}`}
+                      >
+                        <SelectValue placeholder="Hàng rời" />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      <SelectItem value={NONE}>Hàng rời (không đóng thùng)</SelectItem>
+                      {containerTypes.map((t) => (
+                        <SelectItem key={t.id} value={t.code}>
+                          {t.name} ({t.code})
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            {packType ? (
+              <>
+                <span className="text-muted-foreground">×</span>
+                <FormField
+                  control={form.control}
+                  name={`lines.${i}.packQtyPer`}
+                  render={({ field }) => (
+                    <FormItem className="w-28">
+                      <FormControl>
+                        <Input
+                          inputMode="decimal"
+                          className="h-8 text-xs"
+                          placeholder="SL / thùng"
+                          aria-label={`SL mỗi thùng dòng ${i + 1}`}
+                          {...field}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <PackCount form={form} index={i} />
+                <span className="text-muted-foreground">· bọc trong</span>
+                <FormField
+                  control={form.control}
+                  name={`lines.${i}.packWrapIn`}
+                  render={({ field }) => (
+                    <FormItem className="min-w-32">
+                      <Select
+                        value={field.value || NONE}
+                        onValueChange={(v) => field.onChange(v === NONE ? '' : v)}
+                      >
+                        <FormControl>
+                          <SelectTrigger
+                            className="h-8 text-xs"
+                            aria-label={`Bọc trong dòng ${i + 1}`}
+                          >
+                            <SelectValue placeholder="Không bọc" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          <SelectItem value={NONE}>Không bọc</SelectItem>
+                          {containerTypes
+                            .filter((t) => t.code !== packType)
+                            .map((t) => (
+                              <SelectItem key={t.id} value={t.code}>
+                                {t.name} ({t.code})
+                              </SelectItem>
+                            ))}
+                        </SelectContent>
+                      </Select>
+                    </FormItem>
+                  )}
+                />
+                <span className="text-muted-foreground">
+                  — vỏ tạo khi lưu, in tem ở chi tiết phiếu
+                </span>
+              </>
+            ) : null}
+          </div>
+        </TableCell>
+      </TableRow>
     </>
   );
 }
