@@ -153,9 +153,13 @@ interface Selection {
   setMany: (tasks: Task[], on: boolean) => void;
 }
 
-/** Thẻ tick được để gán / gộp: chưa gán hoặc đã gán (đổi người). Đang làm thì không. */
+/**
+ * Thẻ tick được để gán / gộp: chưa gán hoặc đã gán (đổi người). Đang làm thì không. Việc đã
+ * thuộc lượt gộp cũng không — server chặn gán lẻ ("đổi người trên lượt, không gán lẻ"), phải gán
+ * cả lượt ở bảng "Lượt lấy hàng gộp".
+ */
 function selectable(task: Task): boolean {
-  return task.status === 'PENDING' || task.status === 'ASSIGNED';
+  return (task.status === 'PENDING' || task.status === 'ASSIGNED') && task.waveId === null;
 }
 
 /** Gợi ý vai trò cạnh tên trong ô "Gán cho…" — danh bạ giờ gồm cả nhân viên lấy / đóng hàng. */
@@ -245,7 +249,13 @@ function TaskCard({
           {idleWord} {formatMinutes(task.idleMinutes)} · tuổi {formatMinutes(task.ageMinutes)}
         </span>
       </div>
-      {staff && task.status === 'PENDING' ? (
+      {staff && task.waveId && (task.status === 'PENDING' || task.status === 'ASSIGNED') ? (
+        <p className="text-xs text-muted-foreground">
+          <Layers className="inline h-3.5 w-3.5" aria-hidden /> Gán / đổi người cả lượt ở bảng
+          &ldquo;Lượt lấy hàng gộp&rdquo; bên dưới — không gán lẻ từng đơn.
+        </p>
+      ) : null}
+      {staff && task.status === 'PENDING' && !task.waveId ? (
         <Select
           value=""
           onValueChange={(userId) =>
@@ -268,7 +278,7 @@ function TaskCard({
           </SelectContent>
         </Select>
       ) : null}
-      {staff && task.status === 'ASSIGNED' ? (
+      {staff && task.status === 'ASSIGNED' && !task.waveId ? (
         <button
           type="button"
           className="self-start text-xs text-primary hover:underline disabled:opacity-50"

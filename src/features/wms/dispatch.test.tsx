@@ -266,6 +266,48 @@ describe('DispatchScreen — gán / trả việc (POST /tasks/:id/assign|unassig
     expect(region).toHaveTextContent(`Đã chọn ${assignedShown} việc`);
   });
 
+  it('việc đã thuộc lượt gộp: không có ô tick, "Chọn tất cả" bỏ qua, không có "Gán cho…" / "Trả về" lẻ mà chỉ dẫn sang bảng lượt', async () => {
+    search = '';
+    const WAVE_ID = '00000000-0000-4000-8000-00000000e777';
+    const inWavePending = PENDING[0]!;
+    const inWaveAssigned = ALL.find((t) => t.status === 'ASSIGNED')!;
+    server.use(
+      http.get('/api/tasks', ({ request }) => {
+        const status = new URL(request.url).searchParams.get('status');
+        const items = ALL.filter((t) => t.status === status).map((t) =>
+          t.id === inWavePending.id || t.id === inWaveAssigned.id ? { ...t, waveId: WAVE_ID } : t,
+        );
+        return HttpResponse.json({ items, total: items.length });
+      }),
+    );
+    renderApp(<DispatchScreen />);
+    await screen.findByText(inWavePending.docNumber);
+    // Không tick lẻ được, không gán lẻ được — server sẽ từ chối "thuộc lượt pick gộp".
+    expect(
+      screen.queryByRole('checkbox', { name: `Chọn ${inWavePending.docNumber}` }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('combobox', { name: `Gán ${inWavePending.docNumber}` }),
+    ).not.toBeInTheDocument();
+    expect(screen.getAllByText(/Gán \/ đổi người cả lượt/).length).toBe(2);
+    // Thẻ thường cùng làn vẫn tick / gán được.
+    expect(
+      screen.getByRole('checkbox', { name: `Chọn ${PENDING[1]!.docNumber}` }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('combobox', { name: `Gán ${PENDING[1]!.docNumber}` }),
+    ).toBeInTheDocument();
+    // "Chọn tất cả" đếm đúng số thẻ tick được (bỏ thẻ thuộc lượt).
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Chọn tất cả Chưa gán' }));
+    const shown = Math.min(PENDING.length, 20) - 1;
+    expect(await screen.findByRole('region', { name: 'Việc đã chọn' })).toHaveTextContent(
+      `Đã chọn ${shown} việc`,
+    );
+    // Thẻ ASSIGNED thuộc lượt: không có "Trả về hàng đợi" lẻ.
+    const assignedCard = screen.getByText(inWaveAssigned.docNumber).closest('article')!;
+    expect(assignedCard).not.toHaveTextContent('Trả về hàng đợi');
+  });
+
   it('thẻ ASSIGNED có "Trả về hàng đợi" → POST unassign', async () => {
     search = '';
     const unassigned: string[] = [];
