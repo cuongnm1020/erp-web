@@ -28,9 +28,15 @@ const UOMS = [
   { id: 'u-box', code: 'BOX', name: 'Thùng', decimals: 0 },
 ];
 
+const CONTAINER_TYPES = [
+  { id: 'ct-carton', code: 'CARTON', name: 'Thùng', isActive: true },
+  { id: 'ct-pallet', code: 'PALLET', name: 'Pallet', isActive: true },
+];
+
 function baseHandlers() {
   return [
     http.get('/api/uoms', () => HttpResponse.json(UOMS)),
+    http.get('/api/container-types', () => HttpResponse.json(CONTAINER_TYPES)),
     http.get('/api/brands', () => HttpResponse.json([])),
     http.get('/api/categories', () => HttpResponse.json([])),
     http.get('/api/warehouses', () =>
@@ -63,14 +69,16 @@ describe('ProductFormScreen — tạo (design/Products/ProductForm)', () => {
     expect(posts).toHaveLength(0);
   });
 
-  it('ô mã sản phẩm / mã SKU / barcode / ĐVT phụ đang ẩn — không render input; cân nặng (g) có mặt', async () => {
+  it('ô mã sản phẩm / mã SKU / barcode lẻ đang ẩn — không render input; cân nặng (g) + ĐVT phụ có mặt', async () => {
     server.use(...baseHandlers());
     renderApp(<ProductFormScreen />);
     await screen.findByLabelText('Tên sản phẩm *');
-    for (const label of ['Mã sản phẩm', 'Mã SKU', 'Barcode lẻ', 'ĐVT phụ']) {
+    for (const label of ['Mã sản phẩm', 'Mã SKU', 'Barcode lẻ']) {
       expect(screen.queryByLabelText(label)).not.toBeInTheDocument();
     }
     expect(screen.getByLabelText('Cân nặng (g)')).toBeInTheDocument();
+    expect(screen.getByRole('combobox', { name: 'ĐVT phụ' })).toBeInTheDocument();
+    expect(screen.getByRole('combobox', { name: 'Cấp đóng gói SKU 1' })).toBeInTheDocument();
     expect(screen.queryByRole('combobox', { name: 'Theo dõi lô / HSD' })).not.toBeInTheDocument();
   });
 
@@ -110,6 +118,49 @@ describe('ProductFormScreen — tạo (design/Products/ProductForm)', () => {
     // Không gửi code/name — API lấy mã + tên sản phẩm; không barcode (backend tự sinh QR = mã SKU)
     expect(skuBodies[0]).toEqual({ productId: 'p-1', body: { baseUom: 'PCS' } });
     await waitFor(() => expect(push).toHaveBeenCalledWith('/catalog/products'));
+  });
+
+  it('đa ĐVT: chọn ĐVT phụ BOX + hệ số 10 + cấp đóng gói CARTON → body SKU có conversions[{uom,factor,containerType}]', async () => {
+    push.mockClear();
+    const skuBodies: unknown[] = [];
+    server.use(
+      ...baseHandlers(),
+      http.post('/api/products', () =>
+        HttpResponse.json(
+          {
+            id: 'p-1',
+            code: 'TL08',
+            name: 'Bút bi TL-08',
+            categoryId: null,
+            brandId: null,
+            trackingMode: 'NONE',
+            shelfLifeDays: null,
+            isActive: true,
+          },
+          { status: 201 },
+        ),
+      ),
+      http.post('/api/products/:id/skus', async ({ request }) => {
+        skuBodies.push(await request.json());
+        return HttpResponse.json({}, { status: 201 });
+      }),
+    );
+    renderApp(<ProductFormScreen />);
+    fill('Tên sản phẩm *', 'Bút bi TL-08');
+    // Chưa chọn ĐVT phụ → hệ số + cấp đóng gói bị khoá
+    expect(screen.getByLabelText('Hệ số quy đổi')).toBeDisabled();
+    fireEvent.click(screen.getByRole('combobox', { name: 'ĐVT phụ' }));
+    fireEvent.click(await screen.findByRole('option', { name: 'BOX — Thùng' }));
+    fill('Hệ số quy đổi', '10');
+    expect(screen.getByText('1 BOX = ? PCS')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('combobox', { name: 'Cấp đóng gói SKU 1' }));
+    fireEvent.click(await screen.findByRole('option', { name: 'Thùng (CARTON)' }));
+    fireEvent.click(screen.getByRole('button', { name: /Lưu sản phẩm/ }));
+    await waitFor(() => expect(skuBodies).toHaveLength(1));
+    expect(skuBodies[0]).toEqual({
+      baseUom: 'PCS',
+      conversions: [{ uom: 'BOX', factor: '10', containerType: 'CARTON' }],
+    });
   });
 
   it('nhiều biến thể: "Thêm biến thể" copy tên sản phẩm, mã SKU đánh số theo dòng, xóa được dòng chưa lưu', async () => {

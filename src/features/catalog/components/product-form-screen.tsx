@@ -41,6 +41,7 @@ import {
   useSetConversion,
   useCategories,
   useCreateProduct,
+  useContainerTypes,
   useCreateSku,
   useProduct,
   useUoms,
@@ -948,6 +949,7 @@ function ProductFormBody({ product }: { product?: ProductDetail }) {
                 index={i}
                 editing={editing}
                 simple={!hasVariants}
+                uoms={uoms.data ?? []}
                 onRemove={
                   // Design: chỉ xóa dòng CHƯA lưu; biến thể đã có chỉ "Ngừng bán"
                   !form.getValues(`skus.${i}.skuId`) && rows.fields.length > 1
@@ -996,15 +998,18 @@ function ProductFormBody({ product }: { product?: ProductDetail }) {
 }
 
 /**
- * Một dòng biến thể: trạng thái (khi sửa) · tên · giá nhập · giá bán · tồn đầu kỳ (dòng mới).
- * Các ô ảnh / mã SKU / barcode / trọng lượng / đa ĐVT đang tạm ẩn (JSX giữ dạng comment
- * để bật lại) — bật lại thì nhớ đưa lại các prop `uoms`, `skuImage`, `canEditImages`.
+ * Một dòng biến thể: trạng thái (khi sửa) · tên · giá nhập · giá bán · tồn đầu kỳ (dòng mới)
+ * · hàng đa ĐVT (ĐVT phụ + hệ số + cấp đóng gói + barcode phụ + ĐVT bán — bật lại 2026-09-19
+ * vì auto-wave cần quy đổi CARTON/PALLET của SKU).
+ * Các ô ảnh / mã SKU / barcode lẻ / trọng lượng đang tạm ẩn (JSX giữ dạng comment để bật
+ * lại) — bật lại thì nhớ đưa lại các prop `skuImage`, `canEditImages`.
  */
 function SkuRow({
   form,
   index,
   editing,
   simple,
+  uoms,
   onRemove,
 }: {
   form: UseFormReturn<ProductFormValues>;
@@ -1012,10 +1017,19 @@ function SkuRow({
   editing: boolean;
   /** Sản phẩm đơn: ẩn ô tên (server lấy tên sản phẩm), không có nút xóa dòng. */
   simple: boolean;
+  uoms: Array<{ id: string; code: string; name: string }>;
   onRemove?: () => void;
 }) {
   const skuId = form.getValues(`skus.${index}.skuId`);
   const saved = skuId !== '';
+  // F3 — đa ĐVT trên dòng: ĐVT phụ ngoài ĐVT cơ sở; ĐVT bán = cơ sở/phụ/đã có quy đổi.
+  // Cấp đóng gói (CARTON/PALLET) của quy đổi là đầu vào của auto-wave (PLAN-packaging-hierarchy).
+  const baseUom = form.watch('baseUom');
+  const altUom = form.watch(`skus.${index}.altUom`);
+  const existingConvUoms = form.getValues(`skus.${index}.existingConvUoms`);
+  const altOptions = uoms.filter((u) => u.code !== baseUom);
+  const containerTypes = useContainerTypes();
+  const NONE = '__none__';
 
   return (
     <div className="flex flex-col gap-2 px-3 py-2">
@@ -1217,8 +1231,8 @@ function SkuRow({
         )}
       </div>
       {/* F3 — hàng 3: đa ĐVT. SKU đã lưu hiện quy đổi sẵn có dạng chip; khai thêm ở các ô bên cạnh. */}
-      <div className="grid items-start gap-2 sm:grid-cols-4 lg:max-w-3xl">
-        {/* <FormField
+      <div className="grid items-start gap-2 sm:grid-cols-5 lg:max-w-4xl">
+        <FormField
           control={form.control}
           name={`skus.${index}.altUom`}
           render={({ field }) => (
@@ -1356,7 +1370,7 @@ function SkuRow({
               <FormMessage />
             </FormItem>
           )}
-        /> */}
+        />
       </div>
     </div>
   );
