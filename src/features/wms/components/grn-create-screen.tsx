@@ -45,6 +45,9 @@ import { useSkuSearch } from '../api/use-locations';
 import { useCreateReceipt, usePostReceipt } from '../api/use-receipts';
 import { isOperationalWarehouse, useWarehouses } from '../api/use-warehouses';
 
+/** Cùng regex với quantitySchema — dùng để guard trước khi new Decimal(). */
+const QTY_RE = /^\d{1,12}(\.\d{1,6})?$/;
+
 /**
  * Tạo phiếu nhập kho (design GrnCreate) — POST /goods-receipts (DRAFT), nút
  * "Post phiếu" gọi tiếp POST /goods-receipts/:id/post. Idempotency-Key sinh lúc
@@ -98,7 +101,9 @@ const receiptSchema = z
             path: ['lines', i, 'packQtyPer'],
             message: 'Nhập số lượng mỗi thùng',
           });
-        } else if (/^\d{1,12}(\.\d{1,6})?$/.test(l.qty)) {
+        } else if (QTY_RE.test(l.qty) && QTY_RE.test(l.packQtyPer)) {
+          // Guard cả 2 vế: superRefine vẫn chạy khi field con sai regex (status
+          // "dirty"), nên new Decimal('1/10') sẽ throw nếu không kiểm tra trước.
           const per = new Decimal(l.packQtyPer);
           if (per.lte(0) || !new Decimal(l.qty).div(per).isInteger()) {
             ctx.addIssue({

@@ -243,6 +243,32 @@ describe('GrnCreateScreen — POST /goods-receipts (+ post)', () => {
     });
   });
 
+  it('SL mỗi thùng không phải số ("1/10") → lỗi regex tại ô, không crash DecimalError', async () => {
+    const posts: unknown[] = [];
+    server.use(
+      http.post(
+        '/api/goods-receipts',
+        () => (posts.push(1), HttpResponse.json({}, { status: 201 })),
+      ),
+    );
+    renderApp(<GrnCreateScreen />);
+    fireEvent.click(await screen.findByRole('combobox', { name: 'Kho nhận *' }));
+    fireEvent.click(await screen.findByRole('option', { name: 'Kho HN-1' }));
+    fireEvent.click(screen.getByText('Tìm SKU…'));
+    fireEvent.click(await screen.findByText('Giấy A4 Double A 80gsm'));
+    const qty = screen.getAllByPlaceholderText('0');
+    fireEvent.change(qty[0]!, { target: { value: '50' } });
+    fireEvent.change(qty[1]!, { target: { value: '340000' } });
+    fireEvent.click(screen.getByRole('combobox', { name: 'Loại thùng dòng 1' }));
+    fireEvent.click(await screen.findByRole('option', { name: 'Thùng (CARTON)' }));
+    fireEvent.change(await screen.findByLabelText('SL mỗi thùng dòng 1'), {
+      target: { value: '1/10' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Lưu nháp' }));
+    expect(await screen.findByText('Số lượng không hợp lệ (tối đa 6 số lẻ)')).toBeInTheDocument();
+    expect(posts).toHaveLength(0);
+  });
+
   it('lưu nháp: body đúng + Idempotency-Key có mặt → chuyển sang trang chi tiết', async () => {
     const posts: Array<{ body: unknown; key: string | null }> = [];
     server.use(
