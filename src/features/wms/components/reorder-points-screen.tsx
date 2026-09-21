@@ -1,466 +1,292 @@
 'use client';
 
-// UI-first từ design canvas — dữ liệu mẫu, chưa nối API (nối ở phase FE-x).
-
-import { ChevronDown, Search, X } from 'lucide-react';
-import { RowActions } from '@/components/data/row-actions';
+import { Info } from 'lucide-react';
+import Link from 'next/link';
+import { useMemo } from 'react';
+import { DataTable, FilterBar, type ColumnDef, type FilterDef } from '@/components/data/data-table';
+import { EmptyState, ListSkeleton, QueryState } from '@/components/data/states';
 import { StatusBadge, type StatusTone } from '@/components/data/status-badge';
 import { PageHeader } from '@/components/layout/page-header';
 import { Button } from '@/components/ui/button';
-import { Checkbox } from '@/components/ui/checkbox';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
-import { toast } from '@/components/ui/toaster';
 import { cn } from '@/lib/cn';
+import { formatDate, formatQuantity } from '@/lib/format';
+import { useInvalidateOn } from '@/lib/realtime';
+import { useListState } from '@/lib/url-state';
+import {
+  replenishmentKeys,
+  useReplenishment,
+  type ReplenishmentRow,
+  type ReplenishmentStatus,
+} from '../api/use-replenishment';
+import { useWarehouses } from '../api/use-warehouses';
+import { isNegativeQty } from '../labels';
 
-interface ReorderRow {
-  sku: string;
-  name: string;
-  warehouse: string;
-  unit: string;
-  min: string;
-  max: string;
-  reorderPoint: string;
-  current: string;
-  /** so với điểm đặt — số âm hiển thị đỏ */
-  vsPoint: string;
-  vsPointNeg?: boolean;
-  incoming: string;
-  status: string;
-  statusTone: StatusTone;
-  suggestion: string;
-  selected?: boolean;
-  focused?: boolean;
-}
+/**
+ * Cảnh báo nhập hàng (2026-09-22) — GET /stock/replenishment. Mỗi dòng là một SKU của sản phẩm
+ * có "Mức tồn kho" (đặt trên form sản phẩm): tồn thực, số bán hôm nay / hôm qua / hôm kia, tốc
+ * độ bán trung bình 2 ngày, số ngày còn bán được và ngày dự kiến hết. Trạng thái do API xếp:
+ *   Hết hàng (khả dụng ≤ 0) → Dưới mức (tồn ≤ mức) → Sắp chạm mức (2 ngày nữa chạm) → Đủ.
+ * Mọi con số là string decimal do API tính (luật 10) — màn hình chỉ hiển thị.
+ * Kho / phạm vi / tìm nhanh / trang nằm trên URL (luật 8). Mặc định chỉ dòng cần chú ý;
+ * `scope=all` để rà cả SKU đang đủ hàng.
+ */
+const DEFAULTS = { size: 50, filterKeys: ['warehouseId', 'scope'] as const };
+type Filter = (typeof DEFAULTS.filterKeys)[number];
 
-const SAMPLE_ROWS: ReorderRow[] = [
+const STATUS: Record<ReplenishmentStatus, { label: string; tone: StatusTone }> = {
+  OUT: { label: 'Hết hàng', tone: 'err' },
+  BELOW: { label: 'Dưới mức', tone: 'err' },
+  SOON: { label: 'Sắp chạm mức', tone: 'warn' },
+  OK: { label: 'Đủ', tone: 'ok' },
+};
+
+const columns: ColumnDef<ReplenishmentRow, unknown>[] = [
   {
-    sku: 'TL08-BLUE',
-    name: 'Bút bi Thiên Long TL-08 xanh',
-    warehouse: 'Kho HN-1',
-    unit: 'cái',
-    min: '100',
-    max: '400',
-    reorderPoint: '160',
-    current: '180',
-    vsPoint: '20',
-    incoming: '—',
-    status: 'Đủ',
-    statusTone: 'ok',
-    suggestion: '—',
+    id: 'status',
+    header: 'Trạng thái',
+    meta: { width: 130 },
+    cell: ({ row }) => (
+      <StatusBadge tone={STATUS[row.original.status].tone}>
+        {STATUS[row.original.status].label}
+      </StatusBadge>
+    ),
   },
   {
-    sku: 'TL08-RED',
-    name: 'Bút bi Thiên Long TL-08 đỏ',
-    warehouse: 'Kho HN-1',
-    unit: 'cái',
-    min: '200',
-    max: '800',
-    reorderPoint: '320',
-    current: '340',
-    vsPoint: '20',
-    incoming: '—',
-    status: 'Đủ',
-    statusTone: 'ok',
-    suggestion: '—',
+    id: 'skuCode',
+    accessorKey: 'skuCode',
+    header: 'SKU',
+    meta: { width: 140 },
+    cell: ({ getValue }) => <span className="font-mono text-xs">{getValue() as string}</span>,
   },
   {
-    sku: 'TL027-BLK',
-    name: 'Bút bi Thiên Long TL-027 đen',
-    warehouse: 'Kho HN-1',
-    unit: 'cái',
-    min: '300',
-    max: '1.200',
-    reorderPoint: '480',
-    current: '264',
-    vsPoint: '−216',
-    vsPointNeg: true,
-    incoming: '—',
-    status: 'Dưới min',
-    statusTone: 'err',
-    suggestion: '936',
-    selected: true,
+    id: 'productName',
+    header: 'Tên thương mại',
+    meta: { width: 280 },
+    cell: ({ row }) => (
+      <span className="flex flex-col">
+        <span>{row.original.productName}</span>
+        {row.original.skuName !== row.original.productName ? (
+          <span className="text-xs text-muted-foreground">{row.original.skuName}</span>
+        ) : null}
+      </span>
+    ),
+  },
+  { id: 'baseUomCode', accessorKey: 'baseUomCode', header: 'ĐVT', meta: { width: 80 } },
+  {
+    id: 'reorderLevel',
+    header: 'Mức tồn kho',
+    meta: { align: 'right', width: 120 },
+    cell: ({ row }) => formatQuantity(row.original.reorderLevel),
   },
   {
-    sku: 'DA-A4-80',
-    name: 'Giấy A4 Double A 80gsm',
-    warehouse: 'Kho HN-1',
-    unit: 'ream',
-    min: '400',
-    max: '1.600',
-    reorderPoint: '640',
-    current: '660',
-    vsPoint: '20',
-    incoming: '—',
-    status: 'Đủ',
-    statusTone: 'ok',
-    suggestion: '—',
+    id: 'onHand',
+    header: 'Tồn thực',
+    meta: { align: 'right', width: 110 },
+    cell: ({ row }) => (
+      <span
+        className={cn(
+          'font-semibold',
+          (row.original.status === 'BELOW' || row.original.status === 'OUT') && 'text-destructive',
+        )}
+      >
+        {formatQuantity(row.original.onHand)}
+      </span>
+    ),
   },
   {
-    sku: 'DA-A4-70',
-    name: 'Giấy A4 Double A 70gsm',
-    warehouse: 'Kho HN-1',
-    unit: 'ream',
-    min: '500',
-    max: '2.000',
-    reorderPoint: '800',
-    current: '791',
-    vsPoint: '−9',
-    vsPointNeg: true,
-    incoming: '—',
-    status: 'Dưới điểm đặt',
-    statusTone: 'warn',
-    suggestion: '1.209',
-    selected: true,
-    focused: true,
+    id: 'available',
+    header: 'Khả dụng',
+    meta: { align: 'right', width: 110 },
+    cell: ({ row }) => (
+      <span className={cn(isNegativeQty(row.original.available) && 'text-destructive')}>
+        {formatQuantity(row.original.available)}
+      </span>
+    ),
   },
   {
-    sku: 'IK-A4-70',
-    name: 'Giấy A4 IK Plus 70gsm',
-    warehouse: 'Kho HN-1',
-    unit: 'ream',
-    min: '100',
-    max: '400',
-    reorderPoint: '160',
-    current: '255',
-    vsPoint: '95',
-    incoming: '—',
-    status: 'Đủ',
-    statusTone: 'ok',
-    suggestion: '—',
+    id: 'soldToday',
+    header: 'Bán hôm nay',
+    meta: { align: 'right', width: 110 },
+    cell: ({ row }) => formatQuantity(row.original.soldToday),
   },
   {
-    sku: 'TP-BK48-100',
-    name: 'Băng keo trong 48mm × 100y Tiến Phát',
-    warehouse: 'Kho HN-1',
-    unit: 'cây',
-    min: '200',
-    max: '800',
-    reorderPoint: '320',
-    current: '466',
-    vsPoint: '146',
-    incoming: '—',
-    status: 'Đủ',
-    statusTone: 'ok',
-    suggestion: '—',
+    id: 'sold1d',
+    header: 'Bán hôm qua',
+    meta: { align: 'right', width: 110 },
+    cell: ({ row }) => formatQuantity(row.original.sold1d),
   },
   {
-    sku: 'TP-BK48-50',
-    name: 'Băng keo trong 48mm × 50y Tiến Phát',
-    warehouse: 'Kho HN-1',
-    unit: 'cây',
-    min: '300',
-    max: '1.200',
-    reorderPoint: '480',
-    current: '259',
-    vsPoint: '−221',
-    vsPointNeg: true,
-    incoming: '359',
-    status: 'Dưới min',
-    statusTone: 'err',
-    suggestion: '941',
-    selected: true,
+    id: 'sold2d',
+    header: 'Bán hôm kia',
+    meta: { align: 'right', width: 110 },
+    cell: ({ row }) => formatQuantity(row.original.sold2d),
   },
   {
-    sku: 'BK-2M-20',
-    name: 'Băng keo hai mặt 20mm × 10y',
-    warehouse: 'Kho HN-1',
-    unit: 'cuộn',
-    min: '400',
-    max: '1.600',
-    reorderPoint: '640',
-    current: '660',
-    vsPoint: '20',
-    incoming: '—',
-    status: 'Đủ',
-    statusTone: 'ok',
-    suggestion: '—',
+    id: 'avgDaily',
+    header: 'TB / ngày',
+    meta: { align: 'right', width: 100 },
+    cell: ({ row }) => formatQuantity(row.original.avgDaily, { maxDp: 1 }),
   },
   {
-    sku: 'CP-A5-120',
-    name: 'Sổ tay Campus A5 120 trang',
-    warehouse: 'Kho HN-1',
-    unit: 'cuốn',
-    min: '500',
-    max: '2.000',
-    reorderPoint: '800',
-    current: '776',
-    vsPoint: '−24',
-    vsPointNeg: true,
-    incoming: '133',
-    status: 'Dưới điểm đặt',
-    statusTone: 'warn',
-    suggestion: '1.224',
-    selected: true,
+    id: 'daysLeft',
+    header: 'Còn bán được',
+    meta: { align: 'right', width: 120 },
+    cell: ({ row }) =>
+      row.original.daysLeft === null ? (
+        <span className="text-muted-foreground">chưa có số bán</span>
+      ) : (
+        `${formatQuantity(row.original.daysLeft, { maxDp: 1 })} ngày`
+      ),
   },
   {
-    sku: 'DL-25K',
-    name: 'Sổ da Deli 25K bìa cứng',
-    warehouse: 'Kho HN-1',
-    unit: 'cuốn',
-    min: '200',
-    max: '800',
-    reorderPoint: '320',
-    current: '721',
-    vsPoint: '401',
-    incoming: '—',
-    status: 'Đủ',
-    statusTone: 'ok',
-    suggestion: '—',
+    id: 'projectedOutDate',
+    header: 'Dự kiến hết',
+    meta: { width: 120 },
+    cell: ({ row }) =>
+      row.original.projectedOutDate === null ? (
+        <span className="text-muted-foreground">—</span>
+      ) : (
+        formatDate(row.original.projectedOutDate)
+      ),
   },
   {
-    sku: 'PL-KG50',
-    name: 'Kẹp giấy Plus 50mm (hộp 12)',
-    warehouse: 'Kho HN-1',
-    unit: 'hộp',
-    min: '300',
-    max: '1.200',
-    reorderPoint: '480',
-    current: '463',
-    vsPoint: '−17',
-    vsPointNeg: true,
-    incoming: '—',
-    status: 'Dưới điểm đặt',
-    statusTone: 'warn',
-    suggestion: '737',
-    selected: true,
-  },
-  {
-    sku: 'HP-305-BK',
-    name: 'Mực in HP 305 đen',
-    warehouse: 'Kho HN-1',
-    unit: 'hộp',
-    min: '100',
-    max: '400',
-    reorderPoint: '160',
-    current: '75',
-    vsPoint: '−85',
-    vsPointNeg: true,
-    incoming: '355',
-    status: 'Dưới min',
-    statusTone: 'err',
-    suggestion: '325',
-    selected: true,
-  },
-  {
-    sku: 'CN-PG745',
-    name: 'Mực in Canon PG-745 đen',
-    warehouse: 'Kho HN-1',
-    unit: 'hộp',
-    min: '200',
-    max: '800',
-    reorderPoint: '320',
-    current: '340',
-    vsPoint: '20',
-    incoming: '—',
-    status: 'Đủ',
-    statusTone: 'ok',
-    suggestion: '—',
-  },
-  {
-    sku: 'DL-TAY30',
-    name: 'Tẩy Deli 30mm trắng',
-    warehouse: 'Kho HN-1',
-    unit: 'cái',
-    min: '500',
-    max: '2.000',
-    reorderPoint: '800',
-    current: '786',
-    vsPoint: '−14',
-    vsPointNeg: true,
-    incoming: '203',
-    status: 'Dưới điểm đặt',
-    statusTone: 'warn',
-    suggestion: '1.214',
+    id: 'actions',
+    header: '',
+    meta: { width: 110 },
+    cell: ({ row }) => (
+      <Button variant="ghost" size="sm" asChild>
+        <Link href={`/catalog/products/${row.original.productId}/edit`}>Sửa mức</Link>
+      </Button>
+    ),
   },
 ];
 
-function FilterChip({ active, children }: { active?: boolean; children: React.ReactNode }) {
-  return (
-    <span
-      className={cn(
-        'inline-flex h-7 items-center gap-1 whitespace-nowrap rounded-md border px-2 text-sm',
-        active
-          ? 'border-primary bg-secondary font-semibold text-primary'
-          : 'border-input bg-background',
-      )}
-    >
-      {children}
-    </span>
+export function ReplenishmentAlertScreen() {
+  const { state, set, skipTake } = useListState<Filter>(DEFAULTS);
+  const warehouseId = state.filters.warehouseId ?? '';
+  const onlyAlert = state.filters.scope !== 'all';
+  const params = useMemo(
+    () => ({ q: state.q, warehouseId, onlyAlert, ...skipTake }),
+    [state.q, warehouseId, onlyAlert, skipTake],
   );
-}
+  const query = useReplenishment(params);
+  const warehouses = useWarehouses();
+  // Luật 9: realtime chỉ invalidate theo prefix — tồn đổi (pack xong / nhập kho) → tính lại.
+  useInvalidateOn(['stock.changed', 'stock.moved'], [replenishmentKeys.all]);
 
-/** Ô min/max/điểm đặt sửa ngay trên dòng — chỉ hiển thị, chưa nối logic */
-function CellBox({ value, focused }: { value: string; focused?: boolean }) {
-  return (
-    <div
-      className={cn(
-        'ml-auto flex h-7 w-16 items-center justify-end rounded border bg-background px-1.5 text-sm tabular-nums',
-        focused ? 'border-primary ring-2 ring-secondary' : 'border-input',
-      )}
-    >
-      {value}
-    </div>
-  );
-}
+  const filters: FilterDef<Filter>[] = [
+    {
+      key: 'warehouseId',
+      label: 'Kho',
+      type: 'select',
+      options: (warehouses.data ?? []).map((w) => ({ value: w.id, label: w.name })),
+    },
+    {
+      key: 'scope',
+      label: 'Phạm vi',
+      type: 'select',
+      options: [{ value: 'all', label: 'Mọi SKU có mức tồn kho' }],
+    },
+  ];
+  const hasFilter = state.q !== '' || warehouseId !== '';
+  const data = query.data;
 
-export function ReorderPointsScreen() {
   return (
     <div className="flex flex-col gap-3">
       <PageHeader
-        title="Hạn mức tồn & điểm đặt hàng lại"
-        description="Kho HN-1 · 312 SKU · 7 dưới min · 9 dưới điểm đặt hàng"
-        breadcrumb={[{ label: 'Kho' }, { label: 'Hạn mức tồn' }]}
+        title="Cảnh báo nhập hàng"
+        description={
+          data === undefined
+            ? 'Đang tính tồn và số bán 2 ngày gần nhất…'
+            : `${data.alertCount} SKU cần chú ý · số bán tính đến hôm nay ${formatDate(data.asOf)}`
+        }
+        breadcrumb={[{ label: 'Kho' }, { label: 'Cảnh báo nhập hàng' }]}
         actions={
-          <>
-            <Button variant="outline" size="sm">
-              Nhập từ CSV
-            </Button>
-            <Button variant="outline" size="sm">
-              Tính lại theo tốc độ bán 90 ngày
-            </Button>
-            <Button size="sm">Tạo PO từ đề xuất (16)</Button>
-          </>
+          <Button variant="outline" size="sm" asChild>
+            <Link href="/catalog/products">Đặt mức tồn kho ở Sản phẩm</Link>
+          </Button>
         }
       />
 
-      <div className="flex flex-wrap items-center gap-2 rounded-md border bg-card px-2 py-1.5">
-        <div className="flex h-8 w-72 items-center gap-2 rounded-md border border-input bg-background px-2 text-sm text-muted-foreground">
-          <Search className="h-4 w-4" aria-hidden />
-          <span className="flex-1 truncate">Tìm SKU, tên…</span>
-        </div>
-        <FilterChip active>
-          Kho: HN-1 <ChevronDown className="h-3.5 w-3.5" aria-hidden />
-        </FilterChip>
-        <FilterChip active>
-          Chỉ dưới ngưỡng <X className="h-3 w-3" aria-hidden />
-        </FilterChip>
-        <FilterChip>
-          Danh mục: Tất cả <ChevronDown className="h-3.5 w-3.5" aria-hidden />
-        </FilterChip>
-        <Button variant="ghost" size="sm">
-          + Lọc
-        </Button>
-        <span className="ml-auto text-xs text-muted-foreground">
-          Cảnh báo gửi kênh: in-app + email lúc 07:00
+      <p className="flex items-center gap-1.5 rounded-md border bg-card px-3 py-2 text-xs text-muted-foreground">
+        <Info className="h-3.5 w-3.5 shrink-0" aria-hidden />
+        <span>
+          <b className="font-semibold text-foreground">Dưới mức</b> = tồn thực đã chạm mức tồn kho
+          đặt trên sản phẩm. <b className="font-semibold text-foreground">Sắp chạm mức</b> = với tốc
+          độ bán trung bình hôm qua + hôm kia, trong 2 ngày nữa sẽ chạm.{' '}
+          <b className="font-semibold text-foreground">Dự kiến hết</b> = khả dụng ÷ tốc độ bán. Số
+          bán tính theo đơn không hủy, ngày đặt giờ VN.
         </span>
-      </div>
+      </p>
 
-      <div className="overflow-hidden rounded-md border bg-card">
-        <div className="overflow-x-auto">
-          <Table>
-            <TableHeader>
-              <TableRow className="bg-muted hover:bg-muted">
-                <TableHead className="w-8 px-2.5">
-                  <Checkbox aria-label="Chọn tất cả" />
-                </TableHead>
-                <TableHead className="px-2.5">SKU</TableHead>
-                <TableHead className="px-2.5">Tên sản phẩm</TableHead>
-                <TableHead className="px-2.5">Kho</TableHead>
-                <TableHead className="px-2.5">ĐVT</TableHead>
-                <TableHead className="px-2.5 text-right">Min</TableHead>
-                <TableHead className="px-2.5 text-right">Max</TableHead>
-                <TableHead className="px-2.5 text-right">Điểm đặt lại</TableHead>
-                <TableHead className="px-2.5 text-right">Tồn hiện tại</TableHead>
-                <TableHead className="px-2.5 text-right">So điểm đặt</TableHead>
-                <TableHead className="px-2.5 text-right">Đang về (PO)</TableHead>
-                <TableHead className="px-2.5">Trạng thái</TableHead>
-                <TableHead className="px-2.5 text-right">Đề xuất đặt</TableHead>
-                <TableHead className="w-20 px-2.5">
-                  <span className="sr-only">Thao tác</span>
-                </TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {SAMPLE_ROWS.map((r) => (
-                <TableRow
-                  key={r.sku}
-                  className={r.selected ? 'bg-secondary hover:bg-secondary' : undefined}
+      <FilterBar<Filter>
+        q={state.q}
+        onQChange={(q) => set({ q })}
+        filters={filters}
+        values={{ warehouseId: state.filters.warehouseId, scope: state.filters.scope }}
+        onFilterChange={(patch) => set({ filters: { ...state.filters, ...patch } })}
+        searchPlaceholder="Tìm theo mã SKU, tên biến thể hoặc tên thương mại…"
+      />
+
+      <QueryState
+        query={query}
+        skeleton={<ListSkeleton rows={12} columns={13} />}
+        isEmpty={(d) => d.items.length === 0}
+        empty={
+          <EmptyState
+            title={
+              hasFilter
+                ? 'Không có SKU nào khớp'
+                : onlyAlert
+                  ? 'Chưa có sản phẩm nào cần nhập'
+                  : 'Chưa sản phẩm nào đặt mức tồn kho'
+            }
+            description={
+              hasFilter
+                ? 'Thử từ khóa khác, hoặc bỏ bớt bộ lọc đang dán trên URL.'
+                : onlyAlert
+                  ? 'Mọi SKU có mức tồn kho đều đang trên ngưỡng. Xem cả dòng đủ hàng để rà lại ngưỡng.'
+                  : 'Mở form sản phẩm, điền "Mức tồn kho" — SKU của sản phẩm đó sẽ được theo dõi ở đây.'
+            }
+            action={
+              hasFilter ? (
+                <Button
+                  variant="outline"
+                  onClick={() => set({ q: '', filters: { scope: state.filters.scope } })}
                 >
-                  <TableCell className="px-2.5 py-1.5">
-                    <Checkbox defaultChecked={r.selected} aria-label={`Chọn ${r.sku}`} />
-                  </TableCell>
-                  <TableCell className="px-2.5 py-1.5 font-mono text-xs text-primary">
-                    {r.sku}
-                  </TableCell>
-                  <TableCell className="px-2.5 py-1.5">{r.name}</TableCell>
-                  <TableCell className="px-2.5 py-1.5 text-muted-foreground">
-                    {r.warehouse}
-                  </TableCell>
-                  <TableCell className="px-2.5 py-1.5 text-muted-foreground">{r.unit}</TableCell>
-                  <TableCell className="px-2.5 py-1.5">
-                    <CellBox value={r.min} focused={r.focused} />
-                  </TableCell>
-                  <TableCell className="px-2.5 py-1.5">
-                    <CellBox value={r.max} />
-                  </TableCell>
-                  <TableCell className="px-2.5 py-1.5">
-                    <CellBox value={r.reorderPoint} />
-                  </TableCell>
-                  <TableCell className="px-2.5 py-1.5 text-right tabular-nums">
-                    {r.current}
-                  </TableCell>
-                  <TableCell className="px-2.5 py-1.5 text-right tabular-nums">
-                    <span className={cn('font-semibold', r.vsPointNeg && 'text-destructive')}>
-                      {r.vsPoint}
-                    </span>
-                  </TableCell>
-                  <TableCell className="px-2.5 py-1.5 text-right tabular-nums text-muted-foreground">
-                    {r.incoming}
-                  </TableCell>
-                  <TableCell className="px-2.5 py-1.5">
-                    <StatusBadge tone={r.statusTone}>{r.status}</StatusBadge>
-                  </TableCell>
-                  <TableCell className="px-2.5 py-1.5 text-right tabular-nums">
-                    {r.suggestion}
-                  </TableCell>
-                  <TableCell className="px-2.5 py-1.5">
-                    <RowActions
-                      onEdit={() => toast.info('UI-first — form sửa hạn mức tồn chưa nối API')}
-                      onDelete={() => toast.success(`Đã xóa hạn mức tồn ${r.sku} (mẫu)`)}
-                      itemName={`hạn mức tồn ${r.sku}`}
-                    />
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </div>
-        {/* Thanh sửa hàng loạt thay chân trang khi chọn nhiều dòng */}
-        <div className="flex flex-wrap items-center gap-3 border-t border-primary bg-secondary px-3 py-1.5 text-xs">
-          <span className="font-semibold text-primary">Đã chọn 6 SKU</span>
-          <span className="text-muted-foreground">Sửa hàng loạt:</span>
-          <span className="flex items-center gap-1">
-            Min
-            <span className="flex h-7 w-16 items-center justify-end rounded border border-input bg-background px-1.5 text-sm tabular-nums">
-              150
-            </span>
-          </span>
-          <span className="flex items-center gap-1">
-            Max
-            <span className="flex h-7 w-16 items-center justify-end rounded border border-input bg-background px-1.5 text-sm tabular-nums">
-              600
-            </span>
-          </span>
-          <span className="flex items-center gap-1">
-            Điểm đặt lại
-            <span className="flex h-7 w-16 items-center justify-end rounded border border-input bg-background px-1.5 text-sm tabular-nums">
-              240
-            </span>
-          </span>
-          <Button size="sm">Áp dụng cho 6 SKU</Button>
-          <Button variant="ghost" size="sm">
-            Bỏ chọn
-          </Button>
-          <span className="ml-auto text-muted-foreground">Trang 1 / 8</span>
-        </div>
-      </div>
+                  Xóa lọc
+                </Button>
+              ) : onlyAlert ? (
+                <Button
+                  variant="outline"
+                  onClick={() => set({ filters: { ...state.filters, scope: 'all' } })}
+                >
+                  Xem mọi SKU có mức tồn kho
+                </Button>
+              ) : (
+                <Button variant="outline" asChild>
+                  <Link href="/catalog/products">Mở danh sách sản phẩm</Link>
+                </Button>
+              )
+            }
+          />
+        }
+      >
+        {(d) => (
+          <DataTable
+            columns={columns}
+            rows={d.items}
+            getRowId={(r) => r.skuId}
+            total={d.total}
+            page={state.page}
+            size={state.size}
+            sort={state.sort}
+            onPageChange={(page) => set({ page })}
+            onSizeChange={(size) => set({ size })}
+            onSortChange={(sort) => set({ sort })}
+          />
+        )}
+      </QueryState>
     </div>
   );
 }

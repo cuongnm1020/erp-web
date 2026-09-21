@@ -65,15 +65,18 @@ describe('ProductFormScreen — tạo (design/Products/ProductForm)', () => {
     );
     renderApp(<ProductFormScreen />);
     fireEvent.click(screen.getByRole('button', { name: /Lưu sản phẩm/ }));
-    expect(await screen.findByText('Nhập tên sản phẩm')).toBeInTheDocument();
+    expect(await screen.findByText('Nhập tên thương mại')).toBeInTheDocument();
     expect(posts).toHaveLength(0);
   });
 
-  it('ô mã sản phẩm / mã SKU / barcode lẻ đang ẩn — không render input; cân nặng (g) + ĐVT phụ có mặt', async () => {
+  it('ô mã sản phẩm + tên xuất hóa đơn + mức tồn kho có mặt (2026-09-22); mã SKU / barcode lẻ vẫn ẩn; cân nặng (g) + ĐVT phụ có mặt', async () => {
     server.use(...baseHandlers());
     renderApp(<ProductFormScreen />);
-    await screen.findByLabelText('Tên sản phẩm *');
-    for (const label of ['Mã sản phẩm', 'Mã SKU', 'Barcode lẻ']) {
+    await screen.findByLabelText('Tên thương mại *');
+    expect(screen.getByLabelText('Mã sản phẩm')).toBeInTheDocument();
+    expect(screen.getByLabelText('Tên xuất hóa đơn')).toBeInTheDocument();
+    expect(screen.getByLabelText('Mức tồn kho')).toBeInTheDocument();
+    for (const label of ['Mã SKU', 'Barcode lẻ']) {
       expect(screen.queryByLabelText(label)).not.toBeInTheDocument();
     }
     expect(screen.getByLabelText('Cân nặng (g)')).toBeInTheDocument();
@@ -108,7 +111,7 @@ describe('ProductFormScreen — tạo (design/Products/ProductForm)', () => {
       }),
     );
     renderApp(<ProductFormScreen />);
-    fill('Tên sản phẩm *', 'Bút bi TL-08');
+    fill('Tên thương mại *', 'Bút bi TL-08');
     // Sản phẩm đơn: không có ô "Tên biến thể", không có nút "Thêm biến thể"
     expect(screen.queryByLabelText('Tên biến thể')).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Thêm biến thể' })).not.toBeInTheDocument();
@@ -146,7 +149,7 @@ describe('ProductFormScreen — tạo (design/Products/ProductForm)', () => {
       }),
     );
     renderApp(<ProductFormScreen />);
-    fill('Tên sản phẩm *', 'Bút bi TL-08');
+    fill('Tên thương mại *', 'Bút bi TL-08');
     // Chưa chọn ĐVT phụ → hệ số + cấp đóng gói bị khoá
     expect(screen.getByLabelText('Hệ số quy đổi')).toBeDisabled();
     fireEvent.click(screen.getByRole('combobox', { name: 'ĐVT phụ' }));
@@ -189,8 +192,8 @@ describe('ProductFormScreen — tạo (design/Products/ProductForm)', () => {
       }),
     );
     renderApp(<ProductFormScreen />);
-    fill('Tên sản phẩm *', 'Thuốc trĩ');
-    fireEvent.click(screen.getByRole('checkbox', { name: /Sản phẩm có nhiều biến thể/ }));
+    fill('Tên thương mại *', 'Thuốc trĩ');
+    fireEvent.click(screen.getByRole('checkbox', { name: /Có nhiều biến thể/ }));
     expect(await screen.findByLabelText('Tên biến thể')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Thêm biến thể' }));
     fireEvent.click(screen.getByRole('button', { name: 'Thêm biến thể' }));
@@ -235,7 +238,7 @@ describe('ProductFormScreen — tạo (design/Products/ProductForm)', () => {
       http.post('/api/products/:id/skus', () => HttpResponse.json({}, { status: 201 })),
     );
     renderApp(<ProductFormScreen />);
-    fill('Tên sản phẩm *', 'Thuốc bật chồi X');
+    fill('Tên thương mại *', 'Thuốc bật chồi X');
     fill('Tên gọi khác', 'thuốc bật chồi, cheshaland, , thuốc bật chồi');
     fireEvent.click(screen.getByRole('button', { name: /Lưu sản phẩm/ }));
     await waitFor(() => expect(productBody).toBeDefined());
@@ -278,8 +281,8 @@ describe('ProductFormScreen — tạo (design/Products/ProductForm)', () => {
       }),
     );
     renderApp(<ProductFormScreen />);
-    fill('Tên sản phẩm *', 'Bút bi TL-09');
-    fireEvent.click(screen.getByRole('checkbox', { name: /Sản phẩm có nhiều biến thể/ }));
+    fill('Tên thương mại *', 'Bút bi TL-09');
+    fireEvent.click(screen.getByRole('checkbox', { name: /Có nhiều biến thể/ }));
     fill('Tên biến thể', 'Bút TL-09');
     fireEvent.click(screen.getByRole('button', { name: /Lưu sản phẩm/ }));
     expect(await screen.findByText(/1 dòng chưa hợp lệ — chưa lưu hết/)).toBeInTheDocument();
@@ -327,7 +330,11 @@ describe('ProductFormScreen — tạo (design/Products/ProductForm)', () => {
       }),
     );
     renderApp(<ProductFormScreen />);
-    fill('Tên sản phẩm *', 'Bút TL-11');
+    fill('Tên thương mại *', 'Bút TL-11');
+    // 2026-09-22: mã nhập tay, tên xuất hóa đơn, mức tồn kho (string decimal — luật 10)
+    fill('Mã sản phẩm', 'TL11');
+    fill('Tên xuất hóa đơn', 'Bút bi Thiên Long TL-11 (hộp 20)');
+    fill('Mức tồn kho', '500');
     fill('Mô tả', 'Mô tả bán hàng');
     fill('Ghi chú nội bộ', 'Ghi chú riêng');
     fireEvent.click(screen.getByRole('checkbox', { name: 'Cho phép bán tồn kho âm' }));
@@ -341,12 +348,14 @@ describe('ProductFormScreen — tạo (design/Products/ProductForm)', () => {
 
     await waitFor(() => expect(bodies.sku).toBeDefined());
     expect(bodies.product).toMatchObject({
+      code: 'TL11',
+      invoiceName: 'Bút bi Thiên Long TL-11 (hộp 20)',
+      reorderLevel: '500',
       defaultWarehouseId: 'wh-1',
       description: 'Mô tả bán hàng',
       internalNote: 'Ghi chú riêng',
       allowNegativeStock: true,
     });
-    expect(bodies.product).not.toHaveProperty('code');
     expect(bodies.sku).toEqual({
       baseUom: 'PCS',
       purchasePrice: '12000',
@@ -366,7 +375,7 @@ describe('ProductFormScreen — tạo (design/Products/ProductForm)', () => {
       }),
     );
     renderApp(<ProductFormScreen />);
-    fill('Tên sản phẩm *', 'Bút TL-12');
+    fill('Tên thương mại *', 'Bút TL-12');
     fill('Tồn đầu kỳ', '10'); // không giá nhập, không kho mặc định
     fireEvent.click(screen.getByRole('button', { name: /Lưu sản phẩm/ }));
     expect(
@@ -421,7 +430,7 @@ describe('ProductFormScreen — tạo (design/Products/ProductForm)', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Bỏ ảnh khỏi hàng chờ: b.png' }));
     expect(screen.queryByAltText('b.png')).not.toBeInTheDocument();
 
-    fill('Tên sản phẩm *', 'Bút TL-10');
+    fill('Tên thương mại *', 'Bút TL-10');
     fireEvent.click(screen.getByRole('button', { name: /Lưu sản phẩm/ }));
     // Sau khi tạo sản phẩm + SKU, ảnh còn trong hàng chờ tự POST lên đúng productId mới
     await waitFor(() => expect(imagePosts).toEqual([{ productId: 'p-3', size: 4 }]));
@@ -442,6 +451,8 @@ describe('ProductFormScreen — sửa', () => {
     category: null,
     brand: null,
     searchAliases: ['bút tl'],
+    invoiceName: 'Bút bi Thiên Long TL-08 (hộp)',
+    reorderLevel: '120.000000',
     version: 7,
     createdAt: '2026-09-01T00:00:00.000Z',
     updatedAt: '2026-09-01T00:00:00.000Z',
@@ -501,10 +512,12 @@ describe('ProductFormScreen — sửa', () => {
     expect(await screen.findByDisplayValue('Bút bi TL-08 xanh')).toBeInTheDocument();
     // Alias prefill vào ô "Tên gọi khác".
     expect(screen.getByDisplayValue('bút tl')).toBeInTheDocument();
-    // Mã sản phẩm / mã SKU / barcode đang ẩn — mã hiện ở mô tả header, không có input
+    // Mã sản phẩm sửa được (2026-09-22); mã SKU / barcode vẫn ẩn — mã hiện ở mô tả header
     expect(screen.getByText('Sản phẩm cha TL08 · 1 biến thể')).toBeInTheDocument();
+    expect(screen.getByLabelText('Mã sản phẩm')).toHaveValue('TL08');
+    expect(screen.getByLabelText('Tên xuất hóa đơn')).toHaveValue('Bút bi Thiên Long TL-08 (hộp)');
+    expect(screen.getByLabelText('Mức tồn kho')).toHaveValue('120.000000');
     expect(screen.queryByDisplayValue('TL08-BLUE')).not.toBeInTheDocument();
-    expect(screen.queryByDisplayValue('TL08')).not.toBeInTheDocument();
     expect(screen.queryByLabelText('Barcode lẻ')).not.toBeInTheDocument();
     // ĐVT cơ bản khóa khi sửa
     expect(screen.getByRole('combobox', { name: 'ĐVT cơ bản *' })).toBeDisabled();
@@ -513,8 +526,14 @@ describe('ProductFormScreen — sửa', () => {
     fireEvent.click(await screen.findByRole('option', { name: 'Ngừng bán' }));
     fireEvent.click(screen.getByRole('button', { name: /Lưu thay đổi/ }));
     await waitFor(() => expect(patches).toHaveLength(1));
-    // PATCH product mang version của detail (optimistic locking); code không dirty → không gửi
-    expect(productPatches[0]).toMatchObject({ version: 7, searchAliases: ['bút tl'] });
+    // PATCH product mang version của detail (optimistic locking); code không dirty → không gửi;
+    // tên xuất hóa đơn / mức tồn kho gửi lại nguyên giá trị đang có
+    expect(productPatches[0]).toMatchObject({
+      version: 7,
+      searchAliases: ['bút tl'],
+      invoiceName: 'Bút bi Thiên Long TL-08 (hộp)',
+      reorderLevel: '120.000000',
+    });
     expect(productPatches[0]).not.toHaveProperty('code');
     // Chỉ gửi field dirty — tên không đổi thì không nằm trong PATCH; version luôn kèm
     expect(patches[0]).toEqual({ skuId: 's-1', body: { version: 5, isActive: false } });

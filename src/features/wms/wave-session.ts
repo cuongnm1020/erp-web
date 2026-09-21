@@ -90,12 +90,21 @@ export function useWaveSession() {
     }>,
     groupRemaining: string | null,
     waveStatus: PdaWave['status'],
+    /** "Còn trên kệ" server tính sau lần quét — áp cho mọi nhóm cùng SKU ở cùng bin. */
+    bin?: { skuId: string; locationId: string | null; remaining: string | null },
   ) => {
     setWave((cur) => {
       if (!cur) return cur;
       const byLine = new Map(shares.map((s) => [s.taskLineId, s]));
       const doneTasks = new Set(shares.filter((s) => s.taskCompleted).map((s) => s.taskId));
-      const lines = cur.lines.map((g) => {
+      const lines = cur.lines.map((g0) => {
+        const g =
+          bin &&
+          bin.remaining !== null &&
+          g0.skuId === bin.skuId &&
+          g0.locationId === bin.locationId
+            ? { ...g0, binRemaining: bin.remaining }
+            : g0;
         if (g.key !== groupKey) return g;
         const next = g.shares.map((sh) => {
           const u = byLine.get(sh.taskLineId);
@@ -176,6 +185,7 @@ export function useWaveSession() {
           })),
           r.groupRemaining,
           r.waveStatus,
+          { skuId: r.skuId, locationId: r.locationId, remaining: r.binRemaining },
         );
         beep('ok');
         const doneOrders = r.shares

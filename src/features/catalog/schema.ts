@@ -12,7 +12,10 @@ import { codeSchema, moneySchema, quantitySchema } from '@/lib/shared';
  */
 export const createProductSchema = z.object({
   code: codeSchema.optional().or(z.literal('')),
-  name: z.string().trim().min(1, 'Nhập tên sản phẩm').max(300, 'Tối đa 300 ký tự'),
+  /** Tên thương mại — nhãn trên UI là "Tên thương mại", field API vẫn là `name`. */
+  name: z.string().trim().min(1, 'Nhập tên thương mại').max(300, 'Tối đa 300 ký tự'),
+  /** Tên in trên hóa đơn — '' = dùng tên thương mại (gửi null để xóa khi sửa). */
+  invoiceName: z.string().trim().max(300, 'Tối đa 300 ký tự'),
   categoryId: z.string().optional(),
   brandId: z.string().optional(),
   trackingMode: z.enum(['NONE', 'LOT', 'SERIAL']),
@@ -22,6 +25,11 @@ export const createProductSchema = z.object({
   internalNote: z.string().trim().max(2000, 'Tối đa 2000 ký tự'),
   searchAliases: z.string().trim().max(500, 'Tối đa 500 ký tự'),
   allowNegativeStock: z.boolean(),
+  /**
+   * Mức tồn kho cảnh báo nhập hàng — Decimal(18,6) chuỗi theo ĐVT cơ sở (luật 10), '' = không
+   * cảnh báo. Màn /wms/reorder-points so tồn thực + tốc độ bán 1–2 ngày với ngưỡng này.
+   */
+  reorderLevel: quantitySchema.optional().or(z.literal('')),
 });
 
 export type CreateProductValues = z.infer<typeof createProductSchema>;

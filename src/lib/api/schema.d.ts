@@ -943,6 +943,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/stock/replenishment": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Cảnh báo nhập hàng (2026-09-22): SKU của sản phẩm có mức tồn kho, so tồn thực + tốc độ bán
+         *     1–2 ngày gần nhất với ngưỡng; sắp hết hàng lên trước. Mặc định chỉ dòng cần chú ý.
+         */
+        get: operations["InventoryController_replenishment"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/lots": {
         parameters: {
             query?: never;
@@ -3979,6 +3999,10 @@ export interface components {
             isCombo: boolean;
             /** @description Tên dân dã / viết tắt / tên cũ — ô tìm sản phẩm ăn cả các alias này. */
             searchAliases: string[];
+            /** @description Tên in trên hóa đơn — null = dùng tên thương mại. */
+            invoiceName: string | null;
+            /** @description Mức tồn kho cảnh báo nhập hàng — Decimal(18,6) chuỗi; null = không cảnh báo. */
+            reorderLevel: string | null;
             /** @description Optimistic locking — client giữ nguyên và gửi lại trong PATCH; lệch → 409. */
             version: number;
             createdAt: string;
@@ -4079,6 +4103,10 @@ export interface components {
             allowNegativeStock: boolean;
             /** @description Tên dân dã / viết tắt / tên cũ — ô tìm sản phẩm ăn cả các alias này. */
             searchAliases: string[];
+            /** @description Tên in trên hóa đơn — null = dùng tên thương mại (`name`). */
+            invoiceName: string | null;
+            /** @description Mức tồn kho cảnh báo nhập hàng — Decimal(18,6) chuỗi theo ĐVT cơ sở; null = không cảnh báo. */
+            reorderLevel: string | null;
             /** @description Optimistic locking — form sửa giữ nguyên và gửi lại trong PATCH; lệch → 409. */
             version: number;
             createdAt: string;
@@ -4116,6 +4144,13 @@ export interface components {
             internalNote?: string;
             /** @description Cờ master data — reserve/pick CHƯA đọc (chờ chốt vận hành). */
             allowNegativeStock?: boolean;
+            /** @description Tên in trên hóa đơn — bỏ trống / null = dùng tên thương mại (`name`). */
+            invoiceName?: string | null;
+            /**
+             * @description Mức tồn kho cảnh báo nhập hàng — Decimal(18,6) chuỗi theo ĐVT cơ sở, KHÔNG phải số tồn.
+             *     null = tắt cảnh báo cho sản phẩm này (GET /stock/replenishment bỏ qua).
+             */
+            reorderLevel?: string | null;
             /** @description Tên dân dã / viết tắt / tên cũ cho search. */
             searchAliases?: string[];
             /** @description Attribute value MÔ TẢ (isVariant=false) — value sinh biến thể bị từ chối 422. */
@@ -4140,6 +4175,10 @@ export interface components {
             allowNegativeStock: boolean;
             /** @description Tên dân dã / viết tắt / tên cũ — ô tìm sản phẩm ăn cả các alias này. */
             searchAliases: string[];
+            /** @description Tên in trên hóa đơn — null = dùng tên thương mại (`name`). */
+            invoiceName: string | null;
+            /** @description Mức tồn kho cảnh báo nhập hàng — Decimal(18,6) chuỗi theo ĐVT cơ sở; null = không cảnh báo. */
+            reorderLevel: string | null;
             /** @description Optimistic locking — client giữ nguyên và gửi lại trong PATCH; lệch → 409. */
             version: number;
             /** @description true = combo (một SKU, không tồn riêng; quản lý ở /combos). */
@@ -4170,6 +4209,10 @@ export interface components {
             description?: string;
             internalNote?: string;
             allowNegativeStock?: boolean;
+            /** @description Tên in trên hóa đơn — null = xóa, dùng lại tên thương mại. */
+            invoiceName?: string | null;
+            /** @description Mức tồn kho cảnh báo nhập hàng — Decimal(18,6) chuỗi; null = tắt cảnh báo. */
+            reorderLevel?: string | null;
             searchAliases?: string[];
             /** @description Có mặt = THAY TOÀN BỘ danh sách link attribute mô tả. */
             attributes?: components["schemas"]["AttributeLinkDto"][];
@@ -4594,6 +4637,48 @@ export interface components {
         StockByLotResponseDto: {
             items: components["schemas"]["StockByLotRowDto"][];
             total: number;
+        };
+        ReplenishmentRowDto: {
+            skuId: string;
+            skuCode: string;
+            skuName: string;
+            productId: string;
+            /** @description Tên thương mại của sản phẩm cha. */
+            productName: string;
+            baseUomCode: string;
+            /** @description Mức tồn kho đã đặt trên form sản phẩm. */
+            reorderLevel: string;
+            /** @description Tồn thực tế trong kho (ledger). */
+            onHand: string;
+            reserved: string;
+            /** @description `onHand - reserved`. */
+            available: string;
+            /** @description Đã bán HÔM NAY (giờ VN) — đơn không hủy, tính theo ngày đặt. */
+            soldToday: string;
+            /** @description Đã bán HÔM QUA. */
+            sold1d: string;
+            /** @description Đã bán HÔM KIA. */
+            sold2d: string;
+            /** @description Tốc độ bán = (hôm qua + hôm kia) / 2 — cơ sở dự báo. */
+            avgDaily: string;
+            /**
+             * @description Số ngày còn bán được với tốc độ trên = available / avgDaily (làm tròn 1 chữ số).
+             *     null = chưa bán gì hai ngày qua (không dự báo được).
+             */
+            daysLeft: string | null;
+            /** @description Ngày dự kiến bán hết (YYYY-MM-DD, giờ VN); null khi không dự báo được hoặc đã hết. */
+            projectedOutDate: string | null;
+            /** @enum {string} */
+            status: "OK" | "OUT" | "BELOW" | "SOON";
+        };
+        ReplenishmentResponseDto: {
+            items: components["schemas"]["ReplenishmentRowDto"][];
+            /** @description Số dòng khớp bộ lọc (sau `onlyAlert`). */
+            total: number;
+            /** @description Số SKU đang ở trạng thái OUT / BELOW / SOON — không phụ thuộc phân trang, để hiện huy hiệu. */
+            alertCount: number;
+            /** @description Ngày tính (YYYY-MM-DD giờ VN) — "hôm nay" trong các cột bán. */
+            asOf: string;
         };
         LotRowDto: {
             id: string;
@@ -6243,6 +6328,20 @@ export interface components {
             qtyDone: string;
             qtyRemaining: string;
             exceptionNote: string | null;
+            /** @description Tên thương mại (Product.name) — người lấy hàng nhận diện theo tên này, SKU name có thể là tên biến thể. */
+            productName: string;
+            /** @description Ảnh chính của SKU (không có thì ảnh sản phẩm cha) — presigned URL ~1h; null = chưa có ảnh. */
+            imageUrl: string | null;
+            /**
+             * @description Tồn ledger của SKU tại bin nguồn (mọi lô / thùng ở bin đó), Decimal(18,6) chuỗi.
+             *     null = dòng không có bin nguồn (PACK/PUT_AWAY hoặc dòng thiếu tồn).
+             */
+            binOnHand: string | null;
+            /**
+             * @description Còn VẬT LÝ trên bin = `binOnHand` − số đã lấy ở các việc PICK chưa đóng gói xong (bất biến 3:
+             *     pick không chạm ledger, hàng chỉ trừ khi PACK). Là con số người đi lấy hàng nhìn thấy trên kệ.
+             */
+            binRemaining: string | null;
         };
         PdaTaskDto: {
             taskId: string;
@@ -6386,7 +6485,47 @@ export interface components {
             location: components["schemas"]["PdaResolveLocationDto"] | null;
             shipment: components["schemas"]["PdaResolveShipmentDto"] | null;
         };
+        PdaWaveLineGroupDto: {
+            /** @description Khoá ổn định của nhóm: `<skuId>|<locationId|->|<lotId|->`. */
+            key: string;
+            skuId: string;
+            skuCode: string;
+            skuName: string;
+            barcodes: string[];
+            locationId: string | null;
+            locationCode: string | null;
+            pickSequence: number | null;
+            lotId: string | null;
+            lotNumber: string | null;
+            /** @description PLAN-packaging-hierarchy E: thùng/kiện đã allocate cho nhóm — quét mã này là lấy cả nhóm. */
+            containerId: string | null;
+            containerBarcode: string | null;
+            /** @description Gợi ý tổ hợp cho phần còn lại ("2 PKG + 3 BOX + 50 PCS"); rỗng khi SKU không có cấp đóng gói. */
+            suggested: components["schemas"]["PickSuggestionDto"][];
+            /** @description Σ kế hoạch của các dòng con — Decimal(18,6) chuỗi. */
+            qtyPlanned: string;
+            qtyDone: string;
+            qtyRemaining: string;
+            /** @description true = mọi dòng con đã COMPLETED. */
+            complete: boolean;
+            shares: components["schemas"]["WaveLineShareDto"][];
+            /** @description Tên thương mại (Product.name). */
+            productName: string;
+            /** @description Ảnh chính của SKU / sản phẩm — presigned URL ~1h; null = chưa có ảnh. */
+            imageUrl: string | null;
+            /** @description Tồn ledger tại bin nguồn (mọi lô/thùng), chuỗi; null = nhóm không có bin. */
+            binOnHand: string | null;
+            /** @description Còn vật lý trên bin = binOnHand − đã lấy ở các việc PICK chưa đóng gói (xem `PdaTaskLineDto`). */
+            binRemaining: string | null;
+        };
         PdaWaveDto: {
+            /**
+             * @description Nhóm dòng gộp kèm tên thương mại / ảnh / còn trên kệ (ghi đè kiểu của `WaveDetailDto.lines`).
+             * @default []
+             */
+            lines: components["schemas"]["PdaWaveLineGroupDto"][];
+            assignedToMe: boolean;
+            tasks: components["schemas"]["WaveTaskDto"][];
             id: string;
             docNumber: string;
             warehouseId: string;
@@ -6415,10 +6554,6 @@ export interface components {
             skuCode: string | null;
             /** @description Lượt CARTON đã gộp vào lượt PALLET này (khi status CANCELLED vì gộp). */
             mergedIntoId: string | null;
-            tasks: components["schemas"]["WaveTaskDto"][];
-            /** @description Đã sắp theo lối đi (pickSequence). */
-            lines: components["schemas"]["WaveLineGroupDto"][];
-            assignedToMe: boolean;
         };
         WaveScanDto: {
             /** @description Mã SKU hoặc mã container (quét thùng/kiện = chia cả số hàng trong đó cho các đơn trong lượt). */
@@ -6466,6 +6601,8 @@ export interface components {
             containerId: string | null;
             containerBarcode: string | null;
             containerPicked: boolean;
+            /** @description Còn vật lý trên bin của nhóm SAU lần quét này (xem `PdaTaskLineDto.binRemaining`). */
+            binRemaining: string | null;
             shares: components["schemas"]["PdaWaveScanShareDto"][];
             /** @enum {string} */
             waveStatus: "CANCELLED" | "PENDING" | "ASSIGNED" | "IN_PROGRESS" | "COMPLETED" | "EXCEPTION";
@@ -6564,6 +6701,8 @@ export interface components {
             containerBarcode: string | null;
             /** @description true = lấy TRỌN thùng (mọi hàng trong đó) → thùng chuyển PICKED; false = lấy một phần / SKU. */
             containerPicked: boolean;
+            /** @description Còn vật lý trên bin nguồn SAU lần quét này (xem `PdaTaskLineDto.binRemaining`); null với PACK. */
+            binRemaining: string | null;
             /** @description true = kết quả trả lại từ lần gọi trước (cùng idempotencyKey). */
             replayed: boolean;
         };
@@ -9356,6 +9495,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["StockByLotResponseDto"];
+                };
+            };
+        };
+    };
+    InventoryController_replenishment: {
+        parameters: {
+            query: {
+                /** @description Lọc theo mã / tên SKU / tên sản phẩm (không phân biệt hoa thường). */
+                q?: string;
+                /** @description Chỉ tính tồn trong kho này; bỏ trống = mọi kho. Số bán vẫn tính toàn hệ thống. */
+                warehouseId?: string;
+                /**
+                 * @description true (mặc định) = chỉ dòng cần chú ý (`OUT` / `BELOW` / `SOON`); false = mọi SKU có mức tồn kho,
+                 *     kể cả dòng đủ hàng (để rà ngưỡng đã đặt).
+                 */
+                onlyAlert: boolean;
+                take: number;
+                skip: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReplenishmentResponseDto"];
                 };
             };
         };

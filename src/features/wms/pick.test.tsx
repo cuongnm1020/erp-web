@@ -35,6 +35,10 @@ const PICK_TASK = {
       skuId: 'sku-X',
       skuCode: 'SKU-X',
       skuName: 'Nước rửa chén',
+      productName: 'Nước rửa chén Sunlight',
+      imageUrl: 'https://s3.local/erp-images/sku-x.jpg?sig=x',
+      binOnHand: '40.000000',
+      binRemaining: '35.000000',
       barcodes: ['BC-X'],
       lotId: null,
       lotNumber: null,
@@ -56,6 +60,10 @@ const PICK_TASK = {
       skuId: 'sku-Y',
       skuCode: 'SKU-Y',
       skuName: 'Khăn giấy',
+      productName: 'Khăn giấy',
+      imageUrl: null,
+      binOnHand: '3.000000',
+      binRemaining: '3.000000',
       barcodes: ['BC-Y'],
       lotId: null,
       lotNumber: null,
@@ -71,6 +79,16 @@ const PICK_TASK = {
       exceptionNote: null,
     },
   ],
+};
+
+/** Quét mã SKU → ô số lượng nhận focus → gõ số → Enter (2026-09-22). */
+const scanQty = (code: string, qty: string) => {
+  const input = screen.getByLabelText(/Quét/);
+  fireEvent.change(input, { target: { value: code } });
+  fireEvent.keyDown(input, { key: 'Enter' });
+  const q = screen.getByLabelText('Số lượng lần quét này');
+  fireEvent.change(q, { target: { value: qty } });
+  fireEvent.keyDown(q, { key: 'Enter' });
 };
 
 describe('Màn pick trên PDA — quét đơn → dòng theo lối đi → quét SKU → xong đơn (D2)', () => {
@@ -126,6 +144,7 @@ describe('Màn pick trên PDA — quét đơn → dòng theo lối đi → quét
           lineStatus: 'IN_PROGRESS',
           taskStatus: 'IN_PROGRESS',
           complete: d >= Number(l.qtyPlanned),
+          binRemaining: (Number(l.binRemaining) - d).toFixed(6),
           replayed: false,
         });
       }),
@@ -157,18 +176,72 @@ describe('Màn pick trên PDA — quét đơn → dòng theo lối đi → quét
     scan('PICK2609-00009');
     // Dòng hiện tại = vị trí có pickSequence nhỏ nhất (A-01-03), không phải lineNo 1
     expect((await screen.findAllByText('A-01-03')).length).toBeGreaterThan(0);
+    // Tên THƯƠNG MẠI + tên biến thể + ảnh SKU + "trên kệ còn" trên thẻ dòng đang lấy (2026-09-22)
+    expect(screen.getAllByText('Nước rửa chén Sunlight').length).toBeGreaterThan(0);
     expect(screen.getAllByText('Nước rửa chén').length).toBeGreaterThan(0);
+    expect(screen.getAllByRole('img', { name: 'Nước rửa chén Sunlight' })[0]).toHaveAttribute(
+      'src',
+      'https://s3.local/erp-images/sku-x.jpg?sig=x',
+    );
+    expect(screen.getByText('Trên kệ còn', { exact: false })).toHaveTextContent('35');
     // Mã vạch SKU đang lấy hiện để đối chiếu với tem trên hàng
     expect(screen.getByRole('img', { name: 'Mã vạch BC-X' })).toBeInTheDocument();
 
-    // Tăng số lượng lên 2 rồi quét một lần
-    fireEvent.click(screen.getByRole('button', { name: 'Tăng số lượng' }));
+    // Quét SKU → ô số lượng chờ → gõ 2 → Enter = lấy 2 một lần (không bấm +/−)
     scan('BC-X');
+    expect(screen.getByText(/Đã quét BC-X/)).toBeInTheDocument();
+    const q = screen.getByLabelText('Số lượng lần quét này');
+    fireEvent.change(q, { target: { value: '2' } });
+    fireEvent.keyDown(q, { key: 'Enter' });
     // Dòng X đủ → dòng hiện tại chuyển sang B-02-01
     await waitFor(() => expect(screen.getAllByText('B-02-01').length).toBeGreaterThan(0));
-    scan('BC-Y');
+    scanQty('BC-Y', '1');
     expect(await screen.findByText('Xong đơn SO2609-00009')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Quét đơn kế tiếp' })).toBeInTheDocument();
+  });
+
+  it('ô số lượng: Enter với giá trị ≤ 0 → báo lỗi, không gọi server; Esc → bỏ mã đang chờ', async () => {
+    const bodies: unknown[] = [];
+    server.use(
+      http.get('/api/pda/resolve/:code', () =>
+        HttpResponse.json({
+          kind: 'task',
+          code: 'PICK2609-00009',
+          sku: null,
+          order: null,
+          wave: null,
+          location: null,
+          shipment: null,
+          task: {
+            id: TASK_ID,
+            docNumber: 'PICK2609-00009',
+            type: 'PICK',
+            status: 'PENDING',
+            warehouseId: 'wh-1',
+            assignedTo: null,
+            assignedToMe: false,
+            lineCount: 2,
+          },
+        }),
+      ),
+      http.post('/api/pda/tasks/:id/claim', () => HttpResponse.json(PICK_TASK)),
+      http.post('/api/pda/scan', async ({ request }) => {
+        bodies.push(await request.json());
+        return HttpResponse.json({}, { status: 500 });
+      }),
+    );
+    renderApp(<PickScreen />);
+    scan('PICK2609-00009');
+    await screen.findAllByText('A-01-03');
+    scan('BC-X');
+    const q = screen.getByLabelText('Số lượng lần quét này');
+    fireEvent.change(q, { target: { value: '0' } });
+    fireEvent.keyDown(q, { key: 'Enter' });
+    expect(await screen.findByText('Nhập số lượng lớn hơn 0')).toBeInTheDocument();
+    expect(bodies).toHaveLength(0);
+    fireEvent.keyDown(q, { key: 'Escape' });
+    expect(screen.queryByText(/Đã quét BC-X/)).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /^Lấy/ })).toBeDisabled();
   });
 
   it('bấm "Thiếu hàng" ở dòng đang lấy → POST /pda/short → cảnh báo vàng, dòng đánh dấu thiếu, chuyển dòng kế', async () => {

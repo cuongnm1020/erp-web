@@ -75,6 +75,10 @@ const WAVE = {
       skuId: 'sku-W',
       skuCode: 'SKU-W',
       skuName: 'Nước suối',
+      productName: 'Nước suối Lavie 500ml',
+      imageUrl: null,
+      binOnHand: '24.000000',
+      binRemaining: '24.000000',
       barcodes: ['BC-W'],
       locationId: 'loc-1',
       locationCode: 'A-01-01',
@@ -253,10 +257,14 @@ describe('Màn pick — lượt gộp: quét mã WAVE → nhận lượt → qu�
     scan('WAVE2609-00001');
     expect(await screen.findByText('Lượt lấy gộp')).toBeInTheDocument();
     expect(screen.getAllByText('A-01-01').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('Nước suối Lavie 500ml').length).toBeGreaterThan(0);
+    expect(screen.getByText('Trên kệ còn', { exact: false })).toHaveTextContent('24');
     expect(screen.getByText('SO-1 0/2')).toBeInTheDocument();
-    for (let i = 0; i < 2; i++)
-      fireEvent.click(screen.getByRole('button', { name: 'Tăng số lượng' }));
+    // Quét SKU → gõ 3 → Enter (2026-09-22): một lần cho cả nhóm
     scan('BC-W');
+    const q = screen.getByLabelText('Số lượng lần quét này');
+    fireEvent.change(q, { target: { value: '3' } });
+    fireEvent.keyDown(q, { key: 'Enter' });
     await waitFor(() =>
       expect(scans).toEqual([
         expect.objectContaining({ barcode: 'BC-W', qty: '3', locationId: 'loc-1' }),

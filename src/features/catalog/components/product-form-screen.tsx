@@ -114,6 +114,8 @@ function initialValues(p?: ProductDetail): ProductFormValues {
   return {
     code: p?.code ?? '',
     name: p?.name ?? '',
+    invoiceName: p?.invoiceName ?? '',
+    reorderLevel: p?.reorderLevel ?? '',
     categoryId: p?.categoryId ?? '',
     brandId: p?.brandId ?? '',
     trackingMode: p?.trackingMode ?? 'NONE',
@@ -251,6 +253,8 @@ function ProductFormBody({ product }: { product?: ProductDetail }) {
 
   const trackingMode = form.watch('trackingMode');
   const hasVariants = form.watch('hasVariants');
+  /** Nhãn ĐVT cho ô "Mức tồn kho" — ngưỡng tính theo ĐVT cơ sở (luật 10). */
+  const baseUomCode = form.watch('baseUom') || 'ĐVT cơ sở';
   /** Sản phẩm đã có nhiều SKU lưu rồi thì không gộp về đơn được (SKU đã lưu không xóa). */
   const variantsLocked = editing && product.skus.length > 1;
   const toggleVariants = (on: boolean) => {
@@ -274,6 +278,9 @@ function ProductFormBody({ product }: { product?: ProductDetail }) {
       let pid = editing ? product.id : created.current?.productId;
       const headerBody = {
         name: v.name,
+        // Tên xuất hóa đơn / mức tồn kho: '' → null để sửa xóa được giá trị cũ (server: null = xóa).
+        invoiceName: v.invoiceName ? v.invoiceName : null,
+        reorderLevel: v.reorderLevel ? v.reorderLevel : null,
         ...(v.categoryId ? { categoryId: v.categoryId } : {}),
         ...(v.brandId ? { brandId: v.brandId } : {}),
         trackingMode: v.trackingMode,
@@ -295,7 +302,16 @@ function ProductFormBody({ product }: { product?: ProductDetail }) {
           created.current = { productId: p.id, code: p.code, doneRows: new Set() };
         } catch (err) {
           applyServerErrors(form, err as ApiError, {
-            knownFields: ['code', 'name', 'categoryId', 'brandId', 'trackingMode', 'searchAliases'],
+            knownFields: [
+              'code',
+              'name',
+              'invoiceName',
+              'reorderLevel',
+              'categoryId',
+              'brandId',
+              'trackingMode',
+              'searchAliases',
+            ],
           });
           return;
         }
@@ -310,7 +326,16 @@ function ProductFormBody({ product }: { product?: ProductDetail }) {
           });
         } catch (err) {
           applyServerErrors(form, err as ApiError, {
-            knownFields: ['code', 'name', 'categoryId', 'brandId', 'trackingMode', 'searchAliases'],
+            knownFields: [
+              'code',
+              'name',
+              'invoiceName',
+              'reorderLevel',
+              'categoryId',
+              'brandId',
+              'trackingMode',
+              'searchAliases',
+            ],
           });
           return;
         }
@@ -553,38 +578,34 @@ function ProductFormBody({ product }: { product?: ProductDetail }) {
               name="name"
               render={({ field }) => (
                 <FormItem className="lg:col-span-2">
-                  <FormLabel>Tên sản phẩm *</FormLabel>
+                  <FormLabel>Tên thương mại *</FormLabel>
                   <FormControl>
                     <Input autoFocus={!editing} placeholder="Bút bi Thiên Long TL-08" {...field} />
                   </FormControl>
+                  <FormDescription>
+                    Tên gọi khi bán và khi lấy hàng trong kho — hiện trên đơn, phiếu pick / pack
+                  </FormDescription>
                   <FormMessage />
                 </FormItem>
               )}
             />
             <FormField
               control={form.control}
-              name="hasVariants"
+              name="invoiceName"
               render={({ field }) => (
-                <FormItem className="flex flex-row items-start gap-2 pt-6 lg:col-span-2">
-                  <div className="space-y-0.5 leading-none">
-                    <FormControl className="mr-2 items-center space-x-2">
-                      <Checkbox
-                        checked={field.value}
-                        disabled={variantsLocked}
-                        onCheckedChange={(v) => toggleVariants(v === true)}
-                      />
-                    </FormControl>
-                    <FormLabel>Sản phẩm có nhiều biến thể (màu, size, quy cách…)</FormLabel>
-                    <FormDescription>
-                      {variantsLocked
-                        ? 'Đã có nhiều SKU — không gộp về sản phẩm đơn được'
-                        : 'Bỏ chọn = sản phẩm đơn: một SKU mang đúng mã và tên sản phẩm'}
-                    </FormDescription>
-                  </div>
+                <FormItem className="lg:col-span-2">
+                  <FormLabel>Tên xuất hóa đơn</FormLabel>
+                  <FormControl>
+                    <Input placeholder="Bút bi Thiên Long TL-08 (hộp 20 cây)" {...field} />
+                  </FormControl>
+                  <FormDescription>
+                    Tên in trên hóa đơn theo yêu cầu kế toán — bỏ trống thì dùng tên thương mại
+                  </FormDescription>
+                  <FormMessage />
                 </FormItem>
               )}
             />
-            {/* <FormField
+            <FormField
               control={form.control}
               name="code"
               render={({ field }) => (
@@ -605,7 +626,7 @@ function ProductFormBody({ product }: { product?: ProductDetail }) {
                   <FormMessage />
                 </FormItem>
               )}
-            /> */}
+            />
             <FormField
               control={form.control}
               name="categoryId"
@@ -665,9 +686,32 @@ function ProductFormBody({ product }: { product?: ProductDetail }) {
             />
             <FormField
               control={form.control}
+              name="hasVariants"
+              render={({ field }) => (
+                <FormItem className="flex flex-row items-start gap-2 pt-6">
+                  <div className="space-y-0.5 leading-none">
+                    <FormControl className="mr-2 items-center space-x-2">
+                      <Checkbox
+                        checked={field.value}
+                        disabled={variantsLocked}
+                        onCheckedChange={(v) => toggleVariants(v === true)}
+                      />
+                    </FormControl>
+                    <FormLabel>Có nhiều biến thể (màu, size, quy cách…)</FormLabel>
+                    <FormDescription>
+                      {variantsLocked
+                        ? 'Đã có nhiều SKU — không gộp về sản phẩm đơn được'
+                        : 'Bỏ chọn = sản phẩm đơn: một SKU mang đúng mã và tên'}
+                    </FormDescription>
+                  </div>
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
               name="searchAliases"
               render={({ field }) => (
-                <FormItem className="sm:col-span-2 lg:col-span-3">
+                <FormItem className="sm:col-span-2 lg:col-span-4">
                   <FormLabel>Tên gọi khác</FormLabel>
                   <FormControl>
                     <Input placeholder="thuốc bật chồi, thuốc trĩ, cheshaland" {...field} />
@@ -818,6 +862,33 @@ function ProductFormBody({ product }: { product?: ProductDetail }) {
                     </SelectContent>
                   </Select>
                   <FormDescription>Tồn đầu kỳ của biến thể mới ghi vào kho này</FormDescription>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="reorderLevel"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Mức tồn kho</FormLabel>
+                  <FormControl>
+                    <Input
+                      inputMode="decimal"
+                      placeholder="500"
+                      className="text-right tabular-nums"
+                      {...field}
+                      value={field.value ?? ''}
+                    />
+                  </FormControl>
+                  <FormDescription>
+                    Theo {baseUomCode}. Tồn thực chạm mức này, hoặc sẽ chạm trong 2 ngày theo tốc độ
+                    bán → lên{' '}
+                    <Link href="/wms/reorder-points" className="underline">
+                      Cảnh báo nhập hàng
+                    </Link>
+                    . Bỏ trống = không cảnh báo.
+                  </FormDescription>
                   <FormMessage />
                 </FormItem>
               )}

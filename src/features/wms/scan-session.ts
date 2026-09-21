@@ -282,24 +282,30 @@ export function useScanSession(kind: 'PICK' | 'PACK') {
           idempotencyKey,
         });
         setOffline(false);
-        setTask((cur) =>
-          cur
-            ? {
-                ...cur,
-                status: r.taskStatus,
-                lines: cur.lines.map((l) =>
-                  l.taskLineId === r.taskLineId
-                    ? {
-                        ...l,
-                        qtyDone: r.qtyDone,
-                        qtyRemaining: r.qtyRemaining,
-                        status: r.lineStatus,
-                      }
-                    : l,
-                ),
-              }
-            : cur,
-        );
+        setTask((cur) => {
+          if (!cur) return cur;
+          // "Còn trên kệ" server tính sau lần quét — áp cho mọi dòng cùng SKU ở cùng bin.
+          const scannedBin = cur.lines.find((l) => l.taskLineId === r.taskLineId)?.locationId;
+          return {
+            ...cur,
+            status: r.taskStatus,
+            lines: cur.lines.map((l) => {
+              const binRemaining =
+                r.binRemaining !== null && l.skuId === r.skuId && l.locationId === scannedBin
+                  ? r.binRemaining
+                  : l.binRemaining;
+              return l.taskLineId === r.taskLineId
+                ? {
+                    ...l,
+                    qtyDone: r.qtyDone,
+                    qtyRemaining: r.qtyRemaining,
+                    status: r.lineStatus,
+                    binRemaining,
+                  }
+                : { ...l, binRemaining };
+            }),
+          };
+        });
         beep('ok');
         setFeedback({
           kind: 'ok',
