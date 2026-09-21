@@ -3499,6 +3499,72 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/pancake-sync/push/products/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Đẩy MỘT sản phẩm (kèm mọi SKU) lên mọi shop đang cấu hình. */
+        post: operations["PancakePushController_product"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/pancake-sync/push/products": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Đẩy TOÀN BỘ sản phẩm đang có (không combo, chưa xóa) — đồng bộ lần đầu. */
+        post: operations["PancakePushController_allProducts"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/pancake-sync/push/warehouses/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["PancakePushController_warehouse"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/pancake-sync/push/warehouses": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["PancakePushController_allWarehouses"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/health": {
         parameters: {
             query?: never;
@@ -7476,6 +7542,27 @@ export interface components {
         RunTransformDto: {
             shopId: number;
             limit?: number;
+        };
+        PancakePushResultDto: {
+            shopId: string;
+            /** @enum {string} */
+            entity: "product" | "warehouse";
+            internalId: string;
+            /**
+             * @description created = POST mới; updated = PUT theo id đã liên kết; hidden = sản phẩm ngừng / xóa → ẩn trên
+             *     POS; skipped = không đẩy (lý do ở `reason`); failed = Pancake từ chối (lý do ở `reason`).
+             * @enum {string}
+             */
+            action: "failed" | "created" | "skipped" | "updated" | "hidden";
+            /** @description Id trên Pancake sau khi đẩy (sync.entity_link); null khi chưa liên kết được. */
+            externalId: string | null;
+            reason: string | null;
+        };
+        PancakePushReportDto: {
+            results: components["schemas"]["PancakePushResultDto"][];
+            /** @description Số thực thể ERP đã duyệt. */
+            total: number;
+            failed: number;
         };
         HealthReportDto: {
             /** @enum {string} */
@@ -13584,6 +13671,86 @@ export interface operations {
                 };
                 content: {
                     "application/json": Record<string, never>;
+                };
+            };
+        };
+    };
+    PancakePushController_product: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PancakePushResultDto"][];
+                };
+            };
+        };
+    };
+    PancakePushController_allProducts: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PancakePushReportDto"];
+                };
+            };
+        };
+    };
+    PancakePushController_warehouse: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PancakePushResultDto"][];
+                };
+            };
+        };
+    };
+    PancakePushController_allWarehouses: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PancakePushReportDto"];
                 };
             };
         };

@@ -16,10 +16,11 @@ vi.stubGlobal(
   },
 );
 window.HTMLElement.prototype.scrollIntoView = vi.fn();
+let search = '';
 vi.mock('next/navigation', () => ({
   usePathname: () => '/wms/dispatch',
   useRouter: () => ({ push: vi.fn(), replace: vi.fn(), refresh: vi.fn() }),
-  useSearchParams: () => new URLSearchParams(''),
+  useSearchParams: () => new URLSearchParams(search),
 }));
 
 const WAVE_ID = '00000000-0000-4000-8000-00000000e001';
@@ -160,7 +161,8 @@ describe('Bảng điều phối — gộp thẻ PICK chưa gán thành lượt (
     expect(screen.getByRole('button', { name: /In phiếu lượt/ })).toBeInTheDocument();
   });
 
-  it('thẻ có dòng báo thiếu hiện cảnh báo "thiếu N dòng"', async () => {
+  it('dòng có báo thiếu hiện cảnh báo "thiếu N dòng" ở tab Ngoại lệ (2026-09-22: tab trên URL)', async () => {
+    search = 'status=EXCEPTION';
     const one = { ...makeTasks(1)[0]!, status: 'COMPLETED', exceptionLineCount: 2 };
     server.use(
       http.get('/api/tasks', ({ request }) =>
@@ -171,6 +173,7 @@ describe('Bảng điều phối — gộp thẻ PICK chưa gán thành lượt (
     );
     renderApp(<DispatchScreen />);
     expect(await screen.findByText('thiếu 2 dòng')).toBeInTheDocument();
+    search = '';
   });
 });
 

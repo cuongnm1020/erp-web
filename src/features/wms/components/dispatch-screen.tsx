@@ -3,8 +3,8 @@
 import { AlertTriangle, Layers, Printer } from 'lucide-react';
 import Link from 'next/link';
 import { useMemo, useState } from 'react';
-import { KpiCard } from '@/components/data/kpi-card';
-import { QueryState } from '@/components/data/states';
+import { DataTable, type ColumnDef } from '@/components/data/data-table';
+import { ListSkeleton, QueryState } from '@/components/data/states';
 import { StatusBadge } from '@/components/data/status-badge';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -41,8 +41,6 @@ import {
   useUnassignTask,
   useWarehouseStaff,
   type Task,
-  type TaskStatus,
-  type TaskType,
   type WarehouseStaff,
 } from '../api/use-tasks';
 import { useWarehouses } from '../api/use-warehouses';
@@ -67,7 +65,10 @@ import {
 import { WavePrintSheet } from './wave-print-sheet';
 
 /**
- * G-06 Bảng điều phối kho — GET /tasks, mỗi làn là một truy vấn theo `status`.
+ * G-06 Bảng điều phối kho — GET /tasks. Từ 2026-09-22: MỘT bảng phân trang thay cho bốn làn
+ * thẻ; trạng thái điều phối là TAB trên URL (`?status=`), chỉ tab đang mở mới gọi API — vào màn
+ * mặc định chỉ tải "Chưa gán" (việc cần chia), ba tab kia tải khi bấm. Trang / cỡ trang cũng nằm
+ * trên URL (luật 8) nên dán link cho đồng nghiệp ra đúng tab, đúng trang.
  *
  * KHÔNG CÓ CỜ "QUÁ HẠN SLA". `wms.Task` không có cột hạn chót nào, nên không có cách
  * trung thực nào để nói một việc đã trễ. API trả `ageMinutes` (tuổi việc kể từ lúc tạo)
@@ -78,25 +79,36 @@ import { WavePrintSheet } from './wave-print-sheet';
  * `setQueryData` bằng payload socket vì payload chưa đi qua lớp quyền của user hiện tại.
  *
  * Bỏ so với bản UI-first vì `TaskRowDto` không có trường tương ứng:
- * - Làn "Hoàn thành hôm nay": `GET /tasks` không lọc theo ngày, làn COMPLETED sẽ là "mọi
- *   việc đã xong từ trước tới nay" — gắn nhãn "hôm nay" là nói sai.
- * - Bảng nhân viên (tên, ca trực, tiến độ từng người): chỉ có `assigneeId` (UUID), chưa có
- *   danh bạ user và không có dữ liệu ca trực.
- * - Số chứng từ nguồn (SO-…/GRN-…): DTO trả `refType` + `refId` (UUID), không trả số chứng
- *   từ; hiện link "Đơn bán" theo id thay vì bịa một số chứng từ.
- * - "Ưu tiên Cao/TB/Thấp": `priority` là số nguyên, không có thang bậc nào được định nghĩa;
- *   hiện đúng con số.
+ * - Làn "Hoàn thành hôm nay": `GET /tasks` không lọc theo ngày.
+ * - Bảng nhân viên (tên, ca trực, tiến độ từng người): chỉ có `assigneeId` (UUID).
+ * - Số chứng từ nguồn (SO-…/GRN-…): DTO trả `refType` + `refId` (UUID); hiện link "Đơn bán".
+ * - "Ưu tiên Cao/TB/Thấp": `priority` là số nguyên, không có thang bậc; hiện đúng con số.
  *
- * Gán việc: thẻ PENDING có ô "Gán cho…" (POST /tasks/:id/assign), thẻ ASSIGNED có
+ * Gán việc: dòng PENDING có ô "Gán cho…" (POST /tasks/:id/assign), dòng ASSIGNED có
  * "Trả về hàng đợi" (POST /tasks/:id/unassign) — chỉ hiện khi có task.assign; danh bạ
- * người nhận lấy từ GET /tasks/assignees. Kéo thả chưa làm — chọn từ ô là đủ dùng.
+ * người nhận lấy từ GET /tasks/assignees. Tick nhiều dòng (cả ở tab khác — lô chọn giữ khi
+ * đổi tab) → gán một người / gộp thành lượt ở thanh công cụ.
  */
-const LANE_SIZE = 20;
+const PAGE_SIZE = 20;
 const DEFAULTS = {
-  size: LANE_SIZE,
-  filterKeys: ['type', 'warehouseId', 'assignedTo', 'lines'] as const,
+  size: PAGE_SIZE,
+  filterKeys: ['status', 'type', 'warehouseId', 'assignedTo', 'lines'] as const,
 };
 const ALL_TYPES = '__all__';
+
+type DispatchFilter = (typeof DEFAULTS.filterKeys)[number];
+type TabStatus = 'PENDING' | 'ASSIGNED' | 'IN_PROGRESS' | 'EXCEPTION';
+
+const TABS: Array<{ status: TabStatus; title: string; hint: string }> = [
+  { status: 'PENDING', title: 'Chưa gán', hint: 'chờ người nhận' },
+  { status: 'ASSIGNED', title: 'Đã giao', hint: 'đã có người, chưa bắt đầu' },
+  { status: 'IN_PROGRESS', title: 'Đang làm', hint: 'đang quét trên PDA' },
+  { status: 'EXCEPTION', title: 'Ngoại lệ', hint: 'thiếu hàng · sai lô · hỏng' },
+];
+
+function parseStatus(v: string | undefined): TabStatus {
+  return TABS.some((t) => t.status === v) ? (v as TabStatus) : 'PENDING';
+}
 
 /**
  * Lọc theo số dòng SKU của việc (URL `?lines=`): "1".."4" = đúng N dòng (`lineCount`),
@@ -118,44 +130,15 @@ function lineFilter(lines: string): { lineCount?: number; lineCountMin?: number 
     : { lineCount: Number(lines) };
 }
 
-type DispatchFilter = (typeof DEFAULTS.filterKeys)[number];
-
-interface LaneParams {
-  type: TaskType | undefined;
-  warehouseId: string;
-  assignedTo: string;
-  /** Giá trị `?lines=` ('' = tất cả). */
-  lines: string;
-}
-
-const LANES: Array<{ status: TaskStatus; title: string; hint: string }> = [
-  { status: 'PENDING', title: 'Chưa gán', hint: 'chờ người nhận' },
-  { status: 'ASSIGNED', title: 'Đã giao', hint: 'đã có người, chưa bắt đầu' },
-  { status: 'IN_PROGRESS', title: 'Đang làm', hint: 'đang quét trên PDA' },
-  { status: 'EXCEPTION', title: 'Ngoại lệ', hint: 'thiếu hàng · sai lô · hỏng' },
-];
-
-function useLane(status: TaskStatus, p: LaneParams) {
-  return useTasks({
-    status,
-    type: p.type,
-    warehouseId: p.warehouseId,
-    assignedTo: p.assignedTo,
-    ...lineFilter(p.lines),
-    take: LANE_SIZE,
-    skip: 0,
-  });
-}
-
 interface Selection {
   ids: Set<string>;
   toggle: (task: Task) => void;
-  /** Tick / bỏ tick cả một làn (checkbox "Chọn tất cả" ở đầu làn). */
+  /** Tick / bỏ tick cả trang đang hiện (ô "Chọn tất cả" ở đầu bảng). */
   setMany: (tasks: Task[], on: boolean) => void;
 }
 
 /**
- * Thẻ tick được để gán / gộp: chưa gán hoặc đã gán (đổi người). Đang làm thì không. Việc đã
+ * Dòng tick được để gán / gộp: chưa gán hoặc đã gán (đổi người). Đang làm thì không. Việc đã
  * thuộc lượt gộp cũng không — server chặn gán lẻ ("đổi người trên lượt, không gán lẻ"), phải gán
  * cả lượt ở bảng "Lượt lấy hàng gộp".
  */
@@ -180,175 +163,70 @@ function waveable(t: Task): boolean {
   return t.type === 'PICK' && t.status === 'PENDING' && t.waveId === null;
 }
 
-function TaskCard({
-  task,
-  staff,
-  selection,
-}: {
-  task: Task;
-  staff: WarehouseStaff[] | null;
-  selection: Selection | null;
-}) {
-  const idleWord = task.status === 'PENDING' ? 'chờ' : 'đứng yên';
-  // Chọn nhiều để gán một người: việc chưa gán hoặc đã gán (đổi người). Đang làm thì không.
-  const canSelect = selection !== null && selectable(task);
+/** Ô "Gán cho…" / "Trả về hàng đợi" của một dòng — chỉ khi có task.assign và việc không thuộc lượt. */
+function RowActions({ task, staff }: { task: Task; staff: WarehouseStaff[] }) {
   const assign = useAssignTask();
   const unassign = useUnassignTask();
-  const assigneeName = task.assigneeId
-    ? (staff?.find((s) => s.id === task.assigneeId)?.fullName ?? null)
-    : null;
-  return (
-    <article
-      className={cn(
-        'flex flex-col gap-1 rounded-md border bg-card px-2.5 py-2',
-        canSelect && selection.ids.has(task.id) && 'border-primary',
-      )}
-    >
-      <div className="flex items-center gap-2">
-        {canSelect ? (
-          <Checkbox
-            checked={selection.ids.has(task.id)}
-            onCheckedChange={() => selection.toggle(task)}
-            aria-label={`Chọn ${task.docNumber}`}
-          />
-        ) : null}
-        <span className="font-mono text-xs font-semibold">{task.docNumber}</span>
-        <StatusBadge tone={taskTypeTone(task.type)}>{taskTypeLabel(task.type)}</StatusBadge>
-        {task.waveId ? (
-          <span className="text-xs text-muted-foreground" title="Thuộc lượt pick gộp">
-            <Layers className="inline h-3.5 w-3.5" aria-hidden /> lượt
-          </span>
-        ) : null}
-        {task.exceptionLineCount > 0 ? (
-          <span
-            className="ml-auto flex items-center gap-1 rounded-sm bg-warning/15 px-1.5 text-xs font-semibold text-warning-foreground"
-            title="Nhân viên báo thiếu hàng khi lấy — phần thiếu không sang đóng gói"
-          >
-            <AlertTriangle className="h-3.5 w-3.5 text-warning" aria-hidden />
-            thiếu {task.exceptionLineCount} dòng
-          </span>
-        ) : task.status === 'EXCEPTION' ? (
-          <AlertTriangle className="ml-auto h-3.5 w-3.5 text-warning" aria-hidden />
-        ) : null}
-      </div>
-      <div className="text-xs text-muted-foreground">
-        {task.lineCount} dòng · đã làm {formatQuantity(task.qtyDone)}/
-        {formatQuantity(task.qtyPlanned)}
-        {task.refType === 'SalesOrder' && task.refId ? (
-          <>
-            {' · '}
-            <Link href={`/crm/orders/${task.refId}`} className="text-primary hover:underline">
-              Đơn bán
-            </Link>
-          </>
-        ) : null}
-        {assigneeName ? ` · ${assigneeName}` : null}
-      </div>
-      <div className="flex items-center justify-between gap-2 text-xs text-muted-foreground">
-        <span>Ưu tiên {task.priority}</span>
-        <span title={`Tạo lúc ${formatDateTime(task.createdAt)}`}>
-          {idleWord} {formatMinutes(task.idleMinutes)} · tuổi {formatMinutes(task.ageMinutes)}
-        </span>
-      </div>
-      {staff && task.waveId && (task.status === 'PENDING' || task.status === 'ASSIGNED') ? (
-        <p className="text-xs text-muted-foreground">
-          <Layers className="inline h-3.5 w-3.5" aria-hidden /> Gán / đổi người cả lượt ở bảng
-          &ldquo;Lượt lấy hàng gộp&rdquo; bên dưới — không gán lẻ từng đơn.
-        </p>
-      ) : null}
-      {staff && task.status === 'PENDING' && !task.waveId ? (
-        <Select
-          value=""
-          onValueChange={(userId) =>
-            assign
-              .mutateAsync({ taskId: task.id, userId })
-              .then(() => toast.success(`Đã gán ${task.docNumber}`))
-              .catch((err) => toast.error(messageFor(err)))
-          }
-          disabled={assign.isPending}
-        >
-          <SelectTrigger className="h-7 text-xs" aria-label={`Gán ${task.docNumber}`}>
-            <SelectValue placeholder={assign.isPending ? 'Đang gán…' : 'Gán cho…'} />
-          </SelectTrigger>
-          <SelectContent>
-            {staff.map((s) => (
-              <SelectItem key={s.id} value={s.id}>
-                {staffLabel(s)}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      ) : null}
-      {staff && task.status === 'ASSIGNED' && !task.waveId ? (
-        <button
-          type="button"
-          className="self-start text-xs text-primary hover:underline disabled:opacity-50"
-          disabled={unassign.isPending}
-          onClick={() =>
-            unassign
-              .mutateAsync(task.id)
-              .then(() => toast.success(`Đã trả ${task.docNumber} về hàng đợi`))
-              .catch((err) => toast.error(messageFor(err)))
-          }
-        >
-          {unassign.isPending ? 'Đang trả…' : 'Trả về hàng đợi'}
-        </button>
-      ) : null}
-    </article>
-  );
+  if (task.waveId && (task.status === 'PENDING' || task.status === 'ASSIGNED')) {
+    return (
+      <span className="text-xs text-muted-foreground">
+        <Layers className="inline h-3.5 w-3.5" aria-hidden /> Gán / đổi người cả lượt ở bảng
+        &ldquo;Lượt lấy hàng gộp&rdquo; — không gán lẻ.
+      </span>
+    );
+  }
+  if (task.status === 'PENDING') {
+    return (
+      <Select
+        value=""
+        onValueChange={(userId) =>
+          assign
+            .mutateAsync({ taskId: task.id, userId })
+            .then(() => toast.success(`Đã gán ${task.docNumber}`))
+            .catch((err) => toast.error(messageFor(err)))
+        }
+        disabled={assign.isPending}
+      >
+        <SelectTrigger className="h-7 w-44 text-xs" aria-label={`Gán ${task.docNumber}`}>
+          <SelectValue placeholder={assign.isPending ? 'Đang gán…' : 'Gán cho…'} />
+        </SelectTrigger>
+        <SelectContent>
+          {staff.map((s) => (
+            <SelectItem key={s.id} value={s.id}>
+              {staffLabel(s)}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+    );
+  }
+  if (task.status === 'ASSIGNED') {
+    return (
+      <button
+        type="button"
+        className="text-xs text-primary hover:underline disabled:opacity-50"
+        disabled={unassign.isPending}
+        onClick={() =>
+          unassign
+            .mutateAsync(task.id)
+            .then(() => toast.success(`Đã trả ${task.docNumber} về hàng đợi`))
+            .catch((err) => toast.error(messageFor(err)))
+        }
+      >
+        {unassign.isPending ? 'Đang trả…' : 'Trả về hàng đợi'}
+      </button>
+    );
+  }
+  return null;
 }
 
-function LaneSkeleton() {
-  return (
-    <div role="status" aria-label="Đang tải việc" className="flex flex-col gap-2 p-2">
-      {Array.from({ length: 4 }, (_, i) => (
-        <Skeleton key={i} className="h-[74px] w-full" />
-      ))}
-    </div>
-  );
-}
-
-/** Ô chỉ số dùng chính `total` của truy vấn làn tương ứng — không đếm lại ở frontend. */
-function LaneCount({
-  label,
-  status,
-  params,
-}: {
-  label: string;
-  status: TaskStatus;
-  params: LaneParams;
-}) {
-  const query = useLane(status, params);
-  return (
-    <KpiCard
-      label={label}
-      value={
-        query.error ? '—' : query.data ? query.data.total : <Skeleton className="mt-1 h-5 w-12" />
-      }
-      detail={query.error ? 'không đếm được, xem lỗi ở làn bên dưới' : 'việc đang ở trạng thái này'}
-    />
-  );
-}
-
-function Lane({
-  title,
-  hint,
-  status,
-  params,
-  staff,
-  selection,
-}: {
-  title: string;
-  hint: string;
-  status: TaskStatus;
-  params: LaneParams;
-  staff: WarehouseStaff[] | null;
-  selection: Selection | null;
-}) {
-  const query = useLane(status, params);
-  // "Chọn tất cả" chỉ với thẻ tick được đang hiện trong làn (tối đa LANE_SIZE) — không tick
-  // việc chưa tải, để "Đã chọn N việc" luôn đúng với những gì đang nhìn thấy.
-  const pickable = selection ? (query.data?.items ?? []).filter(selectable) : [];
+function buildColumns(
+  tab: (typeof TABS)[number],
+  staff: WarehouseStaff[] | null,
+  selection: Selection | null,
+  pageRows: Task[],
+): ColumnDef<Task, unknown>[] {
+  const pickable = selection ? pageRows.filter(selectable) : [];
   const pickedCount = pickable.filter((t) => selection!.ids.has(t.id)).length;
   const allChecked: boolean | 'indeterminate' =
     pickable.length > 0 && pickedCount === pickable.length
@@ -356,62 +234,237 @@ function Lane({
       : pickedCount > 0
         ? 'indeterminate'
         : false;
+  const selectCol: ColumnDef<Task, unknown>[] =
+    selection && (tab.status === 'PENDING' || tab.status === 'ASSIGNED')
+      ? [
+          {
+            id: 'select',
+            meta: { width: 36 },
+            header: () =>
+              pickable.length > 0 ? (
+                <Checkbox
+                  checked={allChecked}
+                  onCheckedChange={(v) => selection.setMany(pickable, v === true)}
+                  aria-label={`Chọn tất cả ${tab.title}`}
+                />
+              ) : null,
+            cell: ({ row }) =>
+              selectable(row.original) ? (
+                <Checkbox
+                  checked={selection.ids.has(row.original.id)}
+                  onCheckedChange={() => selection.toggle(row.original)}
+                  aria-label={`Chọn ${row.original.docNumber}`}
+                />
+              ) : null,
+          },
+        ]
+      : [];
+  return [
+    ...selectCol,
+    {
+      id: 'docNumber',
+      header: 'Việc',
+      meta: { width: 170 },
+      cell: ({ row }) => (
+        <span className="flex items-center gap-1.5">
+          <span className="font-mono text-xs font-semibold">{row.original.docNumber}</span>
+          {row.original.waveId ? (
+            <Layers
+              className="h-3.5 w-3.5 text-muted-foreground"
+              aria-label="Thuộc lượt pick gộp"
+            />
+          ) : null}
+        </span>
+      ),
+    },
+    {
+      id: 'type',
+      header: 'Loại',
+      meta: { width: 110 },
+      cell: ({ row }) => (
+        <StatusBadge tone={taskTypeTone(row.original.type)}>
+          {taskTypeLabel(row.original.type)}
+        </StatusBadge>
+      ),
+    },
+    {
+      id: 'ref',
+      header: 'Chứng từ',
+      meta: { width: 100 },
+      cell: ({ row }) =>
+        row.original.refType === 'SalesOrder' && row.original.refId ? (
+          <Link href={`/crm/orders/${row.original.refId}`} className="text-primary hover:underline">
+            Đơn bán
+          </Link>
+        ) : (
+          <span className="text-muted-foreground">{row.original.refType ?? '—'}</span>
+        ),
+    },
+    {
+      id: 'warehouse',
+      header: 'Kho',
+      meta: { width: 90 },
+      cell: ({ row }) => <span className="font-mono text-xs">{row.original.warehouseCode}</span>,
+    },
+    {
+      id: 'lines',
+      header: 'Dòng',
+      meta: { align: 'right', width: 70 },
+      cell: ({ row }) => row.original.lineCount,
+    },
+    {
+      id: 'progress',
+      header: 'Đã làm',
+      meta: { align: 'right', width: 120 },
+      cell: ({ row }) =>
+        `${formatQuantity(row.original.qtyDone)}/${formatQuantity(row.original.qtyPlanned)}`,
+    },
+    {
+      id: 'priority',
+      header: 'Ưu tiên',
+      meta: { align: 'right', width: 80 },
+      cell: ({ row }) => row.original.priority,
+    },
+    {
+      id: 'age',
+      header: 'Chờ · tuổi',
+      meta: { width: 150 },
+      cell: ({ row }) => (
+        <span
+          className="text-xs text-muted-foreground"
+          title={`Tạo lúc ${formatDateTime(row.original.createdAt)}`}
+        >
+          {row.original.status === 'PENDING' ? 'chờ' : 'đứng yên'}{' '}
+          {formatMinutes(row.original.idleMinutes)} · tuổi {formatMinutes(row.original.ageMinutes)}
+        </span>
+      ),
+    },
+    {
+      id: 'assignee',
+      header: 'Người nhận',
+      meta: { width: 150 },
+      cell: ({ row }) => {
+        const name = row.original.assigneeId
+          ? (staff?.find((s) => s.id === row.original.assigneeId)?.fullName ?? null)
+          : null;
+        return name ?? <span className="text-muted-foreground">—</span>;
+      },
+    },
+    {
+      id: 'exception',
+      header: 'Cảnh báo',
+      meta: { width: 130 },
+      cell: ({ row }) =>
+        row.original.exceptionLineCount > 0 ? (
+          <span
+            className="flex items-center gap-1 rounded-sm bg-warning/15 px-1.5 text-xs font-semibold text-warning-foreground"
+            title="Nhân viên báo thiếu hàng khi lấy — phần thiếu không sang đóng gói"
+          >
+            <AlertTriangle className="h-3.5 w-3.5 text-warning" aria-hidden />
+            thiếu {row.original.exceptionLineCount} dòng
+          </span>
+        ) : row.original.status === 'EXCEPTION' ? (
+          <AlertTriangle className="h-3.5 w-3.5 text-warning" aria-label="Ngoại lệ" />
+        ) : null,
+    },
+    ...(staff
+      ? [
+          {
+            id: 'actions',
+            header: '',
+            meta: { width: 200 },
+            cell: ({ row }) => <RowActions task={row.original} staff={staff} />,
+          } satisfies ColumnDef<Task, unknown>,
+        ]
+      : []),
+  ];
+}
+
+/** Bảng của tab đang mở: 4 trạng thái (luật 13) + phân trang phía server (luật 8). */
+function TaskTable({
+  tab,
+  query,
+  staff,
+  selection,
+  page,
+  size,
+  onPage,
+  onSize,
+}: {
+  tab: (typeof TABS)[number];
+  query: ReturnType<typeof useTasks>;
+  staff: WarehouseStaff[] | null;
+  selection: Selection | null;
+  page: number;
+  size: number;
+  onPage: (page: number) => void;
+  onSize: (size: number) => void;
+}) {
+  const rows = useMemo(() => query.data?.items ?? [], [query.data]);
+  const columns = useMemo(
+    () => buildColumns(tab, staff, selection, rows),
+    [tab, staff, selection, rows],
+  );
   return (
-    <section className="flex min-h-64 flex-col rounded-md border bg-muted/50">
-      <header className="flex items-center gap-2 border-b px-3 py-2 text-sm font-semibold">
-        {selection && pickable.length > 0 ? (
-          <Checkbox
-            checked={allChecked}
-            onCheckedChange={(v) => selection.setMany(pickable, v === true)}
-            aria-label={`Chọn tất cả ${title}`}
-          />
-        ) : null}
-        {title}
-        <span className="ml-auto text-xs font-normal text-muted-foreground">{hint}</span>
-      </header>
-      <QueryState
-        query={query}
-        skeleton={<LaneSkeleton />}
-        isEmpty={(d) => d.items.length === 0}
-        empty={
-          <p className="px-3 py-8 text-center text-sm text-muted-foreground">
-            Không có việc nào ở trạng thái này.
-          </p>
-        }
-      >
-        {(data) => (
-          <div className="flex flex-col gap-2 p-2">
-            {data.items.map((t) => (
-              <TaskCard key={t.id} task={t} staff={staff} selection={selection} />
-            ))}
-            {data.total > data.items.length ? (
-              <p className="px-1 pb-1 text-xs text-muted-foreground">
-                Hiện {data.items.length} việc gấp nhất trong tổng {data.total}.
-              </p>
-            ) : null}
-          </div>
-        )}
-      </QueryState>
-    </section>
+    <QueryState
+      query={query}
+      skeleton={
+        <div role="status" aria-label="Đang tải việc">
+          <ListSkeleton rows={8} columns={9} />
+        </div>
+      }
+      isEmpty={(d) => d.items.length === 0}
+      empty={
+        <p className="rounded-md border px-3 py-8 text-center text-sm text-muted-foreground">
+          Không có việc nào ở trạng thái này.
+        </p>
+      }
+    >
+      {(data) => (
+        <DataTable
+          columns={columns}
+          rows={data.items}
+          getRowId={(t) => t.id}
+          total={data.total}
+          page={page}
+          size={size}
+          sort={null}
+          onPageChange={onPage}
+          onSizeChange={onSize}
+          onSortChange={() => undefined}
+          stickyFirstColumn={false}
+        />
+      )}
+    </QueryState>
   );
 }
 
 export function DispatchScreen() {
-  const { state, set } = useListState<DispatchFilter>(DEFAULTS);
+  const { state, set, skipTake } = useListState<DispatchFilter>(DEFAULTS);
+  const status = parseStatus(state.filters.status);
+  const tab = TABS.find((t) => t.status === status)!;
   const type = parseTaskType(state.filters.type);
   const warehouseId = state.filters.warehouseId ?? '';
   const assignedTo = state.filters.assignedTo ?? '';
   const lines = LINE_VALUES.has(state.filters.lines ?? '') ? state.filters.lines! : '';
-  const params = useMemo<LaneParams>(
-    () => ({ type, warehouseId, assignedTo, lines }),
-    [type, warehouseId, assignedTo, lines],
-  );
   const ability = useAbility();
   const canAssign = ability.can('assign', 'Task');
   const staffQuery = useWarehouseStaff(canAssign);
   const staff = canAssign ? (staffQuery.data ?? null) : null;
   const warehouses = useWarehouses();
-  // Giữ cả thẻ (không chỉ id) để thanh công cụ biết lô đang chọn gộp lượt được hay chỉ gán.
+
+  // Chỉ tab đang mở gọi API — đổi tab mới gọi tab đó (không tải sẵn bốn trạng thái).
+  const query = useTasks({
+    status,
+    type,
+    warehouseId,
+    assignedTo,
+    ...lineFilter(lines),
+    ...skipTake,
+  });
+
+  // Giữ cả dòng (không chỉ id) để thanh công cụ biết lô đang chọn gộp lượt được hay chỉ gán;
+  // lô chọn giữ khi đổi tab / đổi trang.
   const [selected, setSelected] = useState<Map<string, Task>>(new Map());
   const selection = useMemo<Selection | null>(
     () =>
@@ -446,6 +499,9 @@ export function DispatchScreen() {
   );
   const { connected } = useRealtime();
 
+  const setFilter = (patch: Partial<Record<DispatchFilter, string | undefined>>) =>
+    set({ filters: { ...state.filters, ...patch } });
+
   return (
     <div className="flex flex-col gap-3">
       <PageHeader
@@ -469,9 +525,7 @@ export function DispatchScreen() {
       <div className="flex flex-wrap items-center gap-2">
         <Select
           value={state.filters.type ?? ALL_TYPES}
-          onValueChange={(v) =>
-            set({ filters: { ...state.filters, type: v === ALL_TYPES ? undefined : v } })
-          }
+          onValueChange={(v) => setFilter({ type: v === ALL_TYPES ? undefined : v })}
         >
           <SelectTrigger className="h-9 w-52" aria-label="Loại việc">
             <SelectValue placeholder="Loại việc" />
@@ -487,9 +541,7 @@ export function DispatchScreen() {
         </Select>
         <Select
           value={lines || ALL_TYPES}
-          onValueChange={(v) =>
-            set({ filters: { ...state.filters, lines: v === ALL_TYPES ? undefined : v } })
-          }
+          onValueChange={(v) => setFilter({ lines: v === ALL_TYPES ? undefined : v })}
         >
           <SelectTrigger className="h-9 w-44" aria-label="Số dòng SKU">
             <SelectValue placeholder="Số dòng SKU" />
@@ -505,9 +557,7 @@ export function DispatchScreen() {
         </Select>
         <Select
           value={warehouseId || ALL_TYPES}
-          onValueChange={(v) =>
-            set({ filters: { ...state.filters, warehouseId: v === ALL_TYPES ? undefined : v } })
-          }
+          onValueChange={(v) => setFilter({ warehouseId: v === ALL_TYPES ? undefined : v })}
         >
           <SelectTrigger className="h-9 w-52" aria-label="Kho">
             <SelectValue placeholder="Kho" />
@@ -524,9 +574,7 @@ export function DispatchScreen() {
         {staff ? (
           <Select
             value={assignedTo || ALL_TYPES}
-            onValueChange={(v) =>
-              set({ filters: { ...state.filters, assignedTo: v === ALL_TYPES ? undefined : v } })
-            }
+            onValueChange={(v) => setFilter({ assignedTo: v === ALL_TYPES ? undefined : v })}
           >
             <SelectTrigger className="h-9 w-52" aria-label="Người nhận việc">
               <SelectValue placeholder="Người nhận việc" />
@@ -543,10 +591,35 @@ export function DispatchScreen() {
         ) : null}
       </div>
 
-      <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-        {LANES.map((l) => (
-          <LaneCount key={l.status} label={l.title} status={l.status} params={params} />
-        ))}
+      {/* Tab trạng thái trên URL — chỉ tab đang mở tải dữ liệu; số đếm là `total` của tab đó. */}
+      <div className="flex border-b" role="tablist" aria-label="Trạng thái điều phối">
+        {TABS.map((t) => {
+          const active = t.status === status;
+          return (
+            <button
+              key={t.status}
+              type="button"
+              role="tab"
+              aria-selected={active}
+              title={t.hint}
+              onClick={() => setFilter({ status: t.status === 'PENDING' ? undefined : t.status })}
+              className={cn(
+                '-mb-px flex h-9 items-center gap-1.5 border-b-2 px-3 text-sm',
+                active
+                  ? 'border-primary font-semibold text-primary'
+                  : 'border-transparent text-muted-foreground hover:text-foreground',
+              )}
+            >
+              {t.title}
+              {active ? (
+                <span className="rounded-full bg-muted px-1.5 text-xs font-normal tabular-nums text-muted-foreground">
+                  {query.data ? query.data.total : query.error ? '—' : '…'}
+                </span>
+              ) : null}
+            </button>
+          );
+        })}
+        <span className="ml-auto self-center text-xs text-muted-foreground">{tab.hint}</span>
       </div>
 
       {selection ? (
@@ -557,33 +630,30 @@ export function DispatchScreen() {
         />
       ) : null}
 
-      <div className="grid items-start gap-3 md:grid-cols-2 xl:grid-cols-4">
-        {LANES.map((l) => (
-          <Lane
-            key={l.status}
-            title={l.title}
-            hint={l.hint}
-            status={l.status}
-            params={params}
-            staff={staff}
-            selection={selection}
-          />
-        ))}
-      </div>
+      <TaskTable
+        tab={tab}
+        query={query}
+        staff={staff}
+        selection={selection}
+        page={state.page}
+        size={state.size}
+        onPage={(page) => set({ page })}
+        onSize={(size) => set({ size })}
+      />
 
       {canAssign ? <WavePanel warehouseId={warehouseId} staff={staff ?? []} /> : null}
 
       <p className="text-xs text-muted-foreground">
         Bảng này không có cờ &ldquo;quá hạn SLA&rdquo;: bảng việc trong kho chưa có cột hạn chót
-        nào. Hai con số trên mỗi thẻ là thời gian việc nằm im ở trạng thái hiện tại và tuổi việc
-        tính từ lúc tạo — đúng như API trả về.
+        nào. Hai con số ở cột &ldquo;Chờ · tuổi&rdquo; là thời gian việc nằm im ở trạng thái hiện
+        tại và tuổi việc tính từ lúc tạo — đúng như API trả về.
       </p>
     </div>
   );
 }
 
 /**
- * Thanh công cụ cho lô thẻ đã tick (2026-09-16):
+ * Thanh công cụ cho lô dòng đã tick (2026-09-16):
  *  - "Gán cho…" → POST /tasks/assign một lần cho cả lô (PENDING gán mới, ASSIGNED đổi người).
  *    Server làm từng việc; việc lỗi báo riêng, việc còn lại vẫn về tay người đó.
  *  - "Gộp thành một lượt" (PLAN-barcode-pick-pack E3) chỉ khi cả lô là PICK chưa gán, chưa
@@ -767,7 +837,7 @@ function WavePanel({ warehouseId, staff }: { warehouseId: string; staff: Warehou
         isEmpty={() => items.length === 0}
         empty={
           <p className="px-3 py-4 text-sm text-muted-foreground">
-            Chưa có lượt nào. Tick các thẻ &ldquo;Lấy hàng&rdquo; chưa gán rồi bấm &ldquo;Gộp thành
+            Chưa có lượt nào. Tick các dòng &ldquo;Lấy hàng&rdquo; chưa gán rồi bấm &ldquo;Gộp thành
             một lượt&rdquo;.
           </p>
         }
