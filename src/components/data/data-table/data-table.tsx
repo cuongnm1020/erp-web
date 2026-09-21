@@ -25,7 +25,8 @@ import { ariaSort, ColumnHeader } from './column-header';
 import { DataTablePagination } from './pagination';
 
 export const VIRTUALIZE_THRESHOLD = 200;
-const ROW_HEIGHT = 40;
+/** 13px chữ + 6px đệm trên/dưới + viền (brief §3) — khớp ListSkeleton h-8. */
+const ROW_HEIGHT = 32;
 
 export interface DataTableColumnMeta {
   /** Tiêu đề hiển thị; mặc định header string */
@@ -169,7 +170,7 @@ export function DataTable<T>({
             style={m?.width ? { width: m.width, minWidth: m.width } : undefined}
             className={cn(
               m?.align === 'right' && 'text-right tabular-nums',
-              stickyFirstColumn && i === stickyIdx && 'sticky left-0 z-10 bg-background',
+              stickyFirstColumn && i === stickyIdx && 'sticky left-0 z-10 bg-card',
               m?.className,
             )}
           >
@@ -194,11 +195,11 @@ export function DataTable<T>({
       ) : null}
       <div
         ref={scrollRef}
-        className="relative overflow-auto rounded-md border"
+        className="relative overflow-auto rounded-md border bg-card"
         style={virtualize ? { maxHeight } : undefined}
       >
         <Table>
-          <TableHeader className="sticky top-0 z-20 bg-background">
+          <TableHeader className="sticky top-0 z-20">
             {table.getHeaderGroups().map((hg) => (
               <TableRow key={hg.id} className="hover:bg-transparent">
                 {hg.headers.map((h, i) => {
@@ -214,7 +215,7 @@ export function DataTable<T>({
                       aria-sort={m?.sortable ? ariaSort(h.column.id, sort) : undefined}
                       style={m?.width ? { width: m.width, minWidth: m.width } : undefined}
                       className={cn(
-                        stickyFirstColumn && i === stickyIdx && 'sticky left-0 z-30 bg-background',
+                        stickyFirstColumn && i === stickyIdx && 'sticky left-0 z-30 bg-muted',
                         m?.className,
                       )}
                     >

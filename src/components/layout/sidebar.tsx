@@ -75,12 +75,12 @@ export function Sidebar({ brand = 'ERP' }: { brand?: string }) {
       data-collapsed={collapsed || undefined}
       className={cn(
         'hidden shrink-0 flex-col border-r bg-muted/40 md:flex',
-        collapsed ? 'w-14' : 'w-60',
+        collapsed ? 'w-sidebar-collapsed' : 'w-sidebar',
       )}
     >
       <div
         className={cn(
-          'flex h-14 items-center border-b text-sm font-semibold',
+          'flex h-12 items-center border-b text-sm font-semibold',
           collapsed ? 'justify-center' : 'px-4',
         )}
       >

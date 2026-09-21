@@ -16,13 +16,13 @@ export function ListSkeleton({
 }) {
   return (
     <div role="status" aria-label="Đang tải danh sách" className={cn('space-y-2', className)}>
-      <div className="flex h-9 gap-2">
+      <div className="flex h-8 gap-2">
         {Array.from({ length: columns }, (_, i) => (
-          <Skeleton key={i} className="h-9 flex-1" />
+          <Skeleton key={i} className="h-8 flex-1" />
         ))}
       </div>
       {Array.from({ length: rows }, (_, r) => (
-        <div key={r} className="flex h-10 items-center gap-2">
+        <div key={r} className="flex h-8 items-center gap-2">
           {Array.from({ length: columns }, (_, c) => (
             <Skeleton key={c} className={cn('h-4 flex-1', c === 0 && 'max-w-48')} />
           ))}

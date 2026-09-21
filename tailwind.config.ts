@@ -5,9 +5,11 @@ import animate from 'tailwindcss-animate';
  * Design tokens — NGUỒN DUY NHẤT cho màu / spacing / radius trong apps/web.
  * Component chỉ dùng class theo token ở đây; cấm hex tự do, cấm p-[13px].
  *
- * TODO(DESIGN-BRIEF): giá trị HSL trong globals.css là placeholder trung tính
- * (bố cục shadcn chuẩn) cho tới khi DESIGN-BRIEF.md được bàn giao. Khi có brief,
- * chỉ sửa biến CSS trong globals.css — tên token ở đây giữ nguyên.
+ * Giá trị màu nằm trong globals.css (docs/DESIGN-BRIEF.md §3). Thang chữ, độ đậm và
+ * kích thước khung (thanh trên, sidebar) chốt ở đây theo brief:
+ * - Chữ: 12 chú thích · 13 mặc định bảng/form · 14 nội dung · 16 tiêu đề mục · 20 tiêu đề trang.
+ * - Chỉ hai độ đậm 400 / 600 — `font-medium` và `font-bold` đều quy về 600 để component shadcn
+ *   không kéo thêm weight 500/700.
  */
 const config: Config = {
   darkMode: ['class'],
@@ -75,6 +77,27 @@ const config: Config = {
       fontFamily: {
         sans: ['var(--font-sans)', 'system-ui', 'sans-serif'],
         mono: ['var(--font-mono)', 'ui-monospace', 'monospace'],
+      },
+      // Thang chữ brief §3 — ghi đè xs/sm/base/lg/xl của Tailwind để 500+ chỗ dùng text-sm
+      // tự về 13px mà không sửa từng file.
+      fontSize: {
+        xs: ['12px', { lineHeight: '16px' }],
+        sm: ['13px', { lineHeight: '20px' }],
+        base: ['14px', { lineHeight: '20px' }],
+        lg: ['16px', { lineHeight: '24px' }],
+        xl: ['20px', { lineHeight: '28px' }],
+        '2xl': ['24px', { lineHeight: '32px' }],
+      },
+      fontWeight: {
+        normal: '400',
+        medium: '600',
+        semibold: '600',
+        bold: '600',
+      },
+      // Khung trang brief §3: sidebar 200px, thu gọn 56px. Thanh trên 48px = h-12 có sẵn.
+      spacing: {
+        sidebar: '200px',
+        'sidebar-collapsed': '56px',
       },
       keyframes: {
         'accordion-down': {
