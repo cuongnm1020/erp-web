@@ -1,8 +1,8 @@
 'use client';
 
-import { AlertTriangle, Layers, Printer } from 'lucide-react';
+import { AlertTriangle, ChevronDown, ChevronRight, Layers, Printer } from 'lucide-react';
 import Link from 'next/link';
-import { useMemo, useState } from 'react';
+import { Fragment, useMemo, useState } from 'react';
 import { DataTable, type ColumnDef } from '@/components/data/data-table';
 import { ListSkeleton, QueryState } from '@/components/data/states';
 import { StatusBadge } from '@/components/data/status-badge';
@@ -25,6 +25,15 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
+import { isApiError } from '@/lib/api/errors';
 import { cn } from '@/lib/cn';
 import { formatDateTime, formatQuantity } from '@/lib/format';
 import { usePrint } from '@/lib/print';
@@ -46,13 +55,16 @@ import {
 import { useWarehouses } from '../api/use-warehouses';
 import {
   useAssignWave,
-  useAutoMergeWaves,
   useCreateWave,
+  useMergeWaveSuggestion,
   useUnassignWave,
   useWaveDetail,
+  useWaveSuggestions,
   useWaves,
   waveKeys,
   type Wave,
+  type WavePackLevel,
+  type WaveSuggestion,
 } from '../api/use-waves';
 import {
   TASK_TYPE_OPTIONS,
@@ -88,11 +100,17 @@ import { WavePrintSheet } from './wave-print-sheet';
  * "Trả về hàng đợi" (POST /tasks/:id/unassign) — chỉ hiện khi có task.assign; danh bạ
  * người nhận lấy từ GET /tasks/assignees. Tick nhiều dòng (cả ở tab khác — lô chọn giữ khi
  * đổi tab) → gán một người / gộp thành lượt ở thanh công cụ.
+ *
+ * Gợi ý gộp theo cấp đóng gói (PLAN-packaging-hierarchy §12, 2026-09-22): hai tab "Đủ gộp thùng"
+ * / "Đủ gộp pallet" (`?merge=CARTON|PALLET`) đọc GET /waves/suggestions — server CHỈ gợi ý nhóm
+ * đơn một SKU cộng đúng N thùng / một pallet, không tự tạo lượt. Số nhóm hiện trên tab kể cả khi
+ * chưa mở; mỗi nhóm bung ra thấy đơn con; "Gộp và gán" → POST /waves/merge, server kiểm lại từng
+ * đơn — 409 thì tải lại gợi ý, không gộp phần còn lại. Đơn lẻ / nhiều SKU vẫn ở "Chưa gán".
  */
 const PAGE_SIZE = 20;
 const DEFAULTS = {
   size: PAGE_SIZE,
-  filterKeys: ['status', 'type', 'warehouseId', 'assignedTo', 'lines'] as const,
+  filterKeys: ['status', 'type', 'warehouseId', 'assignedTo', 'lines', 'merge'] as const,
 };
 const ALL_TYPES = '__all__';
 
@@ -108,6 +126,26 @@ const TABS: Array<{ status: TabStatus; title: string; hint: string }> = [
 
 function parseStatus(v: string | undefined): TabStatus {
   return TABS.some((t) => t.status === v) ? (v as TabStatus) : 'PENDING';
+}
+
+/** Tab gợi ý gộp theo cấp đóng gói (`?merge=`) — đứng sau bốn tab trạng thái. */
+const MERGE_TABS: Array<{ level: WavePackLevel; title: string; hint: string }> = [
+  { level: 'CARTON', title: 'Đủ gộp thùng', hint: 'đơn một SKU cộng đúng N thùng — gộp rồi gán' },
+  {
+    level: 'PALLET',
+    title: 'Đủ gộp pallet',
+    hint: 'đơn một SKU cộng đúng một pallet — gộp rồi gán',
+  },
+];
+
+function parseMerge(v: string | undefined): WavePackLevel | null {
+  return MERGE_TABS.some((t) => t.level === v) ? (v as WavePackLevel) : null;
+}
+
+/** Nhãn cấp đóng gói của nhóm gợi ý / lượt: "Trọn thùng × 3", "Trọn pallet". */
+function mergeLabel(level: WavePackLevel, count: number | null | undefined): string {
+  if (level === 'PALLET') return count && count > 1 ? `Trọn pallet × ${count}` : 'Trọn pallet';
+  return count ? `Trọn thùng × ${count}` : 'Trọn thùng';
 }
 
 /**
@@ -442,7 +480,9 @@ function TaskTable({
 export function DispatchScreen() {
   const { state, set, skipTake } = useListState<DispatchFilter>(DEFAULTS);
   const status = parseStatus(state.filters.status);
+  const merge = parseMerge(state.filters.merge);
   const tab = TABS.find((t) => t.status === status)!;
+  const mergeTab = merge ? MERGE_TABS.find((t) => t.level === merge)! : null;
   const type = parseTaskType(state.filters.type);
   const warehouseId = state.filters.warehouseId ?? '';
   const assignedTo = state.filters.assignedTo ?? '';
@@ -462,6 +502,8 @@ export function DispatchScreen() {
     ...lineFilter(lines),
     ...skipTake,
   });
+  // Gợi ý gộp: luôn gọi (không lọc cấp) để hai tab hiện số nhóm; mở tab nào thì lọc đúng cấp đó.
+  const suggestions = useWaveSuggestions({ warehouseId, packLevel: merge ?? undefined });
 
   // Giữ cả dòng (không chỉ id) để thanh công cụ biết lô đang chọn gộp lượt được hay chỉ gán;
   // lô chọn giữ khi đổi tab / đổi trang.
@@ -594,7 +636,7 @@ export function DispatchScreen() {
       {/* Tab trạng thái trên URL — chỉ tab đang mở tải dữ liệu; số đếm là `total` của tab đó. */}
       <div className="flex border-b" role="tablist" aria-label="Trạng thái điều phối">
         {TABS.map((t) => {
-          const active = t.status === status;
+          const active = merge === null && t.status === status;
           return (
             <button
               key={t.status}
@@ -602,7 +644,12 @@ export function DispatchScreen() {
               role="tab"
               aria-selected={active}
               title={t.hint}
-              onClick={() => setFilter({ status: t.status === 'PENDING' ? undefined : t.status })}
+              onClick={() =>
+                setFilter({
+                  status: t.status === 'PENDING' ? undefined : t.status,
+                  merge: undefined,
+                })
+              }
               className={cn(
                 '-mb-px flex h-9 items-center gap-1.5 border-b-2 px-3 text-sm',
                 active
@@ -619,7 +666,44 @@ export function DispatchScreen() {
             </button>
           );
         })}
-        <span className="ml-auto self-center text-xs text-muted-foreground">{tab.hint}</span>
+        {/* Tab gợi ý gộp: số nhóm hiện cả khi chưa mở — quản lý liếc là biết có gì để gộp. */}
+        {MERGE_TABS.map((t) => {
+          const active = merge === t.level;
+          const count = suggestions.data
+            ? t.level === 'PALLET'
+              ? suggestions.data.palletCount
+              : suggestions.data.cartonCount
+            : null;
+          return (
+            <button
+              key={t.level}
+              type="button"
+              role="tab"
+              aria-selected={active}
+              title={t.hint}
+              onClick={() => setFilter({ merge: t.level, status: undefined })}
+              className={cn(
+                '-mb-px flex h-9 items-center gap-1.5 border-b-2 px-3 text-sm',
+                active
+                  ? 'border-primary font-semibold text-primary'
+                  : 'border-transparent text-muted-foreground hover:text-foreground',
+              )}
+            >
+              {t.title}
+              <span
+                className={cn(
+                  'rounded-full px-1.5 text-xs font-normal tabular-nums',
+                  count ? 'bg-primary/10 text-primary' : 'bg-muted text-muted-foreground',
+                )}
+              >
+                {count ?? (suggestions.error ? '—' : '…')}
+              </span>
+            </button>
+          );
+        })}
+        <span className="ml-auto self-center text-xs text-muted-foreground">
+          {mergeTab ? mergeTab.hint : tab.hint}
+        </span>
       </div>
 
       {selection ? (
@@ -630,16 +714,26 @@ export function DispatchScreen() {
         />
       ) : null}
 
-      <TaskTable
-        tab={tab}
-        query={query}
-        staff={staff}
-        selection={selection}
-        page={state.page}
-        size={state.size}
-        onPage={(page) => set({ page })}
-        onSize={(size) => set({ size })}
-      />
+      {merge ? (
+        <SuggestionTable
+          level={merge}
+          query={suggestions}
+          staff={staff ?? []}
+          canAssign={canAssign}
+          onGoPending={() => setFilter({ merge: undefined, status: undefined })}
+        />
+      ) : (
+        <TaskTable
+          tab={tab}
+          query={query}
+          staff={staff}
+          selection={selection}
+          page={state.page}
+          size={state.size}
+          onPage={(page) => set({ page })}
+          onSize={(size) => set({ size })}
+        />
+      )}
 
       {canAssign ? <WavePanel warehouseId={warehouseId} staff={staff ?? []} /> : null}
 
@@ -794,18 +888,6 @@ function WavePanel({ warehouseId, staff }: { warehouseId: string; staff: Warehou
   const detail = useWaveDetail(printId);
   const assign = useAssignWave();
   const unassign = useUnassignWave();
-  const autoMerge = useAutoMergeWaves();
-  const runAutoMerge = () =>
-    autoMerge
-      .mutateAsync({ warehouseId })
-      .then((r) =>
-        toast.success(
-          r.cartonWaves.length + r.palletWaves.length === 0
-            ? 'Chưa có nhóm đơn nào vừa đủ một thùng / một pallet'
-            : `Đã gộp tự động ${r.cartonWaves.length} lượt thùng, ${r.palletWaves.length} lượt pallet`,
-        ),
-      )
-      .catch((err) => toast.error(messageFor(err)));
 
   // Có chi tiết → mở tờ in đúng một lần cho lượt vừa bấm.
   const printing = printId !== null && detail.data?.id === printId;
@@ -820,16 +902,6 @@ function WavePanel({ warehouseId, staff }: { warehouseId: string; staff: Warehou
         <span className="ml-auto text-xs font-normal text-muted-foreground">
           {waves.data ? `${waves.data.total} lượt` : ''}
         </span>
-        <Button
-          size="sm"
-          variant="outline"
-          className="h-7"
-          disabled={autoMerge.isPending}
-          onClick={() => void runAutoMerge()}
-          title="Đơn một SKU vừa đủ một thùng → lượt thùng; đủ thùng một pallet → lượt pallet"
-        >
-          {autoMerge.isPending ? 'Đang gộp…' : 'Gộp tự động thùng / pallet'}
-        </Button>
       </header>
       <QueryState
         query={waves}
@@ -837,8 +909,9 @@ function WavePanel({ warehouseId, staff }: { warehouseId: string; staff: Warehou
         isEmpty={() => items.length === 0}
         empty={
           <p className="px-3 py-4 text-sm text-muted-foreground">
-            Chưa có lượt nào. Tick các dòng &ldquo;Lấy hàng&rdquo; chưa gán rồi bấm &ldquo;Gộp thành
-            một lượt&rdquo;.
+            Chưa có lượt nào. Mở tab &ldquo;Đủ gộp thùng&rdquo; / &ldquo;Đủ gộp pallet&rdquo; để gộp
+            nhóm đơn tròn thùng, hoặc tick các dòng &ldquo;Lấy hàng&rdquo; chưa gán rồi bấm
+            &ldquo;Gộp thành một lượt&rdquo;.
           </p>
         }
       >
@@ -901,7 +974,7 @@ function WaveRow({
       </StatusBadge>
       {wave.packLevel ? (
         <StatusBadge tone="brand">
-          {wave.packLevel === 'PALLET' ? 'Trọn pallet' : 'Trọn thùng'}
+          {mergeLabel(wave.packLevel, wave.packCount)}
           {wave.skuCode ? ` · ${wave.skuCode}` : ''}
         </StatusBadge>
       ) : null}
@@ -936,5 +1009,237 @@ function WaveRow({
         </Button>
       </span>
     </li>
+  );
+}
+
+/**
+ * Bảng nhóm gợi ý gộp của tab `?merge=` (PLAN-packaging-hierarchy §12): mỗi dòng một nhóm đơn
+ * một SKU cộng đúng N thùng / một pallet; bấm "N đơn" bung danh sách đơn con; "Gộp và gán" mở
+ * dialog chọn người (chỉ khi có task.assign). 4 trạng thái theo luật 13.
+ */
+function SuggestionTable({
+  level,
+  query,
+  staff,
+  canAssign,
+  onGoPending,
+}: {
+  level: WavePackLevel;
+  query: ReturnType<typeof useWaveSuggestions>;
+  staff: WarehouseStaff[];
+  canAssign: boolean;
+  onGoPending: () => void;
+}) {
+  const [openKey, setOpenKey] = useState<string | null>(null);
+  const [merging, setMerging] = useState<WaveSuggestion | null>(null);
+  return (
+    <>
+      <QueryState
+        query={query}
+        skeleton={
+          <div role="status" aria-label="Đang tải gợi ý gộp">
+            <ListSkeleton rows={4} columns={6} />
+          </div>
+        }
+        isEmpty={(d) => d.items.length === 0}
+        empty={
+          <div className="rounded-md border px-3 py-8 text-center text-sm text-muted-foreground">
+            <p>
+              {level === 'PALLET'
+                ? 'Chưa có nhóm đơn nào cộng đúng một pallet.'
+                : 'Chưa có nhóm đơn nào cộng tròn thùng.'}{' '}
+              Đơn lẻ và đơn nhiều SKU nằm ở tab &ldquo;Chưa gán&rdquo; — gán tay.
+            </p>
+            <Button size="sm" variant="outline" className="mt-3" onClick={onGoPending}>
+              Xem Chưa gán
+            </Button>
+          </div>
+        }
+      >
+        {(data) => (
+          <div className="rounded-md border bg-card">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Sản phẩm</TableHead>
+                  <TableHead>Cấp đóng gói</TableHead>
+                  <TableHead className="text-right">Số đơn</TableHead>
+                  <TableHead className="text-right">Tổng số lượng</TableHead>
+                  <TableHead>Đơn cũ nhất</TableHead>
+                  <TableHead className="w-32" />
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {data.items.map((g) => {
+                  const open = openKey === g.key;
+                  return (
+                    <Fragment key={g.key}>
+                      <TableRow>
+                        <TableCell>
+                          <span className="font-mono font-semibold">{g.skuCode}</span>
+                          <span className="ml-2 text-muted-foreground">{g.skuName}</span>
+                        </TableCell>
+                        <TableCell>
+                          <StatusBadge tone="brand">
+                            {mergeLabel(g.packLevel, g.packCount)}
+                          </StatusBadge>
+                          <span className="ml-2 text-xs text-muted-foreground">
+                            1 {g.packLevel === 'PALLET' ? 'pallet' : 'thùng'} ={' '}
+                            {formatQuantity(g.unitsPerPack)}
+                          </span>
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <button
+                            type="button"
+                            aria-expanded={open}
+                            onClick={() => setOpenKey(open ? null : g.key)}
+                            className="inline-flex items-center gap-1 tabular-nums underline-offset-2 hover:underline"
+                          >
+                            {open ? (
+                              <ChevronDown className="h-3.5 w-3.5" aria-hidden />
+                            ) : (
+                              <ChevronRight className="h-3.5 w-3.5" aria-hidden />
+                            )}
+                            {g.taskCount} đơn
+                          </button>
+                        </TableCell>
+                        <TableCell className="text-right tabular-nums">
+                          {formatQuantity(g.qtyPlanned)}
+                        </TableCell>
+                        <TableCell className="text-muted-foreground">
+                          {formatDateTime(g.oldestCreatedAt)}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          {canAssign ? (
+                            <Button size="sm" onClick={() => setMerging(g)}>
+                              Gộp và gán
+                            </Button>
+                          ) : null}
+                        </TableCell>
+                      </TableRow>
+                      {open ? (
+                        <TableRow className="bg-muted/30 hover:bg-muted/30">
+                          <TableCell colSpan={6}>
+                            <ul
+                              aria-label={`Đơn trong nhóm ${g.skuCode}`}
+                              className="grid gap-1 text-xs sm:grid-cols-2 lg:grid-cols-3"
+                            >
+                              {g.tasks.map((t) => (
+                                <li key={t.taskId} className="flex items-center gap-2">
+                                  <span className="font-mono">{t.docNumber}</span>
+                                  {t.refDocNumber ? (
+                                    <span className="text-muted-foreground">
+                                      đơn {t.refDocNumber}
+                                    </span>
+                                  ) : null}
+                                  <span className="ml-auto tabular-nums">
+                                    {formatQuantity(t.qtyPlanned)}
+                                  </span>
+                                  <span className="text-muted-foreground">
+                                    {formatDateTime(t.createdAt)}
+                                  </span>
+                                </li>
+                              ))}
+                            </ul>
+                          </TableCell>
+                        </TableRow>
+                      ) : null}
+                    </Fragment>
+                  );
+                })}
+              </TableBody>
+            </Table>
+          </div>
+        )}
+      </QueryState>
+      {merging ? (
+        <MergeDialog group={merging} staff={staff} onClose={() => setMerging(null)} />
+      ) : null}
+    </>
+  );
+}
+
+/** 409 WAVE_SUGGESTION_STALE: nêu thêm mã việc không còn hợp lệ (dữ liệu, không phải message thô). */
+function staleMessage(err: unknown): string {
+  const base = messageFor(err);
+  if (isApiError(err) && err.code === 'WAVE_SUGGESTION_STALE') {
+    const tasks = (err.details as { tasks?: { docNumber?: string }[] } | undefined)?.tasks ?? [];
+    const docs = tasks.map((t) => t.docNumber).filter((d): d is string => Boolean(d));
+    if (docs.length) return `${base} Đơn không còn hợp lệ: ${docs.join(', ')}.`;
+  }
+  return base;
+}
+
+/** Dialog "Gộp và gán" cho một nhóm gợi ý → POST /waves/merge (server kiểm lại từng đơn). */
+function MergeDialog({
+  group,
+  staff,
+  onClose,
+}: {
+  group: WaveSuggestion;
+  staff: WarehouseStaff[];
+  onClose: () => void;
+}) {
+  const [userId, setUserId] = useState('');
+  const merge = useMergeWaveSuggestion();
+  const submit = () =>
+    merge.mutate(
+      {
+        skuId: group.skuId,
+        packLevel: group.packLevel,
+        packCount: group.packCount,
+        taskIds: group.tasks.map((t) => t.taskId),
+        ...(userId ? { assignedTo: userId } : {}),
+      },
+      {
+        onSuccess: (w) => {
+          toast.success(`Đã gộp ${group.taskCount} đơn thành lượt ${w.docNumber}`);
+          onClose();
+        },
+        onError: (err) => toast.error(staleMessage(err)),
+      },
+    );
+  return (
+    <Dialog
+      open
+      onOpenChange={(o) => {
+        if (!o && !merge.isPending) onClose();
+      }}
+    >
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>
+            Gộp {group.taskCount} đơn — {mergeLabel(group.packLevel, group.packCount)} ·{' '}
+            {group.skuCode}
+          </DialogTitle>
+          <DialogDescription>
+            Người lấy quét{' '}
+            {group.packLevel === 'PALLET' ? 'mã pallet' : `${group.packCount} mã thùng`} thay vì
+            từng sản phẩm; bàn đóng gói chia về từng đơn khi quét đóng gói. Hệ thống kiểm lại từng
+            đơn lúc gộp — có đơn đã huỷ hoặc đã gán thì không gộp, tải lại gợi ý.
+          </DialogDescription>
+        </DialogHeader>
+        <Select value={userId} onValueChange={setUserId} disabled={merge.isPending}>
+          <SelectTrigger className="h-9" aria-label="Giao lượt cho">
+            <SelectValue placeholder="Giao cho… (để trống = lượt nằm ở Chưa gán)" />
+          </SelectTrigger>
+          <SelectContent>
+            {staff.map((s) => (
+              <SelectItem key={s.id} value={s.id}>
+                {staffLabel(s)}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <DialogFooter>
+          <Button variant="outline" disabled={merge.isPending} onClick={onClose}>
+            Hủy bỏ
+          </Button>
+          <Button disabled={merge.isPending} onClick={submit}>
+            {merge.isPending ? 'Đang gộp…' : 'Gộp và gán'}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }

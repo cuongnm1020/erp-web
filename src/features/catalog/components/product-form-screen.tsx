@@ -31,8 +31,10 @@ import {
 } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { toast } from '@/components/ui/toaster';
+import Decimal from 'decimal.js';
 import { type ApiError } from '@/lib/api/errors';
 import { cn } from '@/lib/cn';
+import { formatQuantity } from '@/lib/format';
 import { messageFor } from '@/lib/error-messages';
 import { Can, useAbility } from '@/lib/permission';
 import {
@@ -41,7 +43,6 @@ import {
   useSetConversion,
   useCategories,
   useCreateProduct,
-  useContainerTypes,
   useCreateSku,
   useProduct,
   useUoms,
@@ -53,8 +54,11 @@ import {
 } from '../api/use-products';
 import {
   EMPTY_SKU_ROW,
+  existingCartonFactorOf,
   gramsToKg,
   kgToGrams,
+  packagingBarcodes,
+  packagingConversions,
   parseAliases,
   productFormSchema,
   type ProductFormValues,
@@ -144,14 +148,17 @@ function initialValues(p?: ProductDetail): ProductFormValues {
           salePrice: s.salePrice ?? '',
           weightG: s.weightKg ? kgToGrams(s.weightKg) : '',
           openingQty: '',
-          // F3 — alt* để TRỐNG trên SKU đã lưu (khai = thêm quy đổi mới);
-          // quy đổi sẵn có hiển thị dạng chip, xóa ở API riêng khi cần.
-          altUom: '',
-          altFactor: '',
-          altContainerType: '',
-          altBarcode: '',
+          // Khối đóng gói để TRỐNG trên SKU đã lưu (khai = thêm quy đổi mới); quy đổi sẵn có
+          // hiển thị dạng chip, xóa ở API riêng khi cần. Hệ số thùng đã có giữ lại để khai pallet.
+          cartonUom: '',
+          cartonPer: '',
+          cartonBarcode: '',
+          palletUom: '',
+          palletPer: '',
+          palletBarcode: '',
           salesUom: s.salesUom?.code ?? '',
           existingConvUoms: s.uomConversions.map((c) => c.uom.code),
+          existingCartonFactor: existingCartonFactorOf(s.uomConversions),
         }))
       : [{ ...EMPTY_SKU_ROW }],
   };
@@ -355,26 +362,16 @@ function ProductFormBody({ product }: { product?: ProductDetail }) {
                   ? { code: row.code || `${savedCode}-${i + 1}`, name: row.name }
                   : {}),
                 baseUom: v.baseUom,
-                // F3 — ĐVT phụ khai trên dòng: conversion + barcode theo ĐVT + ĐVT bán
-                ...(row.altUom && row.altFactor
-                  ? {
-                      conversions: [
-                        {
-                          uom: row.altUom,
-                          factor: row.altFactor,
-                          ...(row.altContainerType ? { containerType: row.altContainerType } : {}),
-                        },
-                      ],
-                    }
+                // Đóng gói hai cấp (§12): thùng rồi pallet, factor về ĐVT cơ sở + barcode theo ĐVT
+                ...(packagingConversions(row).length
+                  ? { conversions: packagingConversions(row) }
                   : {}),
                 ...(row.salesUom ? { salesUom: row.salesUom } : {}),
-                ...(row.barcode || (row.altBarcode && row.altUom)
+                ...(row.barcode || packagingBarcodes(row).length
                   ? {
                       barcodes: [
                         ...(row.barcode ? [{ code: row.barcode }] : []),
-                        ...(row.altBarcode && row.altUom
-                          ? [{ code: row.altBarcode, uom: row.altUom }]
-                          : []),
+                        ...packagingBarcodes(row),
                       ],
                     }
                   : {}),
@@ -406,25 +403,16 @@ function ProductFormBody({ product }: { product?: ProductDetail }) {
                 body: { version: skuVersion, ...patch },
               });
             }
-            // F3 — quy đổi mới khai trên SKU đã lưu: POST conversion TRƯỚC barcode
-            // (trg_barcode_uom_valid đòi conversion có trước).
-            if (row.altUom && row.altFactor) {
-              await setConversion.mutateAsync({
-                skuId: row.skuId,
-                uom: row.altUom,
-                factor: row.altFactor,
-                ...(row.altContainerType ? { containerType: row.altContainerType } : {}),
-              });
+            // Quy đổi mới khai trên SKU đã lưu: POST conversion (thùng trước pallet) TRƯỚC
+            // barcode (trg_barcode_uom_valid đòi conversion có trước).
+            for (const conv of packagingConversions(row)) {
+              await setConversion.mutateAsync({ skuId: row.skuId, ...conv });
             }
             if (row.barcode && !row.existingBarcode) {
               await addBarcode.mutateAsync({ skuId: row.skuId, code: row.barcode });
             }
-            if (row.altBarcode && row.altUom) {
-              await addBarcode.mutateAsync({
-                skuId: row.skuId,
-                code: row.altBarcode,
-                uom: row.altUom,
-              });
+            for (const bc of packagingBarcodes(row)) {
+              await addBarcode.mutateAsync({ skuId: row.skuId, ...bc });
             }
           }
         } catch (err) {
@@ -1070,8 +1058,9 @@ function ProductFormBody({ product }: { product?: ProductDetail }) {
 
 /**
  * Một dòng biến thể: trạng thái (khi sửa) · tên · giá nhập · giá bán · tồn đầu kỳ (dòng mới)
- * · hàng đa ĐVT (ĐVT phụ + hệ số + cấp đóng gói + barcode phụ + ĐVT bán — bật lại 2026-09-19
- * vì auto-wave cần quy đổi CARTON/PALLET của SKU).
+ * · khối đóng gói hai cấp (PLAN-packaging-hierarchy §12, 2026-09-22): ĐVT thùng + "1 thùng = ?
+ * ĐVT cơ sở" + barcode thùng; ĐVT pallet + "1 pallet = ? thùng" + barcode pallet; ĐVT bán —
+ * gợi ý gộp lượt theo thùng / pallet đọc đúng hai quy đổi CARTON / PALLET này.
  * Các ô ảnh / mã SKU / barcode lẻ / trọng lượng đang tạm ẩn (JSX giữ dạng comment để bật
  * lại) — bật lại thì nhớ đưa lại các prop `skuImage`, `canEditImages`.
  */
@@ -1093,13 +1082,26 @@ function SkuRow({
 }) {
   const skuId = form.getValues(`skus.${index}.skuId`);
   const saved = skuId !== '';
-  // F3 — đa ĐVT trên dòng: ĐVT phụ ngoài ĐVT cơ sở; ĐVT bán = cơ sở/phụ/đã có quy đổi.
-  // Cấp đóng gói (CARTON/PALLET) của quy đổi là đầu vào của auto-wave (PLAN-packaging-hierarchy).
+  // Đóng gói hai cấp: ĐVT thùng / pallet ngoài ĐVT cơ sở, nhập theo chuỗi; ĐVT bán = cơ sở /
+  // thùng / pallet / đã có quy đổi. Hai quy đổi CARTON / PALLET là đầu vào của gợi ý gộp lượt.
   const baseUom = form.watch('baseUom');
-  const altUom = form.watch(`skus.${index}.altUom`);
+  const cartonUom = form.watch(`skus.${index}.cartonUom`);
+  const cartonPer = form.watch(`skus.${index}.cartonPer`);
+  const palletUom = form.watch(`skus.${index}.palletUom`);
+  const palletPer = form.watch(`skus.${index}.palletPer`);
   const existingConvUoms = form.getValues(`skus.${index}.existingConvUoms`);
-  const altOptions = uoms.filter((u) => u.code !== baseUom);
-  const containerTypes = useContainerTypes();
+  const existingCartonFactor = form.getValues(`skus.${index}.existingCartonFactor`);
+  const hasCarton = cartonUom !== '' || existingCartonFactor !== '';
+  const cartonFactor = cartonUom && cartonPer ? cartonPer : existingCartonFactor;
+  const palletInBase =
+    palletUom &&
+    palletPer &&
+    cartonFactor &&
+    /^\d+$/.test(palletPer) &&
+    /^\d+(\.\d+)?$/.test(cartonFactor)
+      ? formatQuantity(new Decimal(cartonFactor).mul(palletPer).toString())
+      : null;
+  const uomOptions = uoms.filter((u) => u.code !== baseUom && !existingConvUoms.includes(u.code));
   const NONE = '__none__';
 
   return (
@@ -1301,29 +1303,29 @@ function SkuRow({
           />
         )}
       </div>
-      {/* F3 — hàng 3: đa ĐVT. SKU đã lưu hiện quy đổi sẵn có dạng chip; khai thêm ở các ô bên cạnh. */}
-      <div className="grid items-start gap-2 sm:grid-cols-5 lg:max-w-4xl">
+      {/* Hàng 3 — đóng gói cấp thùng (CARTON) + ĐVT bán. SKU đã lưu hiện quy đổi sẵn có; khai thêm ở ô bên cạnh. */}
+      <div className="grid items-start gap-2 sm:grid-cols-4 lg:max-w-4xl">
         <FormField
           control={form.control}
-          name={`skus.${index}.altUom`}
+          name={`skus.${index}.cartonUom`}
           render={({ field }) => (
             <FormItem>
               <FormLabel className="text-xs text-muted-foreground">
-                {saved ? 'Thêm ĐVT phụ' : 'ĐVT phụ'}
+                {saved ? 'Thêm ĐVT thùng' : 'ĐVT thùng'}
               </FormLabel>
               <Select
                 value={field.value === '' ? NONE : field.value}
                 onValueChange={(x) => field.onChange(x === NONE ? '' : x)}
               >
                 <FormControl>
-                  <SelectTrigger aria-label="ĐVT phụ">
+                  <SelectTrigger aria-label="ĐVT thùng">
                     <SelectValue placeholder="Không" />
                   </SelectTrigger>
                 </FormControl>
                 <SelectContent>
                   <SelectItem value={NONE}>Không</SelectItem>
-                  {altOptions
-                    .filter((u) => !existingConvUoms.includes(u.code))
+                  {uomOptions
+                    .filter((u) => u.code !== palletUom)
                     .map((u) => (
                       <SelectItem key={u.id} value={u.code}>
                         {u.code} — {u.name}
@@ -1331,33 +1333,35 @@ function SkuRow({
                     ))}
                 </SelectContent>
               </Select>
-              {existingConvUoms.length > 0 ? (
-                <FormDescription className="text-[11px]">
-                  Đã có: {existingConvUoms.join(', ')}
-                </FormDescription>
-              ) : null}
+              <FormDescription className="text-[11px]">
+                {existingConvUoms.length > 0
+                  ? `Đã có: ${existingConvUoms.join(', ')}`
+                  : 'Thùng / kiện / hộp — nhận và lấy hàng theo thùng'}
+              </FormDescription>
               <FormMessage />
             </FormItem>
           )}
         />
         <FormField
           control={form.control}
-          name={`skus.${index}.altFactor`}
+          name={`skus.${index}.cartonPer`}
           render={({ field }) => (
             <FormItem>
-              <FormLabel className="text-xs text-muted-foreground">Hệ số quy đổi</FormLabel>
+              <FormLabel className="text-xs text-muted-foreground">
+                Số lượng trong 1 thùng
+              </FormLabel>
               <FormControl>
                 <Input
-                  inputMode="decimal"
+                  inputMode="numeric"
                   className="text-right tabular-nums"
                   placeholder="24"
-                  disabled={!altUom}
+                  disabled={!cartonUom}
                   {...field}
                   value={field.value ?? ''}
                 />
               </FormControl>
               <FormDescription className="text-[11px]">
-                1 {altUom || 'ĐVT phụ'} = ? {baseUom}
+                1 {cartonUom || 'thùng'} = ? {baseUom}
               </FormDescription>
               <FormMessage />
             </FormItem>
@@ -1365,47 +1369,15 @@ function SkuRow({
         />
         <FormField
           control={form.control}
-          name={`skus.${index}.altContainerType`}
+          name={`skus.${index}.cartonBarcode`}
           render={({ field }) => (
             <FormItem>
-              <FormLabel className="text-xs text-muted-foreground">Cấp đóng gói</FormLabel>
-              <Select
-                value={field.value === '' ? NONE : field.value}
-                onValueChange={(x) => field.onChange(x === NONE ? '' : x)}
-                disabled={!altUom}
-              >
-                <FormControl>
-                  <SelectTrigger aria-label={`Cấp đóng gói SKU ${index + 1}`}>
-                    <SelectValue placeholder="ĐVT thường" />
-                  </SelectTrigger>
-                </FormControl>
-                <SelectContent>
-                  <SelectItem value={NONE}>ĐVT thường (không phải thùng)</SelectItem>
-                  {(containerTypes.data ?? []).map((t) => (
-                    <SelectItem key={t.id} value={t.code}>
-                      {t.name} ({t.code})
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <FormDescription className="text-[11px]">
-                Thùng / kiện / pallet — nhận hàng và lấy hàng theo cấp này
-              </FormDescription>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
-        <FormField
-          control={form.control}
-          name={`skus.${index}.altBarcode`}
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel className="text-xs text-muted-foreground">Barcode ĐVT phụ</FormLabel>
+              <FormLabel className="text-xs text-muted-foreground">Barcode thùng</FormLabel>
               <FormControl>
                 <Input
                   placeholder="quét mã thùng"
                   className="font-mono"
-                  disabled={!altUom}
+                  disabled={!cartonUom}
                   {...field}
                   value={field.value ?? ''}
                 />
@@ -1431,13 +1403,103 @@ function SkuRow({
                 </FormControl>
                 <SelectContent>
                   <SelectItem value={NONE}>{baseUom || 'ĐVT cơ sở'}</SelectItem>
-                  {[...new Set([...existingConvUoms, ...(altUom ? [altUom] : [])])].map((code) => (
+                  {[
+                    ...new Set([
+                      ...existingConvUoms,
+                      ...(cartonUom ? [cartonUom] : []),
+                      ...(palletUom ? [palletUom] : []),
+                    ]),
+                  ].map((code) => (
                     <SelectItem key={code} value={code}>
                       {code}
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+      </div>
+      {/* Hàng 4 — đóng gói cấp pallet (PALLET): nhập theo chuỗi "1 pallet = ? thùng", gửi factor = thùng × pallet. */}
+      <div className="grid items-start gap-2 sm:grid-cols-4 lg:max-w-4xl">
+        <FormField
+          control={form.control}
+          name={`skus.${index}.palletUom`}
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel className="text-xs text-muted-foreground">
+                {saved ? 'Thêm ĐVT pallet' : 'ĐVT pallet'}
+              </FormLabel>
+              <Select
+                value={field.value === '' ? NONE : field.value}
+                onValueChange={(x) => field.onChange(x === NONE ? '' : x)}
+                disabled={!hasCarton}
+              >
+                <FormControl>
+                  <SelectTrigger aria-label="ĐVT pallet">
+                    <SelectValue placeholder="Không" />
+                  </SelectTrigger>
+                </FormControl>
+                <SelectContent>
+                  <SelectItem value={NONE}>Không</SelectItem>
+                  {uomOptions
+                    .filter((u) => u.code !== cartonUom)
+                    .map((u) => (
+                      <SelectItem key={u.id} value={u.code}>
+                        {u.code} — {u.name}
+                      </SelectItem>
+                    ))}
+                </SelectContent>
+              </Select>
+              <FormDescription className="text-[11px]">
+                {hasCarton ? 'Không có pallet thì để trống' : 'Khai cấp thùng trước'}
+              </FormDescription>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+        <FormField
+          control={form.control}
+          name={`skus.${index}.palletPer`}
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel className="text-xs text-muted-foreground">
+                Số thùng trong 1 pallet
+              </FormLabel>
+              <FormControl>
+                <Input
+                  inputMode="numeric"
+                  className="text-right tabular-nums"
+                  placeholder="10"
+                  disabled={!palletUom}
+                  {...field}
+                  value={field.value ?? ''}
+                />
+              </FormControl>
+              <FormDescription className="text-[11px]">
+                1 {palletUom || 'pallet'} = ? {cartonUom || 'thùng'}
+                {palletInBase ? ` = ${palletInBase} ${baseUom}` : ''}
+              </FormDescription>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+        <FormField
+          control={form.control}
+          name={`skus.${index}.palletBarcode`}
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel className="text-xs text-muted-foreground">Barcode pallet</FormLabel>
+              <FormControl>
+                <Input
+                  placeholder="quét mã pallet"
+                  className="font-mono"
+                  disabled={!palletUom}
+                  {...field}
+                  value={field.value ?? ''}
+                />
+              </FormControl>
               <FormMessage />
             </FormItem>
           )}

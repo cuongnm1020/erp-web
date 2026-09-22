@@ -2330,20 +2330,21 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/waves/auto-merge": {
+    "/waves/suggestions": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        get?: never;
-        put?: never;
         /**
-         * Gộp TỰ ĐỘNG theo cấp đóng gói: đơn một SKU vừa đủ một thùng → lượt CARTON; đủ số thùng của
-         *     một pallet → lượt PALLET (tự chạy sau mỗi đơn xác nhận; bấm tay để chạy lại cho cả kho).
+         * Nhóm đơn ĐỦ ĐIỀU KIỆN gộp theo cấp đóng gói (PLAN-packaging-hierarchy §12): đơn một SKU cộng
+         *     đúng N thùng → nhóm CARTON; đúng một pallet → nhóm PALLET. Chỉ gợi ý — quản lý bấm gộp ở
+         *     `POST /waves/merge`. Khai báo trước `:id` để không bị bắt nhầm.
          */
-        post: operations["WaveController_autoMerge"];
+        get: operations["WaveController_suggestions"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -2378,6 +2379,26 @@ export interface paths {
         get: operations["WaveController_detail"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/waves/merge": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Gộp MỘT nhóm gợi ý thành lượt (kiểm lại đơn con trong transaction; lệch → 409
+         *     `WAVE_SUGGESTION_STALE`); gán người luôn nếu có.
+         */
+        post: operations["WaveController_merge"];
         delete?: never;
         options?: never;
         head?: never;
@@ -6212,29 +6233,41 @@ export interface components {
              */
             userId: string;
         };
-        AutoWaveRunDto: {
-            /** Format: uuid */
-            warehouseId?: string;
-            /** Format: uuid */
-            skuId?: string;
-        };
-        AutoWaveCartonDto: {
-            waveId: string;
+        WaveSuggestionTaskDto: {
+            taskId: string;
             docNumber: string;
-            skuId: string;
-            taskCount: number;
+            /** @description `SalesOrder.docNumber` — mã đơn. */
+            refDocNumber: string | null;
+            /** @description Decimal(18,6) chuỗi — số ĐVT cơ sở của đơn. */
+            qtyPlanned: string;
+            createdAt: string;
         };
-        AutoWavePalletDto: {
-            waveId: string;
-            docNumber: string;
+        WaveSuggestionDto: {
+            /** @description Khoá ổn định cho UI: `<skuId>|<packLevel>|<taskId đầu>`. */
+            key: string;
+            warehouseId: string;
             skuId: string;
+            skuCode: string;
+            skuName: string;
+            /** @enum {string} */
+            packLevel: "CARTON" | "PALLET";
+            /** @description Số thùng (CARTON) hoặc số pallet (PALLET) của nhóm. */
+            packCount: number;
+            /** @description Decimal(18,6) chuỗi — số ĐVT cơ sở trong MỘT thùng / MỘT pallet. */
+            unitsPerPack: string;
+            /** @description Σ số lượng của các đơn = `packCount × unitsPerPack`. */
+            qtyPlanned: string;
             taskCount: number;
-            /** @description Các lượt CARTON đã gộp vào (chuyển CANCELLED, mergedIntoId = waveId). */
-            mergedWaveIds: string[];
+            /** @description Đơn cũ nhất trong nhóm — nhóm sắp theo đây, cũ trước. */
+            oldestCreatedAt: string;
+            tasks: components["schemas"]["WaveSuggestionTaskDto"][];
         };
-        AutoWaveResultDto: {
-            cartonWaves: components["schemas"]["AutoWaveCartonDto"][];
-            palletWaves: components["schemas"]["AutoWavePalletDto"][];
+        WaveSuggestionListDto: {
+            items: components["schemas"]["WaveSuggestionDto"][];
+            /** @description Số nhóm cấp thùng TRƯỚC khi lọc `packLevel` — cho badge trên bảng điều phối. */
+            cartonCount: number;
+            /** @description Số nhóm cấp pallet trước khi lọc `packLevel`. */
+            palletCount: number;
         };
         WaveDto: {
             id: string;
@@ -6257,13 +6290,15 @@ export interface components {
             startedAt: string | null;
             completedAt: string | null;
             /**
-             * @description Lượt gộp TỰ ĐỘNG theo cấp đóng gói: CARTON (đủ một thùng) / PALLET (đủ một pallet); null = gộp tay.
+             * @description Lượt gộp theo cấp đóng gói (từ gợi ý): CARTON (đúng N thùng) / PALLET (đúng một pallet); null = gộp tay.
              * @enum {string|null}
              */
             packLevel: "CARTON" | "PALLET" | null;
             skuId: string | null;
             skuCode: string | null;
-            /** @description Lượt CARTON đã gộp vào lượt PALLET này (khi status CANCELLED vì gộp). */
+            /** @description Số thùng (CARTON) / số pallet (PALLET) của lượt; null với lượt gộp tay. */
+            packCount: number | null;
+            /** @description (Auto-wave cũ) lượt CARTON đã gộp vào lượt PALLET này — không còn ghi mới từ 2026-09-22. */
             mergedIntoId: string | null;
         };
         WaveListResponseDto: {
@@ -6339,17 +6374,33 @@ export interface components {
             startedAt: string | null;
             completedAt: string | null;
             /**
-             * @description Lượt gộp TỰ ĐỘNG theo cấp đóng gói: CARTON (đủ một thùng) / PALLET (đủ một pallet); null = gộp tay.
+             * @description Lượt gộp theo cấp đóng gói (từ gợi ý): CARTON (đúng N thùng) / PALLET (đúng một pallet); null = gộp tay.
              * @enum {string|null}
              */
             packLevel: "CARTON" | "PALLET" | null;
             skuId: string | null;
             skuCode: string | null;
-            /** @description Lượt CARTON đã gộp vào lượt PALLET này (khi status CANCELLED vì gộp). */
+            /** @description Số thùng (CARTON) / số pallet (PALLET) của lượt; null với lượt gộp tay. */
+            packCount: number | null;
+            /** @description (Auto-wave cũ) lượt CARTON đã gộp vào lượt PALLET này — không còn ghi mới từ 2026-09-22. */
             mergedIntoId: string | null;
             tasks: components["schemas"]["WaveTaskDto"][];
             /** @description Đã sắp theo lối đi (pickSequence). */
             lines: components["schemas"]["WaveLineGroupDto"][];
+        };
+        MergeWaveSuggestionDto: {
+            /** Format: uuid */
+            skuId: string;
+            /** @enum {string} */
+            packLevel: "CARTON" | "PALLET";
+            /** @description Số thùng (CARTON) hoặc số pallet (PALLET) mà nhóm gợi ý đã hiển thị. */
+            packCount: number;
+            taskIds: string[];
+            /**
+             * Format: uuid
+             * @description Gán ngay cho nhân viên lấy hàng. Bỏ trống = lượt nằm ở "Chưa gán".
+             */
+            assignedTo?: string;
         };
         CreateWaveDto: {
             taskIds: string[];
@@ -6612,13 +6663,15 @@ export interface components {
             startedAt: string | null;
             completedAt: string | null;
             /**
-             * @description Lượt gộp TỰ ĐỘNG theo cấp đóng gói: CARTON (đủ một thùng) / PALLET (đủ một pallet); null = gộp tay.
+             * @description Lượt gộp theo cấp đóng gói (từ gợi ý): CARTON (đúng N thùng) / PALLET (đúng một pallet); null = gộp tay.
              * @enum {string|null}
              */
             packLevel: "CARTON" | "PALLET" | null;
             skuId: string | null;
             skuCode: string | null;
-            /** @description Lượt CARTON đã gộp vào lượt PALLET này (khi status CANCELLED vì gộp). */
+            /** @description Số thùng (CARTON) / số pallet (PALLET) của lượt; null với lượt gộp tay. */
+            packCount: number | null;
+            /** @description (Auto-wave cũ) lượt CARTON đã gộp vào lượt PALLET này — không còn ghi mới từ 2026-09-22. */
             mergedIntoId: string | null;
         };
         WaveScanDto: {
@@ -11710,25 +11763,25 @@ export interface operations {
             };
         };
     };
-    WaveController_autoMerge: {
+    WaveController_suggestions: {
         parameters: {
-            query?: never;
+            query?: {
+                warehouseId?: string;
+                /** @description Chỉ trả nhóm cấp này; `cartonCount` / `palletCount` vẫn đếm cả hai. */
+                packLevel?: "CARTON" | "PALLET";
+            };
             header?: never;
             path?: never;
             cookie?: never;
         };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["AutoWaveRunDto"];
-            };
-        };
+        requestBody?: never;
         responses: {
-            201: {
+            200: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["AutoWaveResultDto"];
+                    "application/json": components["schemas"]["WaveSuggestionListDto"];
                 };
             };
         };
@@ -11737,7 +11790,7 @@ export interface operations {
         parameters: {
             query: {
                 status?: "CANCELLED" | "PENDING" | "ASSIGNED" | "IN_PROGRESS" | "COMPLETED" | "EXCEPTION";
-                /** @description Chỉ lượt gộp tự động cấp này (CARTON / PALLET). */
+                /** @description Chỉ lượt gộp theo cấp đóng gói này (CARTON / PALLET). */
                 packLevel?: "CARTON" | "PALLET";
                 warehouseId?: string;
                 assignedTo?: string;
@@ -11795,6 +11848,29 @@ export interface operations {
         requestBody?: never;
         responses: {
             200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WaveDetailDto"];
+                };
+            };
+        };
+    };
+    WaveController_merge: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MergeWaveSuggestionDto"];
+            };
+        };
+        responses: {
+            201: {
                 headers: {
                     [name: string]: unknown;
                 };

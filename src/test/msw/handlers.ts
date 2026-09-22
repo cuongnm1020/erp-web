@@ -961,6 +961,10 @@ export const handlers = [
 
   // Lượt pick gộp (PLAN-barcode-pick-pack E3) — mặc định trống; test override khi cần.
   http.get('/api/waves', () => HttpResponse.json({ items: [], total: 0 })),
+  // Gợi ý gộp theo cấp đóng gói (PLAN-packaging-hierarchy §12) — mặc định không có nhóm.
+  http.get('/api/waves/suggestions', () =>
+    HttpResponse.json({ items: [], cartonCount: 0, palletCount: 0 }),
+  ),
 
   // Danh bạ người nhận việc của bảng điều phối (GET /tasks/assignees) — khai TRƯỚC /tasks/:id
   http.get('/api/tasks/assignees', () =>

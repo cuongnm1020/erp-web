@@ -116,6 +116,8 @@ const MESSAGES: Record<string, string> = {
   WAVE_NOT_FOUND: 'Lượt pick không tồn tại. Quét lại mã lượt.',
   INVALID_WAVE_INPUT:
     'Không gộp được lượt: chỉ gộp task lấy hàng cùng kho, chưa ai nhận, chưa thuộc lượt khác.',
+  WAVE_SUGGESTION_STALE:
+    'Nhóm này đã thay đổi từ lúc hiển thị (có đơn bị huỷ, đã gán hoặc đã vào lượt khác). Danh sách gợi ý đã tải lại — chọn lại nhóm.',
   SYNC_ACTOR_NOT_FOUND: 'Tài khoản hệ thống cho đồng bộ chưa được tạo. Báo IT chạy seed dữ liệu.',
   SYNC_ACTOR_MISCONFIGURED: 'Tài khoản hệ thống cho đồng bộ đang sai cấu hình. Báo IT kiểm tra.',
 };

@@ -1,4 +1,4 @@
-import { fireEvent, screen, waitFor } from '@testing-library/react';
+import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import { http, HttpResponse } from 'msw';
 import { describe, expect, it, vi } from 'vitest';
 import { makeTasks, scenario } from '@/test/msw/handlers';
@@ -382,7 +382,7 @@ describe('DispatchScreen — gán / trả việc (POST /tasks/:id/assign|unassig
   });
 });
 
-describe('WavePanel — auto-wave theo cấp đóng gói (2026-09-19)', () => {
+describe('Gợi ý gộp theo cấp đóng gói (PLAN-packaging-hierarchy §12, 2026-09-22)', () => {
   const CARTON_WAVE = {
     id: '00000000-0000-4000-8000-00000000e701',
     docNumber: 'WAVE2609-00031',
@@ -394,39 +394,171 @@ describe('WavePanel — auto-wave theo cấp đóng gói (2026-09-19)', () => {
     assigneeName: null,
     taskCount: 4,
     taskDoneCount: 0,
-    qtyPlanned: '100.000000',
+    qtyPlanned: '400.000000',
     qtyDone: '0.000000',
-    createdAt: '2026-09-19T01:00:00.000Z',
+    createdAt: '2026-09-22T01:00:00.000Z',
     assignedAt: null,
     startedAt: null,
     completedAt: null,
     packLevel: 'CARTON',
     skuId: 'sku-a',
     skuCode: 'SKU-A',
+    packCount: 4,
     mergedIntoId: null,
   };
+  const TASK_IDS = [1, 2, 3, 4].map((n) => `00000000-0000-4000-8000-00000000f10${n}`);
+  const GROUP = {
+    key: `sku-a|CARTON|${TASK_IDS[0]}`,
+    warehouseId: 'wh-1',
+    skuId: 'sku-a',
+    skuCode: 'SKU-A',
+    skuName: 'Nước suối 500ml',
+    packLevel: 'CARTON',
+    packCount: 4,
+    unitsPerPack: '100.000000',
+    qtyPlanned: '400.000000',
+    taskCount: 4,
+    oldestCreatedAt: '2026-09-22T01:00:00.000Z',
+    tasks: TASK_IDS.map((taskId, i) => ({
+      taskId,
+      docNumber: `PICK2609-0010${i + 1}`,
+      refDocNumber: `SO2609-0010${i + 1}`,
+      qtyPlanned: ['30.000000', '70.000000', '50.000000', '250.000000'][i]!,
+      createdAt: `2026-09-22T01:0${i}:00.000Z`,
+    })),
+  };
+  const SUGGESTIONS = { items: [GROUP], cartonCount: 1, palletCount: 0 };
 
-  it('lượt CARTON hiện nhãn "Trọn thùng · SKU"; bấm "Gộp tự động" → POST /waves/auto-merge → toast tổng kết', async () => {
+  it('tab "Đủ gộp thùng" / "Đủ gộp pallet" hiện số nhóm ngay cả khi chưa mở; bấm → ?merge=CARTON', async () => {
+    search = '';
+    server.use(http.get('/api/waves/suggestions', () => HttpResponse.json(SUGGESTIONS)));
+    renderApp(<DispatchScreen />);
+    await screen.findByText(PENDING[0]!.docNumber);
+    await waitFor(() =>
+      expect(screen.getByRole('tab', { name: /Đủ gộp thùng/ })).toHaveTextContent('1'),
+    );
+    expect(screen.getByRole('tab', { name: /Đủ gộp pallet/ })).toHaveTextContent('0');
+    expect(screen.getByRole('tab', { name: /Đủ gộp thùng/ })).toHaveAttribute(
+      'aria-selected',
+      'false',
+    );
+    fireEvent.click(screen.getByRole('tab', { name: /Đủ gộp thùng/ }));
+    await waitFor(() =>
+      expect(replace).toHaveBeenCalledWith('/wms/dispatch?merge=CARTON', { scroll: false }),
+    );
+  });
+
+  it('?merge=CARTON: bảng nhóm (SKU · Trọn thùng × 4 · 4 đơn) bung ra thấy đơn con; "Gộp và gán" → chọn người → POST /waves/merge đúng body → toast', async () => {
+    search = 'merge=CARTON';
+    const levels: string[] = [];
     const posts: unknown[] = [];
     server.use(
-      http.get('/api/waves', () => HttpResponse.json({ items: [CARTON_WAVE], total: 1 })),
-      http.post('/api/waves/auto-merge', async ({ request }) => {
+      http.get('/api/waves/suggestions', ({ request }) => {
+        levels.push(new URL(request.url).searchParams.get('packLevel') ?? '');
+        return HttpResponse.json(SUGGESTIONS);
+      }),
+      http.post('/api/waves/merge', async ({ request }) => {
         posts.push(await request.json());
         return HttpResponse.json({
-          cartonWaves: [
-            { waveId: 'w-2', docNumber: 'WAVE2609-00032', skuId: 'sku-a', taskCount: 2 },
-          ],
-          palletWaves: [],
+          ...CARTON_WAVE,
+          id: '00000000-0000-4000-8000-00000000e702',
+          docNumber: 'WAVE2609-00040',
+          status: 'ASSIGNED',
+          tasks: [],
+          lines: [],
         });
       }),
     );
     renderApp(<DispatchScreen />);
-    expect(await screen.findByText('Trọn thùng · SKU-A')).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: 'Gộp tự động thùng / pallet' }));
-    await waitFor(() => expect(posts).toHaveLength(1));
-    expect(posts[0]).toMatchObject({ warehouseId: expect.any(String) });
-    await waitFor(() =>
-      expect(toast.success).toHaveBeenCalledWith('Đã gộp tự động 1 lượt thùng, 0 lượt pallet'),
+    expect(await screen.findByText('SKU-A')).toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: /Đủ gộp thùng/ })).toHaveAttribute(
+      'aria-selected',
+      'true',
     );
+    expect(screen.getByRole('tab', { name: /Chưa gán/ })).toHaveAttribute('aria-selected', 'false');
+    expect(levels).toContain('CARTON');
+    expect(screen.getByText('Trọn thùng × 4')).toBeInTheDocument();
+    // Bảng việc không hiện ở tab gợi ý.
+    expect(screen.queryByText(PENDING[0]!.docNumber)).not.toBeInTheDocument();
+    // Bung đơn con.
+    const expand = screen.getByRole('button', { name: '4 đơn' });
+    expect(expand).toHaveAttribute('aria-expanded', 'false');
+    fireEvent.click(expand);
+    expect(await screen.findByText('PICK2609-00101')).toBeInTheDocument();
+    expect(screen.getByText('đơn SO2609-00104')).toBeInTheDocument();
+    expect(expand).toHaveAttribute('aria-expanded', 'true');
+    // Gộp và gán → dialog chọn người → POST /waves/merge.
+    fireEvent.click(screen.getByRole('button', { name: 'Gộp và gán' }));
+    const dialog = await screen.findByRole('dialog');
+    fireEvent.click(within(dialog).getByRole('combobox', { name: 'Giao lượt cho' }));
+    fireEvent.click(await screen.findByRole('option', { name: 'Phạm Thị Hoa · kho' }));
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Gộp và gán' }));
+    await waitFor(() => expect(posts).toHaveLength(1));
+    expect(posts[0]).toEqual({
+      skuId: 'sku-a',
+      packLevel: 'CARTON',
+      packCount: 4,
+      taskIds: TASK_IDS,
+      assignedTo: 'staff-1',
+    });
+    await waitFor(() =>
+      expect(toast.success).toHaveBeenCalledWith('Đã gộp 4 đơn thành lượt WAVE2609-00040'),
+    );
+  });
+
+  it('409 WAVE_SUGGESTION_STALE → toast nêu mã việc không còn hợp lệ, tải lại gợi ý, không gộp phần còn lại', async () => {
+    search = 'merge=CARTON';
+    let gets = 0;
+    const posts: unknown[] = [];
+    server.use(
+      http.get('/api/waves/suggestions', () => {
+        gets += 1;
+        return HttpResponse.json(SUGGESTIONS);
+      }),
+      http.post('/api/waves/merge', async ({ request }) => {
+        posts.push(await request.json());
+        return HttpResponse.json(
+          {
+            statusCode: 409,
+            code: 'WAVE_SUGGESTION_STALE',
+            message: 'stale',
+            details: {
+              tasks: [{ id: TASK_IDS[0], docNumber: 'PICK2609-00101', status: 'CANCELLED' }],
+            },
+          },
+          { status: 409 },
+        );
+      }),
+    );
+    renderApp(<DispatchScreen />);
+    fireEvent.click(await screen.findByRole('button', { name: 'Gộp và gán' }));
+    const dialog = await screen.findByRole('dialog');
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Gộp và gán' }));
+    await waitFor(() =>
+      expect(toast.error).toHaveBeenCalledWith(
+        expect.stringMatching(/Nhóm này đã thay đổi.*Đơn không còn hợp lệ: PICK2609-00101\./),
+      ),
+    );
+    // Chỉ MỘT lần gộp (không tự gộp phần còn lại) và gợi ý được tải lại.
+    expect(posts).toHaveLength(1);
+    await waitFor(() => expect(gets).toBeGreaterThanOrEqual(2));
+  });
+
+  it('tab gợi ý rỗng: lời mời một hành động "Xem Chưa gán"', async () => {
+    search = 'merge=PALLET';
+    renderApp(<DispatchScreen />);
+    expect(
+      await screen.findByText(/Chưa có nhóm đơn nào cộng đúng một pallet/),
+    ).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Xem Chưa gán' }));
+    await waitFor(() => expect(replace).toHaveBeenCalledWith('/wms/dispatch', { scroll: false }));
+  });
+
+  it('lượt theo cấp đóng gói hiện "Trọn thùng × 4 · SKU-A"; không còn nút "Gộp tự động"', async () => {
+    search = '';
+    server.use(http.get('/api/waves', () => HttpResponse.json({ items: [CARTON_WAVE], total: 1 })));
+    renderApp(<DispatchScreen />);
+    expect(await screen.findByText('Trọn thùng × 4 · SKU-A')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Gộp tự động/ })).not.toBeInTheDocument();
   });
 });
