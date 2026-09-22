@@ -6414,6 +6414,12 @@ export interface components {
             /** Format: uuid */
             userId: string;
         };
+        PdaBarcodeDetailDto: {
+            code: string;
+            uomCode: string;
+            /** @description 1 ĐVT của barcode = factor × base UoM; Decimal chuỗi ("1", "6", "0.5"). */
+            factor: string;
+        };
         PdaTaskLineDto: {
             taskLineId: string;
             lineNo: number;
@@ -6424,15 +6430,23 @@ export interface components {
             skuName: string;
             /** @description Mọi barcode của SKU — quét mã nào cũng hợp lệ (thùng / lẻ / mã NCC). */
             barcodes: string[];
+            /** @description BE-1: cùng danh sách trên kèm ĐVT + hệ số quy đổi, cho app offline. */
+            barcodeDetails: components["schemas"]["PdaBarcodeDetailDto"][];
             lotId: string | null;
             lotNumber: string | null;
             /** @description ISO datetime. */
             expiryDate: string | null;
             locationId: string | null;
             locationCode: string | null;
+            /**
+             * @description BE-1: nhãn đọc được "Dãy 03 · Kệ 05 · Tầng 02" dựng từ cây Location (chốt 2026-09-22: máy
+             *     PDA chỉ hiện chữ này, không hiện mã). null khi dòng không có vị trí.
+             */
+            locationLabel: string | null;
             /** @description Bin ĐÍCH cất hàng — chỉ dòng PUT_AWAY có (A2); PICK/PACK là null. */
             toLocationId: string | null;
             toLocationCode: string | null;
+            toLocationLabel: string | null;
             /** @description Khoá sắp xếp lối đi — nhỏ chạy trước. null = dòng chưa có vị trí. */
             pickSequence: number | null;
             /** @description PLAN-packaging-hierarchy E: thùng đã allocate — quét mã thùng thay vì từng SKU; null = rời. */
@@ -6628,6 +6642,10 @@ export interface components {
             shares: components["schemas"]["WaveLineShareDto"][];
             /** @description Tên thương mại (Product.name). */
             productName: string;
+            /** @description BE-1: barcode + ĐVT + hệ số, cho app offline (xem `PdaTaskLineDto.barcodeDetails`). */
+            barcodeDetails: components["schemas"]["PdaBarcodeDetailDto"][];
+            /** @description BE-1: nhãn vị trí đọc được của nhóm (xem `PdaTaskLineDto.locationLabel`). */
+            locationLabel: string | null;
             /** @description Ảnh chính của SKU / sản phẩm — presigned URL ~1h; null = chưa có ảnh. */
             imageUrl: string | null;
             /** @description Tồn ledger tại bin nguồn (mọi lô/thùng), chuỗi; null = nhóm không có bin. */
