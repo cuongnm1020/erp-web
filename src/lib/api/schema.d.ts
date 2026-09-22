@@ -2444,7 +2444,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Việc của tôi trên máy này, đã sắp theo lối đi trong kho. */
+        /** Việc của tôi trên máy này, đã sắp theo lối đi trong kho. `take` ≤ 200 (mặc định 20), `skip`. */
         get: operations["PdaController_tasks"];
         put?: never;
         post?: never;
@@ -11946,7 +11946,10 @@ export interface operations {
     };
     PdaController_tasks: {
         parameters: {
-            query?: never;
+            query?: {
+                take?: number;
+                skip?: number;
+            };
             header?: never;
             path?: never;
             cookie?: never;
