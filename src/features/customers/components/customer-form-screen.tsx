@@ -232,7 +232,7 @@ function CustomerFormBody({ customer }: { customer?: CustomerDetail }) {
                   <FormItem className="col-span-2">
                     <FormLabel required>Tên khách hàng</FormLabel>
                     <FormControl>
-                      <Input {...field} autoFocus placeholder="Cửa hàng An Nhiên" />
+                      <Input {...field} autoFocus placeholder="Đại lý VTNN An Nhiên" />
                     </FormControl>
                     <FormMessage />
                   </FormItem>

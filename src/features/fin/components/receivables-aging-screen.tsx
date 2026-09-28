@@ -33,7 +33,7 @@ interface AgingRow {
 const SAMPLE_AGING: AgingRow[] = [
   {
     code: 'KH-000317',
-    customer: 'Công ty TNHH Hòa Phát Văn Phòng Phẩm',
+    customer: 'Đại lý VTNN An Nhiên',
     sale: 'Nguyễn Văn An',
     current: '54.670.000',
     b1: '10.000.000',
@@ -46,7 +46,7 @@ const SAMPLE_AGING: AgingRow[] = [
   },
   {
     code: 'KH-001208',
-    customer: 'Nhà sách Phương Nam Q.1',
+    customer: 'HTX Nông nghiệp Kim Quan',
     sale: 'Bùi Thanh Tùng',
     current: '64.120.000',
     b1: '18.240.000',
@@ -58,7 +58,7 @@ const SAMPLE_AGING: AgingRow[] = [
   },
   {
     code: 'KH-000455',
-    customer: 'Công ty CP In & Bao bì Sao Mai',
+    customer: 'Công ty CP Nông sản Sao Mai',
     sale: 'Hoàng Đức Long',
     current: '43.300.000',
     b1: '12.800.000',
@@ -70,7 +70,7 @@ const SAMPLE_AGING: AgingRow[] = [
   },
   {
     code: 'KH-000689',
-    customer: 'Công ty TNHH Thương mại Đại Phát',
+    customer: 'Công ty TNHH Thương mại VTNN Đại Phát',
     sale: 'Trịnh Văn Sơn',
     current: '16.200.000',
     b1: '22.150.000',
@@ -83,7 +83,7 @@ const SAMPLE_AGING: AgingRow[] = [
   },
   {
     code: 'KH-001766',
-    customer: 'Trường Tiểu học Lê Quý Đôn',
+    customer: 'Trang trại Lê Quý',
     sale: 'Đỗ Kim Ngân',
     current: '14.500.000',
     b1: '21.400.000',
@@ -95,7 +95,7 @@ const SAMPLE_AGING: AgingRow[] = [
   },
   {
     code: 'KH-004512',
-    customer: 'Cửa hàng Minh Tâm',
+    customer: 'Nhà vườn Minh Phát',
     sale: 'Nguyễn Văn An',
     current: '7.470.000',
     b1: '4.930.000',
@@ -107,7 +107,7 @@ const SAMPLE_AGING: AgingRow[] = [
   },
   {
     code: 'KH-002981',
-    customer: 'Văn phòng phẩm Thu Hà (Cầu Giấy)',
+    customer: 'Đại lý VTNN Thu Hà (Thạch Thất)',
     sale: 'Phạm Thu Hà',
     current: '6.190.000',
     b1: '0',
@@ -119,7 +119,7 @@ const SAMPLE_AGING: AgingRow[] = [
   },
   {
     code: 'KH-001420',
-    customer: 'Nhà sách Tân Định',
+    customer: 'HTX Rau an toàn Tân Định',
     sale: 'Ngô Thị Lan',
     current: '12.700.000',
     b1: '6.920.000',
@@ -131,7 +131,7 @@ const SAMPLE_AGING: AgingRow[] = [
   },
   {
     code: 'KH-002204',
-    customer: 'Công ty CP Xây dựng Hưng Thịnh',
+    customer: 'Công ty CP Nông nghiệp Hưng Thịnh',
     sale: 'Mai Anh Tuấn',
     current: '7.300.000',
     b1: '9.400.000',
@@ -143,7 +143,7 @@ const SAMPLE_AGING: AgingRow[] = [
   },
   {
     code: 'KH-003318',
-    customer: 'Trung tâm Anh ngữ Bright Star',
+    customer: 'Nhà vườn Sao Sáng',
     sale: 'Lý Hải Yến',
     current: '3.420.000',
     b1: '5.100.000',
@@ -155,7 +155,7 @@ const SAMPLE_AGING: AgingRow[] = [
   },
   {
     code: 'KH-003725',
-    customer: 'Cửa hàng VPP Hồng Hạnh',
+    customer: 'Cửa hàng VTNN Hồng Hạnh',
     sale: 'Vũ Ngọc Mai',
     current: '4.980.000',
     b1: '2.140.000',
@@ -167,7 +167,7 @@ const SAMPLE_AGING: AgingRow[] = [
   },
   {
     code: 'KH-002873',
-    customer: 'Công ty TNHH Dịch vụ Kế toán An Tâm',
+    customer: 'HTX Dịch vụ Nông nghiệp An Tâm',
     sale: 'Võ Thị Hồng',
     current: '2.760.000',
     b1: '3.850.000',
@@ -179,7 +179,7 @@ const SAMPLE_AGING: AgingRow[] = [
   },
   {
     code: 'KH-001987',
-    customer: 'Trường THCS Nguyễn Du',
+    customer: 'Cửa hàng VTNN Hữu Điền',
     sale: 'Lê Minh Châu',
     current: '8.450.000',
     b1: '0',
@@ -191,7 +191,7 @@ const SAMPLE_AGING: AgingRow[] = [
   },
   {
     code: 'KH-002550',
-    customer: 'Công ty TNHH Nội thất Văn phòng Á Châu',
+    customer: 'Công ty TNHH Trang trại Á Châu',
     sale: 'Đặng Quang Huy',
     current: '15.900.000',
     b1: '7.300.000',

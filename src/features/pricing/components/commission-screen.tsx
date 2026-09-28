@@ -328,8 +328,7 @@ export function CommissionScreen() {
                   Khách online không có sale <X className="size-3 text-muted-foreground" />
                 </Chip>
                 <Chip>
-                  Nhóm Mực in chính hãng (margin thấp){' '}
-                  <X className="size-3 text-muted-foreground" />
+                  Nhóm Bình xịt điện (margin thấp) <X className="size-3 text-muted-foreground" />
                 </Chip>
               </div>
             </Field>

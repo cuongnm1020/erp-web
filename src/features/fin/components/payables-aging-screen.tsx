@@ -33,7 +33,7 @@ interface PayableRow {
 const SAMPLE_PAYABLES: PayableRow[] = [
   {
     code: 'NCC-0012',
-    supplier: 'Công ty CP Tập đoàn Thiên Long',
+    supplier: 'Công ty TNHH Vật tư Nông nghiệp Xanh',
     terms: 'Net 45',
     current: '384.200.000',
     b1: '96.400.000',
@@ -46,7 +46,7 @@ const SAMPLE_PAYABLES: PayableRow[] = [
   },
   {
     code: 'NCC-0003',
-    supplier: 'Công ty TNHH Giấy Double A Việt Nam',
+    supplier: 'Công ty CP Phân bón Miền Bắc',
     terms: 'Net 60',
     current: '412.600.000',
     b1: '0',
@@ -58,7 +58,7 @@ const SAMPLE_PAYABLES: PayableRow[] = [
   },
   {
     code: 'NCC-0007',
-    supplier: 'Công ty CP Giấy Sài Gòn',
+    supplier: 'Công ty TNHH Nông dược Phương Nam',
     terms: 'Net 45',
     current: '218.400.000',
     b1: '84.300.000',
@@ -70,7 +70,7 @@ const SAMPLE_PAYABLES: PayableRow[] = [
   },
   {
     code: 'NCC-0018',
-    supplier: 'Công ty TNHH Văn phòng phẩm Deli VN',
+    supplier: 'Công ty TNHH Hạt giống Đồng Xanh',
     terms: 'Net 30',
     current: '146.200.000',
     b1: '78.500.000',
@@ -82,7 +82,7 @@ const SAMPLE_PAYABLES: PayableRow[] = [
   },
   {
     code: 'NCC-0025',
-    supplier: 'Công ty TNHH Băng keo Tiến Phát',
+    supplier: 'Công ty CP Vi sinh Nông nghiệp Tiến Phát',
     terms: 'Net 30',
     current: '96.800.000',
     b1: '52.200.000',
@@ -94,7 +94,7 @@ const SAMPLE_PAYABLES: PayableRow[] = [
   },
   {
     code: 'NCC-0031',
-    supplier: 'Công ty CP Mực in Toàn Cầu',
+    supplier: 'Công ty TNHH BVTV Hà Thành',
     terms: 'Net 15',
     current: '64.500.000',
     b1: '48.600.000',
@@ -107,7 +107,7 @@ const SAMPLE_PAYABLES: PayableRow[] = [
   },
   {
     code: 'NCC-0009',
-    supplier: 'Công ty TNHH Sổ vở Klong',
+    supplier: 'Công ty TNHH Phân hữu cơ Sông Hồng',
     terms: 'Net 45',
     current: '88.100.000',
     b1: '24.800.000',
@@ -119,7 +119,7 @@ const SAMPLE_PAYABLES: PayableRow[] = [
   },
   {
     code: 'NCC-0002',
-    supplier: 'Công ty CP Văn phòng phẩm Hồng Hà',
+    supplier: 'Công ty CP Dụng cụ Nông nghiệp Việt',
     terms: 'Net 45',
     current: '52.300.000',
     b1: '18.400.000',
@@ -131,7 +131,7 @@ const SAMPLE_PAYABLES: PayableRow[] = [
   },
   {
     code: 'NCC-0044',
-    supplier: 'Công ty TNHH Nhựa Duy Tân',
+    supplier: 'Công ty TNHH Bao bì Nông sản Duy Tân',
     terms: 'Net 30',
     current: '38.700.000',
     b1: '12.500.000',
@@ -143,7 +143,7 @@ const SAMPLE_PAYABLES: PayableRow[] = [
   },
   {
     code: 'NCC-0051',
-    supplier: 'Công ty TNHH Kokuyo Việt Nam',
+    supplier: 'Công ty TNHH Giống cây trồng Việt Nông',
     terms: 'Net 60',
     current: '21.400.000',
     b1: '0',
@@ -155,7 +155,7 @@ const SAMPLE_PAYABLES: PayableRow[] = [
   },
   {
     code: 'NCC-0063',
-    supplier: 'Hộ kinh doanh Bao bì Phú Xuân',
+    supplier: 'Hộ kinh doanh Vật tư Nông nghiệp Phú Xuân',
     terms: 'Thanh toán ngay',
     current: '0',
     b1: '6.000.000',
@@ -168,7 +168,7 @@ const SAMPLE_PAYABLES: PayableRow[] = [
   },
   {
     code: 'NCC-0058',
-    supplier: 'Công ty CP In Hồng Đăng',
+    supplier: 'Công ty CP Phân bón Hồng Đăng',
     terms: 'Net 30',
     current: '12.400.000',
     b1: '0',
@@ -180,7 +180,7 @@ const SAMPLE_PAYABLES: PayableRow[] = [
   },
   {
     code: 'NCC-0070',
-    supplier: 'Công ty TNHH Máy văn phòng Nam Á',
+    supplier: 'Công ty TNHH Máy nông nghiệp Nam Á',
     terms: 'Net 15',
     current: '6.700.000',
     b1: '0',

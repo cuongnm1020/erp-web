@@ -44,7 +44,7 @@ interface PoRow {
 const SAMPLE_POS: PoRow[] = [
   {
     docNo: 'PO-2608-00041',
-    supplier: 'Công ty CP Tập đoàn Thiên Long',
+    supplier: 'Công ty TNHH Vật tư Nông nghiệp Xanh',
     warehouse: 'Kho HN-1',
     lineCount: 3,
     qtyOrdered: 400,
@@ -59,7 +59,7 @@ const SAMPLE_POS: PoRow[] = [
   },
   {
     docNo: 'PO-2608-00040',
-    supplier: 'Công ty TNHH Giấy Double A VN',
+    supplier: 'Công ty CP Phân bón Miền Bắc',
     warehouse: 'Kho HN-1',
     lineCount: 10,
     qtyOrdered: 797,
@@ -74,7 +74,7 @@ const SAMPLE_POS: PoRow[] = [
   },
   {
     docNo: 'PO-2608-00039',
-    supplier: 'Tiến Phát Tape',
+    supplier: 'Công ty TNHH Nông dược Phương Nam',
     warehouse: 'Kho HN-1',
     lineCount: 5,
     qtyOrdered: 1194,
@@ -89,7 +89,7 @@ const SAMPLE_POS: PoRow[] = [
   },
   {
     docNo: 'PO-2608-00038',
-    supplier: 'Deli Việt Nam',
+    supplier: 'Công ty TNHH Hạt giống Đồng Xanh',
     warehouse: 'Kho HN-1',
     lineCount: 12,
     qtyOrdered: 1591,
@@ -104,7 +104,7 @@ const SAMPLE_POS: PoRow[] = [
   },
   {
     docNo: 'PO-2608-00037',
-    supplier: 'Plus Việt Nam',
+    supplier: 'Công ty CP Dụng cụ Nông nghiệp Việt',
     warehouse: 'Kho HN-1',
     lineCount: 7,
     qtyOrdered: 1988,
@@ -120,7 +120,7 @@ const SAMPLE_POS: PoRow[] = [
   },
   {
     docNo: 'PO-2608-00036',
-    supplier: 'Synnex FPT (HP)',
+    supplier: 'Công ty TNHH Phân hữu cơ Sông Hồng',
     warehouse: 'Kho HN-1',
     lineCount: 14,
     qtyOrdered: 2385,
@@ -135,7 +135,7 @@ const SAMPLE_POS: PoRow[] = [
   },
   {
     docNo: 'PO-2608-00035',
-    supplier: 'Kokuyo Việt Nam',
+    supplier: 'Công ty CP Vi sinh Nông nghiệp Tiến Phát',
     warehouse: 'Kho HN-1',
     lineCount: 9,
     qtyOrdered: 2782,
@@ -151,7 +151,7 @@ const SAMPLE_POS: PoRow[] = [
   },
   {
     docNo: 'PO-2608-00034',
-    supplier: 'Canon Marketing VN',
+    supplier: 'Công ty TNHH BVTV Hà Thành',
     warehouse: 'Kho HN-1',
     lineCount: 4,
     qtyOrdered: 3179,
@@ -167,7 +167,7 @@ const SAMPLE_POS: PoRow[] = [
   },
   {
     docNo: 'PO-2608-00033',
-    supplier: 'Công ty CP Tập đoàn Thiên Long',
+    supplier: 'Công ty TNHH Vật tư Nông nghiệp Xanh',
     warehouse: 'Kho HN-1',
     lineCount: 11,
     qtyOrdered: 3576,
@@ -183,7 +183,7 @@ const SAMPLE_POS: PoRow[] = [
   },
   {
     docNo: 'PO-2608-00032',
-    supplier: 'Công ty TNHH Giấy Double A VN',
+    supplier: 'Công ty CP Phân bón Miền Bắc',
     warehouse: 'Kho HN-1',
     lineCount: 6,
     qtyOrdered: 3973,
@@ -199,7 +199,7 @@ const SAMPLE_POS: PoRow[] = [
   },
   {
     docNo: 'PO-2608-00024',
-    supplier: 'Công ty TNHH Giấy Double A VN',
+    supplier: 'Công ty CP Phân bón Miền Bắc',
     warehouse: 'Kho HN-1',
     lineCount: 14,
     qtyOrdered: 2949,
@@ -214,7 +214,7 @@ const SAMPLE_POS: PoRow[] = [
   },
   {
     docNo: 'PO-2608-00023',
-    supplier: 'Tiến Phát Tape',
+    supplier: 'Công ty TNHH Nông dược Phương Nam',
     warehouse: 'Kho HN-1',
     lineCount: 9,
     qtyOrdered: 3346,

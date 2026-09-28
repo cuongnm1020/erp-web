@@ -568,7 +568,7 @@ function ProductFormBody({ product }: { product?: ProductDetail }) {
                 <FormItem className="lg:col-span-2">
                   <FormLabel>Tên thương mại *</FormLabel>
                   <FormControl>
-                    <Input autoFocus={!editing} placeholder="Bút bi Thiên Long TL-08" {...field} />
+                    <Input autoFocus={!editing} placeholder="Vua Bật Chồi 40gr" {...field} />
                   </FormControl>
                   <FormDescription>
                     Tên gọi khi bán và khi lấy hàng trong kho — hiện trên đơn, phiếu pick / pack
@@ -584,7 +584,7 @@ function ProductFormBody({ product }: { product?: ProductDetail }) {
                 <FormItem className="lg:col-span-2">
                   <FormLabel>Tên xuất hóa đơn</FormLabel>
                   <FormControl>
-                    <Input placeholder="Bút bi Thiên Long TL-08 (hộp 20 cây)" {...field} />
+                    <Input placeholder="Thuốc kích chồi Vua Bật Chồi 40gr (gói)" {...field} />
                   </FormControl>
                   <FormDescription>
                     Tên in trên hóa đơn theo yêu cầu kế toán — bỏ trống thì dùng tên thương mại
@@ -601,7 +601,7 @@ function ProductFormBody({ product }: { product?: ProductDetail }) {
                   <FormLabel>Mã sản phẩm</FormLabel>
                   <FormControl>
                     <Input
-                      placeholder={editing ? 'TL08' : 'Để trống — tự sinh theo danh mục'}
+                      placeholder={editing ? 'VBC' : 'Để trống — tự sinh theo danh mục'}
                       className="font-mono"
                       {...field}
                     />
@@ -719,7 +719,10 @@ function ProductFormBody({ product }: { product?: ProductDetail }) {
                 <FormItem className="sm:col-span-2 lg:col-span-2">
                   <FormLabel>Mô tả</FormLabel>
                   <FormControl>
-                    <Textarea placeholder="Ngòi bi, mực dầu, viết êm…" {...field} />
+                    <Textarea
+                      placeholder="Thuốc kích chồi, dùng cho cây ăn quả, pha 1 gói/bình 16L…"
+                      {...field}
+                    />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -1125,7 +1128,7 @@ function SkuRow({
               <FormLabel className="sr-only">Mã SKU</FormLabel>
               <FormControl>
                 <Input
-                  placeholder="TL08-BLUE-05"
+                  placeholder="VBC-40G-10"
                   className="font-mono"
                   disabled={saved}
                   {...field}
@@ -1215,7 +1218,7 @@ function SkuRow({
               <FormItem>
                 <FormLabel className="text-xs text-muted-foreground">Tên biến thể</FormLabel>
                 <FormControl>
-                  <Input placeholder="Bút bi Thiên Long TL-08 xanh 0.5" {...field} />
+                  <Input placeholder="Vua Bật Chồi 40gr (combo 10 gói)" {...field} />
                 </FormControl>
                 <FormMessage />
               </FormItem>

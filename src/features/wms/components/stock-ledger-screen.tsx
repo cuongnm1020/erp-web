@@ -52,7 +52,7 @@ const SAMPLE_ROWS: LedgerRow[] = [
     doc: 'GRN-2608-00087',
     kind: '+ Nhập',
     kindTone: 'ok',
-    sku: 'DA-A4-80',
+    sku: 'NPK-202020-1KG',
     lot: 'L2608',
     bin: 'B-01-01-A',
     qtyDelta: '+250',
@@ -65,7 +65,7 @@ const SAMPLE_ROWS: LedgerRow[] = [
     doc: 'SO-2608-01240',
     kind: 'Reserve',
     kindTone: 'brand',
-    sku: 'TL08-BLUE',
+    sku: 'VBC-40G',
     lot: '—',
     bin: '—',
     qtyDelta: '−96',
@@ -78,7 +78,7 @@ const SAMPLE_ROWS: LedgerRow[] = [
     doc: 'GDN-2608-01188',
     kind: '− Xuất',
     kindTone: 'err',
-    sku: 'TL08-BLUE',
+    sku: 'VBC-40G',
     lot: 'L2605',
     bin: 'A-03-02-B',
     qtyDelta: '−48',
@@ -110,7 +110,7 @@ const SAMPLE_ROWS: LedgerRow[] = [
     doc: 'GDN-2608-01188',
     kind: 'Release',
     kindTone: 'draft',
-    sku: 'TL08-BLUE',
+    sku: 'VBC-40G',
     lot: '—',
     bin: '—',
     qtyDelta: '+48',
@@ -123,7 +123,7 @@ const SAMPLE_ROWS: LedgerRow[] = [
     doc: 'SO-2608-01234',
     kind: 'Reserve',
     kindTone: 'brand',
-    sku: 'TL08-BLUE',
+    sku: 'VBC-40G',
     lot: '—',
     bin: '—',
     qtyDelta: '−48',
@@ -136,7 +136,7 @@ const SAMPLE_ROWS: LedgerRow[] = [
     doc: 'GRN-2608-00084',
     kind: '+ Nhập',
     kindTone: 'ok',
-    sku: 'TL08-BLUE',
+    sku: 'VBC-40G',
     lot: 'L2607',
     bin: 'A-03-02-B',
     qtyDelta: '+480',
@@ -149,7 +149,7 @@ const SAMPLE_ROWS: LedgerRow[] = [
     doc: 'ADJ-2608-00012',
     kind: 'Điều chỉnh',
     kindTone: 'warn',
-    sku: 'TL08-RED',
+    sku: 'VBC-40G-10',
     lot: 'L2607',
     bin: 'A-03-02-B',
     qtyDelta: '−12',
@@ -162,7 +162,7 @@ const SAMPLE_ROWS: LedgerRow[] = [
     doc: 'GDN-2608-01186',
     kind: '− Xuất',
     kindTone: 'err',
-    sku: 'TL08-BLUE',
+    sku: 'VBC-40G',
     lot: 'L2605',
     bin: 'A-03-02-B',
     qtyDelta: '−120',
@@ -175,7 +175,7 @@ const SAMPLE_ROWS: LedgerRow[] = [
     doc: 'SO-2608-01201',
     kind: 'Release',
     kindTone: 'draft',
-    sku: 'TL08-BLUE',
+    sku: 'VBC-40G',
     lot: '—',
     bin: '—',
     qtyDelta: '+120',
@@ -188,7 +188,7 @@ const SAMPLE_ROWS: LedgerRow[] = [
     doc: 'SO-2608-01228',
     kind: 'Reserve',
     kindTone: 'brand',
-    sku: 'TL08-BLUE',
+    sku: 'VBC-40G',
     lot: '—',
     bin: '—',
     qtyDelta: '−72',
@@ -201,7 +201,7 @@ const SAMPLE_ROWS: LedgerRow[] = [
     doc: 'TRF-2608-00031',
     kind: '− Xuất chuyển kho',
     kindTone: 'err',
-    sku: 'TL08-BLUE',
+    sku: 'VBC-40G',
     lot: 'L2607',
     bin: 'A-03-02-B',
     qtyDelta: '−480',
@@ -214,7 +214,7 @@ const SAMPLE_ROWS: LedgerRow[] = [
     doc: 'GDN-2608-01185',
     kind: '− Xuất',
     kindTone: 'err',
-    sku: 'TL08-BLUE',
+    sku: 'VBC-40G',
     lot: 'L2605',
     bin: 'A-03-02-B',
     qtyDelta: '−36',
@@ -227,7 +227,7 @@ const SAMPLE_ROWS: LedgerRow[] = [
     doc: 'GRN-2608-00082',
     kind: '+ Nhập',
     kindTone: 'ok',
-    sku: 'TL08-BLUE',
+    sku: 'VBC-40G',
     lot: 'L2605',
     bin: 'A-03-02-B',
     qtyDelta: '+600',
@@ -240,7 +240,7 @@ const SAMPLE_ROWS: LedgerRow[] = [
     doc: 'STK-2608-00008',
     kind: 'Điều chỉnh kiểm kê',
     kindTone: 'warn',
-    sku: 'TL08-BLUE',
+    sku: 'VBC-40G',
     lot: 'L2603',
     bin: 'A-03-01-B',
     qtyDelta: '−4',
@@ -291,7 +291,7 @@ export function StockLedgerScreen() {
           <span className="flex-1 truncate">Tìm chứng từ, movement…</span>
         </div>
         <FilterChip active>
-          SKU: TL08-BLUE <X className="h-3 w-3" aria-hidden />
+          SKU: VBC-40G <X className="h-3 w-3" aria-hidden />
         </FilterChip>
         <FilterChip active>
           Kho: HN-1 <ChevronDown className="h-3.5 w-3.5" aria-hidden />
@@ -372,7 +372,7 @@ export function StockLedgerScreen() {
                         <div className="max-w-3xl overflow-hidden rounded-md border bg-card">
                           <div className="flex items-center justify-between border-b px-3 py-2 text-sm">
                             <span className="font-semibold">
-                              Cost layer FIFO tiêu thụ — movement MV-8841902 · 48 cái TL08-BLUE
+                              Cost layer FIFO tiêu thụ — movement MV-8841902 · 48 gói VBC-40G
                             </span>
                             <span className="font-mono text-xs text-muted-foreground">
                               wms.consume_fifo()

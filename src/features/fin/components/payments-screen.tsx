@@ -233,7 +233,7 @@ export function PaymentsScreen() {
           >
             <div className="flex h-8 items-center gap-1.5 rounded-md border border-input bg-background px-2 text-sm">
               <User className="size-4 shrink-0 text-muted-foreground" />
-              <span className="truncate font-semibold">Công ty TNHH Hòa Phát Văn Phòng Phẩm</span>
+              <span className="truncate font-semibold">Đại lý VTNN An Nhiên</span>
               <span className="whitespace-nowrap text-muted-foreground">· KH-000317</span>
               <ChevronDown className="ml-auto size-3.5 shrink-0 text-muted-foreground" />
             </div>
@@ -250,7 +250,7 @@ export function PaymentsScreen() {
             <FakeInput caret>24/08/2026</FakeInput>
           </Field>
           <Field label="Tham chiếu" className="lg:col-span-2">
-            <FakeInput>VCB FT26236HP0921 — &quot;HPVPP tt hd thang 8&quot;</FakeInput>
+            <FakeInput>VCB FT26236HP0921 — &quot;AN NHIEN tt hd thang 8&quot;</FakeInput>
           </Field>
         </div>
       </section>

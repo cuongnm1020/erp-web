@@ -135,7 +135,7 @@ export function SupplierFormDialog({
                   <FormItem>
                     <FormLabel>Mã số thuế</FormLabel>
                     <FormControl>
-                      <Input placeholder="0301464896" className="font-mono" {...field} />
+                      <Input placeholder="0109123456" className="font-mono" {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -151,7 +151,7 @@ export function SupplierFormDialog({
                   <FormControl>
                     <Input
                       autoFocus={editing}
-                      placeholder="Công ty CP Tập đoàn Thiên Long"
+                      placeholder="Công ty TNHH Vật tư Nông nghiệp Xanh"
                       {...field}
                     />
                   </FormControl>
@@ -167,7 +167,7 @@ export function SupplierFormDialog({
                   <FormItem>
                     <FormLabel>SĐT</FormLabel>
                     <FormControl>
-                      <Input placeholder="028 3750 5555" {...field} />
+                      <Input placeholder="024 3765 4321" {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -180,7 +180,7 @@ export function SupplierFormDialog({
                   <FormItem>
                     <FormLabel>Email</FormLabel>
                     <FormControl>
-                      <Input type="email" placeholder="kd@thienlong.vn" {...field} />
+                      <Input type="email" placeholder="" {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>

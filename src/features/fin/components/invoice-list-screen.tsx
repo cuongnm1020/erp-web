@@ -39,7 +39,7 @@ const SAMPLE_INVOICES: InvoiceRow[] = [
   {
     invoiceNo: null,
     orderNo: 'SO-2608-01244',
-    customer: 'Công ty TNHH Hòa Phát Văn Phòng Phẩm',
+    customer: 'Đại lý VTNN An Nhiên',
     date: '24/08/2026',
     subtotal: '4.620.000',
     total: '4.620.000',
@@ -50,7 +50,7 @@ const SAMPLE_INVOICES: InvoiceRow[] = [
   {
     invoiceNo: null,
     orderNo: 'SO-2608-01243',
-    customer: 'Nhà sách Phương Nam Q.1',
+    customer: 'HTX Nông nghiệp Kim Quan',
     date: '24/08/2026',
     subtotal: '12.380.000',
     total: '12.380.000',
@@ -61,7 +61,7 @@ const SAMPLE_INVOICES: InvoiceRow[] = [
   {
     invoiceNo: null,
     orderNo: 'SO-2608-01241',
-    customer: 'Cửa hàng Minh Tâm',
+    customer: 'Nhà vườn Minh Phát',
     date: '24/08/2026',
     subtotal: '1.596.400',
     total: '1.596.400',
@@ -72,7 +72,7 @@ const SAMPLE_INVOICES: InvoiceRow[] = [
   {
     invoiceNo: 'INV-2608-00431',
     orderNo: 'SO-2608-01238',
-    customer: 'Trường THCS Nguyễn Du',
+    customer: 'Cửa hàng VTNN Hữu Điền',
     date: '23/08/2026',
     subtotal: '8.450.000',
     total: '8.450.000',
@@ -84,7 +84,7 @@ const SAMPLE_INVOICES: InvoiceRow[] = [
   {
     invoiceNo: 'INV-2608-00430',
     orderNo: 'SO-2608-01236',
-    customer: 'Văn phòng phẩm Thu Hà (Cầu Giấy)',
+    customer: 'Đại lý VTNN Thu Hà (Thạch Thất)',
     date: '23/08/2026',
     subtotal: '2.140.000',
     total: '2.140.000',
@@ -95,7 +95,7 @@ const SAMPLE_INVOICES: InvoiceRow[] = [
   {
     invoiceNo: 'INV-2608-00429',
     orderNo: 'SO-2608-01234',
-    customer: 'Công ty CP In & Bao bì Sao Mai',
+    customer: 'Công ty CP Nông sản Sao Mai',
     date: '23/08/2026',
     subtotal: '24.900.000',
     total: '24.900.000',
@@ -106,7 +106,7 @@ const SAMPLE_INVOICES: InvoiceRow[] = [
   {
     invoiceNo: 'INV-2608-00428',
     orderNo: 'SO-2608-01230',
-    customer: 'Nhà sách Tân Định',
+    customer: 'HTX Rau an toàn Tân Định',
     date: '23/08/2026',
     subtotal: '5.780.000',
     total: '5.780.000',
@@ -117,7 +117,7 @@ const SAMPLE_INVOICES: InvoiceRow[] = [
   {
     invoiceNo: 'INV-2608-00426',
     orderNo: 'SO-2608-01225',
-    customer: 'Công ty TNHH Thương mại Đại Phát',
+    customer: 'Công ty TNHH Thương mại VTNN Đại Phát',
     date: '22/08/2026',
     subtotal: '16.200.000',
     total: '16.200.000',
@@ -128,7 +128,7 @@ const SAMPLE_INVOICES: InvoiceRow[] = [
   {
     invoiceNo: 'INV-2608-00425',
     orderNo: 'SO-2608-01225',
-    customer: 'Công ty TNHH Thương mại Đại Phát',
+    customer: 'Công ty TNHH Thương mại VTNN Đại Phát',
     date: '22/08/2026',
     subtotal: '16.020.000',
     total: '16.020.000',
@@ -140,7 +140,7 @@ const SAMPLE_INVOICES: InvoiceRow[] = [
   {
     invoiceNo: 'INV-2608-00424',
     orderNo: 'SO-2608-01222',
-    customer: 'Cửa hàng Minh Tâm',
+    customer: 'Nhà vườn Minh Phát',
     date: '22/08/2026',
     subtotal: '2.698.000',
     total: '2.698.000',
@@ -151,7 +151,7 @@ const SAMPLE_INVOICES: InvoiceRow[] = [
   {
     invoiceNo: 'INV-2608-00422',
     orderNo: 'SO-2608-01215',
-    customer: 'Công ty TNHH Hòa Phát Văn Phòng Phẩm',
+    customer: 'Đại lý VTNN An Nhiên',
     date: '22/08/2026',
     subtotal: '31.750.000',
     total: '31.750.000',
@@ -162,7 +162,7 @@ const SAMPLE_INVOICES: InvoiceRow[] = [
   {
     invoiceNo: 'INV-2608-00420',
     orderNo: 'SO-2608-01208',
-    customer: 'Cửa hàng Văn phòng phẩm Ngọc Bích',
+    customer: 'Cửa hàng VTNN Ngọc Bích',
     date: '21/08/2026',
     subtotal: '1.240.000',
     total: '1.240.000',
@@ -174,7 +174,7 @@ const SAMPLE_INVOICES: InvoiceRow[] = [
   {
     invoiceNo: 'INV-2608-00418',
     orderNo: 'SO-2608-01201',
-    customer: 'Trường Tiểu học Lê Quý Đôn',
+    customer: 'Trang trại Lê Quý',
     date: '21/08/2026',
     subtotal: '14.500.000',
     total: '14.500.000',
@@ -185,7 +185,7 @@ const SAMPLE_INVOICES: InvoiceRow[] = [
   {
     invoiceNo: 'INV-2608-00414',
     orderNo: 'SO-2608-01187',
-    customer: 'Cửa hàng Minh Tâm',
+    customer: 'Nhà vườn Minh Phát',
     date: '19/08/2026',
     subtotal: '1.596.400',
     total: '1.596.400',
@@ -196,7 +196,7 @@ const SAMPLE_INVOICES: InvoiceRow[] = [
   {
     invoiceNo: 'INV-2608-00412',
     orderNo: 'SO-2608-01179',
-    customer: 'Công ty CP In & Bao bì Sao Mai',
+    customer: 'Công ty CP Nông sản Sao Mai',
     date: '19/08/2026',
     subtotal: '18.400.000',
     total: '18.400.000',

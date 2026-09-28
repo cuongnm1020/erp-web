@@ -61,8 +61,8 @@ const SLA_CLASS: Record<'ok' | 'warn' | 'over', string> = {
 const SAMPLE_TICKETS: TicketRow[] = [
   {
     code: 'TK-0244',
-    customer: 'Công ty CP Đầu tư Thành Công',
-    title: 'Hàng giao vỡ 3 hộp mực in Canon 325',
+    customer: 'Công ty CP Nông nghiệp Thành Công',
+    title: 'Hàng giao vỡ 3 chai Rooting Extra 500ml',
     type: 'Hàng lỗi',
     priority: 'high',
     assignee: 'Nguyễn Văn An',
@@ -72,8 +72,8 @@ const SAMPLE_TICKETS: TicketRow[] = [
   },
   {
     code: 'TK-0243',
-    customer: 'Nhà sách Fahasa Long Biên',
-    title: 'Yêu cầu đổi 20 cuốn sổ Campus A5 bị lem bìa sang lô mới',
+    customer: 'Vườn cam Cao Phong',
+    title: 'Yêu cầu đổi 20 gói Vua Bật Chồi 40gr bị rách bao bì sang lô mới',
     type: 'Đổi/trả',
     priority: 'high',
     assignee: 'Nguyễn Văn An',
@@ -83,8 +83,8 @@ const SAMPLE_TICKETS: TicketRow[] = [
   },
   {
     code: 'TK-0231',
-    customer: 'Cửa hàng Minh Tâm',
-    title: 'Giao thiếu 2 hộp kẹp giấy Plus 50mm',
+    customer: 'Cửa hàng VTNN Minh Tâm',
+    title: 'Giao thiếu 2 thùng Rooting Extra 500ml',
     type: 'Giao thiếu',
     priority: 'medium',
     assignee: 'Nguyễn Văn An',
@@ -94,7 +94,7 @@ const SAMPLE_TICKETS: TicketRow[] = [
   },
   {
     code: 'TK-0242',
-    customer: 'Văn phòng phẩm Hồng Hà Cầu Giấy',
+    customer: 'Đại lý VTNN Hồng Hà Thạch Thất',
     title: 'Hỏi tiến độ đơn SO-2308-01301 đang bị chặn công nợ',
     type: 'Hỏi đáp',
     priority: 'medium',
@@ -105,8 +105,8 @@ const SAMPLE_TICKETS: TicketRow[] = [
   },
   {
     code: 'TK-0241',
-    customer: 'Trường THCS Nguyễn Du',
-    title: 'Xin báo giá 500 bộ dụng cụ học sinh cho khai giảng',
+    customer: 'Trang trại sầu riêng Bảy Hùng',
+    title: 'Xin báo giá 500 bao phân hữu cơ vi sinh 25kg cho vụ Đông Xuân',
     type: 'Hỏi đáp',
     priority: 'low',
     assignee: null,
@@ -116,8 +116,8 @@ const SAMPLE_TICKETS: TicketRow[] = [
   },
   {
     code: 'TK-0240',
-    customer: 'Tiệm photocopy Quang Minh',
-    title: 'Mực in Brother TN-2385 nghi hàng không chính hãng',
+    customer: 'Nhà vườn cà phê Quang Minh',
+    title: 'Thuốc trừ sâu sinh học 250ml nghi hàng không chính hãng',
     type: 'Hàng lỗi',
     priority: 'high',
     assignee: 'Lê Thu Hà',
@@ -127,7 +127,7 @@ const SAMPLE_TICKETS: TicketRow[] = [
   },
   {
     code: 'TK-0239',
-    customer: 'Công ty TNHH Hòa Phát Văn Phòng Phẩm',
+    customer: 'HTX Nông nghiệp Kim Quan',
     title: 'Sai đơn giá bảng giá đại lý trên hóa đơn INV-2608-00302',
     type: 'Hóa đơn',
     priority: 'medium',
@@ -138,7 +138,7 @@ const SAMPLE_TICKETS: TicketRow[] = [
   },
   {
     code: 'TK-0238',
-    customer: 'Cửa hàng Sao Mai',
+    customer: 'Cửa hàng VTNN Sao Mai',
     title: 'Xin xuất lại hóa đơn VAT do sai tên công ty',
     type: 'Hóa đơn',
     priority: 'low',
@@ -149,7 +149,7 @@ const SAMPLE_TICKETS: TicketRow[] = [
   },
   {
     code: 'TK-0237',
-    customer: 'Công ty CP Tư vấn Xây dựng Bắc Hà',
+    customer: 'Trang trại chè Bắc Hà',
     title: 'Giao chậm đơn SO-2308-01188 quá 2 ngày so với hẹn',
     type: 'Giao chậm',
     priority: 'high',
@@ -160,8 +160,8 @@ const SAMPLE_TICKETS: TicketRow[] = [
   },
   {
     code: 'TK-0236',
-    customer: 'Trung tâm Anh ngữ Bright Kids',
-    title: 'Đề nghị hỗ trợ in tem nhãn cho bộ quà tặng học viên',
+    customer: 'HTX Rau an toàn Vân Nội',
+    title: 'Đề nghị hỗ trợ in tem nhãn cho bộ quà tặng xã viên',
     type: 'Hỏi đáp',
     priority: 'low',
     assignee: 'Vũ Ngọc Huyền',
@@ -171,8 +171,8 @@ const SAMPLE_TICKETS: TicketRow[] = [
   },
   {
     code: 'TK-0235',
-    customer: 'Nhà sách Tiền Phong',
-    title: 'Trả 5 ream giấy A4 Double A bị ẩm, yêu cầu tạo RMA',
+    customer: 'Nhà vườn Tiền Phong',
+    title: 'Trả 5 bao phân hữu cơ vi sinh 25kg bị ẩm, yêu cầu tạo RMA',
     type: 'Đổi/trả',
     priority: 'medium',
     assignee: 'Lê Thu Hà',
@@ -182,8 +182,8 @@ const SAMPLE_TICKETS: TicketRow[] = [
   },
   {
     code: 'TK-0234',
-    customer: 'Cửa hàng Ngọc Lan',
-    title: 'Hỏi chương trình khuyến mãi mùa tựu trường tháng 9',
+    customer: 'Cửa hàng VTNN Ngọc Lan',
+    title: 'Hỏi chương trình khuyến mãi vụ Đông Xuân tháng 9',
     type: 'Hỏi đáp',
     priority: 'low',
     assignee: null,
@@ -193,7 +193,7 @@ const SAMPLE_TICKETS: TicketRow[] = [
   },
   {
     code: 'TK-0233',
-    customer: 'Công ty TNHH Kế toán An Phát',
+    customer: 'HTX Rau sạch An Phát',
     title: 'Đối chiếu công nợ tháng 7 lệch 1.850.000',
     type: 'Công nợ',
     priority: 'medium',
@@ -204,8 +204,8 @@ const SAMPLE_TICKETS: TicketRow[] = [
   },
   {
     code: 'TK-0232',
-    customer: 'Trường Tiểu học Kim Liên',
-    title: 'Xin giấy chứng nhận xuất xứ cho lô bút màu',
+    customer: 'HTX Dịch vụ Nông nghiệp Kim Liên',
+    title: 'Xin giấy chứng nhận xuất xứ cho lô hạt giống dưa lưới F1',
     type: 'Hỏi đáp',
     priority: 'low',
     assignee: null,
@@ -215,8 +215,8 @@ const SAMPLE_TICKETS: TicketRow[] = [
   },
   {
     code: 'TK-0229',
-    customer: 'Cửa hàng Bảo Châu',
-    title: 'Hỏi giá sỉ sổ lò xo Klong A4 cho đơn 300 cuốn',
+    customer: 'Cửa hàng VTNN Bảo Châu',
+    title: 'Hỏi giá sỉ phân bón lá NPK 20-20-20 cho đơn 300 gói',
     type: 'Hỏi đáp',
     priority: 'low',
     assignee: 'Nguyễn Văn An',

@@ -48,7 +48,7 @@ const KIND_TONE: Record<PromoKind, StatusTone> = {
 const SAMPLE_PROMOTIONS: PromotionRow[] = [
   {
     code: 'KM-2608-012',
-    name: 'Mua 10 ream giấy tặng 1 ream',
+    name: 'Mua 10 bao phân hữu cơ vi sinh tặng 1 bao',
     kind: 'Mua X tặng Y',
     period: '01/08 – 31/08/2026',
     channel: 'Tất cả',
@@ -70,7 +70,7 @@ const SAMPLE_PROMOTIONS: PromotionRow[] = [
   },
   {
     code: 'KM-2608-010',
-    name: 'Khai giảng: giảm 50.000 cho đơn vở ≥ 1.000.000',
+    name: 'Vụ Đông Xuân: giảm 50.000 cho đơn phân bón ≥ 1.000.000',
     kind: 'Giảm tiền',
     period: '10/08 – 05/09/2026',
     channel: 'Tất cả',
@@ -82,7 +82,7 @@ const SAMPLE_PROMOTIONS: PromotionRow[] = [
   },
   {
     code: 'KM-2608-009',
-    name: 'Combo bút TL-08 + sổ Campus A5',
+    name: 'Combo 10 gói Vua Bật Chồi tặng 1 chai Rooting Extra',
     kind: 'Combo',
     period: '15/08 – 15/09/2026',
     channel: 'Online',
@@ -93,7 +93,7 @@ const SAMPLE_PROMOTIONS: PromotionRow[] = [
   },
   {
     code: 'KM-2608-008',
-    name: 'Mực in HP: mua 2 tặng 1 ream A4',
+    name: 'Bình xịt điện 16L: mua 2 tặng 1 chai Rooting Extra',
     kind: 'Mua X tặng Y',
     period: '01/08 – 31/08/2026',
     channel: 'Điện thoại',
@@ -115,7 +115,7 @@ const SAMPLE_PROMOTIONS: PromotionRow[] = [
   },
   {
     code: 'KM-2608-006',
-    name: 'Băng keo Tiến Phát: mua 50 cuộn tặng 5',
+    name: 'Purger: mua 50 gói tặng 5',
     kind: 'Mua X tặng Y',
     period: '01/08 – 30/09/2026',
     channel: 'Tất cả',
@@ -126,7 +126,7 @@ const SAMPLE_PROMOTIONS: PromotionRow[] = [
   },
   {
     code: 'KM-2609-001',
-    name: 'Tháng 9: giảm 8% nhóm Mực in cho VIP Vàng',
+    name: 'Tháng 9: giảm 8% nhóm Thuốc BVTV cho VIP Vàng',
     kind: 'Giảm %',
     period: '01/09 – 30/09/2026',
     channel: 'Tất cả',
@@ -137,7 +137,7 @@ const SAMPLE_PROMOTIONS: PromotionRow[] = [
   },
   {
     code: 'KM-2609-002',
-    name: 'Trung thu: tặng hộp bút màu cho đơn ≥ 3.000.000',
+    name: 'Trung thu: tặng 1 gói hạt giống dưa lưới F1 cho đơn ≥ 3.000.000',
     kind: 'Mua X tặng Y',
     period: '10/09 – 25/09/2026',
     channel: 'Tất cả',
@@ -148,7 +148,7 @@ const SAMPLE_PROMOTIONS: PromotionRow[] = [
   },
   {
     code: 'KM-2608-013',
-    name: 'Sổ Klong: mua 100 tặng 10',
+    name: 'Vua Bật Chồi: mua 100 gói tặng 10',
     kind: 'Mua X tặng Y',
     period: 'Chưa đặt',
     periodMuted: true,
@@ -160,7 +160,7 @@ const SAMPLE_PROMOTIONS: PromotionRow[] = [
   },
   {
     code: 'KM-2608-014',
-    name: 'Giảm 10% mực tương thích Brother',
+    name: 'Giảm 10% thuốc trừ sâu sinh học 250ml',
     kind: 'Giảm %',
     period: 'Chưa đặt',
     periodMuted: true,
@@ -183,7 +183,7 @@ const SAMPLE_PROMOTIONS: PromotionRow[] = [
   },
   {
     code: 'KM-2607-005',
-    name: 'Tháng 7: mua 20 ream tặng 1 hộp kẹp bướm',
+    name: 'Tháng 7: mua 20 bao phân tặng 1 chai Rooting 500ml',
     kind: 'Mua X tặng Y',
     period: '01/07 – 31/07/2026',
     channel: 'Tất cả',
@@ -205,7 +205,7 @@ const SAMPLE_PROMOTIONS: PromotionRow[] = [
   },
   {
     code: 'KM-2602-001',
-    name: 'Tết 2026: tặng lịch bàn cho đơn ≥ 1.500.000',
+    name: 'Tết 2026: tặng 1 gói Purger cho đơn ≥ 1.500.000',
     kind: 'Mua X tặng Y',
     period: '15/01 – 10/02/2026',
     channel: 'Tất cả',
