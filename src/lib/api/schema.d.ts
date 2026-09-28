@@ -5400,7 +5400,7 @@ export interface components {
             id: string;
             docNumber: string;
             /** @enum {string} */
-            status: "PENDING" | "PICKED_UP" | "IN_TRANSIT" | "DELIVERED" | "FAILED" | "RETURNED";
+            status: "CANCELLED" | "PENDING" | "PICKED_UP" | "IN_TRANSIT" | "DELIVERED" | "FAILED" | "RETURNED";
             /** @description Hãng đã gán trên phiếu (có thể khác hãng chọn trên đơn nếu kho đổi lúc đóng gói). */
             carrierCode: string | null;
             /** @description Mã vận đơn hãng cấp — null = chưa cấp (chưa đóng gói, hoặc hãng lỗi đang chờ). */
@@ -5898,7 +5898,7 @@ export interface components {
             /** @description Mã thô của hãng. */
             carrierStatusCode: string;
             /** @enum {string|null} */
-            mappedStatus: "PENDING" | "PICKED_UP" | "IN_TRANSIT" | "DELIVERED" | "FAILED" | "RETURNED" | null;
+            mappedStatus: "CANCELLED" | "PENDING" | "PICKED_UP" | "IN_TRANSIT" | "DELIVERED" | "FAILED" | "RETURNED" | null;
             /** @enum {string} */
             outcome: "APPLIED" | "DUPLICATE" | "REJECTED_UNMAPPED" | "REJECTED_TRANSITION" | "NOT_FOUND";
             note: string | null;
@@ -5916,7 +5916,7 @@ export interface components {
             docNumber: string;
             orderId: string | null;
             /** @enum {string} */
-            status: "PENDING" | "PICKED_UP" | "IN_TRANSIT" | "DELIVERED" | "FAILED" | "RETURNED";
+            status: "CANCELLED" | "PENDING" | "PICKED_UP" | "IN_TRANSIT" | "DELIVERED" | "FAILED" | "RETURNED";
             carrierCode: string | null;
             carrierName: string | null;
             trackingNo: string | null;
@@ -5941,7 +5941,7 @@ export interface components {
             shipmentId: string;
             docNumber: string;
             /** @enum {string} */
-            status: "PENDING" | "PICKED_UP" | "IN_TRANSIT" | "DELIVERED" | "FAILED" | "RETURNED";
+            status: "CANCELLED" | "PENDING" | "PICKED_UP" | "IN_TRANSIT" | "DELIVERED" | "FAILED" | "RETURNED";
             orderId: string | null;
             carrierId: string | null;
             carrierCode: string | null;
@@ -5977,7 +5977,7 @@ export interface components {
              *     `POST /shipments/:id/ship`, không phải một lần đổi trạng thái tuỳ ý.
              * @enum {string}
              */
-            status: "PENDING" | "PICKED_UP" | "IN_TRANSIT" | "DELIVERED" | "FAILED" | "RETURNED";
+            status: "CANCELLED" | "PENDING" | "PICKED_UP" | "IN_TRANSIT" | "DELIVERED" | "FAILED" | "RETURNED";
         };
         GoodsIssueListRowDto: {
             id: string;
@@ -6597,7 +6597,7 @@ export interface components {
             docNumber: string;
             trackingNo: string | null;
             /** @enum {string} */
-            status: "PENDING" | "PICKED_UP" | "IN_TRANSIT" | "DELIVERED" | "FAILED" | "RETURNED";
+            status: "CANCELLED" | "PENDING" | "PICKED_UP" | "IN_TRANSIT" | "DELIVERED" | "FAILED" | "RETURNED";
             orderId: string | null;
             /** @description Task PACK của đơn (nếu có) — quét vận đơn ở bàn đóng gói cũng mở được việc. */
             tasks: components["schemas"]["PdaTaskRefDto"][];
@@ -11424,7 +11424,7 @@ export interface operations {
         parameters: {
             query?: {
                 orderId?: string;
-                status?: "PENDING" | "PICKED_UP" | "IN_TRANSIT" | "DELIVERED" | "FAILED" | "RETURNED";
+                status?: "CANCELLED" | "PENDING" | "PICKED_UP" | "IN_TRANSIT" | "DELIVERED" | "FAILED" | "RETURNED";
                 take?: number;
                 skip?: number;
             };

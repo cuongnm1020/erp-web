@@ -116,6 +116,7 @@ export const SHIPMENT_STATUS_BADGE: Record<string, { label: string; tone: Status
   DELIVERED: { label: 'Đã giao', tone: 'ok' },
   FAILED: { label: 'Giao lỗi', tone: 'err' },
   RETURNED: { label: 'Đã hoàn', tone: 'warn' },
+  CANCELLED: { label: 'Đã hủy', tone: 'neutral' },
 };
 
 export function carrierOutcome(o: string): { label: string; tone: StatusTone } {

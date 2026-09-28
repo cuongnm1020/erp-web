@@ -105,6 +105,7 @@ const SHIPMENT_STATUS_LABEL: Record<
   DELIVERED: 'Đã giao',
   FAILED: 'Giao lỗi',
   RETURNED: 'Đã hoàn',
+  CANCELLED: 'Đã hủy theo đơn',
 };
 
 /**

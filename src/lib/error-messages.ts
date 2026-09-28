@@ -83,6 +83,11 @@ const MESSAGES: Record<string, string> = {
     'Đơn chưa có việc pick và không tự sinh được. Kiểm tra dòng hàng của đơn rồi thử lại.',
   ORDER_IN_WAVE:
     'Đơn đang nằm trong lượt pick gộp. Hoàn tất lượt trên màn quét, không đóng tay từng đơn được.',
+  // Hủy đơn (2026-09-28): đơn đã đóng gói thì tồn đã trừ — không hủy chứng từ được.
+  ORDER_ALREADY_PACKED:
+    'Đơn đã đóng gói, hàng đã trừ kho — không hủy được. Xử lý bằng hoàn hàng / nhập lại kho.',
+  SHIPMENT_CANCELLED: 'Phiếu giao này đã hủy theo đơn — không đóng gói / giao hãng được nữa.',
+  SHIPMENT_CANCEL_VIA_ORDER: 'Muốn hủy phiếu giao thì hủy đơn bán, không đổi tay trạng thái phiếu.',
   ORDER_PICK_SHORTAGE:
     'Không có dòng nào lấy được — thiếu tồn ở vị trí pick được. Nhập kho hoặc chuyển hàng vào vị trí pick rồi thử lại.',
   PDA_PICK_NEEDS_ASSIGNMENT:
