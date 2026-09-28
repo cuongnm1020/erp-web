@@ -3,6 +3,7 @@ import {
   Barcode,
   Boxes,
   Columns3,
+  Gauge,
   Gift,
   LayoutDashboard,
   Landmark,
@@ -225,6 +226,12 @@ export const NAV_MODULES: NavModule[] = [
         ability: { action: 'execute', subject: 'Task' },
       },
       {
+        label: 'Năng suất kho',
+        href: '/wms/productivity',
+        icon: Gauge,
+        ability: { action: 'read_all', subject: 'Task' },
+      },
+      {
         label: 'Cất hàng (PDA)',
         href: '/pda/put-away',
         icon: PackagePlus,
@@ -425,6 +432,7 @@ export const SEGMENT_LABELS: Record<string, string> = {
   gdn: 'Phiếu xuất kho',
   dispatch: 'Điều phối task',
   pack: 'Trạm đóng gói',
+  productivity: 'Năng suất kho',
   shipping: 'Theo dõi giao hàng',
   transfers: 'Chuyển kho',
   po: 'Purchase order',

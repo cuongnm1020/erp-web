@@ -2243,6 +2243,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/tasks/productivity": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Năng suất kho theo khoảng ngày (giờ VN): đơn đã lấy / đã đóng của từng nhân viên + việc
+         *     đang giao cho từng người + hàng chờ chưa giao — màn Kho › Năng suất kho.
+         */
+        get: operations["TaskEngineController_productivity"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/tasks/assignees": {
         parameters: {
             query?: never;
@@ -2556,6 +2576,44 @@ export interface paths {
         put?: never;
         /** Nhận việc bằng máy quét: PENDING chưa ai giữ → của tôi; người khác giữ → 409. */
         post: operations["PdaController_claim"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/pda/waves/self-merge": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Nhân viên pick tự gộp các đơn đang giao cho mình (chưa bắt đầu) thành một lượt — trả lượt
+         *     vừa tạo, đã giao cho chính mình. Danh sách đổi so với lúc xác nhận → 409 WAVE_SELF_MERGE_STALE.
+         *     Route tĩnh đặt TRƯỚC `waves/:id` cho dễ đọc (method khác nhau nên không đè nhau).
+         */
+        post: operations["PdaController_selfMergeWave"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/pda/waves/{id}/dissolve": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Rã lượt mình tự gộp khi chưa quét gì → đơn về lại việc lẻ. Đã quét / lượt điều phối → 409. */
+        post: operations["PdaController_dissolveWave"];
         delete?: never;
         options?: never;
         head?: never;
@@ -6109,6 +6167,54 @@ export interface components {
             completed: number;
             byAssignee: components["schemas"]["TaskAssigneeStatsDto"][];
         };
+        ProductivityDoneDto: {
+            /** @description Số đơn đã lấy (PICK) / đã đóng (PACK) xong. */
+            orders: number;
+            /** @description Số dòng SKU có số lượng > 0. */
+            lines: number;
+            /** @description Tổng số lượng (đơn vị cơ sở), Decimal(18,6) chuỗi. */
+            qty: string;
+            /** @description Số đơn có dòng nhân viên BÁO THIẾU (dòng thiếu tồn do hệ thống không tính). Luôn 0 với PACK. */
+            shortOrders: number;
+            /**
+             * @description Thời gian trung bình / đơn (giây) từ lúc bắt đầu (quét đầu tiên) tới lúc xong. null = không
+             *     có đơn nào đo được (đóng tay / đóng gói không quét ghi bắt đầu = xong nên bị loại).
+             */
+            avgSeconds: number | null;
+        };
+        ProductivityOpenDto: {
+            /** @description Đã giao, chưa bắt đầu. */
+            assigned: number;
+            /** @description Đang làm hoặc đang báo sự cố. */
+            inProgress: number;
+        };
+        ProductivityTotalsDto: {
+            done: components["schemas"]["ProductivityDoneDto"];
+            open: components["schemas"]["ProductivityOpenDto"];
+            /** @description Việc chưa giao cho ai (PENDING) — hàng chờ điều phối. */
+            unassigned: number;
+        };
+        ProductivityRowDto: {
+            userId: string;
+            code: string;
+            fullName: string;
+            roles: string[];
+            done: components["schemas"]["ProductivityDoneDto"];
+            open: components["schemas"]["ProductivityOpenDto"];
+        };
+        ProductivitySectionDto: {
+            totals: components["schemas"]["ProductivityTotalsDto"];
+            /** @description Nhân viên có việc (xong trong khoảng hoặc đang giữ) + mọi người mang role đúng loại việc. */
+            rows: components["schemas"]["ProductivityRowDto"][];
+        };
+        TaskProductivityDto: {
+            /** @description YYYY-MM-DD (Asia/Ho_Chi_Minh), bao gồm hai đầu. */
+            from: string;
+            to: string;
+            warehouseId: string | null;
+            pick: components["schemas"]["ProductivitySectionDto"];
+            pack: components["schemas"]["ProductivitySectionDto"];
+        };
         TaskAssigneeDto: {
             id: string;
             code: string;
@@ -6300,6 +6406,8 @@ export interface components {
             packCount: number | null;
             /** @description (Auto-wave cũ) lượt CARTON đã gộp vào lượt PALLET này — không còn ghi mới từ 2026-09-22. */
             mergedIntoId: string | null;
+            /** @description Người tạo lượt. Trùng người đang giữ = lượt nhân viên TỰ GỘP trên máy PDA (rã được khi chưa quét). */
+            createdBy: string | null;
         };
         WaveListResponseDto: {
             items: components["schemas"]["WaveDto"][];
@@ -6384,6 +6492,8 @@ export interface components {
             packCount: number | null;
             /** @description (Auto-wave cũ) lượt CARTON đã gộp vào lượt PALLET này — không còn ghi mới từ 2026-09-22. */
             mergedIntoId: string | null;
+            /** @description Người tạo lượt. Trùng người đang giữ = lượt nhân viên TỰ GỘP trên máy PDA (rã được khi chưa quét). */
+            createdBy: string | null;
             tasks: components["schemas"]["WaveTaskDto"][];
             /** @description Đã sắp theo lối đi (pickSequence). */
             lines: components["schemas"]["WaveLineGroupDto"][];
@@ -6616,6 +6726,10 @@ export interface components {
             location: components["schemas"]["PdaResolveLocationDto"] | null;
             shipment: components["schemas"]["PdaResolveShipmentDto"] | null;
         };
+        SelfMergeWaveDto: {
+            taskIds: string[];
+            idempotencyKey: string;
+        };
         PdaWaveLineGroupDto: {
             /** @description Khoá ổn định của nhóm: `<skuId>|<locationId|->|<lotId|->`. */
             key: string;
@@ -6691,6 +6805,19 @@ export interface components {
             packCount: number | null;
             /** @description (Auto-wave cũ) lượt CARTON đã gộp vào lượt PALLET này — không còn ghi mới từ 2026-09-22. */
             mergedIntoId: string | null;
+            /** @description Người tạo lượt. Trùng người đang giữ = lượt nhân viên TỰ GỘP trên máy PDA (rã được khi chưa quét). */
+            createdBy: string | null;
+        };
+        DissolveWaveDto: {
+            idempotencyKey: string;
+        };
+        PdaWaveDissolveResultDto: {
+            waveId: string;
+            waveDocNumber: string;
+            /** @description Task PICK con — giờ là việc lẻ ASSIGNED của mình như trước khi gộp. */
+            taskIds: string[];
+            /** @description true = cùng idempotencyKey đã xử lý trước đó — trả lại kết quả cũ. */
+            replayed: boolean;
         };
         WaveScanDto: {
             /** @description Mã SKU hoặc mã container (quét thùng/kiện = chia cả số hàng trong đó cho các đơn trong lượt). */
@@ -11672,6 +11799,29 @@ export interface operations {
             };
         };
     };
+    TaskEngineController_productivity: {
+        parameters: {
+            query?: {
+                from?: string;
+                to?: string;
+                warehouseId?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TaskProductivityDto"];
+                };
+            };
+        };
+    };
     TaskEngineController_assignees: {
         parameters: {
             query?: never;
@@ -12088,6 +12238,54 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["PdaTaskDto"];
+                };
+            };
+        };
+    };
+    PdaController_selfMergeWave: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SelfMergeWaveDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PdaWaveDto"];
+                };
+            };
+        };
+    };
+    PdaController_dissolveWave: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DissolveWaveDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PdaWaveDissolveResultDto"];
                 };
             };
         };
