@@ -26,7 +26,12 @@ import {
 import { cn } from '@/lib/cn';
 import { formatDate, formatDateTime, formatMoney, formatQuantity } from '@/lib/format';
 import { Can } from '@/lib/permission';
-import { useProduct, useWarehouses, type ProductDetail } from '../api/use-products';
+import {
+  useContainerTypes,
+  useProduct,
+  useWarehouses,
+  type ProductDetail,
+} from '../api/use-products';
 import {
   useSkuStockByLocation,
   useSkuStockByLot,
@@ -422,6 +427,9 @@ function BarcodesTab({ skus }: { skus: Sku[] }) {
 
 function UnitsTab({ skus }: { skus: Sku[] }) {
   const barcodeFor = (s: Sku, uomId: string) => s.barcodes.find((b) => b.uomId === uomId)?.code;
+  // PLAN-packaging-hierarchy B: ĐVT phụ nào là cấp đóng gói (thùng/kiện/pallet) — tên loại từ danh mục.
+  const types = useContainerTypes();
+  const typeCodeById = new Map((types.data ?? []).map((t) => [t.id, t.code]));
   return (
     <>
       <Table>
@@ -431,12 +439,19 @@ function UnitsTab({ skus }: { skus: Sku[] }) {
             <TableHead className={cn(HEAD, 'w-24 text-right')}>Hệ số</TableHead>
             <TableHead className={cn(HEAD, 'w-52')}>= đơn vị cơ bản</TableHead>
             <TableHead className={cn(HEAD, 'w-44')}>Barcode</TableHead>
+            <TableHead className={cn(HEAD, 'w-32')}>Cấp đóng gói</TableHead>
             <TableHead className={HEAD}>ĐVT bán mặc định</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
           {skus.map((s) => (
-            <UnitRows key={s.id} sku={s} showSkuHeader={skus.length > 1} barcodeFor={barcodeFor} />
+            <UnitRows
+              key={s.id}
+              sku={s}
+              showSkuHeader={skus.length > 1}
+              barcodeFor={barcodeFor}
+              typeCodeById={typeCodeById}
+            />
           ))}
         </TableBody>
       </Table>
@@ -452,17 +467,19 @@ function UnitRows({
   sku,
   showSkuHeader,
   barcodeFor,
+  typeCodeById,
 }: {
   sku: Sku;
   showSkuHeader: boolean;
   barcodeFor: (s: Sku, uomId: string) => string | undefined;
+  typeCodeById: ReadonlyMap<string, string>;
 }) {
   const noBarcode = <span className="font-sans text-muted-foreground">chưa có</span>;
   return (
     <>
       {showSkuHeader ? (
         <TableRow className="bg-muted/50 hover:bg-muted/50">
-          <TableCell colSpan={5} className="px-2.5 py-1 font-mono text-xs font-semibold">
+          <TableCell colSpan={6} className="px-2.5 py-1 font-mono text-xs font-semibold">
             {sku.code} — {sku.name}
           </TableCell>
         </TableRow>
@@ -479,6 +496,7 @@ function UnitRows({
         <TableCell className="px-2.5 py-1.5 font-mono text-xs">
           {barcodeFor(sku, sku.baseUomId) ?? noBarcode}
         </TableCell>
+        <TableCell className="px-2.5 py-1.5 text-xs text-muted-foreground">đơn vị lẻ</TableCell>
         <TableCell className="px-2.5 py-1.5">
           {sku.salesUomId === null ? <StatusBadge tone="ok">bán mặc định</StatusBadge> : null}
         </TableCell>
@@ -492,6 +510,15 @@ function UnitRows({
           </TableCell>
           <TableCell className="px-2.5 py-1.5 font-mono text-xs">
             {barcodeFor(sku, c.uomId) ?? noBarcode}
+          </TableCell>
+          <TableCell className="px-2.5 py-1.5 text-xs">
+            {c.containerTypeId ? (
+              <StatusBadge tone="brand">
+                {typeCodeById.get(c.containerTypeId) ?? 'thùng'}
+              </StatusBadge>
+            ) : (
+              <span className="text-muted-foreground">—</span>
+            )}
           </TableCell>
           <TableCell className="px-2.5 py-1.5">
             {sku.salesUomId === c.uomId ? <StatusBadge tone="ok">bán mặc định</StatusBadge> : null}

@@ -1,6 +1,6 @@
 'use client';
 
-import { Download, FileSpreadsheet, Plus, Upload } from 'lucide-react';
+import { Download, FileSpreadsheet, Plus, Trash2, Upload } from 'lucide-react';
 import Link from 'next/link';
 import { useMemo, useState } from 'react';
 import {
@@ -24,6 +24,7 @@ import { Can, useAbility } from '@/lib/permission';
 import { useListState } from '@/lib/url-state';
 import {
   useBrands,
+  useBulkDeleteProducts,
   useCategories,
   useDeleteProduct,
   useProducts,
@@ -41,6 +42,8 @@ import {
  *   filter server-side theo danh mục (gộp CẢ danh mục con), thương hiệu, theo dõi
  *   lô, còn tồn; sort theo mã / tên / ngày tạo; q ăn cả tên dân dã (searchAliases),
  *   mã/tên SKU và barcode. Xóa mềm từng dòng (server chặn 409 khi còn tồn/đang giữ).
+ *   Chọn nhiều dòng → nút "Xóa" trên tiêu đề: server tự quyết xóa mềm (đã có đơn / đã
+ *   vào kho) hay xóa hẳn (chưa phát sinh gì) cho từng sản phẩm.
  * - "Theo SKU": GET /skus — mỗi dòng một SKU kèm tồn thực / đang giữ / khả dụng gộp
  *   mọi kho (đúng design/Products/ProductList@2x.png). API này chỉ nhận q + status,
  *   sắp cố định theo mã SKU — không cột sortable, không hứa hão.
@@ -469,10 +472,80 @@ function BulkStopSelling({ rows, onDone }: { rows: SkuListRow[]; onDone: () => v
   );
 }
 
+/**
+ * Nút "Xóa" trên tiêu đề — xóa các sản phẩm đã chọn ở góc nhìn Sản phẩm qua
+ * POST /products/bulk-delete. Server phân loại từng sản phẩm: đã có đơn hoặc đã vào kho
+ * → xóa mềm; chưa phát sinh gì → xóa hẳn. Không optimistic (luật 5) — chờ kết quả rồi
+ * mới báo và bỏ chọn. Ở góc nhìn Theo SKU nút vô hiệu (chọn ở đó là chọn SKU, không phải
+ * sản phẩm — có bulk "Ngừng bán" riêng).
+ */
+function BulkDeleteButton({
+  ids,
+  enabled,
+  onDone,
+}: {
+  ids: string[];
+  enabled: boolean;
+  onDone: () => void;
+}) {
+  const [confirming, setConfirming] = useState(false);
+  const del = useBulkDeleteProducts();
+  const disabled = !enabled || ids.length === 0;
+  return (
+    <>
+      <Button
+        size="sm"
+        variant="outline"
+        disabled={disabled}
+        title={
+          !enabled
+            ? 'Chuyển sang góc nhìn Sản phẩm rồi chọn sản phẩm cần xóa'
+            : ids.length === 0
+              ? 'Chọn sản phẩm trong bảng để xóa'
+              : undefined
+        }
+        onClick={() => setConfirming(true)}
+      >
+        <Trash2 aria-hidden />
+        {ids.length > 0 ? `Xóa (${ids.length})` : 'Xóa'}
+      </Button>
+      <ConfirmDialog
+        open={confirming}
+        onOpenChange={setConfirming}
+        title={`Xóa ${ids.length} sản phẩm?`}
+        description="Sản phẩm đã có đơn hàng hoặc đã nhập kho sẽ xóa mềm: ẩn khỏi danh mục, SKU chuyển Ngừng bán, tồn kho và chứng từ cũ giữ nguyên. Sản phẩm chưa phát sinh gì sẽ xóa hẳn cùng SKU, barcode, ảnh và giá — không hoàn tác được."
+        confirmLabel="Xóa"
+        onConfirm={async () => {
+          try {
+            const r = await del.mutateAsync(ids);
+            const parts: string[] = [];
+            if (r.hardDeleted.length) parts.push(`xóa hẳn ${r.hardDeleted.length}`);
+            if (r.softDeleted.length) parts.push(`ẩn ${r.softDeleted.length} đã có đơn/tồn kho`);
+            if (r.skipped.length) parts.push(`bỏ qua ${r.skipped.length} đã xóa trước đó`);
+            toast.success(`Đã xóa sản phẩm: ${parts.join(', ')}`);
+            onDone();
+          } catch (err) {
+            toast.error(messageFor(err));
+          }
+        }}
+      />
+    </>
+  );
+}
+
 export function ProductListScreen() {
-  const { state, set, skipTake } = useListState<ProductFilter>(DEFAULTS);
+  const { state, set: setUrl, skipTake } = useListState<ProductFilter>(DEFAULTS);
   const view: 'product' | 'sku' = state.filters.view === 'sku' ? 'sku' : 'product';
   const status = parseStatus(state.filters.status);
+
+  // Sản phẩm đã tick ở góc nhìn Sản phẩm (id = productId). Đổi trang / lọc / sort / góc
+  // nhìn là bỏ chọn — không để id ngoài tầm mắt lọt vào lệnh xóa.
+  const [selectedProducts, setSelectedProducts] = useState<RowSelectionState>({});
+  const set: typeof setUrl = (patch) => {
+    setSelectedProducts({});
+    setUrl(patch);
+  };
+  const selectedProductIds = Object.keys(selectedProducts).filter((k) => selectedProducts[k]);
 
   const setFilter = (patch: Partial<Record<ProductFilter, string | undefined>>) =>
     set({ filters: { ...state.filters, ...patch } });
@@ -501,6 +574,13 @@ export function ProductListScreen() {
         breadcrumb={[{ label: 'Sản phẩm', href: '/catalog/products' }, { label: 'Danh sách' }]}
         actions={
           <>
+            <Can I="delete" a="Product">
+              <BulkDeleteButton
+                ids={selectedProductIds}
+                enabled={view === 'product'}
+                onDone={() => setSelectedProducts({})}
+              />
+            </Can>
             <Button size="sm" variant="outline" asChild>
               <Link href="/admin/import">
                 <Upload aria-hidden />
@@ -560,6 +640,7 @@ export function ProductListScreen() {
           status={status}
           hasFilter={hasFilter}
           onClearFilters={clearFilters}
+          selection={{ selected: selectedProducts, onChange: setSelectedProducts }}
         />
       ) : (
         <SkuView
@@ -586,7 +667,7 @@ interface ViewProps {
   onClearFilters: () => void;
 }
 
-/** Góc nhìn sản phẩm cha — GET /products với filter/sort server-side. */
+/** Góc nhìn sản phẩm cha — GET /products với filter/sort server-side; tick dòng cho nút Xóa. */
 function ProductView({
   state,
   set,
@@ -595,7 +676,10 @@ function ProductView({
   status,
   hasFilter,
   onClearFilters,
-}: ViewProps) {
+  selection,
+}: ViewProps & {
+  selection: { selected: RowSelectionState; onChange: (s: RowSelectionState) => void };
+}) {
   const categories = useCategories();
   const brands = useBrands();
   // Chỉ cột nằm trong whitelist sort của API mới gửi lên — cột khác bấm không có tác dụng.
@@ -708,6 +792,7 @@ function ProductView({
               onPageChange={(page) => set({ page })}
               onSizeChange={(size) => set({ size })}
               onSortChange={(s) => set({ sort: s })}
+              selection={selection}
             />
             <p className="mt-2 text-xs text-muted-foreground">
               Lọc danh mục gộp cả danh mục con · &quot;Còn hàng&quot; = có ít nhất một SKU còn tồn ·

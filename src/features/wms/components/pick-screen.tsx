@@ -2,13 +2,12 @@
 
 import {
   AlertTriangle,
+  Archive,
   CheckCircle2,
   CircleAlert,
   Layers,
   MapPin,
-  Minus,
   PackageX,
-  Plus,
   WifiOff,
 } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
@@ -20,12 +19,16 @@ import { cn } from '@/lib/cn';
 import { messageFor } from '@/lib/error-messages';
 import { formatDateTime, formatQuantity } from '@/lib/format';
 import { useAbility } from '@/lib/permission';
-import { usePdaMyTasks, usePdaStats, useResolveCode } from '../api/use-pda';
+import { usePdaMyTasks, usePdaMyWaves, usePdaStats, useResolveCode } from '../api/use-pda';
 import { useScanSession, type ScanFeedback, type Shortage } from '../scan-session';
+import { useScanQty } from '../use-scan-qty';
 import { useWaveSession } from '../wave-session';
 import { PdaListColumn } from './pda-list-column';
+import { ScanQtyBar } from './scan-qty-bar';
 import { ShortPickDialog } from './short-pick-dialog';
+import { ContainerHint } from './container-hint';
 import { SkuBarcodes } from './sku-barcodes';
+import { SkuIdentity, SkuThumb } from './sku-identity';
 
 type Mode = 'task' | 'wave';
 
@@ -35,6 +38,10 @@ type Mode = 'task' | 'wave';
  * Quét mã đơn / mã việc → việc đơn lẻ; quét mã WAVE → lượt gộp (nhóm theo vị trí, server tự
  * chia về từng đơn). Thiếu hàng → nút "Thiếu hàng" → cảnh báo vàng giữ trên màn, phần thiếu
  * không sang đóng gói, điều phối nhận cảnh báo. Không offline (app RN lo).
+ *
+ * 2026-09-22: quét mã SKU → nhập số lượng → Enter (lấy 30 một lần, không bấm +/−); thẻ dòng
+ * đang lấy hiện ảnh + tên thương mại + vị trí + "trên kệ còn N" (server tính = tồn bin − đã
+ * lấy chưa đóng gói, bất biến 3 — pick không chạm ledger).
  */
 export function PickScreen() {
   const ability = useAbility();
@@ -43,19 +50,24 @@ export function PickScreen() {
   const wave = useWaveSession();
   const scanRef = useRef<ScanInputHandle>(null);
   const [mode, setMode] = useState<Mode>('task');
-  const [qty, setQty] = useState(1);
+  const scanQty = useScanQty({
+    lines: mode === 'wave' ? (wave.wave?.lines ?? []) : (task.task?.lines ?? []),
+    send: (code, qty) => void (mode === 'wave' ? wave : task).scan(code, qty),
+  });
   const [shortOpen, setShortOpen] = useState(false);
   const [resolving, setResolving] = useState(false);
   const [resolveError, setResolveError] = useState<string | null>(null);
   const canExecute = ability.can('execute', 'Task');
   // Hai cột khi chưa nhận việc: việc điều phối đã giao cho tôi + đơn tôi đã lấy xong hôm nay.
   const myTasks = usePdaMyTasks(canExecute);
+  const myWaves = usePdaMyWaves(canExecute);
   const doneToday = usePdaStats('PICK', null, canExecute);
   const idle = !resolving && task.phase === 'idle' && wave.phase === 'idle';
   useEffect(() => {
     // Quay về màn chờ (sau "Quét đơn kế tiếp") → làm tươi hai cột ngay, không đợi 30s.
     if (idle && canExecute) {
       void myTasks.refetch();
+      void myWaves.refetch();
       void doneToday.refetch();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -95,8 +107,7 @@ export function PickScreen() {
 
   const onScan = (code: string) => {
     if (phase === 'ready') {
-      void s.scan(code, String(qty));
-      setQty(1);
+      scanQty.onScan(code);
     } else if (phase === 'idle') {
       void openCode(code);
     }
@@ -105,6 +116,7 @@ export function PickScreen() {
   const clear = () => {
     task.clear();
     wave.clear();
+    scanQty.reset();
     setResolveError(null);
     setMode('task');
     scanRef.current?.focus();
@@ -137,7 +149,21 @@ export function PickScreen() {
       : '';
   const shortRemaining = currentWave?.qtyRemaining ?? currentTask?.qtyRemaining ?? '0';
   // GET /pda/tasks trả mọi loại việc còn mở của tôi — màn này chỉ là lấy hàng.
-  const myPicks = myTasks.data?.filter((t) => t.type === 'PICK') ?? null;
+  // Việc lẻ: PICK không thuộc lượt. Đơn con của lượt gộp KHÔNG rải ra đây — lượt là một mục riêng.
+  const myPicks = myTasks.data?.filter((t) => t.type === 'PICK' && !t.waveId) ?? null;
+  const myWaveItems = myWaves.data?.items ?? null;
+  const assignedCount =
+    myPicks === null && myWaveItems === null
+      ? null
+      : (myPicks?.length ?? 0) + (myWaveItems?.length ?? 0);
+
+  // Chạm mục "Lượt" → nhận cả lượt (POST /pda/waves/:id/claim), không qua resolve.
+  const openWave = async (waveId: string) => {
+    setResolveError(null);
+    setMode('wave');
+    task.clear();
+    await wave.open(waveId);
+  };
 
   return (
     <div className="flex min-h-dvh flex-col bg-background text-base">
@@ -222,10 +248,40 @@ export function PickScreen() {
               <PdaListColumn
                 title="Việc được giao"
                 hint="chưa lấy xong"
-                count={myPicks?.length ?? null}
-                error={myTasks.isError}
+                count={assignedCount}
+                error={myTasks.isError || myWaves.isError}
                 empty="Chưa có việc nào được giao — điều phối sẽ gán trên bảng điều phối."
               >
+                {myWaveItems?.map((w) => (
+                  <li key={w.id}>
+                    <button
+                      type="button"
+                      className="flex min-h-14 w-full items-center justify-between gap-2 px-3 py-2 text-left hover:bg-muted"
+                      onClick={() => void openWave(w.id)}
+                      aria-label={`Mở lượt ${w.docNumber}`}
+                    >
+                      <span className="flex flex-col">
+                        <span className="flex items-center gap-1 font-mono font-semibold">
+                          <Layers className="h-4 w-4 text-primary" aria-hidden />
+                          {w.docNumber}
+                        </span>
+                        <span className="text-xs text-muted-foreground">
+                          Lượt gộp · {w.taskDoneCount}/{w.taskCount} đơn
+                        </span>
+                      </span>
+                      <span
+                        className={cn(
+                          'rounded-sm px-1.5 py-0.5 text-xs font-medium',
+                          w.status === 'IN_PROGRESS'
+                            ? 'bg-primary/10 text-primary'
+                            : 'bg-muted text-muted-foreground',
+                        )}
+                      >
+                        {w.status === 'IN_PROGRESS' ? 'Đang lấy' : 'Chưa bắt đầu'}
+                      </span>
+                    </button>
+                  </li>
+                ))}
                 {myPicks?.map((t) => (
                   <li key={t.taskId}>
                     <button
@@ -298,16 +354,12 @@ export function PickScreen() {
             <div className="font-mono text-4xl font-bold leading-tight">
               {(currentWave ?? currentTask)!.locationCode ?? '—'}
             </div>
-            <div className="mt-3 text-lg font-semibold">
-              {(currentWave ?? currentTask)!.skuName}
-            </div>
-            <div className="font-mono text-sm text-muted-foreground">
-              {(currentWave ?? currentTask)!.skuCode}
-              {(currentWave ?? currentTask)!.lotNumber
-                ? ` · lô ${(currentWave ?? currentTask)!.lotNumber}`
-                : ''}
-            </div>
+            <SkuIdentity sku={(currentWave ?? currentTask)!} className="mt-3" />
             <SkuBarcodes barcodes={(currentWave ?? currentTask)!.barcodes} />
+            <ContainerHint
+              containerBarcode={(currentWave ?? currentTask)!.containerBarcode}
+              suggested={(currentWave ?? currentTask)!.suggested}
+            />
             <div className="mt-3 flex items-baseline gap-2">
               <span className="text-5xl font-bold tabular-nums">
                 {formatQuantity((currentWave ?? currentTask)!.qtyRemaining)}
@@ -317,6 +369,21 @@ export function PickScreen() {
                 {formatQuantity((currentWave ?? currentTask)!.qtyPlanned)}
               </span>
             </div>
+            {(currentWave ?? currentTask)!.binRemaining !== null ? (
+              <p
+                className="mt-2 flex items-center gap-2 rounded-md bg-muted px-3 py-2 text-base"
+                aria-live="polite"
+              >
+                <Archive className="h-5 w-5 shrink-0 text-muted-foreground" aria-hidden />
+                <span>
+                  Trên kệ còn{' '}
+                  <b className="text-xl font-bold tabular-nums">
+                    {formatQuantity((currentWave ?? currentTask)!.binRemaining)}
+                  </b>{' '}
+                  <span className="text-muted-foreground">· đã trừ phần lấy chưa đóng gói</span>
+                </span>
+              </p>
+            ) : null}
             {currentWave ? (
               <ul className="mt-2 flex flex-wrap gap-1 text-xs">
                 {currentWave.shares.map((sh) => (
@@ -350,14 +417,22 @@ export function PickScreen() {
                   l.taskLineId === currentTask?.taskLineId && 'border-primary',
                 )}
               >
-                <span>
-                  <span className="font-mono font-semibold">{l.locationCode ?? '—'}</span>{' '}
-                  <span>{l.skuName}</span>
-                  {l.status === 'EXCEPTION' ? (
-                    <span className="ml-1 text-xs text-warning-foreground">· thiếu</span>
-                  ) : null}
+                <span className="flex min-w-0 items-center gap-2">
+                  <SkuThumb src={l.imageUrl} alt={l.productName} />
+                  <span className="flex min-w-0 flex-col">
+                    <span className="truncate">
+                      <span className="font-mono font-semibold">{l.locationCode ?? '—'}</span>{' '}
+                      {l.productName}
+                      {l.status === 'EXCEPTION' ? (
+                        <span className="ml-1 text-xs text-warning-foreground">· thiếu</span>
+                      ) : null}
+                    </span>
+                    {l.skuName !== l.productName ? (
+                      <span className="truncate text-xs text-muted-foreground">{l.skuName}</span>
+                    ) : null}
+                  </span>
                 </span>
-                <span className="tabular-nums">
+                <span className="shrink-0 tabular-nums">
                   {formatQuantity(l.qtyDone)}/{formatQuantity(l.qtyPlanned)}
                 </span>
               </li>
@@ -376,14 +451,22 @@ export function PickScreen() {
                   g.key === currentWave?.key && 'border-primary',
                 )}
               >
-                <span>
-                  <span className="font-mono font-semibold">{g.locationCode ?? '—'}</span>{' '}
-                  <span>{g.skuName}</span>
-                  <span className="ml-1 text-xs text-muted-foreground">
-                    · {g.shares.length} đơn
+                <span className="flex min-w-0 items-center gap-2">
+                  <SkuThumb src={g.imageUrl} alt={g.productName} />
+                  <span className="flex min-w-0 flex-col">
+                    <span className="truncate">
+                      <span className="font-mono font-semibold">{g.locationCode ?? '—'}</span>{' '}
+                      {g.productName}
+                      <span className="ml-1 text-xs text-muted-foreground">
+                        · {g.shares.length} đơn
+                      </span>
+                    </span>
+                    {g.skuName !== g.productName ? (
+                      <span className="truncate text-xs text-muted-foreground">{g.skuName}</span>
+                    ) : null}
                   </span>
                 </span>
-                <span className="tabular-nums">
+                <span className="shrink-0 tabular-nums">
                   {formatQuantity(g.qtyDone)}/{formatQuantity(g.qtyPlanned)}
                 </span>
               </li>
@@ -412,39 +495,18 @@ export function PickScreen() {
       </main>
 
       <footer className="sticky bottom-0 flex flex-col gap-3 border-t bg-background px-4 pb-4 pt-3">
-        {phase === 'ready' ? (
-          <div className="flex items-center justify-between gap-3">
-            <span className="text-sm text-muted-foreground">Số lượng mỗi lần quét</span>
-            <div className="flex items-center gap-2">
-              <Button
-                variant="outline"
-                className="h-14 w-14"
-                aria-label="Giảm số lượng"
-                onClick={() => setQty((q) => Math.max(1, q - 1))}
-              >
-                <Minus aria-hidden />
-              </Button>
-              <span className="w-10 text-center text-2xl font-bold tabular-nums" aria-live="polite">
-                {qty}
-              </span>
-              <Button
-                variant="outline"
-                className="h-14 w-14"
-                aria-label="Tăng số lượng"
-                onClick={() => setQty((q) => q + 1)}
-              >
-                <Plus aria-hidden />
-              </Button>
-            </div>
-          </div>
-        ) : null}
+        {phase === 'ready' ? <ScanQtyBar ctl={scanQty} verb="Lấy" /> : null}
         <ScanInput
           ref={scanRef}
           size="lg"
           label={phase === 'ready' ? 'Quét sản phẩm' : 'Quét mã đơn'}
-          placeholder={phase === 'ready' ? 'Quét mã sản phẩm…' : 'Quét mã đơn / mã việc / mã lượt…'}
+          placeholder={
+            phase === 'ready'
+              ? 'Quét mã sản phẩm hoặc mã thùng…'
+              : 'Quét mã đơn / mã việc / mã lượt…'
+          }
           onScan={onScan}
-          paused={shortOpen}
+          paused={shortOpen || scanQty.pending !== null}
           disabled={phase === 'opening'}
         />
         {phase === 'done' ? (

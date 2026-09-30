@@ -107,7 +107,7 @@ export function QuickCustomerDialog({
                 <FormItem>
                   <FormLabel>Tên khách hàng</FormLabel>
                   <FormControl>
-                    <Input autoFocus placeholder="Cửa hàng An Nhiên" {...field} />
+                    <Input autoFocus placeholder="Đại lý VTNN An Nhiên" {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>

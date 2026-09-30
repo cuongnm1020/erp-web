@@ -188,7 +188,7 @@ function AddressDialog({
                 <FormItem>
                   <FormLabel>Địa chỉ</FormLabel>
                   <FormControl>
-                    <Input placeholder="Lô 6-8-10, đường số 3, KCN Tân Tạo" {...field} />
+                    <Input placeholder="Số 59 đường Cốc Trại" {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -203,7 +203,7 @@ function AddressDialog({
                   <FormItem>
                     <FormLabel>Thôn / xóm</FormLabel>
                     <FormControl>
-                      <Input placeholder="Khu phố 3" {...field} />
+                      <Input placeholder="Thôn Kim Quan 3" {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -216,7 +216,7 @@ function AddressDialog({
                   <FormItem>
                     <FormLabel>Phường / xã</FormLabel>
                     <FormControl>
-                      <Input placeholder="P. Tân Tạo A" {...field} />
+                      <Input placeholder="Xã Thạch Thất" {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -229,7 +229,7 @@ function AddressDialog({
                   <FormItem>
                     <FormLabel>Tỉnh / thành</FormLabel>
                     <FormControl>
-                      <Input placeholder="TP.HCM" {...field} />
+                      <Input placeholder="Hà Nội" {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>

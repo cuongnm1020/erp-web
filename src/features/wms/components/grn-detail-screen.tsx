@@ -1,6 +1,7 @@
 'use client';
 
-import { Lock } from 'lucide-react';
+import { Box, Lock, Printer } from 'lucide-react';
+import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { DetailSkeleton, QueryState } from '@/components/data/states';
 import { StatusBadge, type StatusTone } from '@/components/data/status-badge';
@@ -18,6 +19,8 @@ import { toast } from '@/components/ui/toaster';
 import { messageFor } from '@/lib/error-messages';
 import { formatDate, formatDateTime, formatMoney, formatQuantity } from '@/lib/format';
 import { useAbility } from '@/lib/permission';
+import { usePrint } from '@/lib/print';
+import { LpnPrintSheet, type LpnLabelData } from './lpn-label';
 import {
   useCancelReceipt,
   usePostReceipt,
@@ -120,9 +123,39 @@ function Movements({ id }: { id: string }) {
   );
 }
 
+/** Tem LPN của một dòng đóng gói: thùng con trước, pallet bọc ngoài cuối (dán sau cùng). */
+function labelsOf(line: ReceiptDetail['lines'][number]): LpnLabelData[] {
+  const p = line.packaging;
+  if (!p) return [];
+  const per = `${formatQuantity(p.qtyPerContainer)} ${line.baseUomCode}`;
+  const out: LpnLabelData[] = p.containers.map((c) => ({
+    barcode: c.barcode,
+    typeCode: p.containerType,
+    line1: `${line.skuCode} × ${per}`,
+    line2: line.skuName,
+  }));
+  if (p.wrapper) {
+    out.push({
+      barcode: p.wrapper.barcode,
+      typeCode: 'PALLET',
+      line1: `${p.count} ${p.containerType} · ${line.skuCode}`,
+      line2: `${formatQuantity(line.qtyBase)} ${line.baseUomCode} · ${line.skuName}`,
+    });
+  }
+  return out;
+}
+
 function DetailBody({ receipt }: { receipt: ReceiptDetail }) {
+  const printer = usePrint();
+  const [labels, setLabels] = useState<LpnLabelData[]>([]);
+  const printLine = (line: ReceiptDetail['lines'][number]) => {
+    setLabels(labelsOf(line));
+    printer.print();
+  };
+  const packed = receipt.lines.filter((l) => l.packaging);
   return (
     <div className="flex flex-col gap-3">
+      {labels.length ? <LpnPrintSheet labels={labels} printer={printer} /> : null}
       {receipt.status === 'POSTED' ? (
         <p className="flex items-center gap-2 rounded-md border border-success/30 bg-success/10 px-3 py-2 text-sm">
           <Lock className="h-3.5 w-3.5" aria-hidden />
@@ -155,8 +188,23 @@ function DetailBody({ receipt }: { receipt: ReceiptDetail }) {
       </div>
 
       <section className="overflow-hidden rounded-md border bg-card">
-        <header className="border-b px-3 py-2 text-sm font-semibold">
-          Dòng nhập · {receipt.lineCount} dòng · {formatQuantity(receipt.totalQty)} đơn vị cơ bản
+        <header className="flex items-center justify-between border-b px-3 py-2 text-sm font-semibold">
+          <span>
+            Dòng nhập · {receipt.lineCount} dòng · {formatQuantity(receipt.totalQty)} đơn vị cơ bản
+          </span>
+          {packed.length ? (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                setLabels(packed.flatMap(labelsOf));
+                printer.print();
+              }}
+            >
+              <Printer aria-hidden />
+              In tất cả tem thùng
+            </Button>
+          ) : null}
         </header>
         <div className="overflow-x-auto">
           <Table>
@@ -170,6 +218,7 @@ function DetailBody({ receipt }: { receipt: ReceiptDetail }) {
                 <TableHead className="px-2.5 text-xs">HSD</TableHead>
                 <TableHead className="px-2.5 text-right text-xs">Đơn giá</TableHead>
                 <TableHead className="px-2.5 text-right text-xs">Thành tiền</TableHead>
+                <TableHead className="px-2.5 text-xs">Đóng gói</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -197,6 +246,35 @@ function DetailBody({ receipt }: { receipt: ReceiptDetail }) {
                   </TableCell>
                   <TableCell className="px-2.5 py-1.5 text-right tabular-nums font-semibold">
                     {l.lineValue ? formatMoney(l.lineValue) : '—'}
+                  </TableCell>
+                  <TableCell className="px-2.5 py-1.5 text-xs">
+                    {l.packaging ? (
+                      <div className="flex items-center gap-2">
+                        <span className="flex items-center gap-1">
+                          <Box className="h-3.5 w-3.5 text-muted-foreground" aria-hidden />
+                          {l.packaging.count} {l.packaging.containerType} ×{' '}
+                          {formatQuantity(l.packaging.qtyPerContainer)}
+                          {l.packaging.wrapper ? (
+                            <span className="text-muted-foreground">
+                              {' '}
+                              · bọc <span className="font-mono">{l.packaging.wrapper.barcode}</span>
+                            </span>
+                          ) : null}
+                        </span>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-7"
+                          aria-label={`In tem thùng dòng ${l.lineNo}`}
+                          onClick={() => printLine(l)}
+                        >
+                          <Printer aria-hidden />
+                          In tem
+                        </Button>
+                      </div>
+                    ) : (
+                      <span className="text-muted-foreground">Hàng rời</span>
+                    )}
                   </TableCell>
                 </TableRow>
               ))}

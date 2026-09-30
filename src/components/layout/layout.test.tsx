@@ -70,6 +70,8 @@ describe('visibleModules', () => {
       'Kho & vị trí',
       'Phiếu nhập kho',
       'Phiếu bán hàng',
+      'Thùng / pallet',
+      'Cảnh báo nhập hàng',
     ]);
   });
 

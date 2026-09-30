@@ -1,6 +1,6 @@
 'use client';
 
-import { AlertTriangle, Gift, Lock } from 'lucide-react';
+import { AlertTriangle, Boxes, CornerDownRight, Gift, Lock } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
@@ -18,6 +18,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { toast } from '@/components/ui/toaster';
+import { groupOrderLines } from '../combo-lines';
 import { isApiError } from '@/lib/api/errors';
 import { messageFor } from '@/lib/error-messages';
 import { formatDate, formatDateTime, formatMoney, formatQuantity, toDecimal } from '@/lib/format';
@@ -372,36 +373,87 @@ function Editor({ order }: { order: SalesOrderDetail }) {
             }
           >
             <ul className="divide-y">
-              {order.lines.map((l) => (
-                <li key={l.id} className="grid gap-x-3 gap-y-1 px-3 py-2 sm:grid-cols-[1fr_auto]">
-                  <div className="min-w-0">
-                    <div className="flex flex-wrap items-center gap-1.5">
-                      <span className="rounded border px-1.5 font-mono text-xs text-primary">
-                        {l.skuCode}
-                      </span>
-                      <span className="font-medium">{l.skuName}</span>
-                      {l.isGift ? (
+              {groupOrderLines(order.lines)
+                .flatMap((g) =>
+                  g.kind === 'line'
+                    ? [g.line]
+                    : [
+                        /* Dòng tổng combo — không phải SalesOrderLine, vẽ riêng ngay dưới */
+                        { comboGroup: g } as const,
+                        ...g.lines,
+                      ],
+                )
+                .map((item) =>
+                  'comboGroup' in item ? (
+                    <li
+                      key={`combo-${item.comboGroup.groupNo}`}
+                      className="grid gap-x-3 gap-y-1 bg-muted/40 px-3 py-2 sm:grid-cols-[1fr_auto]"
+                    >
+                      <div className="flex flex-wrap items-center gap-1.5">
+                        <span className="rounded border px-1.5 font-mono text-xs text-primary">
+                          {item.comboGroup.skuCode}
+                        </span>
+                        <span className="font-medium">{item.comboGroup.skuName}</span>
                         <StatusBadge tone="brand">
-                          <Gift className="h-3 w-3" aria-hidden />
-                          Hàng tặng
+                          <Boxes className="h-3 w-3" aria-hidden />
+                          Combo
                         </StatusBadge>
-                      ) : null}
-                    </div>
-                    <div className="mt-1 flex flex-wrap gap-x-4 text-xs text-muted-foreground">
-                      <span>Chiết khấu: {money(l.discount)} ₫</span>
-                      <span>Đang giữ: {formatQuantity(l.reservedQty)}</span>
-                      <span>Đã pick: {formatQuantity(l.pickedQty)}</span>
-                    </div>
-                  </div>
-                  <div className="text-right tabular-nums">
-                    <div className="text-sm">
-                      {money(l.unitPrice)} ₫ <span className="text-muted-foreground">×</span>{' '}
-                      {formatQuantity(l.qty)} {l.uomCode}
-                    </div>
-                    <div className="font-semibold text-primary">{money(l.lineTotal)} ₫</div>
-                  </div>
-                </li>
-              ))}
+                      </div>
+                      <div className="text-right tabular-nums">
+                        <div className="text-sm">
+                          {money(item.comboGroup.unitPrice)} ₫{' '}
+                          <span className="text-muted-foreground">×</span>{' '}
+                          {formatQuantity(item.comboGroup.qty)} combo
+                        </div>
+                        <div className="font-semibold text-primary">
+                          {money(item.comboGroup.lineTotal)} ₫
+                        </div>
+                      </div>
+                    </li>
+                  ) : (
+                    <li
+                      key={item.id}
+                      className={
+                        item.combo
+                          ? 'grid gap-x-3 gap-y-1 px-3 py-2 pl-7 sm:grid-cols-[1fr_auto]'
+                          : 'grid gap-x-3 gap-y-1 px-3 py-2 sm:grid-cols-[1fr_auto]'
+                      }
+                    >
+                      <div className="min-w-0">
+                        <div className="flex flex-wrap items-center gap-1.5">
+                          {item.combo ? (
+                            <CornerDownRight
+                              className="h-3 w-3 text-muted-foreground"
+                              aria-hidden
+                            />
+                          ) : null}
+                          <span className="rounded border px-1.5 font-mono text-xs text-primary">
+                            {item.skuCode}
+                          </span>
+                          <span className="font-medium">{item.skuName}</span>
+                          {item.isGift ? (
+                            <StatusBadge tone="brand">
+                              <Gift className="h-3 w-3" aria-hidden />
+                              Hàng tặng
+                            </StatusBadge>
+                          ) : null}
+                        </div>
+                        <div className="mt-1 flex flex-wrap gap-x-4 text-xs text-muted-foreground">
+                          <span>Chiết khấu: {money(item.discount)} ₫</span>
+                          <span>Đang giữ: {formatQuantity(item.reservedQty)}</span>
+                          <span>Đã pick: {formatQuantity(item.pickedQty)}</span>
+                        </div>
+                      </div>
+                      <div className="text-right tabular-nums">
+                        <div className="text-sm">
+                          {money(item.unitPrice)} ₫ <span className="text-muted-foreground">×</span>{' '}
+                          {formatQuantity(item.qty)} {item.uomCode}
+                        </div>
+                        <div className="font-semibold text-primary">{money(item.lineTotal)} ₫</div>
+                      </div>
+                    </li>
+                  ),
+                )}
             </ul>
             <p className="flex items-center gap-1.5 border-t px-3 py-2 text-xs text-muted-foreground">
               <AlertTriangle className="h-3.5 w-3.5" aria-hidden />

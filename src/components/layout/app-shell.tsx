@@ -39,7 +39,7 @@ export function AppShell({
       <div className="flex min-h-screen">
         <Sidebar />
         <div className="flex min-w-0 flex-1 flex-col">
-          <header className="flex h-14 items-center justify-between gap-4 border-b px-4">
+          <header className="flex h-12 items-center justify-between gap-4 border-b bg-card px-5">
             <Button
               variant="outline"
               size="sm"
@@ -79,7 +79,7 @@ export function AppShell({
               </DropdownMenuContent>
             </DropdownMenu>
           </header>
-          <main className="flex-1 p-4">{children}</main>
+          <main className="flex-1 p-5">{children}</main>
         </div>
       </div>
       <CommandPalette />

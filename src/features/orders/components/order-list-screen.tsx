@@ -10,11 +10,19 @@ import { StatusBadge } from '@/components/data/status-badge';
 import { PageHeader } from '@/components/layout/page-header';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { cn } from '@/lib/cn';
 import { formatDate, formatMoney, formatQuantity, toDecimal } from '@/lib/format';
 import { Can } from '@/lib/permission';
 import { useInvalidateOn } from '@/lib/realtime';
 import { useListState } from '@/lib/url-state';
+import { useCarriers } from '@/features/wms/api/use-shipping';
 import { orderKeys, useOrders, type SalesOrder } from '../api/use-orders';
 import {
   ORDER_STATUSES,
@@ -46,7 +54,16 @@ import { SendToCarrierMenu } from './send-to-carrier-menu';
  */
 const DEFAULTS = {
   size: 50,
-  filterKeys: ['status', 'customerId', 'weightMin', 'weightMax', 'noCarrier'] as const,
+  filterKeys: [
+    'status',
+    'customerId',
+    'weightMin',
+    'weightMax',
+    'noCarrier',
+    'carrierId',
+    'from',
+    'to',
+  ] as const,
 };
 
 type OrderFilter = (typeof DEFAULTS.filterKeys)[number];
@@ -266,6 +283,42 @@ function WeightRangeFilter({
   );
 }
 
+const NO_CARRIER = '__none__';
+const ANY_CARRIER = '__all__';
+
+/** Ô "Hãng vận chuyển": Tất cả / Chưa gán hãng / từng hãng đang bật. */
+function CarrierFilter({
+  value,
+  carriers,
+  onChange,
+}: {
+  value: string;
+  carriers: { id: string; code: string; name: string; isActive: boolean }[];
+  onChange: (v: string) => void;
+}) {
+  return (
+    <Select
+      value={value || ANY_CARRIER}
+      onValueChange={(v) => onChange(v === ANY_CARRIER ? '' : v)}
+    >
+      <SelectTrigger className="h-9 w-56" aria-label="Hãng vận chuyển">
+        <SelectValue placeholder="Hãng vận chuyển" />
+      </SelectTrigger>
+      <SelectContent>
+        <SelectItem value={ANY_CARRIER}>Hãng vận chuyển: tất cả</SelectItem>
+        <SelectItem value={NO_CARRIER}>Chưa gán hãng</SelectItem>
+        {carriers
+          .filter((c) => c.isActive)
+          .map((c) => (
+            <SelectItem key={c.id} value={c.id}>
+              {c.name}
+            </SelectItem>
+          ))}
+      </SelectContent>
+    </Select>
+  );
+}
+
 export function OrderListScreen() {
   const { state, set, skipTake } = useListState<OrderFilter>(DEFAULTS);
   const status = parseOrderStatus(state.filters.status);
@@ -273,10 +326,25 @@ export function OrderListScreen() {
   const weightMin = state.filters.weightMin ?? '';
   const weightMax = state.filters.weightMax ?? '';
   const noCarrier = state.filters.noCarrier === 'true';
+  const carrierId = state.filters.carrierId ?? '';
+  const from = state.filters.from ?? '';
+  const to = state.filters.to ?? '';
   const params = useMemo(
-    () => ({ q: state.q, status, customerId, weightMin, weightMax, noCarrier, ...skipTake }),
-    [state.q, status, customerId, weightMin, weightMax, noCarrier, skipTake],
+    () => ({
+      q: state.q,
+      status,
+      customerId,
+      weightMin,
+      weightMax,
+      noCarrier,
+      carrierId,
+      from,
+      to,
+      ...skipTake,
+    }),
+    [state.q, status, customerId, weightMin, weightMax, noCarrier, carrierId, from, to, skipTake],
   );
+  const carriers = useCarriers();
   const query = useOrders(params);
   useInvalidateOn(['order.created', 'order.updated'], [orderKeys.lists()]);
   const [selected, setSelected] = useState<RowSelectionState>({});
@@ -290,7 +358,10 @@ export function OrderListScreen() {
     customerId !== '' ||
     weightMin !== '' ||
     weightMax !== '' ||
-    noCarrier;
+    noCarrier ||
+    carrierId !== '' ||
+    from !== '' ||
+    to !== '';
   const customerName = query.data?.items[0]?.customer.name;
 
   return (
@@ -320,11 +391,27 @@ export function OrderListScreen() {
         onQChange={(q) => set({ q })}
         filters={[
           {
-            key: 'noCarrier',
+            // Một ô cho cả "chưa gán hãng" lẫn "đã gán hãng X" — hai key URL (noCarrier / carrierId)
+            // loại trừ nhau; kết hợp với Từ ngày / Đến ngày = lọc theo hãng + thời gian.
+            key: 'carrierId',
             label: 'Hãng vận chuyển',
-            type: 'select',
-            options: [{ value: 'true', label: 'Chưa gán hãng' }],
+            type: 'custom',
+            render: () => (
+              <CarrierFilter
+                value={noCarrier ? NO_CARRIER : carrierId}
+                carriers={carriers.data ?? []}
+                onChange={(v) =>
+                  setFilter(
+                    v === NO_CARRIER
+                      ? { noCarrier: 'true', carrierId: undefined }
+                      : { noCarrier: undefined, carrierId: v || undefined },
+                  )
+                }
+              />
+            ),
           },
+          { key: 'from', label: 'Từ ngày', type: 'date' },
+          { key: 'to', label: 'Đến ngày', type: 'date' },
           {
             key: 'weightMin',
             label: 'Cân nặng',
@@ -344,6 +431,9 @@ export function OrderListScreen() {
           weightMin: state.filters.weightMin,
           weightMax: state.filters.weightMax,
           noCarrier: state.filters.noCarrier,
+          carrierId: state.filters.carrierId,
+          from: state.filters.from,
+          to: state.filters.to,
         }}
         onFilterChange={setFilter}
         searchPlaceholder="Tìm theo số đơn, mã hoặc tên khách…"

@@ -38,8 +38,8 @@ const SAMPLE_RMAS: RmaRow[] = [
   {
     rmaNo: 'RMA-2608-00031',
     orderNo: 'SO-2608-01183',
-    customer: 'Nhà sách Phương Nam Q.1',
-    reason: 'Hàng lỗi in ấn',
+    customer: 'Đại lý VTNN Phương Nam Đồng Tháp',
+    reason: 'Hàng lỗi bao bì',
     lineCount: 2,
     refundValue: '1062000',
     receivedAt: '2026-08-24T01:00:00Z',
@@ -50,8 +50,8 @@ const SAMPLE_RMAS: RmaRow[] = [
   {
     rmaNo: 'RMA-2608-00030',
     orderNo: 'SO-2608-01121',
-    customer: 'Cửa hàng Hồng Phúc',
-    reason: 'Giao nhầm mã màu',
+    customer: 'Cửa hàng VTNN Hồng Phúc',
+    reason: 'Giao nhầm quy cách',
     lineCount: 1,
     refundValue: '180000',
     receivedAt: '2026-08-23T01:00:00Z',
@@ -61,7 +61,7 @@ const SAMPLE_RMAS: RmaRow[] = [
   {
     rmaNo: 'RMA-2608-00029',
     orderNo: 'SO-2608-01043',
-    customer: 'Tiệm photocopy Hải Yến',
+    customer: 'Nhà vườn Hải Yến',
     reason: 'Khách đổi ý (chưa mở hộp)',
     lineCount: 1,
     refundValue: '450000',
@@ -72,7 +72,7 @@ const SAMPLE_RMAS: RmaRow[] = [
   {
     rmaNo: 'RMA-2608-00028',
     orderNo: 'SO-2608-00988',
-    customer: 'Cửa hàng Tuấn Kiệt',
+    customer: 'Cửa hàng VTNN Tuấn Kiệt',
     reason: 'Hỏng trong vận chuyển',
     lineCount: 3,
     refundValue: '312500',
@@ -83,8 +83,8 @@ const SAMPLE_RMAS: RmaRow[] = [
   {
     rmaNo: 'RMA-2608-00027',
     orderNo: 'SO-2608-00941',
-    customer: 'Siêu thị văn phòng Ba Đình',
-    reason: 'Hàng lỗi — mực khô',
+    customer: 'Siêu thị nông nghiệp Ba Vì',
+    reason: 'Hàng lỗi — chai rò rỉ',
     lineCount: 1,
     refundValue: '611400',
     receivedAt: '2026-08-21T01:00:00Z',
@@ -94,7 +94,7 @@ const SAMPLE_RMAS: RmaRow[] = [
   {
     rmaNo: 'RMA-2608-00026',
     orderNo: 'SO-2608-00902',
-    customer: 'Công ty TNHH Đức Thịnh',
+    customer: 'Công ty TNHH Nông sản Đức Thịnh',
     reason: 'Giao thừa số lượng',
     lineCount: 1,
     refundValue: '216000',
@@ -105,7 +105,7 @@ const SAMPLE_RMAS: RmaRow[] = [
   {
     rmaNo: 'RMA-2608-00025',
     orderNo: 'SO-2608-00867',
-    customer: 'Trường THCS Nguyễn Du',
+    customer: 'Trang trại sầu riêng Bảy Hùng',
     reason: 'Khách đổi ý (chưa mở hộp)',
     lineCount: 2,
     refundValue: '388000',
@@ -115,8 +115,8 @@ const SAMPLE_RMAS: RmaRow[] = [
   {
     rmaNo: 'RMA-2608-00024',
     orderNo: 'SO-2608-00812',
-    customer: 'Cửa hàng Minh Tâm',
-    reason: 'Hàng lỗi — nắp bút gãy',
+    customer: 'Cửa hàng VTNN Minh Tâm',
+    reason: 'Hàng lỗi — gói bị rách',
     lineCount: 1,
     refundValue: '171000',
     receivedAt: '2026-08-20T01:00:00Z',
@@ -126,7 +126,7 @@ const SAMPLE_RMAS: RmaRow[] = [
   {
     rmaNo: 'RMA-2608-00023',
     orderNo: 'SO-2608-00778',
-    customer: 'Công ty TNHH In Hồng Hà',
+    customer: 'Đại lý VTNN Hồng Hà Thạch Thất',
     reason: 'Hỏng trong vận chuyển',
     lineCount: 2,
     refundValue: '724000',
@@ -137,7 +137,7 @@ const SAMPLE_RMAS: RmaRow[] = [
   {
     rmaNo: 'RMA-2608-00022',
     orderNo: 'SO-2608-00734',
-    customer: 'Nhà sách Fahasa Hà Đông',
+    customer: 'Nhà vườn Minh Phát',
     reason: 'Giao nhầm mã',
     lineCount: 1,
     refundValue: '92000',
@@ -148,7 +148,7 @@ const SAMPLE_RMAS: RmaRow[] = [
   {
     rmaNo: 'RMA-2608-00021',
     orderNo: 'SO-2608-00701',
-    customer: 'Công ty CP Giáo dục Ánh Dương',
+    customer: 'Công ty CP Nông sản Ánh Dương',
     reason: 'Khách đổi ý (chưa mở hộp)',
     lineCount: 4,
     refundValue: '1418000',
@@ -159,8 +159,8 @@ const SAMPLE_RMAS: RmaRow[] = [
   {
     rmaNo: 'RMA-2608-00020',
     orderNo: 'SO-2608-00688',
-    customer: 'Văn phòng phẩm Thanh Hằng',
-    reason: 'Hàng lỗi in ấn',
+    customer: 'Cửa hàng VTNN Thanh Hằng',
+    reason: 'Hàng lỗi bao bì',
     lineCount: 1,
     refundValue: '76500',
     receivedAt: '2026-08-16T01:00:00Z',
@@ -190,15 +190,15 @@ interface RmaReturnLine {
 
 const SAMPLE_RETURN_LINES: RmaReturnLine[] = [
   {
-    name: 'Sổ tay Campus A5 120 trang',
-    sku: 'CP-A5-120',
+    name: 'Vua Bật Chồi 40gr (combo 10 gói)',
+    sku: 'VBC-40G-10',
     qty: 30,
     condition: { label: 'Bán lại được', tone: 'ok' },
-    restock: { lot: 'L2608-CP11', bin: 'bin A-03-02-B' },
+    restock: { lot: 'L2608-VBC11', bin: 'bin A-03-02-B' },
   },
   {
-    name: 'Sổ lò xo Klong A4 200 trang',
-    sku: 'KL-A4-200',
+    name: 'Phân hữu cơ vi sinh 25kg',
+    sku: 'HCVS-25KG',
     qty: 12,
     condition: { label: 'Hỏng — hủy', tone: 'err' },
     restockNote: { main: 'không nhập lại', hint: 'phiếu hủy đính kèm' },
@@ -395,9 +395,9 @@ export function RmaListScreen() {
                 <a href="#" className="font-mono text-xs text-primary hover:underline">
                   SO-2608-01183
                 </a>{' '}
-                · giao 21/08/2026 · Nhà sách Phương Nam Q.1
+                · giao 21/08/2026 · Đại lý VTNN Phương Nam Đồng Tháp
               </KeyValue>
-              <KeyValue k="Lý do hoàn">Hàng lỗi in ấn — khách gửi ảnh, CSKH xác nhận</KeyValue>
+              <KeyValue k="Lý do hoàn">Hàng lỗi bao bì — khách gửi ảnh, CSKH xác nhận</KeyValue>
               <KeyValue k="Nhận hàng">24/08/2026 08:30 · Kho HN-1 · Lê Quang Huy</KeyValue>
             </div>
 

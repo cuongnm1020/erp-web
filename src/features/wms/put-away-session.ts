@@ -36,8 +36,8 @@ export function currentPutAwayLine(task: PdaTask | null): PdaTaskLine | null {
   return open.find(isFullyScanned) ?? open[0] ?? null;
 }
 
-const sameCode = (a: string, b: string | null): boolean =>
-  b !== null && a.trim().toUpperCase() === b.trim().toUpperCase();
+const sameCode = (a: string, b: string | null | undefined): boolean =>
+  b != null && a.trim().toUpperCase() === b.trim().toUpperCase();
 
 /** Mã quét ở bước xác nhận mà không phải SKU của việc, cũng không phải ô kệ nào. */
 const notBinText = (code: string, docNumber: string, cur: PdaTaskLine): string =>
@@ -209,7 +209,13 @@ export function usePutAwaySession() {
   const scan = useCallback(
     async (code: string, qty: string) => {
       if (!task) return;
-      const bySku = task.lines.filter((l) => l.barcodes.includes(code));
+      // PLAN-packaging-hierarchy F/D: mã THÙNG/PALLET của dòng (containerBarcode) → quét không qty
+      // = nhận cả cây; sau đó quét ô kệ, server chuyển cả cây (ContainerService.move).
+      const byContainer = task.lines.filter((l) => sameCode(code, l.containerBarcode));
+      const bySku = byContainer.length
+        ? byContainer
+        : task.lines.filter((l) => l.barcodes.includes(code));
+      const viaContainer = byContainer.length > 0;
       if (bySku.length) {
         const line = bySku.find((l) => isOpenLine(l) && !isFullyScanned(l)) ?? null;
         if (!line) {
@@ -227,7 +233,7 @@ export function usePutAwaySession() {
           const r = await scanMut.mutateAsync({
             taskLineId: line.taskLineId,
             barcode: code,
-            qty,
+            ...(viaContainer ? {} : { qty }),
             idempotencyKey: newIdempotencyKey(),
           });
           setOffline(false);
@@ -250,11 +256,14 @@ export function usePutAwaySession() {
               : cur,
           );
           beep('ok');
+          const what = r.containerBarcode
+            ? `Thùng ${r.containerBarcode} (${r.skuCode})`
+            : r.skuCode;
           setFeedback({
             kind: r.complete ? 'info' : 'ok',
             text: r.complete
-              ? `${r.skuCode} đủ ${r.qtyDone}/${r.qtyPlanned} — quét ô kệ ${line.toLocationCode ?? '—'} để xác nhận cất.`
-              : `${r.skuCode}: ${r.qtyDone}/${r.qtyPlanned}`,
+              ? `${what} đủ ${r.qtyDone}/${r.qtyPlanned} — quét ô kệ ${line.toLocationCode ?? '—'} để xác nhận cất.`
+              : `${what}: ${r.qtyDone}/${r.qtyPlanned}`,
           });
         } catch (err) {
           fail(err);

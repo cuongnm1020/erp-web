@@ -30,21 +30,21 @@ interface CouponRow {
   lastUsed: string | null;
 }
 
-const PROGRAM = 'Khai giảng: giảm 50.000 cho đơn vở ≥ 1.000.000';
+const PROGRAM = 'Vụ Đông Xuân: giảm 50.000 cho đơn phân bón ≥ 1.000.000';
 
 const SAMPLE_COUPONS: CouponRow[] = [
   {
-    code: 'KG26-7H3K-A2QM',
+    code: 'DX26-7H3K-A2QM',
     program: PROGRAM,
     value: '50.000',
     usage: '1 / 1',
-    customer: 'Nhà sách Phương Nam Q.1',
+    customer: 'Đại lý VTNN Phương Nam Đồng Tháp',
     expires: '05/09/2026',
     status: { tone: 'neutral', label: 'Đã dùng hết' },
     lastUsed: '22/08/2026 16:40',
   },
   {
-    code: 'KG26-9XC2-PL4D',
+    code: 'DX26-9XC2-PL4D',
     program: PROGRAM,
     value: '50.000',
     usage: '0 / 1',
@@ -54,17 +54,17 @@ const SAMPLE_COUPONS: CouponRow[] = [
     lastUsed: null,
   },
   {
-    code: 'KG26-M2N8-ZK1T',
+    code: 'DX26-M2N8-ZK1T',
     program: PROGRAM,
     value: '50.000',
     usage: '1 / 1',
-    customer: 'Cửa hàng Minh Tâm',
+    customer: 'Cửa hàng VTNN Minh Tâm',
     expires: '05/09/2026',
     status: { tone: 'neutral', label: 'Đã dùng hết' },
     lastUsed: '22/08/2026 11:02',
   },
   {
-    code: 'KG26-4RTY-B7WQ',
+    code: 'DX26-4RTY-B7WQ',
     program: PROGRAM,
     value: '50.000',
     usage: '0 / 1',
@@ -74,17 +74,17 @@ const SAMPLE_COUPONS: CouponRow[] = [
     lastUsed: null,
   },
   {
-    code: 'KG26-Q8LP-3MHD',
+    code: 'DX26-Q8LP-3MHD',
     program: PROGRAM,
     value: '50.000',
     usage: '1 / 1',
-    customer: 'Công ty TNHH Hòa Phát Văn Phòng Phẩm',
+    customer: 'HTX Nông nghiệp Kim Quan',
     expires: '05/09/2026',
     status: { tone: 'neutral', label: 'Đã dùng hết' },
     lastUsed: '21/08/2026 09:15',
   },
   {
-    code: 'KG26-V5JE-8NCA',
+    code: 'DX26-V5JE-8NCA',
     program: PROGRAM,
     value: '50.000',
     usage: '0 / 1',
@@ -94,7 +94,7 @@ const SAMPLE_COUPONS: CouponRow[] = [
     lastUsed: null,
   },
   {
-    code: 'KG26-D1KS-6TRF',
+    code: 'DX26-D1KS-6TRF',
     program: PROGRAM,
     value: '50.000',
     usage: '0 / 1',
@@ -104,17 +104,17 @@ const SAMPLE_COUPONS: CouponRow[] = [
     lastUsed: null,
   },
   {
-    code: 'KG26-2WXN-H9PL',
+    code: 'DX26-2WXN-H9PL',
     program: PROGRAM,
     value: '50.000',
     usage: '1 / 1',
-    customer: 'Văn phòng phẩm Thu Hà (Cầu Giấy)',
+    customer: 'Cửa hàng VTNN Thu Hà (Thạch Thất)',
     expires: '05/09/2026',
     status: { tone: 'neutral', label: 'Đã dùng hết' },
     lastUsed: '20/08/2026 14:33',
   },
   {
-    code: 'KG26-8GFA-K3VB',
+    code: 'DX26-8GFA-K3VB',
     program: PROGRAM,
     value: '50.000',
     usage: '0 / 1',
@@ -124,17 +124,17 @@ const SAMPLE_COUPONS: CouponRow[] = [
     lastUsed: null,
   },
   {
-    code: 'KG26-N3BR-Y5QE',
+    code: 'DX26-N3BR-Y5QE',
     program: PROGRAM,
     value: '50.000',
     usage: '1 / 1',
-    customer: 'Trường THCS Nguyễn Du',
+    customer: 'Trang trại sầu riêng Bảy Hùng',
     expires: '05/09/2026',
     status: { tone: 'neutral', label: 'Đã dùng hết' },
     lastUsed: '19/08/2026 10:48',
   },
   {
-    code: 'KG26-T4MK-7JWN',
+    code: 'DX26-T4MK-7JWN',
     program: PROGRAM,
     value: '50.000',
     usage: '0 / 1',
@@ -144,17 +144,17 @@ const SAMPLE_COUPONS: CouponRow[] = [
     lastUsed: null,
   },
   {
-    code: 'KG26-Z6QA-F8CB',
+    code: 'DX26-Z6QA-F8CB',
     program: PROGRAM,
     value: '50.000',
     usage: '1 / 1',
-    customer: 'Nhà sách Tân Định',
+    customer: 'Cửa hàng VTNN Hữu Điền',
     expires: '05/09/2026',
     status: { tone: 'neutral', label: 'Đã dùng hết' },
     lastUsed: '18/08/2026 15:20',
   },
   {
-    code: 'KG26-B2ES-4HRT',
+    code: 'DX26-B2ES-4HRT',
     program: PROGRAM,
     value: '50.000',
     usage: '0 / 1',
@@ -164,7 +164,7 @@ const SAMPLE_COUPONS: CouponRow[] = [
     lastUsed: null,
   },
   {
-    code: 'KG26-C5RW-9ZMT',
+    code: 'DX26-C5RW-9ZMT',
     program: PROGRAM,
     value: '50.000',
     usage: '1 / 1',
@@ -229,7 +229,7 @@ export function CouponsScreen() {
             </Button>
             <div className="ml-auto flex items-center gap-2 text-xs text-muted-foreground">
               <span>
-                Đã lưu: <span className="font-semibold text-foreground">Khai giảng</span>
+                Đã lưu: <span className="font-semibold text-foreground">Đông Xuân</span>
               </span>
               <span>·</span>
               <span className="inline-flex items-center gap-0.5">
@@ -354,8 +354,8 @@ export function CouponsScreen() {
               hint="Mã chỉ có hiệu lực trong khoảng ngày của chương trình"
             >
               <FakeInput caret>
-                <span className="mr-1 font-mono text-xs">KM-2609-002</span> Trung thu: tặng hộp bút
-                màu…
+                <span className="mr-1 font-mono text-xs">KM-2609-002</span> Trung thu: tặng 1 gói
+                hạt giống dưa lưới…
               </FakeInput>
             </Field>
             <div className="flex gap-3">

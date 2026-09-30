@@ -199,7 +199,11 @@ function WarehouseFormDialog({
                 <FormItem>
                   <FormLabel>Tên kho</FormLabel>
                   <FormControl>
-                    <Input autoFocus={editing} placeholder="Kho Hà Nội 2" {...field} />
+                    <Input
+                      autoFocus={editing}
+                      placeholder="Kho vật tư nông nghiệp Thạch Thất"
+                      {...field}
+                    />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -212,7 +216,7 @@ function WarehouseFormDialog({
                 <FormItem>
                   <FormLabel>Số nhà, đường</FormLabel>
                   <FormControl>
-                    <Input placeholder="Số 5 KCN Quang Minh" {...field} />
+                    <Input placeholder="Số 59 đường Cốc Trại" {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -221,9 +225,9 @@ function WarehouseFormDialog({
             <div className="grid grid-cols-3 gap-2">
               {(
                 [
-                  ['hamlet', 'Thôn/xóm', 'Khu phố 3'],
-                  ['ward', 'Phường/xã', 'Phường Tân Tạo A'],
-                  ['province', 'Tỉnh/thành', 'Hồ Chí Minh'],
+                  ['hamlet', 'Thôn/xóm', 'Thôn Kim Quan 3'],
+                  ['ward', 'Phường/xã', 'Xã Thạch Thất'],
+                  ['province', 'Tỉnh/thành', 'Hà Nội'],
                 ] as const
               ).map(([name, label, placeholder]) => (
                 <FormField

@@ -1,7 +1,7 @@
-import { ReorderPointsScreen } from '@/features/wms/components/reorder-points-screen';
+import { ReplenishmentAlertScreen } from '@/features/wms/components/reorder-points-screen';
 
-export const metadata = { title: 'Hạn mức tồn — ERP' };
+export const metadata = { title: 'Cảnh báo nhập hàng — ERP' };
 
 export default function Page() {
-  return <ReorderPointsScreen />;
+  return <ReplenishmentAlertScreen />;
 }

@@ -41,11 +41,11 @@ const SAMPLE_GROUPS: GroupRow[] = [
   { name: 'Đại lý', detail: 'Bảng giá: Đại lý miền Bắc · hạn mức 50.000.000', count: '418' },
   { name: 'Doanh nghiệp', detail: 'Bảng giá: Doanh nghiệp · hạn mức 100.000.000', count: '356' },
   {
-    name: 'Trường học',
+    name: 'Trang trại',
     detail: 'Bảng giá: Dự án · hạn mức 80.000.000 · công nợ 45 ngày',
     count: '204',
   },
-  { name: 'Nhà sách', detail: 'Bảng giá: Đại lý miền Bắc · hạn mức 60.000.000', count: '112' },
+  { name: 'Nhà vườn', detail: 'Bảng giá: Đại lý miền Bắc · hạn mức 60.000.000', count: '112' },
   { name: 'Bán lẻ', detail: 'Bảng giá: Mặc định · hạn mức 20.000.000', count: '150' },
 ];
 
@@ -79,18 +79,18 @@ const SAMPLE_LEVELS: LevelRow[] = [
 const SAMPLE_TAGS: TagChip[] = [
   { name: 'Đại lý', count: '312' },
   { name: 'Doanh nghiệp', count: '298' },
-  { name: 'Trường học', count: '186' },
-  { name: 'Nhà sách', count: '98' },
+  { name: 'Trang trại', count: '186' },
+  { name: 'Nhà vườn', count: '98' },
   { name: 'Bán lẻ', count: '240' },
-  { name: 'Photocopy', count: '74' },
+  { name: 'Cây ăn quả', count: '74' },
   { name: 'Ký HĐ', count: '122' },
   { name: 'Chuỗi', count: '31' },
-  { name: 'Hoàn Kiếm', count: '64' },
-  { name: 'Cầu Giấy', count: '58' },
-  { name: 'Đống Đa', count: '51' },
-  { name: 'Long Biên', count: '44' },
-  { name: 'Hà Đông', count: '39' },
-  { name: 'Mùa tựu trường', count: '210', active: true },
+  { name: 'Quốc Oai', count: '64' },
+  { name: 'Thạch Thất', count: '58' },
+  { name: 'Chương Mỹ', count: '51' },
+  { name: 'Đan Phượng', count: '44' },
+  { name: 'Ba Vì', count: '39' },
+  { name: 'Vụ Đông Xuân', count: '210', active: true },
   { name: 'Dự án thầu', count: '26' },
   { name: 'Khách VIP cũ', count: '12' },
 ];
@@ -222,7 +222,7 @@ export function CustomerGroupsScreen() {
             ))}
           </div>
           <div className="border-t px-3 py-2.5">
-            <p className="mb-1.5 text-sm font-semibold">Tag đang chọn: Mùa tựu trường</p>
+            <p className="mb-1.5 text-sm font-semibold">Tag đang chọn: Vụ Đông Xuân</p>
             <div className="flex items-center gap-2">
               <Button
                 variant="outline"
@@ -239,7 +239,7 @@ export function CustomerGroupsScreen() {
                 variant="outline"
                 size="sm"
                 className="h-7 border-destructive px-2 text-xs text-destructive hover:bg-destructive/10 hover:text-destructive"
-                onClick={() => toast.success('Đã xóa tag Mùa tựu trường (mẫu)')}
+                onClick={() => toast.success('Đã xóa tag Vụ Đông Xuân (mẫu)')}
               >
                 Xóa tag
               </Button>

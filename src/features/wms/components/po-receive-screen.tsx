@@ -40,8 +40,8 @@ interface PoReceiveLine {
 const SAMPLE_LINES: PoReceiveLine[] = [
   {
     no: 1,
-    productName: 'Giấy A4 Double A 80gsm',
-    sku: 'DA-A4-80',
+    productName: 'Vua Bật Chồi 40gr (combo 10 gói)',
+    sku: 'VBC-40G-10',
     unit: 'thùng',
     ordered: 100,
     receivedBefore: 50,
@@ -55,8 +55,8 @@ const SAMPLE_LINES: PoReceiveLine[] = [
   },
   {
     no: 2,
-    productName: 'Giấy A4 Double A 70gsm',
-    sku: 'DA-A4-70',
+    productName: 'Rooting Extra 500ml',
+    sku: 'RTX-500',
     unit: 'thùng',
     ordered: 40,
     receivedBefore: 20,
@@ -70,8 +70,8 @@ const SAMPLE_LINES: PoReceiveLine[] = [
   },
   {
     no: 3,
-    productName: 'Giấy A4 IK Plus 70gsm',
-    sku: 'IK-A4-70',
+    productName: 'Rooting 500ml',
+    sku: 'RT-500',
     unit: 'thùng',
     ordered: 30,
     receivedBefore: 12,
@@ -87,8 +87,8 @@ const SAMPLE_LINES: PoReceiveLine[] = [
   },
   {
     no: 4,
-    productName: 'Giấy note 3M Post-it 76x76 vàng',
-    sku: '3M-NOTE76',
+    productName: 'Thuốc trừ sâu sinh học 250ml',
+    sku: 'TSSH-250',
     unit: 'thùng',
     ordered: 10,
     receivedBefore: 5,
@@ -103,8 +103,8 @@ const SAMPLE_LINES: PoReceiveLine[] = [
   },
   {
     no: 5,
-    productName: 'Giấy in ảnh HP A4 180gsm (20 tờ)',
-    sku: 'HP-PH180',
+    productName: 'Phân bón lá NPK 20-20-20 1kg',
+    sku: 'NPK-202020-1KG',
     unit: 'thùng',
     ordered: 6,
     receivedBefore: 3,
@@ -118,8 +118,8 @@ const SAMPLE_LINES: PoReceiveLine[] = [
   },
   {
     no: 6,
-    productName: 'Sổ lò xo Klong A4 200 trang',
-    sku: 'KL-A4-200',
+    productName: 'Purger (gói)',
+    sku: 'PUR-GOI',
     unit: 'thùng',
     ordered: 8,
     receivedBefore: 0,
@@ -182,7 +182,7 @@ export function PoReceiveScreen() {
     <div className="flex flex-col gap-3">
       <PageHeader
         title="Nhận hàng đối chiếu PO-2608-00041"
-        description="Công ty TNHH Giấy Double A VN · Kho HN-1 · phiếu nhập sẽ tạo: GRN (tự động) · ngày 23/08/2026"
+        description="Công ty TNHH Vật tư Nông nghiệp Xanh · Kho HN-1 · phiếu nhập sẽ tạo: GRN (tự động) · ngày 23/08/2026"
         breadcrumb={[
           { label: 'Kho' },
           { label: 'Đơn mua (PO)', href: '/wms/po' },

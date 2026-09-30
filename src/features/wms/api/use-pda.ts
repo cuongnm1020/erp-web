@@ -26,6 +26,7 @@ export const pdaKeys = {
   wave: (id: string) => [...pdaKeys.all, 'wave', id] as const,
   queue: (type: string) => [...pdaKeys.all, 'queue', type] as const,
   myTasks: () => [...pdaKeys.all, 'my-tasks'] as const,
+  myWaves: () => [...pdaKeys.all, 'my-waves'] as const,
   stats: (type: string, date: string | null) => [...pdaKeys.all, 'stats', type, date] as const,
 };
 
@@ -64,9 +65,10 @@ export function useClaimTask() {
 
 export interface ScanInput {
   taskLineId: string;
+  /** Mã SKU hoặc mã container (LPN / mã NCC trên thùng — PLAN-packaging-hierarchy F). */
   barcode: string;
-  /** Số lượng theo ĐVT của barcode, CHUỖI (luật 10). */
-  qty: string;
+  /** Số lượng theo ĐVT của barcode, CHUỖI (luật 10). Bỏ trống khi quét THÙNG = lấy trọn. */
+  qty?: string;
   /** Sinh lúc quét (luật 4), giữ nguyên khi retry. */
   idempotencyKey: string;
 }
@@ -167,8 +169,9 @@ export function useWaveScan() {
       ...body
     }: {
       waveId: string;
+      /** Mã SKU hoặc mã container — quét thùng thì bỏ `qty` (lấy trọn / tới đủ nhóm). */
       barcode: string;
-      qty: string;
+      qty?: string;
       locationId?: string;
       lotId?: string;
       idempotencyKey: string;
@@ -220,6 +223,21 @@ export function usePdaMyTasks(enabled = true) {
   return useQuery({
     queryKey: pdaKeys.myTasks(),
     queryFn: () => unwrap(api.GET('/pda/tasks')),
+    enabled,
+    refetchInterval: 30_000,
+  });
+}
+
+export type PdaMyWave = components['schemas']['WaveDto'];
+
+/**
+ * GET /pda/waves — lượt pick gộp ĐÃ GIAO cho tôi còn mở. Màn pick hiện mỗi lượt là MỘT mục
+ * (thay vì rải từng đơn con của /pda/tasks); chạm vào → nhận cả lượt. Làm tươi 30s như /pda/tasks.
+ */
+export function usePdaMyWaves(enabled = true) {
+  return useQuery({
+    queryKey: pdaKeys.myWaves(),
+    queryFn: () => unwrap(api.GET('/pda/waves')),
     enabled,
     refetchInterval: 30_000,
   });

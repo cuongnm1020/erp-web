@@ -16,10 +16,11 @@ vi.stubGlobal(
   },
 );
 window.HTMLElement.prototype.scrollIntoView = vi.fn();
+let search = '';
 vi.mock('next/navigation', () => ({
   usePathname: () => '/wms/dispatch',
   useRouter: () => ({ push: vi.fn(), replace: vi.fn(), refresh: vi.fn() }),
-  useSearchParams: () => new URLSearchParams(''),
+  useSearchParams: () => new URLSearchParams(search),
 }));
 
 const WAVE_ID = '00000000-0000-4000-8000-00000000e001';
@@ -75,6 +76,10 @@ const WAVE = {
       skuId: 'sku-W',
       skuCode: 'SKU-W',
       skuName: 'Nước suối',
+      productName: 'Nước suối Lavie 500ml',
+      imageUrl: null,
+      binOnHand: '24.000000',
+      binRemaining: '24.000000',
       barcodes: ['BC-W'],
       locationId: 'loc-1',
       locationCode: 'A-01-01',
@@ -156,7 +161,8 @@ describe('Bảng điều phối — gộp thẻ PICK chưa gán thành lượt (
     expect(screen.getByRole('button', { name: /In phiếu lượt/ })).toBeInTheDocument();
   });
 
-  it('thẻ có dòng báo thiếu hiện cảnh báo "thiếu N dòng"', async () => {
+  it('dòng có báo thiếu hiện cảnh báo "thiếu N dòng" ở tab Ngoại lệ (2026-09-22: tab trên URL)', async () => {
+    search = 'status=EXCEPTION';
     const one = { ...makeTasks(1)[0]!, status: 'COMPLETED', exceptionLineCount: 2 };
     server.use(
       http.get('/api/tasks', ({ request }) =>
@@ -167,6 +173,7 @@ describe('Bảng điều phối — gộp thẻ PICK chưa gán thành lượt (
     );
     renderApp(<DispatchScreen />);
     expect(await screen.findByText('thiếu 2 dòng')).toBeInTheDocument();
+    search = '';
   });
 });
 
@@ -253,10 +260,14 @@ describe('Màn pick — lượt gộp: quét mã WAVE → nhận lượt → qu�
     scan('WAVE2609-00001');
     expect(await screen.findByText('Lượt lấy gộp')).toBeInTheDocument();
     expect(screen.getAllByText('A-01-01').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('Nước suối Lavie 500ml').length).toBeGreaterThan(0);
+    expect(screen.getByText('Trên kệ còn', { exact: false })).toHaveTextContent('24');
     expect(screen.getByText('SO-1 0/2')).toBeInTheDocument();
-    for (let i = 0; i < 2; i++)
-      fireEvent.click(screen.getByRole('button', { name: 'Tăng số lượng' }));
+    // Quét SKU → gõ 3 → Enter (2026-09-22): một lần cho cả nhóm
     scan('BC-W');
+    const q = screen.getByLabelText('Số lượng lần quét này');
+    fireEvent.change(q, { target: { value: '3' } });
+    fireEvent.keyDown(q, { key: 'Enter' });
     await waitFor(() =>
       expect(scans).toEqual([
         expect.objectContaining({ barcode: 'BC-W', qty: '3', locationId: 'loc-1' }),

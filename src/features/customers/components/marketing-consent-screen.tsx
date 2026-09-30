@@ -39,7 +39,7 @@ const CONSENT_TONE: Record<ConsentValue, StatusTone> = {
 const SAMPLE_CONSENTS: ConsentRow[] = [
   {
     code: 'KH-004512',
-    name: 'Cửa hàng Minh Tâm',
+    name: 'Cửa hàng VTNN Minh Tâm',
     email: 'Đồng ý',
     sms: 'Đồng ý',
     zalo: 'Từ chối',
@@ -49,7 +49,7 @@ const SAMPLE_CONSENTS: ConsentRow[] = [
   },
   {
     code: 'KH-003201',
-    name: 'Công ty TNHH Hòa Phát Văn Phòng Phẩm',
+    name: 'HTX Nông nghiệp Kim Quan',
     email: 'Đồng ý',
     sms: 'Đồng ý',
     zalo: 'Đồng ý',
@@ -59,7 +59,7 @@ const SAMPLE_CONSENTS: ConsentRow[] = [
   },
   {
     code: 'KH-006104',
-    name: 'Văn phòng phẩm Hồng Hà Cầu Giấy',
+    name: 'Đại lý VTNN Hồng Hà Thạch Thất',
     email: 'Đồng ý',
     sms: 'Từ chối',
     zalo: 'Đồng ý',
@@ -69,7 +69,7 @@ const SAMPLE_CONSENTS: ConsentRow[] = [
   },
   {
     code: 'KH-013207',
-    name: 'Cửa hàng An Nhiên',
+    name: 'Đại lý VTNN An Nhiên',
     email: 'Chưa hỏi',
     sms: 'Chưa hỏi',
     zalo: 'Chưa hỏi',
@@ -79,7 +79,7 @@ const SAMPLE_CONSENTS: ConsentRow[] = [
   },
   {
     code: 'KH-005870',
-    name: 'Trường THCS Nguyễn Du',
+    name: 'Trang trại sầu riêng Bảy Hùng',
     email: 'Đồng ý',
     sms: 'Chưa hỏi',
     zalo: 'Chưa hỏi',
@@ -89,7 +89,7 @@ const SAMPLE_CONSENTS: ConsentRow[] = [
   },
   {
     code: 'KH-002018',
-    name: 'Công ty CP Đầu tư Thành Công',
+    name: 'Công ty CP Nông nghiệp Thành Công',
     email: 'Đồng ý',
     sms: 'Đồng ý',
     zalo: 'Đồng ý',
@@ -99,7 +99,7 @@ const SAMPLE_CONSENTS: ConsentRow[] = [
   },
   {
     code: 'KH-007332',
-    name: 'Nhà sách Tiền Phong',
+    name: 'Nhà vườn Tiền Phong',
     email: 'Từ chối',
     sms: 'Từ chối',
     zalo: 'Đồng ý',
@@ -109,7 +109,7 @@ const SAMPLE_CONSENTS: ConsentRow[] = [
   },
   {
     code: 'KH-008015',
-    name: 'Cửa hàng Sao Mai',
+    name: 'Cửa hàng VTNN Sao Mai',
     email: 'Chưa hỏi',
     sms: 'Đồng ý',
     zalo: 'Đồng ý',
@@ -119,7 +119,7 @@ const SAMPLE_CONSENTS: ConsentRow[] = [
   },
   {
     code: 'KH-004877',
-    name: 'Công ty TNHH Kế toán An Phát',
+    name: 'HTX Rau sạch An Phát',
     email: 'Đồng ý',
     sms: 'Chưa hỏi',
     zalo: 'Từ chối',
@@ -129,7 +129,7 @@ const SAMPLE_CONSENTS: ConsentRow[] = [
   },
   {
     code: 'KH-009210',
-    name: 'Tiệm photocopy Quang Minh',
+    name: 'Nhà vườn cà phê Quang Minh',
     email: 'Chưa hỏi',
     sms: 'Chưa hỏi',
     zalo: 'Đồng ý',
@@ -139,7 +139,7 @@ const SAMPLE_CONSENTS: ConsentRow[] = [
   },
   {
     code: 'KH-010388',
-    name: 'Văn phòng phẩm Tân Tiến',
+    name: 'Đại lý VTNN Tân Tiến',
     email: 'Từ chối',
     sms: 'Từ chối',
     zalo: 'Từ chối',
@@ -149,7 +149,7 @@ const SAMPLE_CONSENTS: ConsentRow[] = [
   },
   {
     code: 'KH-002990',
-    name: 'Công ty TNHH Dịch vụ Đức Thịnh',
+    name: 'Công ty TNHH Nông sản Đức Thịnh',
     email: 'Đồng ý',
     sms: 'Đồng ý',
     zalo: 'Đồng ý',
@@ -159,7 +159,7 @@ const SAMPLE_CONSENTS: ConsentRow[] = [
   },
   {
     code: 'KH-007801',
-    name: 'Nhà sách Fahasa Long Biên',
+    name: 'Vườn cam Cao Phong',
     email: 'Đồng ý',
     sms: 'Đồng ý',
     zalo: 'Đồng ý',
@@ -169,7 +169,7 @@ const SAMPLE_CONSENTS: ConsentRow[] = [
   },
   {
     code: 'KH-012063',
-    name: 'Cửa hàng Thu Hương',
+    name: 'Cửa hàng VTNN Thu Hương',
     email: 'Từ chối',
     sms: 'Chưa hỏi',
     zalo: 'Đồng ý',

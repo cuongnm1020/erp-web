@@ -28,18 +28,22 @@ interface CompareRow {
 }
 
 const SAMPLE_PAIRS: DuplicatePair[] = [
-  { phone: '0912 345 678', names: 'Cửa hàng Minh Tâm · Minh Tâm HN (mới tạo 23/08)', active: true },
-  { phone: '0987 445 020', names: 'Tiệm photocopy Tuấn Kiệt · CH Tuấn Kiệt' },
-  { phone: '0932 006 771', names: 'VPP Thảo Nguyên · Thảo Nguyên Hà Đông' },
-  { phone: '0968 771 203', names: 'Nhà sách Trí Đức · Trí Đức Book' },
-  { phone: '0904 512 380', names: 'VPP Bình Minh · Bình Minh Long Biên' },
-  { phone: '0977 128 665', names: 'Tiệm in Song Long · In ấn S.Long' },
-  { phone: '0936 704 221', names: 'Cửa hàng Phúc Lộc · Phúc Lộc 2' },
-  { phone: '0983 116 902', names: 'Cửa hàng Kim Ngân · Kim Ngân Store' },
+  {
+    phone: '0912 345 678',
+    names: 'Cửa hàng VTNN Minh Tâm · Minh Tâm HN (mới tạo 23/08)',
+    active: true,
+  },
+  { phone: '0987 445 020', names: 'Cửa hàng VTNN Tuấn Kiệt · CH Tuấn Kiệt' },
+  { phone: '0932 006 771', names: 'Nhà vườn Thảo Nguyên · Thảo Nguyên Ba Vì' },
+  { phone: '0968 771 203', names: 'Đại lý VTNN Trí Đức · Trí Đức Agri' },
+  { phone: '0904 512 380', names: 'VTNN Bình Minh · Bình Minh Đan Phượng' },
+  { phone: '0977 128 665', names: 'HTX Song Long · HTX Nông nghiệp S.Long' },
+  { phone: '0936 704 221', names: 'Cửa hàng VTNN Phúc Lộc · Phúc Lộc 2' },
+  { phone: '0983 116 902', names: 'Cửa hàng VTNN Kim Ngân · Kim Ngân Nông nghiệp' },
 ];
 
 const SAMPLE_COMPARE: CompareRow[] = [
-  { field: 'Tên', keep: 'Cửa hàng Minh Tâm', merge: 'Minh Tâm HN', keepSelected: 'keep' },
+  { field: 'Tên', keep: 'Cửa hàng VTNN Minh Tâm', merge: 'Minh Tâm HN', keepSelected: 'keep' },
   {
     field: 'Email',
     keep: '(trống)',
@@ -49,8 +53,8 @@ const SAMPLE_COMPARE: CompareRow[] = [
   },
   {
     field: 'Địa chỉ giao',
-    keep: 'Số 12 Lê Lợi, Hoàn Kiếm (+1 địa chỉ)',
-    merge: 'Số 15 Hàng Bông, Hoàn Kiếm',
+    keep: 'Thôn 3, xã Kim Quan, Thạch Thất (+1 địa chỉ)',
+    merge: 'Thôn 5, xã Kim Quan, Thạch Thất',
     keepSelected: 'keep',
   },
   {
@@ -159,7 +163,7 @@ export function MergeDuplicatesScreen() {
                 </TableCell>
                 <TableCell className="px-2.5 py-1.5">
                   <Radio on />
-                  <span className="font-semibold">Cửa hàng Minh Tâm</span>
+                  <span className="font-semibold">Cửa hàng VTNN Minh Tâm</span>
                 </TableCell>
                 <TableCell className="px-2.5 py-1.5">
                   <Radio />

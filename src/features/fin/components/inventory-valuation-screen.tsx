@@ -32,8 +32,8 @@ interface ValuationRow {
 
 const SAMPLE_VALUATION: ValuationRow[] = [
   {
-    sku: 'DA-A4-80',
-    name: 'Giấy A4 Double A 80gsm (ream 500 tờ)',
+    sku: 'VBC-40G-10',
+    name: 'Vua Bật Chồi 40gr (combo 10 gói)',
     warehouse: 'Kho HN-1',
     onHand: '8.420',
     reserved: '640',
@@ -44,8 +44,8 @@ const SAMPLE_VALUATION: ValuationRow[] = [
     expanded: true,
   },
   {
-    sku: 'HP-305A',
-    name: 'Mực in HP 305A đen chính hãng',
+    sku: 'BXD-16L',
+    name: 'Bình xịt điện 16L',
     warehouse: 'Kho HN-1',
     onHand: '312',
     reserved: '28',
@@ -55,8 +55,8 @@ const SAMPLE_VALUATION: ValuationRow[] = [
     layers: 3,
   },
   {
-    sku: 'DA-A4-80',
-    name: 'Giấy A4 Double A 80gsm (ream 500 tờ)',
+    sku: 'VBC-40G-10',
+    name: 'Vua Bật Chồi 40gr (combo 10 gói)',
     warehouse: 'Kho HCM-2',
     onHand: '5.160',
     reserved: '380',
@@ -66,8 +66,8 @@ const SAMPLE_VALUATION: ValuationRow[] = [
     layers: 3,
   },
   {
-    sku: 'CN-325',
-    name: 'Mực in Canon 325 chính hãng',
+    sku: 'MPT-25L',
+    name: 'Máy phun thuốc đeo vai 25L',
     warehouse: 'Kho HN-1',
     onHand: '198',
     reserved: '12',
@@ -77,8 +77,8 @@ const SAMPLE_VALUATION: ValuationRow[] = [
     layers: 2,
   },
   {
-    sku: 'DA-A4-70',
-    name: 'Giấy A4 Double A 70gsm (ream 500 tờ)',
+    sku: 'RTX-500',
+    name: 'Rooting Extra 500ml',
     warehouse: 'Kho HN-1',
     onHand: '4.230',
     reserved: '510',
@@ -88,8 +88,8 @@ const SAMPLE_VALUATION: ValuationRow[] = [
     layers: 3,
   },
   {
-    sku: 'IK-A4-70',
-    name: 'Giấy A4 IK Plus 70gsm (ream 500 tờ)',
+    sku: 'RT-500',
+    name: 'Rooting 500ml',
     warehouse: 'Kho HCM-2',
     onHand: '4.610',
     reserved: '220',
@@ -99,8 +99,8 @@ const SAMPLE_VALUATION: ValuationRow[] = [
     layers: 2,
   },
   {
-    sku: 'TL08-BLUE',
-    name: 'Bút bi Thiên Long TL-08 xanh',
+    sku: 'VBC-40G',
+    name: 'Vua Bật Chồi 40gr',
     warehouse: 'Kho HN-1',
     onHand: '31.200',
     reserved: '1.152',
@@ -110,8 +110,8 @@ const SAMPLE_VALUATION: ValuationRow[] = [
     layers: 5,
   },
   {
-    sku: 'BR-TN2385',
-    name: 'Mực in Brother TN-2385 tương thích',
+    sku: 'HCVS-25KG',
+    name: 'Phân hữu cơ vi sinh 25kg (bao)',
     warehouse: 'Kho HCM-2',
     onHand: '240',
     reserved: '6',
@@ -121,8 +121,8 @@ const SAMPLE_VALUATION: ValuationRow[] = [
     layers: 2,
   },
   {
-    sku: 'CP-A4-200',
-    name: 'Sổ tay Campus A4 200 trang',
+    sku: 'NPK-202020-1KG',
+    name: 'Phân bón lá NPK 20-20-20 1kg',
     warehouse: 'Kho HN-1',
     onHand: '2.640',
     reserved: '180',
@@ -132,8 +132,8 @@ const SAMPLE_VALUATION: ValuationRow[] = [
     layers: 3,
   },
   {
-    sku: 'TL08-BLACK',
-    name: 'Bút bi Thiên Long TL-08 đen',
+    sku: 'PUR-GOI',
+    name: 'Purger (gói)',
     warehouse: 'Kho HN-1',
     onHand: '26.400',
     reserved: '720',
@@ -143,8 +143,8 @@ const SAMPLE_VALUATION: ValuationRow[] = [
     layers: 4,
   },
   {
-    sku: 'CP-A5-120',
-    name: 'Sổ tay Campus A5 120 trang',
+    sku: 'TSSH-250',
+    name: 'Thuốc trừ sâu sinh học 250ml',
     warehouse: 'Kho HCM-2',
     onHand: '4.180',
     reserved: '310',
@@ -154,8 +154,8 @@ const SAMPLE_VALUATION: ValuationRow[] = [
     layers: 2,
   },
   {
-    sku: 'TP-BK48-100',
-    name: 'Băng keo trong 48mm × 100y Tiến Phát',
+    sku: 'HG-DUALUOI-100',
+    name: 'Hạt giống dưa lưới F1 (gói 100 hạt)',
     warehouse: 'Kho HN-1',
     onHand: '8.640',
     reserved: '460',
@@ -165,8 +165,8 @@ const SAMPLE_VALUATION: ValuationRow[] = [
     layers: 3,
   },
   {
-    sku: 'PL-KG50',
-    name: 'Kẹp giấy Plus 50mm (hộp 12)',
+    sku: 'TNSH-100',
+    name: 'Thuốc trừ nấm sinh học 100ml',
     warehouse: 'Kho HN-1',
     onHand: '2.480',
     reserved: '92',
@@ -176,8 +176,8 @@ const SAMPLE_VALUATION: ValuationRow[] = [
     layers: 2,
   },
   {
-    sku: 'TL-HL03',
-    name: 'Bút dạ quang Thiên Long HL-03 vàng',
+    sku: 'KRH-20ML',
+    name: 'Chế phẩm kích ra hoa 20ml',
     slowMoving: '92 ngày không xuất',
     warehouse: 'Kho HCM-2',
     onHand: '4.960',
@@ -204,7 +204,7 @@ const SAMPLE_LAYERS: CostLayerRow[] = [
   {
     receivedAt: '02/07/2026',
     grn: 'GRN-2607-00012',
-    supplier: 'Giấy Double A VN',
+    supplier: 'Vật tư Nông nghiệp Xanh',
     qtyIn: '3.000',
     qtyLeft: '420',
     unitCost: '57.100',
@@ -214,7 +214,7 @@ const SAMPLE_LAYERS: CostLayerRow[] = [
   {
     receivedAt: '25/07/2026',
     grn: 'GRN-2607-00078',
-    supplier: 'Giấy Double A VN',
+    supplier: 'Vật tư Nông nghiệp Xanh',
     qtyIn: '3.000',
     qtyLeft: '3.000',
     unitCost: '58.000',
@@ -224,7 +224,7 @@ const SAMPLE_LAYERS: CostLayerRow[] = [
   {
     receivedAt: '08/08/2026',
     grn: 'GRN-2608-00087',
-    supplier: 'Giấy Double A VN',
+    supplier: 'Vật tư Nông nghiệp Xanh',
     qtyIn: '3.000',
     qtyLeft: '3.000',
     unitCost: '58.600',
@@ -234,7 +234,7 @@ const SAMPLE_LAYERS: CostLayerRow[] = [
   {
     receivedAt: '21/08/2026',
     grn: 'GRN-2608-00121',
-    supplier: 'Giấy Double A VN',
+    supplier: 'Vật tư Nông nghiệp Xanh',
     qtyIn: '2.000',
     qtyLeft: '2.000',
     unitCost: '58.325',

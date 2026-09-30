@@ -180,3 +180,39 @@ describe('OrderListScreen — cân nặng gửi hãng + gán hãng hàng loạt'
     await waitFor(() => expect(screen.queryByRole('toolbar')).not.toBeInTheDocument());
   });
 });
+
+describe('OrderListScreen — lọc theo hãng + thời gian (2026-09-19)', () => {
+  it('carrierId + from/to đọc từ URL → gửi lên server; ô hãng hiện tên hãng, ô ngày phản ánh URL', async () => {
+    search = 'carrierId=c-ghtk&from=2026-08-20&to=2026-08-22';
+    const expected = makeOrders(60).filter(
+      (o) =>
+        o.carrierId === 'c-ghtk' &&
+        o.orderDate >= '2026-08-20T00:00:00.000Z' &&
+        o.orderDate <= '2026-08-22T23:59:59.999Z',
+    ).length;
+    expect(expected).toBeGreaterThan(0);
+    renderApp(<OrderListScreen />);
+    await screen.findByText(`${expected} đơn khớp bộ lọc`);
+    await waitFor(() =>
+      expect(screen.getByRole('combobox', { name: 'Hãng vận chuyển' })).toHaveTextContent(
+        'Giao Hàng Tiết Kiệm',
+      ),
+    );
+    expect(screen.getByLabelText('Từ ngày')).toHaveValue('2026-08-20');
+    expect(screen.getByLabelText('Đến ngày')).toHaveValue('2026-08-22');
+  });
+
+  it('chọn "Chưa gán hãng" → URL noCarrier=true và bỏ carrierId (hai key loại trừ nhau)', async () => {
+    search = 'carrierId=c-ghtk';
+    renderApp(<OrderListScreen />);
+    const box = await screen.findByRole('combobox', { name: 'Hãng vận chuyển' });
+    await waitFor(() => expect(box).toHaveTextContent('Giao Hàng Tiết Kiệm'));
+    replace.mockClear();
+    fireEvent.click(box);
+    fireEvent.click(await screen.findByRole('option', { name: 'Chưa gán hãng' }));
+    await waitFor(() => expect(replace).toHaveBeenCalled());
+    const url = String(replace.mock.calls.at(-1)![0]);
+    expect(url).toContain('noCarrier=true');
+    expect(url).not.toContain('carrierId=');
+  });
+});

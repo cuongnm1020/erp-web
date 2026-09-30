@@ -5,9 +5,8 @@ import {
   CheckCircle2,
   CircleAlert,
   Keyboard,
-  Minus,
+  MapPin,
   PackageCheck,
-  Plus,
   WifiOff,
 } from 'lucide-react';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
@@ -27,9 +26,12 @@ import { formatDateTime, formatQuantity } from '@/lib/format';
 import { useAbility } from '@/lib/permission';
 import { usePdaQueue, usePdaStats } from '../api/use-pda';
 import { useScanSession } from '../scan-session';
+import { useScanQty } from '../use-scan-qty';
 import { LabelPrintDialog } from './label-print-dialog';
 import { PdaListColumn } from './pda-list-column';
+import { ScanQtyBar } from './scan-qty-bar';
 import { SkuBarcodes } from './sku-barcodes';
+import { SkuIdentity, SkuThumb } from './sku-identity';
 
 /**
  * Trạm đóng gói (PLAN-barcode-pick-pack D1) — desktop + máy quét USB (keyboard wedge), cùng bố
@@ -40,6 +42,9 @@ import { SkuBarcodes } from './sku-barcodes';
  * → dòng đủ tự đóng → dòng cuối → popup nhãn vận đơn (LabelPrintDialog). Đơn đang đóng nằm
  * trên URL `?order=` (luật 8). Phím: F2 về ô quét, Esc bỏ đơn đang mở, ? trợ giúp.
  * Quyền: task.execute (quét) + shipment.pack (nhãn) — cả hai thuộc role WAREHOUSE / PACKER.
+ *
+ * 2026-09-22: quét mã SKU → gõ số lượng → Enter (đóng 30 một lần); thẻ dòng đang đóng hiện ảnh,
+ * tên thương mại và vị trí đã lấy để đối chiếu với hàng trên bàn.
  */
 export function PackStationScreen() {
   const ability = useAbility();
@@ -48,7 +53,10 @@ export function PackStationScreen() {
   const search = useSearchParams();
   const s = useScanSession('PACK');
   const scanRef = useRef<ScanInputHandle>(null);
-  const [qty, setQty] = useState(1);
+  const scanQty = useScanQty({
+    lines: s.task?.lines ?? [],
+    send: (code, qty) => void s.scan(code, qty),
+  });
   const [help, setHelp] = useState(false);
   const [labelOpen, setLabelOpen] = useState(false);
 
@@ -98,7 +106,7 @@ export function PackStationScreen() {
     s.clear();
     opened.current = null;
     setLabelOpen(false);
-    setQty(1);
+    scanQty.reset();
     setUrlOrder(null);
     scanRef.current?.focus();
   };
@@ -121,8 +129,7 @@ export function PackStationScreen() {
 
   const onScan = (code: string) => {
     if (s.phase === 'ready' && s.task) {
-      void s.scan(code, String(qty));
-      setQty(1);
+      scanQty.onScan(code);
     } else if (s.phase === 'idle') {
       void s.open(code);
     }
@@ -285,15 +292,19 @@ export function PackStationScreen() {
 
         {phase === 'ready' && current ? (
           <section className="rounded-lg border bg-card p-4" aria-label="Dòng đang đóng">
-            <div className="flex items-center gap-2 text-sm text-muted-foreground">
-              <PackageCheck className="h-4 w-4" aria-hidden />
-              Sản phẩm
+            <div className="flex items-center justify-between gap-2 text-sm text-muted-foreground">
+              <span className="flex items-center gap-2">
+                <PackageCheck className="h-4 w-4" aria-hidden />
+                Sản phẩm
+              </span>
+              {current.locationCode ? (
+                <span className="flex items-center gap-1">
+                  <MapPin className="h-4 w-4" aria-hidden />
+                  Đã lấy từ <span className="font-mono font-semibold">{current.locationCode}</span>
+                </span>
+              ) : null}
             </div>
-            <div className="text-3xl font-bold leading-tight">{current.skuName}</div>
-            <div className="font-mono text-sm text-muted-foreground">
-              {current.skuCode}
-              {current.lotNumber ? ` · lô ${current.lotNumber}` : ''}
-            </div>
+            <SkuIdentity sku={current} className="mt-2" />
             <SkuBarcodes barcodes={current.barcodes} />
             <div className="mt-3 flex items-baseline gap-2">
               <span className="text-5xl font-bold tabular-nums">
@@ -319,14 +330,23 @@ export function PackStationScreen() {
                   l.taskLineId === current?.taskLineId && 'border-primary',
                 )}
               >
-                <span>
-                  <span className="font-mono font-semibold">{l.skuCode}</span>{' '}
-                  <span>{l.skuName}</span>
-                  {l.status === 'COMPLETED' ? (
-                    <span className="ml-1 text-xs text-success">· đủ</span>
-                  ) : null}
+                <span className="flex min-w-0 items-center gap-2">
+                  <SkuThumb src={l.imageUrl} alt={l.productName} />
+                  <span className="flex min-w-0 flex-col">
+                    <span className="truncate">
+                      {l.productName}
+                      {l.status === 'COMPLETED' ? (
+                        <span className="ml-1 text-xs text-success">· đủ</span>
+                      ) : null}
+                    </span>
+                    <span className="truncate font-mono text-xs text-muted-foreground">
+                      {l.locationCode ? `${l.locationCode} · ` : ''}
+                      {l.skuCode}
+                      {l.skuName !== l.productName ? ` · ${l.skuName}` : ''}
+                    </span>
+                  </span>
                 </span>
-                <span className="tabular-nums">
+                <span className="shrink-0 tabular-nums">
                   {formatQuantity(l.qtyDone)}/{formatQuantity(l.qtyPlanned)}
                 </span>
               </li>
@@ -349,32 +369,7 @@ export function PackStationScreen() {
       </main>
 
       <footer className="sticky bottom-0 flex flex-col gap-3 border-t bg-background px-4 pb-4 pt-3">
-        {phase === 'ready' ? (
-          <div className="flex items-center justify-between gap-3">
-            <span className="text-sm text-muted-foreground">Số lượng mỗi lần quét</span>
-            <div className="flex items-center gap-2">
-              <Button
-                variant="outline"
-                className="h-14 w-14"
-                aria-label="Giảm số lượng"
-                onClick={() => setQty((q) => Math.max(1, q - 1))}
-              >
-                <Minus aria-hidden />
-              </Button>
-              <span className="w-10 text-center text-2xl font-bold tabular-nums" aria-live="polite">
-                {qty}
-              </span>
-              <Button
-                variant="outline"
-                className="h-14 w-14"
-                aria-label="Tăng số lượng"
-                onClick={() => setQty((q) => q + 1)}
-              >
-                <Plus aria-hidden />
-              </Button>
-            </div>
-          </div>
-        ) : null}
+        {phase === 'ready' ? <ScanQtyBar ctl={scanQty} verb="Đóng" /> : null}
         <ScanInput
           ref={scanRef}
           size="lg"
@@ -383,7 +378,7 @@ export function PackStationScreen() {
             phase === 'ready' ? 'Quét mã vạch sản phẩm…' : 'Quét mã đơn / mã việc / vận đơn…'
           }
           onScan={onScan}
-          paused={labelOpen || help}
+          paused={labelOpen || help || scanQty.pending !== null}
           disabled={phase === 'opening' || phase === 'done'}
         />
         {phase === 'done' ? (
@@ -416,11 +411,11 @@ export function PackStationScreen() {
           </DialogHeader>
           <dl className="grid grid-cols-[6rem_1fr] gap-y-1 text-sm">
             <dt className="font-mono">Enter</dt>
-            <dd>Gửi mã vừa quét / gõ</dd>
+            <dd>Gửi mã vừa quét / gõ. Sau khi quét SKU: gõ số lượng rồi Enter để đóng số đó</dd>
             <dt className="font-mono">F2</dt>
             <dd>Về ô quét</dd>
             <dt className="font-mono">Esc</dt>
-            <dd>Bỏ đơn đang mở, quét đơn khác</dd>
+            <dd>Đang chờ số lượng: bỏ mã vừa quét. Ngược lại: bỏ đơn đang mở, quét đơn khác</dd>
             <dt className="font-mono">?</dt>
             <dd>Bảng này</dd>
           </dl>

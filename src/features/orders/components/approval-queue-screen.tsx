@@ -33,7 +33,7 @@ const SAMPLE_PENDING: PendingOrderRow[] = [
   {
     soNo: 'SO-2608-01302',
     sale: 'Nguyễn Văn An',
-    customer: 'Cửa hàng Minh Tâm',
+    customer: 'Cửa hàng VTNN Minh Tâm',
     reasons: ['CK vượt trần 18% > 15%'],
     total: '1362400',
     waitingFor: '2 giờ 10 phút',
@@ -42,7 +42,7 @@ const SAMPLE_PENDING: PendingOrderRow[] = [
   {
     soNo: 'SO-2608-01295',
     sale: 'Lê Thị Hoa',
-    customer: 'Công ty TNHH Hòa Phát Văn Phòng Phẩm',
+    customer: 'HTX Nông nghiệp Kim Quan',
     reasons: ['Giá trị 68.500.000 > 50.000.000'],
     total: '68500000',
     waitingFor: '3 giờ 42 phút',
@@ -50,7 +50,7 @@ const SAMPLE_PENDING: PendingOrderRow[] = [
   {
     soNo: 'SO-2608-01288',
     sale: 'Phạm Minh Đức',
-    customer: 'Trường THCS Nguyễn Du',
+    customer: 'Trang trại sầu riêng Bảy Hùng',
     reasons: ['CK vượt trần 20% > 15%'],
     total: '12150000',
     waitingFor: '5 giờ 05 phút',
@@ -58,7 +58,7 @@ const SAMPLE_PENDING: PendingOrderRow[] = [
   {
     soNo: 'SO-2608-01270',
     sale: 'Lê Thị Hoa',
-    customer: 'Công ty CP Giáo dục Ánh Dương',
+    customer: 'Công ty CP Nông sản Ánh Dương',
     reasons: ['Giá trị 53.900.000 > 50.000.000', 'CK 16% > 15%'],
     total: '53900000',
     waitingFor: '1 ngày 2 giờ',
@@ -75,16 +75,16 @@ interface ReviewLine {
 }
 
 const SAMPLE_REVIEW_LINES: ReviewLine[] = [
-  { name: 'Bút bi Thiên Long TL-08 xanh', qty: '2 thùng', discountPct: 5, amount: '342000' },
+  { name: 'Vua Bật Chồi 40gr (combo 10 gói)', qty: '2 thùng', discountPct: 5, amount: '342000' },
   {
-    name: 'Giấy A4 Double A 80gsm',
-    qty: '10 ream',
+    name: 'Rooting Extra 500ml',
+    qty: '10 chai',
     discountPct: 18,
     amount: '590400',
     violation: 'CK 18% — trần bảng giá 15%, chênh −21.600',
   },
-  { name: 'Băng keo trong 48mm × 100y Tiến Phát', qty: '40 cây', discountPct: 0, amount: '380000' },
-  { name: 'Kẹp giấy Plus 50mm (hộp 12)', qty: '6 hộp', discountPct: 0, amount: '144000' },
+  { name: 'Phân bón lá NPK 20-20-20 1kg', qty: '40 gói', discountPct: 0, amount: '380000' },
+  { name: 'Thuốc trừ sâu sinh học 250ml', qty: '6 chai', discountPct: 0, amount: '144000' },
 ];
 
 const money = (v: string) => formatMoney(v, { unit: '' });
@@ -242,7 +242,7 @@ export function ApprovalQueueScreen() {
               <KeyValue k="Sale">Nguyễn Văn An · gửi 24/08/2026 09:20</KeyValue>
               <KeyValue k="Khách hàng">
                 <a href="#" className="text-primary hover:underline">
-                  Cửa hàng Minh Tâm
+                  Cửa hàng VTNN Minh Tâm
                 </a>{' '}
                 · KH-004512 · hạng Bạc
               </KeyValue>

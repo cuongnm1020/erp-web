@@ -303,7 +303,7 @@ export function LoyaltyScreen() {
               <Field label="Loại trừ">
                 <div className="flex flex-wrap gap-1.5">
                   <Chip>
-                    Nhóm Mực in chính hãng <X className="size-3 text-muted-foreground" />
+                    Nhóm Bình xịt điện <X className="size-3 text-muted-foreground" />
                   </Chip>
                   <Chip>
                     Kênh Online <X className="size-3 text-muted-foreground" />
@@ -370,7 +370,7 @@ export function LoyaltyScreen() {
               <h2 className="text-sm font-semibold">Lịch sử điểm</h2>
               <div className="flex h-7 items-center gap-1.5 rounded-md border border-input bg-background px-2 text-sm">
                 <User className="size-4 text-muted-foreground" />
-                <span className="font-semibold">Cửa hàng Minh Tâm</span>
+                <span className="font-semibold">Cửa hàng VTNN Minh Tâm</span>
                 <span className="text-muted-foreground">· KH-004512</span>
                 <ChevronDown className="size-3.5 text-muted-foreground" />
               </div>

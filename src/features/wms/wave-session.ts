@@ -13,7 +13,7 @@ import {
   type PdaWave,
   type PdaWaveScanResult,
 } from './api/use-pda';
-import type { ScanFeedback, Shortage } from './scan-session';
+import { sameCode, type ScanFeedback, type Shortage } from './scan-session';
 
 export type WavePhase = 'idle' | 'opening' | 'ready' | 'done';
 type Group = PdaWave['lines'][number];
@@ -90,12 +90,21 @@ export function useWaveSession() {
     }>,
     groupRemaining: string | null,
     waveStatus: PdaWave['status'],
+    /** "Còn trên kệ" server tính sau lần quét — áp cho mọi nhóm cùng SKU ở cùng bin. */
+    bin?: { skuId: string; locationId: string | null; remaining: string | null },
   ) => {
     setWave((cur) => {
       if (!cur) return cur;
       const byLine = new Map(shares.map((s) => [s.taskLineId, s]));
       const doneTasks = new Set(shares.filter((s) => s.taskCompleted).map((s) => s.taskId));
-      const lines = cur.lines.map((g) => {
+      const lines = cur.lines.map((g0) => {
+        const g =
+          bin &&
+          bin.remaining !== null &&
+          g0.skuId === bin.skuId &&
+          g0.locationId === bin.locationId
+            ? { ...g0, binRemaining: bin.remaining }
+            : g0;
         if (g.key !== groupKey) return g;
         const next = g.shares.map((sh) => {
           const u = byLine.get(sh.taskLineId);
@@ -138,8 +147,11 @@ export function useWaveSession() {
   const scan = useCallback(
     async (code: string, qty: string) => {
       if (!wave || !current) return;
-      // Nhóm đang đứng phải chứa mã này — quét nhầm nhóm khác thì báo ngay, không gửi.
-      if (!current.barcodes.includes(code)) {
+      // PLAN-packaging-hierarchy F: mã THÙNG của một nhóm còn mở → quét thùng (không qty, server
+      // chia cả số hàng trong thùng cho các đơn). Mã SKU: nhóm đang đứng phải chứa mã này.
+      const containerGroup =
+        wave.lines.find((g) => sameCode(g.containerBarcode, code) && !g.complete) ?? null;
+      if (!containerGroup && !current.barcodes.includes(code)) {
         const other = wave.lines.find((g) => g.barcodes.includes(code) && !g.complete);
         beep('error');
         setFeedback({
@@ -150,13 +162,14 @@ export function useWaveSession() {
         });
         return;
       }
+      const target = containerGroup ?? current;
       try {
         const r = await scanMut.mutateAsync({
           waveId: wave.id,
           barcode: code,
-          qty,
-          ...(current.locationId ? { locationId: current.locationId } : {}),
-          ...(current.lotId ? { lotId: current.lotId } : {}),
+          ...(containerGroup ? {} : { qty }),
+          ...(target.locationId ? { locationId: target.locationId } : {}),
+          ...(target.lotId ? { lotId: target.lotId } : {}),
           idempotencyKey: newIdempotencyKey(),
         });
         setOffline(false);
@@ -172,6 +185,7 @@ export function useWaveSession() {
           })),
           r.groupRemaining,
           r.waveStatus,
+          { skuId: r.skuId, locationId: r.locationId, remaining: r.binRemaining },
         );
         beep('ok');
         const doneOrders = r.shares
@@ -180,6 +194,9 @@ export function useWaveSession() {
         setFeedback({
           kind: 'ok',
           text:
+            (r.containerBarcode
+              ? `Thùng ${r.containerBarcode}${r.containerPicked ? ' (trọn)' : ''} · `
+              : '') +
             `${r.skuCode}: chia cho ${r.shares.length} đơn, nhóm còn ${r.groupRemaining}` +
             (doneOrders.length ? ` · xong đơn ${doneOrders.join(', ')}` : ''),
         });

@@ -20,6 +20,7 @@ import { useAbility } from '@/lib/permission';
 import { usePdaQueue, usePdaStats } from '../api/use-pda';
 import { currentPutAwayLine, isFullyScanned, usePutAwaySession } from '../put-away-session';
 import { PdaListColumn } from './pda-list-column';
+import { ContainerHint } from './container-hint';
 import { SkuBarcodes } from './sku-barcodes';
 
 /**
@@ -225,6 +226,10 @@ export function PutAwayScreen() {
               {current.lotNumber ? ` · lô ${current.lotNumber}` : ''}
             </div>
             <SkuBarcodes barcodes={current.barcodes} />
+            <ContainerHint
+              containerBarcode={current.containerBarcode}
+              suggested={current.suggested}
+            />
             {awaitingBin ? (
               <p
                 role="status"

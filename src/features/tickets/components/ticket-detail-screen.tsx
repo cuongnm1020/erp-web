@@ -27,7 +27,7 @@ const SAMPLE_TIMELINE: TimelineItem[] = [
     kind: 'call',
     internal: false,
     title: 'Khách gọi đến',
-    body: '— chị Tâm báo đơn SO-2308-01102 nhận 4/6 hộp kẹp giấy Plus 50mm, thùng ngoài nguyên vẹn',
+    body: '— chị Tâm báo đơn SO-2308-01102 nhận 4/6 thùng Rooting Extra 500ml, bao ngoài nguyên vẹn',
     meta: '18/08/2026 09:10 · ghi bởi Nguyễn Văn An · có ghi âm 2:30',
   },
   {
@@ -48,7 +48,7 @@ const SAMPLE_TIMELINE: TimelineItem[] = [
     kind: 'note',
     internal: true,
     title: 'Ghi chú nội bộ',
-    body: '— QC xác nhận camera cho thấy chỉ đóng 4 hộp. Thiếu do đóng gói. Đề xuất: giao bù 2 hộp kèm đơn SO-2308-01277 ngày mai.',
+    body: '— QC xác nhận camera cho thấy chỉ đóng 4 thùng. Thiếu do đóng gói. Đề xuất: giao bù 2 thùng kèm đơn SO-2308-01277 ngày mai.',
     meta: '23/08/2026 16:20 · Đỗ Thanh Tùng (QC kho HN-1)',
   },
 ];
@@ -63,7 +63,7 @@ const RELATED_ORDER = {
   code: 'SO-2308-01102',
   total: '3680000',
   status: 'Đã giao',
-  detail: 'Giao 16/08 · phiếu xuất GDN-2608-00214 · dòng lỗi: Kẹp giấy Plus 50mm × 6 hộp',
+  detail: 'Giao 16/08 · phiếu xuất GDN-2608-00214 · dòng lỗi: Rooting Extra 500ml × 6 thùng',
 };
 
 type ConvFilter = 'all' | 'customer' | 'internal';
@@ -82,7 +82,7 @@ export function TicketDetailScreen({ id }: { id: string }) {
   return (
     <>
       <PageHeader
-        title={`${id} — Giao thiếu 2 hộp kẹp giấy Plus 50mm`}
+        title={`${id} — Giao thiếu 2 thùng Rooting Extra 500ml`}
         description="Tạo bởi Nguyễn Văn An · 18/08/2026 09:15 · loại: Giao thiếu · ưu tiên: Trung bình"
         breadcrumb={[
           { label: 'Khách hàng' },
@@ -236,7 +236,7 @@ export function TicketDetailScreen({ id }: { id: string }) {
                 </span>
                 <div className="min-w-0">
                   <div className="font-semibold">
-                    Cửa hàng Minh Tâm <StatusBadge tone="neutral">Bạc</StatusBadge>
+                    Cửa hàng VTNN Minh Tâm <StatusBadge tone="neutral">Bạc</StatusBadge>
                   </div>
                   <div className="text-xs text-muted-foreground">
                     <span className="font-mono">KH-004512</span> · 0912 345 678 · phụ trách Nguyễn

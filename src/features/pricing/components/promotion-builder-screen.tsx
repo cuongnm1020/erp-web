@@ -24,10 +24,10 @@ interface PreviewLine {
 }
 
 const SAMPLE_PREVIEW_LINES: PreviewLine[] = [
-  { sku: 'DA-A4-80', qty: '12 ream', amount: '828.000' },
-  { sku: 'IK-A4-70', qty: '20 ream', amount: '1.120.000' },
-  { sku: 'TL08-BLUE', qty: '5 thùng', amount: '850.000' },
-  { sku: 'PL-KG50', qty: '1 hộp', amount: 'tặng', gift: true },
+  { sku: 'HCVS-25KG', qty: '12 bao', amount: '828.000' },
+  { sku: 'NPK-202020-25KG', qty: '20 bao', amount: '1.120.000' },
+  { sku: 'VBC-40G-10', qty: '5 thùng', amount: '850.000' },
+  { sku: 'RTX-500', qty: '1 chai', amount: 'tặng', gift: true },
 ];
 
 export function PromotionBuilderScreen() {
@@ -74,7 +74,7 @@ export function PromotionBuilderScreen() {
           <h2 className="border-b px-3 py-2 text-sm font-semibold">Thông tin chung</h2>
           <div className="space-y-3 p-3">
             <Field label="Tên chương trình" required>
-              <FakeInput>Quý 4: giảm 100.000 nhóm Giấy</FakeInput>
+              <FakeInput>Quý 4: giảm 100.000 nhóm Phân bón</FakeInput>
             </Field>
             <Field label="Loại ưu đãi">
               <FakeInput caret>Giảm tiền</FakeInput>
@@ -151,11 +151,11 @@ export function PromotionBuilderScreen() {
               <OpRow onA />
               <RuleRow
                 c1={<FakeInput caret>SL trong nhóm</FakeInput>}
-                c2={<FakeInput caret>Giấy in &amp; photocopy</FakeInput>}
+                c2={<FakeInput caret>Phân bón</FakeInput>}
                 c3={<FakeInput caret>≥</FakeInput>}
                 c4={
                   <FakeInput className="justify-end tabular-nums">
-                    10&nbsp;<span className="text-muted-foreground">ream</span>
+                    10&nbsp;<span className="text-muted-foreground">bao</span>
                   </FakeInput>
                 }
               />
@@ -207,11 +207,10 @@ export function PromotionBuilderScreen() {
                   Tặng SKU
                 </FakeInput>
                 <FakeInput caret className="min-w-0 flex-1">
-                  <span className="mr-1 font-mono text-xs">PL-KG50</span> Kẹp giấy Plus 50mm (hộp
-                  12)
+                  <span className="mr-1 font-mono text-xs">RTX-500</span> Rooting Extra 500ml
                 </FakeInput>
                 <FakeInput className="w-28 shrink-0 justify-end tabular-nums">
-                  1&nbsp;<span className="text-muted-foreground">hộp</span>
+                  1&nbsp;<span className="text-muted-foreground">chai</span>
                 </FakeInput>
                 <X className="size-4 shrink-0 text-muted-foreground" />
               </div>
@@ -234,9 +233,9 @@ export function PromotionBuilderScreen() {
               <div className="flex items-start gap-2.5 rounded-md border bg-warning/10 px-3 py-2 text-sm text-warning">
                 <AlertTriangle className="mt-0.5 size-4 shrink-0" />
                 <p>
-                  SKU tặng <span className="font-semibold">PL-KG50</span> sẽ được reserve như dòng
-                  hàng bình thường khi đơn xác nhận. Tồn khả dụng hiện tại ở Kho HN-1: 890 hộp, Kho
-                  HCM-2: 120 hộp.
+                  SKU tặng <span className="font-semibold">RTX-500</span> sẽ được reserve như dòng
+                  hàng bình thường khi đơn xác nhận. Tồn khả dụng hiện tại ở Kho HN-1: 890 chai, Kho
+                  HCM-2: 120 chai.
                 </p>
               </div>
             </div>
@@ -277,7 +276,7 @@ export function PromotionBuilderScreen() {
             </div>
             <div className="space-y-1.5 p-3">
               <p className="text-xs text-muted-foreground">
-                Khách: Công ty TNHH Hòa Phát Văn Phòng Phẩm · Đại lý cấp 1 MB · kênh Điện thoại
+                Khách: HTX Nông nghiệp Kim Quan · Đại lý cấp 1 MB · kênh Điện thoại
               </p>
               <Table className="text-xs">
                 <TableHeader>
@@ -324,7 +323,7 @@ export function PromotionBuilderScreen() {
                 <StatusBadge tone="ok">thỏa</StatusBadge>
               </div>
               <div className="flex items-center justify-between text-sm">
-                <span className="text-muted-foreground">Điều kiện 2: Giấy ≥ 10 ream (32)</span>
+                <span className="text-muted-foreground">Điều kiện 2: Phân bón ≥ 10 bao (32)</span>
                 <StatusBadge tone="ok">thỏa</StatusBadge>
               </div>
               <div className="flex items-center justify-between text-sm">

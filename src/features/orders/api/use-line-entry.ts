@@ -106,8 +106,14 @@ export function useSkuSearch(q: string): EntitySearchResult {
       unwrap(api.GET('/products', { params: { query: { q: q || undefined, take: 20, skip: 0 } } })),
     staleTime: 30_000,
   });
+  // Combo cũng là SKU (server bung thành thành phần khi chốt) — đánh dấu để sale nhận ra.
   const options: EntityOption[] | undefined = query.data?.items.flatMap((p) =>
-    p.skus.map((s) => ({ id: s.id, label: s.name, hint: `${s.code} · ${p.name}` })),
+    p.skus.map((s) => ({
+      id: s.id,
+      label: s.name,
+      hint: p.isCombo ? `Combo · ${s.code}` : `${s.code} · ${p.name}`,
+      meta: p.isCombo ? { isCombo: 'true' } : undefined,
+    })),
   );
   return { options, isPending: query.isPending, error: query.error };
 }

@@ -29,6 +29,14 @@ const MESSAGES: Record<string, string> = {
     'Chưa có giá cho sản phẩm này với khách đang chọn. Báo quản lý cập nhật bảng giá.',
   INVALID_STATUS_TRANSITION:
     'Trạng thái chứng từ đã đổi, thao tác này không còn hợp lệ. Tải lại trang.',
+  // Combo sản phẩm (/combos + bung combo khi lên đơn)
+  COMBO_COMPONENT_INVALID:
+    'Danh sách thành phần chưa hợp lệ: thiếu, trùng SKU, SKU ngừng bán hoặc định mức bằng 0.',
+  COMBO_NESTED: 'Không dùng combo làm thành phần của combo khác. Chọn SKU thường.',
+  COMBO_EMPTY: 'Combo chưa có thành phần nên chưa bán được. Thêm thành phần ở màn Combo sản phẩm.',
+  COMBO_SINGLE_SKU: 'Sản phẩm combo chỉ có một SKU. Sửa thành phần ở màn Combo sản phẩm.',
+  COMBO_SKU_NOT_STOCKABLE:
+    'Combo không có tồn riêng. Nhập / điều chỉnh tồn trên từng SKU thành phần.',
   // Phân công khách hàng (P2-04)
   NOT_TEAM_LEADER: 'Chỉ trưởng nhóm của team này mới được phân công. Chọn team bạn đang lead.',
   USER_NOT_IN_TEAM: 'Người được chọn không còn thuộc team này. Tải lại danh sách thành viên.',
@@ -75,6 +83,11 @@ const MESSAGES: Record<string, string> = {
     'Đơn chưa có việc pick và không tự sinh được. Kiểm tra dòng hàng của đơn rồi thử lại.',
   ORDER_IN_WAVE:
     'Đơn đang nằm trong lượt pick gộp. Hoàn tất lượt trên màn quét, không đóng tay từng đơn được.',
+  // Hủy đơn (2026-09-28): đơn đã đóng gói thì tồn đã trừ — không hủy chứng từ được.
+  ORDER_ALREADY_PACKED:
+    'Đơn đã đóng gói, hàng đã trừ kho — không hủy được. Xử lý bằng hoàn hàng / nhập lại kho.',
+  SHIPMENT_CANCELLED: 'Phiếu giao này đã hủy theo đơn — không đóng gói / giao hãng được nữa.',
+  SHIPMENT_CANCEL_VIA_ORDER: 'Muốn hủy phiếu giao thì hủy đơn bán, không đổi tay trạng thái phiếu.',
   ORDER_PICK_SHORTAGE:
     'Không có dòng nào lấy được — thiếu tồn ở vị trí pick được. Nhập kho hoặc chuyển hàng vào vị trí pick rồi thử lại.',
   PDA_PICK_NEEDS_ASSIGNMENT:
@@ -94,9 +107,22 @@ const MESSAGES: Record<string, string> = {
     'Dòng này chưa có vị trí lấy hàng (thiếu tồn). Điều phối phải xử lý trước.',
   PDA_NO_RESERVATION: 'Không tìm thấy giữ chỗ khớp dòng này. Báo điều phối kiểm tra lại đơn nguồn.',
   PDA_WAVE_SKU_NOT_FOUND: 'Sản phẩm này không có trong lượt hoặc đã lấy đủ. Kiểm tra lại kệ.',
+  CONTAINER_SCAN_REJECTED:
+    'Thùng này không lấy được cho dòng đang làm — kiểm tra đúng thùng ghi trên phiếu, đúng vị trí, thùng chưa bị việc khác lấy.',
+  CONTAINER_NOT_FOUND: 'Mã thùng không tồn tại. Quét lại tem trên thùng.',
+  CONTAINER_NOT_OPEN: 'Thùng đã đóng hoặc đã rỗng — không thao tác được.',
+  CONTAINER_NOT_EMPTY: 'Thùng còn hàng — không đóng được.',
+  CONTAINER_LOCATION_MISMATCH:
+    'Thùng không cùng vị trí với thùng cha — chuyển tới vị trí cha trước.',
+  CONTAINER_HAS_PARENT:
+    'Thùng đang nằm trong thùng cha — thao tác trên thùng cha hoặc tách ra trước.',
+  CONTAINER_BARCODE_TAKEN: 'Mã thùng này đã được dùng — nhập mã khác.',
+  INVALID_CONTAINER_INPUT: 'Thao tác thùng không hợp lệ. Xem chi tiết.',
   WAVE_NOT_FOUND: 'Lượt pick không tồn tại. Quét lại mã lượt.',
   INVALID_WAVE_INPUT:
     'Không gộp được lượt: chỉ gộp task lấy hàng cùng kho, chưa ai nhận, chưa thuộc lượt khác.',
+  WAVE_SUGGESTION_STALE:
+    'Nhóm này đã thay đổi từ lúc hiển thị (có đơn bị huỷ, đã gán hoặc đã vào lượt khác). Danh sách gợi ý đã tải lại — chọn lại nhóm.',
   SYNC_ACTOR_NOT_FOUND: 'Tài khoản hệ thống cho đồng bộ chưa được tạo. Báo IT chạy seed dữ liệu.',
   SYNC_ACTOR_MISCONFIGURED: 'Tài khoản hệ thống cho đồng bộ đang sai cấu hình. Báo IT kiểm tra.',
 };

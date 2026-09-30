@@ -109,7 +109,8 @@ export function makeOrders(n: number) {
     currencyCode: 'VND',
     ownerId: i % 3 === 0 ? null : 'u-sale',
     teamId: 't-hn',
-    carrierId: null,
+    // Mỗi đơn thứ 5 (lệch 1) đã gán GHTK — để test lọc theo hãng; đơn đầu (FIRST) vẫn chưa gán.
+    carrierId: i % 5 === 1 ? 'c-ghtk' : null,
     warehouseId: null,
     addressId: null,
     // Cân nặng: đặt tay 1 kg ở mỗi đơn thứ 4; còn lại tính từ dòng 0,3 → 1,5 kg.
@@ -145,6 +146,7 @@ export function makeOrderDetail(id: string) {
     priceListId: null,
     promotionId: null,
     isGift: i === 2,
+    combo: null,
     reservedQty: String((i + 1) * 10),
     pickedQty: i === 0 ? String((i + 1) * 10) : '0',
   }));
@@ -163,6 +165,74 @@ export function makeOrderDetail(id: string) {
     shipment: null,
     lines,
   };
+}
+
+/**
+ * Chi tiết đơn có MỘT combo (2 dòng thành phần, `combo.groupNo` = 1) + một dòng thường —
+ * đúng shape `SalesOrderLineDto.combo` (server bung combo, tiền đã phân bổ xuống thành phần).
+ */
+export function makeOrderDetailWithCombo(id: string) {
+  const base = makeOrderDetail(id);
+  if (!base) return null;
+  const combo = {
+    skuId: uuid('00000005', 1),
+    skuCode: 'CB-0001',
+    skuName: 'Combo A + B',
+    groupNo: 1,
+    qty: '3',
+    componentQty: '2',
+    listPrice: '150000',
+    unitPrice: '150000',
+  };
+  const lines = [
+    {
+      ...base.lines[0]!,
+      lineNo: 1,
+      skuCode: 'SKU-A',
+      skuName: 'Sản phẩm A',
+      qty: '6',
+      qtyBase: '6',
+      listPrice: '56250',
+      unitPrice: '56250',
+      discount: '0',
+      lineTotal: '337500',
+      isGift: false,
+      combo,
+    },
+    {
+      ...base.lines[0]!,
+      id: uuid('00000002', 11),
+      lineNo: 2,
+      skuId: uuid('00000003', 11),
+      skuCode: 'SKU-B',
+      skuName: 'Sản phẩm B',
+      qty: '3',
+      qtyBase: '3',
+      listPrice: '37500',
+      unitPrice: '37500',
+      discount: '0',
+      lineTotal: '112500',
+      isGift: false,
+      combo: { ...combo, componentQty: '1' },
+    },
+    {
+      ...base.lines[0]!,
+      id: uuid('00000002', 12),
+      lineNo: 3,
+      skuId: uuid('00000003', 12),
+      skuCode: 'SKU-C',
+      skuName: 'Sản phẩm C',
+      qty: '1',
+      qtyBase: '1',
+      listPrice: '60000',
+      unitPrice: '60000',
+      discount: '0',
+      lineTotal: '60000',
+      isGift: false,
+      combo: null,
+    },
+  ];
+  return { ...base, lineCount: 3, subtotal: '510000', total: '510000', lines };
 }
 
 /** Đúng shape `SalesOrderShipmentDto` — phiếu giao đã có vận đơn GHTK, chưa in nhãn. */
@@ -560,6 +630,95 @@ export const DEPARTMENTS_FIXTURE = [
   },
 ];
 
+/** Đúng shape `OrgTreeDto` (GET /org/tree): 2 phòng ban lồng nhau, 2 team lồng nhau, 1 người chưa có phòng ban. */
+const ORG_EMP = (i: number, departmentId: string | null, isActive = true) => ({
+  id: uuid('0000000e', i),
+  code: `NV${String(i).padStart(3, '0')}`,
+  fullName:
+    ['Nguyễn Văn Lãnh', 'Trần Thị Hoa', 'Lê Minh Tuấn', 'Đỗ Văn Kho'][i - 1] ?? `Nhân viên ${i}`,
+  email: `nv${i}@erp.local`,
+  isActive,
+  departmentId,
+});
+export const ORG_TREE_FIXTURE = {
+  departments: [
+    {
+      id: uuid('0000000c', 0),
+      code: 'SALES',
+      name: 'Kinh doanh',
+      isActive: true,
+      managerId: uuid('0000000e', 1),
+      members: [ORG_EMP(1, uuid('0000000c', 0))],
+      memberCount: 3,
+      children: [
+        {
+          id: uuid('0000000c', 1),
+          code: 'SALES-HN',
+          name: 'Kinh doanh Hà Nội',
+          isActive: true,
+          managerId: null,
+          members: [ORG_EMP(2, uuid('0000000c', 1)), ORG_EMP(3, uuid('0000000c', 1))],
+          memberCount: 2,
+          children: [],
+        },
+      ],
+    },
+  ],
+  teams: [
+    {
+      id: uuid('0000000d', 0),
+      code: 'SALES',
+      name: 'Phòng kinh doanh',
+      type: 'SALES' as const,
+      isActive: true,
+      members: [],
+      memberCount: 3,
+      children: [
+        {
+          id: uuid('0000000d', 1),
+          code: 'SALES-HN',
+          name: 'Sale Hà Nội',
+          type: 'SALES' as const,
+          isActive: true,
+          members: [
+            {
+              ...ORG_EMP(1, uuid('0000000c', 0)),
+              role: 'LEADER' as const,
+              joinedAt: '2026-01-01T00:00:00.000Z',
+            },
+            {
+              ...ORG_EMP(2, uuid('0000000c', 1)),
+              role: 'MEMBER' as const,
+              joinedAt: '2026-01-01T00:00:00.000Z',
+            },
+            {
+              ...ORG_EMP(3, uuid('0000000c', 1)),
+              role: 'MEMBER' as const,
+              joinedAt: '2026-01-01T00:00:00.000Z',
+            },
+          ],
+          memberCount: 3,
+          children: [],
+        },
+      ],
+    },
+    {
+      id: uuid('0000000d', 2),
+      code: 'WH',
+      name: 'Kho',
+      type: 'WAREHOUSE' as const,
+      isActive: true,
+      members: [
+        { ...ORG_EMP(4, null), role: 'MEMBER' as const, joinedAt: '2026-01-01T00:00:00.000Z' },
+      ],
+      memberCount: 1,
+      children: [],
+    },
+  ],
+  unassigned: [ORG_EMP(4, null)],
+  totals: { employees: 4, departments: 2, teams: 3 },
+};
+
 /** Đúng shape `StuckShipmentDto`. */
 export function makeStuckShipments(n: number) {
   return Array.from({ length: n }, (_, i) => ({
@@ -612,6 +771,7 @@ export const STATUS_LOG_FIXTURE = {
 };
 
 export const handlers = [
+  http.get('/api/container-types', () => HttpResponse.json([])),
   http.get('/api/carriers', () => HttpResponse.json(CARRIERS)),
   http.get('/api/pickup-warehouses', () => HttpResponse.json(PICKUP_WAREHOUSES)),
   http.get('/api/sales-orders/:id/shipping-quote', ({ params, request }) => {
@@ -658,6 +818,9 @@ export const handlers = [
     const weightMin = url.searchParams.get('weightMin');
     const weightMax = url.searchParams.get('weightMax');
     const noCarrier = url.searchParams.get('noCarrier') === 'true';
+    const carrierId = url.searchParams.get('carrierId');
+    const from = url.searchParams.get('from');
+    const to = url.searchParams.get('to');
     await delay(50);
     let all = makeOrders(60);
     if (q)
@@ -670,6 +833,13 @@ export const handlers = [
     if (weightMin) all = all.filter((o) => Number(o.weightKg) >= Number(weightMin));
     if (weightMax) all = all.filter((o) => Number(o.weightKg) <= Number(weightMax));
     if (noCarrier) all = all.filter((o) => o.carrierId === null);
+    if (carrierId) all = all.filter((o) => o.carrierId === carrierId);
+    // Fixture: ngày → so sánh theo UTC là đủ (server thật lấy trọn ngày VN).
+    if (from) all = all.filter((o) => o.orderDate >= new Date(from).toISOString());
+    if (to) {
+      const end = /^\d{4}-\d{2}-\d{2}$/.test(to) ? new Date(`${to}T23:59:59.999Z`) : new Date(to);
+      all = all.filter((o) => o.orderDate <= end.toISOString());
+    }
     return HttpResponse.json({ items: all.slice(skip, skip + take), total: all.length });
   }),
   http.post('/api/sales-orders/bulk-update', async ({ request }) => {
@@ -775,6 +945,8 @@ export const handlers = [
     const refType = url.searchParams.get('refType');
     const refId = url.searchParams.get('refId');
     const docNumber = url.searchParams.get('docNumber');
+    const lineCount = url.searchParams.get('lineCount');
+    const lineCountMin = url.searchParams.get('lineCountMin');
     await delay(50);
     let all = makeTasks(40);
     if (status) all = all.filter((t) => t.status === status);
@@ -782,11 +954,17 @@ export const handlers = [
     if (refType) all = all.filter((t) => t.refType === refType);
     if (refId) all = all.filter((t) => t.refId === refId);
     if (docNumber) all = all.filter((t) => t.docNumber === docNumber);
+    if (lineCount) all = all.filter((t) => t.lineCount === Number(lineCount));
+    if (lineCountMin) all = all.filter((t) => t.lineCount >= Number(lineCountMin));
     return HttpResponse.json({ items: all.slice(skip, skip + take), total: all.length });
   }),
 
   // Lượt pick gộp (PLAN-barcode-pick-pack E3) — mặc định trống; test override khi cần.
   http.get('/api/waves', () => HttpResponse.json({ items: [], total: 0 })),
+  // Gợi ý gộp theo cấp đóng gói (PLAN-packaging-hierarchy §12) — mặc định không có nhóm.
+  http.get('/api/waves/suggestions', () =>
+    HttpResponse.json({ items: [], cartonCount: 0, palletCount: 0 }),
+  ),
 
   // Danh bạ người nhận việc của bảng điều phối (GET /tasks/assignees) — khai TRƯỚC /tasks/:id
   http.get('/api/tasks/assignees', () =>
@@ -872,6 +1050,8 @@ export const handlers = [
   }),
   // Việc đã giao cho tôi (GET /pda/tasks, màn pick cột "Việc được giao") — mặc định rỗng.
   http.get('/api/pda/tasks', () => HttpResponse.json([])),
+  // Lượt gộp đã giao cho tôi (GET /pda/waves) — mặc định rỗng.
+  http.get('/api/pda/waves', () => HttpResponse.json({ items: [], total: 0 })),
   // Hàng đợi + thống kê bàn đóng gói (role PACKER, 2026-09-15) — mặc định rỗng / 0.
   http.get('/api/pda/queue', ({ request }) => {
     const type = new URL(request.url).searchParams.get('type') ?? 'PACK';
@@ -893,6 +1073,7 @@ export const handlers = [
     HttpResponse.json({ ...STATUS_LOG_FIXTURE, shipmentId: params.id }),
   ),
   http.get('/api/departments', () => HttpResponse.json(DEPARTMENTS_FIXTURE)),
+  http.get('/api/org/tree', () => HttpResponse.json(ORG_TREE_FIXTURE)),
 
   // ── Quản trị: kết nối Pancake ──
   http.get('/api/pancake-sync/config', () => HttpResponse.json(PANCAKE_CONFIG_FIXTURE)),

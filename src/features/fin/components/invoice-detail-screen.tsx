@@ -31,9 +31,9 @@ interface InvoiceLine {
 const SAMPLE_LINES: InvoiceLine[] = [
   {
     no: 1,
-    product: 'Giấy A4 Double A 80gsm (ream 500 tờ)',
-    sku: 'DA-A4-80',
-    unit: 'ream',
+    product: 'Vua Bật Chồi 40gr (combo 10 gói)',
+    sku: 'VBC-40G-10',
+    unit: 'thùng',
     qty: '60',
     unitPrice: '66.000',
     discountPct: '0',
@@ -41,9 +41,9 @@ const SAMPLE_LINES: InvoiceLine[] = [
   },
   {
     no: 2,
-    product: 'Giấy A4 IK Plus 70gsm (ream 500 tờ)',
-    sku: 'IK-A4-70',
-    unit: 'ream',
+    product: 'Rooting Extra 500ml',
+    sku: 'RTX-500',
+    unit: 'chai',
     qty: '40',
     unitPrice: '54.500',
     discountPct: '0',
@@ -51,9 +51,9 @@ const SAMPLE_LINES: InvoiceLine[] = [
   },
   {
     no: 3,
-    product: 'Bút bi Thiên Long TL-08 xanh',
-    sku: 'TL08-BLUE',
-    unit: 'thùng',
+    product: 'Phân hữu cơ vi sinh 25kg (bao)',
+    sku: 'HCVS-25KG',
+    unit: 'bao',
     qty: '10',
     unitPrice: '168.000',
     discountPct: '5',
@@ -61,9 +61,9 @@ const SAMPLE_LINES: InvoiceLine[] = [
   },
   {
     no: 4,
-    product: 'Bút bi Thiên Long TL-08 đen',
-    sku: 'TL08-BLACK',
-    unit: 'thùng',
+    product: 'Phân bón lá NPK 20-20-20 1kg',
+    sku: 'NPK-202020-1KG',
+    unit: 'gói',
     qty: '5',
     unitPrice: '168.000',
     discountPct: '5',
@@ -71,9 +71,9 @@ const SAMPLE_LINES: InvoiceLine[] = [
   },
   {
     no: 5,
-    product: 'Sổ tay Campus A5 120 trang',
-    sku: 'CP-A5-120',
-    unit: 'cuốn',
+    product: 'Vua Bật Chồi 40gr',
+    sku: 'VBC-40G',
+    unit: 'gói',
     qty: '120',
     unitPrice: '19.200',
     discountPct: '0',
@@ -81,9 +81,9 @@ const SAMPLE_LINES: InvoiceLine[] = [
   },
   {
     no: 6,
-    product: 'Sổ lò xo Klong A4 200 trang',
-    sku: 'KL-A4-200',
-    unit: 'cuốn',
+    product: 'Thuốc trừ sâu sinh học 250ml',
+    sku: 'TSSH-250',
+    unit: 'chai',
     qty: '30',
     unitPrice: '35.000',
     discountPct: '0',
@@ -91,9 +91,9 @@ const SAMPLE_LINES: InvoiceLine[] = [
   },
   {
     no: 7,
-    product: 'Băng keo trong 48mm × 100y Tiến Phát',
-    sku: 'TP-BK48-100',
-    unit: 'cuộn',
+    product: 'Hạt giống dưa lưới F1 (gói 100 hạt)',
+    sku: 'HG-DUALUOI-100',
+    unit: 'gói',
     qty: '50',
     unitPrice: '8.400',
     discountPct: '0',
@@ -101,9 +101,9 @@ const SAMPLE_LINES: InvoiceLine[] = [
   },
   {
     no: 8,
-    product: 'Kẹp giấy Plus 50mm (hộp 12)',
-    sku: 'PL-KG50',
-    unit: 'hộp',
+    product: 'Purger (gói)',
+    sku: 'PUR-GOI',
+    unit: 'gói',
     qty: '12',
     unitPrice: '21.000',
     discountPct: '0',
@@ -111,9 +111,9 @@ const SAMPLE_LINES: InvoiceLine[] = [
   },
   {
     no: 9,
-    product: 'Kẹp giấy Plus 50mm (hộp 12) — hàng tặng KM-2610-001',
-    sku: 'PL-KG50',
-    unit: 'hộp',
+    product: 'Purger (gói) — hàng tặng KM-2610-001',
+    sku: 'PUR-GOI',
+    unit: 'gói',
     qty: '1',
     unitPrice: '0',
     discountPct: '0',
@@ -202,10 +202,10 @@ export function InvoiceDetailScreen({ id }: { id?: string }) {
             <div className="grid gap-x-4 gap-y-2.5 lg:grid-cols-12">
               <Field
                 label="Người mua"
-                hint="KH-001208 · MST 0301234567 · 940 Đường 3/2, P.15, Q.11, TP.HCM"
+                hint="KH-001208 · MST 0301234567 · Thôn Kim Quan 3, Xã Thạch Thất, Hà Nội"
                 className="lg:col-span-5"
               >
-                <ReadOnlyInput className="font-semibold">Nhà sách Phương Nam Q.1</ReadOnlyInput>
+                <ReadOnlyInput className="font-semibold">HTX Nông nghiệp Kim Quan</ReadOnlyInput>
               </Field>
               <Field label="Ngày hóa đơn" className="lg:col-span-2">
                 <ReadOnlyInput>24/08/2026</ReadOnlyInput>

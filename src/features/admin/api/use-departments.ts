@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api, unwrap } from '@/lib/api/client';
 import type { components } from '@/lib/api/schema';
+import { orgTreeKeys } from './use-org-tree';
 import { userKeys } from './use-users';
 
 export type Department = components['schemas']['DepartmentDto'];
@@ -39,7 +40,10 @@ export function useCreateDepartment() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (input: CreateDepartmentInput) => unwrap(api.POST('/departments', { body: input })),
-    onSuccess: () => void qc.invalidateQueries({ queryKey: departmentKeys.all }),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: departmentKeys.all });
+      void qc.invalidateQueries({ queryKey: orgTreeKeys.all });
+    },
   });
 }
 
@@ -52,6 +56,7 @@ export function useUpdateDepartment(id: string) {
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: departmentKeys.all });
       void qc.invalidateQueries({ queryKey: userKeys.all });
+      void qc.invalidateQueries({ queryKey: orgTreeKeys.all });
     },
   });
 }
@@ -69,6 +74,7 @@ export function useAssignUserToDepartment() {
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: departmentKeys.all });
       void qc.invalidateQueries({ queryKey: userKeys.all });
+      void qc.invalidateQueries({ queryKey: orgTreeKeys.all });
     },
   });
 }
@@ -87,6 +93,7 @@ export function useRemoveUserFromDepartment() {
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: departmentKeys.all });
       void qc.invalidateQueries({ queryKey: userKeys.all });
+      void qc.invalidateQueries({ queryKey: orgTreeKeys.all });
     },
   });
 }

@@ -12,7 +12,10 @@ import { codeSchema, moneySchema, quantitySchema } from '@/lib/shared';
  */
 export const createProductSchema = z.object({
   code: codeSchema.optional().or(z.literal('')),
-  name: z.string().trim().min(1, 'Nhập tên sản phẩm').max(300, 'Tối đa 300 ký tự'),
+  /** Tên thương mại — nhãn trên UI là "Tên thương mại", field API vẫn là `name`. */
+  name: z.string().trim().min(1, 'Nhập tên thương mại').max(300, 'Tối đa 300 ký tự'),
+  /** Tên in trên hóa đơn — '' = dùng tên thương mại (gửi null để xóa khi sửa). */
+  invoiceName: z.string().trim().max(300, 'Tối đa 300 ký tự'),
   categoryId: z.string().optional(),
   brandId: z.string().optional(),
   trackingMode: z.enum(['NONE', 'LOT', 'SERIAL']),
@@ -22,6 +25,11 @@ export const createProductSchema = z.object({
   internalNote: z.string().trim().max(2000, 'Tối đa 2000 ký tự'),
   searchAliases: z.string().trim().max(500, 'Tối đa 500 ký tự'),
   allowNegativeStock: z.boolean(),
+  /**
+   * Mức tồn kho cảnh báo nhập hàng — Decimal(18,6) chuỗi theo ĐVT cơ sở (luật 10), '' = không
+   * cảnh báo. Màn /wms/reorder-points so tồn thực + tốc độ bán 1–2 ngày với ngưỡng này.
+   */
+  reorderLevel: quantitySchema.optional().or(z.literal('')),
 });
 
 export type CreateProductValues = z.infer<typeof createProductSchema>;
@@ -82,17 +90,29 @@ export const skuRowSchema = z.object({
     .optional()
     .or(z.literal('')),
   openingQty: quantitySchema.optional().or(z.literal('')),
-  // F3 (PLAN-master-data-lot-uom) — đa ĐVT: một ĐVT phụ khai ngay trên dòng
-  // ("BOX = 24 PCS" + barcode thùng). '' = không khai. SKU đã lưu: khai thêm
-  // → POST /skus/:id/conversions (+ barcode theo ĐVT).
-  altUom: z.string(),
-  altFactor: quantitySchema.optional().or(z.literal('')),
-  altBarcode: barcodeValue.optional().or(z.literal('')),
+  // PLAN-packaging-hierarchy §12 (2026-09-22) — đóng gói HAI cấp thùng trên ĐVT cơ sở, nhập theo
+  // chuỗi: "1 thùng = ? ĐVT cơ sở" (CARTON) và "1 pallet = ? thùng" (PALLET). Gửi API vẫn là
+  // `UomConversion.factor` VỀ ĐVT CƠ SỞ (pallet = thùng × pallet). '' = không khai. SKU đã lưu:
+  // khai thêm → POST /skus/:id/conversions (+ barcode theo ĐVT).
+  cartonUom: z.string(),
+  cartonPer: quantitySchema.optional().or(z.literal('')),
+  cartonBarcode: barcodeValue.optional().or(z.literal('')),
+  palletUom: z.string(),
+  palletPer: quantitySchema.optional().or(z.literal('')),
+  palletBarcode: barcodeValue.optional().or(z.literal('')),
   /** ĐVT bán mặc định — '' = ĐVT cơ sở; phải là ĐVT quy đổi được. */
   salesUom: z.string(),
   /** Mã các ĐVT đã có quy đổi (SKU đã lưu) — chỉ để validate salesUom, không sửa. */
   existingConvUoms: z.array(z.string()),
+  /** SKU đã lưu: hệ số cấp thùng ĐÃ có ('' = chưa khai thùng) — để khai thêm pallet tính được factor. */
+  existingCartonFactor: z.string(),
 });
+
+/** Số nguyên dương (số lượng trong thùng / số thùng trong pallet): factor cấp đóng gói luôn tròn. */
+const wholeAtLeast = (s: string, min: number) => {
+  const d = new Decimal(s);
+  return d.isInteger() && d.gte(min);
+};
 
 export const productFormSchema = createProductSchema
   .extend({
@@ -142,46 +162,46 @@ export const productFormSchema = createProductSchema
         });
       }
     });
-    // F3 — ràng buộc ĐVT phụ, mirror 422 server (trg_conversion_not_base,
-    // resolveSalesUom, trg_barcode_uom_valid)
+    // Đóng gói hai cấp — mirror 422 server (trg_conversion_not_base, resolveSalesUom,
+    // trg_barcode_uom_valid) + luật §12: hệ số nguyên, pallet chia hết cho thùng (nhập theo chuỗi
+    // nên luôn chia hết), phải có thùng mới có pallet.
     v.skus.forEach((row, i) => {
-      const factorFilled = row.altFactor !== undefined && row.altFactor !== '';
-      if (row.altUom && !factorFilled) {
-        ctx.addIssue({
-          code: z.ZodIssueCode.custom,
-          path: ['skus', i, 'altFactor'],
-          message: 'Nhập hệ số quy đổi, ví dụ 24',
-        });
+      const issue = (field: keyof typeof row, message: string) =>
+        ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['skus', i, field], message });
+      const cartonFilled = row.cartonPer !== undefined && row.cartonPer !== '';
+      if (row.cartonUom && !cartonFilled) {
+        issue('cartonPer', 'Nhập số lượng trong một thùng, ví dụ 24');
       }
-      if (row.altUom && factorFilled && new Decimal(row.altFactor!).lte(0)) {
-        ctx.addIssue({
-          code: z.ZodIssueCode.custom,
-          path: ['skus', i, 'altFactor'],
-          message: 'Hệ số phải lớn hơn 0',
-        });
+      if (row.cartonUom && cartonFilled && !wholeAtLeast(row.cartonPer!, 1)) {
+        issue('cartonPer', 'Số lượng trong thùng phải là số nguyên lớn hơn 0');
       }
-      if (!row.altUom && factorFilled) {
-        ctx.addIssue({
-          code: z.ZodIssueCode.custom,
-          path: ['skus', i, 'altUom'],
-          message: 'Chọn ĐVT phụ cho hệ số này',
-        });
+      if (!row.cartonUom && cartonFilled) issue('cartonUom', 'Chọn ĐVT thùng cho số lượng này');
+      if (row.cartonBarcode && !row.cartonUom)
+        issue('cartonUom', 'Barcode thùng cần chọn ĐVT thùng');
+      if (row.cartonUom && row.cartonUom === v.baseUom) {
+        issue('cartonUom', 'ĐVT thùng phải khác ĐVT cơ sở');
       }
-      if (row.altBarcode && !row.altUom) {
-        ctx.addIssue({
-          code: z.ZodIssueCode.custom,
-          path: ['skus', i, 'altUom'],
-          message: 'Barcode ĐVT phụ cần chọn ĐVT phụ',
-        });
+
+      const hasCarton = Boolean(row.cartonUom) || row.existingCartonFactor !== '';
+      const palletFilled = row.palletPer !== undefined && row.palletPer !== '';
+      if (row.palletUom && !hasCarton) {
+        issue('palletUom', 'Khai cấp thùng trước rồi mới khai pallet');
       }
-      if (row.altUom && row.altUom === v.baseUom) {
-        ctx.addIssue({
-          code: z.ZodIssueCode.custom,
-          path: ['skus', i, 'altUom'],
-          message: 'ĐVT phụ phải khác ĐVT cơ sở',
-        });
+      if (row.palletUom && !palletFilled) {
+        issue('palletPer', 'Nhập số thùng trong một pallet, ví dụ 10');
       }
-      const sellable = ['', v.baseUom, row.altUom, ...row.existingConvUoms];
+      if (row.palletUom && palletFilled && !wholeAtLeast(row.palletPer!, 2)) {
+        issue('palletPer', 'Số thùng trong pallet phải là số nguyên từ 2 trở lên');
+      }
+      if (!row.palletUom && palletFilled) issue('palletUom', 'Chọn ĐVT pallet cho số thùng này');
+      if (row.palletBarcode && !row.palletUom) {
+        issue('palletUom', 'Barcode pallet cần chọn ĐVT pallet');
+      }
+      if (row.palletUom && (row.palletUom === v.baseUom || row.palletUom === row.cartonUom)) {
+        issue('palletUom', 'ĐVT pallet phải khác ĐVT cơ sở và ĐVT thùng');
+      }
+
+      const sellable = ['', v.baseUom, row.cartonUom, row.palletUom, ...row.existingConvUoms];
       if (!sellable.includes(row.salesUom)) {
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
@@ -206,12 +226,68 @@ export const EMPTY_SKU_ROW: SkuRowValues = {
   salePrice: '',
   weightG: '',
   openingQty: '',
-  altUom: '',
-  altFactor: '',
-  altBarcode: '',
+  cartonUom: '',
+  cartonPer: '',
+  cartonBarcode: '',
+  palletUom: '',
+  palletPer: '',
+  palletBarcode: '',
   salesUom: '',
   existingConvUoms: [],
+  existingCartonFactor: '',
 };
+
+/** Loại thùng gửi API cho hai cấp đóng gói của form (mã trong `/container-types`). */
+export const CARTON_TYPE = 'CARTON';
+export const PALLET_TYPE = 'PALLET';
+
+/**
+ * Hệ số cấp thùng ĐÃ có của SKU đã lưu: quyết định §12 tối đa hai cấp thùng → quy đổi có
+ * `containerTypeId` với factor NHỎ nhất là thùng (lớn hơn là pallet). '' = chưa khai thùng.
+ */
+export function existingCartonFactorOf(
+  conversions: ReadonlyArray<{ factor: string; containerTypeId: string | null }>,
+): string {
+  const containers = conversions
+    .filter((c) => c.containerTypeId !== null)
+    .sort((a, b) => new Decimal(a.factor).comparedTo(new Decimal(b.factor)));
+  return containers[0]?.factor ?? '';
+}
+
+/**
+ * Quy đổi gửi API từ khối đóng gói của một dòng SKU — thùng TRƯỚC pallet (server đòi thùng có
+ * trước để kiểm chia hết). Factor về ĐVT cơ sở: thùng = `cartonPer`; pallet = thùng × `palletPer`,
+ * lấy hệ số thùng vừa nhập hoặc hệ số thùng đã có của SKU đã lưu.
+ */
+export function packagingConversions(
+  row: SkuRowValues,
+): Array<{ uom: string; factor: string; containerType: string }> {
+  const out: Array<{ uom: string; factor: string; containerType: string }> = [];
+  const cartonFactor = row.cartonUom && row.cartonPer ? row.cartonPer : row.existingCartonFactor;
+  if (row.cartonUom && row.cartonPer) {
+    out.push({ uom: row.cartonUom, factor: row.cartonPer, containerType: CARTON_TYPE });
+  }
+  if (row.palletUom && row.palletPer && cartonFactor) {
+    out.push({
+      uom: row.palletUom,
+      factor: new Decimal(cartonFactor).mul(row.palletPer).toString(),
+      containerType: PALLET_TYPE,
+    });
+  }
+  return out;
+}
+
+/** Barcode theo ĐVT thùng / pallet của dòng — chỉ khi ĐVT tương ứng được khai. */
+export function packagingBarcodes(row: SkuRowValues): Array<{ code: string; uom: string }> {
+  return [
+    ...(row.cartonBarcode && row.cartonUom
+      ? [{ code: row.cartonBarcode, uom: row.cartonUom }]
+      : []),
+    ...(row.palletBarcode && row.palletUom
+      ? [{ code: row.palletBarcode, uom: row.palletUom }]
+      : []),
+  ];
+}
 
 /** Gram (form) → kg (API, Decimal(12,4) chuỗi) — chỉ ở lớp hiển thị/submit (luật 10). */
 export function gramsToKg(g: string): string {
@@ -221,4 +297,84 @@ export function gramsToKg(g: string): string {
 /** Kg (API) → gram (form). */
 export function kgToGrams(kg: string): string {
   return new Decimal(kg).mul(1000).toDecimalPlaces(1).toString();
+}
+
+// ── Combo sản phẩm (2026-09-18) ─────────────────────────────────────────────
+
+/**
+ * Một dòng thành phần combo — khớp ComboComponentInputDto (skuId + qty); mã / tên / ĐVT /
+ * khả dụng chỉ để hiển thị (lấy từ option đã chọn hoặc từ ComboDetailDto khi sửa).
+ */
+export const comboComponentRowSchema = z.object({
+  skuId: z.string().refine((v) => v !== '', 'Chọn SKU thành phần'),
+  skuCode: z.string(),
+  skuName: z.string(),
+  baseUomCode: z.string(),
+  /** Decimal(18,6) chuỗi — tồn khả dụng thành phần lúc chọn; '' = chưa biết. */
+  available: z.string(),
+  qty: quantitySchema.refine((v) => !new Decimal(v).isZero(), 'Định mức phải lớn hơn 0'),
+});
+
+/**
+ * Khớp CreateComboDto / UpdateComboDto (luật 11). `version` không nằm trong form — lấy từ
+ * ComboDetailDto lúc submit. Giá bán ghi vào BẢNG GIÁ MẶC ĐỊNH (giá không nằm trên SKU).
+ */
+export const comboFormSchema = z
+  .object({
+    code: codeSchema.optional().or(z.literal('')),
+    name: z.string().trim().min(1, 'Nhập tên combo').max(300, 'Tối đa 300 ký tự'),
+    categoryId: z.string().optional(),
+    brandId: z.string().optional(),
+    description: z.string().trim().max(2000, 'Tối đa 2000 ký tự'),
+    searchAliases: z.string().trim().max(500, 'Tối đa 500 ký tự'),
+    salePrice: moneySchema.optional().or(z.literal('')),
+    isActive: z.boolean(),
+    components: z.array(comboComponentRowSchema).min(1, 'Combo cần ít nhất một thành phần'),
+  })
+  .superRefine((v, ctx) => {
+    // Server chặn 422 COMBO_COMPONENT_INVALID khi trùng SKU — báo ngay trên dòng sau.
+    const seen = new Set<string>();
+    v.components.forEach((row, i) => {
+      if (!row.skuId) return;
+      if (seen.has(row.skuId)) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['components', i, 'skuId'],
+          message: 'SKU này đã có ở dòng trên',
+        });
+      }
+      seen.add(row.skuId);
+    });
+  });
+
+export type ComboComponentRowValues = z.infer<typeof comboComponentRowSchema>;
+export type ComboFormValues = z.infer<typeof comboFormSchema>;
+
+export const EMPTY_COMBO_ROW: ComboComponentRowValues = {
+  skuId: '',
+  skuCode: '',
+  skuName: '',
+  baseUomCode: '',
+  available: '',
+  qty: '1',
+};
+
+/**
+ * Số combo còn bán được từ các dòng thành phần = min floor(khả dụng / định mức); dòng chưa
+ * biết tồn ('') hoặc định mức sai → null (không đoán). Cùng công thức với server (ComboService).
+ */
+export function comboAvailableFromRows(
+  rows: readonly { qty: string; available: string }[],
+): string | null {
+  if (rows.length === 0) return null;
+  let min: Decimal | null = null;
+  for (const r of rows) {
+    if (r.available === '' || !/^-?\d/.test(r.available) || !/^\d/.test(r.qty)) return null;
+    const qty = new Decimal(r.qty);
+    if (qty.lessThanOrEqualTo(0)) return null;
+    const available = new Decimal(r.available);
+    const n = available.lessThanOrEqualTo(0) ? new Decimal(0) : available.div(qty).floor();
+    if (min === null || n.lessThan(min)) min = n;
+  }
+  return min === null ? null : min.toString();
 }

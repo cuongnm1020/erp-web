@@ -36,6 +36,10 @@ const line = (id: string, code: string, planned: string, done = '0.000000') => (
   skuId: `sku-${code}`,
   skuCode: `SKU-${code}`,
   skuName: `Sản phẩm ${code}`,
+  productName: `Sản phẩm ${code}`,
+  imageUrl: null,
+  binOnHand: null,
+  binRemaining: null,
   barcodes: [`BC-${code}`],
   lotId: null,
   lotNumber: null,
@@ -223,6 +227,13 @@ describe('Trạm đóng gói — quét đơn → quét SKU → tự đóng dòng
     fireEvent.change(input, { target: { value: code } });
     fireEvent.keyDown(input, { key: 'Enter' });
   };
+  /** Quét SKU → ô số lượng nhận focus → Enter với số mặc định 1 (2026-09-22). */
+  const scanSku = (code: string, qty = '1') => {
+    scan(code);
+    const q = screen.getByLabelText('Số lượng lần quét này');
+    fireEvent.change(q, { target: { value: qty } });
+    fireEvent.keyDown(q, { key: 'Enter' });
+  };
 
   it('happy path: quét mã đơn → nhận PACK → 3 lần quét đúng → 2 complete → iframe nhãn GHTK A6', async () => {
     server.use(
@@ -235,7 +246,11 @@ describe('Trạm đóng gói — quét đơn → quét SKU → tự đóng dòng
     scan('SO2609-00007');
     // Thẻ dòng đang đóng (to) + danh sách dòng — cùng bố cục màn pick PDA
     expect((await screen.findAllByText('Sản phẩm A')).length).toBeGreaterThan(0);
-    expect(screen.getByRole('region', { name: 'Dòng đang đóng' })).toHaveTextContent('SKU-A');
+    const card = screen.getByRole('region', { name: 'Dòng đang đóng' });
+    expect(card).toHaveTextContent('SKU-A');
+    // Vị trí đã lấy hàng hiện trên thẻ để đối chiếu (2026-09-22)
+    expect(card).toHaveTextContent('Đã lấy từ');
+    expect(card).toHaveTextContent('PACK-01');
     expect(screen.getByRole('img', { name: 'Mã vạch BC-A' })).toBeInTheDocument();
     expect(screen.getByText('Công ty Mai Linh', { exact: false })).toBeInTheDocument();
     expect(screen.getByText('0/2 dòng')).toBeInTheDocument();
@@ -244,17 +259,17 @@ describe('Trạm đóng gói — quét đơn → quét SKU → tự đóng dòng
       expect(replace).toHaveBeenCalledWith('/wms/pack?order=SO2609-00007', { scroll: false }),
     );
 
-    scan('BC-A');
+    scanSku('BC-A');
     await waitFor(() => expect(completes).toHaveLength(1));
     // Dòng A đủ → thẻ chuyển sang dòng B, tiến độ 1/2
     await waitFor(() =>
       expect(screen.getByRole('region', { name: 'Dòng đang đóng' })).toHaveTextContent('SKU-B'),
     );
     expect(screen.getByText('1/2 dòng')).toBeInTheDocument();
-    scan('BC-B');
+    scanSku('BC-B');
     await waitFor(() => expect(scans).toHaveLength(2));
     expect(completes).toHaveLength(1); // B mới 1/2 — chưa đóng dòng
-    scan('BC-B');
+    scanSku('BC-B');
     await waitFor(() => expect(completes).toHaveLength(2));
     expect(await screen.findByText('Xong đơn SO2609-00007')).toBeInTheDocument();
 
@@ -298,10 +313,10 @@ describe('Trạm đóng gói — quét đơn → quét SKU → tự đóng dòng
     renderApp(<PackStationScreen />);
     scan('SO2609-00007');
     await screen.findAllByText('Sản phẩm A');
-    scan('BC-A');
-    scan('BC-B');
+    scanSku('BC-A');
+    scanSku('BC-B');
     await waitFor(() => expect(scans).toHaveLength(2));
-    scan('BC-B');
+    scanSku('BC-B');
     expect(await screen.findByText(/Hãng chưa cấp vận đơn/)).toBeInTheDocument();
     // Lần poll thứ hai có vận đơn → iframe nhãn
     expect(
@@ -335,10 +350,10 @@ describe('Trạm đóng gói — quét đơn → quét SKU → tự đóng dòng
     renderApp(<PackStationScreen />);
     scan('SO2609-00007');
     await screen.findAllByText('Sản phẩm A');
-    scan('BC-A');
-    scan('BC-B');
+    scanSku('BC-A');
+    scanSku('BC-B');
     await waitFor(() => expect(scans).toHaveLength(2));
-    scan('BC-B');
+    scanSku('BC-B');
     expect(await screen.findByText(/Đơn chưa gán hãng vận chuyển/)).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('combobox', { name: 'Hãng vận chuyển' }));

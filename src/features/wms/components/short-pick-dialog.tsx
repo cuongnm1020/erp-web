@@ -26,7 +26,7 @@ export function ShortPickDialog({
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  /** "SKU-X · Nước rửa chén tại A-01-03" */
+  /** "VBC-40G · Vua Bật Chồi 40gr tại A-01-03" */
   what: string;
   remaining: string;
   onConfirm: (note: string) => Promise<unknown>;

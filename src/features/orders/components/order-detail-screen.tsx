@@ -1,9 +1,9 @@
 'use client';
 
-import { Gift, Info, Printer } from 'lucide-react';
+import { Boxes, CornerDownRight, Gift, Info, Printer } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { Fragment, useEffect, useRef, useState, type ReactNode } from 'react';
 import { KpiCard } from '@/components/data/kpi-card';
 import { PdfPrintDialog } from '@/components/data/pdf-print-dialog';
 import { DetailSkeleton, QueryState } from '@/components/data/states';
@@ -44,6 +44,7 @@ import {
   useOrder,
   useOrders,
   type SalesOrderDetail,
+  type SalesOrderLine,
 } from '../api/use-orders';
 import {
   fulfilmentLabel,
@@ -53,6 +54,7 @@ import {
   orderStatusLabel,
   orderStatusTone,
 } from '../labels';
+import { groupOrderLines } from '../combo-lines';
 import { OrderPrintSheet } from './order-print-sheet';
 
 /**
@@ -103,6 +105,7 @@ const SHIPMENT_STATUS_LABEL: Record<
   DELIVERED: 'Đã giao',
   FAILED: 'Giao lỗi',
   RETURNED: 'Đã hoàn',
+  CANCELLED: 'Đã hủy theo đơn',
 };
 
 /**
@@ -262,6 +265,84 @@ const MISSING: Array<{ title: string; need: string }> = [
   { title: 'Ghi chú giao', need: 'đơn chưa có trường ghi chú giao hàng' },
 ];
 
+/** Một dòng SKU; `component` = dòng thành phần combo (thụt vào, giá đã phân bổ hiện mờ). */
+function LineRow({ l, component = false }: { l: SalesOrderLine; component?: boolean }) {
+  return (
+    <TableRow data-testid={component ? 'combo-component-row' : undefined}>
+      <TableCell className="px-2.5 py-1.5 text-muted-foreground">{l.lineNo}</TableCell>
+      <TableCell className="px-2.5 py-1.5">
+        <div
+          className={
+            component
+              ? 'flex items-center gap-1.5 pl-4 text-muted-foreground'
+              : 'flex items-center gap-1.5 font-semibold'
+          }
+        >
+          {component ? <CornerDownRight className="h-3 w-3" aria-hidden /> : null}
+          {l.skuName}
+          {l.isGift ? (
+            <StatusBadge tone="brand">
+              <Gift className="h-3 w-3" aria-hidden />
+              Hàng tặng
+            </StatusBadge>
+          ) : null}
+        </div>
+        <div
+          className={
+            component
+              ? 'pl-8 font-mono text-xs text-muted-foreground'
+              : 'font-mono text-xs text-muted-foreground'
+          }
+        >
+          {l.skuCode}
+          {component && l.combo ? ` · ${qty(l.combo.componentQty)} / combo` : ''}
+        </div>
+      </TableCell>
+      <TableCell className="px-2.5 py-1.5">{l.uomCode}</TableCell>
+      <TableCell className="px-2.5 py-1.5 text-right tabular-nums">
+        {qty(l.qty)}
+        <div className="text-xs text-muted-foreground">{qty(l.qtyBase)} ĐVT cơ sở</div>
+      </TableCell>
+      <TableCell className="px-2.5 py-1.5 text-right tabular-nums text-muted-foreground">
+        {money(l.listPrice)}
+      </TableCell>
+      <TableCell
+        className={
+          component
+            ? 'px-2.5 py-1.5 text-right tabular-nums text-muted-foreground'
+            : 'px-2.5 py-1.5 text-right tabular-nums'
+        }
+      >
+        {money(l.unitPrice)}
+      </TableCell>
+      <TableCell
+        className={
+          component
+            ? 'px-2.5 py-1.5 text-right tabular-nums text-muted-foreground'
+            : 'px-2.5 py-1.5 text-right tabular-nums'
+        }
+      >
+        {money(l.discount)}
+      </TableCell>
+      <TableCell
+        className={
+          component
+            ? 'px-2.5 py-1.5 text-right tabular-nums text-muted-foreground'
+            : 'px-2.5 py-1.5 text-right font-semibold tabular-nums'
+        }
+      >
+        {money(l.lineTotal)}
+      </TableCell>
+      <TableCell className="px-2.5 py-1.5 text-right font-semibold tabular-nums text-primary">
+        {qty(l.reservedQty)}
+      </TableCell>
+      <TableCell className="px-2.5 py-1.5 text-right tabular-nums text-muted-foreground">
+        {qty(l.pickedQty)}
+      </TableCell>
+    </TableRow>
+  );
+}
+
 function Card({
   title,
   children,
@@ -324,46 +405,50 @@ function Lines({ order }: { order: SalesOrderDetail }) {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {order.lines.map((l) => (
-              <TableRow key={l.id}>
-                <TableCell className="px-2.5 py-1.5 text-muted-foreground">{l.lineNo}</TableCell>
-                <TableCell className="px-2.5 py-1.5">
-                  <div className="flex items-center gap-1.5 font-semibold">
-                    {l.skuName}
-                    {l.isGift ? (
-                      <StatusBadge tone="brand">
-                        <Gift className="h-3 w-3" aria-hidden />
-                        Hàng tặng
-                      </StatusBadge>
-                    ) : null}
-                  </div>
-                  <div className="font-mono text-xs text-muted-foreground">{l.skuCode}</div>
-                </TableCell>
-                <TableCell className="px-2.5 py-1.5">{l.uomCode}</TableCell>
-                <TableCell className="px-2.5 py-1.5 text-right tabular-nums">
-                  {qty(l.qty)}
-                  <div className="text-xs text-muted-foreground">{qty(l.qtyBase)} ĐVT cơ sở</div>
-                </TableCell>
-                <TableCell className="px-2.5 py-1.5 text-right tabular-nums text-muted-foreground">
-                  {money(l.listPrice)}
-                </TableCell>
-                <TableCell className="px-2.5 py-1.5 text-right tabular-nums">
-                  {money(l.unitPrice)}
-                </TableCell>
-                <TableCell className="px-2.5 py-1.5 text-right tabular-nums">
-                  {money(l.discount)}
-                </TableCell>
-                <TableCell className="px-2.5 py-1.5 text-right font-semibold tabular-nums">
-                  {money(l.lineTotal)}
-                </TableCell>
-                <TableCell className="px-2.5 py-1.5 text-right font-semibold tabular-nums text-primary">
-                  {qty(l.reservedQty)}
-                </TableCell>
-                <TableCell className="px-2.5 py-1.5 text-right tabular-nums text-muted-foreground">
-                  {qty(l.pickedQty)}
-                </TableCell>
-              </TableRow>
-            ))}
+            {groupOrderLines(order.lines).map((g) =>
+              g.kind === 'line' ? (
+                <LineRow key={g.line.id} l={g.line} />
+              ) : (
+                /* Combo: một dòng tổng (giá combo × số combo) + các dòng thành phần thụt vào —
+                   kho giữ / pick trên thành phần nên hai cột cuối chỉ có ở dòng thành phần. */
+                <Fragment key={`combo-${g.groupNo}`}>
+                  <TableRow className="bg-muted/40" data-testid="combo-row">
+                    <TableCell className="px-2.5 py-1.5 text-muted-foreground" />
+                    <TableCell className="px-2.5 py-1.5">
+                      <div className="flex items-center gap-1.5 font-semibold">
+                        {g.skuName}
+                        <StatusBadge tone="brand">
+                          <Boxes className="h-3 w-3" aria-hidden />
+                          Combo
+                        </StatusBadge>
+                      </div>
+                      <div className="font-mono text-xs text-muted-foreground">{g.skuCode}</div>
+                    </TableCell>
+                    <TableCell className="px-2.5 py-1.5">combo</TableCell>
+                    <TableCell className="px-2.5 py-1.5 text-right tabular-nums">
+                      {qty(g.qty)}
+                    </TableCell>
+                    <TableCell className="px-2.5 py-1.5 text-right tabular-nums text-muted-foreground">
+                      {money(g.listPrice)}
+                    </TableCell>
+                    <TableCell className="px-2.5 py-1.5 text-right tabular-nums">
+                      {money(g.unitPrice)}
+                    </TableCell>
+                    <TableCell className="px-2.5 py-1.5 text-right tabular-nums">
+                      {money(g.discount)}
+                    </TableCell>
+                    <TableCell className="px-2.5 py-1.5 text-right font-semibold tabular-nums">
+                      {money(g.lineTotal)}
+                    </TableCell>
+                    <TableCell className="px-2.5 py-1.5" />
+                    <TableCell className="px-2.5 py-1.5" />
+                  </TableRow>
+                  {g.lines.map((l) => (
+                    <LineRow key={l.id} l={l} component />
+                  ))}
+                </Fragment>
+              ),
+            )}
           </TableBody>
         </Table>
       </div>

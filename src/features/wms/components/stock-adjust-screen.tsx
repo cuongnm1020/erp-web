@@ -39,11 +39,11 @@ interface AdjustLine {
 const SAMPLE_LINES: AdjustLine[] = [
   {
     no: 1,
-    productName: 'Giấy note 3M Post-it 76x76 vàng',
-    sku: '3M-NOTE76',
+    productName: 'Phân bón lá NPK 20-20-20 1kg',
+    sku: 'NPK-202020-1KG',
     bin: 'A-02-01-C',
     lot: 'L2512',
-    unit: 'tập',
+    unit: 'gói',
     onHand: '364',
     reserved: '10',
     delta: '−120',
@@ -52,11 +52,11 @@ const SAMPLE_LINES: AdjustLine[] = [
   },
   {
     no: 2,
-    productName: 'Keo dán giấy UHU Stic 21g',
-    sku: 'UHU-21',
+    productName: 'Rooting Extra 500ml',
+    sku: 'RTX-500',
     bin: 'A-02-01-C',
     lot: 'L2601',
-    unit: 'cây',
+    unit: 'chai',
     onHand: '132',
     reserved: '0',
     delta: '−3',
@@ -65,8 +65,8 @@ const SAMPLE_LINES: AdjustLine[] = [
   },
   {
     no: 3,
-    productName: 'Bìa lá Kokuyo A4 xanh dương',
-    sku: 'KK-BL-A4',
+    productName: 'Bình xịt điện 16L',
+    sku: 'BXD-16L',
     bin: 'D-01-01-A',
     lot: 'L2604',
     unit: 'cái',
@@ -78,11 +78,11 @@ const SAMPLE_LINES: AdjustLine[] = [
   },
   {
     no: 4,
-    productName: 'Bút bi Thiên Long TL-08 đỏ',
-    sku: 'TL08-RED',
+    productName: 'Vua Bật Chồi 40gr',
+    sku: 'VBC-40G',
     bin: 'A-03-02-B',
     lot: 'L2607',
-    unit: 'cái',
+    unit: 'gói',
     onHand: '480',
     reserved: '470',
     delta: '−12',
@@ -204,7 +204,7 @@ export function StockAdjustScreen() {
             <FauxInput placeholder="Biên bản, ảnh chụp…" />
           </Field>
           <Field label="Ghi chú" required className="md:col-span-2">
-            <FauxInput value="Lô L2512 hết hạn 31/08 — hủy theo biên bản BB-0823-02; keo UHU chảy nắp; bìa lá ướt mưa dột khu D" />
+            <FauxInput value="Lô L2512 hết hạn 31/08 — hủy theo biên bản BB-0823-02; chai Rooting Extra rò nắp; bình xịt móp vỏ do mưa dột khu D" />
           </Field>
           <Field label="Ngày hiệu lực">
             <FauxInput value="23/08/2026" select />

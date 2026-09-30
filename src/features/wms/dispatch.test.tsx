@@ -1,4 +1,4 @@
-import { fireEvent, screen, waitFor } from '@testing-library/react';
+import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import { http, HttpResponse } from 'msw';
 import { describe, expect, it, vi } from 'vitest';
 import { makeTasks, scenario } from '@/test/msw/handlers';
@@ -31,24 +31,66 @@ const ALL = makeTasks(40);
 const PENDING = ALL.filter((t) => t.status === 'PENDING');
 
 describe('DispatchScreen — GET /tasks (P1-12)', () => {
-  it('loading → bốn làn theo trạng thái thật, đếm bằng total của API', async () => {
+  it('loading → MỘT bảng của tab đang mở (mặc định Chưa gán), chỉ gọi API cho tab đó; tab khác bấm mới gọi (2026-09-22)', async () => {
     search = '';
+    const seen: string[] = [];
+    server.use(
+      http.get('/api/tasks', ({ request }) => {
+        const q = new URL(request.url).searchParams;
+        seen.push(q.get('status') ?? '');
+        const items = ALL.filter((t) => t.status === q.get('status'));
+        return HttpResponse.json({
+          items: items.slice(0, Number(q.get('take'))),
+          total: items.length,
+        });
+      }),
+    );
     renderApp(<DispatchScreen />);
-    expect(screen.getAllByRole('status', { name: 'Đang tải việc' }).length).toBe(4);
+    expect(screen.getAllByRole('status', { name: 'Đang tải việc' }).length).toBe(1);
     expect(await screen.findByText(PENDING[0]!.docNumber)).toBeInTheDocument();
     for (const label of ['Chưa gán', 'Đã giao', 'Đang làm', 'Ngoại lệ']) {
-      expect(screen.getAllByText(label).length).toBeGreaterThan(0);
+      expect(screen.getByRole('tab', { name: new RegExp(label) })).toBeInTheDocument();
     }
+    // Chỉ tab Chưa gán gọi API; số đếm trên tab = total của API.
+    expect(new Set(seen)).toEqual(new Set(['PENDING']));
+    expect(screen.getByRole('tab', { name: /Chưa gán/ })).toHaveAttribute('aria-selected', 'true');
+    expect(screen.getByRole('tab', { name: /Chưa gán/ })).toHaveTextContent(String(PENDING.length));
+    // Bảng phân trang phía server (luật 8): 20 dòng / trang.
+    expect(screen.getAllByRole('row').length).toBe(Math.min(PENDING.length, 20) + 1);
+    // Bấm tab khác → ghi ?status= lên URL (tab chỉ tải khi mở).
+    fireEvent.click(screen.getByRole('tab', { name: /Đã giao/ }));
+    await waitFor(() =>
+      expect(replace).toHaveBeenCalledWith('/wms/dispatch?status=ASSIGNED', { scroll: false }),
+    );
   });
 
-  it('thẻ việc hiện tuổi việc và thời gian nằm im, KHÔNG có cờ quá hạn SLA', async () => {
+  it('tab trên URL: ?status=EXCEPTION → chỉ tải ngoại lệ, tab đó được chọn', async () => {
+    search = 'status=EXCEPTION';
+    const seen: string[] = [];
+    server.use(
+      http.get('/api/tasks', ({ request }) => {
+        const q = new URL(request.url).searchParams;
+        seen.push(q.get('status') ?? '');
+        const items = ALL.filter((t) => t.status === q.get('status'));
+        return HttpResponse.json({ items, total: items.length });
+      }),
+    );
+    renderApp(<DispatchScreen />);
+    const exc = ALL.find((t) => t.status === 'EXCEPTION')!;
+    expect(await screen.findByText(exc.docNumber)).toBeInTheDocument();
+    expect(new Set(seen)).toEqual(new Set(['EXCEPTION']));
+    expect(screen.getByRole('tab', { name: /Ngoại lệ/ })).toHaveAttribute('aria-selected', 'true');
+    expect(screen.queryByText(PENDING[0]!.docNumber)).not.toBeInTheDocument();
+  });
+
+  it('dòng việc hiện tuổi việc và thời gian nằm im, KHÔNG có cờ quá hạn SLA', async () => {
     search = '';
     renderApp(<DispatchScreen />);
     await screen.findByText(PENDING[0]!.docNumber);
     expect(screen.getAllByText(/tuổi \d+ phút/).length).toBeGreaterThan(0);
-    // Không thẻ việc nào được gắn cờ trễ hạn: wms.Task không có cột hạn chót.
-    for (const card of screen.getAllByRole('article')) {
-      expect(card.textContent).not.toMatch(/quá hạn|SLA|trễ/i);
+    // Không dòng việc nào được gắn cờ trễ hạn: wms.Task không có cột hạn chót.
+    for (const row of screen.getAllByRole('row')) {
+      expect(row.textContent).not.toMatch(/quá hạn|SLA|trễ/i);
     }
   });
 
@@ -60,21 +102,21 @@ describe('DispatchScreen — GET /tasks (P1-12)', () => {
     );
   });
 
-  it('làn rỗng nói rõ là rỗng, không dựng thẻ giả', async () => {
+  it('tab rỗng nói rõ là rỗng, không dựng dòng giả', async () => {
     search = '';
     server.use(scenario.tasksEmpty);
     renderApp(<DispatchScreen />);
     await waitFor(() =>
-      expect(screen.getAllByText('Không có việc nào ở trạng thái này.')).toHaveLength(4),
+      expect(screen.getAllByText('Không có việc nào ở trạng thái này.')).toHaveLength(1),
     );
   });
 
-  it('error 500: ErrorState có traceId ở từng làn', async () => {
+  it('error 500: ErrorState có traceId', async () => {
     search = '';
     server.use(scenario.tasksError);
     renderApp(<DispatchScreen />);
-    await waitFor(() => expect(screen.getAllByRole('alert')).toHaveLength(4));
-    expect(screen.getAllByText('trace-db_error')).toHaveLength(4);
+    await waitFor(() => expect(screen.getAllByRole('alert')).toHaveLength(1));
+    expect(screen.getAllByText('trace-db_error')).toHaveLength(1);
   });
 
   it('403: màn không có quyền, không đá về đăng nhập (luật 6)', async () => {
@@ -82,7 +124,7 @@ describe('DispatchScreen — GET /tasks (P1-12)', () => {
     server.use(scenario.tasksForbidden);
     renderApp(<DispatchScreen />);
     await waitFor(() =>
-      expect(screen.getAllByText('Bạn không có quyền xem mục này')).toHaveLength(4),
+      expect(screen.getAllByText('Bạn không có quyền xem mục này')).toHaveLength(1),
     );
   });
 
@@ -162,13 +204,13 @@ describe('DispatchScreen — gán / trả việc (POST /tasks/:id/assign|unassig
       }),
     );
     renderApp(<DispatchScreen />);
-    const pending = PENDING.slice(0, 2);
-    const assignedTask = ALL.find((t) => t.status === 'ASSIGNED')!;
-    await screen.findByText(pending[0]!.docNumber);
-    for (const t of [...pending, assignedTask]) {
+    // Lô 3 việc chưa gán, cố ý có việc KHÔNG phải lấy hàng → không gộp lượt được, nhưng gán được.
+    const lot = PENDING.slice(0, 3);
+    expect(lot.some((t) => t.type !== 'PICK')).toBe(true);
+    await screen.findByText(lot[0]!.docNumber);
+    for (const t of lot) {
       fireEvent.click(screen.getByRole('checkbox', { name: `Chọn ${t.docNumber}` }));
     }
-    // Có thẻ ASSIGNED trong lô → không gộp lượt được, nhưng gán được.
     const region = screen.getByRole('region', { name: 'Việc đã chọn' });
     expect(region).toHaveTextContent('Đã chọn 3 việc');
     expect(screen.getByRole('button', { name: 'Gộp thành một lượt' })).toBeDisabled();
@@ -176,9 +218,7 @@ describe('DispatchScreen — gán / trả việc (POST /tasks/:id/assign|unassig
     fireEvent.click(await screen.findByRole('option', { name: 'Lê Văn Lấy · lấy hàng' }));
     fireEvent.click(screen.getByRole('button', { name: 'Gán 3 việc' }));
     await waitFor(() =>
-      expect(posted).toEqual([
-        { taskIds: [pending[0]!.id, pending[1]!.id, assignedTask.id], userId: 'staff-3' },
-      ]),
+      expect(posted).toEqual([{ taskIds: lot.map((t) => t.id), userId: 'staff-3' }]),
     );
     // Toaster không render trong test harness → khẳng định qua spy.
     await waitFor(() => expect(success).toHaveBeenCalledWith('Đã gán 2 việc cho Lê Văn Lấy'));
@@ -189,8 +229,140 @@ describe('DispatchScreen — gán / trả việc (POST /tasks/:id/assign|unassig
     );
   });
 
-  it('thẻ ASSIGNED có "Trả về hàng đợi" → POST unassign', async () => {
+  it('lọc số dòng SKU: ?lines=1 → gửi lineCount=1, ?lines=5+ → lineCountMin=5; chọn ở ô → ghi URL (luật 8)', async () => {
+    const seen: URLSearchParams[] = [];
+    server.use(
+      http.get('/api/tasks', ({ request }) => {
+        const q = new URL(request.url).searchParams;
+        seen.push(q);
+        const n = q.get('lineCount');
+        const min = q.get('lineCountMin');
+        let all = ALL.filter((t) => t.status === q.get('status'));
+        if (n) all = all.filter((t) => t.lineCount === Number(n));
+        if (min) all = all.filter((t) => t.lineCount >= Number(min));
+        return HttpResponse.json({ items: all, total: all.length });
+      }),
+    );
+    search = 'lines=1';
+    const { unmount } = renderApp(<DispatchScreen />);
+    await waitFor(() =>
+      expect(screen.getByRole('combobox', { name: 'Số dòng SKU' })).toHaveTextContent('1 SKU'),
+    );
+    await waitFor(() => expect(seen.length).toBeGreaterThanOrEqual(1));
+    expect(seen.every((q) => q.get('lineCount') === '1' && q.get('lineCountMin') === null)).toBe(
+      true,
+    );
+    // Chỉ còn dòng 1 SKU trong bảng.
+    const one = PENDING.find((t) => t.lineCount === 1)!;
+    const two = PENDING.find((t) => t.lineCount === 2)!;
+    expect(await screen.findByText(one.docNumber)).toBeInTheDocument();
+    expect(screen.queryByText(two.docNumber)).not.toBeInTheDocument();
+    unmount();
+
+    seen.length = 0;
+    search = 'lines=5%2B';
+    renderApp(<DispatchScreen />);
+    await waitFor(() =>
+      expect(screen.getByRole('combobox', { name: 'Số dòng SKU' })).toHaveTextContent('5+ SKU'),
+    );
+    await waitFor(() => expect(seen.length).toBeGreaterThanOrEqual(1));
+    expect(seen.every((q) => q.get('lineCountMin') === '5' && q.get('lineCount') === null)).toBe(
+      true,
+    );
+    fireEvent.click(screen.getByRole('combobox', { name: 'Số dòng SKU' }));
+    fireEvent.click(await screen.findByRole('option', { name: '2 SKU' }));
+    await waitFor(() =>
+      expect(replace).toHaveBeenCalledWith('/wms/dispatch?lines=2', { scroll: false }),
+    );
+  });
+
+  it('"Chọn tất cả" ở đầu bảng tick mọi dòng đang hiện của trang; bỏ tick trả về rỗng; tab Đang làm không có ô', async () => {
     search = '';
+    const { unmount } = renderApp(<DispatchScreen />);
+    await screen.findByText(PENDING[0]!.docNumber);
+    const pendingShown = Math.min(PENDING.length, 20);
+    // Ô đầu bảng vẽ lại sau mỗi lần tick (cột theo lô chọn) → tra lại mỗi lần.
+    const all = () => screen.getByRole('checkbox', { name: 'Chọn tất cả Chưa gán' });
+    await screen.findByRole('checkbox', { name: 'Chọn tất cả Chưa gán' });
+    fireEvent.click(all());
+    const region = await screen.findByRole('region', { name: 'Việc đã chọn' });
+    expect(region).toHaveTextContent(`Đã chọn ${pendingShown} việc`);
+    expect(all()).toHaveAttribute('aria-checked', 'true');
+    // Bỏ tick một dòng → ô đầu bảng thành "một phần".
+    fireEvent.click(screen.getByRole('checkbox', { name: `Chọn ${PENDING[0]!.docNumber}` }));
+    expect(region).toHaveTextContent(`Đã chọn ${pendingShown - 1} việc`);
+    expect(all()).toHaveAttribute('aria-checked', 'mixed');
+    // Tick lại cả trang rồi bỏ tick cả trang → thanh công cụ đóng.
+    fireEvent.click(all());
+    expect(all()).toHaveAttribute('aria-checked', 'true');
+    fireEvent.click(all());
+    expect(screen.queryByRole('region', { name: 'Việc đã chọn' })).not.toBeInTheDocument();
+    unmount();
+
+    // Tab Đã giao cũng tick được (đổi người); tab Đang làm / Ngoại lệ không có ô.
+    search = 'status=ASSIGNED';
+    const assignedShown = Math.min(ALL.filter((t) => t.status === 'ASSIGNED').length, 20);
+    const r2 = renderApp(<DispatchScreen />);
+    fireEvent.click(await screen.findByRole('checkbox', { name: 'Chọn tất cả Đã giao' }));
+    expect(await screen.findByRole('region', { name: 'Việc đã chọn' })).toHaveTextContent(
+      `Đã chọn ${assignedShown} việc`,
+    );
+    r2.unmount();
+
+    search = 'status=IN_PROGRESS';
+    renderApp(<DispatchScreen />);
+    await screen.findByText(ALL.find((t) => t.status === 'IN_PROGRESS')!.docNumber);
+    expect(screen.queryByRole('checkbox', { name: /Chọn tất cả/ })).not.toBeInTheDocument();
+  });
+
+  it('việc đã thuộc lượt gộp: không có ô tick, "Chọn tất cả" bỏ qua, không có "Gán cho…" / "Trả về" lẻ mà chỉ dẫn sang bảng lượt', async () => {
+    search = '';
+    const WAVE_ID = '00000000-0000-4000-8000-00000000e777';
+    const inWavePending = PENDING[0]!;
+    const inWaveAssigned = ALL.find((t) => t.status === 'ASSIGNED')!;
+    server.use(
+      http.get('/api/tasks', ({ request }) => {
+        const status = new URL(request.url).searchParams.get('status');
+        const items = ALL.filter((t) => t.status === status).map((t) =>
+          t.id === inWavePending.id || t.id === inWaveAssigned.id ? { ...t, waveId: WAVE_ID } : t,
+        );
+        return HttpResponse.json({ items, total: items.length });
+      }),
+    );
+    const { unmount } = renderApp(<DispatchScreen />);
+    await screen.findByText(inWavePending.docNumber);
+    // Không tick lẻ được, không gán lẻ được — server sẽ từ chối "thuộc lượt pick gộp".
+    expect(
+      screen.queryByRole('checkbox', { name: `Chọn ${inWavePending.docNumber}` }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('combobox', { name: `Gán ${inWavePending.docNumber}` }),
+    ).not.toBeInTheDocument();
+    expect(screen.getAllByText(/Gán \/ đổi người cả lượt/).length).toBe(1);
+    // Dòng thường cùng tab vẫn tick / gán được.
+    expect(
+      screen.getByRole('checkbox', { name: `Chọn ${PENDING[1]!.docNumber}` }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('combobox', { name: `Gán ${PENDING[1]!.docNumber}` }),
+    ).toBeInTheDocument();
+    // "Chọn tất cả" đếm đúng số dòng tick được (bỏ dòng thuộc lượt).
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Chọn tất cả Chưa gán' }));
+    const shown = Math.min(PENDING.length, 20) - 1;
+    expect(await screen.findByRole('region', { name: 'Việc đã chọn' })).toHaveTextContent(
+      `Đã chọn ${shown} việc`,
+    );
+    unmount();
+    // Dòng ASSIGNED thuộc lượt: không có "Trả về hàng đợi" lẻ.
+    search = 'status=ASSIGNED';
+    renderApp(<DispatchScreen />);
+    const assignedRow = (await screen.findByText(inWaveAssigned.docNumber)).closest('tr')!;
+    expect(assignedRow).not.toHaveTextContent('Trả về hàng đợi');
+    expect(assignedRow).toHaveTextContent('Gán / đổi người cả lượt');
+  });
+
+  it('dòng ASSIGNED (tab Đã giao) có "Trả về hàng đợi" → POST unassign', async () => {
+    search = 'status=ASSIGNED';
     const unassigned: string[] = [];
     server.use(
       http.post('/api/tasks/:id/unassign', ({ params }) => {
@@ -207,5 +379,186 @@ describe('DispatchScreen — gán / trả việc (POST /tasks/:id/assign|unassig
     const buttons = await screen.findAllByRole('button', { name: 'Trả về hàng đợi' });
     fireEvent.click(buttons[0]!);
     await waitFor(() => expect(unassigned).toHaveLength(1));
+  });
+});
+
+describe('Gợi ý gộp theo cấp đóng gói (PLAN-packaging-hierarchy §12, 2026-09-22)', () => {
+  const CARTON_WAVE = {
+    id: '00000000-0000-4000-8000-00000000e701',
+    docNumber: 'WAVE2609-00031',
+    warehouseId: 'wh-1',
+    warehouseCode: 'WH01',
+    strategy: 'BATCH',
+    status: 'PENDING',
+    assignedTo: null,
+    assigneeName: null,
+    taskCount: 4,
+    taskDoneCount: 0,
+    qtyPlanned: '400.000000',
+    qtyDone: '0.000000',
+    createdAt: '2026-09-22T01:00:00.000Z',
+    assignedAt: null,
+    startedAt: null,
+    completedAt: null,
+    packLevel: 'CARTON',
+    skuId: 'sku-a',
+    skuCode: 'SKU-A',
+    packCount: 4,
+    mergedIntoId: null,
+  };
+  const TASK_IDS = [1, 2, 3, 4].map((n) => `00000000-0000-4000-8000-00000000f10${n}`);
+  const GROUP = {
+    key: `sku-a|CARTON|${TASK_IDS[0]}`,
+    warehouseId: 'wh-1',
+    skuId: 'sku-a',
+    skuCode: 'SKU-A',
+    skuName: 'Nước suối 500ml',
+    packLevel: 'CARTON',
+    packCount: 4,
+    unitsPerPack: '100.000000',
+    qtyPlanned: '400.000000',
+    taskCount: 4,
+    oldestCreatedAt: '2026-09-22T01:00:00.000Z',
+    tasks: TASK_IDS.map((taskId, i) => ({
+      taskId,
+      docNumber: `PICK2609-0010${i + 1}`,
+      refDocNumber: `SO2609-0010${i + 1}`,
+      qtyPlanned: ['30.000000', '70.000000', '50.000000', '250.000000'][i]!,
+      createdAt: `2026-09-22T01:0${i}:00.000Z`,
+    })),
+  };
+  const SUGGESTIONS = { items: [GROUP], cartonCount: 1, palletCount: 0 };
+
+  it('tab "Đủ gộp thùng" / "Đủ gộp pallet" hiện số nhóm ngay cả khi chưa mở; bấm → ?merge=CARTON', async () => {
+    search = '';
+    server.use(http.get('/api/waves/suggestions', () => HttpResponse.json(SUGGESTIONS)));
+    renderApp(<DispatchScreen />);
+    await screen.findByText(PENDING[0]!.docNumber);
+    await waitFor(() =>
+      expect(screen.getByRole('tab', { name: /Đủ gộp thùng/ })).toHaveTextContent('1'),
+    );
+    expect(screen.getByRole('tab', { name: /Đủ gộp pallet/ })).toHaveTextContent('0');
+    expect(screen.getByRole('tab', { name: /Đủ gộp thùng/ })).toHaveAttribute(
+      'aria-selected',
+      'false',
+    );
+    fireEvent.click(screen.getByRole('tab', { name: /Đủ gộp thùng/ }));
+    await waitFor(() =>
+      expect(replace).toHaveBeenCalledWith('/wms/dispatch?merge=CARTON', { scroll: false }),
+    );
+  });
+
+  it('?merge=CARTON: bảng nhóm (SKU · Trọn thùng × 4 · 4 đơn) bung ra thấy đơn con; "Gộp và gán" → chọn người → POST /waves/merge đúng body → toast', async () => {
+    search = 'merge=CARTON';
+    const levels: string[] = [];
+    const posts: unknown[] = [];
+    server.use(
+      http.get('/api/waves/suggestions', ({ request }) => {
+        levels.push(new URL(request.url).searchParams.get('packLevel') ?? '');
+        return HttpResponse.json(SUGGESTIONS);
+      }),
+      http.post('/api/waves/merge', async ({ request }) => {
+        posts.push(await request.json());
+        return HttpResponse.json({
+          ...CARTON_WAVE,
+          id: '00000000-0000-4000-8000-00000000e702',
+          docNumber: 'WAVE2609-00040',
+          status: 'ASSIGNED',
+          tasks: [],
+          lines: [],
+        });
+      }),
+    );
+    renderApp(<DispatchScreen />);
+    expect(await screen.findByText('SKU-A')).toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: /Đủ gộp thùng/ })).toHaveAttribute(
+      'aria-selected',
+      'true',
+    );
+    expect(screen.getByRole('tab', { name: /Chưa gán/ })).toHaveAttribute('aria-selected', 'false');
+    expect(levels).toContain('CARTON');
+    expect(screen.getByText('Trọn thùng × 4')).toBeInTheDocument();
+    // Bảng việc không hiện ở tab gợi ý.
+    expect(screen.queryByText(PENDING[0]!.docNumber)).not.toBeInTheDocument();
+    // Bung đơn con.
+    const expand = screen.getByRole('button', { name: '4 đơn' });
+    expect(expand).toHaveAttribute('aria-expanded', 'false');
+    fireEvent.click(expand);
+    expect(await screen.findByText('PICK2609-00101')).toBeInTheDocument();
+    expect(screen.getByText('đơn SO2609-00104')).toBeInTheDocument();
+    expect(expand).toHaveAttribute('aria-expanded', 'true');
+    // Gộp và gán → dialog chọn người → POST /waves/merge.
+    fireEvent.click(screen.getByRole('button', { name: 'Gộp và gán' }));
+    const dialog = await screen.findByRole('dialog');
+    fireEvent.click(within(dialog).getByRole('combobox', { name: 'Giao lượt cho' }));
+    fireEvent.click(await screen.findByRole('option', { name: 'Phạm Thị Hoa · kho' }));
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Gộp và gán' }));
+    await waitFor(() => expect(posts).toHaveLength(1));
+    expect(posts[0]).toEqual({
+      skuId: 'sku-a',
+      packLevel: 'CARTON',
+      packCount: 4,
+      taskIds: TASK_IDS,
+      assignedTo: 'staff-1',
+    });
+    await waitFor(() =>
+      expect(toast.success).toHaveBeenCalledWith('Đã gộp 4 đơn thành lượt WAVE2609-00040'),
+    );
+  });
+
+  it('409 WAVE_SUGGESTION_STALE → toast nêu mã việc không còn hợp lệ, tải lại gợi ý, không gộp phần còn lại', async () => {
+    search = 'merge=CARTON';
+    let gets = 0;
+    const posts: unknown[] = [];
+    server.use(
+      http.get('/api/waves/suggestions', () => {
+        gets += 1;
+        return HttpResponse.json(SUGGESTIONS);
+      }),
+      http.post('/api/waves/merge', async ({ request }) => {
+        posts.push(await request.json());
+        return HttpResponse.json(
+          {
+            statusCode: 409,
+            code: 'WAVE_SUGGESTION_STALE',
+            message: 'stale',
+            details: {
+              tasks: [{ id: TASK_IDS[0], docNumber: 'PICK2609-00101', status: 'CANCELLED' }],
+            },
+          },
+          { status: 409 },
+        );
+      }),
+    );
+    renderApp(<DispatchScreen />);
+    fireEvent.click(await screen.findByRole('button', { name: 'Gộp và gán' }));
+    const dialog = await screen.findByRole('dialog');
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Gộp và gán' }));
+    await waitFor(() =>
+      expect(toast.error).toHaveBeenCalledWith(
+        expect.stringMatching(/Nhóm này đã thay đổi.*Đơn không còn hợp lệ: PICK2609-00101\./),
+      ),
+    );
+    // Chỉ MỘT lần gộp (không tự gộp phần còn lại) và gợi ý được tải lại.
+    expect(posts).toHaveLength(1);
+    await waitFor(() => expect(gets).toBeGreaterThanOrEqual(2));
+  });
+
+  it('tab gợi ý rỗng: lời mời một hành động "Xem Chưa gán"', async () => {
+    search = 'merge=PALLET';
+    renderApp(<DispatchScreen />);
+    expect(
+      await screen.findByText(/Chưa có nhóm đơn nào cộng đúng một pallet/),
+    ).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Xem Chưa gán' }));
+    await waitFor(() => expect(replace).toHaveBeenCalledWith('/wms/dispatch', { scroll: false }));
+  });
+
+  it('lượt theo cấp đóng gói hiện "Trọn thùng × 4 · SKU-A"; không còn nút "Gộp tự động"', async () => {
+    search = '';
+    server.use(http.get('/api/waves', () => HttpResponse.json({ items: [CARTON_WAVE], total: 1 })));
+    renderApp(<DispatchScreen />);
+    expect(await screen.findByText('Trọn thùng × 4 · SKU-A')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Gộp tự động/ })).not.toBeInTheDocument();
   });
 });
