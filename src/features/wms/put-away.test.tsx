@@ -5,10 +5,11 @@ import { server } from '@/test/msw/server';
 import { renderApp } from '@/test/render';
 import { PutAwayScreen } from './components/put-away-screen';
 
+const nav = vi.hoisted(() => ({ search: '', replace: vi.fn() }));
 vi.mock('next/navigation', () => ({
   usePathname: () => '/pda/put-away',
-  useRouter: () => ({ push: vi.fn(), replace: vi.fn(), refresh: vi.fn() }),
-  useSearchParams: () => new URLSearchParams(''),
+  useRouter: () => ({ push: vi.fn(), replace: nav.replace, refresh: vi.fn() }),
+  useSearchParams: () => new URLSearchParams(nav.search),
 }));
 
 const TASK_ID = '00000000-0000-4000-8000-00000000e101';
@@ -349,6 +350,28 @@ describe('Màn cất hàng trên PDA — hàng đợi → nhận → quét SKU �
     fireEvent.click(confirm);
     await waitFor(() => expect(completes).toEqual([LINE_1]));
     expect(screen.getByRole('region', { name: 'Dòng đang cất' })).toHaveTextContent('A01-02');
+  });
+
+  it('?task=<id> (chạm từ màn pick) → tự nhận việc đó, bỏ param khỏi URL', async () => {
+    const claimed: string[] = [];
+    usePutAwayServer();
+    server.use(
+      http.post('/api/pda/tasks/:id/claim', ({ params }) => {
+        claimed.push(String(params.id));
+        return HttpResponse.json(PUT_TASK);
+      }),
+    );
+    nav.search = `task=${TASK_ID}`;
+    nav.replace.mockClear();
+    try {
+      renderApp(<PutAwayScreen />);
+      const card = await screen.findByRole('region', { name: 'Dòng đang cất' });
+      expect(card).toHaveTextContent('A01-01');
+      expect(claimed).toEqual([TASK_ID]);
+      expect(nav.replace).toHaveBeenCalledWith('/pda/put-away');
+    } finally {
+      nav.search = '';
+    }
   });
 
   it('quét mã việc không phải cất hàng → báo rõ, không nhận', async () => {

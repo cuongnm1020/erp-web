@@ -8,8 +8,10 @@ import {
   Layers,
   MapPin,
   PackageX,
+  Warehouse,
   WifiOff,
 } from 'lucide-react';
+import { useRouter } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
 import { ScanInput, type ScanInputHandle } from '@/components/data/scan-input';
 import { ForbiddenState } from '@/components/data/states';
@@ -19,7 +21,13 @@ import { cn } from '@/lib/cn';
 import { messageFor } from '@/lib/error-messages';
 import { formatDateTime, formatQuantity } from '@/lib/format';
 import { useAbility } from '@/lib/permission';
-import { usePdaMyTasks, usePdaMyWaves, usePdaStats, useResolveCode } from '../api/use-pda';
+import {
+  usePdaMyTasks,
+  usePdaMyWaves,
+  usePdaQueue,
+  usePdaStats,
+  useResolveCode,
+} from '../api/use-pda';
 import { useScanSession, type ScanFeedback, type Shortage } from '../scan-session';
 import { useScanQty } from '../use-scan-qty';
 import { useWaveSession } from '../wave-session';
@@ -42,9 +50,14 @@ type Mode = 'task' | 'wave';
  * 2026-09-22: quét mã SKU → nhập số lượng → Enter (lấy 30 một lần, không bấm +/−); thẻ dòng
  * đang lấy hiện ảnh + tên thương mại + vị trí + "trên kệ còn N" (server tính = tồn bin − đã
  * lấy chưa đóng gói, bất biến 3 — pick không chạm ledger).
+ *
+ * 2026-10-01: màn chờ hiện thêm cột "Việc cất hàng" (hàng đợi PUT_AWAY: của tôi + chưa ai nhận)
+ * để người lấy hàng thấy cả việc lấy và việc cất trên một màn. Chạm / quét mã PUT… → chuyển sang
+ * /pda/put-away?task=… (màn cất hàng tự nhận việc), không gộp luồng cất vào phiên pick.
  */
 export function PickScreen() {
   const ability = useAbility();
+  const router = useRouter();
   const resolve = useResolveCode();
   const task = useScanSession('PICK');
   const wave = useWaveSession();
@@ -62,6 +75,7 @@ export function PickScreen() {
   const myTasks = usePdaMyTasks(canExecute);
   const myWaves = usePdaMyWaves(canExecute);
   const doneToday = usePdaStats('PICK', null, canExecute);
+  const putQueue = usePdaQueue('PUT_AWAY', canExecute);
   const idle = !resolving && task.phase === 'idle' && wave.phase === 'idle';
   useEffect(() => {
     // Quay về màn chờ (sau "Quét đơn kế tiếp") → làm tươi hai cột ngay, không đợi 30s.
@@ -69,6 +83,7 @@ export function PickScreen() {
       void myTasks.refetch();
       void myWaves.refetch();
       void doneToday.refetch();
+      void putQueue.refetch();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [idle, canExecute]);
@@ -83,11 +98,19 @@ export function PickScreen() {
   const shortages: Shortage[] = s.shortages;
   const offline = task.offline || wave.offline;
 
+  const openPutAway = (taskId: string) => {
+    router.push(`/pda/put-away?task=${encodeURIComponent(taskId)}`);
+  };
+
   const openCode = async (code: string) => {
     setResolving(true);
     setResolveError(null);
     try {
       const r = await resolve.mutateAsync(code);
+      if (r.kind === 'task' && r.task?.type === 'PUT_AWAY') {
+        openPutAway(r.task.id);
+        return;
+      }
       if (r.kind === 'wave' && r.wave) {
         setMode('wave');
         task.clear();
@@ -240,8 +263,8 @@ export function PickScreen() {
             <div className="flex flex-col items-center gap-1 py-2 text-center text-muted-foreground">
               <p className="text-lg font-medium text-foreground">Quét mã đơn để nhận việc</p>
               <p className="text-sm">
-                Mã trên phiếu đơn hàng, phiếu lấy hàng hoặc phiếu lượt gộp — hoặc chạm một việc bên
-                dưới.
+                Mã trên phiếu đơn hàng, phiếu lấy hàng, phiếu lượt gộp hoặc phiếu cất hàng — hoặc
+                chạm một việc bên dưới.
               </p>
             </div>
             <div className="grid gap-3 md:grid-cols-2">
@@ -307,6 +330,52 @@ export function PickScreen() {
                         )}
                       >
                         {t.status === 'IN_PROGRESS' ? 'Đang lấy' : 'Chưa bắt đầu'}
+                      </span>
+                    </button>
+                  </li>
+                ))}
+              </PdaListColumn>
+              <PdaListColumn
+                title="Việc cất hàng"
+                hint={
+                  putQueue.data
+                    ? `${putQueue.data.waiting} chờ · ${putQueue.data.mine} của tôi`
+                    : ''
+                }
+                count={putQueue.data?.items.length ?? null}
+                error={putQueue.isError}
+                empty="Chưa có việc cất hàng — hàng nhập đã cất hết."
+              >
+                {putQueue.data?.items.map((q) => (
+                  <li key={q.taskId}>
+                    <button
+                      type="button"
+                      className="flex min-h-14 w-full items-center justify-between gap-2 px-3 py-2 text-left hover:bg-muted"
+                      onClick={() => openPutAway(q.taskId)}
+                      aria-label={`Cất hàng ${q.docNumber}`}
+                    >
+                      <span className="flex flex-col">
+                        <span className="flex items-center gap-1 font-mono font-semibold">
+                          <Warehouse className="h-4 w-4 text-primary" aria-hidden />
+                          {q.docNumber}
+                        </span>
+                        <span className="text-xs text-muted-foreground">
+                          Cất hàng · {q.lineCount} dòng · chờ {q.ageMinutes} phút
+                        </span>
+                      </span>
+                      <span
+                        className={cn(
+                          'rounded-sm px-1.5 py-0.5 text-xs font-medium',
+                          q.assignedToMe
+                            ? 'bg-primary/10 text-primary'
+                            : 'bg-muted text-muted-foreground',
+                        )}
+                      >
+                        {q.assignedToMe
+                          ? q.status === 'IN_PROGRESS'
+                            ? 'Đang cất'
+                            : 'Của tôi'
+                          : 'Chưa ai nhận'}
                       </span>
                     </button>
                   </li>

@@ -5,9 +5,10 @@ import { server } from '@/test/msw/server';
 import { renderApp } from '@/test/render';
 import { PickScreen } from './components/pick-screen';
 
+const push = vi.hoisted(() => vi.fn());
 vi.mock('next/navigation', () => ({
   usePathname: () => '/pda/pick',
-  useRouter: () => ({ push: vi.fn(), replace: vi.fn(), refresh: vi.fn() }),
+  useRouter: () => ({ push, replace: vi.fn(), refresh: vi.fn() }),
   useSearchParams: () => new URLSearchParams(''),
 }));
 
@@ -444,6 +445,68 @@ describe('Màn pick trên PDA — quét đơn → dòng theo lối đi → quét
     await waitFor(() => expect(claimed).toEqual([WAVE_ID]));
     await waitFor(() => expect(screen.getByText('Lượt lấy gộp')).toBeInTheDocument());
     expect(screen.getByText('WAVE2609-00009')).toBeInTheDocument();
+  });
+
+  it('màn chờ: cột "Việc cất hàng" (GET /pda/queue?type=PUT_AWAY) — chạm hoặc quét mã PUT → sang /pda/put-away?task=', async () => {
+    const queueTypes: string[] = [];
+    server.use(
+      http.get('/api/pda/queue', ({ request }) => {
+        const type = new URL(request.url).searchParams.get('type') ?? '';
+        queueTypes.push(type);
+        return HttpResponse.json({
+          type,
+          warehouseId: null,
+          items: [
+            {
+              taskId: 'put-1',
+              docNumber: 'PUT2609-00003',
+              status: 'PENDING',
+              assignedToMe: false,
+              refDocNumber: null,
+              lineCount: 3,
+              createdAt: new Date(Date.UTC(2026, 8, 16)).toISOString(),
+              ageMinutes: 12,
+            },
+          ],
+          waiting: 1,
+          mine: 0,
+        });
+      }),
+      http.get('/api/pda/resolve/:code', () =>
+        HttpResponse.json({
+          kind: 'task',
+          code: 'PUT2609-00004',
+          sku: null,
+          order: null,
+          wave: null,
+          location: null,
+          shipment: null,
+          task: {
+            id: 'put-2',
+            docNumber: 'PUT2609-00004',
+            type: 'PUT_AWAY',
+            status: 'PENDING',
+            warehouseId: 'wh-1',
+            assignedTo: null,
+            assignedToMe: false,
+          },
+        }),
+      ),
+    );
+    push.mockClear();
+    renderApp(<PickScreen />);
+    const col = await screen.findByRole('region', { name: 'Việc cất hàng' });
+    await waitFor(() => expect(col).toHaveTextContent('Việc cất hàng · 1'));
+    expect(col).toHaveTextContent('PUT2609-00003');
+    expect(col).toHaveTextContent('Chưa ai nhận');
+    expect(queueTypes).toContain('PUT_AWAY');
+    fireEvent.click(screen.getByRole('button', { name: 'Cất hàng PUT2609-00003' }));
+    expect(push).toHaveBeenLastCalledWith('/pda/put-away?task=put-1');
+
+    const input = screen.getByLabelText(/Quét/);
+    fireEvent.change(input, { target: { value: 'PUT2609-00004' } });
+    fireEvent.keyDown(input, { key: 'Enter' });
+    await waitFor(() => expect(push).toHaveBeenLastCalledWith('/pda/put-away?task=put-2'));
   });
 
   it('việc của người khác → 409 hiện câu từ bộ dịch, không nhận', async () => {

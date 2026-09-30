@@ -1,6 +1,7 @@
 'use client';
 
 import {
+  ArrowLeft,
   ArrowRight,
   CheckCircle2,
   CircleAlert,
@@ -10,6 +11,8 @@ import {
   Plus,
   WifiOff,
 } from 'lucide-react';
+import Link from 'next/link';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
 import { ScanInput, type ScanInputHandle } from '@/components/data/scan-input';
 import { ForbiddenState } from '@/components/data/states';
@@ -32,6 +35,8 @@ import { SkuBarcodes } from './sku-barcodes';
  * nhận (DOCK), quét sản phẩm đủ số lượng, đem tới ô kệ đích, quét mã ô kệ (hoặc bấm "Đã cất
  * vào …") → server chuyển tồn DOCK → bin. Hết dòng → việc xong. Dòng không có ô kệ (kho hết
  * chỗ trống, EXCEPTION) hiện mờ để điều phối chỉ định — máy quét không làm được.
+ *
+ * `?task=<id>` (từ cột "Việc cất hàng" trên màn pick) → tự nhận việc đó một lần rồi bỏ param.
  */
 export function PutAwayScreen() {
   const ability = useAbility();
@@ -42,6 +47,17 @@ export function PutAwayScreen() {
   const queue = usePdaQueue('PUT_AWAY', canExecute);
   const doneToday = usePdaStats('PUT_AWAY', null, canExecute);
   const idle = s.phase === 'idle';
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const taskParam = searchParams.get('task');
+  const openedParam = useRef<string | null>(null);
+  useEffect(() => {
+    if (!taskParam || !canExecute || openedParam.current === taskParam) return;
+    openedParam.current = taskParam;
+    router.replace('/pda/put-away');
+    void s.openTask(taskParam);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [taskParam, canExecute]);
   useEffect(() => {
     // Quay về màn chờ (sau "Việc kế tiếp") → làm tươi hai cột ngay, không đợi 30s.
     if (idle && canExecute) {
@@ -80,7 +96,18 @@ export function PutAwayScreen() {
     <div className="flex min-h-dvh flex-col bg-background text-base">
       <header className="flex items-center justify-between border-b px-4 py-3">
         <div>
-          <div className="text-xs uppercase tracking-wide text-muted-foreground">Cất hàng</div>
+          <div className="flex items-center gap-2 text-xs uppercase tracking-wide text-muted-foreground">
+            <Link
+              href="/pda/pick"
+              className="-m-2 flex items-center gap-1 p-2 hover:text-foreground"
+              aria-label="Về màn lấy hàng"
+            >
+              <ArrowLeft className="h-3 w-3" aria-hidden />
+              Lấy hàng
+            </Link>
+            <span aria-hidden>·</span>
+            Cất hàng
+          </div>
           <div className="font-mono text-lg font-semibold">
             {task?.docNumber ?? 'Chưa nhận việc'}
           </div>
