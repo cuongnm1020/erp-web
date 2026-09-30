@@ -3578,6 +3578,28 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/pancake-sync/push/products/bulk": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Trạng thái / kết quả lượt đẩy toàn bộ gần nhất — web hỏi định kỳ khi đang chạy. */
+        get: operations["PancakePushController_bulkStatus"];
+        put?: never;
+        /**
+         * Xếp job nền đẩy TOÀN BỘ sản phẩm lên mọi shop (nút "Đồng bộ Pancake" ở danh sách sản
+         *     phẩm). Đang có lượt chạy → không xếp thêm, trả trạng thái lượt đó. Khai báo TRƯỚC
+         *     `products/:id` để `bulk` không rơi vào ParseUUIDPipe.
+         */
+        post: operations["PancakePushController_startBulk"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/pancake-sync/push/products/{id}": {
         parameters: {
             query?: never;
@@ -3604,7 +3626,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Đẩy TOÀN BỘ sản phẩm đang có (không combo, chưa xóa) — đồng bộ lần đầu. */
+        /** Đẩy TOÀN BỘ sản phẩm đang có (không combo, chưa xóa), chờ xong mới trả — CLI / test. */
         post: operations["PancakePushController_allProducts"];
         delete?: never;
         options?: never;
@@ -7741,17 +7763,47 @@ export interface components {
             shopId: number;
             limit?: number;
         };
+        PancakePushCountsDto: {
+            created: number;
+            updated: number;
+            linked: number;
+            hidden: number;
+            skipped: number;
+            failed: number;
+        };
+        PancakeBulkPushFailureDto: {
+            shopId: string;
+            productId: string;
+            productCode: string;
+            productName: string;
+            reason: string | null;
+        };
+        PancakeBulkPushStatusDto: {
+            /** @enum {string} */
+            state: "completed" | "failed" | "active" | "waiting" | "idle";
+            /** @description Số sản phẩm đã duyệt / tổng — tính theo sản phẩm, không theo shop. */
+            done: number;
+            total: number;
+            counts: components["schemas"]["PancakePushCountsDto"];
+            /** @description Các dòng `failed` (tối đa 50) để người vận hành xem lý do. */
+            failures: components["schemas"]["PancakeBulkPushFailureDto"][];
+            /** @description Lỗi của cả lượt (ném ra khỏi job — mạng / DB), khác với lỗi từng sản phẩm. */
+            error: string | null;
+            startedAt: string | null;
+            finishedAt: string | null;
+        };
         PancakePushResultDto: {
             shopId: string;
             /** @enum {string} */
             entity: "product" | "warehouse";
             internalId: string;
             /**
-             * @description created = POST mới; updated = PUT theo id đã liên kết; hidden = sản phẩm ngừng / xóa → ẩn trên
+             * @description created = POST mới; updated = PUT theo id đã liên kết; linked = chưa liên kết nhưng đã có
+             *     trên Pancake (tìm theo mã) → liên kết rồi PUT, không tạo trùng; hidden = sản phẩm ngừng / xóa → ẩn trên
              *     POS; skipped = không đẩy (lý do ở `reason`); failed = Pancake từ chối (lý do ở `reason`).
              * @enum {string}
              */
-            action: "failed" | "created" | "skipped" | "updated" | "hidden";
+            action: "failed" | "created" | "skipped" | "updated" | "linked" | "hidden";
             /** @description Id trên Pancake sau khi đẩy (sync.entity_link); null khi chưa liên kết được. */
             externalId: string | null;
             reason: string | null;
@@ -13966,6 +14018,44 @@ export interface operations {
                 };
                 content: {
                     "application/json": Record<string, never>;
+                };
+            };
+        };
+    };
+    PancakePushController_bulkStatus: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PancakeBulkPushStatusDto"];
+                };
+            };
+        };
+    };
+    PancakePushController_startBulk: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PancakeBulkPushStatusDto"];
                 };
             };
         };

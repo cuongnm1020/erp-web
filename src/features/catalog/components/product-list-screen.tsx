@@ -34,6 +34,7 @@ import {
   type SkuListRow,
   type TrackingMode,
 } from '../api/use-products';
+import { PancakeSyncButton } from './pancake-sync-button';
 
 /**
  * C-01 Danh sách sản phẩm — hai góc nhìn trên cùng URL state (?view):
@@ -608,6 +609,9 @@ export function ProductListScreen() {
                 Xuất Pancake
               </a>
             </Button>
+            <Can I="config" a="Sync">
+              <PancakeSyncButton />
+            </Can>
             <Can I="create" a="Product">
               <Button size="sm" asChild>
                 <Link href="/catalog/products/new">
