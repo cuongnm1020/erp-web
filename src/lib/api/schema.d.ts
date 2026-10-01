@@ -2818,6 +2818,43 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/reports/profit": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Tổng hợp + danh sách theo đơn hoặc theo SKU, trong data scope của người gọi. */
+        get: operations["ProfitController_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/reports/profit/backfill": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Chốt giá vốn cho đơn đã đóng gói trước khi có tính năng (chạy một lần sau deploy). Tính
+         *     lại từ sổ cái nên gọi lặp an toàn.
+         */
+        post: operations["ProfitController_backfill"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/transfers": {
         parameters: {
             query?: never;
@@ -7203,6 +7240,80 @@ export interface components {
              * @description Vị trí nhận thực tế; bỏ trống thì service tự chọn DOCK/STAGING của kho.
              */
             receiveLocationId?: string;
+        };
+        ProfitSummaryDto: {
+            orderCount: number;
+            /** @description Σ thành tiền dòng (đã trừ chiết khấu dòng). */
+            goodsRevenue: string;
+            /** @description Σ giảm trừ khuyến mãi cấp đơn. */
+            orderDiscount: string;
+            /** @description goodsRevenue − orderDiscount (không gồm phí ship, thuế). */
+            revenue: string;
+            /** @description Giá vốn FIFO đã chốt lúc đóng gói. */
+            actualCogs: string;
+            /** @description Giá vốn tạm tính cho dòng chưa đóng gói. */
+            estimatedCogs: string;
+            /** @description actualCogs + estimatedCogs. */
+            cogs: string;
+            grossProfit: string;
+            marginPct: string | null;
+            /** @description Số SKU (trong các dòng chưa đóng gói) chưa có lô giá nào — giá vốn của chúng tính 0. */
+            missingCostSkuCount: number;
+        };
+        ProfitOrderRowDto: {
+            orderId: string;
+            docNumber: string;
+            /** @description ISO datetime. */
+            orderDate: string;
+            /** @enum {string} */
+            status: "APPROVED" | "POSTED";
+            customerCode: string;
+            customerName: string;
+            revenue: string;
+            cogs: string;
+            grossProfit: string;
+            marginPct: string | null;
+            /** @enum {string} */
+            costStatus: "ACTUAL" | "ESTIMATED" | "MISSING";
+        };
+        ProfitSkuRowDto: {
+            skuId: string;
+            skuCode: string;
+            skuName: string;
+            /** @description Số lượng bán theo đơn vị cơ sở — Decimal(18,6). */
+            qtyBase: string;
+            /** @description Σ thành tiền dòng — CHƯA trừ khuyến mãi cấp đơn (không phân bổ được về SKU). */
+            revenue: string;
+            cogs: string;
+            grossProfit: string;
+            marginPct: string | null;
+            /** @description Giá vốn bình quân / đơn vị cơ sở của số đã bán (cogs / qtyBase). */
+            avgUnitCost: string | null;
+            /** @enum {string} */
+            costStatus: "ACTUAL" | "ESTIMATED" | "MISSING";
+        };
+        ProfitReportDto: {
+            /** @description `YYYY-MM-DD`. */
+            from: string;
+            to: string;
+            /** @enum {string} */
+            groupBy: "sku" | "order";
+            summary: components["schemas"]["ProfitSummaryDto"];
+            /** @description Có khi groupBy=order. */
+            orders: components["schemas"]["ProfitOrderRowDto"][];
+            /** @description Có khi groupBy=sku. */
+            skus: components["schemas"]["ProfitSkuRowDto"][];
+            total: number;
+        };
+        ProfitBackfillDto: {
+            from: string;
+            to: string;
+        };
+        ProfitBackfillResultDto: {
+            /** @description Số đơn đã quét trong khoảng. */
+            scanned: number;
+            /** @description Số đơn đã chốt giá vốn lần này. */
+            costed: number;
         };
         TransferListRowDto: {
             id: string;
@@ -12640,6 +12751,59 @@ export interface operations {
                 };
                 content: {
                     "application/json": Record<string, never>;
+                };
+            };
+        };
+    };
+    ProfitController_get: {
+        parameters: {
+            query: {
+                /** @description `YYYY-MM-DD` — ngày đầu (giờ VN). */
+                from: string;
+                /** @description `YYYY-MM-DD` — ngày cuối, lấy hết ngày đó. Tối đa 93 ngày tính từ `from`. */
+                to: string;
+                /** @description `order` = mỗi đơn một dòng; `sku` = gộp theo SKU. */
+                groupBy: "order" | "sku";
+                /** @description order: số đơn / mã / tên khách. sku: mã / tên SKU. Không phân biệt hoa thường. */
+                q?: string;
+                take: number;
+                skip: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProfitReportDto"];
+                };
+            };
+        };
+    };
+    ProfitController_backfill: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ProfitBackfillDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProfitBackfillResultDto"];
                 };
             };
         };
