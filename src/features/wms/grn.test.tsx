@@ -119,6 +119,24 @@ const DETAIL_PACKED = {
   ],
 };
 
+/** GET /skus/:id/conversions — 1 BOX = 10 REAM (CARTON), 1 PLT = 100 REAM (PALLET). */
+const CONVERSIONS = [
+  {
+    id: 'cv-2',
+    uomId: 'u-plt',
+    factor: '100.000000',
+    containerTypeId: 'ct-1',
+    uom: { id: 'u-plt', code: 'PLT', name: 'Pallet', decimals: 0 },
+  },
+  {
+    id: 'cv-1',
+    uomId: 'u-box',
+    factor: '10.000000',
+    containerTypeId: 'ct-2',
+    uom: { id: 'u-box', code: 'BOX', name: 'Thùng', decimals: 0 },
+  },
+];
+
 const SKU_LIST = {
   items: [
     {
@@ -190,7 +208,47 @@ describe('GrnCreateScreen — POST /goods-receipts (+ post)', () => {
       http.get('/api/warehouses', () => HttpResponse.json(WAREHOUSES)),
       http.get('/api/skus', () => HttpResponse.json(SKU_LIST)),
       http.get('/api/container-types', () => HttpResponse.json(CONTAINER_TYPES)),
+      http.get('/api/skus/:id/conversions', () => HttpResponse.json(CONVERSIONS)),
     );
+  });
+
+  it('nhập theo thùng / pallet: chọn ĐVT nhập → hiện SL quy ra đơn vị bán chính, điền sẵn đóng gói, body gửi uom + SL theo ĐVT đó', async () => {
+    const posts: Array<{ body: unknown }> = [];
+    server.use(
+      http.post('/api/goods-receipts', async ({ request }) => {
+        posts.push({ body: await request.json() });
+        return HttpResponse.json(
+          { receiptId: 'r-8', docNumber: 'GRN2610-00001', status: 'DRAFT', warehouseId: 'wh-1' },
+          { status: 201 },
+        );
+      }),
+    );
+    renderApp(<GrnCreateScreen />);
+    fireEvent.click(await screen.findByRole('combobox', { name: 'Kho nhận *' }));
+    fireEvent.click(await screen.findByRole('option', { name: 'Kho HN-1' }));
+    fireEvent.click(screen.getByText('Tìm SKU…'));
+    fireEvent.click(await screen.findByText('Giấy A4 Double A 80gsm'));
+    fireEvent.change(screen.getByLabelText('Số lượng dòng 1'), { target: { value: '2' } });
+    fireEvent.click(screen.getByRole('combobox', { name: 'ĐVT nhập dòng 1' }));
+    fireEvent.click(await screen.findByRole('option', { name: 'PLT (100 REAM)' }));
+    // 2 pallet × 100 = 200 REAM; đóng gói điền sẵn: mỗi pallet 100
+    expect(await screen.findByText('= 200 REAM')).toBeInTheDocument();
+    expect(screen.getByLabelText('SL mỗi thùng dòng 1')).toHaveValue('100');
+    expect(screen.getByText('2 thùng')).toBeInTheDocument();
+    fireEvent.change(screen.getAllByPlaceholderText('0')[1]!, { target: { value: '5000000' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Lưu nháp' }));
+    await waitFor(() => expect(posts).toHaveLength(1));
+    expect(posts[0]!.body).toMatchObject({
+      lines: [
+        {
+          skuId: 'sku-1',
+          qty: '2',
+          uom: 'PLT',
+          unitCost: '5000000',
+          packaging: { containerType: 'PALLET', qtyPerContainer: '100' },
+        },
+      ],
+    });
   });
 
   it('PLAN-packaging-hierarchy D: chọn loại thùng + SL/thùng → body có packaging; không chia hết → lỗi tại ô', async () => {

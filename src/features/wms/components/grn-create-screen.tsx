@@ -38,15 +38,21 @@ import {
 import { toast } from '@/components/ui/toaster';
 import type { ApiError } from '@/lib/api/errors';
 import { messageFor } from '@/lib/error-messages';
-import { formatMoney } from '@/lib/format';
+import { formatMoney, formatQuantity } from '@/lib/format';
 import { dateKeySchema, moneySchema, quantitySchema } from '@/lib/shared';
 import { useContainerTypes } from '../api/use-containers';
-import { useSkuSearch } from '../api/use-locations';
+import { useSkuConversions, useSkuSearch } from '../api/use-locations';
 import { useCreateReceipt, usePostReceipt } from '../api/use-receipts';
 import { isOperationalWarehouse, useWarehouses } from '../api/use-warehouses';
 
 /** Cùng regex với quantitySchema — dùng để guard trước khi new Decimal(). */
 const QTY_RE = /^\d{1,12}(\.\d{1,6})?$/;
+
+/** SL dòng (theo ĐVT dòng) × factor → SL đơn vị bán chính; null khi chưa nhập hợp lệ. */
+function baseQty(qty: string, factor: string): Decimal | null {
+  if (!QTY_RE.test(qty) || !QTY_RE.test(factor)) return null;
+  return new Decimal(qty).mul(factor);
+}
 
 /**
  * Tạo phiếu nhập kho (design GrnCreate) — POST /goods-receipts (DRAFT), nút
@@ -56,8 +62,13 @@ const QTY_RE = /^\d{1,12}(\.\d{1,6})?$/;
  * Khác design (backend chưa mô tả được):
  * - "Nhà cung cấp" + "Tham chiếu PO": chờ P2-01 — chưa có GET /purchase-orders
  *   để dựng ô chọn; phiếu tạo ở đây là NHẬP TỰ DO.
- * - "Số chứng từ NCC", cột ĐVT quy đổi / NSX / Vị trí cất: DTO chưa có trường
- *   tương ứng (SL nhập theo ĐVT cơ sở; vị trí cất do task PUT_AWAY gợi ý sau post).
+ * - "Số chứng từ NCC", NSX / Vị trí cất: DTO chưa có trường tương ứng (vị trí cất do
+ *   task PUT_AWAY gợi ý sau post).
+ *
+ * 2026-10-01 — nhập theo thùng / pallet: chọn ĐVT của dòng trong các quy đổi của SKU (quy cách
+ * khai ở form sản phẩm); gửi `uom` + SL + đơn giá THEO ĐVT ĐÓ, server quy ra đơn vị bán chính
+ * (qtyBase = SL × factor, giá mỗi đơn vị = đơn giá / factor) và snapshot factor lên dòng. Chọn
+ * ĐVT là cấp đóng gói → điền sẵn khối "Đóng gói" (mỗi thùng / pallet = factor đơn vị).
  */
 const lineSchema = z.object({
   skuId: z.string().min(1, 'Chọn sản phẩm'),
@@ -65,7 +76,15 @@ const lineSchema = z.object({
   skuLabel: z.string(),
   /** F4 — chế độ theo dõi của SKU đã chọn (từ meta của picker, không gửi server). */
   tracking: z.enum(['NONE', 'LOT', 'SERIAL']),
+  /** SL theo ĐVT của dòng (`uom`). */
   qty: quantitySchema,
+  /** Mã ĐVT nhập — '' = đơn vị bán chính (ĐVT cơ sở). */
+  uom: z.string(),
+  /** Hệ số của `uom` về ĐVT cơ sở ('1' khi nhập theo ĐVT cơ sở) — chỉ để hiển thị / kiểm form. */
+  factor: z.string(),
+  /** ĐVT cơ sở của SKU đã chọn (meta picker) — chỉ hiển thị. */
+  baseUomCode: z.string(),
+  /** Đơn giá theo ĐVT của dòng — server chia factor ra giá mỗi đơn vị bán chính. */
   unitCost: moneySchema,
   lotNumber: z.string().trim().max(64, 'Tối đa 64 ký tự'),
   expiryDate: z.union([dateKeySchema, z.literal('')]),
@@ -104,12 +123,14 @@ const receiptSchema = z
         } else if (QTY_RE.test(l.qty) && QTY_RE.test(l.packQtyPer)) {
           // Guard cả 2 vế: superRefine vẫn chạy khi field con sai regex (status
           // "dirty"), nên new Decimal('1/10') sẽ throw nếu không kiểm tra trước.
+          // SL mỗi thùng tính theo ĐVT cơ sở → so với SL dòng ĐÃ quy đổi (× factor).
           const per = new Decimal(l.packQtyPer);
-          if (per.lte(0) || !new Decimal(l.qty).div(per).isInteger()) {
+          const qtyBase = baseQty(l.qty, l.factor);
+          if (per.lte(0) || !qtyBase || !qtyBase.div(per).isInteger()) {
             ctx.addIssue({
               code: z.ZodIssueCode.custom,
               path: ['lines', i, 'packQtyPer'],
-              message: `SL dòng (${l.qty}) phải chia hết cho SL mỗi thùng`,
+              message: `SL dòng (${qtyBase ? qtyBase.toString() : l.qty}) phải chia hết cho SL mỗi thùng`,
             });
           }
         }
@@ -123,6 +144,9 @@ const EMPTY_LINE: ReceiptValues['lines'][number] = {
   skuLabel: '',
   tracking: 'NONE',
   qty: '',
+  uom: '',
+  factor: '1',
+  baseUomCode: '',
   unitCost: '',
   lotNumber: '',
   expiryDate: '',
@@ -152,13 +176,12 @@ function LineValue({ form, index }: { form: UseFormReturn<ReceiptValues>; index:
 /** Số thùng sẽ tạo từ SL dòng / SL mỗi thùng — chỉ hiển thị (server tự tính lại). */
 function PackCount({ form, index }: { form: UseFormReturn<ReceiptValues>; index: number }) {
   const qty = useWatch({ control: form.control, name: `lines.${index}.qty` });
+  const factor = useWatch({ control: form.control, name: `lines.${index}.factor` });
   const per = useWatch({ control: form.control, name: `lines.${index}.packQtyPer` });
-  const ok =
-    /^\d{1,12}(\.\d{1,6})?$/.test(qty) &&
-    /^\d{1,12}(\.\d{1,6})?$/.test(per) &&
-    !new Decimal(per).isZero();
+  const qtyBase = baseQty(qty, factor);
+  const ok = qtyBase !== null && QTY_RE.test(per) && !new Decimal(per).isZero();
   if (!ok) return <span className="text-muted-foreground">— thùng</span>;
-  const n = new Decimal(qty).div(per);
+  const n = qtyBase.div(per);
   return (
     <span className={n.isInteger() ? 'tabular-nums' : 'tabular-nums text-destructive'}>
       {n.isInteger() ? `${n.toFixed(0)} thùng` : 'không chia hết'}
@@ -206,6 +229,8 @@ export function GrnCreateScreen() {
         lines: v.lines.map((l) => ({
           skuId: l.skuId,
           qty: l.qty,
+          // Nhập theo thùng / pallet: SL + đơn giá theo ĐVT này, server quy ra đơn vị bán chính.
+          ...(l.uom ? { uom: l.uom } : {}),
           unitCost: l.unitCost,
           ...(l.lotNumber ? { lotNumber: l.lotNumber } : {}),
           ...(l.expiryDate ? { expiryDate: l.expiryDate } : {}),
@@ -361,10 +386,10 @@ export function GrnCreateScreen() {
                   <TableRow className="bg-muted hover:bg-muted">
                     <TableHead className="w-8 px-2.5 text-xs">#</TableHead>
                     <TableHead className="min-w-64 px-2.5 text-xs">Sản phẩm</TableHead>
-                    <TableHead className="w-28 px-2.5 text-xs">SL (ĐVT cơ sở)</TableHead>
+                    <TableHead className="w-56 px-2.5 text-xs">Số lượng · ĐVT nhập</TableHead>
                     <TableHead className="w-32 px-2.5 text-xs">Lô</TableHead>
                     <TableHead className="w-36 px-2.5 text-xs">HSD</TableHead>
-                    <TableHead className="w-32 px-2.5 text-xs">Đơn giá</TableHead>
+                    <TableHead className="w-32 px-2.5 text-xs">Đơn giá / ĐVT nhập</TableHead>
                     <TableHead className="w-32 px-2.5 text-right text-xs">Thành tiền</TableHead>
                     <TableHead className="w-10 px-2.5 text-xs">
                       <span className="sr-only">Xóa dòng</span>
@@ -433,6 +458,13 @@ function LineRows({
                         `lines.${i}.tracking`,
                         (option?.meta?.trackingMode as 'NONE' | 'LOT' | 'SERIAL') ?? 'NONE',
                       );
+                      // Đổi SKU → về đơn vị bán chính; quy đổi của SKU mới tải lại.
+                      form.setValue(
+                        `lines.${i}.baseUomCode`,
+                        (option?.meta?.baseUomCode as string | undefined) ?? '',
+                      );
+                      form.setValue(`lines.${i}.uom`, '');
+                      form.setValue(`lines.${i}.factor`, '1');
                     }}
                     useSearch={useSkuSearch}
                     selectedLabel={form.getValues(`lines.${i}.skuLabel`) || undefined}
@@ -447,18 +479,7 @@ function LineRows({
           />
         </TableCell>
         <TableCell className="px-2.5 py-1.5">
-          <FormField
-            control={form.control}
-            name={`lines.${i}.qty`}
-            render={({ field }) => (
-              <FormItem>
-                <FormControl>
-                  <Input inputMode="decimal" placeholder="0" {...field} />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
+          <QtyUnitCell form={form} i={i} containerTypes={containerTypes} />
         </TableCell>
         <TableCell className="px-2.5 py-1.5">
           <FormField
@@ -618,5 +639,94 @@ function LineRows({
         </TableCell>
       </TableRow>
     </>
+  );
+}
+
+/**
+ * Ô số lượng + ĐVT nhập của một dòng: đơn vị bán chính hoặc một quy đổi của SKU (thùng / pallet
+ * khai ở form sản phẩm). Chọn ĐVT là cấp đóng gói → điền sẵn "Đóng gói" mỗi thùng = factor; dưới
+ * ô hiện SL đã quy ra đơn vị bán chính (decimal.js, chỉ hiển thị — server tự tính lại).
+ */
+function QtyUnitCell({
+  form,
+  i,
+  containerTypes,
+}: {
+  form: UseFormReturn<ReceiptValues>;
+  i: number;
+  containerTypes: { id: string; code: string; name: string }[];
+}) {
+  const skuId = useWatch({ control: form.control, name: `lines.${i}.skuId` });
+  const uom = useWatch({ control: form.control, name: `lines.${i}.uom` });
+  const qty = useWatch({ control: form.control, name: `lines.${i}.qty` });
+  const factor = useWatch({ control: form.control, name: `lines.${i}.factor` });
+  const baseUom = useWatch({ control: form.control, name: `lines.${i}.baseUomCode` });
+  const conversions = useSkuConversions(skuId);
+  const typeCode = new Map(containerTypes.map((t) => [t.id, t.code]));
+  const options = [...(conversions.data ?? [])].sort((a, b) =>
+    new Decimal(a.factor).comparedTo(new Decimal(b.factor)),
+  );
+  const BASE = '__base__';
+  const qtyBase = uom ? baseQty(qty, factor) : null;
+
+  const onUnit = (code: string) => {
+    if (code === BASE) {
+      form.setValue(`lines.${i}.uom`, '');
+      form.setValue(`lines.${i}.factor`, '1');
+      return;
+    }
+    const c = options.find((o) => o.uom.code === code);
+    if (!c) return;
+    form.setValue(`lines.${i}.uom`, code);
+    form.setValue(`lines.${i}.factor`, new Decimal(c.factor).toString());
+    const container = c.containerTypeId ? typeCode.get(c.containerTypeId) : undefined;
+    if (container) {
+      // Nhập theo thùng / pallet → mỗi vỏ chứa đúng factor đơn vị bán chính (sửa được).
+      form.setValue(`lines.${i}.packType`, container);
+      form.setValue(`lines.${i}.packQtyPer`, new Decimal(c.factor).toString());
+      form.setValue(`lines.${i}.packWrapIn`, '');
+    }
+  };
+
+  return (
+    <div className="flex flex-col gap-1">
+      <div className="flex items-start gap-1">
+        <FormField
+          control={form.control}
+          name={`lines.${i}.qty`}
+          render={({ field }) => (
+            <FormItem className="w-24">
+              <FormControl>
+                <Input
+                  inputMode="decimal"
+                  placeholder="0"
+                  aria-label={`Số lượng dòng ${i + 1}`}
+                  {...field}
+                />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+        <Select value={uom || BASE} onValueChange={onUnit} disabled={!skuId}>
+          <SelectTrigger className="w-28" aria-label={`ĐVT nhập dòng ${i + 1}`}>
+            <SelectValue placeholder="ĐVT" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value={BASE}>{baseUom || 'Đơn vị bán chính'}</SelectItem>
+            {options.map((c) => (
+              <SelectItem key={c.id} value={c.uom.code}>
+                {c.uom.code} ({formatQuantity(c.factor)} {baseUom})
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+      {qtyBase ? (
+        <span className="text-xs tabular-nums text-muted-foreground">
+          = {formatQuantity(qtyBase.toString())} {baseUom}
+        </span>
+      ) : null}
+    </div>
   );
 }

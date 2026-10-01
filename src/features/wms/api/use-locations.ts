@@ -14,6 +14,7 @@ export const locationKeys = {
   tree: (warehouseId: string) =>
     [...warehouseKeys.all, 'detail', warehouseId, 'locations', 'tree'] as const,
   skuSearch: (q: string) => ['wms', 'locations', 'sku-search', q] as const,
+  skuConversions: (skuId: string) => ['wms', 'locations', 'sku-conversions', skuId] as const,
 };
 
 /**
@@ -35,10 +36,23 @@ export function useSkuSearch(q: string): EntitySearchResult {
     id: s.skuId,
     label: s.name,
     hint: `${s.code} · ${s.productName}`,
-    // F4 — form GRN đòi số lô ngay khi chọn SKU theo lô
-    meta: { trackingMode: s.trackingMode },
+    // F4 — form GRN đòi số lô ngay khi chọn SKU theo lô; ĐVT cơ sở để quy đổi thùng / pallet
+    meta: { trackingMode: s.trackingMode, baseUomCode: s.baseUomCode },
   }));
   return { options, isPending: query.isPending, error: query.error };
+}
+
+/**
+ * GET /skus/{id}/conversions — quy đổi ĐVT của một SKU (thùng / pallet = factor × ĐVT cơ sở).
+ * Form nhập kho dùng để cho nhập theo thùng / pallet và tự quy ra đơn vị bán chính.
+ */
+export function useSkuConversions(skuId: string) {
+  return useQuery({
+    queryKey: locationKeys.skuConversions(skuId),
+    queryFn: () => unwrap(api.GET('/skus/{id}/conversions', { params: { path: { id: skuId } } })),
+    enabled: skuId !== '',
+    staleTime: 60_000,
+  });
 }
 
 /** GET /warehouses/{id}/locations/tree — cây ZONE/AISLE/RACK/BIN; cần stock.read. */
