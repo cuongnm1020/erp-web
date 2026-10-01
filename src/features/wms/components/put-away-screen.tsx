@@ -42,7 +42,10 @@ export function PutAwayScreen() {
   const ability = useAbility();
   const s = usePutAwaySession();
   const scanRef = useRef<ScanInputHandle>(null);
-  const [qty, setQty] = useState(1);
+  const [qtyText, setQtyText] = useState('1');
+  // Ô nhập cho phép tạm rỗng khi đang gõ; giá trị dùng để quét luôn là số nguyên ≥ 1.
+  const qty = Math.max(1, Number.parseInt(qtyText, 10) || 1);
+  const setQty = (next: number) => setQtyText(String(Math.max(1, next)));
   const canExecute = ability.can('execute', 'Task');
   const queue = usePdaQueue('PUT_AWAY', canExecute);
   const doneToday = usePdaStats('PUT_AWAY', null, canExecute);
@@ -330,18 +333,33 @@ export function PutAwayScreen() {
                 variant="outline"
                 className="h-14 w-14"
                 aria-label="Giảm số lượng"
-                onClick={() => setQty((q) => Math.max(1, q - 1))}
+                onClick={() => setQty(qty - 1)}
               >
                 <Minus aria-hidden />
               </Button>
-              <span className="w-10 text-center text-2xl font-bold tabular-nums" aria-live="polite">
-                {qty}
-              </span>
+              <input
+                type="text"
+                inputMode="numeric"
+                pattern="[0-9]*"
+                aria-label="Số lượng mỗi lần quét"
+                className="h-14 w-20 rounded-md border bg-background text-center text-2xl font-bold tabular-nums focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                value={qtyText}
+                onChange={(e) => setQtyText(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                onFocus={(e) => e.target.select()}
+                onBlur={() => setQty(qty)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    setQty(qty);
+                    scanRef.current?.focus();
+                  }
+                }}
+              />
               <Button
                 variant="outline"
                 className="h-14 w-14"
                 aria-label="Tăng số lượng"
-                onClick={() => setQty((q) => q + 1)}
+                onClick={() => setQty(qty + 1)}
               >
                 <Plus aria-hidden />
               </Button>
