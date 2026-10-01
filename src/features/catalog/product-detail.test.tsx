@@ -220,14 +220,15 @@ describe('ProductDetailScreen — C-03 chi tiết sản phẩm (GET /products/:i
     await screen.findByText(PRODUCT.name);
     fireEvent.click(screen.getByRole('tab', { name: /Biến thể/ }));
     const blueRow = screen.getByText(SKU_BLUE.code).closest('tr')!;
-    expect(within(blueRow).getByText('2.500 ₫')).toBeInTheDocument();
+    // Không còn cột Giá nhập (2026-10-01 — giá vốn theo phiếu nhập kho)
+    expect(within(blueRow).queryByText('2.500 ₫')).not.toBeInTheDocument();
     expect(within(blueRow).getByText('4.000 ₫')).toBeInTheDocument();
     // ĐVT bán mặc định là hộp (salesUom), không phải ĐVT cơ sở.
     expect(within(blueRow).getByText('hộp')).toBeInTheDocument();
     expect(within(blueRow).getByText('Đang bán')).toBeInTheDocument();
     const redRow = screen.getByText(SKU_RED.code).closest('tr')!;
     // Giá null → dấu gạch, không render '0 ₫'.
-    expect(within(redRow).getAllByText('—')).toHaveLength(2);
+    expect(within(redRow).getAllByText('—')).toHaveLength(1);
     expect(within(redRow).getByText('cái')).toBeInTheDocument();
     expect(within(redRow).getByText('Ngừng bán')).toBeInTheDocument();
   });

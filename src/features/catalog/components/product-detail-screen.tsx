@@ -353,7 +353,6 @@ function VariantsTab({ skus }: { skus: Sku[] }) {
           <TableHead className={cn(HEAD, 'w-40')}>Mã SKU</TableHead>
           <TableHead className={HEAD}>Tên biến thể</TableHead>
           <TableHead className={cn(HEAD, 'w-20')}>ĐVT bán</TableHead>
-          <TableHead className={cn(HEAD, 'w-32 text-right')}>Giá nhập</TableHead>
           <TableHead className={cn(HEAD, 'w-32 text-right')}>Giá bán</TableHead>
           <TableHead className={cn(HEAD, 'w-28')}>Trạng thái</TableHead>
         </TableRow>
@@ -364,7 +363,6 @@ function VariantsTab({ skus }: { skus: Sku[] }) {
             <TableCell className="px-2.5 py-1.5 font-mono text-xs text-primary">{s.code}</TableCell>
             <TableCell className="px-2.5 py-1.5">{s.name}</TableCell>
             <TableCell className="px-2.5 py-1.5">{(s.salesUom ?? s.baseUom).code}</TableCell>
-            <TableCell className={NUM_CELL}>{formatMoney(s.purchasePrice)}</TableCell>
             <TableCell className={NUM_CELL}>{formatMoney(s.salePrice)}</TableCell>
             <TableCell className="px-2.5 py-1.5">
               <StatusBadge tone={s.isActive ? 'ok' : 'neutral'}>
