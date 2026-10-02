@@ -562,6 +562,16 @@ function CancelOrderDialog({
   );
 }
 
+/** Hàng đã rời kho (đã đóng gói trở đi) → kho lập được phiếu nhập hàng hoàn (2026-10-02). */
+const RETURNABLE_FULFILMENT: ReadonlySet<SalesOrderDetail['fulfilment']['status']> = new Set([
+  'PACKED',
+  'SHIPPED',
+  'IN_TRANSIT',
+  'DELIVERED',
+  'FAILED',
+  'RETURNED',
+]);
+
 function Detail({ order }: { order: SalesOrderDetail }) {
   const [dialog, setDialog] = useState<'cancel' | 'recreate' | null>(null);
   const printer = usePrint();
@@ -612,6 +622,13 @@ function Detail({ order }: { order: SalesOrderDetail }) {
               </Button>
             </Can>
           )}
+          {RETURNABLE_FULFILMENT.has(order.fulfilment.status) ? (
+            <Can I="receive" a="Stock">
+              <Button variant="outline" size="sm" asChild>
+                <Link href={`/wms/returns/new?orderId=${order.id}`}>Nhập hàng hoàn</Link>
+              </Button>
+            </Can>
+          ) : null}
           <Button variant="outline" size="sm" onClick={printer.print}>
             <Printer aria-hidden />
             In phiếu đơn

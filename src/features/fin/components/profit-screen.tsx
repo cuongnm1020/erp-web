@@ -62,6 +62,27 @@ const daysBetween = (from: string, to: string) =>
 const pct = (v: string | null) => (v === null ? '—' : `${v.replace('.', ',')}%`);
 const negative = (v: string) => v.startsWith('-');
 
+/** Nhãn hoàn hàng trên dòng đơn — NONE không hiện gì. */
+const RETURN_STATUS: Partial<
+  Record<ProfitOrderRow['returnStatus'], { tone: StatusTone; label: string; hint: string }>
+> = {
+  PARTIAL: {
+    tone: 'warn',
+    label: 'Hoàn một phần',
+    hint: 'Đã trừ doanh thu + giá vốn phần nhập lại kho theo phiếu nhập hàng hoàn',
+  },
+  FULL: {
+    tone: 'err',
+    label: 'Hoàn hết',
+    hint: 'Không tính doanh thu; phần hàng hủy / thiếu (nếu có) tính vào giá vốn; vẫn chịu cước',
+  },
+  AWAITING_RECEIPT: {
+    tone: 'err',
+    label: 'Hoàn · chờ nhập kho',
+    hint: 'ĐVVC đã hoàn nhưng kho chưa post phiếu nhập hàng hoàn — tạm coi hàng về đủ',
+  },
+};
+
 function CostStatusBadge({ status }: { status: ProfitCostStatus }) {
   const s = COST_STATUS[status];
   return (
@@ -219,14 +240,27 @@ export function ProfitScreen() {
         id: 'costStatus',
         header: 'Giá vốn',
         meta: { width: 120 },
-        cell: ({ row }) =>
-          row.original.returned ? (
-            <span title="Hàng hoàn về — không tính doanh thu, giá vốn; vẫn chịu cước">
-              <StatusBadge tone="err">Hoàn hàng</StatusBadge>
+        cell: ({ row }) => {
+          const r = RETURN_STATUS[row.original.returnStatus];
+          return (
+            <span className="flex flex-col items-start gap-0.5">
+              {r ? (
+                <span title={r.hint}>
+                  <StatusBadge tone={r.tone}>{r.label}</StatusBadge>
+                </span>
+              ) : null}
+              {row.original.returnStatus === 'FULL' ||
+              row.original.returnStatus === 'AWAITING_RECEIPT' ? null : (
+                <CostStatusBadge status={row.original.costStatus} />
+              )}
+              {isZero(row.original.returnedRevenue) ? null : (
+                <span className="text-xs text-muted-foreground">
+                  −{formatMoney(row.original.returnedRevenue)} hoàn
+                </span>
+              )}
             </span>
-          ) : (
-            <CostStatusBadge status={row.original.costStatus} />
-          ),
+          );
+        },
       },
     ],
     [],
@@ -249,7 +283,14 @@ export function ProfitScreen() {
         header: 'SL bán',
         meta: { align: 'right', width: 100 },
         cell: ({ row }) => (
-          <span className="tabular-nums">{formatQuantity(row.original.qtyBase)}</span>
+          <span className="flex flex-col items-end">
+            <span className="tabular-nums">{formatQuantity(row.original.qtyBase)}</span>
+            {isZero(row.original.returnedQtyBase) ? null : (
+              <span className="text-xs tabular-nums text-muted-foreground">
+                hoàn {formatQuantity(row.original.returnedQtyBase)}
+              </span>
+            )}
+          </span>
         ),
       },
       {
@@ -461,10 +502,20 @@ export function ProfitScreen() {
               {data.summary.returnedOrderCount > 0 ? (
                 <li>
                   <span className="font-semibold text-foreground">
-                    {data.summary.returnedOrderCount} đơn hoàn
+                    {data.summary.returnedOrderCount} đơn có hàng hoàn
                   </span>{' '}
                   — đã loại {formatMoney(data.summary.returnedRevenue)} doanh thu và{' '}
-                  {formatMoney(data.summary.returnedCogs)} giá vốn (hàng về kho); cước vẫn tính.
+                  {formatMoney(data.summary.returnedCogs)} giá vốn (hàng nhập lại kho); hàng hủy vẫn
+                  tính giá vốn, cước vẫn tính.
+                </li>
+              ) : null}
+              {data.summary.awaitingReturnReceiptCount > 0 ? (
+                <li className="text-warning">
+                  {data.summary.awaitingReturnReceiptCount} đơn ĐVVC đã hoàn nhưng kho chưa post
+                  phiếu nhập hàng hoàn — đang tạm coi hàng về đủ.{' '}
+                  <Link href="/wms/returns/new" className="underline">
+                    Lập phiếu
+                  </Link>
                 </li>
               ) : null}
               <li>
@@ -481,8 +532,9 @@ export function ProfitScreen() {
             {view === 'sku' ? (
               <>
                 <p className="text-xs text-muted-foreground">
-                  Doanh thu theo SKU là thành tiền dòng, chưa trừ khuyến mãi cấp đơn; không gồm đơn
-                  hoàn. Phí ship, cước, thuế là cấp đơn nên không phân bổ về từng SKU.
+                  Doanh thu theo SKU là thành tiền dòng đã trừ phần hoàn, chưa trừ khuyến mãi cấp
+                  đơn; không gồm đơn ĐVVC hoàn. Phí ship, cước, thuế là cấp đơn nên không phân bổ về
+                  từng SKU.
                 </p>
                 <DataTable
                   columns={skuColumns}

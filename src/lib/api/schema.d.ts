@@ -2818,6 +2818,74 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/return-receipts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["ReturnsController_list"];
+        put?: never;
+        /** Tạo phiếu DRAFT (chưa chạm tồn). `Idempotency-Key` header hoặc body (luật 4 web). */
+        post: operations["ReturnsController_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/return-receipts/returnable": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Dòng đơn còn hoàn được (đã xuất − đã hoàn) + bin / lô / giá vốn mặc định. */
+        get: operations["ReturnsController_returnable"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/return-receipts/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["ReturnsController_get"];
+        put?: never;
+        post?: never;
+        /** Hủy phiếu NHÁP (idempotent). */
+        delete: operations["ReturnsController_cancel"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/return-receipts/{id}/post": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** POST phiếu: nhập lại kho dòng RESTOCK + chốt giá vốn. Gọi lại → 409 DOCUMENT_POSTED. */
+        post: operations["ReturnsController_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/reports/profit": {
         parameters: {
             query?: never;
@@ -7238,21 +7306,147 @@ export interface components {
              */
             receiveLocationId?: string;
         };
+        ReturnReceiptListRowDto: {
+            id: string;
+            docNumber: string;
+            /** @enum {string} */
+            status: "DRAFT" | "PENDING_APPROVAL" | "APPROVED" | "POSTED" | "CANCELLED";
+            orderId: string;
+            orderDocNumber: string;
+            warehouseId: string;
+            warehouseName: string;
+            reason: string | null;
+            /** @description ISO datetime. */
+            receivedAt: string;
+            lineCount: number;
+            /** @description Σ SL hoàn (ĐVT cơ sở). */
+            totalQty: string;
+        };
+        ReturnReceiptListResponseDto: {
+            items: components["schemas"]["ReturnReceiptListRowDto"][];
+            total: number;
+        };
+        ReturnableLineDto: {
+            orderLineId: string;
+            lineNo: number;
+            skuId: string;
+            skuCode: string;
+            skuName: string;
+            /** @description SL đặt (ĐVT cơ sở). */
+            qtyOrdered: string;
+            /** @description SL đã xuất kho (trừ tồn lúc PACK). */
+            qtyShipped: string;
+            /** @description Đã hoàn ở các phiếu POSTED. */
+            qtyReturned: string;
+            /** @description qtyShipped − qtyReturned. */
+            qtyReturnable: string;
+            /** @description Giá vốn FIFO bình quân đã xuất — giá nhập lại kho. null = chưa xuất. */
+            unitCost: string | null;
+            /** @description Bin + lô mặc định nhận lại (nơi đã lấy nhiều nhất). */
+            defaultLocationId: string | null;
+            defaultLocationCode: string | null;
+            defaultLotId: string | null;
+            defaultLotNumber: string | null;
+        };
+        ReturnableOrderDto: {
+            orderId: string;
+            docNumber: string;
+            status: string;
+            lines: components["schemas"]["ReturnableLineDto"][];
+        };
+        ReturnReceiptLineDto: {
+            id: string;
+            lineNo: number;
+            orderLineId: string;
+            skuId: string;
+            skuCode: string;
+            skuName: string;
+            qtyBase: string;
+            /** @enum {string} */
+            disposition: "SCRAP" | "RESTOCK";
+            locationId: string | null;
+            locationCode: string | null;
+            lotId: string | null;
+            lotNumber: string | null;
+            /** @description Có sau POST: giá vốn FIFO bình quân đã xuất. */
+            unitCost: string | null;
+            costAmount: string | null;
+        };
+        ReturnReceiptDetailDto: {
+            id: string;
+            docNumber: string;
+            /** @enum {string} */
+            status: "DRAFT" | "PENDING_APPROVAL" | "APPROVED" | "POSTED" | "CANCELLED";
+            orderId: string;
+            orderDocNumber: string;
+            warehouseId: string;
+            warehouseName: string;
+            reason: string | null;
+            /** @description ISO datetime. */
+            receivedAt: string;
+            lineCount: number;
+            /** @description Σ SL hoàn (ĐVT cơ sở). */
+            totalQty: string;
+            note: string | null;
+            /** @description ISO datetime, null khi chưa POST. */
+            postedAt: string | null;
+            lines: components["schemas"]["ReturnReceiptLineDto"][];
+        };
+        CreateReturnLineDto: {
+            /**
+             * Format: uuid
+             * @description core.SalesOrderLine.id của đơn đang hoàn.
+             */
+            orderLineId: string;
+            /** @description SL hoàn theo ĐVT cơ sở — Decimal(18,6) chuỗi, > 0. */
+            qty: string;
+            /**
+             * @description RESTOCK (mặc định) = nhập lại kho; SCRAP = hỏng, không nhập kho.
+             * @enum {string}
+             */
+            disposition?: "SCRAP" | "RESTOCK";
+            /**
+             * Format: uuid
+             * @description Bin nhận lại (RESTOCK) — bỏ trống = bin đã lấy hàng cho dòng đơn này.
+             */
+            locationId?: string;
+            /**
+             * Format: uuid
+             * @description Lô nhận lại — phải là lô đã xuất cho dòng; bỏ trống = lô xuất nhiều nhất.
+             */
+            lotId?: string;
+        };
+        CreateReturnReceiptDto: {
+            /** Format: uuid */
+            orderId: string;
+            reason?: string;
+            note?: string;
+            /** @description Header `Idempotency-Key` thắng nếu có cả hai (luật 4 phía web). */
+            idempotencyKey?: string;
+            lines: components["schemas"]["CreateReturnLineDto"][];
+        };
+        CreateReturnReceiptResponseDto: {
+            receiptId: string;
+            docNumber: string;
+            status: string;
+        };
         ProfitSummaryDto: {
             orderCount: number;
-            /** @description Σ thành tiền dòng (đã trừ chiết khấu dòng) — mọi đơn, kể cả đơn hoàn. */
+            /** @description Σ thành tiền dòng (đã trừ chiết khấu dòng) — mọi đơn, kể cả hàng hoàn. */
             goodsRevenue: string;
-            /** @description Σ giảm trừ khuyến mãi cấp đơn — mọi đơn, kể cả đơn hoàn. */
+            /** @description Σ giảm trừ khuyến mãi cấp đơn — mọi đơn, kể cả hàng hoàn. */
             orderDiscount: string;
-            /** @description Số đơn hoàn trong khoảng. */
+            /** @description Số đơn có hàng hoàn (một phần hoặc cả đơn). */
             returnedOrderCount: number;
-            /** @description Tiền hàng (sau khuyến mãi đơn) của đơn hoàn — đã loại khỏi `revenue`. */
+            /** @description Số đơn ĐVVC đã hoàn mà kho chưa POST phiếu nhập hàng hoàn. */
+            awaitingReturnReceiptCount: number;
+            /** @description Tiền hàng (sau KM cấp đơn) của phần hoàn — đã loại khỏi `revenue`. */
             returnedRevenue: string;
-            /** @description Giá vốn của đơn hoàn — đã loại khỏi `cogs` (hàng quay về kho). */
+            /** @description Giá vốn của phần hoàn đã loại khỏi `cogs` (hàng nhập lại kho / tạm coi về đủ). */
             returnedCogs: string;
             /** @description goodsRevenue − orderDiscount − returnedRevenue. Không gồm phí ship, thuế. */
             revenue: string;
-            /** @description Giá vốn FIFO đã chốt lúc đóng gói (không gồm đơn hoàn). */
+            /** @description Giá vốn FIFO đã chốt lúc đóng gói, trừ phần hoàn nhập lại kho. */
             actualCogs: string;
             /** @description Giá vốn tạm tính cho dòng chưa đóng gói. */
             estimatedCogs: string;
@@ -7261,15 +7455,15 @@ export interface components {
             /** @description revenue − cogs. */
             grossProfit: string;
             marginPct: string | null;
-            /** @description Σ phí ship THU KHÁCH (SalesOrder.shippingFee) của đơn không hoàn. */
+            /** @description Σ phí ship THU KHÁCH (SalesOrder.shippingFee) của đơn không bị ĐVVC hoàn. */
             shippingCharged: string;
             /** @description Σ cước hãng vận chuyển (cước + phụ phí + phí COD) — mọi đơn đã có phiếu giao, kể cả hoàn. */
             shippingCost: string;
             /** @description Số đơn có phiếu đã rời kho mà hãng chưa báo cước → `shippingCost` đang thiếu. */
             shippingCostMissingCount: number;
             /**
-             * @description Σ thuế trên đơn (SalesOrder.taxAmount) của đơn không hoàn — tiền THU HỘ nhà nước, không phải
-             *     doanh thu nên không vào lợi nhuận; hiện để đối chiếu với tiền thu khách.
+             * @description Σ thuế trên đơn (SalesOrder.taxAmount) của đơn không bị ĐVVC hoàn — tiền THU HỘ nhà nước,
+             *     không phải doanh thu nên không vào lợi nhuận; hiện để đối chiếu với tiền thu khách.
              */
             taxAmount: string;
             /** @description grossProfit + shippingCharged − shippingCost. */
@@ -7288,15 +7482,18 @@ export interface components {
             status: "APPROVED" | "POSTED";
             customerCode: string;
             customerName: string;
-            /** @description Đơn hoàn: revenue / cogs / grossProfit / shippingCharged / taxAmount = 0, chỉ còn cước. */
-            returned: boolean;
+            /** @enum {string} */
+            returnStatus: "NONE" | "PARTIAL" | "FULL" | "AWAITING_RECEIPT";
+            /** @description Doanh thu đã loại vì hoàn (sau KM cấp đơn phân bổ). */
+            returnedRevenue: string;
+            /** @description Doanh thu sau khi trừ phần hoàn. */
             revenue: string;
             cogs: string;
             grossProfit: string;
             marginPct: string | null;
             /** @enum {string} */
             costStatus: "ACTUAL" | "ESTIMATED" | "MISSING";
-            /** @description Phí ship thu khách. */
+            /** @description Phí ship thu khách (0 khi ĐVVC hoàn). */
             shippingCharged: string;
             /** @description Cước hãng (0 khi chưa có phiếu giao). */
             shippingCost: string;
@@ -7311,11 +7508,13 @@ export interface components {
             skuId: string;
             skuCode: string;
             skuName: string;
-            /** @description Số lượng bán theo đơn vị cơ sở — Decimal(18,6). */
+            /** @description Số lượng bán (đã trừ hàng hoàn) theo đơn vị cơ sở — Decimal(18,6). */
             qtyBase: string;
+            /** @description Số lượng hoàn — Decimal(18,6). */
+            returnedQtyBase: string;
             /**
-             * @description Σ thành tiền dòng — CHƯA trừ khuyến mãi cấp đơn (không phân bổ được về SKU). Không gồm đơn
-             *     hoàn; phí ship / cước / thuế là cấp đơn nên không có ở góc nhìn SKU.
+             * @description Σ thành tiền dòng trừ phần hoàn — CHƯA trừ khuyến mãi cấp đơn (không phân bổ về SKU). Đơn
+             *     ĐVVC hoàn không tính; phí ship / cước / thuế là cấp đơn nên không có ở góc nhìn SKU.
              */
             revenue: string;
             cogs: string;
@@ -12787,6 +12986,140 @@ export interface operations {
                 };
                 content: {
                     "application/json": Record<string, never>;
+                };
+            };
+        };
+    };
+    ReturnsController_list: {
+        parameters: {
+            query: {
+                orderId?: string;
+                status?: "DRAFT" | "PENDING_APPROVAL" | "APPROVED" | "POSTED" | "CANCELLED";
+                /** @description Số phiếu RTN (contains, không phân biệt hoa thường). */
+                q?: string;
+                take: number;
+                skip: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReturnReceiptListResponseDto"];
+                };
+            };
+        };
+    };
+    ReturnsController_create: {
+        parameters: {
+            query?: never;
+            header: {
+                "idempotency-key": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateReturnReceiptDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CreateReturnReceiptResponseDto"];
+                };
+            };
+        };
+    };
+    ReturnsController_returnable: {
+        parameters: {
+            query?: {
+                orderId?: string;
+                docNumber?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReturnableOrderDto"];
+                };
+            };
+        };
+    };
+    ReturnsController_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReturnReceiptDetailDto"];
+                };
+            };
+        };
+    };
+    ReturnsController_cancel: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    ReturnsController_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReturnReceiptDetailDto"];
                 };
             };
         };

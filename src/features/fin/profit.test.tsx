@@ -26,6 +26,7 @@ const SUMMARY: ProfitReport['summary'] = {
   grossProfit: '380000.0000',
   marginPct: '54.29',
   returnedOrderCount: 1,
+  awaitingReturnReceiptCount: 1,
   returnedRevenue: '100000.0000',
   returnedCogs: '50000.0000',
   shippingCharged: '25000.0000',
@@ -38,7 +39,8 @@ const SUMMARY: ProfitReport['summary'] = {
 };
 
 const ORDER_EXTRA = {
-  returned: false,
+  returnStatus: 'NONE',
+  returnedRevenue: '0.0000',
   shippingCharged: '0.0000',
   shippingCost: '0.0000',
   shippingCostMissing: false,
@@ -82,6 +84,8 @@ const BY_ORDER: ProfitReport = {
       marginPct: '-25.00',
       costStatus: 'ESTIMATED',
       ...ORDER_EXTRA,
+      returnStatus: 'PARTIAL',
+      returnedRevenue: '20000.0000',
       shippingCostMissing: true,
       netProfit: '-50000.0000',
     },
@@ -98,7 +102,8 @@ const BY_ORDER: ProfitReport = {
       marginPct: null,
       costStatus: 'ACTUAL',
       ...ORDER_EXTRA,
-      returned: true,
+      returnStatus: 'AWAITING_RECEIPT',
+      returnedRevenue: '100000.0000',
       shippingCost: '5000.0000',
       netProfit: '-5000.0000',
     },
@@ -136,7 +141,8 @@ describe('ProfitScreen — GET /reports/profit', () => {
     await screen.findByText('SO2610-00001');
     expect(screen.getByText('Lãi sau vận chuyển')).toBeInTheDocument();
     expect(screen.getByText(/51,03%/)).toBeInTheDocument();
-    expect(screen.getByText('1 đơn hoàn')).toBeInTheDocument();
+    expect(screen.getByText('1 đơn có hàng hoàn')).toBeInTheDocument();
+    expect(screen.getByText(/chưa post\s+phiếu nhập hàng hoàn/)).toBeInTheDocument();
     expect(screen.getByText(/Thuế trên đơn/)).toBeInTheDocument();
 
     const shipped = screen.getByText('SO2610-00001').closest('tr')!;
@@ -144,8 +150,10 @@ describe('ProfitScreen — GET /reports/profit', () => {
     const noFee = screen.getByText('SO2610-00002').closest('tr')!;
     expect(within(noFee).getByText('Chưa có cước')).toBeInTheDocument();
     const returned = screen.getByText('SO2610-00003').closest('tr')!;
-    expect(within(returned).getByText('Hoàn hàng')).toBeInTheDocument();
+    expect(within(returned).getByText('Hoàn · chờ nhập kho')).toBeInTheDocument();
     expect(within(returned).queryByText('Đã chốt')).not.toBeInTheDocument();
+    expect(within(noFee).getByText('Hoàn một phần')).toBeInTheDocument();
+    expect(within(noFee).getByText(/hoàn$/)).toBeInTheDocument();
   });
 
   it('theo SKU: gửi groupBy=sku, hiện giá vốn bình quân', async () => {
@@ -165,6 +173,7 @@ describe('ProfitScreen — GET /reports/profit', () => {
               skuCode: 'VBC-40G',
               skuName: 'Vua Bật Chồi 40gr',
               qtyBase: '7.000000',
+              returnedQtyBase: '2.000000',
               revenue: '700000.0000',
               cogs: '320000.0000',
               grossProfit: '380000.0000',
@@ -180,6 +189,7 @@ describe('ProfitScreen — GET /reports/profit', () => {
     expect(await screen.findByText('VBC-40G')).toBeInTheDocument();
     expect(calls[0]!.get('groupBy')).toBe('sku');
     expect(screen.getByText('Giá vốn BQ')).toBeInTheDocument();
+    expect(screen.getByText('hoàn 2')).toBeInTheDocument();
   });
 
   it('không đơn nào trong khoảng → trạng thái trống kèm một hành động', async () => {

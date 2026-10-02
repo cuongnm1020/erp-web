@@ -69,6 +69,7 @@ describe('visibleModules', () => {
       'Tồn kho',
       'Kho & vị trí',
       'Phiếu nhập kho',
+      'Nhập hàng hoàn',
       'Phiếu bán hàng',
       'Thùng / pallet',
       'Cảnh báo nhập hàng',

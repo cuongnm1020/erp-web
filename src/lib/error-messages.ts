@@ -44,6 +44,14 @@ const MESSAGES: Record<string, string> = {
   RECEIPT_LOT_REQUIRED: 'Sản phẩm theo lô — nhập số lô cho dòng này rồi lưu lại.',
   RECEIPT_LOT_EXPIRY_CONFLICT:
     'Lô này đã có hạn dùng khác với phiếu. Sửa hạn của lô ở màn Lô & hạn dùng nếu hạn cũ sai.',
+  // Phiếu nhập hàng hoàn (/wms/returns)
+  RETURN_QTY_EXCEEDED:
+    'SL hoàn vượt phần đã xuất chưa hoàn (có thể vừa có phiếu hoàn khác được post). Tải lại đơn và sửa SL.',
+  RETURN_ORDER_NOT_FOUND: 'Không tìm thấy đơn bán này. Kiểm tra lại số đơn.',
+  RETURN_ORDER_NOT_RETURNABLE: 'Đơn chưa chốt hoặc đã hủy — không có hàng đã xuất để nhận hoàn.',
+  RETURN_INVALID_INPUT:
+    'Phiếu hoàn chưa hợp lệ: kiểm tra SL, vị trí nhận lại và các dòng cùng một kho.',
+  RETURN_RECEIPT_NOT_FOUND: 'Phiếu nhập hàng hoàn không còn tồn tại. Tải lại danh sách.',
   RESERVATION_REPOINT_FAILED:
     'Lô vừa nhặt đã bị đơn khác giữ mất. Tải lại nhiệm vụ và nhặt lại theo gợi ý mới.',
   // Kết nối Pancake (Quản trị › Kết nối Pancake)
