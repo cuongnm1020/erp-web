@@ -24,10 +24,14 @@ import {
 } from '../api/use-profit';
 
 /**
- * Lợi nhuận gộp (2026-10-01) — GET /reports/profit. Giá nhập thay đổi theo từng phiếu nhập kho;
+ * Lợi nhuận (2026-10-01) — GET /reports/profit. Giá nhập thay đổi theo từng phiếu nhập kho;
  * giá vốn của mỗi đơn là đúng giá các lô FIFO đã xuất cho nó, chốt lúc đóng gói. Đơn chưa đóng
  * gói: tạm tính theo lô đang mở (nhãn "Tạm tính"). Khoảng ngày + cách xem + tìm kiếm nằm trên
  * URL (luật 8). Chỉ đơn đã chốt (APPROVED / POSTED), theo ngày đặt hàng giờ VN.
+ *
+ * 2026-10-02: thêm lợi nhuận sau vận chuyển (lãi gộp + phí ship thu khách − cước hãng), đơn hoàn
+ * (loại doanh thu + giá vốn, vẫn chịu cước) và thuế trên đơn (thu hộ, ngoài doanh thu). Mọi con số
+ * do API tính — màn chỉ hiển thị (luật 10).
  */
 const DEFAULTS = { filterKeys: ['from', 'to', 'view'] as const };
 type Filter = (typeof DEFAULTS.filterKeys)[number];
@@ -68,6 +72,7 @@ function CostStatusBadge({ status }: { status: ProfitCostStatus }) {
 }
 
 const money = (v: string) => <span className="tabular-nums">{formatMoney(v)}</span>;
+const isZero = (v: string) => /^-?0(\.0+)?$/.test(v);
 const profitCell = (v: string) => (
   <span className={cn('font-semibold tabular-nums', negative(v) && 'text-destructive')}>
     {formatMoney(v)}
@@ -181,10 +186,47 @@ export function ProfitScreen() {
         cell: ({ row }) => <span className="tabular-nums">{pct(row.original.marginPct)}</span>,
       },
       {
+        id: 'shipping',
+        header: 'Cước ĐVVC',
+        meta: { align: 'right', width: 130 },
+        cell: ({ row }) => {
+          const r = row.original;
+          return (
+            <span className="flex flex-col items-end">
+              {r.shippingCostMissing ? (
+                <span title="Phiếu đã rời kho nhưng hãng chưa báo cước — lợi nhuận đang cao hơn thực tế">
+                  <StatusBadge tone="warn">Chưa có cước</StatusBadge>
+                </span>
+              ) : (
+                money(r.shippingCost)
+              )}
+              {isZero(r.shippingCharged) ? null : (
+                <span className="text-xs text-muted-foreground">
+                  thu khách {formatMoney(r.shippingCharged)}
+                </span>
+              )}
+            </span>
+          );
+        },
+      },
+      {
+        id: 'netProfit',
+        header: 'Lãi sau VC',
+        meta: { align: 'right', width: 130 },
+        cell: ({ row }) => profitCell(row.original.netProfit),
+      },
+      {
         id: 'costStatus',
         header: 'Giá vốn',
         meta: { width: 120 },
-        cell: ({ row }) => <CostStatusBadge status={row.original.costStatus} />,
+        cell: ({ row }) =>
+          row.original.returned ? (
+            <span title="Hàng hoàn về — không tính doanh thu, giá vốn; vẫn chịu cước">
+              <StatusBadge tone="err">Hoàn hàng</StatusBadge>
+            </span>
+          ) : (
+            <CostStatusBadge status={row.original.costStatus} />
+          ),
       },
     ],
     [],
@@ -258,8 +300,8 @@ export function ProfitScreen() {
       { from, to },
       {
         onSuccess: (r) =>
-          toast.success('Đã chốt giá vốn cho đơn cũ', {
-            description: `Quét ${r.scanned} đơn · chốt ${r.costed} đơn đã đóng gói`,
+          toast.success('Đã chốt số liệu cho đơn cũ', {
+            description: `Quét ${r.scanned} đơn · chốt giá vốn ${r.costed} đơn · cập nhật cước ${r.shippingRefreshed} đơn`,
           }),
         onError: (err) => toast.error(messageFor(err)),
       },
@@ -268,16 +310,16 @@ export function ProfitScreen() {
   return (
     <div className="flex flex-col gap-3">
       <PageHeader
-        title="Lợi nhuận gộp"
-        description={`Doanh thu − giá vốn FIFO theo từng lô nhập · đơn đã chốt · ${rangeLabel}`}
-        breadcrumb={[{ label: 'Tài chính' }, { label: 'Lợi nhuận gộp' }]}
+        title="Lợi nhuận"
+        description={`Doanh thu − giá vốn FIFO theo từng lô nhập − cước vận chuyển · đơn đã chốt · ${rangeLabel}`}
+        breadcrumb={[{ label: 'Tài chính' }, { label: 'Lợi nhuận' }]}
         actions={
           <Button
             variant="outline"
             size="sm"
             onClick={runBackfill}
             disabled={backfill.isPending}
-            title="Đơn đã đóng gói trước khi có báo cáo này chưa có giá vốn chốt — chạy một lần cho khoảng ngày đang xem"
+            title="Đơn đóng gói / giao trước khi có báo cáo này chưa có giá vốn, cước, trạng thái hoàn — chạy một lần cho khoảng ngày đang xem"
           >
             {backfill.isPending ? 'Đang chốt…' : 'Chốt giá vốn đơn cũ'}
           </Button>
@@ -359,7 +401,7 @@ export function ProfitScreen() {
 
       <QueryState
         query={query}
-        skeleton={<ListSkeleton rows={8} columns={8} />}
+        skeleton={<ListSkeleton rows={8} columns={10} />}
         isEmpty={(d) => d.summary.orderCount === 0}
         empty={
           <EmptyState
@@ -375,7 +417,7 @@ export function ProfitScreen() {
       >
         {(data) => (
           <>
-            <div className="grid grid-cols-2 gap-2 md:grid-cols-3 xl:grid-cols-5">
+            <div className="grid grid-cols-2 gap-2 md:grid-cols-3 xl:grid-cols-6">
               <KpiCard
                 label="Doanh thu"
                 value={formatMoney(data.summary.revenue)}
@@ -389,7 +431,7 @@ export function ProfitScreen() {
               <KpiCard
                 label="Lãi gộp"
                 value={formatMoney(data.summary.grossProfit)}
-                detail="Doanh thu − giá vốn (chưa trừ phí ship, thuế)"
+                detail="Doanh thu − giá vốn"
               />
               <KpiCard
                 label="% lãi gộp"
@@ -397,20 +439,50 @@ export function ProfitScreen() {
                 detail="trên doanh thu"
               />
               <KpiCard
-                label="SKU thiếu giá vốn"
-                value={data.summary.missingCostSkuCount}
+                label="Cước vận chuyển"
+                value={formatMoney(data.summary.shippingCost)}
                 detail={
-                  data.summary.missingCostSkuCount > 0
-                    ? 'Chưa từng nhập kho — lãi đang tính cao hơn thực tế'
-                    : 'Mọi SKU đều có giá nhập'
+                  data.summary.shippingCostMissingCount > 0
+                    ? `Thu khách ${formatMoney(data.summary.shippingCharged)} · ${data.summary.shippingCostMissingCount} đơn chưa có cước`
+                    : `Thu khách ${formatMoney(data.summary.shippingCharged)}`
                 }
               />
+              <KpiCard
+                label="Lãi sau vận chuyển"
+                value={
+                  <span className={cn(negative(data.summary.netProfit) && 'text-destructive')}>
+                    {formatMoney(data.summary.netProfit)}
+                  </span>
+                }
+                detail={`${pct(data.summary.netMarginPct)} · lãi gộp + phí ship thu − cước`}
+              />
             </div>
+            <ul className="flex flex-col gap-0.5 text-xs text-muted-foreground">
+              {data.summary.returnedOrderCount > 0 ? (
+                <li>
+                  <span className="font-semibold text-foreground">
+                    {data.summary.returnedOrderCount} đơn hoàn
+                  </span>{' '}
+                  — đã loại {formatMoney(data.summary.returnedRevenue)} doanh thu và{' '}
+                  {formatMoney(data.summary.returnedCogs)} giá vốn (hàng về kho); cước vẫn tính.
+                </li>
+              ) : null}
+              <li>
+                Thuế trên đơn {formatMoney(data.summary.taxAmount)} — tiền thu hộ, không tính vào
+                doanh thu và lợi nhuận.
+              </li>
+              {data.summary.missingCostSkuCount > 0 ? (
+                <li className="text-destructive">
+                  {data.summary.missingCostSkuCount} SKU chưa từng nhập kho — giá vốn phần đó tính
+                  0, lãi đang cao hơn thực tế.
+                </li>
+              ) : null}
+            </ul>
             {view === 'sku' ? (
               <>
                 <p className="text-xs text-muted-foreground">
-                  Doanh thu theo SKU là thành tiền dòng, chưa trừ khuyến mãi cấp đơn (không phân bổ
-                  được về từng SKU).
+                  Doanh thu theo SKU là thành tiền dòng, chưa trừ khuyến mãi cấp đơn; không gồm đơn
+                  hoàn. Phí ship, cước, thuế là cấp đơn nên không phân bổ về từng SKU.
                 </p>
                 <DataTable
                   columns={skuColumns}

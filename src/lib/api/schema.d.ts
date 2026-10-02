@@ -4280,8 +4280,6 @@ export interface components {
             /** @description ĐVT lưu kho — mọi tồn quy về đây. */
             baseUomId: string;
             isActive: boolean;
-            /** @description Giá nhập THAM KHẢO Decimal(18,4) chuỗi — giá vốn thật vẫn FIFO (bất biến 11). */
-            purchasePrice: string | null;
             /** @description Decimal(12,4) kg dạng chuỗi — form hiển thị theo gram. */
             weightKg: string | null;
             /** @description null = không tổ hợp thuộc tính (sản phẩm đơn). */
@@ -4479,8 +4477,12 @@ export interface components {
             shelfLifeDays?: number;
             /** @description Attribute value SINH BIẾN THỂ (isVariant=true) — service tính variantKey chống trùng tổ hợp. */
             attributeValueIds?: string[];
-            /** @description Giá nhập tham khảo Decimal(18,4) chuỗi — cũng là unitCost của tồn đầu kỳ. */
-            purchasePrice?: string;
+            /**
+             * @description Đơn giá vốn / ĐVT cơ sở của tồn đầu kỳ, Decimal(18,4) chuỗi — bắt buộc khi có `openingQty`,
+             *     chỉ để ghi lô giá OPENING, không lưu lên SKU. Giá nhập không còn là thuộc tính SKU
+             *     (2026-10-01): mỗi phiếu nhập kho tạo lô giá riêng.
+             */
+            openingUnitCost?: string;
             /** @description Giá bán Decimal(18,4) chuỗi → ghi vào BẢNG GIÁ MẶC ĐỊNH (bất biến 12), không nằm trên Sku. */
             salePrice?: string;
             /** @description Tồn đầu kỳ (ĐVT cơ sở) — ghi movement OPENING + CostLayer vào kho mặc định của sản phẩm. */
@@ -4555,8 +4557,6 @@ export interface components {
             /** @description ĐVT lưu kho — mọi tồn quy về đây. */
             baseUomId: string;
             isActive: boolean;
-            /** @description Giá nhập THAM KHẢO Decimal(18,4) chuỗi — giá vốn thật vẫn FIFO (bất biến 11). */
-            purchasePrice: string | null;
             /** @description Decimal(12,4) kg dạng chuỗi — form hiển thị theo gram. */
             weightKg: string | null;
             /** @description null = không tổ hợp thuộc tính (sản phẩm đơn). */
@@ -4602,7 +4602,6 @@ export interface components {
             /** @description Optimistic locking bắt buộc — cùng cơ chế UpdateProductDto. */
             version: number;
             name?: string;
-            purchasePrice?: string;
             /** @description Giá bán → upsert vào bảng giá mặc định. */
             salePrice?: string;
             weightKg?: string;
@@ -4627,8 +4626,6 @@ export interface components {
             /** @description ĐVT lưu kho — mọi tồn quy về đây. */
             baseUomId: string;
             isActive: boolean;
-            /** @description Giá nhập THAM KHẢO Decimal(18,4) chuỗi — giá vốn thật vẫn FIFO (bất biến 11). */
-            purchasePrice: string | null;
             /** @description Decimal(12,4) kg dạng chuỗi — form hiển thị theo gram. */
             weightKg: string | null;
             /** @description null = không tổ hợp thuộc tính (sản phẩm đơn). */
@@ -7243,20 +7240,42 @@ export interface components {
         };
         ProfitSummaryDto: {
             orderCount: number;
-            /** @description Σ thành tiền dòng (đã trừ chiết khấu dòng). */
+            /** @description Σ thành tiền dòng (đã trừ chiết khấu dòng) — mọi đơn, kể cả đơn hoàn. */
             goodsRevenue: string;
-            /** @description Σ giảm trừ khuyến mãi cấp đơn. */
+            /** @description Σ giảm trừ khuyến mãi cấp đơn — mọi đơn, kể cả đơn hoàn. */
             orderDiscount: string;
-            /** @description goodsRevenue − orderDiscount (không gồm phí ship, thuế). */
+            /** @description Số đơn hoàn trong khoảng. */
+            returnedOrderCount: number;
+            /** @description Tiền hàng (sau khuyến mãi đơn) của đơn hoàn — đã loại khỏi `revenue`. */
+            returnedRevenue: string;
+            /** @description Giá vốn của đơn hoàn — đã loại khỏi `cogs` (hàng quay về kho). */
+            returnedCogs: string;
+            /** @description goodsRevenue − orderDiscount − returnedRevenue. Không gồm phí ship, thuế. */
             revenue: string;
-            /** @description Giá vốn FIFO đã chốt lúc đóng gói. */
+            /** @description Giá vốn FIFO đã chốt lúc đóng gói (không gồm đơn hoàn). */
             actualCogs: string;
             /** @description Giá vốn tạm tính cho dòng chưa đóng gói. */
             estimatedCogs: string;
             /** @description actualCogs + estimatedCogs. */
             cogs: string;
+            /** @description revenue − cogs. */
             grossProfit: string;
             marginPct: string | null;
+            /** @description Σ phí ship THU KHÁCH (SalesOrder.shippingFee) của đơn không hoàn. */
+            shippingCharged: string;
+            /** @description Σ cước hãng vận chuyển (cước + phụ phí + phí COD) — mọi đơn đã có phiếu giao, kể cả hoàn. */
+            shippingCost: string;
+            /** @description Số đơn có phiếu đã rời kho mà hãng chưa báo cước → `shippingCost` đang thiếu. */
+            shippingCostMissingCount: number;
+            /**
+             * @description Σ thuế trên đơn (SalesOrder.taxAmount) của đơn không hoàn — tiền THU HỘ nhà nước, không phải
+             *     doanh thu nên không vào lợi nhuận; hiện để đối chiếu với tiền thu khách.
+             */
+            taxAmount: string;
+            /** @description grossProfit + shippingCharged − shippingCost. */
+            netProfit: string;
+            /** @description netProfit / (revenue + shippingCharged). */
+            netMarginPct: string | null;
             /** @description Số SKU (trong các dòng chưa đóng gói) chưa có lô giá nào — giá vốn của chúng tính 0. */
             missingCostSkuCount: number;
         };
@@ -7269,12 +7288,24 @@ export interface components {
             status: "APPROVED" | "POSTED";
             customerCode: string;
             customerName: string;
+            /** @description Đơn hoàn: revenue / cogs / grossProfit / shippingCharged / taxAmount = 0, chỉ còn cước. */
+            returned: boolean;
             revenue: string;
             cogs: string;
             grossProfit: string;
             marginPct: string | null;
             /** @enum {string} */
             costStatus: "ACTUAL" | "ESTIMATED" | "MISSING";
+            /** @description Phí ship thu khách. */
+            shippingCharged: string;
+            /** @description Cước hãng (0 khi chưa có phiếu giao). */
+            shippingCost: string;
+            /** @description Phiếu đã rời kho mà hãng chưa báo cước. */
+            shippingCostMissing: boolean;
+            /** @description Thuế trên đơn — không vào lợi nhuận. */
+            taxAmount: string;
+            /** @description grossProfit + shippingCharged − shippingCost. */
+            netProfit: string;
         };
         ProfitSkuRowDto: {
             skuId: string;
@@ -7282,7 +7313,10 @@ export interface components {
             skuName: string;
             /** @description Số lượng bán theo đơn vị cơ sở — Decimal(18,6). */
             qtyBase: string;
-            /** @description Σ thành tiền dòng — CHƯA trừ khuyến mãi cấp đơn (không phân bổ được về SKU). */
+            /**
+             * @description Σ thành tiền dòng — CHƯA trừ khuyến mãi cấp đơn (không phân bổ được về SKU). Không gồm đơn
+             *     hoàn; phí ship / cước / thuế là cấp đơn nên không có ở góc nhìn SKU.
+             */
             revenue: string;
             cogs: string;
             grossProfit: string;
@@ -7314,6 +7348,8 @@ export interface components {
             scanned: number;
             /** @description Số đơn đã chốt giá vốn lần này. */
             costed: number;
+            /** @description Số đơn đã ghi lại cước vận chuyển + trạng thái hoàn. */
+            shippingRefreshed: number;
         };
         TransferListRowDto: {
             id: string;

@@ -25,8 +25,25 @@ const SUMMARY: ProfitReport['summary'] = {
   cogs: '320000.0000',
   grossProfit: '380000.0000',
   marginPct: '54.29',
+  returnedOrderCount: 1,
+  returnedRevenue: '100000.0000',
+  returnedCogs: '50000.0000',
+  shippingCharged: '25000.0000',
+  shippingCost: '35000.0000',
+  shippingCostMissingCount: 0,
+  taxAmount: '10000.0000',
+  netProfit: '370000.0000',
+  netMarginPct: '51.03',
   missingCostSkuCount: 0,
 };
+
+const ORDER_EXTRA = {
+  returned: false,
+  shippingCharged: '0.0000',
+  shippingCost: '0.0000',
+  shippingCostMissing: false,
+  taxAmount: '0.0000',
+} as const;
 
 /** Đúng shape `ProfitReportDto` (GET /reports/profit). */
 const BY_ORDER: ProfitReport = {
@@ -47,6 +64,10 @@ const BY_ORDER: ProfitReport = {
       grossProfit: '280000.0000',
       marginPct: '56.00',
       costStatus: 'ACTUAL',
+      ...ORDER_EXTRA,
+      shippingCharged: '25000.0000',
+      shippingCost: '30000.0000',
+      netProfit: '275000.0000',
     },
     {
       orderId: 'o-2',
@@ -60,10 +81,30 @@ const BY_ORDER: ProfitReport = {
       grossProfit: '-50000.0000',
       marginPct: '-25.00',
       costStatus: 'ESTIMATED',
+      ...ORDER_EXTRA,
+      shippingCostMissing: true,
+      netProfit: '-50000.0000',
+    },
+    {
+      orderId: 'o-3',
+      docNumber: 'SO2610-00003',
+      orderDate: '2026-10-01T05:00:00.000Z',
+      status: 'APPROVED',
+      customerCode: 'KH01',
+      customerName: 'Đại lý Hưng Phát',
+      revenue: '0.0000',
+      cogs: '0.0000',
+      grossProfit: '0.0000',
+      marginPct: null,
+      costStatus: 'ACTUAL',
+      ...ORDER_EXTRA,
+      returned: true,
+      shippingCost: '5000.0000',
+      netProfit: '-5000.0000',
     },
   ],
   skus: [],
-  total: 2,
+  total: 3,
 };
 
 describe('ProfitScreen — GET /reports/profit', () => {
@@ -86,6 +127,25 @@ describe('ProfitScreen — GET /reports/profit', () => {
     expect(within(lossRow).getByText('-25,00%')).toBeInTheDocument();
     const okRow = screen.getByText('SO2610-00001').closest('tr')!;
     expect(within(okRow).getByText('Đã chốt')).toBeInTheDocument();
+  });
+
+  it('cước, phí ship thu khách, thuế, đơn hoàn: KPI lãi sau vận chuyển + nhãn trên dòng', async () => {
+    search = 'from=2026-10-01&to=2026-10-01';
+    server.use(http.get('/api/reports/profit', () => HttpResponse.json(BY_ORDER)));
+    renderApp(<ProfitScreen />);
+    await screen.findByText('SO2610-00001');
+    expect(screen.getByText('Lãi sau vận chuyển')).toBeInTheDocument();
+    expect(screen.getByText(/51,03%/)).toBeInTheDocument();
+    expect(screen.getByText('1 đơn hoàn')).toBeInTheDocument();
+    expect(screen.getByText(/Thuế trên đơn/)).toBeInTheDocument();
+
+    const shipped = screen.getByText('SO2610-00001').closest('tr')!;
+    expect(within(shipped).getByText(/thu khách/)).toBeInTheDocument();
+    const noFee = screen.getByText('SO2610-00002').closest('tr')!;
+    expect(within(noFee).getByText('Chưa có cước')).toBeInTheDocument();
+    const returned = screen.getByText('SO2610-00003').closest('tr')!;
+    expect(within(returned).getByText('Hoàn hàng')).toBeInTheDocument();
+    expect(within(returned).queryByText('Đã chốt')).not.toBeInTheDocument();
   });
 
   it('theo SKU: gửi groupBy=sku, hiện giá vốn bình quân', async () => {
@@ -146,7 +206,7 @@ describe('ProfitScreen — GET /reports/profit', () => {
       http.get('/api/reports/profit', () => HttpResponse.json(BY_ORDER)),
       http.post('/api/reports/profit/backfill', async ({ request }) => {
         bodies.push(await request.json());
-        return HttpResponse.json({ scanned: 10, costed: 8 });
+        return HttpResponse.json({ scanned: 10, costed: 8, shippingRefreshed: 6 });
       }),
     );
     renderApp(<ProfitScreen />);

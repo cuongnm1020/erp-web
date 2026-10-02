@@ -36,7 +36,6 @@ const SKU_BLUE = {
   shelfLifeDays: null,
   taxRateId: null,
   images: [],
-  purchasePrice: null,
   salePrice: '4000.0000',
   weightKg: null,
   variantKey: 'blue',
