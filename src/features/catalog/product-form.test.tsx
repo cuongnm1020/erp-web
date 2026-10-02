@@ -26,7 +26,7 @@ vi.mock('next/navigation', () => ({
 const UOMS = [
   { id: 'u-pcs', code: 'PCS', name: 'Cái', decimals: 0 },
   { id: 'u-box', code: 'BOX', name: 'Thùng', decimals: 0 },
-  { id: 'u-plt', code: 'PLT', name: 'Pallet', decimals: 0 },
+  { id: 'u-plt', code: 'PALLET', name: 'Pallet', decimals: 0 },
 ];
 
 const CONTAINER_TYPES = [
@@ -82,9 +82,9 @@ describe('ProductFormScreen — tạo (design/Products/ProductForm)', () => {
     }
     expect(screen.getByLabelText('Cân nặng (g)')).toBeInTheDocument();
     // Quy cách nhập kho cấp sản phẩm (§12): thùng luôn chọn được; pallet khoá tới khi khai thùng.
-    expect(screen.getByRole('combobox', { name: 'ĐVT thùng' })).toBeInTheDocument();
-    expect(screen.getByRole('combobox', { name: 'ĐVT pallet' })).toBeDisabled();
-    expect(screen.getByText('Khai thùng trước')).toBeInTheDocument();
+    expect(screen.getByRole('combobox', { name: 'Nhập theo thùng' })).toBeInTheDocument();
+    expect(screen.getByRole('combobox', { name: 'Nhập theo pallet' })).toBeDisabled();
+    expect(screen.getByText('Có thùng mới có pallet')).toBeInTheDocument();
     // 2026-10-01: không còn giá nhập / tồn đầu kỳ / ĐVT bán mặc định trên form sản phẩm
     for (const label of ['Giá nhập', 'Tồn đầu kỳ', 'ĐVT bán mặc định']) {
       expect(screen.queryByLabelText(label)).not.toBeInTheDocument();
@@ -160,25 +160,27 @@ describe('ProductFormScreen — tạo (design/Products/ProductForm)', () => {
     fill('Tên thương mại *', 'Bút bi TL-08');
     // Chưa chọn ĐVT thùng → số lượng / barcode thùng bị khoá, pallet bị khoá
     expect(screen.getByLabelText('Số PCS trong 1 thùng')).toBeDisabled();
-    expect(screen.getByRole('combobox', { name: 'ĐVT pallet' })).toBeDisabled();
-    fireEvent.click(screen.getByRole('combobox', { name: 'ĐVT thùng' }));
-    fireEvent.click(await screen.findByRole('option', { name: 'BOX — Thùng' }));
+    expect(screen.getByRole('combobox', { name: 'Nhập theo pallet' })).toBeDisabled();
+    fireEvent.click(screen.getByRole('combobox', { name: 'Nhập theo thùng' }));
+    fireEvent.click(await screen.findByRole('option', { name: 'Có' }));
     fill('Số PCS trong 1 thùng', '10');
-    expect(screen.getByText('1 BOX = ? PCS')).toBeInTheDocument();
-    fill('Barcode BOX', '8930000000012');
+    expect(screen.getByText('1 thùng = ? PCS')).toBeInTheDocument();
+    fill('Barcode thùng', '8930000000012');
     // Có thùng → chọn được pallet; số thùng / pallet nhập theo chuỗi, form tự nhân ra ĐVT cơ sở
-    await waitFor(() => expect(screen.getByRole('combobox', { name: 'ĐVT pallet' })).toBeEnabled());
-    fireEvent.click(screen.getByRole('combobox', { name: 'ĐVT pallet' }));
-    fireEvent.click(await screen.findByRole('option', { name: 'PLT — Pallet' }));
+    await waitFor(() =>
+      expect(screen.getByRole('combobox', { name: 'Nhập theo pallet' })).toBeEnabled(),
+    );
+    fireEvent.click(screen.getByRole('combobox', { name: 'Nhập theo pallet' }));
+    fireEvent.click(await screen.findByRole('option', { name: 'Có' }));
     fill('Số thùng trong 1 pallet', '5');
-    expect(screen.getByText('1 PLT = ? BOX = 50 PCS')).toBeInTheDocument();
+    expect(screen.getByText('1 pallet = ? thùng = 50 PCS')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: /Lưu sản phẩm/ }));
     await waitFor(() => expect(skuBodies).toHaveLength(1));
     expect(skuBodies[0]).toEqual({
       baseUom: 'PCS',
       conversions: [
         { uom: 'BOX', factor: '10', containerType: 'CARTON' },
-        { uom: 'PLT', factor: '50', containerType: 'PALLET' },
+        { uom: 'PALLET', factor: '50', containerType: 'PALLET' },
       ],
       barcodes: [{ code: '8930000000012', uom: 'BOX' }],
     });
@@ -195,12 +197,14 @@ describe('ProductFormScreen — tạo (design/Products/ProductForm)', () => {
     );
     renderApp(<ProductFormScreen />);
     fill('Tên thương mại *', 'Bút bi TL-08');
-    fireEvent.click(screen.getByRole('combobox', { name: 'ĐVT thùng' }));
-    fireEvent.click(await screen.findByRole('option', { name: 'BOX — Thùng' }));
+    fireEvent.click(screen.getByRole('combobox', { name: 'Nhập theo thùng' }));
+    fireEvent.click(await screen.findByRole('option', { name: 'Có' }));
     fill('Số PCS trong 1 thùng', '2.5');
-    await waitFor(() => expect(screen.getByRole('combobox', { name: 'ĐVT pallet' })).toBeEnabled());
-    fireEvent.click(screen.getByRole('combobox', { name: 'ĐVT pallet' }));
-    fireEvent.click(await screen.findByRole('option', { name: 'PLT — Pallet' }));
+    await waitFor(() =>
+      expect(screen.getByRole('combobox', { name: 'Nhập theo pallet' })).toBeEnabled(),
+    );
+    fireEvent.click(screen.getByRole('combobox', { name: 'Nhập theo pallet' }));
+    fireEvent.click(await screen.findByRole('option', { name: 'Có' }));
     fill('Số thùng trong 1 pallet', '1');
     fireEvent.click(screen.getByRole('button', { name: /Lưu sản phẩm/ }));
     expect(
@@ -430,19 +434,19 @@ describe('ProductFormScreen — tạo (design/Products/ProductForm)', () => {
     );
     renderApp(<ProductFormScreen />);
     fill('Tên thương mại *', 'Vua Bật Chồi');
-    fireEvent.click(screen.getByRole('combobox', { name: 'ĐVT thùng' }));
-    fireEvent.click(await screen.findByRole('option', { name: 'BOX — Thùng' }));
+    fireEvent.click(screen.getByRole('combobox', { name: 'Nhập theo thùng' }));
+    fireEvent.click(await screen.findByRole('option', { name: 'Có' }));
     fill('Số PCS trong 1 thùng', '10');
     fireEvent.click(screen.getByRole('checkbox', { name: /Có nhiều biến thể/ }));
     fireEvent.click(await screen.findByRole('button', { name: 'Thêm biến thể' }));
     const names = screen.getAllByLabelText('Tên biến thể');
     fireEvent.change(names[0]!, { target: { value: 'Gói 40gr' } });
     fireEvent.change(names[1]!, { target: { value: 'Gói 100gr' } });
-    expect(screen.getAllByText('Theo sản phẩm: 1 BOX = 10 PCS')).toHaveLength(2);
+    expect(screen.getAllByText('Theo sản phẩm: 1 thùng = 10 PCS')).toHaveLength(2);
     // Dòng 2 khai riêng: 1 BOX = 12 PCS
     fireEvent.click(screen.getAllByRole('checkbox', { name: 'Quy cách riêng' })[1]!);
-    fireEvent.click(await screen.findByRole('combobox', { name: 'ĐVT thùng riêng' }));
-    fireEvent.click(await screen.findByRole('option', { name: 'BOX — Thùng' }));
+    fireEvent.click(await screen.findByRole('combobox', { name: 'Nhập theo thùng (riêng)' }));
+    fireEvent.click(await screen.findByRole('option', { name: 'Có' }));
     const perInputs = screen.getAllByLabelText('Số PCS trong 1 thùng');
     fireEvent.change(perInputs[1]!, { target: { value: '12' } });
     fireEvent.click(screen.getByRole('button', { name: /Lưu sản phẩm/ }));

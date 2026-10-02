@@ -241,6 +241,9 @@ export const EMPTY_SKU_ROW: SkuRowValues = {
 };
 
 /** Loại thùng gửi API cho hai cấp đóng gói của form (mã trong `/container-types`). */
+/** ĐVT cố định của cấp thùng / pallet khi khai quy cách trên form (seed + migration api đảm bảo có). */
+export const PACK_CARTON_UOM = 'BOX';
+export const PACK_PALLET_UOM = 'PALLET';
 export const CARTON_TYPE = 'CARTON';
 export const PALLET_TYPE = 'PALLET';
 
