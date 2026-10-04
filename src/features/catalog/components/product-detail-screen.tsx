@@ -1,12 +1,15 @@
 'use client';
 
-import { Printer } from 'lucide-react';
+import Decimal from 'decimal.js';
+import { Printer, ScanBarcode } from 'lucide-react';
 import Link from 'next/link';
-import { useState } from 'react';
+import { Fragment, useState } from 'react';
+import { Barcode } from '@/components/data/barcode';
 import { DetailSkeleton, EmptyState, ListSkeleton, QueryState } from '@/components/data/states';
 import { PageHeader } from '@/components/layout/page-header';
 import { StatusBadge } from '@/components/data/status-badge';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import {
   Select,
   SelectContent,
@@ -15,6 +18,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
+import { toast } from '@/components/ui/toaster';
 import {
   Table,
   TableBody,
@@ -24,9 +28,11 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { cn } from '@/lib/cn';
+import { messageFor } from '@/lib/error-messages';
 import { formatDate, formatDateTime, formatMoney, formatQuantity } from '@/lib/format';
 import { Can } from '@/lib/permission';
 import {
+  useAddBarcode,
   useContainerTypes,
   useProduct,
   useWarehouses,
@@ -183,7 +189,7 @@ function DetailBody({ product }: { product: ProductDetail }) {
           <div className="overflow-x-auto">
             {tab === 'info' ? <InfoTab product={product} /> : null}
             {tab === 'variants' ? <VariantsTab skus={skus} /> : null}
-            {tab === 'barcodes' ? <BarcodesTab skus={skus} /> : null}
+            {tab === 'barcodes' ? <BarcodesTab product={product} skus={skus} /> : null}
             {tab === 'units' ? <UnitsTab skus={skus} /> : null}
             {tab === 'stock' ? (
               <StockTab
@@ -384,50 +390,239 @@ function VariantsTab({ skus }: { skus: Sku[] }) {
   );
 }
 
-function BarcodesTab({ skus }: { skus: Sku[] }) {
-  const rows = skus.flatMap((s) => s.barcodes.map((b) => ({ sku: s, b })));
-  if (rows.length === 0) {
-    return (
-      <EmptyState
-        className="m-3"
-        title="Chưa có barcode"
-        description="Thêm barcode cho từng biến thể ở màn Sửa sản phẩm — máy quét PDA và ô tìm sản phẩm ăn theo các mã này."
-      />
-    );
-  }
+/** Một cấp đóng gói của SKU trong tab Barcode — ĐVT cơ sở, thùng, pallet hoặc ĐVT phụ thường. */
+interface BarcodeLevel {
+  key: string;
+  label: string;
+  /** Mã ĐVT gửi API khi thêm barcode — undefined = ĐVT cơ sở. */
+  uomCode: string | undefined;
+  uomId: string;
+  /** "= 24 cái" — trống với ĐVT cơ sở. */
+  hint: string;
+}
+
+/**
+ * Cấp hiển thị của một SKU: sản phẩm (ĐVT cơ sở) → thùng / pallet (quy đổi là cấp đóng gói,
+ * theo factor tăng dần) → ĐVT phụ thường còn barcode. Tên cấp lấy từ danh mục loại thùng.
+ */
+function barcodeLevels(sku: Sku, typeNameById: ReadonlyMap<string, string>): BarcodeLevel[] {
+  const convs = [...sku.uomConversions].sort((a, b) =>
+    new Decimal(a.factor).comparedTo(new Decimal(b.factor)),
+  );
+  const hint = (factor: string) => `= ${formatQuantity(factor)} ${sku.baseUom.code}`;
+  return [
+    {
+      key: sku.baseUomId,
+      label: 'Sản phẩm',
+      uomCode: undefined,
+      uomId: sku.baseUomId,
+      hint: '',
+    },
+    ...convs
+      .filter((c) => c.containerTypeId !== null)
+      .map((c) => ({
+        key: c.uomId,
+        label: typeNameById.get(c.containerTypeId!) ?? 'Thùng',
+        uomCode: c.uom.code,
+        uomId: c.uomId,
+        hint: hint(c.factor),
+      })),
+    ...convs
+      .filter((c) => c.containerTypeId === null && sku.barcodes.some((b) => b.uomId === c.uomId))
+      .map((c) => ({
+        key: c.uomId,
+        label: 'ĐVT phụ',
+        uomCode: c.uom.code,
+        uomId: c.uomId,
+        hint: hint(c.factor),
+      })),
+  ];
+}
+
+/** Mã do nhà sản xuất in sẵn: 13 số → EAN13 (ký hiệu thật kiểm check digit lúc render), còn lại CODE128. */
+function barcodeTypeOf(code: string): 'EAN13' | 'CODE128' {
+  return /^\d{13}$/.test(code) ? 'EAN13' : 'CODE128';
+}
+
+const BARCODE_RE = /^[A-Za-z0-9-]{4,64}$/;
+
+function BarcodesTab({ product, skus }: { product: ProductDetail; skus: Sku[] }) {
+  const types = useContainerTypes();
+  const typeNameById = new Map((types.data ?? []).map((t) => [t.id, t.name]));
+  const total = skus.reduce((n, s) => n + s.barcodes.length, 0);
   return (
     <>
       <div className="border-b px-3 py-2 text-sm text-muted-foreground">
-        {rows.length} barcode. Ô tìm sản phẩm ở màn tạo đơn và máy quét PDA nhận mọi mã bên dưới.
+        {total} barcode. Máy quét PDA, ô quét ở phiếu nhập kho và ô tìm sản phẩm nhận mọi mã bên
+        dưới — mã dán sẵn trên sản phẩm / thùng / pallet của nhà sản xuất khai ở ô quét từng cấp.
       </div>
       <Table>
         <TableHeader>
           <TableRow className="bg-muted hover:bg-muted">
-            <TableHead className={cn(HEAD, 'w-48')}>Barcode</TableHead>
-            <TableHead className={cn(HEAD, 'w-28')}>Loại</TableHead>
-            <TableHead className={cn(HEAD, 'w-32')}>ĐVT gắn</TableHead>
-            <TableHead className={HEAD}>SKU</TableHead>
+            <TableHead className={cn(HEAD, 'w-36')}>Cấp</TableHead>
+            <TableHead className={HEAD}>Barcode</TableHead>
+            <TableHead className={cn(HEAD, 'w-24')}>Loại</TableHead>
+            <TableHead className={cn(HEAD, 'w-24 text-right')}>In tem</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
-          {rows.map(({ sku, b }) => (
-            <TableRow key={b.id}>
-              <TableCell className="px-2.5 py-1.5 font-mono text-xs font-semibold">
-                {b.code}
-              </TableCell>
-              <TableCell className="px-2.5 py-1.5">
-                <StatusBadge tone="neutral">{b.type}</StatusBadge>
-              </TableCell>
-              <TableCell className="px-2.5 py-1.5">{b.uom.code}</TableCell>
-              <TableCell className="px-2.5 py-1.5 font-mono text-xs">{sku.code}</TableCell>
-            </TableRow>
+          {skus.map((sku) => (
+            <SkuBarcodeRows
+              key={sku.id}
+              product={product}
+              sku={sku}
+              showSkuHeader={skus.length > 1}
+              levels={barcodeLevels(sku, typeNameById)}
+            />
           ))}
         </TableBody>
       </Table>
       <div className="border-t px-3 py-2 text-xs text-muted-foreground">
-        Mã duy nhất toàn hệ thống. Thêm / gỡ barcode ở màn Sửa sản phẩm.
+        Mã duy nhất toàn hệ thống. Thùng / pallet chỉ hiện khi đã khai quy cách ở màn Sửa sản phẩm.
       </div>
     </>
+  );
+}
+
+function SkuBarcodeRows({
+  product,
+  sku,
+  showSkuHeader,
+  levels,
+}: {
+  product: ProductDetail;
+  sku: Sku;
+  showSkuHeader: boolean;
+  levels: BarcodeLevel[];
+}) {
+  const printHref = (barcodeId: string) =>
+    `/catalog/barcode-print?productId=${product.id}&skuIds=${sku.id}&barcodeId=${barcodeId}`;
+  return (
+    <>
+      {showSkuHeader ? (
+        <TableRow className="bg-muted/50 hover:bg-muted/50">
+          <TableCell colSpan={4} className="px-2.5 py-1 font-mono text-xs font-semibold">
+            {sku.code} — {sku.name}
+          </TableCell>
+        </TableRow>
+      ) : null}
+      {levels.map((level) => {
+        const codes = sku.barcodes.filter((b) => b.uomId === level.uomId);
+        return (
+          <Fragment key={level.key}>
+            {codes.map((b, i) => (
+              <TableRow key={b.id} data-barcode-row={b.code}>
+                <TableCell className="px-2.5 py-1.5 align-top">
+                  {i === 0 ? <LevelLabel level={level} /> : null}
+                </TableCell>
+                <TableCell className="px-2.5 py-1.5">
+                  <div className="flex flex-col items-start gap-0.5">
+                    <Barcode
+                      value={b.code}
+                      apiType={b.type}
+                      height={8}
+                      scale={1}
+                      showText={false}
+                      className="max-w-full"
+                    />
+                    <span className="font-mono text-xs font-semibold">{b.code}</span>
+                  </div>
+                </TableCell>
+                <TableCell className="px-2.5 py-1.5">
+                  <StatusBadge tone="neutral">{b.type}</StatusBadge>
+                </TableCell>
+                <TableCell className="px-2.5 py-1.5 text-right">
+                  <Button variant="outline" size="sm" asChild>
+                    <Link href={printHref(b.id)} aria-label={`In tem ${b.code}`}>
+                      <Printer /> In
+                    </Link>
+                  </Button>
+                </TableCell>
+              </TableRow>
+            ))}
+            <TableRow className="hover:bg-transparent">
+              <TableCell className="px-2.5 py-1.5 align-top">
+                {codes.length === 0 ? <LevelLabel level={level} /> : null}
+              </TableCell>
+              <TableCell colSpan={3} className="px-2.5 py-1.5">
+                {codes.length === 0 ? (
+                  <span className="mr-3 text-xs text-muted-foreground">chưa có barcode</span>
+                ) : null}
+                <Can I="update" a="Product">
+                  <AddBarcodeInput sku={sku} level={level} />
+                </Can>
+              </TableCell>
+            </TableRow>
+          </Fragment>
+        );
+      })}
+    </>
+  );
+}
+
+function LevelLabel({ level }: { level: BarcodeLevel }) {
+  return (
+    <div className="flex flex-col text-sm">
+      <span className="font-semibold">{level.label}</span>
+      <span className="text-xs text-muted-foreground">
+        {level.uomCode ?? 'ĐVT cơ sở'} {level.hint}
+      </span>
+    </div>
+  );
+}
+
+/**
+ * Ô quét / gõ mã nhà sản xuất dán sẵn cho một cấp (sản phẩm / thùng / pallet) — Enter = thêm.
+ * POST /skus/{id}/barcodes với ĐVT của cấp; mã trùng / sai định dạng báo lỗi, giữ chuỗi để sửa.
+ */
+function AddBarcodeInput({ sku, level }: { sku: Sku; level: BarcodeLevel }) {
+  const add = useAddBarcode();
+  const [code, setCode] = useState('');
+  const [error, setError] = useState<string | null>(null);
+  const submit = () => {
+    const v = code.trim();
+    if (!v || add.isPending) return;
+    if (!BARCODE_RE.test(v)) {
+      setError('Mã 4–64 ký tự, chỉ chữ, số và dấu gạch');
+      return;
+    }
+    setError(null);
+    add.mutate(
+      { skuId: sku.id, code: v, uom: level.uomCode, type: barcodeTypeOf(v) },
+      {
+        onSuccess: () => {
+          setCode('');
+          toast.success('Đã thêm barcode', { description: `${v} · ${level.label} ${sku.code}` });
+        },
+        onError: (err) => setError(messageFor(err)),
+      },
+    );
+  };
+  return (
+    <span className="inline-flex flex-col gap-0.5 align-middle">
+      <span className="relative inline-flex">
+        <ScanBarcode
+          aria-hidden
+          className="pointer-events-none absolute left-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground"
+        />
+        <Input
+          value={code}
+          onChange={(e) => setCode(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key !== 'Enter') return;
+            e.preventDefault();
+            submit();
+          }}
+          disabled={add.isPending}
+          placeholder="Quét mã NSX dán sẵn, Enter để thêm"
+          aria-label={`Thêm barcode ${level.label} ${sku.code}`}
+          autoComplete="off"
+          spellCheck={false}
+          className="h-8 w-72 pl-7 font-mono text-xs"
+        />
+      </span>
+      {error ? <span className="text-xs text-destructive">{error}</span> : null}
+    </span>
   );
 }
 

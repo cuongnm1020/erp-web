@@ -209,11 +209,21 @@ export function useDeleteImage() {
 export function useAddBarcode() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: ({ skuId, code, uom }: { skuId: string; code: string; uom?: string }) =>
+    mutationFn: ({
+      skuId,
+      code,
+      uom,
+      type,
+    }: {
+      skuId: string;
+      code: string;
+      uom?: string;
+      type?: components['schemas']['BarcodeDto']['type'];
+    }) =>
       unwrap(
         api.POST('/skus/{id}/barcodes', {
           params: { path: { id: skuId } },
-          body: { code, ...(uom ? { uom } : {}) },
+          body: { code, ...(uom ? { uom } : {}), ...(type ? { type } : {}) },
         }),
       ),
     onSuccess: () => {

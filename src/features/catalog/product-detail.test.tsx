@@ -47,7 +47,15 @@ const SKU_BLUE = {
     { id: uuid(11), code: '8935001234567', uomId: UOM_CAI.id, type: 'EAN13', uom: UOM_CAI },
     { id: uuid(12), code: 'THUNG-TL08-B', uomId: UOM_HOP.id, type: 'CODE128', uom: UOM_HOP },
   ],
-  uomConversions: [{ id: uuid(21), uomId: UOM_HOP.id, factor: '24.000000', uom: UOM_HOP }],
+  uomConversions: [
+    {
+      id: uuid(21),
+      uomId: UOM_HOP.id,
+      factor: '24.000000',
+      containerTypeId: uuid(701),
+      uom: UOM_HOP,
+    },
+  ],
   trackingMode: 'LOT',
   shelfLifeDays: null,
   taxRateId: null,
@@ -167,6 +175,11 @@ const handlers = [
     params.id === PRODUCT.id ? HttpResponse.json(PRODUCT) : new HttpResponse(null, { status: 404 }),
   ),
   http.get('/api/warehouses', () => HttpResponse.json([WAREHOUSE])),
+  http.get('/api/container-types', () =>
+    HttpResponse.json([
+      { id: uuid(701), code: 'CARTON', name: 'Thùng', sortOrder: 30, isActive: true },
+    ]),
+  ),
   http.get('/api/stock', ({ request }) => {
     stockCalls.push(new URL(request.url).searchParams);
     return HttpResponse.json(STOCK_SUMMARY);
@@ -247,17 +260,54 @@ describe('ProductDetailScreen — C-03 chi tiết sản phẩm (GET /products/:i
     expect(within(redRow).getByText('Ngừng bán')).toBeInTheDocument();
   });
 
-  it('tab Barcode: gộp mọi SKU, hiện loại mã và ĐVT gắn', async () => {
+  it('tab Barcode: theo cấp sản phẩm / thùng, mã vạch thật + nút In trỏ đúng mã', async () => {
     renderApp(<ProductDetailScreen productId={PRODUCT.id} />);
     await screen.findByText(PRODUCT.name);
     fireEvent.click(screen.getByRole('tab', { name: /Barcode/ }));
-    expect(screen.getByText(/2 barcode\./)).toBeInTheDocument();
-    const eanRow = screen.getByText('8935001234567').closest('tr')!;
+    expect(screen.getByText(/^2 barcode\./)).toBeInTheDocument();
+    const eanRow = document.querySelector('[data-barcode-row="8935001234567"]') as HTMLElement;
+    expect(within(eanRow).getByText('Sản phẩm')).toBeInTheDocument();
     expect(within(eanRow).getByText('EAN13')).toBeInTheDocument();
-    expect(within(eanRow).getByText('cái')).toBeInTheDocument();
-    const caseRow = screen.getByText('THUNG-TL08-B').closest('tr')!;
-    expect(within(caseRow).getByText('CODE128')).toBeInTheDocument();
-    expect(within(caseRow).getByText('hộp')).toBeInTheDocument();
+    expect(within(eanRow).getByRole('img', { name: 'Mã vạch 8935001234567' })).toBeInTheDocument();
+    // hộp là cấp đóng gói (containerTypeId) → tên loại thùng từ danh mục
+    const caseRow = document.querySelector('[data-barcode-row="THUNG-TL08-B"]') as HTMLElement;
+    expect(within(caseRow).getByText('Thùng')).toBeInTheDocument();
+    expect(within(caseRow).getByText('hộp = 24 cái')).toBeInTheDocument();
+    expect(within(caseRow).getByRole('link', { name: 'In tem THUNG-TL08-B' })).toHaveAttribute(
+      'href',
+      `/catalog/barcode-print?productId=${PRODUCT.id}&skuIds=${SKU_BLUE.id}&barcodeId=${uuid(12)}`,
+    );
+  });
+
+  it('tab Barcode: quét mã NSX vào ô của cấp thùng → POST /skus/:id/barcodes với ĐVT thùng, mã 13 số = EAN13', async () => {
+    const posts: Array<{ id: string; body: unknown }> = [];
+    server.use(
+      http.post('/api/skus/:id/barcodes', async ({ params, request }) => {
+        posts.push({ id: params.id as string, body: await request.json() });
+        return HttpResponse.json({}, { status: 201 });
+      }),
+    );
+    renderApp(<ProductDetailScreen productId={PRODUCT.id} />);
+    await screen.findByText(PRODUCT.name);
+    fireEvent.click(screen.getByRole('tab', { name: /Barcode/ }));
+    const input = screen.getByLabelText(`Thêm barcode Thùng ${SKU_BLUE.code}`);
+    fireEvent.change(input, { target: { value: 'ab' } });
+    fireEvent.keyDown(input, { key: 'Enter' });
+    expect(await screen.findByText('Mã 4–64 ký tự, chỉ chữ, số và dấu gạch')).toBeInTheDocument();
+    fireEvent.change(input, { target: { value: '18935001234564' } });
+    fireEvent.keyDown(input, { key: 'Enter' });
+    fireEvent.change(screen.getByLabelText(`Thêm barcode Sản phẩm ${SKU_RED.code}`), {
+      target: { value: '8935001234999' },
+    });
+    fireEvent.keyDown(screen.getByLabelText(`Thêm barcode Sản phẩm ${SKU_RED.code}`), {
+      key: 'Enter',
+    });
+    await waitFor(() => expect(posts).toHaveLength(2));
+    expect(posts[0]).toEqual({
+      id: SKU_BLUE.id,
+      body: { code: '18935001234564', uom: 'hộp', type: 'CODE128' },
+    });
+    expect(posts[1]).toEqual({ id: SKU_RED.id, body: { code: '8935001234999', type: 'EAN13' } });
   });
 
   it('tab Đơn vị & quy đổi: dòng cơ bản + dòng quy đổi 1 hộp = 24 cái, chip bán mặc định theo salesUomId', async () => {

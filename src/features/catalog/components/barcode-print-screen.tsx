@@ -38,7 +38,9 @@ import {
  * In tem SKU (PLAN-barcode-pick-pack hạng mục A2) — nối thật GET /products/{id}.
  *
  * Trạng thái trên URL (luật 8): `?productId=a,b` = các sản phẩm đưa vào danh sách,
- * `?skuIds=x,y` = chỉ chọn sẵn những SKU này (mặc định chọn mọi SKU đang bán).
+ * `?skuIds=x,y` = chỉ chọn sẵn những SKU này (mặc định chọn mọi SKU đang bán),
+ * `?barcodeId=b` = mã in chọn sẵn cho SKU sở hữu mã đó (nút "In" ở tab Barcode chi tiết sản phẩm —
+ * in tem thùng / pallet thay vì mã ĐVT cơ sở).
  * Mỗi dòng = một SKU: chọn mã in (mặc định mã của ĐVT cơ sở), số tem. Tem 50×30 mm,
  * 2 cột trên cuộn (quyết định 3); ký hiệu theo `Barcode.type`, EAN13 chỉ khi check digit
  * đúng (`symbologyFor`). In qua trình duyệt (`PrintSheet`) — không có agent máy in,
@@ -158,6 +160,7 @@ export function BarcodePrintScreen() {
   const search = useSearchParams();
   const productIds = useMemo(() => splitIds(search.get('productId')), [search]);
   const preselect = useMemo(() => new Set(splitIds(search.get('skuIds'))), [search]);
+  const preBarcodeId = search.get('barcodeId');
 
   const setProductIds = (ids: string[]) => {
     const params = new URLSearchParams(search);
@@ -176,7 +179,9 @@ export function BarcodePrintScreen() {
     selected:
       overrides[row.skuId]?.selected ??
       (preselect.size > 0 ? preselect.has(row.skuId) : row.isActive && row.barcodes.length > 0),
-    barcodeId: overrides[row.skuId]?.barcodeId ?? defaultBarcodeId(row),
+    barcodeId:
+      overrides[row.skuId]?.barcodeId ??
+      (row.barcodes.some((b) => b.id === preBarcodeId) ? preBarcodeId : defaultBarcodeId(row)),
     copies: overrides[row.skuId]?.copies ?? 1,
   });
   const patch = (skuId: string, p: Partial<RowState>) =>
