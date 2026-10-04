@@ -54,14 +54,19 @@ import {
 } from '../api/use-products';
 import {
   EMPTY_SKU_ROW,
+  effectivePack,
   existingCartonFactorOf,
+  PACK_CARTON_UOM,
+  PACK_PALLET_UOM,
   gramsToKg,
   kgToGrams,
   packagingBarcodes,
   packagingConversions,
   parseAliases,
   productFormSchema,
+  savedPackOf,
   type ProductFormValues,
+  type RowPack,
 } from '../schema';
 import { ImageDropzone, ProductGallery } from './product-images';
 import { UomManagerDialog } from './uom-manager-dialog';
@@ -71,7 +76,9 @@ import { UomManagerDialog } from './uom-manager-dialog';
  * nối API product mới (prompt-product-api 2026-09-02):
  * - Mã sản phẩm KHÔNG bắt buộc — bỏ trống backend tự sinh `{categoryCode|SP}-{seq}`;
  *   sửa được cả khi edit (server trả 409 nếu sản phẩm đã có chứng từ).
- * - Tên gọi khác (searchAliases): một ô, phân tách phẩy — ô tìm sản phẩm ăn các tên này.
+ * - Tên lên đơn Pancake (searchAliases): một ô, phân tách phẩy — ô tìm sản phẩm ăn các tên này.
+ * - Công dụng (= description, đẩy lên Pancake note_product) / Thành phần / Cách dùng / Lưu ý khi
+ *   lên đơn: textarea tự do. Khi sửa, ô xóa trắng gửi '' để xóa giá trị cũ.
  * - PATCH product/SKU bắt buộc `version` (optimistic locking) — 409 khi người khác vừa
  *   sửa: banner root.server + nút tải lại, KHÔNG retry tự động (luật 6).
  * Điểm LỆCH còn lại so với artboard (ghi ở thẻ PENDING_API):
@@ -115,6 +122,10 @@ function focusSkuRow(index: number) {
 }
 
 function initialValues(p?: ProductDetail): ProductFormValues {
+  // Quy cách cấp sản phẩm khi sửa = quy cách đã lưu của SKU đầu tiên có đóng gói.
+  const firstPack = (p?.skus ?? [])
+    .map((s) => savedPackOf(s.uomConversions))
+    .find((x) => x.cartonUom !== '');
   return {
     code: p?.code ?? '',
     name: p?.name ?? '',
@@ -126,6 +137,9 @@ function initialValues(p?: ProductDetail): ProductFormValues {
     shelfLifeDays: p?.shelfLifeDays == null ? '' : String(p.shelfLifeDays),
     defaultWarehouseId: p?.defaultWarehouseId ?? '',
     description: p?.description ?? '',
+    ingredients: p?.ingredients ?? '',
+    usageInstructions: p?.usageInstructions ?? '',
+    orderNote: p?.orderNote ?? '',
     internalNote: p?.internalNote ?? '',
     searchAliases: (p?.searchAliases ?? []).join(', '),
     allowNegativeStock: p?.allowNegativeStock ?? false,
@@ -136,6 +150,10 @@ function initialValues(p?: ProductDetail): ProductFormValues {
         (p.skus.length > 1 || (p.skus[0] !== undefined && p.skus[0].name !== p.name)))
       : false,
     baseUom: p?.skus[0]?.baseUom.code ?? 'PCS',
+    packCartonUom: firstPack?.cartonUom ?? '',
+    packCartonPer: firstPack?.cartonPer ?? '',
+    packPalletUom: firstPack?.palletUom ?? '',
+    packPalletPer: firstPack?.palletPer ?? '',
     skus: p
       ? p.skus.map((s) => ({
           skuId: s.id,
@@ -144,19 +162,17 @@ function initialValues(p?: ProductDetail): ProductFormValues {
           barcode: '',
           isActive: s.isActive,
           existingBarcode: s.barcodes[0]?.code ?? '',
-          purchasePrice: s.purchasePrice ?? '',
           salePrice: s.salePrice ?? '',
           weightG: s.weightKg ? kgToGrams(s.weightKg) : '',
-          openingQty: '',
-          // Khối đóng gói để TRỐNG trên SKU đã lưu (khai = thêm quy đổi mới); quy đổi sẵn có
-          // hiển thị dạng chip, xóa ở API riêng khi cần. Hệ số thùng đã có giữ lại để khai pallet.
+          // Khối đóng gói riêng để TRỐNG trên SKU đã lưu (khai = thêm quy đổi mới); quy cách đã
+          // có hiện dạng tóm tắt. Hệ số thùng đã có giữ lại để khai thêm pallet.
+          customPack: false,
           cartonUom: '',
           cartonPer: '',
           cartonBarcode: '',
           palletUom: '',
           palletPer: '',
           palletBarcode: '',
-          salesUom: s.salesUom?.code ?? '',
           existingConvUoms: s.uomConversions.map((c) => c.uom.code),
           existingCartonFactor: existingCartonFactorOf(s.uomConversions),
         }))
@@ -294,6 +310,9 @@ function ProductFormBody({ product }: { product?: ProductDetail }) {
         ...(v.shelfLifeDays ? { shelfLifeDays: Number.parseInt(v.shelfLifeDays, 10) } : {}),
         ...(v.defaultWarehouseId ? { defaultWarehouseId: v.defaultWarehouseId } : {}),
         ...(v.description ? { description: v.description } : {}),
+        ...(v.ingredients || editing ? { ingredients: v.ingredients } : {}),
+        ...(v.usageInstructions || editing ? { usageInstructions: v.usageInstructions } : {}),
+        ...(v.orderNote || editing ? { orderNote: v.orderNote } : {}),
         ...(v.internalNote ? { internalNote: v.internalNote } : {}),
         searchAliases: parseAliases(v.searchAliases),
         allowNegativeStock: v.allowNegativeStock,
@@ -351,6 +370,9 @@ function ProductFormBody({ product }: { product?: ProductDetail }) {
       // 2. Từng dòng biến thể — lỗi dòng nào ghi dòng đó, các dòng khác vẫn lưu
       for (let i = 0; i < v.skus.length; i += 1) {
         const row = v.skus[i]!;
+        const pack = effectivePack(v, row);
+        const conversions = packagingConversions(pack, row.existingCartonFactor);
+        const packBarcodes = packagingBarcodes(row, pack);
         try {
           if (!row.skuId && !created.current?.doneRows.has(i)) {
             await createSku.mutateAsync({
@@ -362,23 +384,16 @@ function ProductFormBody({ product }: { product?: ProductDetail }) {
                   ? { code: row.code || `${savedCode}-${i + 1}`, name: row.name }
                   : {}),
                 baseUom: v.baseUom,
-                // Đóng gói hai cấp (§12): thùng rồi pallet, factor về ĐVT cơ sở + barcode theo ĐVT
-                ...(packagingConversions(row).length
-                  ? { conversions: packagingConversions(row) }
-                  : {}),
-                ...(row.salesUom ? { salesUom: row.salesUom } : {}),
-                ...(row.barcode || packagingBarcodes(row).length
+                // Đóng gói hai cấp (§12): thùng rồi pallet, factor về ĐVT cơ sở + barcode theo ĐVT.
+                // ĐVT bán mặc định = đơn vị bán chính (không gửi salesUom).
+                ...(conversions.length ? { conversions } : {}),
+                ...(row.barcode || packBarcodes.length
                   ? {
-                      barcodes: [
-                        ...(row.barcode ? [{ code: row.barcode }] : []),
-                        ...packagingBarcodes(row),
-                      ],
+                      barcodes: [...(row.barcode ? [{ code: row.barcode }] : []), ...packBarcodes],
                     }
                   : {}),
-                ...(row.purchasePrice ? { purchasePrice: row.purchasePrice } : {}),
                 ...(row.salePrice ? { salePrice: row.salePrice } : {}),
                 ...(row.weightG ? { weightKg: gramsToKg(row.weightG) } : {}),
-                ...(row.openingQty ? { openingQty: row.openingQty } : {}),
               },
             });
             created.current?.doneRows.add(i);
@@ -387,13 +402,8 @@ function ProductFormBody({ product }: { product?: ProductDetail }) {
             const patch = {
               ...(dirty?.name && v.hasVariants ? { name: row.name } : {}),
               ...(dirty?.isActive ? { isActive: row.isActive } : {}),
-              ...(dirty?.purchasePrice && row.purchasePrice
-                ? { purchasePrice: row.purchasePrice }
-                : {}),
               ...(dirty?.salePrice && row.salePrice ? { salePrice: row.salePrice } : {}),
               ...(dirty?.weightG && row.weightG ? { weightKg: gramsToKg(row.weightG) } : {}),
-              // F3 — đổi ĐVT bán ('' = quay về ĐVT cơ sở → gửi null)
-              ...(dirty?.salesUom ? { salesUom: row.salesUom || null } : {}),
             };
             if (Object.keys(patch).length > 0) {
               // version của từng SKU lấy từ ProductDetailDto — PATCH bắt buộc (optimistic locking).
@@ -405,22 +415,22 @@ function ProductFormBody({ product }: { product?: ProductDetail }) {
             }
             // Quy đổi mới khai trên SKU đã lưu: POST conversion (thùng trước pallet) TRƯỚC
             // barcode (trg_barcode_uom_valid đòi conversion có trước).
-            for (const conv of packagingConversions(row)) {
+            for (const conv of conversions) {
               await setConversion.mutateAsync({ skuId: row.skuId, ...conv });
             }
             if (row.barcode && !row.existingBarcode) {
               await addBarcode.mutateAsync({ skuId: row.skuId, code: row.barcode });
             }
-            for (const bc of packagingBarcodes(row)) {
+            for (const bc of packBarcodes) {
               await addBarcode.mutateAsync({ skuId: row.skuId, ...bc });
             }
           }
         } catch (err) {
           const msg = messageFor(err);
           errors.push({ index: i, message: msg });
-          // Ô mã SKU ẩn → lỗi dòng gắn vào "Tên biến thể" (có biến thể) hoặc "Giá nhập"
+          // Ô mã SKU ẩn → lỗi dòng gắn vào "Tên biến thể" (có biến thể) hoặc "Giá bán"
           // (sản phẩm đơn — ô tên cũng ẩn) để FormMessage hiện đúng dòng.
-          form.setError(v.hasVariants ? `skus.${i}.name` : `skus.${i}.purchasePrice`, {
+          form.setError(v.hasVariants ? `skus.${i}.name` : `skus.${i}.salePrice`, {
             message: msg,
           });
         }
@@ -700,13 +710,13 @@ function ProductFormBody({ product }: { product?: ProductDetail }) {
               name="searchAliases"
               render={({ field }) => (
                 <FormItem className="sm:col-span-2 lg:col-span-4">
-                  <FormLabel>Tên gọi khác</FormLabel>
+                  <FormLabel>Tên lên đơn Pancake</FormLabel>
                   <FormControl>
                     <Input placeholder="thuốc bật chồi, thuốc trĩ, cheshaland" {...field} />
                   </FormControl>
                   <FormDescription>
-                    Tên dân dã / viết tắt, phân tách bằng dấu phẩy — ô tìm sản phẩm ăn cả các tên
-                    này
+                    Tên khách / sale hay gọi khi lên đơn, phân tách bằng dấu phẩy — ô tìm sản phẩm
+                    ăn cả các tên này
                   </FormDescription>
                   <FormMessage />
                 </FormItem>
@@ -717,10 +727,52 @@ function ProductFormBody({ product }: { product?: ProductDetail }) {
               name="description"
               render={({ field }) => (
                 <FormItem className="sm:col-span-2 lg:col-span-2">
-                  <FormLabel>Mô tả</FormLabel>
+                  <FormLabel>Công dụng</FormLabel>
                   <FormControl>
                     <Textarea
-                      placeholder="Thuốc kích chồi, dùng cho cây ăn quả, pha 1 gói/bình 16L…"
+                      placeholder="Kích chồi, ra hoa đồng loạt cho cây ăn quả…"
+                      {...field}
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="ingredients"
+              render={({ field }) => (
+                <FormItem className="sm:col-span-2 lg:col-span-2">
+                  <FormLabel>Thành phần</FormLabel>
+                  <FormControl>
+                    <Textarea placeholder="Hoạt chất, hàm lượng: Hexaconazole 50g/l…" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="usageInstructions"
+              render={({ field }) => (
+                <FormItem className="sm:col-span-2 lg:col-span-2">
+                  <FormLabel>Cách dùng</FormLabel>
+                  <FormControl>
+                    <Textarea placeholder="Pha 1 gói / bình 16L, phun ướt đều tán lá…" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="orderNote"
+              render={({ field }) => (
+                <FormItem className="sm:col-span-2 lg:col-span-2">
+                  <FormLabel>Lưu ý khi lên đơn</FormLabel>
+                  <FormControl>
+                    <Textarea
+                      placeholder="Nhắc sale khi chốt đơn: không gửi kèm phân bón lá…"
                       {...field}
                     />
                   </FormControl>
@@ -755,7 +807,7 @@ function ProductFormBody({ product }: { product?: ProductDetail }) {
               name="baseUom"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>ĐVT cơ bản *</FormLabel>
+                  <FormLabel>Đơn vị bán chính *</FormLabel>
                   <Select value={field.value} onValueChange={field.onChange} disabled={editing}>
                     <FormControl>
                       <SelectTrigger>
@@ -770,11 +822,11 @@ function ProductFormBody({ product }: { product?: ProductDetail }) {
                       ))}
                     </SelectContent>
                   </Select>
-                  {editing ? (
-                    <p className="text-xs text-muted-foreground">
-                      ĐVT lưu kho không đổi sau khi tạo
-                    </p>
-                  ) : null}
+                  <p className="text-xs text-muted-foreground">
+                    {editing
+                      ? 'Không đổi sau khi tạo'
+                      : 'Đơn vị nhỏ nhất — tồn kho, giá bán, đơn hàng tính theo đơn vị này'}
+                  </p>
                   <FormMessage />
                 </FormItem>
               )}
@@ -852,7 +904,6 @@ function ProductFormBody({ product }: { product?: ProductDetail }) {
                       ))}
                     </SelectContent>
                   </Select>
-                  <FormDescription>Tồn đầu kỳ của biến thể mới ghi vào kho này</FormDescription>
                   <FormMessage />
                 </FormItem>
               )}
@@ -907,6 +958,7 @@ function ProductFormBody({ product }: { product?: ProductDetail }) {
               )}
             />
           </div>
+          <ProductPackFields form={form} />
         </section>
 
         {editing ? (
@@ -1012,6 +1064,10 @@ function ProductFormBody({ product }: { product?: ProductDetail }) {
                 editing={editing}
                 simple={!hasVariants}
                 uoms={uoms.data ?? []}
+                savedPack={(() => {
+                  const sku = product?.skus.find((x) => x.id === form.getValues(`skus.${i}.skuId`));
+                  return sku ? savedPackOf(sku.uomConversions) : null;
+                })()}
                 onRemove={
                   // Design: chỉ xóa dòng CHƯA lưu; biến thể đã có chỉ "Ngừng bán"
                   !form.getValues(`skus.${i}.skuId`) && rows.fields.length > 1
@@ -1060,12 +1116,157 @@ function ProductFormBody({ product }: { product?: ProductDetail }) {
 }
 
 /**
- * Một dòng biến thể: trạng thái (khi sửa) · tên · giá nhập · giá bán · tồn đầu kỳ (dòng mới)
- * · khối đóng gói hai cấp (PLAN-packaging-hierarchy §12, 2026-09-22): ĐVT thùng + "1 thùng = ?
- * ĐVT cơ sở" + barcode thùng; ĐVT pallet + "1 pallet = ? thùng" + barcode pallet; ĐVT bán —
- * gợi ý gộp lượt theo thùng / pallet đọc đúng hai quy đổi CARTON / PALLET này.
- * Các ô ảnh / mã SKU / barcode lẻ / trọng lượng đang tạm ẩn (JSX giữ dạng comment để bật
- * lại) — bật lại thì nhớ đưa lại các prop `skuImage`, `canEditImages`.
+ * Quy cách nhập kho cấp sản phẩm (2026-10-01, không bắt buộc). Chỉ hỏi "có thùng không / có pallet
+ * không" (2026-10-02) — ĐVT cố định `BOX` / `PALLET` — rồi "1 thùng = ? đơn vị bán chính",
+ * "1 pallet = ? thùng". Mọi biến thể kế thừa (trừ dòng tick "Quy cách riêng"); phiếu nhập kho cho
+ * nhập theo thùng / pallet và tự quy ra đơn vị bán chính từ hai hệ số này. Sản phẩm cũ đã lưu với
+ * ĐVT thùng khác `BOX` vẫn giữ nguyên mã đó (chọn "Có" = giữ).
+ */
+function ProductPackFields({ form }: { form: UseFormReturn<ProductFormValues> }) {
+  const baseUom = form.watch('baseUom');
+  const cartonUom = form.watch('packCartonUom');
+  const cartonPer = form.watch('packCartonPer');
+  const palletUom = form.watch('packPalletUom');
+  const palletPer = form.watch('packPalletPer');
+  const palletInBase =
+    palletUom && palletPer && cartonPer && /^\d+$/.test(palletPer) && /^\d+$/.test(cartonPer)
+      ? formatQuantity(new Decimal(cartonPer).mul(palletPer).toString())
+      : null;
+  return (
+    <div className="border-t px-3 py-3">
+      <p className="text-sm font-medium">
+        Quy cách nhập kho{' '}
+        <span className="font-normal text-muted-foreground">
+          · không bắt buộc — nhập kho theo thùng / pallet, tự quy ra {baseUom || 'đơn vị bán chính'}
+        </span>
+      </p>
+      <div className="mt-2 grid items-start gap-x-4 gap-y-3 sm:grid-cols-2 lg:grid-cols-4">
+        <FormField
+          control={form.control}
+          name="packCartonUom"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Nhập theo thùng</FormLabel>
+              <Select
+                value={field.value === '' ? 'no' : 'yes'}
+                onValueChange={(x) => {
+                  if (x === 'yes') {
+                    field.onChange(PACK_CARTON_UOM);
+                    return;
+                  }
+                  field.onChange('');
+                  form.setValue('packCartonPer', '');
+                  form.setValue('packPalletUom', '');
+                  form.setValue('packPalletPer', '');
+                }}
+              >
+                <FormControl>
+                  <SelectTrigger aria-label="Nhập theo thùng">
+                    <SelectValue />
+                  </SelectTrigger>
+                </FormControl>
+                <SelectContent>
+                  <SelectItem value="no">Không</SelectItem>
+                  <SelectItem value="yes">Có</SelectItem>
+                </SelectContent>
+              </Select>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+        <FormField
+          control={form.control}
+          name="packCartonPer"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Số {baseUom || 'đơn vị'} trong 1 thùng</FormLabel>
+              <FormControl>
+                <Input
+                  inputMode="numeric"
+                  className="text-right tabular-nums"
+                  placeholder={cartonUom ? '24' : ''}
+                  disabled={!cartonUom}
+                  {...field}
+                  value={field.value ?? ''}
+                />
+              </FormControl>
+              <FormDescription>
+                {cartonUom ? `1 thùng = ? ${baseUom}` : 'Chọn "Có" ở ô bên trái'}
+              </FormDescription>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+        <FormField
+          control={form.control}
+          name="packPalletUom"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Nhập theo pallet</FormLabel>
+              <Select
+                value={field.value === '' ? 'no' : 'yes'}
+                onValueChange={(x) => {
+                  if (x === 'yes') {
+                    field.onChange(PACK_PALLET_UOM);
+                    return;
+                  }
+                  field.onChange('');
+                  form.setValue('packPalletPer', '');
+                }}
+                disabled={!cartonUom}
+              >
+                <FormControl>
+                  <SelectTrigger aria-label="Nhập theo pallet">
+                    <SelectValue />
+                  </SelectTrigger>
+                </FormControl>
+                <SelectContent>
+                  <SelectItem value="no">Không</SelectItem>
+                  <SelectItem value="yes">Có</SelectItem>
+                </SelectContent>
+              </Select>
+              <FormDescription>{cartonUom ? ' ' : 'Có thùng mới có pallet'}</FormDescription>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+        <FormField
+          control={form.control}
+          name="packPalletPer"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Số thùng trong 1 pallet</FormLabel>
+              <FormControl>
+                <Input
+                  inputMode="numeric"
+                  className="text-right tabular-nums"
+                  placeholder={palletUom ? '10' : ''}
+                  disabled={!palletUom}
+                  {...field}
+                  value={field.value ?? ''}
+                />
+              </FormControl>
+              <FormDescription>
+                {palletUom
+                  ? `1 pallet = ? thùng${palletInBase ? ` = ${palletInBase} ${baseUom}` : ''}`
+                  : ' '}
+              </FormDescription>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Một dòng biến thể: trạng thái (khi sửa) · tên · giá bán · cân nặng · quy cách đóng gói.
+ * Quy cách (thùng / pallet) mặc định KẾ THỪA cấp sản phẩm (2026-10-01); tick "Quy cách riêng"
+ * để khai khác (PLAN-packaging-hierarchy §12: "1 thùng = ? đơn vị bán chính", "1 pallet = ?
+ * thùng"). SKU đã lưu có quy cách rồi thì chỉ hiện tóm tắt — quy đổi đã dùng trên đơn bị đóng băng.
+ * Barcode thùng / pallet luôn theo từng biến thể. Không còn giá nhập / tồn đầu kỳ: giá vốn theo
+ * phiếu nhập kho. Các ô ảnh / mã SKU / barcode lẻ đang tạm ẩn (JSX giữ dạng comment để bật lại).
  */
 function SkuRow({
   form,
@@ -1073,6 +1274,7 @@ function SkuRow({
   editing,
   simple,
   uoms,
+  savedPack,
   onRemove,
 }: {
   form: UseFormReturn<ProductFormValues>;
@@ -1081,19 +1283,27 @@ function SkuRow({
   /** Sản phẩm đơn: ẩn ô tên (server lấy tên sản phẩm), không có nút xóa dòng. */
   simple: boolean;
   uoms: Array<{ id: string; code: string; name: string }>;
+  /** Quy cách đã lưu của SKU (null = dòng mới / chưa có thùng). */
+  savedPack: RowPack | null;
   onRemove?: () => void;
 }) {
   const skuId = form.getValues(`skus.${index}.skuId`);
   const saved = skuId !== '';
-  // Đóng gói hai cấp: ĐVT thùng / pallet ngoài ĐVT cơ sở, nhập theo chuỗi; ĐVT bán = cơ sở /
-  // thùng / pallet / đã có quy đổi. Hai quy đổi CARTON / PALLET là đầu vào của gợi ý gộp lượt.
   const baseUom = form.watch('baseUom');
+  const customPack = form.watch(`skus.${index}.customPack`);
   const cartonUom = form.watch(`skus.${index}.cartonUom`);
   const cartonPer = form.watch(`skus.${index}.cartonPer`);
   const palletUom = form.watch(`skus.${index}.palletUom`);
   const palletPer = form.watch(`skus.${index}.palletPer`);
+  const productPack = {
+    packCartonUom: form.watch('packCartonUom'),
+    packCartonPer: form.watch('packCartonPer'),
+    packPalletUom: form.watch('packPalletUom'),
+    packPalletPer: form.watch('packPalletPer'),
+  };
   const existingConvUoms = form.getValues(`skus.${index}.existingConvUoms`);
   const existingCartonFactor = form.getValues(`skus.${index}.existingCartonFactor`);
+  const pack = effectivePack(productPack, form.watch(`skus.${index}`));
   const hasCarton = cartonUom !== '' || existingCartonFactor !== '';
   const cartonFactor = cartonUom && cartonPer ? cartonPer : existingCartonFactor;
   const palletInBase =
@@ -1104,8 +1314,23 @@ function SkuRow({
     /^\d+(\.\d+)?$/.test(cartonFactor)
       ? formatQuantity(new Decimal(cartonFactor).mul(palletPer).toString())
       : null;
-  const uomOptions = uoms.filter((u) => u.code !== baseUom && !existingConvUoms.includes(u.code));
-  const NONE = '__none__';
+  // ĐVT thùng / pallet cố định (BOX / PALLET) — chỉ hỏi có / không; SKU đã có ĐVT đó thì khóa.
+  const usable = (code: string) =>
+    uoms.some((u) => u.code === code) && code !== baseUom && !existingConvUoms.includes(code);
+  const canCarton = usable(PACK_CARTON_UOM);
+  const canPallet = usable(PACK_PALLET_UOM) || palletUom !== '';
+  const summary = (pk: RowPack | null) =>
+    pk && pk.cartonUom && pk.cartonPer
+      ? `1 thùng = ${formatQuantity(pk.cartonPer)} ${baseUom}` +
+        (pk.palletUom && pk.palletPer ? ` · 1 pallet = ${formatQuantity(pk.palletPer)} thùng` : '')
+      : null;
+  const savedSummary = saved ? summary(savedPack) : null;
+  const inherited = summary({
+    cartonUom: productPack.packCartonUom,
+    cartonPer: productPack.packCartonPer ?? '',
+    palletUom: productPack.packPalletUom,
+    palletPer: productPack.packPalletPer ?? '',
+  });
 
   return (
     <div className="flex flex-col gap-2 px-3 py-2">
@@ -1208,8 +1433,8 @@ function SkuRow({
           <span />
         )}
       </div>
-      {/* Dòng 2: giá nhập / giá bán / trọng lượng (gram → kg lúc gửi) / tồn đầu kỳ (chỉ dòng mới) */}
-      <div className="grid items-start gap-2 sm:grid-cols-5">
+      {/* Dòng 2: tên (có biến thể) / giá bán / cân nặng (gram → kg lúc gửi) */}
+      <div className="grid items-start gap-2 sm:grid-cols-4">
         {simple ? null : (
           <FormField
             control={form.control}
@@ -1227,23 +1452,12 @@ function SkuRow({
         )}
         <FormField
           control={form.control}
-          name={`skus.${index}.purchasePrice`}
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel className="text-xs text-muted-foreground">Giá nhập</FormLabel>
-              <FormControl>
-                <MoneyInput value={field.value ?? ''} onChange={field.onChange} />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
-        <FormField
-          control={form.control}
           name={`skus.${index}.salePrice`}
           render={({ field }) => (
             <FormItem>
-              <FormLabel className="text-xs text-muted-foreground">Giá bán</FormLabel>
+              <FormLabel className="text-xs text-muted-foreground">
+                Giá bán / {baseUom || 'đơn vị'}
+              </FormLabel>
               <FormControl>
                 <MoneyInput value={field.value ?? ''} onChange={field.onChange} />
               </FormControl>
@@ -1274,240 +1488,201 @@ function SkuRow({
             </FormItem>
           )}
         />
-        {saved ? (
-          <FormItem>
-            <FormLabel className="text-xs text-muted-foreground">Tồn kho</FormLabel>
-            <p className="pt-2 text-sm text-muted-foreground">
-              Xem ở danh sách — nhập/xuất qua chứng từ
-            </p>
-          </FormItem>
-        ) : (
+      </div>
+      {/* Dòng 3: quy cách đóng gói — tóm tắt (đã lưu / kế thừa) + tick "Quy cách riêng" */}
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
+        <span>
+          {savedSummary
+            ? `Quy cách đã lưu: ${savedSummary}`
+            : customPack
+              ? 'Quy cách riêng cho biến thể này'
+              : inherited
+                ? `Theo sản phẩm: ${inherited}`
+                : 'Chưa khai quy cách nhập kho — nhập theo đơn vị bán chính'}
+        </span>
+        {simple && !savedSummary ? null : (
           <FormField
             control={form.control}
-            name={`skus.${index}.openingQty`}
+            name={`skus.${index}.customPack`}
             render={({ field }) => (
-              <FormItem>
-                <FormLabel className="text-xs text-muted-foreground">Tồn đầu kỳ</FormLabel>
+              <FormItem className="flex flex-row items-center gap-2 space-y-0">
                 <FormControl>
-                  <Input
-                    inputMode="decimal"
-                    className="text-right tabular-nums"
-                    placeholder="0"
-                    {...field}
-                    value={field.value ?? ''}
+                  <Checkbox
+                    checked={field.value}
+                    onCheckedChange={(c) => field.onChange(c === true)}
                   />
                 </FormControl>
-                <FormDescription className="text-[11px]">
-                  Ghi movement OPENING vào kho mặc định, giá vốn = giá nhập
-                </FormDescription>
-                <FormMessage />
+                <FormLabel className="text-xs font-normal">
+                  {savedSummary ? 'Khai thêm cấp đóng gói' : 'Quy cách riêng'}
+                </FormLabel>
               </FormItem>
             )}
           />
         )}
       </div>
-      {/* Hàng 3 — đóng gói cấp thùng (CARTON) + ĐVT bán. SKU đã lưu hiện quy đổi sẵn có; khai thêm ở ô bên cạnh. */}
-      <div className="grid items-start gap-2 sm:grid-cols-4 lg:max-w-4xl">
-        <FormField
-          control={form.control}
-          name={`skus.${index}.cartonUom`}
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel className="text-xs text-muted-foreground">
-                {saved ? 'Thêm ĐVT thùng' : 'ĐVT thùng'}
-              </FormLabel>
-              <Select
-                value={field.value === '' ? NONE : field.value}
-                onValueChange={(x) => field.onChange(x === NONE ? '' : x)}
-              >
-                <FormControl>
-                  <SelectTrigger aria-label="ĐVT thùng">
-                    <SelectValue placeholder="Không" />
-                  </SelectTrigger>
-                </FormControl>
-                <SelectContent>
-                  <SelectItem value={NONE}>Không</SelectItem>
-                  {uomOptions
-                    .filter((u) => u.code !== palletUom)
-                    .map((u) => (
-                      <SelectItem key={u.id} value={u.code}>
-                        {u.code} — {u.name}
-                      </SelectItem>
-                    ))}
-                </SelectContent>
-              </Select>
-              <FormDescription className="text-[11px]">
-                {existingConvUoms.length > 0
-                  ? `Đã có: ${existingConvUoms.join(', ')}`
-                  : 'Thùng / kiện / hộp — nhận và lấy hàng theo thùng'}
-              </FormDescription>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
-        <FormField
-          control={form.control}
-          name={`skus.${index}.cartonPer`}
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel className="text-xs text-muted-foreground">
-                Số lượng trong 1 thùng
-              </FormLabel>
-              <FormControl>
-                <Input
-                  inputMode="numeric"
-                  className="text-right tabular-nums"
-                  placeholder="24"
-                  disabled={!cartonUom}
-                  {...field}
-                  value={field.value ?? ''}
-                />
-              </FormControl>
-              <FormDescription className="text-[11px]">
-                1 {cartonUom || 'thùng'} = ? {baseUom}
-              </FormDescription>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
-        <FormField
-          control={form.control}
-          name={`skus.${index}.cartonBarcode`}
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel className="text-xs text-muted-foreground">Barcode thùng</FormLabel>
-              <FormControl>
-                <Input
-                  placeholder="quét mã thùng"
-                  className="font-mono"
-                  disabled={!cartonUom}
-                  {...field}
-                  value={field.value ?? ''}
-                />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
-        <FormField
-          control={form.control}
-          name={`skus.${index}.salesUom`}
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel className="text-xs text-muted-foreground">ĐVT bán mặc định</FormLabel>
-              <Select
-                value={field.value === '' ? NONE : field.value}
-                onValueChange={(x) => field.onChange(x === NONE ? '' : x)}
-              >
-                <FormControl>
-                  <SelectTrigger aria-label="ĐVT bán mặc định">
-                    <SelectValue />
-                  </SelectTrigger>
-                </FormControl>
-                <SelectContent>
-                  <SelectItem value={NONE}>{baseUom || 'ĐVT cơ sở'}</SelectItem>
-                  {[
-                    ...new Set([
-                      ...existingConvUoms,
-                      ...(cartonUom ? [cartonUom] : []),
-                      ...(palletUom ? [palletUom] : []),
-                    ]),
-                  ].map((code) => (
-                    <SelectItem key={code} value={code}>
-                      {code}
+      {customPack ? (
+        <div className="grid items-start gap-2 sm:grid-cols-4 lg:max-w-4xl">
+          <FormField
+            control={form.control}
+            name={`skus.${index}.cartonUom`}
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel className="text-xs text-muted-foreground">
+                  {saved ? 'Thêm cấp thùng' : 'Nhập theo thùng'}
+                </FormLabel>
+                <Select
+                  value={field.value === '' ? 'no' : 'yes'}
+                  onValueChange={(x) => field.onChange(x === 'yes' ? PACK_CARTON_UOM : '')}
+                  disabled={existingCartonFactor !== ''}
+                >
+                  <FormControl>
+                    <SelectTrigger aria-label="Nhập theo thùng (riêng)">
+                      <SelectValue />
+                    </SelectTrigger>
+                  </FormControl>
+                  <SelectContent>
+                    <SelectItem value="no">Không</SelectItem>
+                    <SelectItem value="yes" disabled={!canCarton}>
+                      Có
                     </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
-      </div>
-      {/* Hàng 4 — đóng gói cấp pallet (PALLET): nhập theo chuỗi "1 pallet = ? thùng", gửi factor = thùng × pallet. */}
-      <div className="grid items-start gap-2 sm:grid-cols-4 lg:max-w-4xl">
-        <FormField
-          control={form.control}
-          name={`skus.${index}.palletUom`}
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel className="text-xs text-muted-foreground">
-                {saved ? 'Thêm ĐVT pallet' : 'ĐVT pallet'}
-              </FormLabel>
-              <Select
-                value={field.value === '' ? NONE : field.value}
-                onValueChange={(x) => field.onChange(x === NONE ? '' : x)}
-                disabled={!hasCarton}
-              >
+                  </SelectContent>
+                </Select>
+                <FormDescription className="text-[11px]">
+                  {existingCartonFactor !== '' ? 'Đã có cấp thùng' : ' '}
+                </FormDescription>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+          <FormField
+            control={form.control}
+            name={`skus.${index}.cartonPer`}
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel className="text-xs text-muted-foreground">
+                  Số {baseUom} trong 1 thùng
+                </FormLabel>
                 <FormControl>
-                  <SelectTrigger aria-label="ĐVT pallet">
-                    <SelectValue placeholder="Không" />
-                  </SelectTrigger>
+                  <Input
+                    inputMode="numeric"
+                    className="text-right tabular-nums"
+                    placeholder="24"
+                    disabled={!cartonUom}
+                    {...field}
+                    value={field.value ?? ''}
+                  />
                 </FormControl>
-                <SelectContent>
-                  <SelectItem value={NONE}>Không</SelectItem>
-                  {uomOptions
-                    .filter((u) => u.code !== cartonUom)
-                    .map((u) => (
-                      <SelectItem key={u.id} value={u.code}>
-                        {u.code} — {u.name}
-                      </SelectItem>
-                    ))}
-                </SelectContent>
-              </Select>
-              <FormDescription className="text-[11px]">
-                {hasCarton ? 'Không có pallet thì để trống' : 'Khai cấp thùng trước'}
-              </FormDescription>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
-        <FormField
-          control={form.control}
-          name={`skus.${index}.palletPer`}
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel className="text-xs text-muted-foreground">
-                Số thùng trong 1 pallet
-              </FormLabel>
-              <FormControl>
-                <Input
-                  inputMode="numeric"
-                  className="text-right tabular-nums"
-                  placeholder="10"
-                  disabled={!palletUom}
-                  {...field}
-                  value={field.value ?? ''}
-                />
-              </FormControl>
-              <FormDescription className="text-[11px]">
-                1 {palletUom || 'pallet'} = ? {cartonUom || 'thùng'}
-                {palletInBase ? ` = ${palletInBase} ${baseUom}` : ''}
-              </FormDescription>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
-        <FormField
-          control={form.control}
-          name={`skus.${index}.palletBarcode`}
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel className="text-xs text-muted-foreground">Barcode pallet</FormLabel>
-              <FormControl>
-                <Input
-                  placeholder="quét mã pallet"
-                  className="font-mono"
-                  disabled={!palletUom}
-                  {...field}
-                  value={field.value ?? ''}
-                />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
-      </div>
+                <FormDescription className="text-[11px]">1 thùng = ? {baseUom}</FormDescription>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+          <FormField
+            control={form.control}
+            name={`skus.${index}.palletUom`}
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel className="text-xs text-muted-foreground">
+                  {saved ? 'Thêm cấp pallet' : 'Nhập theo pallet'}
+                </FormLabel>
+                <Select
+                  value={field.value === '' ? 'no' : 'yes'}
+                  onValueChange={(x) => field.onChange(x === 'yes' ? PACK_PALLET_UOM : '')}
+                  disabled={!hasCarton || !canPallet}
+                >
+                  <FormControl>
+                    <SelectTrigger aria-label="Nhập theo pallet (riêng)">
+                      <SelectValue />
+                    </SelectTrigger>
+                  </FormControl>
+                  <SelectContent>
+                    <SelectItem value="no">Không</SelectItem>
+                    <SelectItem value="yes">Có</SelectItem>
+                  </SelectContent>
+                </Select>
+                <FormDescription className="text-[11px]">
+                  {!hasCarton
+                    ? 'Có thùng mới có pallet'
+                    : !canPallet && !palletUom
+                      ? 'Đã có cấp pallet'
+                      : ' '}
+                </FormDescription>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+          <FormField
+            control={form.control}
+            name={`skus.${index}.palletPer`}
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel className="text-xs text-muted-foreground">
+                  Số thùng trong 1 pallet
+                </FormLabel>
+                <FormControl>
+                  <Input
+                    inputMode="numeric"
+                    className="text-right tabular-nums"
+                    placeholder="10"
+                    disabled={!palletUom}
+                    {...field}
+                    value={field.value ?? ''}
+                  />
+                </FormControl>
+                <FormDescription className="text-[11px]">
+                  1 pallet = ? thùng
+                  {palletInBase ? ` = ${palletInBase} ${baseUom}` : ''}
+                </FormDescription>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+        </div>
+      ) : null}
+      {pack.cartonUom || pack.palletUom ? (
+        <div className="grid items-start gap-2 sm:grid-cols-4 lg:max-w-4xl">
+          {pack.cartonUom ? (
+            <FormField
+              control={form.control}
+              name={`skus.${index}.cartonBarcode`}
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel className="text-xs text-muted-foreground">Barcode thùng</FormLabel>
+                  <FormControl>
+                    <Input
+                      placeholder="quét mã thùng"
+                      className="font-mono"
+                      {...field}
+                      value={field.value ?? ''}
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+          ) : null}
+          {pack.palletUom ? (
+            <FormField
+              control={form.control}
+              name={`skus.${index}.palletBarcode`}
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel className="text-xs text-muted-foreground">Barcode pallet</FormLabel>
+                  <FormControl>
+                    <Input
+                      placeholder="quét mã pallet"
+                      className="font-mono"
+                      {...field}
+                      value={field.value ?? ''}
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+          ) : null}
+        </div>
+      ) : null}
     </div>
   );
 }

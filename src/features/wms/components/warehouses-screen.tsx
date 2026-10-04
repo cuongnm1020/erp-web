@@ -58,7 +58,8 @@ import { LocationsPanel } from './locations-panel';
 /**
  * G-02 Kho & vị trí — nối API thật: GET/POST/PATCH/DELETE /warehouses; chọn một kho
  * (searchParam ?wh= — luật 8, F5 giữ nguyên) mở cây vị trí bên dưới (LocationsPanel).
- * Xóa = soft delete (kho chuyển Ngừng dùng — tồn, chứng từ, vị trí giữ nguyên).
+ * Xóa = soft delete (kho chuyển Ngừng dùng — tồn, chứng từ, vị trí giữ nguyên); kho Ngừng dùng
+ * ẩn khỏi danh sách (2026-10-02).
  * Kho MẶC ĐỊNH (Warehouse.isDefault, tối đa một): đơn đồng bộ từ Pancake giữ chỗ và nhận
  * kho này lúc tạo. Đặt qua ô trong form hoặc nút "Đặt mặc định" trên dòng; kho mặc định
  * không ngừng dùng được (server 422) → ẩn nút xóa, đổi kho mặc định trước.
@@ -324,7 +325,9 @@ function WarehouseFormDialog({
 }
 
 export function WarehousesScreen() {
-  const query = useWarehouses();
+  const all = useWarehouses();
+  // Kho Ngừng dùng (đã xóa mềm) ẩn khỏi danh sách — tồn / chứng từ vẫn giữ ở server.
+  const query = { ...all, data: all.data?.filter((w) => w.isActive) } as typeof all;
   const del = useDeleteWarehouse();
   const setDefault = useSetDefaultWarehouse();
   const ability = useAbility();

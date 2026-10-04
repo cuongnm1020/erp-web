@@ -36,7 +36,6 @@ const SKU_BLUE = {
   shelfLifeDays: null,
   taxRateId: null,
   images: [],
-  purchasePrice: null,
   salePrice: '4000.0000',
   weightKg: null,
   variantKey: 'blue',
@@ -116,6 +115,15 @@ describe('BarcodePrintScreen — in tem SKU thật (GET /products/{id} + bwip-js
     expect(img.querySelector('svg')).not.toBeNull();
     expect(within(preview).getByText('TL08-BLUE')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'In 1 tem' })).toBeEnabled();
+  });
+
+  it('?barcodeId= (nút In ở tab Barcode) → chọn sẵn đúng mã thùng thay cho mã ĐVT cơ sở', async () => {
+    search = `productId=${PRODUCT.id}&skuIds=${SKU_BLUE.id}&barcodeId=${uuid(12)}`;
+    renderApp(<BarcodePrintScreen />);
+    await screen.findAllByText('Bút bi Thiên Long TL-08 — TL-08 xanh');
+    const preview = screen.getByTestId('label-preview');
+    expect(within(preview).getByRole('img', { name: 'Mã vạch THUNG-TL08-B' })).toBeInTheDocument();
+    expect(within(preview).getByText(/hộp/)).toBeInTheDocument();
   });
 
   it('số tem × dòng = số tem in; bấm In → window.print đúng một lần với đủ trang tem', async () => {

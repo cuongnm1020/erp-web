@@ -26,7 +26,7 @@ vi.mock('next/navigation', () => ({
 const UOMS = [
   { id: 'u-pcs', code: 'PCS', name: 'Cái', decimals: 0 },
   { id: 'u-box', code: 'BOX', name: 'Thùng', decimals: 0 },
-  { id: 'u-plt', code: 'PLT', name: 'Pallet', decimals: 0 },
+  { id: 'u-plt', code: 'PALLET', name: 'Pallet', decimals: 0 },
 ];
 
 const CONTAINER_TYPES = [
@@ -81,10 +81,15 @@ describe('ProductFormScreen — tạo (design/Products/ProductForm)', () => {
       expect(screen.queryByLabelText(label)).not.toBeInTheDocument();
     }
     expect(screen.getByLabelText('Cân nặng (g)')).toBeInTheDocument();
-    // Đóng gói hai cấp (§12): thùng luôn chọn được; pallet khoá tới khi khai thùng.
-    expect(screen.getByRole('combobox', { name: 'ĐVT thùng' })).toBeInTheDocument();
-    expect(screen.getByRole('combobox', { name: 'ĐVT pallet' })).toBeDisabled();
-    expect(screen.getByText('Khai cấp thùng trước')).toBeInTheDocument();
+    // Quy cách nhập kho cấp sản phẩm (§12): thùng luôn chọn được; pallet khoá tới khi khai thùng.
+    expect(screen.getByRole('combobox', { name: 'Nhập theo thùng' })).toBeInTheDocument();
+    expect(screen.getByRole('combobox', { name: 'Nhập theo pallet' })).toBeDisabled();
+    expect(screen.getByText('Có thùng mới có pallet')).toBeInTheDocument();
+    // 2026-10-01: không còn giá nhập / tồn đầu kỳ / ĐVT bán mặc định trên form sản phẩm
+    for (const label of ['Giá nhập', 'Tồn đầu kỳ', 'ĐVT bán mặc định']) {
+      expect(screen.queryByLabelText(label)).not.toBeInTheDocument();
+    }
+    expect(screen.getByRole('combobox', { name: 'Đơn vị bán chính *' })).toBeEnabled();
     expect(screen.queryByRole('combobox', { name: 'Theo dõi lô / HSD' })).not.toBeInTheDocument();
   });
 
@@ -154,26 +159,28 @@ describe('ProductFormScreen — tạo (design/Products/ProductForm)', () => {
     renderApp(<ProductFormScreen />);
     fill('Tên thương mại *', 'Bút bi TL-08');
     // Chưa chọn ĐVT thùng → số lượng / barcode thùng bị khoá, pallet bị khoá
-    expect(screen.getByLabelText('Số lượng trong 1 thùng')).toBeDisabled();
-    expect(screen.getByRole('combobox', { name: 'ĐVT pallet' })).toBeDisabled();
-    fireEvent.click(screen.getByRole('combobox', { name: 'ĐVT thùng' }));
-    fireEvent.click(await screen.findByRole('option', { name: 'BOX — Thùng' }));
-    fill('Số lượng trong 1 thùng', '10');
-    expect(screen.getByText('1 BOX = ? PCS')).toBeInTheDocument();
+    expect(screen.getByLabelText('Số PCS trong 1 thùng')).toBeDisabled();
+    expect(screen.getByRole('combobox', { name: 'Nhập theo pallet' })).toBeDisabled();
+    fireEvent.click(screen.getByRole('combobox', { name: 'Nhập theo thùng' }));
+    fireEvent.click(await screen.findByRole('option', { name: 'Có' }));
+    fill('Số PCS trong 1 thùng', '10');
+    expect(screen.getByText('1 thùng = ? PCS')).toBeInTheDocument();
     fill('Barcode thùng', '8930000000012');
     // Có thùng → chọn được pallet; số thùng / pallet nhập theo chuỗi, form tự nhân ra ĐVT cơ sở
-    await waitFor(() => expect(screen.getByRole('combobox', { name: 'ĐVT pallet' })).toBeEnabled());
-    fireEvent.click(screen.getByRole('combobox', { name: 'ĐVT pallet' }));
-    fireEvent.click(await screen.findByRole('option', { name: 'PLT — Pallet' }));
+    await waitFor(() =>
+      expect(screen.getByRole('combobox', { name: 'Nhập theo pallet' })).toBeEnabled(),
+    );
+    fireEvent.click(screen.getByRole('combobox', { name: 'Nhập theo pallet' }));
+    fireEvent.click(await screen.findByRole('option', { name: 'Có' }));
     fill('Số thùng trong 1 pallet', '5');
-    expect(screen.getByText('1 PLT = ? BOX = 50 PCS')).toBeInTheDocument();
+    expect(screen.getByText('1 pallet = ? thùng = 50 PCS')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: /Lưu sản phẩm/ }));
     await waitFor(() => expect(skuBodies).toHaveLength(1));
     expect(skuBodies[0]).toEqual({
       baseUom: 'PCS',
       conversions: [
         { uom: 'BOX', factor: '10', containerType: 'CARTON' },
-        { uom: 'PLT', factor: '50', containerType: 'PALLET' },
+        { uom: 'PALLET', factor: '50', containerType: 'PALLET' },
       ],
       barcodes: [{ code: '8930000000012', uom: 'BOX' }],
     });
@@ -190,12 +197,14 @@ describe('ProductFormScreen — tạo (design/Products/ProductForm)', () => {
     );
     renderApp(<ProductFormScreen />);
     fill('Tên thương mại *', 'Bút bi TL-08');
-    fireEvent.click(screen.getByRole('combobox', { name: 'ĐVT thùng' }));
-    fireEvent.click(await screen.findByRole('option', { name: 'BOX — Thùng' }));
-    fill('Số lượng trong 1 thùng', '2.5');
-    await waitFor(() => expect(screen.getByRole('combobox', { name: 'ĐVT pallet' })).toBeEnabled());
-    fireEvent.click(screen.getByRole('combobox', { name: 'ĐVT pallet' }));
-    fireEvent.click(await screen.findByRole('option', { name: 'PLT — Pallet' }));
+    fireEvent.click(screen.getByRole('combobox', { name: 'Nhập theo thùng' }));
+    fireEvent.click(await screen.findByRole('option', { name: 'Có' }));
+    fill('Số PCS trong 1 thùng', '2.5');
+    await waitFor(() =>
+      expect(screen.getByRole('combobox', { name: 'Nhập theo pallet' })).toBeEnabled(),
+    );
+    fireEvent.click(screen.getByRole('combobox', { name: 'Nhập theo pallet' }));
+    fireEvent.click(await screen.findByRole('option', { name: 'Có' }));
     fill('Số thùng trong 1 pallet', '1');
     fireEvent.click(screen.getByRole('button', { name: /Lưu sản phẩm/ }));
     expect(
@@ -280,7 +289,7 @@ describe('ProductFormScreen — tạo (design/Products/ProductForm)', () => {
     );
     renderApp(<ProductFormScreen />);
     fill('Tên thương mại *', 'Thuốc bật chồi X');
-    fill('Tên gọi khác', 'thuốc bật chồi, cheshaland, , thuốc bật chồi');
+    fill('Tên lên đơn Pancake', 'thuốc bật chồi, cheshaland, , thuốc bật chồi');
     fireEvent.click(screen.getByRole('button', { name: /Lưu sản phẩm/ }));
     await waitFor(() => expect(productBody).toBeDefined());
     expect(productBody).not.toHaveProperty('code');
@@ -340,7 +349,7 @@ describe('ProductFormScreen — tạo (design/Products/ProductForm)', () => {
     expect(skuPosts).toBe(2);
   });
 
-  it('trường mới: kho mặc định + mô tả + tồn âm vào body product; giá nhập/bán + gram→kg + tồn đầu kỳ vào body SKU', async () => {
+  it('trường mới: kho mặc định + mô tả + tồn âm vào body product; chỉ giá bán vào body SKU (không giá nhập / tồn đầu kỳ)', async () => {
     push.mockClear();
     const bodies: { product?: unknown; sku?: unknown } = {};
     server.use(
@@ -376,15 +385,16 @@ describe('ProductFormScreen — tạo (design/Products/ProductForm)', () => {
     fill('Mã sản phẩm', 'TL11');
     fill('Tên xuất hóa đơn', 'Bút bi Thiên Long TL-11 (hộp 20)');
     fill('Mức tồn kho', '500');
-    fill('Mô tả', 'Mô tả bán hàng');
+    fill('Công dụng', 'Mô tả bán hàng');
+    fill('Thành phần', 'Hexaconazole 50g/l');
+    fill('Cách dùng', 'Pha 1 chai / bình 25L');
+    fill('Lưu ý khi lên đơn', 'Không gửi kèm phân bón lá');
     fill('Ghi chú nội bộ', 'Ghi chú riêng');
     fireEvent.click(screen.getByRole('checkbox', { name: 'Cho phép bán tồn kho âm' }));
     fireEvent.click(screen.getByRole('combobox', { name: 'Kho mặc định' }));
     fireEvent.click(await screen.findByRole('option', { name: 'Kho HN-1' }));
 
-    fill('Giá nhập', '12000');
-    fill('Giá bán', '19000');
-    fill('Tồn đầu kỳ', '50');
+    fill('Giá bán / PCS', '19000');
     fireEvent.click(screen.getByRole('button', { name: /Lưu sản phẩm/ }));
 
     await waitFor(() => expect(bodies.sku).toBeDefined());
@@ -394,36 +404,66 @@ describe('ProductFormScreen — tạo (design/Products/ProductForm)', () => {
       reorderLevel: '500',
       defaultWarehouseId: 'wh-1',
       description: 'Mô tả bán hàng',
+      ingredients: 'Hexaconazole 50g/l',
+      usageInstructions: 'Pha 1 chai / bình 25L',
+      orderNote: 'Không gửi kèm phân bón lá',
       internalNote: 'Ghi chú riêng',
       allowNegativeStock: true,
     });
-    expect(bodies.sku).toEqual({
-      baseUom: 'PCS',
-      purchasePrice: '12000',
-      salePrice: '19000',
-      openingQty: '50',
-    });
+    expect(bodies.sku).toEqual({ baseUom: 'PCS', salePrice: '19000' });
     await waitFor(() => expect(push).toHaveBeenCalledWith('/catalog/products'));
   });
 
-  it('tồn đầu kỳ thiếu giá nhập / thiếu kho mặc định → chặn ngay ở client, không gọi API', async () => {
-    const posts: unknown[] = [];
+  it('nhiều biến thể kế thừa quy cách sản phẩm (BOX = 10 PCS); dòng tick "Quy cách riêng" gửi BOX = 12', async () => {
+    const skuBodies: Array<Record<string, unknown>> = [];
     server.use(
       ...baseHandlers(),
-      http.post('/api/products', () => {
-        posts.push(1);
-        return HttpResponse.json({});
+      http.post('/api/products', () =>
+        HttpResponse.json(
+          {
+            id: 'p-7',
+            code: 'BVTV-0008',
+            name: 'x',
+            categoryId: null,
+            brandId: null,
+            trackingMode: 'NONE',
+            shelfLifeDays: null,
+            isActive: true,
+          },
+          { status: 201 },
+        ),
+      ),
+      http.post('/api/products/:id/skus', async ({ request }) => {
+        skuBodies.push((await request.json()) as Record<string, unknown>);
+        return HttpResponse.json({}, { status: 201 });
       }),
     );
     renderApp(<ProductFormScreen />);
-    fill('Tên thương mại *', 'Bút TL-12');
-    fill('Tồn đầu kỳ', '10'); // không giá nhập, không kho mặc định
+    fill('Tên thương mại *', 'Vua Bật Chồi');
+    fireEvent.click(screen.getByRole('combobox', { name: 'Nhập theo thùng' }));
+    fireEvent.click(await screen.findByRole('option', { name: 'Có' }));
+    fill('Số PCS trong 1 thùng', '10');
+    fireEvent.click(screen.getByRole('checkbox', { name: /Có nhiều biến thể/ }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Thêm biến thể' }));
+    const names = screen.getAllByLabelText('Tên biến thể');
+    fireEvent.change(names[0]!, { target: { value: 'Gói 40gr' } });
+    fireEvent.change(names[1]!, { target: { value: 'Gói 100gr' } });
+    expect(screen.getAllByText('Theo sản phẩm: 1 thùng = 10 PCS')).toHaveLength(2);
+    // Dòng 2 khai riêng: 1 BOX = 12 PCS
+    fireEvent.click(screen.getAllByRole('checkbox', { name: 'Quy cách riêng' })[1]!);
+    fireEvent.click(await screen.findByRole('combobox', { name: 'Nhập theo thùng (riêng)' }));
+    fireEvent.click(await screen.findByRole('option', { name: 'Có' }));
+    const perInputs = screen.getAllByLabelText('Số PCS trong 1 thùng');
+    fireEvent.change(perInputs[1]!, { target: { value: '12' } });
     fireEvent.click(screen.getByRole('button', { name: /Lưu sản phẩm/ }));
-    expect(
-      await screen.findByText('Nhập giá nhập để ghi giá vốn cho tồn đầu kỳ'),
-    ).toBeInTheDocument();
-    expect(screen.getByText('Chọn kho mặc định để ghi tồn đầu kỳ')).toBeInTheDocument();
-    expect(posts).toHaveLength(0);
+    await waitFor(() => expect(skuBodies).toHaveLength(2));
+    expect(skuBodies[0]!.conversions).toEqual([
+      { uom: 'BOX', factor: '10', containerType: 'CARTON' },
+    ]);
+    expect(skuBodies[1]!.conversions).toEqual([
+      { uom: 'BOX', factor: '12', containerType: 'CARTON' },
+    ]);
+    expect(skuBodies[0]).not.toHaveProperty('salesUom');
   });
 
   it('upload zone: kéo thả ảnh vào hàng chờ (ảnh đầu = Ảnh chính), bỏ bớt được, lưu xong tự tải lên sản phẩm mới', async () => {
@@ -551,7 +591,7 @@ describe('ProductFormScreen — sửa', () => {
     );
     renderApp(<ProductFormScreen productId="p-9" />);
     expect(await screen.findByDisplayValue('Bút bi TL-08 xanh')).toBeInTheDocument();
-    // Alias prefill vào ô "Tên gọi khác".
+    // Alias prefill vào ô "Tên lên đơn Pancake".
     expect(screen.getByDisplayValue('bút tl')).toBeInTheDocument();
     // Mã sản phẩm sửa được (2026-09-22); mã SKU / barcode vẫn ẩn — mã hiện ở mô tả header
     expect(screen.getByText('Sản phẩm cha TL08 · 1 biến thể')).toBeInTheDocument();
@@ -560,8 +600,8 @@ describe('ProductFormScreen — sửa', () => {
     expect(screen.getByLabelText('Mức tồn kho')).toHaveValue('120.000000');
     expect(screen.queryByDisplayValue('TL08-BLUE')).not.toBeInTheDocument();
     expect(screen.queryByLabelText('Barcode lẻ')).not.toBeInTheDocument();
-    // ĐVT cơ bản khóa khi sửa
-    expect(screen.getByRole('combobox', { name: 'ĐVT cơ bản *' })).toBeDisabled();
+    // Đơn vị bán chính khóa khi sửa
+    expect(screen.getByRole('combobox', { name: 'Đơn vị bán chính *' })).toBeDisabled();
 
     fireEvent.click(screen.getByRole('combobox', { name: 'Trạng thái' }));
     fireEvent.click(await screen.findByRole('option', { name: 'Ngừng bán' }));

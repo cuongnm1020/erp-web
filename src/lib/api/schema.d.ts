@@ -281,6 +281,38 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/promotions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["PromotionController_list"];
+        put?: never;
+        post: operations["PromotionController_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/promotions/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["PromotionController_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch: operations["PromotionController_update"];
+        trace?: never;
+    };
     "/customers": {
         parameters: {
             query?: never;
@@ -1912,6 +1944,63 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/carriers/settings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Cấu hình kết nối các hãng có adapter (màn Cấu hình hệ thống › Đơn vị vận chuyển).
+         *     Bí mật chỉ trả 4 ký tự cuối; mỗi trường kèm nguồn (màn hình / env).
+         */
+        get: operations["CarrierController_listSettings"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/carriers/{code}/settings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Sửa kết nối một hãng. Trường bỏ qua = giữ; `null`/rỗng = xoá → rơi về env. Có hiệu lực
+         *     ngay ở API và worker (không restart); token đăng nhập đang cache bị bỏ.
+         */
+        put: operations["CarrierController_updateSettings"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/carriers/{code}/settings/verify": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Gọi thử hãng bằng cấu hình đang hiệu lực. Luôn 200 — kết quả ở `status`. */
+        post: operations["CarrierController_verifySettings"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/carriers": {
         parameters: {
             query?: never;
@@ -2818,6 +2907,111 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/return-receipts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["ReturnsController_list"];
+        put?: never;
+        /** Tạo phiếu DRAFT (chưa chạm tồn). `Idempotency-Key` header hoặc body (luật 4 web). */
+        post: operations["ReturnsController_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/return-receipts/returnable": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Dòng đơn còn hoàn được (đã xuất − đã hoàn) + bin / lô / giá vốn mặc định. */
+        get: operations["ReturnsController_returnable"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/return-receipts/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["ReturnsController_get"];
+        put?: never;
+        post?: never;
+        /** Hủy phiếu NHÁP (idempotent). */
+        delete: operations["ReturnsController_cancel"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/return-receipts/{id}/post": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** POST phiếu: nhập lại kho dòng RESTOCK + chốt giá vốn. Gọi lại → 409 DOCUMENT_POSTED. */
+        post: operations["ReturnsController_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/reports/profit": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Tổng hợp + danh sách theo đơn hoặc theo SKU, trong data scope của người gọi. */
+        get: operations["ProfitController_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/reports/profit/backfill": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Chốt giá vốn cho đơn đã đóng gói trước khi có tính năng (chạy một lần sau deploy). Tính
+         *     lại từ sổ cái nên gọi lặp an toàn.
+         */
+        post: operations["ProfitController_backfill"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/transfers": {
         parameters: {
             query?: never;
@@ -3578,6 +3772,28 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/pancake-sync/push/products/bulk": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Trạng thái / kết quả lượt đẩy toàn bộ gần nhất — web hỏi định kỳ khi đang chạy. */
+        get: operations["PancakePushController_bulkStatus"];
+        put?: never;
+        /**
+         * Xếp job nền đẩy TOÀN BỘ sản phẩm lên mọi shop (nút "Đồng bộ Pancake" ở danh sách sản
+         *     phẩm). Đang có lượt chạy → không xếp thêm, trả trạng thái lượt đó. Khai báo TRƯỚC
+         *     `products/:id` để `bulk` không rơi vào ParseUUIDPipe.
+         */
+        post: operations["PancakePushController_startBulk"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/pancake-sync/push/products/{id}": {
         parameters: {
             query?: never;
@@ -3604,7 +3820,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Đẩy TOÀN BỘ sản phẩm đang có (không combo, chưa xóa) — đồng bộ lần đầu. */
+        /** Đẩy TOÀN BỘ sản phẩm đang có (không combo, chưa xóa), chờ xong mới trả — CLI / test. */
         post: operations["PancakePushController_allProducts"];
         delete?: never;
         options?: never;
@@ -3855,6 +4071,84 @@ export interface components {
             listPrice: string;
             /** @description Trần chiết khấu 0..1 dạng chuỗi; null = bảng giá không quy định. */
             maxDiscount: string | null;
+        };
+        /** @enum {string} */
+        PromotionType: "ORDER_DISCOUNT" | "LINE_DISCOUNT" | "BUY_X_GET_Y" | "FREE_SHIPPING" | "GIFT";
+        PromotionDto: {
+            type: components["schemas"]["PromotionType"];
+            condition: {
+                [key: string]: unknown;
+            };
+            reward: {
+                [key: string]: unknown;
+            };
+            id: string;
+            code: string;
+            name: string;
+            couponCode: string | null;
+            priority: number;
+            stackable: boolean;
+            validFrom: string;
+            validTo: string | null;
+            usageLimit: number | null;
+            usageLimitPerCustomer: number | null;
+            /** @description Số lần đã áp (đếm atomic ở core.claim_promotion) — chỉ đọc. */
+            usedCount: number;
+            isActive: boolean;
+            version: number;
+            createdAt: string;
+            updatedAt: string;
+        };
+        PromotionListResponseDto: {
+            items: components["schemas"]["PromotionDto"][];
+            total: number;
+        };
+        CreatePromotionDto: {
+            condition: {
+                [key: string]: unknown;
+            };
+            reward: {
+                [key: string]: unknown;
+            };
+            code: string;
+            name: string;
+            /** @enum {string} */
+            type: "ORDER_DISCOUNT" | "LINE_DISCOUNT" | "BUY_X_GET_Y" | "FREE_SHIPPING" | "GIFT";
+            /** @description Mã khách nhập để áp; bỏ trống = KM tự động. */
+            couponCode?: string | null;
+            /** @description Cao hơn được xét trước. */
+            priority?: number;
+            /** @description Cho phép áp cùng KM khác (cái đầu tiên được chọn cũng phải stackable). */
+            stackable?: boolean;
+            validFrom: string;
+            validTo?: string | null;
+            /** @description Tổng số lần dùng toàn hệ thống; bỏ trống = không giới hạn. */
+            usageLimit?: number | null;
+            usageLimitPerCustomer?: number | null;
+            isActive?: boolean;
+        };
+        UpdatePromotionDto: {
+            condition?: {
+                [key: string]: unknown;
+            };
+            reward?: {
+                [key: string]: unknown;
+            };
+            /** @description Optimistic lock — version client đang cầm; lệch → 409. */
+            version: number;
+            code?: string;
+            name?: string;
+            /** @enum {string} */
+            type?: "ORDER_DISCOUNT" | "LINE_DISCOUNT" | "BUY_X_GET_Y" | "FREE_SHIPPING" | "GIFT";
+            couponCode?: string | null;
+            priority?: number;
+            stackable?: boolean;
+            validFrom?: string;
+            validTo?: string | null;
+            usageLimit?: number | null;
+            usageLimitPerCustomer?: number | null;
+            /** @description false = ngừng chạy (không xoá — PromotionUsage giữ lịch sử đối soát). */
+            isActive?: boolean;
         };
         CustomerDto: {
             id: string;
@@ -4221,8 +4515,6 @@ export interface components {
             /** @description ĐVT lưu kho — mọi tồn quy về đây. */
             baseUomId: string;
             isActive: boolean;
-            /** @description Giá nhập THAM KHẢO Decimal(18,4) chuỗi — giá vốn thật vẫn FIFO (bất biến 11). */
-            purchasePrice: string | null;
             /** @description Decimal(12,4) kg dạng chuỗi — form hiển thị theo gram. */
             weightKg: string | null;
             /** @description null = không tổ hợp thuộc tính (sản phẩm đơn). */
@@ -4244,6 +4536,9 @@ export interface components {
             brand: components["schemas"]["BrandDto"] | null;
             defaultWarehouseId: string | null;
             description: string | null;
+            ingredients: string | null;
+            usageInstructions: string | null;
+            orderNote: string | null;
             internalNote: string | null;
             allowNegativeStock: boolean;
             /** @description Tên dân dã / viết tắt / tên cũ — ô tìm sản phẩm ăn cả các alias này. */
@@ -4284,7 +4579,14 @@ export interface components {
              * @description Kho mặc định — tồn đầu kỳ của SKU mới ghi vào kho này.
              */
             defaultWarehouseId?: string;
+            /** @description Công dụng. */
             description?: string;
+            /** @description Thành phần (hoạt chất, hàm lượng). */
+            ingredients?: string;
+            /** @description Cách dùng (liều lượng, cách pha). */
+            usageInstructions?: string;
+            /** @description Lưu ý khi lên đơn — nhắc sale lúc chốt đơn. */
+            orderNote?: string;
             /** @description Ghi chú nội bộ — không đưa ra kênh bán/khách. */
             internalNote?: string;
             /** @description Cờ master data — reserve/pick CHƯA đọc (chờ chốt vận hành). */
@@ -4313,7 +4615,14 @@ export interface components {
             isActive: boolean;
             /** @description Kho mặc định (wms.Warehouse.id) — tồn đầu kỳ SKU mới ghi vào đây. */
             defaultWarehouseId: string | null;
+            /** @description Công dụng. */
             description: string | null;
+            /** @description Thành phần (hoạt chất, hàm lượng). */
+            ingredients: string | null;
+            /** @description Cách dùng (liều lượng, cách pha). */
+            usageInstructions: string | null;
+            /** @description Lưu ý khi lên đơn — nhắc sale lúc chốt đơn. */
+            orderNote: string | null;
             /** @description Ghi chú nội bộ — không đưa ra kênh bán/khách. */
             internalNote: string | null;
             /** @description Cờ master data — reserve/pick CHƯA đọc (chờ chốt vận hành). */
@@ -4352,6 +4661,9 @@ export interface components {
             /** Format: uuid */
             defaultWarehouseId?: string;
             description?: string;
+            ingredients?: string;
+            usageInstructions?: string;
+            orderNote?: string;
             internalNote?: string;
             allowNegativeStock?: boolean;
             /** @description Tên in trên hóa đơn — null = xóa, dùng lại tên thương mại. */
@@ -4420,8 +4732,12 @@ export interface components {
             shelfLifeDays?: number;
             /** @description Attribute value SINH BIẾN THỂ (isVariant=true) — service tính variantKey chống trùng tổ hợp. */
             attributeValueIds?: string[];
-            /** @description Giá nhập tham khảo Decimal(18,4) chuỗi — cũng là unitCost của tồn đầu kỳ. */
-            purchasePrice?: string;
+            /**
+             * @description Đơn giá vốn / ĐVT cơ sở của tồn đầu kỳ, Decimal(18,4) chuỗi — bắt buộc khi có `openingQty`,
+             *     chỉ để ghi lô giá OPENING, không lưu lên SKU. Giá nhập không còn là thuộc tính SKU
+             *     (2026-10-01): mỗi phiếu nhập kho tạo lô giá riêng.
+             */
+            openingUnitCost?: string;
             /** @description Giá bán Decimal(18,4) chuỗi → ghi vào BẢNG GIÁ MẶC ĐỊNH (bất biến 12), không nằm trên Sku. */
             salePrice?: string;
             /** @description Tồn đầu kỳ (ĐVT cơ sở) — ghi movement OPENING + CostLayer vào kho mặc định của sản phẩm. */
@@ -4438,6 +4754,8 @@ export interface components {
             baseUomCode: string;
             /** @description Số lượng cho MỘT combo — Decimal(18,6) chuỗi. */
             qty: string;
+            /** @description Giá bán lẻ ĐVT cơ sở (bảng giá mặc định) — null = chưa có giá. */
+            unitPrice: string | null;
             /** @description Tồn khả dụng thành phần (mọi kho) — Decimal(18,6) chuỗi. */
             available: string;
             isActive: boolean;
@@ -4446,6 +4764,10 @@ export interface components {
             components: components["schemas"]["SkuComboComponentDto"][];
             /** @description Số combo còn bán được — chuỗi số nguyên. */
             available: string;
+            /** @description Số tiền giảm cho MỘT combo — Decimal(18,4) chuỗi. */
+            discountAmount: string;
+            /** @description Combo miễn ship — gợi ý bật miễn ship khi lên đơn (sale quyết định). */
+            freeShipping: boolean;
         };
         PackagingLevelDto: {
             /** @description 1 = cấp lớn nhất. */
@@ -4496,14 +4818,21 @@ export interface components {
             /** @description ĐVT lưu kho — mọi tồn quy về đây. */
             baseUomId: string;
             isActive: boolean;
-            /** @description Giá nhập THAM KHẢO Decimal(18,4) chuỗi — giá vốn thật vẫn FIFO (bất biến 11). */
-            purchasePrice: string | null;
             /** @description Decimal(12,4) kg dạng chuỗi — form hiển thị theo gram. */
             weightKg: string | null;
             /** @description null = không tổ hợp thuộc tính (sản phẩm đơn). */
             variantKey: string | null;
             /** @description Optimistic locking — gửi lại trong PATCH /skus/:id; lệch → 409. */
             version: number;
+        };
+        SkuWarehouseStockDto: {
+            warehouseId: string;
+            warehouseCode: string;
+            warehouseName: string;
+            onHand: string;
+            reserved: string;
+            /** @description `onHand - reserved`; combo: số combo còn bán được trong kho. */
+            available: string;
         };
         SkuListRowDto: {
             skuId: string;
@@ -4534,6 +4863,11 @@ export interface components {
             reserved: string;
             /** @description `onHand - reserved` — có thể ÂM khi giữ cho đơn nhiều hơn tồn thực. */
             available: string;
+            /**
+             * @description Tồn theo từng kho (bỏ TRANSIT / kho ngừng dùng) — ô chọn SKU khi lên đơn hiện để sale chọn
+             *     kho xuất. Combo: onHand/reserved = 0, available = số combo còn bán được ở kho đó.
+             */
+            byWarehouse: components["schemas"]["SkuWarehouseStockDto"][];
         };
         SkuListResponseDto: {
             items: components["schemas"]["SkuListRowDto"][];
@@ -4543,7 +4877,6 @@ export interface components {
             /** @description Optimistic locking bắt buộc — cùng cơ chế UpdateProductDto. */
             version: number;
             name?: string;
-            purchasePrice?: string;
             /** @description Giá bán → upsert vào bảng giá mặc định. */
             salePrice?: string;
             weightKg?: string;
@@ -4568,8 +4901,6 @@ export interface components {
             /** @description ĐVT lưu kho — mọi tồn quy về đây. */
             baseUomId: string;
             isActive: boolean;
-            /** @description Giá nhập THAM KHẢO Decimal(18,4) chuỗi — giá vốn thật vẫn FIFO (bất biến 11). */
-            purchasePrice: string | null;
             /** @description Decimal(12,4) kg dạng chuỗi — form hiển thị theo gram. */
             weightKg: string | null;
             /** @description null = không tổ hợp thuộc tính (sản phẩm đơn). */
@@ -4867,8 +5198,17 @@ export interface components {
             /** @description Mã ĐVT bán của combo. */
             baseUomCode: string;
             baseUomId: string;
-            /** @description Giá bán MỘT combo trong bảng giá mặc định — null = chưa đặt giá. */
+            /**
+             * @description Giá bán MỘT combo trong bảng giá mặc định = componentsPrice − discountAmount (hệ thống tự
+             *     tính, không nhập tay). null = còn thành phần chưa có giá lẻ.
+             */
             salePrice: string | null;
+            /** @description Σ(giá lẻ thành phần × số lượng) trước giảm — null khi còn thành phần chưa có giá. */
+            componentsPrice: string | null;
+            /** @description Số tiền giảm cho MỘT combo — Decimal(18,4) chuỗi. */
+            discountAmount: string;
+            /** @description Combo miễn ship — gợi ý cho sale khi lên đơn. */
+            freeShipping: boolean;
             componentCount: number;
             /**
              * @description Số combo còn bán được = min theo thành phần của floor(available / qty) — chuỗi số nguyên,
@@ -4892,6 +5232,8 @@ export interface components {
             baseUomCode: string;
             /** @description Số lượng cho MỘT combo — Decimal(18,6) chuỗi. */
             qty: string;
+            /** @description Giá bán lẻ ĐVT cơ sở của thành phần (bảng giá mặc định) — null = chưa có giá. */
+            unitPrice: string | null;
             /** @description Tồn khả dụng của thành phần (onHand − reserved, mọi kho) — Decimal(18,6) chuỗi. */
             available: string;
             isActive: boolean;
@@ -4907,8 +5249,17 @@ export interface components {
             /** @description Mã ĐVT bán của combo. */
             baseUomCode: string;
             baseUomId: string;
-            /** @description Giá bán MỘT combo trong bảng giá mặc định — null = chưa đặt giá. */
+            /**
+             * @description Giá bán MỘT combo trong bảng giá mặc định = componentsPrice − discountAmount (hệ thống tự
+             *     tính, không nhập tay). null = còn thành phần chưa có giá lẻ.
+             */
             salePrice: string | null;
+            /** @description Σ(giá lẻ thành phần × số lượng) trước giảm — null khi còn thành phần chưa có giá. */
+            componentsPrice: string | null;
+            /** @description Số tiền giảm cho MỘT combo — Decimal(18,4) chuỗi. */
+            discountAmount: string;
+            /** @description Combo miễn ship — gợi ý cho sale khi lên đơn. */
+            freeShipping: boolean;
             componentCount: number;
             /**
              * @description Số combo còn bán được = min theo thành phần của floor(available / qty) — chuỗi số nguyên,
@@ -4945,8 +5296,13 @@ export interface components {
             description?: string;
             /** @description Mã ĐVT của SKU combo (mặc định PCS) — combo bán theo đơn vị này, không quy đổi. */
             baseUom?: string;
-            /** @description Giá bán MỘT combo vào bảng giá mặc định — Decimal(18,4) chuỗi. Bỏ trống = chưa đặt giá. */
-            salePrice?: string;
+            /**
+             * @description Số tiền giảm cho MỘT combo — Decimal(18,4) chuỗi, ≥ 0, mặc định 0. Giá bán combo do hệ
+             *     thống tính: Σ(giá bán lẻ thành phần × số lượng) − discountAmount.
+             */
+            discountAmount?: string;
+            /** @description Combo miễn ship — gợi ý cho sale khi lên đơn (sale quyết định phí ship cuối). */
+            freeShipping?: boolean;
             /** @description Tên dân dã / viết tắt cho ô tìm kiếm. */
             searchAliases?: string[];
             components: components["schemas"]["ComboComponentInputDto"][];
@@ -4961,7 +5317,9 @@ export interface components {
             brandId?: string | null;
             description?: string;
             isActive?: boolean;
-            salePrice?: string;
+            /** @description Xem CreateComboDto.discountAmount. */
+            discountAmount?: string;
+            freeShipping?: boolean;
             searchAliases?: string[];
             components?: components["schemas"]["ComboComponentInputDto"][];
         };
@@ -5645,6 +6003,13 @@ export interface components {
             customerId: string;
             /** Format: uuid */
             addressId?: string;
+            /**
+             * Format: uuid
+             * @description Kho xuất (wms.Warehouse.id đang dùng, không phải TRANSIT) — đơn xuất từ MỘT kho: mọi dòng
+             *     (kể cả thành phần combo, hàng tặng) chỉ giữ tồn trong kho này; thiếu → 409 INSUFFICIENT_STOCK.
+             *     Bỏ trống = giữ ở bất kỳ kho nào (hành vi cũ).
+             */
+            warehouseId?: string;
             /** @enum {string} */
             channel?: "DIRECT" | "MARKETPLACE" | "WEBSITE" | "POS";
             /** @description Decimal(18,4) dạng chuỗi — cấm number cho tiền. */
@@ -5895,6 +6260,67 @@ export interface components {
             phone: string | null;
             /** @description true = đủ tỉnh/thành + số điện thoại để làm điểm lấy hàng cho hãng. */
             pickupReady: boolean;
+        };
+        CarrierSettingFieldDto: {
+            /** @enum {string} */
+            key: "baseUrl" | "shopId" | "partnerCode" | "username" | "password" | "token" | "apiKey" | "webhookSecret";
+            label: string;
+            /** @description Bí mật: không bao giờ trả giá trị, chỉ `hint`. */
+            secret: boolean;
+            /** @description Giá trị hiệu lực của trường không bí mật; bí mật luôn null. */
+            value: string | null;
+            /** @description Bí mật đang hiệu lực: 4 ký tự cuối ("…abcd"); tài khoản thì hiện nguyên. */
+            hint: string | null;
+            /**
+             * @description db = nhập ở màn này; env = biến môi trường; apiConfig = JSON cũ trong wms.Carrier; null = chưa có.
+             * @enum {string|null}
+             */
+            source: "apiConfig" | "db" | "env" | null;
+            /** @description Biến env làm nền khi ô này trống. */
+            envName: string;
+            /** @description Mô tả ngắn cho admin. */
+            help: string | null;
+        };
+        CarrierSettingDto: {
+            code: string;
+            name: string;
+            isActive: boolean;
+            /** @description Đủ thông tin để gọi ra hãng (base URL + token hoặc tài khoản). */
+            configured: boolean;
+            /** @description Hãng có cài kiểm tra kết nối. */
+            canVerify: boolean;
+            fields: components["schemas"]["CarrierSettingFieldDto"][];
+            /** @description Bí mật đã lưu không giải mã được (APP_SECRET_KEY đổi) — phải nhập lại. */
+            secretsUnreadable: boolean;
+            lastVerifiedAt: string | null;
+            lastVerifyError: string | null;
+            updatedAt: string | null;
+        };
+        UpdateCarrierSettingDto: {
+            /**
+             * Format: uri
+             * @description Địa chỉ API của hãng (môi trường thật / thử nghiệm).
+             */
+            baseUrl?: string | null;
+            /** @description Token API tĩnh (GHN, GHTK, J&T, VTP token tĩnh). */
+            token?: string | null;
+            /** @description Tài khoản đăng nhập API (VTP, VNPost) — thay cho token tĩnh. */
+            username?: string | null;
+            password?: string | null;
+            /** @description Khoá phụ (VNPost `cApiKey`). */
+            apiKey?: string | null;
+            /** @description GHN ShopId. */
+            shopId?: string | null;
+            /** @description GHTK X-Client-Source, VTP / J&T mã đối tác. */
+            partnerCode?: string | null;
+            /** @description Bí mật xác thực webhook vào. Trống = dùng token. */
+            webhookSecret?: string | null;
+        };
+        CarrierVerifyResultDto: {
+            /** @enum {string} */
+            status: "failed" | "ok" | "unsupported";
+            message: string;
+            verifiedAt: string | null;
         };
         CarrierDto: {
             id: string;
@@ -7182,6 +7608,250 @@ export interface components {
              */
             receiveLocationId?: string;
         };
+        ReturnReceiptListRowDto: {
+            id: string;
+            docNumber: string;
+            /** @enum {string} */
+            status: "DRAFT" | "PENDING_APPROVAL" | "APPROVED" | "POSTED" | "CANCELLED";
+            orderId: string;
+            orderDocNumber: string;
+            warehouseId: string;
+            warehouseName: string;
+            reason: string | null;
+            /** @description ISO datetime. */
+            receivedAt: string;
+            lineCount: number;
+            /** @description Σ SL hoàn (ĐVT cơ sở). */
+            totalQty: string;
+        };
+        ReturnReceiptListResponseDto: {
+            items: components["schemas"]["ReturnReceiptListRowDto"][];
+            total: number;
+        };
+        ReturnableLineDto: {
+            orderLineId: string;
+            lineNo: number;
+            skuId: string;
+            skuCode: string;
+            skuName: string;
+            /** @description SL đặt (ĐVT cơ sở). */
+            qtyOrdered: string;
+            /** @description SL đã xuất kho (trừ tồn lúc PACK). */
+            qtyShipped: string;
+            /** @description Đã hoàn ở các phiếu POSTED. */
+            qtyReturned: string;
+            /** @description qtyShipped − qtyReturned. */
+            qtyReturnable: string;
+            /** @description Giá vốn FIFO bình quân đã xuất — giá nhập lại kho. null = chưa xuất. */
+            unitCost: string | null;
+            /** @description Bin + lô mặc định nhận lại (nơi đã lấy nhiều nhất). */
+            defaultLocationId: string | null;
+            defaultLocationCode: string | null;
+            defaultLotId: string | null;
+            defaultLotNumber: string | null;
+        };
+        ReturnableOrderDto: {
+            orderId: string;
+            docNumber: string;
+            status: string;
+            lines: components["schemas"]["ReturnableLineDto"][];
+        };
+        ReturnReceiptLineDto: {
+            id: string;
+            lineNo: number;
+            orderLineId: string;
+            skuId: string;
+            skuCode: string;
+            skuName: string;
+            qtyBase: string;
+            /** @enum {string} */
+            disposition: "SCRAP" | "RESTOCK";
+            locationId: string | null;
+            locationCode: string | null;
+            lotId: string | null;
+            lotNumber: string | null;
+            /** @description Có sau POST: giá vốn FIFO bình quân đã xuất. */
+            unitCost: string | null;
+            costAmount: string | null;
+        };
+        ReturnReceiptDetailDto: {
+            id: string;
+            docNumber: string;
+            /** @enum {string} */
+            status: "DRAFT" | "PENDING_APPROVAL" | "APPROVED" | "POSTED" | "CANCELLED";
+            orderId: string;
+            orderDocNumber: string;
+            warehouseId: string;
+            warehouseName: string;
+            reason: string | null;
+            /** @description ISO datetime. */
+            receivedAt: string;
+            lineCount: number;
+            /** @description Σ SL hoàn (ĐVT cơ sở). */
+            totalQty: string;
+            note: string | null;
+            /** @description ISO datetime, null khi chưa POST. */
+            postedAt: string | null;
+            lines: components["schemas"]["ReturnReceiptLineDto"][];
+        };
+        CreateReturnLineDto: {
+            /**
+             * Format: uuid
+             * @description core.SalesOrderLine.id của đơn đang hoàn.
+             */
+            orderLineId: string;
+            /** @description SL hoàn theo ĐVT cơ sở — Decimal(18,6) chuỗi, > 0. */
+            qty: string;
+            /**
+             * @description RESTOCK (mặc định) = nhập lại kho; SCRAP = hỏng, không nhập kho.
+             * @enum {string}
+             */
+            disposition?: "SCRAP" | "RESTOCK";
+            /**
+             * Format: uuid
+             * @description Bin nhận lại (RESTOCK) — bỏ trống = bin đã lấy hàng cho dòng đơn này.
+             */
+            locationId?: string;
+            /**
+             * Format: uuid
+             * @description Lô nhận lại — phải là lô đã xuất cho dòng; bỏ trống = lô xuất nhiều nhất.
+             */
+            lotId?: string;
+        };
+        CreateReturnReceiptDto: {
+            /** Format: uuid */
+            orderId: string;
+            reason?: string;
+            note?: string;
+            /** @description Header `Idempotency-Key` thắng nếu có cả hai (luật 4 phía web). */
+            idempotencyKey?: string;
+            lines: components["schemas"]["CreateReturnLineDto"][];
+        };
+        CreateReturnReceiptResponseDto: {
+            receiptId: string;
+            docNumber: string;
+            status: string;
+        };
+        ProfitSummaryDto: {
+            orderCount: number;
+            /** @description Σ thành tiền dòng (đã trừ chiết khấu dòng) — mọi đơn, kể cả hàng hoàn. */
+            goodsRevenue: string;
+            /** @description Σ giảm trừ khuyến mãi cấp đơn — mọi đơn, kể cả hàng hoàn. */
+            orderDiscount: string;
+            /** @description Số đơn có hàng hoàn (một phần hoặc cả đơn). */
+            returnedOrderCount: number;
+            /** @description Số đơn ĐVVC đã hoàn mà kho chưa POST phiếu nhập hàng hoàn. */
+            awaitingReturnReceiptCount: number;
+            /** @description Tiền hàng (sau KM cấp đơn) của phần hoàn — đã loại khỏi `revenue`. */
+            returnedRevenue: string;
+            /** @description Giá vốn của phần hoàn đã loại khỏi `cogs` (hàng nhập lại kho / tạm coi về đủ). */
+            returnedCogs: string;
+            /** @description goodsRevenue − orderDiscount − returnedRevenue. Không gồm phí ship, thuế. */
+            revenue: string;
+            /** @description Giá vốn FIFO đã chốt lúc đóng gói, trừ phần hoàn nhập lại kho. */
+            actualCogs: string;
+            /** @description Giá vốn tạm tính cho dòng chưa đóng gói. */
+            estimatedCogs: string;
+            /** @description actualCogs + estimatedCogs. */
+            cogs: string;
+            /** @description revenue − cogs. */
+            grossProfit: string;
+            marginPct: string | null;
+            /** @description Σ phí ship THU KHÁCH (SalesOrder.shippingFee) của đơn không bị ĐVVC hoàn. */
+            shippingCharged: string;
+            /** @description Σ cước hãng vận chuyển (cước + phụ phí + phí COD) — mọi đơn đã có phiếu giao, kể cả hoàn. */
+            shippingCost: string;
+            /** @description Số đơn có phiếu đã rời kho mà hãng chưa báo cước → `shippingCost` đang thiếu. */
+            shippingCostMissingCount: number;
+            /**
+             * @description Σ thuế trên đơn (SalesOrder.taxAmount) của đơn không bị ĐVVC hoàn — tiền THU HỘ nhà nước,
+             *     không phải doanh thu nên không vào lợi nhuận; hiện để đối chiếu với tiền thu khách.
+             */
+            taxAmount: string;
+            /** @description grossProfit + shippingCharged − shippingCost. */
+            netProfit: string;
+            /** @description netProfit / (revenue + shippingCharged). */
+            netMarginPct: string | null;
+            /** @description Số SKU (trong các dòng chưa đóng gói) chưa có lô giá nào — giá vốn của chúng tính 0. */
+            missingCostSkuCount: number;
+        };
+        ProfitOrderRowDto: {
+            orderId: string;
+            docNumber: string;
+            /** @description ISO datetime. */
+            orderDate: string;
+            /** @enum {string} */
+            status: "APPROVED" | "POSTED";
+            customerCode: string;
+            customerName: string;
+            /** @enum {string} */
+            returnStatus: "NONE" | "PARTIAL" | "FULL" | "AWAITING_RECEIPT";
+            /** @description Doanh thu đã loại vì hoàn (sau KM cấp đơn phân bổ). */
+            returnedRevenue: string;
+            /** @description Doanh thu sau khi trừ phần hoàn. */
+            revenue: string;
+            cogs: string;
+            grossProfit: string;
+            marginPct: string | null;
+            /** @enum {string} */
+            costStatus: "ACTUAL" | "ESTIMATED" | "MISSING";
+            /** @description Phí ship thu khách (0 khi ĐVVC hoàn). */
+            shippingCharged: string;
+            /** @description Cước hãng (0 khi chưa có phiếu giao). */
+            shippingCost: string;
+            /** @description Phiếu đã rời kho mà hãng chưa báo cước. */
+            shippingCostMissing: boolean;
+            /** @description Thuế trên đơn — không vào lợi nhuận. */
+            taxAmount: string;
+            /** @description grossProfit + shippingCharged − shippingCost. */
+            netProfit: string;
+        };
+        ProfitSkuRowDto: {
+            skuId: string;
+            skuCode: string;
+            skuName: string;
+            /** @description Số lượng bán (đã trừ hàng hoàn) theo đơn vị cơ sở — Decimal(18,6). */
+            qtyBase: string;
+            /** @description Số lượng hoàn — Decimal(18,6). */
+            returnedQtyBase: string;
+            /**
+             * @description Σ thành tiền dòng trừ phần hoàn — CHƯA trừ khuyến mãi cấp đơn (không phân bổ về SKU). Đơn
+             *     ĐVVC hoàn không tính; phí ship / cước / thuế là cấp đơn nên không có ở góc nhìn SKU.
+             */
+            revenue: string;
+            cogs: string;
+            grossProfit: string;
+            marginPct: string | null;
+            /** @description Giá vốn bình quân / đơn vị cơ sở của số đã bán (cogs / qtyBase). */
+            avgUnitCost: string | null;
+            /** @enum {string} */
+            costStatus: "ACTUAL" | "ESTIMATED" | "MISSING";
+        };
+        ProfitReportDto: {
+            /** @description `YYYY-MM-DD`. */
+            from: string;
+            to: string;
+            /** @enum {string} */
+            groupBy: "sku" | "order";
+            summary: components["schemas"]["ProfitSummaryDto"];
+            /** @description Có khi groupBy=order. */
+            orders: components["schemas"]["ProfitOrderRowDto"][];
+            /** @description Có khi groupBy=sku. */
+            skus: components["schemas"]["ProfitSkuRowDto"][];
+            total: number;
+        };
+        ProfitBackfillDto: {
+            from: string;
+            to: string;
+        };
+        ProfitBackfillResultDto: {
+            /** @description Số đơn đã quét trong khoảng. */
+            scanned: number;
+            /** @description Số đơn đã chốt giá vốn lần này. */
+            costed: number;
+            /** @description Số đơn đã ghi lại cước vận chuyển + trạng thái hoàn. */
+            shippingRefreshed: number;
+        };
         TransferListRowDto: {
             id: string;
             docNumber: string;
@@ -7741,17 +8411,47 @@ export interface components {
             shopId: number;
             limit?: number;
         };
+        PancakePushCountsDto: {
+            created: number;
+            updated: number;
+            linked: number;
+            hidden: number;
+            skipped: number;
+            failed: number;
+        };
+        PancakeBulkPushFailureDto: {
+            shopId: string;
+            productId: string;
+            productCode: string;
+            productName: string;
+            reason: string | null;
+        };
+        PancakeBulkPushStatusDto: {
+            /** @enum {string} */
+            state: "completed" | "failed" | "active" | "waiting" | "idle";
+            /** @description Số sản phẩm đã duyệt / tổng — tính theo sản phẩm, không theo shop. */
+            done: number;
+            total: number;
+            counts: components["schemas"]["PancakePushCountsDto"];
+            /** @description Các dòng `failed` (tối đa 50) để người vận hành xem lý do. */
+            failures: components["schemas"]["PancakeBulkPushFailureDto"][];
+            /** @description Lỗi của cả lượt (ném ra khỏi job — mạng / DB), khác với lỗi từng sản phẩm. */
+            error: string | null;
+            startedAt: string | null;
+            finishedAt: string | null;
+        };
         PancakePushResultDto: {
             shopId: string;
             /** @enum {string} */
             entity: "product" | "warehouse";
             internalId: string;
             /**
-             * @description created = POST mới; updated = PUT theo id đã liên kết; hidden = sản phẩm ngừng / xóa → ẩn trên
+             * @description created = POST mới; updated = PUT theo id đã liên kết; linked = chưa liên kết nhưng đã có
+             *     trên Pancake (tìm theo mã) → liên kết rồi PUT, không tạo trùng; hidden = sản phẩm ngừng / xóa → ẩn trên
              *     POS; skipped = không đẩy (lý do ở `reason`); failed = Pancake từ chối (lý do ở `reason`).
              * @enum {string}
              */
-            action: "failed" | "created" | "skipped" | "updated" | "hidden";
+            action: "failed" | "created" | "skipped" | "updated" | "linked" | "hidden";
             /** @description Id trên Pancake sau khi đẩy (sync.entity_link); null khi chưa liên kết được. */
             externalId: string | null;
             reason: string | null;
@@ -8337,6 +9037,103 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ResolvedPriceDto"];
+                };
+            };
+        };
+    };
+    PromotionController_list: {
+        parameters: {
+            query: {
+                /** @description Tìm theo mã / tên / mã coupon. */
+                q?: string;
+                isActive?: boolean;
+                type?: "ORDER_DISCOUNT" | "LINE_DISCOUNT" | "BUY_X_GET_Y" | "FREE_SHIPPING" | "GIFT";
+                /** @description true = chỉ KM đang trong hiệu lực lúc này (validFrom ≤ now ≤ validTo). */
+                runningNow?: boolean;
+                take: number;
+                skip: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PromotionListResponseDto"];
+                };
+            };
+        };
+    };
+    PromotionController_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreatePromotionDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PromotionDto"];
+                };
+            };
+        };
+    };
+    PromotionController_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PromotionDto"];
+                };
+            };
+        };
+    };
+    PromotionController_update: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdatePromotionDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PromotionDto"];
                 };
             };
         };
@@ -11343,6 +12140,71 @@ export interface operations {
             };
         };
     };
+    CarrierController_listSettings: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CarrierSettingDto"][];
+                };
+            };
+        };
+    };
+    CarrierController_updateSettings: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                code: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateCarrierSettingDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CarrierSettingDto"];
+                };
+            };
+        };
+    };
+    CarrierController_verifySettings: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                code: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CarrierVerifyResultDto"];
+                };
+            };
+        };
+    };
     CarrierController_list: {
         parameters: {
             query?: never;
@@ -12588,6 +13450,193 @@ export interface operations {
                 };
                 content: {
                     "application/json": Record<string, never>;
+                };
+            };
+        };
+    };
+    ReturnsController_list: {
+        parameters: {
+            query: {
+                orderId?: string;
+                status?: "DRAFT" | "PENDING_APPROVAL" | "APPROVED" | "POSTED" | "CANCELLED";
+                /** @description Số phiếu RTN (contains, không phân biệt hoa thường). */
+                q?: string;
+                take: number;
+                skip: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReturnReceiptListResponseDto"];
+                };
+            };
+        };
+    };
+    ReturnsController_create: {
+        parameters: {
+            query?: never;
+            header: {
+                "idempotency-key": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateReturnReceiptDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CreateReturnReceiptResponseDto"];
+                };
+            };
+        };
+    };
+    ReturnsController_returnable: {
+        parameters: {
+            query?: {
+                orderId?: string;
+                docNumber?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReturnableOrderDto"];
+                };
+            };
+        };
+    };
+    ReturnsController_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReturnReceiptDetailDto"];
+                };
+            };
+        };
+    };
+    ReturnsController_cancel: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    ReturnsController_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReturnReceiptDetailDto"];
+                };
+            };
+        };
+    };
+    ProfitController_get: {
+        parameters: {
+            query: {
+                /** @description `YYYY-MM-DD` — ngày đầu (giờ VN). */
+                from: string;
+                /** @description `YYYY-MM-DD` — ngày cuối, lấy hết ngày đó. Tối đa 93 ngày tính từ `from`. */
+                to: string;
+                /** @description `order` = mỗi đơn một dòng; `sku` = gộp theo SKU. */
+                groupBy: "order" | "sku";
+                /** @description order: số đơn / mã / tên khách. sku: mã / tên SKU. Không phân biệt hoa thường. */
+                q?: string;
+                take: number;
+                skip: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProfitReportDto"];
+                };
+            };
+        };
+    };
+    ProfitController_backfill: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ProfitBackfillDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProfitBackfillResultDto"];
                 };
             };
         };
@@ -13966,6 +15015,44 @@ export interface operations {
                 };
                 content: {
                     "application/json": Record<string, never>;
+                };
+            };
+        };
+    };
+    PancakePushController_bulkStatus: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PancakeBulkPushStatusDto"];
+                };
+            };
+        };
+    };
+    PancakePushController_startBulk: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PancakeBulkPushStatusDto"];
                 };
             };
         };

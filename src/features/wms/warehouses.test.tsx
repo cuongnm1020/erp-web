@@ -31,13 +31,14 @@ describe('WarehousesScreen — GET/POST/PATCH/DELETE /warehouses', () => {
     server.use(http.get('/api/warehouses', () => HttpResponse.json(WAREHOUSES)));
   });
 
-  it('tải danh sách thật: mã, tên, địa chỉ, trạng thái Đang dùng / Ngừng dùng', async () => {
+  it('tải danh sách thật: mã, tên, địa chỉ; kho Ngừng dùng bị ẩn', async () => {
     renderApp(<WarehousesScreen />);
     expect(await screen.findByText('Kho Hà Nội 1')).toBeInTheDocument();
-    expect(screen.getByText('3 kho')).toBeInTheDocument();
+    expect(screen.getByText('2 kho')).toBeInTheDocument();
     expect(screen.getByText('KCN Quang Minh')).toBeInTheDocument();
     expect(screen.getAllByText('Đang dùng')).toHaveLength(2);
-    expect(screen.getByText('Ngừng dùng')).toBeInTheDocument();
+    expect(screen.queryByText('Ngừng dùng')).not.toBeInTheDocument();
+    expect(screen.queryByText('Kho HCM')).not.toBeInTheDocument();
   });
 
   it('thêm kho: dialog → POST /warehouses đúng body, đóng + toast', async () => {
@@ -112,8 +113,8 @@ describe('WarehousesScreen — GET/POST/PATCH/DELETE /warehouses', () => {
     renderApp(<WarehousesScreen />);
     await screen.findByText('Kho Đà Nẵng');
     expect(screen.getByText('Mặc định')).toBeInTheDocument();
-    // 3 kho, chỉ 2 kho không mặc định có nút Xóa (WH01, WH02)
-    expect(screen.getAllByRole('button', { name: 'Xóa' })).toHaveLength(2);
+    // WH02 ngừng dùng bị ẩn; còn 2 kho, chỉ kho không mặc định có nút Xóa (WH01)
+    expect(screen.getAllByRole('button', { name: 'Xóa' })).toHaveLength(1);
     // Chỉ kho ĐANG HOẠT ĐỘNG và chưa mặc định có "Đặt mặc định" → WH01 (WH02 ngừng dùng)
     const setDefault = screen.getAllByRole('button', { name: /Đặt mặc định/ });
     expect(setDefault).toHaveLength(1);

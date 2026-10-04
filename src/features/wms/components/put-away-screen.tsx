@@ -1,6 +1,7 @@
 'use client';
 
 import {
+  ArrowLeft,
   ArrowRight,
   CheckCircle2,
   CircleAlert,
@@ -10,6 +11,8 @@ import {
   Plus,
   WifiOff,
 } from 'lucide-react';
+import Link from 'next/link';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
 import { ScanInput, type ScanInputHandle } from '@/components/data/scan-input';
 import { ForbiddenState } from '@/components/data/states';
@@ -32,16 +35,32 @@ import { SkuBarcodes } from './sku-barcodes';
  * nhận (DOCK), quét sản phẩm đủ số lượng, đem tới ô kệ đích, quét mã ô kệ (hoặc bấm "Đã cất
  * vào …") → server chuyển tồn DOCK → bin. Hết dòng → việc xong. Dòng không có ô kệ (kho hết
  * chỗ trống, EXCEPTION) hiện mờ để điều phối chỉ định — máy quét không làm được.
+ *
+ * `?task=<id>` (từ cột "Việc cất hàng" trên màn pick) → tự nhận việc đó một lần rồi bỏ param.
  */
 export function PutAwayScreen() {
   const ability = useAbility();
   const s = usePutAwaySession();
   const scanRef = useRef<ScanInputHandle>(null);
-  const [qty, setQty] = useState(1);
+  const [qtyText, setQtyText] = useState('1');
+  // Ô nhập cho phép tạm rỗng khi đang gõ; giá trị dùng để quét luôn là số nguyên ≥ 1.
+  const qty = Math.max(1, Number.parseInt(qtyText, 10) || 1);
+  const setQty = (next: number) => setQtyText(String(Math.max(1, next)));
   const canExecute = ability.can('execute', 'Task');
   const queue = usePdaQueue('PUT_AWAY', canExecute);
   const doneToday = usePdaStats('PUT_AWAY', null, canExecute);
   const idle = s.phase === 'idle';
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const taskParam = searchParams.get('task');
+  const openedParam = useRef<string | null>(null);
+  useEffect(() => {
+    if (!taskParam || !canExecute || openedParam.current === taskParam) return;
+    openedParam.current = taskParam;
+    router.replace('/pda/put-away');
+    void s.openTask(taskParam);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [taskParam, canExecute]);
   useEffect(() => {
     // Quay về màn chờ (sau "Việc kế tiếp") → làm tươi hai cột ngay, không đợi 30s.
     if (idle && canExecute) {
@@ -80,7 +99,18 @@ export function PutAwayScreen() {
     <div className="flex min-h-dvh flex-col bg-background text-base">
       <header className="flex items-center justify-between border-b px-4 py-3">
         <div>
-          <div className="text-xs uppercase tracking-wide text-muted-foreground">Cất hàng</div>
+          <div className="flex items-center gap-2 text-xs uppercase tracking-wide text-muted-foreground">
+            <Link
+              href="/pda/pick"
+              className="-m-2 flex items-center gap-1 p-2 hover:text-foreground"
+              aria-label="Về màn lấy hàng"
+            >
+              <ArrowLeft className="h-3 w-3" aria-hidden />
+              Lấy hàng
+            </Link>
+            <span aria-hidden>·</span>
+            Cất hàng
+          </div>
           <div className="font-mono text-lg font-semibold">
             {task?.docNumber ?? 'Chưa nhận việc'}
           </div>
@@ -303,18 +333,33 @@ export function PutAwayScreen() {
                 variant="outline"
                 className="h-14 w-14"
                 aria-label="Giảm số lượng"
-                onClick={() => setQty((q) => Math.max(1, q - 1))}
+                onClick={() => setQty(qty - 1)}
               >
                 <Minus aria-hidden />
               </Button>
-              <span className="w-10 text-center text-2xl font-bold tabular-nums" aria-live="polite">
-                {qty}
-              </span>
+              <input
+                type="text"
+                inputMode="numeric"
+                pattern="[0-9]*"
+                aria-label="Số lượng mỗi lần quét"
+                className="h-14 w-20 rounded-md border bg-background text-center text-2xl font-bold tabular-nums focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                value={qtyText}
+                onChange={(e) => setQtyText(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                onFocus={(e) => e.target.select()}
+                onBlur={() => setQty(qty)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    setQty(qty);
+                    scanRef.current?.focus();
+                  }
+                }}
+              />
               <Button
                 variant="outline"
                 className="h-14 w-14"
                 aria-label="Tăng số lượng"
-                onClick={() => setQty((q) => q + 1)}
+                onClick={() => setQty(qty + 1)}
               >
                 <Plus aria-hidden />
               </Button>

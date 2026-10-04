@@ -18,6 +18,12 @@ vi.stubGlobal(
 );
 window.HTMLElement.prototype.scrollIntoView = vi.fn();
 
+// Toast không render trong harness → mock để kiểm câu báo khi quét mã lạ.
+const toastError = vi.fn();
+vi.mock('@/components/ui/toaster', () => ({
+  toast: { success: vi.fn(), error: (...a: unknown[]) => toastError(...a) },
+}));
+
 const push = vi.fn();
 vi.mock('next/navigation', () => ({
   usePathname: () => '/wms/grn',
@@ -119,6 +125,34 @@ const DETAIL_PACKED = {
   ],
 };
 
+/**
+ * GET /skus/:id/conversions — 1 BOX = 10 REAM (CARTON), 1 PLT = 100 REAM (PALLET); 1 GOI = 5 REAM
+ * là ĐVT phụ thường (không phải cấp đóng gói) → không được chọn làm ĐVT nhập.
+ */
+const CONVERSIONS = [
+  {
+    id: 'cv-3',
+    uomId: 'u-goi',
+    factor: '5.000000',
+    containerTypeId: null,
+    uom: { id: 'u-goi', code: 'GOI', name: 'Gói', decimals: 0 },
+  },
+  {
+    id: 'cv-2',
+    uomId: 'u-plt',
+    factor: '100.000000',
+    containerTypeId: 'ct-1',
+    uom: { id: 'u-plt', code: 'PLT', name: 'Pallet', decimals: 0 },
+  },
+  {
+    id: 'cv-1',
+    uomId: 'u-box',
+    factor: '10.000000',
+    containerTypeId: 'ct-2',
+    uom: { id: 'u-box', code: 'BOX', name: 'Thùng', decimals: 0 },
+  },
+];
+
 const SKU_LIST = {
   items: [
     {
@@ -190,16 +224,17 @@ describe('GrnCreateScreen — POST /goods-receipts (+ post)', () => {
       http.get('/api/warehouses', () => HttpResponse.json(WAREHOUSES)),
       http.get('/api/skus', () => HttpResponse.json(SKU_LIST)),
       http.get('/api/container-types', () => HttpResponse.json(CONTAINER_TYPES)),
+      http.get('/api/skus/:id/conversions', () => HttpResponse.json(CONVERSIONS)),
     );
   });
 
-  it('PLAN-packaging-hierarchy D: chọn loại thùng + SL/thùng → body có packaging; không chia hết → lỗi tại ô', async () => {
+  it('nhập theo thùng / pallet: ĐVT nhập chỉ có đơn vị bán chính + thùng / pallet đã khai; chọn pallet → SL quy đổi, body gửi uom + packaging suy từ ĐVT', async () => {
     const posts: Array<{ body: unknown }> = [];
     server.use(
       http.post('/api/goods-receipts', async ({ request }) => {
         posts.push({ body: await request.json() });
         return HttpResponse.json(
-          { receiptId: 'r-9', docNumber: 'GRN2608-00099', status: 'DRAFT', warehouseId: 'wh-1' },
+          { receiptId: 'r-8', docNumber: 'GRN2610-00001', status: 'DRAFT', warehouseId: 'wh-1' },
           { status: 201 },
         );
       }),
@@ -209,41 +244,36 @@ describe('GrnCreateScreen — POST /goods-receipts (+ post)', () => {
     fireEvent.click(await screen.findByRole('option', { name: 'Kho HN-1' }));
     fireEvent.click(screen.getByText('Tìm SKU…'));
     fireEvent.click(await screen.findByText('Giấy A4 Double A 80gsm'));
-    const qty = screen.getAllByPlaceholderText('0');
-    fireEvent.change(qty[0]!, { target: { value: '50' } });
-    fireEvent.change(qty[1]!, { target: { value: '340000' } });
-
-    fireEvent.click(screen.getByRole('combobox', { name: 'Loại thùng dòng 1' }));
-    fireEvent.click(await screen.findByRole('option', { name: 'Thùng (CARTON)' }));
-    const per = await screen.findByLabelText('SL mỗi thùng dòng 1');
-    fireEvent.change(per, { target: { value: '30' } });
-    expect(await screen.findByText('không chia hết')).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: 'Lưu nháp' }));
-    expect(await screen.findByText(/phải chia hết/)).toBeInTheDocument();
-    expect(posts).toHaveLength(0);
-
-    fireEvent.change(per, { target: { value: '25' } });
-    expect(await screen.findByText('2 thùng')).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('combobox', { name: 'Bọc trong dòng 1' }));
-    fireEvent.click(await screen.findByRole('option', { name: 'Pallet (PALLET)' }));
+    fireEvent.change(screen.getByLabelText('Số lượng dòng 1'), { target: { value: '2' } });
+    fireEvent.click(screen.getByRole('combobox', { name: 'ĐVT nhập dòng 1' }));
+    await waitFor(() =>
+      expect(screen.getAllByRole('option').map((o) => o.textContent)).toEqual([
+        'REAM',
+        'Thùng (10 REAM)',
+        'Pallet (100 REAM)',
+      ]),
+    );
+    fireEvent.click(screen.getByRole('option', { name: 'Pallet (100 REAM)' }));
+    // 2 pallet × 100 = 200 REAM; khối "Đóng gói" không còn hiện trên form
+    expect(await screen.findByText('= 200 REAM')).toBeInTheDocument();
+    expect(screen.queryByLabelText('Loại thùng dòng 1')).not.toBeInTheDocument();
+    fireEvent.change(screen.getAllByPlaceholderText('0')[1]!, { target: { value: '5000000' } });
     fireEvent.click(screen.getByRole('button', { name: 'Lưu nháp' }));
     await waitFor(() => expect(posts).toHaveLength(1));
     expect(posts[0]!.body).toMatchObject({
       lines: [
         {
           skuId: 'sku-1',
-          qty: '50',
-          packaging: {
-            containerType: 'CARTON',
-            qtyPerContainer: '25',
-            wrapIn: { containerType: 'PALLET' },
-          },
+          qty: '2',
+          uom: 'PLT',
+          unitCost: '5000000',
+          packaging: { containerType: 'PALLET', qtyPerContainer: '100' },
         },
       ],
     });
   });
 
-  it('SL mỗi thùng không phải số ("1/10") → lỗi regex tại ô, không crash DecimalError', async () => {
+  it('nhập theo thùng mà SL lẻ (1.5 thùng) → lỗi ngay ô số lượng, không gọi API', async () => {
     const posts: unknown[] = [];
     server.use(
       http.post(
@@ -256,17 +286,100 @@ describe('GrnCreateScreen — POST /goods-receipts (+ post)', () => {
     fireEvent.click(await screen.findByRole('option', { name: 'Kho HN-1' }));
     fireEvent.click(screen.getByText('Tìm SKU…'));
     fireEvent.click(await screen.findByText('Giấy A4 Double A 80gsm'));
-    const qty = screen.getAllByPlaceholderText('0');
-    fireEvent.change(qty[0]!, { target: { value: '50' } });
-    fireEvent.change(qty[1]!, { target: { value: '340000' } });
-    fireEvent.click(screen.getByRole('combobox', { name: 'Loại thùng dòng 1' }));
-    fireEvent.click(await screen.findByRole('option', { name: 'Thùng (CARTON)' }));
-    fireEvent.change(await screen.findByLabelText('SL mỗi thùng dòng 1'), {
-      target: { value: '1/10' },
-    });
+    fireEvent.click(screen.getByRole('combobox', { name: 'ĐVT nhập dòng 1' }));
+    fireEvent.click(await screen.findByRole('option', { name: 'Thùng (10 REAM)' }));
+    fireEvent.change(screen.getByLabelText('Số lượng dòng 1'), { target: { value: '1.5' } });
+    fireEvent.change(screen.getAllByPlaceholderText('0')[1]!, { target: { value: '340000' } });
     fireEvent.click(screen.getByRole('button', { name: 'Lưu nháp' }));
-    expect(await screen.findByText('Số lượng không hợp lệ (tối đa 6 số lẻ)')).toBeInTheDocument();
+    expect(await screen.findByText('Nhập số BOX nguyên')).toBeInTheDocument();
     expect(posts).toHaveLength(0);
+  });
+
+  it('quét barcode: mã thùng thêm dòng theo thùng (packaging CARTON), quét lại +1; mã lẻ thêm dòng ĐVT cơ sở; mã lạ báo lỗi', async () => {
+    const posts: Array<{ body: unknown }> = [];
+    const LOOKUP = {
+      type: 'EAN13',
+      sku: {
+        id: 'sku-1',
+        code: 'A4-DA80',
+        name: 'Giấy A4 Double A 80gsm',
+        productCode: 'A4',
+        trackingMode: 'NONE',
+      },
+      baseUom: { id: 'u-ream', code: 'REAM' },
+    };
+    server.use(
+      http.get('/api/barcodes/:code', ({ params }) => {
+        if (params.code === 'THUNG-A4')
+          return HttpResponse.json({
+            ...LOOKUP,
+            barcode: 'THUNG-A4',
+            uom: { id: 'u-box', code: 'BOX', name: 'Thùng' },
+            factor: '10',
+          });
+        if (params.code === '8850000000001')
+          return HttpResponse.json({
+            ...LOOKUP,
+            barcode: '8850000000001',
+            uom: { id: 'u-ream', code: 'REAM', name: 'Ram' },
+            factor: '1',
+          });
+        return HttpResponse.json(
+          { code: 'NOT_FOUND', message: 'x', details: null, traceId: 't' },
+          { status: 404 },
+        );
+      }),
+      http.post('/api/goods-receipts', async ({ request }) => {
+        posts.push({ body: await request.json() });
+        return HttpResponse.json(
+          { receiptId: 'r-10', docNumber: 'GRN2610-00002', status: 'DRAFT', warehouseId: 'wh-1' },
+          { status: 201 },
+        );
+      }),
+    );
+    renderApp(<GrnCreateScreen />);
+    fireEvent.click(await screen.findByRole('combobox', { name: 'Kho nhận *' }));
+    fireEvent.click(await screen.findByRole('option', { name: 'Kho HN-1' }));
+    const scan = (code: string) => {
+      const input = screen.getByLabelText('Quét barcode sản phẩm / thùng / pallet');
+      fireEvent.change(input, { target: { value: code } });
+      fireEvent.keyDown(input, { key: 'Enter' });
+    };
+    scan('THUNG-A4');
+    // Dòng trống đầu tiên được điền, không thêm dòng mới
+    await waitFor(() => expect(screen.getByLabelText('Số lượng dòng 1')).toHaveValue('1'));
+    scan('THUNG-A4');
+    await waitFor(() => expect(screen.getByLabelText('Số lượng dòng 1')).toHaveValue('2'));
+    expect(await screen.findByText('= 20 REAM')).toBeInTheDocument();
+    scan('8850000000001');
+    await waitFor(() => expect(screen.getByLabelText('Số lượng dòng 2')).toHaveValue('1'));
+    scan('KHONG-CO');
+    await waitFor(() =>
+      expect(toastError).toHaveBeenCalledWith(
+        expect.stringContaining('Không tìm thấy barcode KHONG-CO'),
+      ),
+    );
+    expect(screen.queryByLabelText('Số lượng dòng 3')).not.toBeInTheDocument();
+
+    const costs = screen
+      .getAllByPlaceholderText('0')
+      .filter((el) => el.getAttribute('inputmode') === 'decimal' && !el.getAttribute('aria-label'));
+    fireEvent.change(costs[0]!, { target: { value: '3400000' } });
+    fireEvent.change(costs[1]!, { target: { value: '340000' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Lưu nháp' }));
+    await waitFor(() => expect(posts).toHaveLength(1));
+    expect(posts[0]!.body).toMatchObject({
+      lines: [
+        {
+          skuId: 'sku-1',
+          qty: '2',
+          uom: 'BOX',
+          packaging: { containerType: 'CARTON', qtyPerContainer: '10' },
+        },
+        { skuId: 'sku-1', qty: '1', unitCost: '340000' },
+      ],
+    });
+    expect((posts[0]!.body as { lines: object[] }).lines[1]).not.toHaveProperty('uom');
   });
 
   it('lưu nháp: body đúng + Idempotency-Key có mặt → chuyển sang trang chi tiết', async () => {

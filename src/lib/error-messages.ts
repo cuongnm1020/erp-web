@@ -44,6 +44,14 @@ const MESSAGES: Record<string, string> = {
   RECEIPT_LOT_REQUIRED: 'Sản phẩm theo lô — nhập số lô cho dòng này rồi lưu lại.',
   RECEIPT_LOT_EXPIRY_CONFLICT:
     'Lô này đã có hạn dùng khác với phiếu. Sửa hạn của lô ở màn Lô & hạn dùng nếu hạn cũ sai.',
+  // Phiếu nhập hàng hoàn (/wms/returns)
+  RETURN_QTY_EXCEEDED:
+    'SL hoàn vượt phần đã xuất chưa hoàn (có thể vừa có phiếu hoàn khác được post). Tải lại đơn và sửa SL.',
+  RETURN_ORDER_NOT_FOUND: 'Không tìm thấy đơn bán này. Kiểm tra lại số đơn.',
+  RETURN_ORDER_NOT_RETURNABLE: 'Đơn chưa chốt hoặc đã hủy — không có hàng đã xuất để nhận hoàn.',
+  RETURN_INVALID_INPUT:
+    'Phiếu hoàn chưa hợp lệ: kiểm tra SL, vị trí nhận lại và các dòng cùng một kho.',
+  RETURN_RECEIPT_NOT_FOUND: 'Phiếu nhập hàng hoàn không còn tồn tại. Tải lại danh sách.',
   RESERVATION_REPOINT_FAILED:
     'Lô vừa nhặt đã bị đơn khác giữ mất. Tải lại nhiệm vụ và nhặt lại theo gợi ý mới.',
   // Kết nối Pancake (Quản trị › Kết nối Pancake)
@@ -61,7 +69,9 @@ const MESSAGES: Record<string, string> = {
   CARRIER_WAYBILL_DATA:
     'Đơn chưa có địa chỉ giao đủ tỉnh/thành hoặc chưa có dòng hàng. Chọn địa chỉ giao ở hồ sơ khách rồi thử lại.',
   CARRIER_NOT_CONFIGURED:
-    'Hãng này chưa được cấu hình token/điểm lấy hàng trên server. Báo IT đặt biến môi trường CARRIER_*.',
+    'Hãng này chưa có token hoặc địa chỉ API. Quản trị viên nhập ở Quản trị › Cấu hình hệ thống › Đơn vị vận chuyển.',
+  CARRIER_SECRET_KEY_MISSING:
+    'Server chưa có APP_SECRET_KEY để mã hoá token hãng. Báo IT đặt biến môi trường rồi khởi động lại API.',
   CARRIER_API_ERROR: 'Hãng vận chuyển không phản hồi hoặc trả lỗi. Thử lại sau ít phút.',
   CARRIER_OPERATION_UNSUPPORTED:
     'Hãng này không hỗ trợ thao tác vừa gọi (tra cước / in nhãn). Chọn hãng khác hoặc làm tay.',

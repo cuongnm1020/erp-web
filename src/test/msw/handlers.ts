@@ -1102,6 +1102,92 @@ export const handlers = [
       verifiedAt: '2026-09-07T08:00:00.000Z',
     }),
   ),
+  // ── Quản trị: Cấu hình hệ thống › Đơn vị vận chuyển ──
+  http.get('/api/carriers/settings', () => HttpResponse.json(CARRIER_SETTINGS_FIXTURE)),
+  http.put('/api/carriers/:code/settings', async ({ params, request }) => {
+    const body = (await request.json()) as Record<string, unknown>;
+    const base = CARRIER_SETTINGS_FIXTURE.find((c) => c.code === params.code)!;
+    return HttpResponse.json({
+      ...base,
+      fields: base.fields.map((f) =>
+        typeof body[f.key] === 'string'
+          ? {
+              ...f,
+              source: 'db',
+              value: f.secret ? null : body[f.key],
+              hint: f.secret ? `…${String(body[f.key]).slice(-4)}` : null,
+            }
+          : f,
+      ),
+    });
+  }),
+  http.post('/api/carriers/:code/settings/verify', () =>
+    HttpResponse.json({
+      status: 'ok',
+      message: 'Token hợp lệ — 1 địa chỉ lấy hàng',
+      verifiedAt: '2026-10-04T08:00:00.000Z',
+    }),
+  ),
+];
+
+/** Đúng shape `CarrierSettingDto` trong openapi.json — bí mật chỉ có hint, không có giá trị. */
+export const CARRIER_SETTINGS_FIXTURE = [
+  {
+    code: 'GHTK',
+    name: 'Giao Hàng Tiết Kiệm',
+    isActive: true,
+    configured: true,
+    canVerify: true,
+    secretsUnreadable: false,
+    lastVerifiedAt: null,
+    lastVerifyError: 'Hãng GHTK lỗi khi kiểm tra kết nối: Token không hợp lệ',
+    updatedAt: null,
+    fields: [
+      {
+        key: 'baseUrl' as const,
+        label: 'Địa chỉ API',
+        secret: false,
+        value: 'https://services.giaohangtietkiem.vn',
+        hint: null,
+        source: 'env' as 'db' | 'env' | 'apiConfig' | null,
+        envName: 'CARRIER_GHTK_BASE_URL',
+        help: null,
+      },
+      {
+        key: 'token' as const,
+        label: 'Token API',
+        secret: true,
+        value: null,
+        hint: '…9f2c',
+        source: 'env' as 'db' | 'env' | 'apiConfig' | null,
+        envName: 'CARRIER_GHTK_TOKEN',
+        help: 'Token API ở khachhang.giaohangtietkiem.vn',
+      },
+    ],
+  },
+  {
+    code: 'JT',
+    name: 'J&T Express',
+    isActive: true,
+    configured: false,
+    canVerify: false,
+    secretsUnreadable: false,
+    lastVerifiedAt: null,
+    lastVerifyError: null,
+    updatedAt: null,
+    fields: [
+      {
+        key: 'token' as const,
+        label: 'Token API',
+        secret: true,
+        value: null,
+        hint: null,
+        source: null as 'db' | 'env' | 'apiConfig' | null,
+        envName: 'CARRIER_JT_TOKEN',
+        help: null,
+      },
+    ],
+  },
 ];
 
 /** Đúng shape `PancakeShopConfigDto` trong openapi.json — không có trường nào chứa khoá. */
@@ -1176,6 +1262,15 @@ export const scenario = {
     }),
   ),
   pancakeError: http.get('/api/pancake-sync/config', () => errorEnvelope(500, 'DB_ERROR')),
+  carrierSettingsEmpty: http.get('/api/carriers/settings', () => HttpResponse.json([])),
+  carrierSettingsError: http.get('/api/carriers/settings', () => errorEnvelope(500, 'DB_ERROR')),
+  carrierVerifyFailed: http.post('/api/carriers/:code/settings/verify', () =>
+    HttpResponse.json({
+      status: 'failed',
+      message: 'Hãng GHTK lỗi khi kiểm tra kết nối: Token không hợp lệ',
+      verifiedAt: null,
+    }),
+  ),
   pancakeVerifyFailed: http.post('/api/pancake-sync/config/:shopId/verify', () =>
     errorEnvelope(502, 'PANCAKE_VERIFY_FAILED', 'x', { upstreamStatus: 401 }),
   ),
