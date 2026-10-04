@@ -312,7 +312,7 @@ function InfoTab({ product }: { product: ProductDetail }) {
         <span>{formatDateTime(product.updatedAt)}</span>
       </div>
       <div className="col-span-full grid grid-cols-[140px_1fr] gap-2 text-sm">
-        <span className="text-muted-foreground">Tên gọi khác</span>
+        <span className="text-muted-foreground">Tên lên đơn Pancake</span>
         {product.searchAliases.length > 0 ? (
           <span className="flex flex-wrap gap-1">
             {product.searchAliases.map((a) => (
@@ -325,14 +325,10 @@ function InfoTab({ product }: { product: ProductDetail }) {
           <span className="text-muted-foreground">—</span>
         )}
       </div>
-      <div className="col-span-full grid grid-cols-[140px_1fr] gap-2 text-sm">
-        <span className="text-muted-foreground">Mô tả</span>
-        <span
-          className={cn('whitespace-pre-wrap', !product.description && 'text-muted-foreground')}
-        >
-          {product.description || '—'}
-        </span>
-      </div>
+      <TextRow label="Công dụng" value={product.description} />
+      <TextRow label="Thành phần" value={product.ingredients} />
+      <TextRow label="Cách dùng" value={product.usageInstructions} />
+      <TextRow label="Lưu ý khi lên đơn" value={product.orderNote} />
       <div className="col-span-full grid grid-cols-[140px_1fr] gap-2 text-sm">
         <span className="text-muted-foreground">Ghi chú nội bộ</span>
         <span
@@ -341,6 +337,18 @@ function InfoTab({ product }: { product: ProductDetail }) {
           {product.internalNote || '—'}
         </span>
       </div>
+    </div>
+  );
+}
+
+/** Một dòng văn bản nhiều dòng trong tab Thông tin — trống hiện "—". */
+function TextRow({ label, value }: { label: string; value: string | null }) {
+  return (
+    <div className="col-span-full grid grid-cols-[140px_1fr] gap-2 text-sm">
+      <span className="text-muted-foreground">{label}</span>
+      <span className={cn('whitespace-pre-wrap', !value && 'text-muted-foreground')}>
+        {value || '—'}
+      </span>
     </div>
   );
 }

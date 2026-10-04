@@ -88,6 +88,9 @@ const PRODUCT = {
   defaultWarehouseId: WAREHOUSE.id,
   hasVariants: true,
   description: 'Ngòi bi 0.8mm, mực dầu.',
+  ingredients: 'Mực dầu gốc nước',
+  usageInstructions: null,
+  orderNote: 'Bán theo hộp, không lẻ cây',
   internalNote: null,
   allowNegativeStock: false,
   searchAliases: ['bút thiên long', 'tl08'],
@@ -211,6 +214,19 @@ describe('ProductDetailScreen — C-03 chi tiết sản phẩm (GET /products/:i
       'Đơn vị & quy đổi3',
       'Tồn theo kho',
     ]);
+  });
+
+  it('tab Thông tin: Tên lên đơn Pancake, Công dụng, Thành phần, Cách dùng, Lưu ý khi lên đơn', async () => {
+    renderApp(<ProductDetailScreen productId={PRODUCT.id} />);
+    await screen.findByText(PRODUCT.name);
+    const row = (label: string) => screen.getByText(label).parentElement!;
+    expect(within(row('Tên lên đơn Pancake')).getByText('tl08')).toBeInTheDocument();
+    expect(within(row('Công dụng')).getByText(PRODUCT.description)).toBeInTheDocument();
+    expect(within(row('Thành phần')).getByText('Mực dầu gốc nước')).toBeInTheDocument();
+    expect(within(row('Cách dùng')).getByText('—')).toBeInTheDocument();
+    expect(
+      within(row('Lưu ý khi lên đơn')).getByText('Bán theo hộp, không lẻ cây'),
+    ).toBeInTheDocument();
   });
 
   it('tab Biến thể: giá qua formatMoney, ĐVT bán = salesUom (fallback baseUom), trạng thái từng SKU', async () => {

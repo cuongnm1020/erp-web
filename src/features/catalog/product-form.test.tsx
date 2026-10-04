@@ -289,7 +289,7 @@ describe('ProductFormScreen — tạo (design/Products/ProductForm)', () => {
     );
     renderApp(<ProductFormScreen />);
     fill('Tên thương mại *', 'Thuốc bật chồi X');
-    fill('Tên gọi khác', 'thuốc bật chồi, cheshaland, , thuốc bật chồi');
+    fill('Tên lên đơn Pancake', 'thuốc bật chồi, cheshaland, , thuốc bật chồi');
     fireEvent.click(screen.getByRole('button', { name: /Lưu sản phẩm/ }));
     await waitFor(() => expect(productBody).toBeDefined());
     expect(productBody).not.toHaveProperty('code');
@@ -385,7 +385,10 @@ describe('ProductFormScreen — tạo (design/Products/ProductForm)', () => {
     fill('Mã sản phẩm', 'TL11');
     fill('Tên xuất hóa đơn', 'Bút bi Thiên Long TL-11 (hộp 20)');
     fill('Mức tồn kho', '500');
-    fill('Mô tả', 'Mô tả bán hàng');
+    fill('Công dụng', 'Mô tả bán hàng');
+    fill('Thành phần', 'Hexaconazole 50g/l');
+    fill('Cách dùng', 'Pha 1 chai / bình 25L');
+    fill('Lưu ý khi lên đơn', 'Không gửi kèm phân bón lá');
     fill('Ghi chú nội bộ', 'Ghi chú riêng');
     fireEvent.click(screen.getByRole('checkbox', { name: 'Cho phép bán tồn kho âm' }));
     fireEvent.click(screen.getByRole('combobox', { name: 'Kho mặc định' }));
@@ -401,6 +404,9 @@ describe('ProductFormScreen — tạo (design/Products/ProductForm)', () => {
       reorderLevel: '500',
       defaultWarehouseId: 'wh-1',
       description: 'Mô tả bán hàng',
+      ingredients: 'Hexaconazole 50g/l',
+      usageInstructions: 'Pha 1 chai / bình 25L',
+      orderNote: 'Không gửi kèm phân bón lá',
       internalNote: 'Ghi chú riêng',
       allowNegativeStock: true,
     });
@@ -585,7 +591,7 @@ describe('ProductFormScreen — sửa', () => {
     );
     renderApp(<ProductFormScreen productId="p-9" />);
     expect(await screen.findByDisplayValue('Bút bi TL-08 xanh')).toBeInTheDocument();
-    // Alias prefill vào ô "Tên gọi khác".
+    // Alias prefill vào ô "Tên lên đơn Pancake".
     expect(screen.getByDisplayValue('bút tl')).toBeInTheDocument();
     // Mã sản phẩm sửa được (2026-09-22); mã SKU / barcode vẫn ẩn — mã hiện ở mô tả header
     expect(screen.getByText('Sản phẩm cha TL08 · 1 biến thể')).toBeInTheDocument();

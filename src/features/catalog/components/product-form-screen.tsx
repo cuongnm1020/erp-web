@@ -76,7 +76,9 @@ import { UomManagerDialog } from './uom-manager-dialog';
  * nối API product mới (prompt-product-api 2026-09-02):
  * - Mã sản phẩm KHÔNG bắt buộc — bỏ trống backend tự sinh `{categoryCode|SP}-{seq}`;
  *   sửa được cả khi edit (server trả 409 nếu sản phẩm đã có chứng từ).
- * - Tên gọi khác (searchAliases): một ô, phân tách phẩy — ô tìm sản phẩm ăn các tên này.
+ * - Tên lên đơn Pancake (searchAliases): một ô, phân tách phẩy — ô tìm sản phẩm ăn các tên này.
+ * - Công dụng (= description, đẩy lên Pancake note_product) / Thành phần / Cách dùng / Lưu ý khi
+ *   lên đơn: textarea tự do. Khi sửa, ô xóa trắng gửi '' để xóa giá trị cũ.
  * - PATCH product/SKU bắt buộc `version` (optimistic locking) — 409 khi người khác vừa
  *   sửa: banner root.server + nút tải lại, KHÔNG retry tự động (luật 6).
  * Điểm LỆCH còn lại so với artboard (ghi ở thẻ PENDING_API):
@@ -135,6 +137,9 @@ function initialValues(p?: ProductDetail): ProductFormValues {
     shelfLifeDays: p?.shelfLifeDays == null ? '' : String(p.shelfLifeDays),
     defaultWarehouseId: p?.defaultWarehouseId ?? '',
     description: p?.description ?? '',
+    ingredients: p?.ingredients ?? '',
+    usageInstructions: p?.usageInstructions ?? '',
+    orderNote: p?.orderNote ?? '',
     internalNote: p?.internalNote ?? '',
     searchAliases: (p?.searchAliases ?? []).join(', '),
     allowNegativeStock: p?.allowNegativeStock ?? false,
@@ -305,6 +310,9 @@ function ProductFormBody({ product }: { product?: ProductDetail }) {
         ...(v.shelfLifeDays ? { shelfLifeDays: Number.parseInt(v.shelfLifeDays, 10) } : {}),
         ...(v.defaultWarehouseId ? { defaultWarehouseId: v.defaultWarehouseId } : {}),
         ...(v.description ? { description: v.description } : {}),
+        ...(v.ingredients || editing ? { ingredients: v.ingredients } : {}),
+        ...(v.usageInstructions || editing ? { usageInstructions: v.usageInstructions } : {}),
+        ...(v.orderNote || editing ? { orderNote: v.orderNote } : {}),
         ...(v.internalNote ? { internalNote: v.internalNote } : {}),
         searchAliases: parseAliases(v.searchAliases),
         allowNegativeStock: v.allowNegativeStock,
@@ -702,13 +710,13 @@ function ProductFormBody({ product }: { product?: ProductDetail }) {
               name="searchAliases"
               render={({ field }) => (
                 <FormItem className="sm:col-span-2 lg:col-span-4">
-                  <FormLabel>Tên gọi khác</FormLabel>
+                  <FormLabel>Tên lên đơn Pancake</FormLabel>
                   <FormControl>
                     <Input placeholder="thuốc bật chồi, thuốc trĩ, cheshaland" {...field} />
                   </FormControl>
                   <FormDescription>
-                    Tên dân dã / viết tắt, phân tách bằng dấu phẩy — ô tìm sản phẩm ăn cả các tên
-                    này
+                    Tên khách / sale hay gọi khi lên đơn, phân tách bằng dấu phẩy — ô tìm sản phẩm
+                    ăn cả các tên này
                   </FormDescription>
                   <FormMessage />
                 </FormItem>
@@ -719,10 +727,52 @@ function ProductFormBody({ product }: { product?: ProductDetail }) {
               name="description"
               render={({ field }) => (
                 <FormItem className="sm:col-span-2 lg:col-span-2">
-                  <FormLabel>Mô tả</FormLabel>
+                  <FormLabel>Công dụng</FormLabel>
                   <FormControl>
                     <Textarea
-                      placeholder="Thuốc kích chồi, dùng cho cây ăn quả, pha 1 gói/bình 16L…"
+                      placeholder="Kích chồi, ra hoa đồng loạt cho cây ăn quả…"
+                      {...field}
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="ingredients"
+              render={({ field }) => (
+                <FormItem className="sm:col-span-2 lg:col-span-2">
+                  <FormLabel>Thành phần</FormLabel>
+                  <FormControl>
+                    <Textarea placeholder="Hoạt chất, hàm lượng: Hexaconazole 50g/l…" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="usageInstructions"
+              render={({ field }) => (
+                <FormItem className="sm:col-span-2 lg:col-span-2">
+                  <FormLabel>Cách dùng</FormLabel>
+                  <FormControl>
+                    <Textarea placeholder="Pha 1 gói / bình 16L, phun ướt đều tán lá…" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="orderNote"
+              render={({ field }) => (
+                <FormItem className="sm:col-span-2 lg:col-span-2">
+                  <FormLabel>Lưu ý khi lên đơn</FormLabel>
+                  <FormControl>
+                    <Textarea
+                      placeholder="Nhắc sale khi chốt đơn: không gửi kèm phân bón lá…"
                       {...field}
                     />
                   </FormControl>

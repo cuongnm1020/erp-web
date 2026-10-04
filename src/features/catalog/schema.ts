@@ -21,7 +21,12 @@ export const createProductSchema = z.object({
   trackingMode: z.enum(['NONE', 'LOT', 'SERIAL']),
   shelfLifeDays: z.string().trim().regex(/^\d*$/, 'Nhập số nguyên ngày, không âm'),
   defaultWarehouseId: z.string().optional(),
+  /** Nhãn UI "Công dụng" — field API vẫn là `description`. */
   description: z.string().trim().max(2000, 'Tối đa 2000 ký tự'),
+  /** Thành phần / Cách dùng / Lưu ý khi lên đơn — cùng luật với description (≤ 2000). */
+  ingredients: z.string().trim().max(2000, 'Tối đa 2000 ký tự'),
+  usageInstructions: z.string().trim().max(2000, 'Tối đa 2000 ký tự'),
+  orderNote: z.string().trim().max(2000, 'Tối đa 2000 ký tự'),
   internalNote: z.string().trim().max(2000, 'Tối đa 2000 ký tự'),
   searchAliases: z.string().trim().max(500, 'Tối đa 500 ký tự'),
   allowNegativeStock: z.boolean(),
