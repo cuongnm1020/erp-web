@@ -53,6 +53,11 @@ export interface NavItem {
   icon?: LucideIcon;
   /** Phím tắt hiển thị trong command palette, ví dụ 'g k' */
   shortcut?: string;
+  /**
+   * Ẩn khỏi sidebar + command palette nhưng VẪN giữ trong bảng nav để `requiredAbilityFor`
+   * còn gate URL trực tiếp (đừng comment mục ra — mất gate). Module ẩn thì ẩn cả mục con.
+   */
+  hidden?: boolean;
 }
 
 export interface NavModule extends NavItem {
@@ -120,6 +125,7 @@ export const NAV_MODULES: NavModule[] = [
         label: 'Phân công',
         href: '/crm/customers/assign',
         icon: UsersRound,
+        hidden: true,
         // Chỉ leader (customer.assign) — member không có mục này trong sidebar.
         ability: { action: 'assign', subject: 'Customer' },
       },
@@ -180,7 +186,8 @@ export const NAV_MODULES: NavModule[] = [
   },
   {
     label: 'Kho',
-    href: '/wms/stock',
+    // Không trỏ /wms/stock — mục Tồn kho đang ẩn (2026-10-04).
+    href: '/wms/warehouses',
     icon: Warehouse,
     shortcut: 'g w',
     children: [
@@ -188,6 +195,7 @@ export const NAV_MODULES: NavModule[] = [
         label: 'Tồn kho',
         href: '/wms/stock',
         icon: Boxes,
+        hidden: true,
         ability: { action: 'read', subject: 'Stock' },
       },
       {
@@ -293,6 +301,8 @@ export const NAV_MODULES: NavModule[] = [
     href: '/pricing/price-lists',
     icon: Percent,
     shortcut: 'g g',
+    // Ẩn cả nhóm (2026-10-04): Bảng giá, Khuyến mãi, Mã giảm giá, Tích điểm, Hoa hồng.
+    hidden: true,
     children: [
       { label: 'Bảng giá', href: '/pricing/price-lists', icon: Tag },
       { label: 'Khuyến mãi', href: '/pricing/promotions', icon: Gift },
@@ -307,6 +317,8 @@ export const NAV_MODULES: NavModule[] = [
     icon: Landmark,
     ability: { action: 'read', subject: 'Invoice' },
     shortcut: 'g h',
+    // Ẩn cả nhóm Tài chính (2026-10-04).
+    hidden: true,
     children: [
       {
         label: 'Hóa đơn',
@@ -378,15 +390,19 @@ export interface CanFn {
 }
 
 export function visibleModules(can: CanFn): NavModule[] {
-  return NAV_MODULES.map((m) => ({
-    ...m,
-    children: m.children?.filter((c) => !c.ability || can(c.ability.action, c.ability.subject)),
-  })).filter(
-    (m) =>
-      (!m.ability || can(m.ability.action, m.ability.subject)) &&
-      // Module có children mà bị ẩn hết → ẩn luôn module (href của nó cũng cần quyền)
-      (!m.children || m.children.length > 0),
-  );
+  return NAV_MODULES.filter((m) => !m.hidden)
+    .map((m) => ({
+      ...m,
+      children: m.children?.filter(
+        (c) => !c.hidden && (!c.ability || can(c.ability.action, c.ability.subject)),
+      ),
+    }))
+    .filter(
+      (m) =>
+        (!m.ability || can(m.ability.action, m.ability.subject)) &&
+        // Module có children mà bị ẩn hết → ẩn luôn module (href của nó cũng cần quyền)
+        (!m.children || m.children.length > 0),
+    );
 }
 
 /**

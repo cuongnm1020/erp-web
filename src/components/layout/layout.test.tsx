@@ -43,8 +43,24 @@ describe('visibleModules', () => {
     expect(labels).not.toContain('Kho');
   });
 
-  it('không có quyền nào → chỉ thấy Tổng quan và Giá & KM (chưa có subject backend)', () => {
-    expect(visibleModules(() => false).map((m) => m.label)).toEqual(['Tổng quan', 'Giá & KM']);
+  it('không có quyền nào → chỉ thấy Tổng quan (Giá & KM đang ẩn)', () => {
+    expect(visibleModules(() => false).map((m) => m.label)).toEqual(['Tổng quan']);
+  });
+
+  it('mục ẩn (2026-10-04): Phân công, Tồn kho, cả nhóm Giá & KM và Tài chính — URL vẫn gate', () => {
+    const mods = visibleModules(() => true);
+    const labels = mods.map((m) => m.label);
+    expect(labels).not.toContain('Giá & KM');
+    expect(labels).not.toContain('Tài chính');
+    const children = mods.flatMap((m) => m.children ?? []).map((c) => c.label);
+    expect(children).not.toContain('Phân công');
+    expect(children).not.toContain('Tồn kho');
+    expect(mods.find((m) => m.label === 'Kho')?.href).toBe('/wms/warehouses');
+    expect(requiredAbilityFor('/crm/customers/assign')).toEqual({
+      action: 'assign',
+      subject: 'Customer',
+    });
+    expect(requiredAbilityFor('/fin/invoices')).toEqual({ action: 'read', subject: 'Invoice' });
   });
 
   it('chỉ có shipment.read → module Kho ẩn (Theo dõi giao hàng đã rút khỏi menu, commit 45e2880)', () => {
@@ -66,7 +82,6 @@ describe('visibleModules', () => {
     const mods = visibleModules((a, s) => a === 'read' && s === 'Stock');
     const wms = mods.find((m) => m.label === 'Kho');
     expect(wms?.children?.map((c) => c.label)).toEqual([
-      'Tồn kho',
       'Kho & vị trí',
       'Phiếu nhập kho',
       'Nhập hàng hoàn',
@@ -76,8 +91,8 @@ describe('visibleModules', () => {
     ]);
   });
 
-  it('admin thấy đủ 8 module', () => {
-    expect(visibleModules(() => true)).toHaveLength(8);
+  it('admin thấy 6 module (Giá & KM, Tài chính đang ẩn)', () => {
+    expect(visibleModules(() => true)).toHaveLength(6);
   });
 });
 
@@ -137,20 +152,14 @@ describe('<Sidebar>', () => {
     expect(screen.queryByText('Tài chính')).not.toBeInTheDocument();
   });
 
-  it('admin thấy đủ 8 nhóm/mục', () => {
+  it('admin thấy 6 nhóm/mục; Giá & KM và Tài chính đang ẩn', () => {
     renderSidebar(ADMIN);
     expect(screen.getByRole('link', { name: 'Tổng quan' })).toBeInTheDocument();
-    for (const l of [
-      'Bán hàng',
-      'Khách hàng',
-      'Sản phẩm',
-      'Kho',
-      'Giá & KM',
-      'Tài chính',
-      'Quản trị',
-    ]) {
+    for (const l of ['Bán hàng', 'Khách hàng', 'Sản phẩm', 'Kho', 'Quản trị']) {
       expect(screen.getByText(l)).toBeInTheDocument();
     }
+    expect(screen.queryByText('Giá & KM')).not.toBeInTheDocument();
+    expect(screen.queryByText('Tài chính')).not.toBeInTheDocument();
   });
 
   it('thu gọn: chỉ icon (tên vào aria-label), nhớ vào localStorage, phím [ bật lại', () => {
