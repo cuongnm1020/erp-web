@@ -3820,7 +3820,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Đẩy TOÀN BỘ sản phẩm đang có (không combo, chưa xóa), chờ xong mới trả — CLI / test. */
+        /** Đẩy TOÀN BỘ sản phẩm đang có (kể cả combo, chưa xóa), chờ xong mới trả — CLI / test. */
         post: operations["PancakePushController_allProducts"];
         delete?: never;
         options?: never;
