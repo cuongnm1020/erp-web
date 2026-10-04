@@ -1944,6 +1944,63 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/carriers/settings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Cấu hình kết nối các hãng có adapter (màn Cấu hình hệ thống › Đơn vị vận chuyển).
+         *     Bí mật chỉ trả 4 ký tự cuối; mỗi trường kèm nguồn (màn hình / env).
+         */
+        get: operations["CarrierController_listSettings"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/carriers/{code}/settings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Sửa kết nối một hãng. Trường bỏ qua = giữ; `null`/rỗng = xoá → rơi về env. Có hiệu lực
+         *     ngay ở API và worker (không restart); token đăng nhập đang cache bị bỏ.
+         */
+        put: operations["CarrierController_updateSettings"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/carriers/{code}/settings/verify": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Gọi thử hãng bằng cấu hình đang hiệu lực. Luôn 200 — kết quả ở `status`. */
+        post: operations["CarrierController_verifySettings"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/carriers": {
         parameters: {
             query?: never;
@@ -6203,6 +6260,67 @@ export interface components {
             phone: string | null;
             /** @description true = đủ tỉnh/thành + số điện thoại để làm điểm lấy hàng cho hãng. */
             pickupReady: boolean;
+        };
+        CarrierSettingFieldDto: {
+            /** @enum {string} */
+            key: "baseUrl" | "shopId" | "partnerCode" | "username" | "password" | "token" | "apiKey" | "webhookSecret";
+            label: string;
+            /** @description Bí mật: không bao giờ trả giá trị, chỉ `hint`. */
+            secret: boolean;
+            /** @description Giá trị hiệu lực của trường không bí mật; bí mật luôn null. */
+            value: string | null;
+            /** @description Bí mật đang hiệu lực: 4 ký tự cuối ("…abcd"); tài khoản thì hiện nguyên. */
+            hint: string | null;
+            /**
+             * @description db = nhập ở màn này; env = biến môi trường; apiConfig = JSON cũ trong wms.Carrier; null = chưa có.
+             * @enum {string|null}
+             */
+            source: "apiConfig" | "db" | "env" | null;
+            /** @description Biến env làm nền khi ô này trống. */
+            envName: string;
+            /** @description Mô tả ngắn cho admin. */
+            help: string | null;
+        };
+        CarrierSettingDto: {
+            code: string;
+            name: string;
+            isActive: boolean;
+            /** @description Đủ thông tin để gọi ra hãng (base URL + token hoặc tài khoản). */
+            configured: boolean;
+            /** @description Hãng có cài kiểm tra kết nối. */
+            canVerify: boolean;
+            fields: components["schemas"]["CarrierSettingFieldDto"][];
+            /** @description Bí mật đã lưu không giải mã được (APP_SECRET_KEY đổi) — phải nhập lại. */
+            secretsUnreadable: boolean;
+            lastVerifiedAt: string | null;
+            lastVerifyError: string | null;
+            updatedAt: string | null;
+        };
+        UpdateCarrierSettingDto: {
+            /**
+             * Format: uri
+             * @description Địa chỉ API của hãng (môi trường thật / thử nghiệm).
+             */
+            baseUrl?: string | null;
+            /** @description Token API tĩnh (GHN, GHTK, J&T, VTP token tĩnh). */
+            token?: string | null;
+            /** @description Tài khoản đăng nhập API (VTP, VNPost) — thay cho token tĩnh. */
+            username?: string | null;
+            password?: string | null;
+            /** @description Khoá phụ (VNPost `cApiKey`). */
+            apiKey?: string | null;
+            /** @description GHN ShopId. */
+            shopId?: string | null;
+            /** @description GHTK X-Client-Source, VTP / J&T mã đối tác. */
+            partnerCode?: string | null;
+            /** @description Bí mật xác thực webhook vào. Trống = dùng token. */
+            webhookSecret?: string | null;
+        };
+        CarrierVerifyResultDto: {
+            /** @enum {string} */
+            status: "failed" | "ok" | "unsupported";
+            message: string;
+            verifiedAt: string | null;
         };
         CarrierDto: {
             id: string;
@@ -12018,6 +12136,71 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["PickupWarehouseDto"][];
+                };
+            };
+        };
+    };
+    CarrierController_listSettings: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CarrierSettingDto"][];
+                };
+            };
+        };
+    };
+    CarrierController_updateSettings: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                code: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateCarrierSettingDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CarrierSettingDto"];
+                };
+            };
+        };
+    };
+    CarrierController_verifySettings: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                code: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CarrierVerifyResultDto"];
                 };
             };
         };

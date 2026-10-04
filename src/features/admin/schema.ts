@@ -75,3 +75,26 @@ export const createPancakeConfigSchema = pancakeConfigFormSchema.extend({
 });
 
 export type PancakeConfigFormValues = z.infer<typeof pancakeConfigFormSchema>;
+
+/**
+ * Sửa kết nối một hãng vận chuyển — khớp UpdateCarrierSettingDto (luật 11). Ô trống = giữ
+ * nguyên; `clear` = các trường bỏ giá trị đã nhập ở màn hình (rơi về env). Trường hiện ra tuỳ
+ * hãng (server trả `fields`) nên `values` là record theo khoá trường.
+ */
+export const carrierSettingFormSchema = z
+  .object({
+    values: z.record(z.string(), z.string().max(2000, 'Tối đa 2000 ký tự')),
+    clear: z.array(z.string()),
+  })
+  .superRefine((v, ctx) => {
+    const url = v.values.baseUrl?.trim() ?? '';
+    if (url && !/^https?:\/\/\S+$/.test(url)) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['values', 'baseUrl'],
+        message: 'Địa chỉ phải bắt đầu bằng http:// hoặc https://',
+      });
+    }
+  });
+
+export type CarrierSettingFormValues = z.infer<typeof carrierSettingFormSchema>;

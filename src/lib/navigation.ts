@@ -377,7 +377,13 @@ export const NAV_MODULES: NavModule[] = [
         icon: Plug,
         ability: { action: 'config', subject: 'Sync' },
       },
-      // { label: 'Cấu hình hệ thống', href: '/admin/settings', icon: Settings },
+      {
+        label: 'Cấu hình hệ thống',
+        href: '/admin/settings',
+        icon: Settings,
+        // Hiện chỉ có tab Đơn vị vận chuyển (2026-10-04) — mở theo quyền của tab đó.
+        ability: { action: 'config', subject: 'Carrier' },
+      },
       // { label: 'Quy tắc duyệt', href: '/admin/approval-rules', icon: CheckCheck },
       // { label: 'Import / Export', href: '/admin/import', icon: ArrowDownUp },
       // { label: 'Webhook & tích hợp', href: '/admin/webhooks', icon: Webhook },
