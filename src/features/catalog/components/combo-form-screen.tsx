@@ -33,7 +33,7 @@ import {
 import { Textarea } from '@/components/ui/textarea';
 import { toast } from '@/components/ui/toaster';
 import { type ApiError } from '@/lib/api/errors';
-import { formatQuantity } from '@/lib/format';
+import { formatMoney, formatQuantity } from '@/lib/format';
 import { Can } from '@/lib/permission';
 import {
   useComponentSkuSearch,
@@ -46,6 +46,7 @@ import { useBrands, useCategories } from '../api/use-products';
 import {
   comboAvailableFromRows,
   comboFormSchema,
+  comboPriceFromRows,
   EMPTY_COMBO_ROW,
   parseAliases,
   type ComboFormValues,
@@ -59,6 +60,10 @@ import {
  * - Định mức theo ĐVT cơ sở của SKU thành phần (không quy đổi). "Còn bán được" tính ngay
  *   từ khả dụng của thành phần đã chọn — cùng công thức với cột trên danh sách.
  * - PATCH bắt buộc `version` (optimistic locking) — 409 → banner + tải lại, không retry (luật 6).
+ * - Giá combo không nhập tay (COMBO-1): server tính Σ(giá lẻ thành phần × định mức) − giảm giá,
+ *   ghi bảng giá mặc định và đẩy lên Pancake đúng giá đó. Form chỉ nhập "Giảm giá"; giá xem
+ *   trước tính được khi biết giá lẻ thành phần (combo đang sửa), combo mới thì tính khi lưu.
+ * - "Miễn ship" = gợi ý cho sale khi lên đơn, sale vẫn quyết định phí ship cuối.
  */
 function initialValues(c?: ComboDetail): ComboFormValues {
   return {
@@ -68,7 +73,8 @@ function initialValues(c?: ComboDetail): ComboFormValues {
     brandId: c?.brandId ?? '',
     description: c?.description ?? '',
     searchAliases: c?.searchAliases.join(', ') ?? '',
-    salePrice: c?.salePrice ?? '',
+    discountAmount: c && c.discountAmount !== '0' ? c.discountAmount : '',
+    freeShipping: c?.freeShipping ?? false,
     isActive: c?.isActive ?? true,
     components: c
       ? c.components.map((x) => ({
@@ -77,6 +83,7 @@ function initialValues(c?: ComboDetail): ComboFormValues {
           skuName: x.name,
           baseUomCode: x.baseUomCode,
           available: x.available,
+          unitPrice: x.unitPrice ?? '',
           qty: x.qty,
         }))
       : [{ ...EMPTY_COMBO_ROW }],
@@ -115,6 +122,8 @@ function ComboFormBody({ combo }: { combo?: ComboDetail }) {
   const rows = useFieldArray({ control: form.control, name: 'components' });
   const components = useWatch({ control: form.control, name: 'components' });
   const available = comboAvailableFromRows(components ?? []);
+  const discount = useWatch({ control: form.control, name: 'discountAmount' });
+  const price = comboPriceFromRows(components ?? [], discount ?? '');
   const saving = create.isPending || update.isPending;
 
   const onSubmit = form.handleSubmit(async (v) => {
@@ -126,7 +135,8 @@ function ComboFormBody({ combo }: { combo?: ComboDetail }) {
       ...(v.brandId ? { brandId: v.brandId } : {}),
       ...(v.description ? { description: v.description } : {}),
       searchAliases: parseAliases(v.searchAliases),
-      ...(v.salePrice ? { salePrice: v.salePrice } : {}),
+      discountAmount: v.discountAmount || '0',
+      freeShipping: v.freeShipping,
     };
     try {
       if (editing) {
@@ -156,7 +166,8 @@ function ComboFormBody({ combo }: { combo?: ComboDetail }) {
           'name',
           'categoryId',
           'brandId',
-          'salePrice',
+          'discountAmount',
+          'freeShipping',
           'searchAliases',
           'components',
         ],
@@ -281,20 +292,22 @@ function ComboFormBody({ combo }: { combo?: ComboDetail }) {
             />
             <FormField
               control={form.control}
-              name="salePrice"
+              name="discountAmount"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Giá bán (bảng giá mặc định)</FormLabel>
+                  <FormLabel>Giảm giá</FormLabel>
                   <FormControl>
                     <MoneyInput
-                      aria-label="Giá bán"
+                      aria-label="Giảm giá"
                       value={field.value ?? ''}
                       onChange={field.onChange}
                       placeholder="0"
                     />
                   </FormControl>
                   <FormDescription>
-                    Giá MỘT combo — lên đơn lấy giá này, không cộng giá thành phần.
+                    {price
+                      ? `Giá combo = ${formatMoney(price.componentsPrice)} − giảm = ${formatMoney(price.salePrice)}`
+                      : 'Giá combo = tổng giá lẻ thành phần − giảm giá (tính khi lưu, đẩy lên Pancake giá này)'}
                   </FormDescription>
                   <FormMessage />
                 </FormItem>
@@ -382,6 +395,25 @@ function ComboFormBody({ combo }: { combo?: ComboDetail }) {
                     <Textarea rows={2} {...field} />
                   </FormControl>
                   <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="freeShipping"
+              render={({ field }) => (
+                <FormItem className="flex flex-row items-start gap-2 pt-6">
+                  <FormControl>
+                    <Checkbox
+                      checked={field.value}
+                      onCheckedChange={(v) => field.onChange(v === true)}
+                      aria-label="Miễn ship"
+                    />
+                  </FormControl>
+                  <div className="space-y-0.5 leading-none">
+                    <FormLabel>Miễn ship</FormLabel>
+                    <FormDescription>Gợi ý miễn phí ship cho sale khi lên đơn.</FormDescription>
+                  </div>
                 </FormItem>
               )}
             />
@@ -506,6 +538,8 @@ function ComponentRow({
                   );
                   form.setValue(`components.${index}.baseUomCode`, option?.meta?.baseUomCode ?? '');
                   form.setValue(`components.${index}.available`, option?.meta?.available ?? '');
+                  // /skus không trả giá — giá lẻ thành phần mới chỉ biết sau khi lưu.
+                  form.setValue(`components.${index}.unitPrice`, '');
                 }}
                 useSearch={useComponentSkuSearch}
                 selectedLabel={row?.skuName || undefined}

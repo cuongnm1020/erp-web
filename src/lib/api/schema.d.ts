@@ -281,6 +281,38 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/promotions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["PromotionController_list"];
+        put?: never;
+        post: operations["PromotionController_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/promotions/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["PromotionController_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch: operations["PromotionController_update"];
+        trace?: never;
+    };
     "/customers": {
         parameters: {
             query?: never;
@@ -3983,6 +4015,84 @@ export interface components {
             /** @description Trần chiết khấu 0..1 dạng chuỗi; null = bảng giá không quy định. */
             maxDiscount: string | null;
         };
+        /** @enum {string} */
+        PromotionType: "ORDER_DISCOUNT" | "LINE_DISCOUNT" | "BUY_X_GET_Y" | "FREE_SHIPPING" | "GIFT";
+        PromotionDto: {
+            type: components["schemas"]["PromotionType"];
+            condition: {
+                [key: string]: unknown;
+            };
+            reward: {
+                [key: string]: unknown;
+            };
+            id: string;
+            code: string;
+            name: string;
+            couponCode: string | null;
+            priority: number;
+            stackable: boolean;
+            validFrom: string;
+            validTo: string | null;
+            usageLimit: number | null;
+            usageLimitPerCustomer: number | null;
+            /** @description Số lần đã áp (đếm atomic ở core.claim_promotion) — chỉ đọc. */
+            usedCount: number;
+            isActive: boolean;
+            version: number;
+            createdAt: string;
+            updatedAt: string;
+        };
+        PromotionListResponseDto: {
+            items: components["schemas"]["PromotionDto"][];
+            total: number;
+        };
+        CreatePromotionDto: {
+            condition: {
+                [key: string]: unknown;
+            };
+            reward: {
+                [key: string]: unknown;
+            };
+            code: string;
+            name: string;
+            /** @enum {string} */
+            type: "ORDER_DISCOUNT" | "LINE_DISCOUNT" | "BUY_X_GET_Y" | "FREE_SHIPPING" | "GIFT";
+            /** @description Mã khách nhập để áp; bỏ trống = KM tự động. */
+            couponCode?: string | null;
+            /** @description Cao hơn được xét trước. */
+            priority?: number;
+            /** @description Cho phép áp cùng KM khác (cái đầu tiên được chọn cũng phải stackable). */
+            stackable?: boolean;
+            validFrom: string;
+            validTo?: string | null;
+            /** @description Tổng số lần dùng toàn hệ thống; bỏ trống = không giới hạn. */
+            usageLimit?: number | null;
+            usageLimitPerCustomer?: number | null;
+            isActive?: boolean;
+        };
+        UpdatePromotionDto: {
+            condition?: {
+                [key: string]: unknown;
+            };
+            reward?: {
+                [key: string]: unknown;
+            };
+            /** @description Optimistic lock — version client đang cầm; lệch → 409. */
+            version: number;
+            code?: string;
+            name?: string;
+            /** @enum {string} */
+            type?: "ORDER_DISCOUNT" | "LINE_DISCOUNT" | "BUY_X_GET_Y" | "FREE_SHIPPING" | "GIFT";
+            couponCode?: string | null;
+            priority?: number;
+            stackable?: boolean;
+            validFrom?: string;
+            validTo?: string | null;
+            usageLimit?: number | null;
+            usageLimitPerCustomer?: number | null;
+            /** @description false = ngừng chạy (không xoá — PromotionUsage giữ lịch sử đối soát). */
+            isActive?: boolean;
+        };
         CustomerDto: {
             id: string;
             code: string;
@@ -4369,6 +4479,9 @@ export interface components {
             brand: components["schemas"]["BrandDto"] | null;
             defaultWarehouseId: string | null;
             description: string | null;
+            ingredients: string | null;
+            usageInstructions: string | null;
+            orderNote: string | null;
             internalNote: string | null;
             allowNegativeStock: boolean;
             /** @description Tên dân dã / viết tắt / tên cũ — ô tìm sản phẩm ăn cả các alias này. */
@@ -4409,7 +4522,14 @@ export interface components {
              * @description Kho mặc định — tồn đầu kỳ của SKU mới ghi vào kho này.
              */
             defaultWarehouseId?: string;
+            /** @description Công dụng. */
             description?: string;
+            /** @description Thành phần (hoạt chất, hàm lượng). */
+            ingredients?: string;
+            /** @description Cách dùng (liều lượng, cách pha). */
+            usageInstructions?: string;
+            /** @description Lưu ý khi lên đơn — nhắc sale lúc chốt đơn. */
+            orderNote?: string;
             /** @description Ghi chú nội bộ — không đưa ra kênh bán/khách. */
             internalNote?: string;
             /** @description Cờ master data — reserve/pick CHƯA đọc (chờ chốt vận hành). */
@@ -4438,7 +4558,14 @@ export interface components {
             isActive: boolean;
             /** @description Kho mặc định (wms.Warehouse.id) — tồn đầu kỳ SKU mới ghi vào đây. */
             defaultWarehouseId: string | null;
+            /** @description Công dụng. */
             description: string | null;
+            /** @description Thành phần (hoạt chất, hàm lượng). */
+            ingredients: string | null;
+            /** @description Cách dùng (liều lượng, cách pha). */
+            usageInstructions: string | null;
+            /** @description Lưu ý khi lên đơn — nhắc sale lúc chốt đơn. */
+            orderNote: string | null;
             /** @description Ghi chú nội bộ — không đưa ra kênh bán/khách. */
             internalNote: string | null;
             /** @description Cờ master data — reserve/pick CHƯA đọc (chờ chốt vận hành). */
@@ -4477,6 +4604,9 @@ export interface components {
             /** Format: uuid */
             defaultWarehouseId?: string;
             description?: string;
+            ingredients?: string;
+            usageInstructions?: string;
+            orderNote?: string;
             internalNote?: string;
             allowNegativeStock?: boolean;
             /** @description Tên in trên hóa đơn — null = xóa, dùng lại tên thương mại. */
@@ -4567,6 +4697,8 @@ export interface components {
             baseUomCode: string;
             /** @description Số lượng cho MỘT combo — Decimal(18,6) chuỗi. */
             qty: string;
+            /** @description Giá bán lẻ ĐVT cơ sở (bảng giá mặc định) — null = chưa có giá. */
+            unitPrice: string | null;
             /** @description Tồn khả dụng thành phần (mọi kho) — Decimal(18,6) chuỗi. */
             available: string;
             isActive: boolean;
@@ -4575,6 +4707,10 @@ export interface components {
             components: components["schemas"]["SkuComboComponentDto"][];
             /** @description Số combo còn bán được — chuỗi số nguyên. */
             available: string;
+            /** @description Số tiền giảm cho MỘT combo — Decimal(18,4) chuỗi. */
+            discountAmount: string;
+            /** @description Combo miễn ship — gợi ý bật miễn ship khi lên đơn (sale quyết định). */
+            freeShipping: boolean;
         };
         PackagingLevelDto: {
             /** @description 1 = cấp lớn nhất. */
@@ -4632,6 +4768,15 @@ export interface components {
             /** @description Optimistic locking — gửi lại trong PATCH /skus/:id; lệch → 409. */
             version: number;
         };
+        SkuWarehouseStockDto: {
+            warehouseId: string;
+            warehouseCode: string;
+            warehouseName: string;
+            onHand: string;
+            reserved: string;
+            /** @description `onHand - reserved`; combo: số combo còn bán được trong kho. */
+            available: string;
+        };
         SkuListRowDto: {
             skuId: string;
             code: string;
@@ -4661,6 +4806,11 @@ export interface components {
             reserved: string;
             /** @description `onHand - reserved` — có thể ÂM khi giữ cho đơn nhiều hơn tồn thực. */
             available: string;
+            /**
+             * @description Tồn theo từng kho (bỏ TRANSIT / kho ngừng dùng) — ô chọn SKU khi lên đơn hiện để sale chọn
+             *     kho xuất. Combo: onHand/reserved = 0, available = số combo còn bán được ở kho đó.
+             */
+            byWarehouse: components["schemas"]["SkuWarehouseStockDto"][];
         };
         SkuListResponseDto: {
             items: components["schemas"]["SkuListRowDto"][];
@@ -4991,8 +5141,17 @@ export interface components {
             /** @description Mã ĐVT bán của combo. */
             baseUomCode: string;
             baseUomId: string;
-            /** @description Giá bán MỘT combo trong bảng giá mặc định — null = chưa đặt giá. */
+            /**
+             * @description Giá bán MỘT combo trong bảng giá mặc định = componentsPrice − discountAmount (hệ thống tự
+             *     tính, không nhập tay). null = còn thành phần chưa có giá lẻ.
+             */
             salePrice: string | null;
+            /** @description Σ(giá lẻ thành phần × số lượng) trước giảm — null khi còn thành phần chưa có giá. */
+            componentsPrice: string | null;
+            /** @description Số tiền giảm cho MỘT combo — Decimal(18,4) chuỗi. */
+            discountAmount: string;
+            /** @description Combo miễn ship — gợi ý cho sale khi lên đơn. */
+            freeShipping: boolean;
             componentCount: number;
             /**
              * @description Số combo còn bán được = min theo thành phần của floor(available / qty) — chuỗi số nguyên,
@@ -5016,6 +5175,8 @@ export interface components {
             baseUomCode: string;
             /** @description Số lượng cho MỘT combo — Decimal(18,6) chuỗi. */
             qty: string;
+            /** @description Giá bán lẻ ĐVT cơ sở của thành phần (bảng giá mặc định) — null = chưa có giá. */
+            unitPrice: string | null;
             /** @description Tồn khả dụng của thành phần (onHand − reserved, mọi kho) — Decimal(18,6) chuỗi. */
             available: string;
             isActive: boolean;
@@ -5031,8 +5192,17 @@ export interface components {
             /** @description Mã ĐVT bán của combo. */
             baseUomCode: string;
             baseUomId: string;
-            /** @description Giá bán MỘT combo trong bảng giá mặc định — null = chưa đặt giá. */
+            /**
+             * @description Giá bán MỘT combo trong bảng giá mặc định = componentsPrice − discountAmount (hệ thống tự
+             *     tính, không nhập tay). null = còn thành phần chưa có giá lẻ.
+             */
             salePrice: string | null;
+            /** @description Σ(giá lẻ thành phần × số lượng) trước giảm — null khi còn thành phần chưa có giá. */
+            componentsPrice: string | null;
+            /** @description Số tiền giảm cho MỘT combo — Decimal(18,4) chuỗi. */
+            discountAmount: string;
+            /** @description Combo miễn ship — gợi ý cho sale khi lên đơn. */
+            freeShipping: boolean;
             componentCount: number;
             /**
              * @description Số combo còn bán được = min theo thành phần của floor(available / qty) — chuỗi số nguyên,
@@ -5069,8 +5239,13 @@ export interface components {
             description?: string;
             /** @description Mã ĐVT của SKU combo (mặc định PCS) — combo bán theo đơn vị này, không quy đổi. */
             baseUom?: string;
-            /** @description Giá bán MỘT combo vào bảng giá mặc định — Decimal(18,4) chuỗi. Bỏ trống = chưa đặt giá. */
-            salePrice?: string;
+            /**
+             * @description Số tiền giảm cho MỘT combo — Decimal(18,4) chuỗi, ≥ 0, mặc định 0. Giá bán combo do hệ
+             *     thống tính: Σ(giá bán lẻ thành phần × số lượng) − discountAmount.
+             */
+            discountAmount?: string;
+            /** @description Combo miễn ship — gợi ý cho sale khi lên đơn (sale quyết định phí ship cuối). */
+            freeShipping?: boolean;
             /** @description Tên dân dã / viết tắt cho ô tìm kiếm. */
             searchAliases?: string[];
             components: components["schemas"]["ComboComponentInputDto"][];
@@ -5085,7 +5260,9 @@ export interface components {
             brandId?: string | null;
             description?: string;
             isActive?: boolean;
-            salePrice?: string;
+            /** @description Xem CreateComboDto.discountAmount. */
+            discountAmount?: string;
+            freeShipping?: boolean;
             searchAliases?: string[];
             components?: components["schemas"]["ComboComponentInputDto"][];
         };
@@ -5769,6 +5946,13 @@ export interface components {
             customerId: string;
             /** Format: uuid */
             addressId?: string;
+            /**
+             * Format: uuid
+             * @description Kho xuất (wms.Warehouse.id đang dùng, không phải TRANSIT) — đơn xuất từ MỘT kho: mọi dòng
+             *     (kể cả thành phần combo, hàng tặng) chỉ giữ tồn trong kho này; thiếu → 409 INSUFFICIENT_STOCK.
+             *     Bỏ trống = giữ ở bất kỳ kho nào (hành vi cũ).
+             */
+            warehouseId?: string;
             /** @enum {string} */
             channel?: "DIRECT" | "MARKETPLACE" | "WEBSITE" | "POS";
             /** @description Decimal(18,4) dạng chuỗi — cấm number cho tiền. */
@@ -8735,6 +8919,103 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ResolvedPriceDto"];
+                };
+            };
+        };
+    };
+    PromotionController_list: {
+        parameters: {
+            query: {
+                /** @description Tìm theo mã / tên / mã coupon. */
+                q?: string;
+                isActive?: boolean;
+                type?: "ORDER_DISCOUNT" | "LINE_DISCOUNT" | "BUY_X_GET_Y" | "FREE_SHIPPING" | "GIFT";
+                /** @description true = chỉ KM đang trong hiệu lực lúc này (validFrom ≤ now ≤ validTo). */
+                runningNow?: boolean;
+                take: number;
+                skip: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PromotionListResponseDto"];
+                };
+            };
+        };
+    };
+    PromotionController_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreatePromotionDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PromotionDto"];
+                };
+            };
+        };
+    };
+    PromotionController_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PromotionDto"];
+                };
+            };
+        };
+    };
+    PromotionController_update: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdatePromotionDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PromotionDto"];
                 };
             };
         };

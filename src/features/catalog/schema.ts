@@ -387,12 +387,15 @@ export const comboComponentRowSchema = z.object({
   baseUomCode: z.string(),
   /** Decimal(18,6) chuỗi — tồn khả dụng thành phần lúc chọn; '' = chưa biết. */
   available: z.string(),
+  /** Giá lẻ ĐVT cơ sở (bảng giá mặc định) — chỉ có khi sửa combo (ComboComponentDto.unitPrice); '' = chưa biết. */
+  unitPrice: z.string(),
   qty: quantitySchema.refine((v) => !new Decimal(v).isZero(), 'Định mức phải lớn hơn 0'),
 });
 
 /**
  * Khớp CreateComboDto / UpdateComboDto (luật 11). `version` không nằm trong form — lấy từ
- * ComboDetailDto lúc submit. Giá bán ghi vào BẢNG GIÁ MẶC ĐỊNH (giá không nằm trên SKU).
+ * ComboDetailDto lúc submit. Giá combo KHÔNG nhập tay (COMBO-1): server tính
+ * Σ(giá lẻ thành phần × định mức) − discountAmount, ghi vào bảng giá mặc định và đẩy lên Pancake.
  */
 export const comboFormSchema = z
   .object({
@@ -402,7 +405,11 @@ export const comboFormSchema = z
     brandId: z.string().optional(),
     description: z.string().trim().max(2000, 'Tối đa 2000 ký tự'),
     searchAliases: z.string().trim().max(500, 'Tối đa 500 ký tự'),
-    salePrice: moneySchema.optional().or(z.literal('')),
+    /** Giảm giá cho MỘT combo — Decimal(18,4) ≥ 0; '' = 0. */
+    discountAmount: moneySchema
+      .refine((v) => !v.startsWith('-'), 'Giảm giá không được âm')
+      .or(z.literal('')),
+    freeShipping: z.boolean(),
     isActive: z.boolean(),
     components: z.array(comboComponentRowSchema).min(1, 'Combo cần ít nhất một thành phần'),
   })
@@ -431,6 +438,7 @@ export const EMPTY_COMBO_ROW: ComboComponentRowValues = {
   skuName: '',
   baseUomCode: '',
   available: '',
+  unitPrice: '',
   qty: '1',
 };
 
@@ -452,4 +460,22 @@ export function comboAvailableFromRows(
     if (min === null || n.lessThan(min)) min = n;
   }
   return min === null ? null : min.toString();
+}
+
+/**
+ * Giá combo xem trước = Σ(giá lẻ × định mức) − giảm giá, cùng công thức server
+ * (PricingService.refreshComboPrices). Dòng chưa biết giá / định mức sai → null (không đoán).
+ */
+export function comboPriceFromRows(
+  rows: readonly { qty: string; unitPrice: string }[],
+  discount: string,
+): { componentsPrice: string; salePrice: string } | null {
+  if (rows.length === 0) return null;
+  let sum = new Decimal(0);
+  for (const r of rows) {
+    if (!/^\d+(\.\d+)?$/.test(r.unitPrice) || !/^\d+(\.\d+)?$/.test(r.qty)) return null;
+    sum = sum.plus(new Decimal(r.unitPrice).mul(r.qty));
+  }
+  const d = /^\d+(\.\d+)?$/.test(discount) ? new Decimal(discount) : new Decimal(0);
+  return { componentsPrice: sum.toFixed(4), salePrice: sum.minus(d).toFixed(4) };
 }

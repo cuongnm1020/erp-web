@@ -150,7 +150,8 @@ describe('ComboFormScreen — tạo combo (POST /combos)', () => {
     );
     renderApp(<ComboFormScreen />);
     fill('Tên combo *', 'Combo A+B');
-    fill('Giá bán', '150000');
+    fill('Giảm giá', '10000');
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Miễn ship' }));
 
     // Dòng 1: chọn SKU-A qua picker — SKU combo không được liệt kê
     fireEvent.click(screen.getAllByRole('combobox', { name: 'SKU thành phần' })[0]!);
@@ -176,7 +177,8 @@ describe('ComboFormScreen — tạo combo (POST /combos)', () => {
     expect(bodies[0]).toEqual({
       name: 'Combo A+B',
       searchAliases: [],
-      salePrice: '150000',
+      discountAmount: '10000',
+      freeShipping: true,
       components: [
         { skuId: uuid(1), qty: '2' },
         { skuId: uuid(2), qty: '1' },
@@ -225,7 +227,10 @@ describe('ComboFormScreen — sửa combo (PATCH /combos/{id})', () => {
           isActive: true,
           baseUomCode: 'PCS',
           baseUomId: uuid(9),
-          salePrice: '150000',
+          salePrice: '110000',
+          componentsPrice: '120000',
+          discountAmount: '10000',
+          freeShipping: false,
           componentCount: 1,
           available: '50',
           version: 3,
@@ -242,6 +247,7 @@ describe('ComboFormScreen — sửa combo (PATCH /combos/{id})', () => {
               name: 'Thuốc trừ sâu A',
               baseUomCode: 'chai',
               qty: '2',
+              unitPrice: '60000',
               available: '100',
               isActive: true,
             },
@@ -257,6 +263,9 @@ describe('ComboFormScreen — sửa combo (PATCH /combos/{id})', () => {
     expect(await screen.findByDisplayValue('Combo A+B')).toBeInTheDocument();
     expect(screen.getByText('SKU-A')).toBeInTheDocument();
     expect(screen.getByLabelText('Mã combo')).toBeDisabled();
+    // Giá xem trước = 2 × 60.000 − 10.000
+    expect(screen.getByLabelText('Giảm giá')).toHaveValue('10.000');
+    expect(screen.getByText(/Giá combo = .*120\.000.*110\.000/)).toBeInTheDocument();
     fill('Tên combo *', 'Combo A+B v2');
     fireEvent.change(screen.getAllByLabelText('Định mức')[0]!, { target: { value: '5' } });
     fireEvent.click(screen.getByRole('button', { name: /Lưu thay đổi/ }));
@@ -267,7 +276,8 @@ describe('ComboFormScreen — sửa combo (PATCH /combos/{id})', () => {
       categoryId: null,
       brandId: null,
       searchAliases: ['combo a'],
-      salePrice: '150000',
+      discountAmount: '10000',
+      freeShipping: false,
       isActive: true,
       components: [{ skuId: uuid(1), qty: '5' }],
     });
