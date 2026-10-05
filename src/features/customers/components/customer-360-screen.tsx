@@ -1,6 +1,6 @@
 'use client';
 
-import { Info, MapPin, Pencil, Plus } from 'lucide-react';
+import { GitMerge, History, Info, MapPin, Pencil, Plus } from 'lucide-react';
 import Link from 'next/link';
 import type { ReactNode } from 'react';
 import { KpiCard } from '@/components/data/kpi-card';
@@ -66,11 +66,47 @@ function Field({ label, children }: { label: string; children: ReactNode }) {
   );
 }
 
+/**
+ * CRM-09/10 — hồ sơ đã bị gộp: báo rõ và dẫn sang khách giữ (không tự chuyển trang — đơn đã
+ * chốt trước khi gộp vẫn nằm ở hồ sơ này, người xem có thể cần đối chiếu).
+ * `code`/`name` null = khách giữ ngoài phạm vi người xem → không có link.
+ */
+function MergedBanner({ target }: { target: NonNullable<CustomerDetail['mergedInto']> }) {
+  return (
+    <div
+      role="status"
+      className="flex flex-wrap items-center gap-2 rounded-md border border-warning/40 bg-warning/10 px-3 py-2 text-sm"
+    >
+      <GitMerge className="h-4 w-4 shrink-0 text-warning" aria-hidden />
+      {target.code ? (
+        <span>
+          Khách này đã được gộp vào{' '}
+          <Link href={`/crm/customers/${target.id}`} className="font-semibold hover:underline">
+            <span className="font-mono text-xs">{target.code}</span> · {target.name}
+          </Link>
+          . Đơn đã chốt trước khi gộp vẫn nằm ở hồ sơ này; đơn mới lên ở khách giữ.
+        </span>
+      ) : (
+        <span>
+          Khách này đã được gộp vào một khách khác ngoài phạm vi bạn phụ trách. Đơn đã chốt trước
+          khi gộp vẫn nằm ở hồ sơ này.
+        </span>
+      )}
+      {target.code ? (
+        <Button size="sm" variant="outline" className="ml-auto" asChild>
+          <Link href={`/crm/customers/${target.id}`}>Mở hồ sơ khách giữ</Link>
+        </Button>
+      ) : null}
+    </div>
+  );
+}
+
 function Profile({ c }: { c: CustomerDetail }) {
   const ability = useAbility();
   const canUpdate = ability.can('update', 'Customer');
   return (
     <>
+      {c.mergedInto ? <MergedBanner target={c.mergedInto} /> : null}
       <section className="flex items-center gap-4 rounded-md border bg-card px-4 py-3">
         <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-secondary text-sm font-semibold text-primary">
           {initialsOf(c.name)}
@@ -97,6 +133,14 @@ function Profile({ c }: { c: CustomerDetail }) {
           </p>
         </div>
         <div className="flex shrink-0 items-center gap-2">
+          <Can I="merge" a="Customer">
+            <Button variant="outline" size="sm" asChild>
+              <Link href={`/crm/customers/duplicates?tab=history&customerId=${c.id}`}>
+                <History aria-hidden />
+                Lịch sử gộp
+              </Link>
+            </Button>
+          </Can>
           <Can I="update" a="Customer">
             <Button variant="outline" size="sm" asChild>
               <Link href={`/crm/customers/${c.id}/edit`}>

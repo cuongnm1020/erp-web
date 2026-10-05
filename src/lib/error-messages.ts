@@ -151,6 +151,21 @@ const MESSAGES: Record<string, string> = {
     'Cấp độ vẫn đang gán cho khách hàng nên không xóa được. Gỡ cấp khỏi các khách (hoặc chạy nâng hạng) rồi xóa lại.',
   CUSTOMER_GROUP_NOT_FOUND: 'Nhóm khách hàng không còn tồn tại. Tải lại danh sách nhóm.',
   CUSTOMER_TIER_NOT_FOUND: 'Cấp độ khách hàng không còn tồn tại. Tải lại danh sách cấp độ.',
+  // Gộp khách trùng (/crm/customers/duplicates, CRM-07..09)
+  MERGE_SELF: 'Không gộp được một khách vào chính nó. Chọn hai hồ sơ khác nhau.',
+  MERGE_WALK_IN:
+    'Khách vãng lai của Pancake gom đơn của nhiều người nên không được gộp. Bỏ hồ sơ này khỏi lựa chọn.',
+  CUSTOMER_ALREADY_MERGED:
+    'Một trong hai khách đã được gộp vào khách khác (có thể vừa có người gộp). Tải lại danh sách nhóm trùng.',
+  PHONE_MISMATCH:
+    'Hai khách khác số điện thoại. Chỉ gộp khi chắc chắn là cùng một người — xác nhận thêm một lần.',
+  MERGE_ALREADY_UNDONE: 'Lần gộp này đã được hoàn tác trước đó. Tải lại lịch sử gộp.',
+  MERGE_UNDO_CONFLICT:
+    'Hồ sơ đã thay đổi sau lần gộp này nên không hoàn tác được. Tải lại lịch sử gộp.',
+  MERGE_UNDO_CONFLICT_MERGED_CHANGED:
+    'Hồ sơ cũ đã thay đổi sau lần gộp này (không còn trỏ về khách giữ) nên không hoàn tác được.',
+  MERGE_UNDO_CONFLICT_SURVIVOR_MERGED:
+    'Khách giữ đã bị gộp tiếp vào khách khác — hoàn tác lần gộp sau trước, rồi hoàn tác lần này.',
   TAG_NOT_FOUND: 'Tag không còn tồn tại (có thể vừa bị xóa). Tải lại danh sách tag.',
   INVALID_TIER_PERIOD: 'Kỳ tính doanh số không hợp lệ. Chọn số tháng từ 1 đến 120 rồi chạy lại.',
   TIER_JOB_ACTOR_NOT_FOUND:

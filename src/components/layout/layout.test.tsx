@@ -38,6 +38,9 @@ describe('visibleModules', () => {
     const orders = mods.find((m) => m.label === 'Bán hàng')!;
     expect(orders.children?.map((c) => c.label)).not.toContain('Tạo đơn');
     expect(orders.children?.map((c) => c.label)).toContain('Đơn hàng');
+    // Không có customer.merge → không thấy Gộp khách trùng.
+    const customers = mods.find((m) => m.label === 'Khách hàng')!;
+    expect(customers.children?.map((c) => c.label)).not.toContain('Gộp khách trùng');
     // Không có product.read / stock.read → cả module ẩn (mọi con đều bị ẩn)
     expect(labels).not.toContain('Sản phẩm');
     expect(labels).not.toContain('Kho');
@@ -54,6 +57,12 @@ describe('visibleModules', () => {
     expect(labels).not.toContain('Tài chính');
     const children = mods.flatMap((m) => m.children ?? []).map((c) => c.label);
     expect(children).not.toContain('Phân công');
+    // CRM-10: mục hiện với customer.merge (ở đây ability = true).
+    expect(children).toContain('Gộp khách trùng');
+    expect(requiredAbilityFor('/crm/customers/duplicates')).toEqual({
+      action: 'merge',
+      subject: 'Customer',
+    });
     expect(children).not.toContain('Tồn kho');
     expect(mods.find((m) => m.label === 'Kho')?.href).toBe('/wms/warehouses');
     expect(requiredAbilityFor('/crm/customers/assign')).toEqual({

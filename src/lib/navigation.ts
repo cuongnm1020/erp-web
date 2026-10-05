@@ -6,6 +6,7 @@ import {
   Columns3,
   Gauge,
   Gift,
+  GitMerge,
   LayoutDashboard,
   Landmark,
   List,
@@ -131,7 +132,13 @@ export const NAV_MODULES: NavModule[] = [
         ability: { action: 'assign', subject: 'Customer' },
       },
       // { label: 'Nhóm · cấp độ · tag', href: '/crm/segments', icon: Tags },
-      // { label: 'Gộp khách trùng', href: '/crm/customers/duplicates', icon: Merge },
+      {
+        label: 'Gộp khách trùng',
+        href: '/crm/customers/duplicates',
+        icon: GitMerge,
+        // CRM-10: chỉ quản trị (customer.merge) — người khác không thấy mục, URL bị chặn.
+        ability: { action: 'merge', subject: 'Customer' },
+      },
       // { label: 'Đồng ý marketing', href: '/crm/customers/consent', icon: MailCheck },
       // {
       //   label: 'Ticket CSKH',

@@ -318,6 +318,1009 @@ export interface paths {
         patch: operations["PromotionController_update"];
         trace?: never;
     };
+    "/customers/duplicates": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Nhóm khách đang hoạt động, chưa gộp, cùng SĐT chuẩn hoá — mới nhất trước. */
+        get: operations["CustomerMergeController_list"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/customers/duplicates/compare": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** So sánh 2..5 khách cạnh nhau. Một id ngoài scope / không có → 404. */
+        get: operations["CustomerMergeController_compare"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/customers/merge": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Gộp `mergedId` vào `survivorId` trong một transaction. 404 khách ngoài scope; 422 MERGE_SELF /
+         *     MERGE_WALK_IN; 409 CUSTOMER_ALREADY_MERGED, PHONE_MISMATCH (khác SĐT mà không `force`).
+         */
+        post: operations["CustomerMergeController_merge"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/customers/merge/{logId}/undo": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Hoàn tác một lần gộp. 404 log không có / khách ngoài scope; 409 MERGE_ALREADY_UNDONE;
+         *     409 MERGE_UNDO_CONFLICT (bản bị gộp đã đổi, hoặc bản giữ đã bị gộp tiếp — hoàn tác lần sau trước).
+         */
+        post: operations["CustomerMergeController_undo"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/customers/merge-logs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Lịch sử gộp, mới nhất trước. Không phải super admin thì bắt buộc customerId (422). */
+        get: operations["CustomerMergeController_logs"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/invoices": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["InvoiceController_list"];
+        put?: never;
+        /** Xuất hoá đơn cho đơn đã giao, và đóng đơn bán APPROVED → POSTED. */
+        post: operations["InvoiceController_issue"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/invoices/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["InvoiceController_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/payments/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["PaymentController_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/payments": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Ghi nhận tiền khách trả + cấn trừ vào hoá đơn, tất cả trong một transaction. */
+        post: operations["PaymentController_record"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/shipments": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["ShippingController_list"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/shipments/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["ShippingController_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/shipments/{id}/pack": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Đóng gói xong: task PACK → COMPLETED, ghi cân nặng + tiền thu hộ. */
+        post: operations["ShippingController_pack"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/shipments/{id}/carrier": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Gán hãng vận chuyển + sinh mã vận đơn. Tích hợp thật là P1-15. */
+        post: operations["ShippingController_assignCarrier"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/shipments/{id}/ship": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Bàn giao cho hãng vận chuyển: phiếu → PICKED_UP. KHÔNG chạm tồn (hàng đã
+         *     rời sổ kho từ bước PICK) và KHÔNG post đơn bán — xem doc block của
+         *     `ShippingService`.
+         */
+        post: operations["ShippingController_ship"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/shipments/{id}/status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Cập nhật hành trình sau khi rời kho (IN_TRANSIT / DELIVERED / FAILED /
+         *     RETURNED). Webhook của hãng (P1-15) sẽ đi vào đúng đường này.
+         */
+        post: operations["ShippingController_updateStatus"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/shipment-monitor/summary": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["ShipmentMonitorController_summary"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/shipment-monitor": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["ShipmentMonitorController_list"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/goods-issues": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["GoodsIssueController_list"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/goods-issues/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["GoodsIssueController_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/stock": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Tồn gộp theo SKU — ba con số onHand / reserved / available tách riêng. */
+        get: operations["InventoryController_list"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/stock/by-location": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Bóc theo vị trí, sắp theo thứ tự đi trong kho. */
+        get: operations["InventoryController_byLocation"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/stock/by-lot": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Bóc theo lô, sắp theo hạn dùng tăng dần (FEFO). */
+        get: operations["InventoryController_byLot"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/stock/replenishment": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Cảnh báo nhập hàng (2026-09-22): SKU của sản phẩm có mức tồn kho, so tồn thực + tốc độ bán
+         *     1–2 ngày gần nhất với ngưỡng; sắp hết hàng lên trước. Mặc định chỉ dòng cần chú ý.
+         */
+        get: operations["InventoryController_replenishment"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/lots": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["LotController_list"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/lots/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Sửa HSD/NSX khai sai lúc nhập — cần stock.adjust (đổi HSD đổi thứ tự FEFO). */
+        patch: operations["LotController_update"];
+        trace?: never;
+    };
+    "/customer-assignments/teams": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["CustomerAssignmentController_teams"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/customer-assignments/teams/{teamId}/members": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["CustomerAssignmentController_members"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/customer-assignments": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Lịch sử phân công — member cũng xem được của khách mình (customer.read + scope). */
+        get: operations["CustomerAssignmentController_history"];
+        put?: never;
+        post: operations["CustomerAssignmentController_assign"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/pancake-sync/mapping/backlog": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["PancakeMappingController_backlog"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/pancake-sync/mapping/skus": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["PancakeMappingController_skus"];
+        put?: never;
+        post: operations["PancakeMappingController_mapSku"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/pancake-sync/mapping/actors": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["PancakeMappingController_actors"];
+        put?: never;
+        post: operations["PancakeMappingController_mapActor"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/pancake-sync/config": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["PancakeConfigController_list"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/pancake-sync/config/{shopId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put: operations["PancakeConfigController_upsert"];
+        post?: never;
+        delete: operations["PancakeConfigController_remove"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/pancake-sync/config/{shopId}/webhook-secret": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Xoay shared secret webhook — secret cũ mất hiệu lực ngay, dán secret mới vào Pancake. */
+        post: operations["PancakeConfigController_rotateWebhookSecret"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/pancake-sync/config/{shopId}/verify": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Gọi thử Pancake bằng cấu hình đang lưu; thất bại → 502 PANCAKE_VERIFY_FAILED kèm nguyên nhân. */
+        post: operations["PancakeConfigController_verify"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/pancake-sync/webhook/{shopId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Một số hệ thống GET thử URL khi lưu cấu hình — trả 200 rỗng, không lộ gì. */
+        get: operations["PancakeWebhookController_ping"];
+        put?: never;
+        post: operations["PancakeWebhookController_receive"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/pancake-sync/transform/orders": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Ingest + chiếu ngay một payload đơn. 200 kể cả khi blocked/failed — kết quả nằm trong body. */
+        post: operations["PancakeTransformController_replayOrder"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/pancake-sync/transform/run": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Quét ngay (thay vì chờ job mỗi phút) — sau khi gán SKU / nhân viên hàng loạt. */
+        post: operations["PancakeTransformController_run"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/pancake-sync/push/products/bulk": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Trạng thái / kết quả lượt đẩy toàn bộ gần nhất — web hỏi định kỳ khi đang chạy. */
+        get: operations["PancakePushController_bulkStatus"];
+        put?: never;
+        /**
+         * Xếp job nền đẩy TOÀN BỘ sản phẩm lên mọi shop (nút "Đồng bộ Pancake" ở danh sách sản
+         *     phẩm). Đang có lượt chạy → không xếp thêm, trả trạng thái lượt đó. Khai báo TRƯỚC
+         *     `products/:id` để `bulk` không rơi vào ParseUUIDPipe.
+         */
+        post: operations["PancakePushController_startBulk"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/pancake-sync/push/products/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Đẩy MỘT sản phẩm (kèm mọi SKU) lên mọi shop đang cấu hình. */
+        post: operations["PancakePushController_product"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/pancake-sync/push/products": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Đẩy TOÀN BỘ sản phẩm đang có (kể cả combo, chưa xóa), chờ xong mới trả — CLI / test. */
+        post: operations["PancakePushController_allProducts"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/pancake-sync/push/warehouses/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["PancakePushController_warehouse"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/pancake-sync/push/warehouses": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["PancakePushController_allWarehouses"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/tasks": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Mọi task của kho (bảng điều phối) — `task.read_all`; `task.read` chỉ mở việc của mình qua /pda. */
+        get: operations["TaskEngineController_list"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/tasks/stats": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Danh bạ người nhận việc (user active role WAREHOUSE) cho ô "Gán cho…". */
+        get: operations["TaskEngineController_stats"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/tasks/productivity": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Năng suất kho theo khoảng ngày (giờ VN): đơn đã lấy / đã đóng của từng nhân viên + việc
+         *     đang giao cho từng người + hàng chờ chưa giao — màn Kho › Năng suất kho.
+         */
+        get: operations["TaskEngineController_productivity"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/tasks/assignees": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["TaskEngineController_assignees"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/tasks/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Chi tiết một việc + dòng — in phiếu pick, trạm đóng gói, thẻ trên bảng điều phối. */
+        get: operations["TaskEngineController_detail"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/tasks/assign": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Gán NHIỀU việc cho một người — chọn nhiều thẻ trên bảng điều phối. Từng việc một,
+         *     việc lỗi nằm trong `failed` (không rollback cả lô). Khai TRƯỚC `:id/assign`.
+         */
+        post: operations["TaskEngineController_assignBulk"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/tasks/{id}/assign": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Gán việc cho nhân viên kho — chỉ task PENDING; user phải active. */
+        post: operations["TaskEngineController_assign"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/tasks/{id}/unassign": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Trả task về hàng đợi (ASSIGNED → PENDING) — dùng khi đổi người / nghỉ ca. */
+        post: operations["TaskEngineController_unassign"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/tasks/{id}/replan-shortages": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Lập lại dòng "thiếu tồn" của việc PICK (lỗi thật SOP2610-00005, 2026-10-05: việc sinh lúc vị
+         *     trí chứa hàng đang Ngừng dùng → dòng EXCEPTION không vị trí, không ai sửa được). Chỉ lấy ở vị
+         *     trí pick được — như lúc sinh việc; không đổi trạng thái task, GDN nháp cập nhật cùng transaction.
+         */
+        post: operations["TaskEngineController_replanShortages"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/waves/suggestions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Nhóm đơn ĐỦ ĐIỀU KIỆN gộp theo cấp đóng gói (PLAN-packaging-hierarchy §12): đơn một SKU cộng
+         *     đúng N thùng → nhóm CARTON; đúng một pallet → nhóm PALLET. Chỉ gợi ý — quản lý bấm gộp ở
+         *     `POST /waves/merge`. Khai báo trước `:id` để không bị bắt nhầm.
+         */
+        get: operations["WaveController_suggestions"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/waves": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["WaveController_list"];
+        put?: never;
+        /** Gộp N task PICK (cùng kho, chưa ai nhận) thành một lượt; gán người luôn nếu có. */
+        post: operations["WaveController_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/waves/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Chi tiết + dòng gộp theo vị trí — in phiếu wave, xem tiến độ từng đơn. */
+        get: operations["WaveController_detail"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/waves/merge": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Gộp MỘT nhóm gợi ý thành lượt (kiểm lại đơn con trong transaction; lệch → 409
+         *     `WAVE_SUGGESTION_STALE`); gán người luôn nếu có.
+         */
+        post: operations["WaveController_merge"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/waves/{id}/assign": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["WaveController_assign"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/waves/{id}/unassign": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["WaveController_unassign"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/customers": {
         parameters: {
             query?: never;
@@ -927,110 +1930,6 @@ export interface paths {
         options?: never;
         head?: never;
         patch: operations["ContainerTypeController_update"];
-        trace?: never;
-    };
-    "/stock": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Tồn gộp theo SKU — ba con số onHand / reserved / available tách riêng. */
-        get: operations["InventoryController_list"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/stock/by-location": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Bóc theo vị trí, sắp theo thứ tự đi trong kho. */
-        get: operations["InventoryController_byLocation"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/stock/by-lot": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Bóc theo lô, sắp theo hạn dùng tăng dần (FEFO). */
-        get: operations["InventoryController_byLot"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/stock/replenishment": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Cảnh báo nhập hàng (2026-09-22): SKU của sản phẩm có mức tồn kho, so tồn thực + tốc độ bán
-         *     1–2 ngày gần nhất với ngưỡng; sắp hết hàng lên trước. Mặc định chỉ dòng cần chú ý.
-         */
-        get: operations["InventoryController_replenishment"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/lots": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get: operations["LotController_list"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/lots/{id}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        /** Sửa HSD/NSX khai sai lúc nhập — cần stock.adjust (đổi HSD đổi thứ tự FEFO). */
-        patch: operations["LotController_update"];
         trace?: never;
     };
     "/combos": {
@@ -2185,446 +3084,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/shipments": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get: operations["ShippingController_list"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/shipments/{id}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get: operations["ShippingController_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/shipments/{id}/pack": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** Đóng gói xong: task PACK → COMPLETED, ghi cân nặng + tiền thu hộ. */
-        post: operations["ShippingController_pack"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/shipments/{id}/carrier": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** Gán hãng vận chuyển + sinh mã vận đơn. Tích hợp thật là P1-15. */
-        post: operations["ShippingController_assignCarrier"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/shipments/{id}/ship": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Bàn giao cho hãng vận chuyển: phiếu → PICKED_UP. KHÔNG chạm tồn (hàng đã
-         *     rời sổ kho từ bước PICK) và KHÔNG post đơn bán — xem doc block của
-         *     `ShippingService`.
-         */
-        post: operations["ShippingController_ship"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/shipments/{id}/status": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Cập nhật hành trình sau khi rời kho (IN_TRANSIT / DELIVERED / FAILED /
-         *     RETURNED). Webhook của hãng (P1-15) sẽ đi vào đúng đường này.
-         */
-        post: operations["ShippingController_updateStatus"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/shipment-monitor/summary": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get: operations["ShipmentMonitorController_summary"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/shipment-monitor": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get: operations["ShipmentMonitorController_list"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/goods-issues": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get: operations["GoodsIssueController_list"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/goods-issues/{id}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get: operations["GoodsIssueController_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/tasks": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Mọi task của kho (bảng điều phối) — `task.read_all`; `task.read` chỉ mở việc của mình qua /pda. */
-        get: operations["TaskEngineController_list"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/tasks/stats": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Danh bạ người nhận việc (user active role WAREHOUSE) cho ô "Gán cho…". */
-        get: operations["TaskEngineController_stats"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/tasks/productivity": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Năng suất kho theo khoảng ngày (giờ VN): đơn đã lấy / đã đóng của từng nhân viên + việc
-         *     đang giao cho từng người + hàng chờ chưa giao — màn Kho › Năng suất kho.
-         */
-        get: operations["TaskEngineController_productivity"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/tasks/assignees": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get: operations["TaskEngineController_assignees"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/tasks/{id}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Chi tiết một việc + dòng — in phiếu pick, trạm đóng gói, thẻ trên bảng điều phối. */
-        get: operations["TaskEngineController_detail"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/tasks/assign": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Gán NHIỀU việc cho một người — chọn nhiều thẻ trên bảng điều phối. Từng việc một,
-         *     việc lỗi nằm trong `failed` (không rollback cả lô). Khai TRƯỚC `:id/assign`.
-         */
-        post: operations["TaskEngineController_assignBulk"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/tasks/{id}/assign": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** Gán việc cho nhân viên kho — chỉ task PENDING; user phải active. */
-        post: operations["TaskEngineController_assign"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/tasks/{id}/unassign": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** Trả task về hàng đợi (ASSIGNED → PENDING) — dùng khi đổi người / nghỉ ca. */
-        post: operations["TaskEngineController_unassign"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/tasks/{id}/replan-shortages": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Lập lại dòng "thiếu tồn" của việc PICK (lỗi thật SOP2610-00005, 2026-10-05: việc sinh lúc vị
-         *     trí chứa hàng đang Ngừng dùng → dòng EXCEPTION không vị trí, không ai sửa được). Chỉ lấy ở vị
-         *     trí pick được — như lúc sinh việc; không đổi trạng thái task, GDN nháp cập nhật cùng transaction.
-         */
-        post: operations["TaskEngineController_replanShortages"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/waves/suggestions": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Nhóm đơn ĐỦ ĐIỀU KIỆN gộp theo cấp đóng gói (PLAN-packaging-hierarchy §12): đơn một SKU cộng
-         *     đúng N thùng → nhóm CARTON; đúng một pallet → nhóm PALLET. Chỉ gợi ý — quản lý bấm gộp ở
-         *     `POST /waves/merge`. Khai báo trước `:id` để không bị bắt nhầm.
-         */
-        get: operations["WaveController_suggestions"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/waves": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get: operations["WaveController_list"];
-        put?: never;
-        /** Gộp N task PICK (cùng kho, chưa ai nhận) thành một lượt; gán người luôn nếu có. */
-        post: operations["WaveController_create"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/waves/{id}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Chi tiết + dòng gộp theo vị trí — in phiếu wave, xem tiến độ từng đơn. */
-        get: operations["WaveController_detail"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/waves/merge": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Gộp MỘT nhóm gợi ý thành lượt (kiểm lại đơn con trong transaction; lệch → 409
-         *     `WAVE_SUGGESTION_STALE`); gán người luôn nếu có.
-         */
-        post: operations["WaveController_merge"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/waves/{id}/assign": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post: operations["WaveController_assign"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/waves/{id}/unassign": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post: operations["WaveController_unassign"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/pda/tasks": {
         parameters: {
             query?: never;
@@ -3433,72 +3892,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/invoices": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get: operations["InvoiceController_list"];
-        put?: never;
-        /** Xuất hoá đơn cho đơn đã giao, và đóng đơn bán APPROVED → POSTED. */
-        post: operations["InvoiceController_issue"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/invoices/{id}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get: operations["InvoiceController_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/payments/{id}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get: operations["PaymentController_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/payments": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** Ghi nhận tiền khách trả + cấn trừ vào hoá đơn, tất cả trong một transaction. */
-        post: operations["PaymentController_record"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/payment-gateways": {
         parameters: {
             query?: never;
@@ -3814,308 +4207,6 @@ export interface paths {
         patch: operations["CustomerSegmentController_setSegment"];
         trace?: never;
     };
-    "/customer-assignments/teams": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get: operations["CustomerAssignmentController_teams"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/customer-assignments/teams/{teamId}/members": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get: operations["CustomerAssignmentController_members"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/customer-assignments": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Lịch sử phân công — member cũng xem được của khách mình (customer.read + scope). */
-        get: operations["CustomerAssignmentController_history"];
-        put?: never;
-        post: operations["CustomerAssignmentController_assign"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/pancake-sync/mapping/backlog": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get: operations["PancakeMappingController_backlog"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/pancake-sync/mapping/skus": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get: operations["PancakeMappingController_skus"];
-        put?: never;
-        post: operations["PancakeMappingController_mapSku"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/pancake-sync/mapping/actors": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get: operations["PancakeMappingController_actors"];
-        put?: never;
-        post: operations["PancakeMappingController_mapActor"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/pancake-sync/config": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get: operations["PancakeConfigController_list"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/pancake-sync/config/{shopId}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put: operations["PancakeConfigController_upsert"];
-        post?: never;
-        delete: operations["PancakeConfigController_remove"];
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/pancake-sync/config/{shopId}/webhook-secret": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** Xoay shared secret webhook — secret cũ mất hiệu lực ngay, dán secret mới vào Pancake. */
-        post: operations["PancakeConfigController_rotateWebhookSecret"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/pancake-sync/config/{shopId}/verify": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** Gọi thử Pancake bằng cấu hình đang lưu; thất bại → 502 PANCAKE_VERIFY_FAILED kèm nguyên nhân. */
-        post: operations["PancakeConfigController_verify"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/pancake-sync/webhook/{shopId}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Một số hệ thống GET thử URL khi lưu cấu hình — trả 200 rỗng, không lộ gì. */
-        get: operations["PancakeWebhookController_ping"];
-        put?: never;
-        post: operations["PancakeWebhookController_receive"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/pancake-sync/transform/orders": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** Ingest + chiếu ngay một payload đơn. 200 kể cả khi blocked/failed — kết quả nằm trong body. */
-        post: operations["PancakeTransformController_replayOrder"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/pancake-sync/transform/run": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** Quét ngay (thay vì chờ job mỗi phút) — sau khi gán SKU / nhân viên hàng loạt. */
-        post: operations["PancakeTransformController_run"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/pancake-sync/push/products/bulk": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Trạng thái / kết quả lượt đẩy toàn bộ gần nhất — web hỏi định kỳ khi đang chạy. */
-        get: operations["PancakePushController_bulkStatus"];
-        put?: never;
-        /**
-         * Xếp job nền đẩy TOÀN BỘ sản phẩm lên mọi shop (nút "Đồng bộ Pancake" ở danh sách sản
-         *     phẩm). Đang có lượt chạy → không xếp thêm, trả trạng thái lượt đó. Khai báo TRƯỚC
-         *     `products/:id` để `bulk` không rơi vào ParseUUIDPipe.
-         */
-        post: operations["PancakePushController_startBulk"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/pancake-sync/push/products/{id}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** Đẩy MỘT sản phẩm (kèm mọi SKU) lên mọi shop đang cấu hình. */
-        post: operations["PancakePushController_product"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/pancake-sync/push/products": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** Đẩy TOÀN BỘ sản phẩm đang có (kể cả combo, chưa xóa), chờ xong mới trả — CLI / test. */
-        post: operations["PancakePushController_allProducts"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/pancake-sync/push/warehouses/{id}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post: operations["PancakePushController_warehouse"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/pancake-sync/push/warehouses": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post: operations["PancakePushController_allWarehouses"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/health": {
         parameters: {
             query?: never;
@@ -4418,6 +4509,44 @@ export interface components {
             /** @description false = ngừng chạy (không xoá — PromotionUsage giữ lịch sử đối soát). */
             isActive?: boolean;
         };
+        NamedRefDto: {
+            id: string;
+            name: string;
+        };
+        DuplicateCustomerDto: {
+            id: string;
+            code: string;
+            name: string;
+            phone: string | null;
+            email: string | null;
+            createdAt: string;
+            /** @description Số đơn không tính CANCELLED. */
+            orderCount: number;
+            /** @description Ngày đặt đơn APPROVED/POSTED gần nhất; null = chưa có. */
+            lastOrderAt: string | null;
+            /** @description Σ `total` đơn APPROVED/POSTED, Decimal(18,4) string (tổng đơn — không phải doanh thu thuần D-CR1). */
+            revenue: string;
+            owners: components["schemas"]["NamedRefDto"][];
+            teams: components["schemas"]["NamedRefDto"][];
+            /**
+             * @description PANCAKE = có hồ sơ / định danh Pancake hoặc mã do sync tạo (PC…-C-…); MANUAL = tạo trên ERP.
+             * @enum {string}
+             */
+            source: "PANCAKE" | "MANUAL";
+        };
+        DuplicateGroupDto: {
+            /** @description SĐT chuẩn hoá (core.normalize_phone) chung của nhóm. */
+            phone: string;
+            /** @description Gợi ý bản GIỮ: nhiều đơn nhất, hoà thì tạo sớm nhất. Chỉ là gợi ý — quản trị chọn. */
+            suggestedSurvivorId: string;
+            /** @description Tạo sớm nhất trước. */
+            customers: components["schemas"]["DuplicateCustomerDto"][];
+        };
+        DuplicateGroupListDto: {
+            items: components["schemas"]["DuplicateGroupDto"][];
+            /** @description Tổng số nhóm (không phải số khách). */
+            total: number;
+        };
         CustomerGroupRefDto: {
             id: string;
             code: string;
@@ -4434,6 +4563,1228 @@ export interface components {
             name: string;
             /** @description #rrggbb */
             color: string | null;
+        };
+        CustomerAddressDto: {
+            id: string;
+            customerId: string;
+            label: string | null;
+            recipient: string;
+            phone: string;
+            line1: string;
+            hamlet: string | null;
+            ward: string | null;
+            province: string;
+            isDefault: boolean;
+        };
+        PancakeLinkDto: {
+            source: string;
+            /** @description bigint dạng string. */
+            shopId: string;
+            externalId: string;
+            fbId: string | null;
+            conversationLink: string | null;
+        };
+        ConsentSummaryDto: {
+            /** @enum {string} */
+            channel: "EMAIL" | "SMS" | "ZALO" | "PHONE_CALL";
+            granted: boolean;
+            source: string;
+            recordedAt: string;
+        };
+        CustomerOrderSummaryDto: {
+            /** @description Mọi trạng thái trừ CANCELLED. */
+            total: number;
+            posted: number;
+            /** @description DRAFT / PENDING_APPROVAL / APPROVED. */
+            open: number;
+            lastOrderAt: string | null;
+            /** @description Σ `total` đơn APPROVED/POSTED, Decimal(18,4) string. */
+            revenue: string;
+        };
+        CustomerRefCountDto: {
+            /** @description `schema.bảng.cột`, vd. `core.SalesOrder.customerId`. */
+            key: string;
+            label: string;
+            count: number;
+        };
+        CustomerCompareItemDto: {
+            normalizedPhone: string | null;
+            group: components["schemas"]["CustomerGroupRefDto"] | null;
+            tier: components["schemas"]["CustomerTierRefDto"] | null;
+            tags: components["schemas"]["CustomerTagRefDto"][];
+            addresses: components["schemas"]["CustomerAddressDto"][];
+            owners: components["schemas"]["NamedRefDto"][];
+            teams: components["schemas"]["NamedRefDto"][];
+            /** @enum {string} */
+            source: "PANCAKE" | "MANUAL";
+            pancake: components["schemas"]["PancakeLinkDto"] | null;
+            consents: components["schemas"]["ConsentSummaryDto"][];
+            orders: components["schemas"]["CustomerOrderSummaryDto"];
+            /** @description Hoá đơn còn mở (công nợ) — khác POSTED / CANCELLED. */
+            openInvoices: number;
+            references: components["schemas"]["CustomerRefCountDto"][];
+            id: string;
+            code: string;
+            name: string;
+            taxCode: string | null;
+            phone: string | null;
+            email: string | null;
+            /** @enum {string} */
+            type: "RETAIL" | "WHOLESALE" | "DISTRIBUTOR" | "KEY_ACCOUNT";
+            groupId: string | null;
+            tierId: string | null;
+            isActive: boolean;
+            mergedIntoId: string | null;
+            teamIds: string[];
+            ownerIds: string[];
+            priceListId: string | null;
+            /** @description Decimal(18,4) dạng string */
+            creditLimit: string | null;
+            paymentTerm: number | null;
+            createdAt: string;
+            updatedAt: string;
+        };
+        DuplicateCompareDto: {
+            /** @description Đúng thứ tự `ids` gửi lên. */
+            customers: components["schemas"]["CustomerCompareItemDto"][];
+            /** @description Mọi khách cùng một SĐT chuẩn hoá (khác nhau thì gộp phải gửi `force: true`). */
+            samePhone: boolean;
+        };
+        MergeFieldChoicesDto: {
+            /** @enum {string} */
+            name?: "survivor" | "merged";
+            /** @enum {string} */
+            phone?: "survivor" | "merged";
+            /** @enum {string} */
+            email?: "survivor" | "merged";
+            /** @enum {string} */
+            taxCode?: "survivor" | "merged";
+            /** @enum {string} */
+            type?: "survivor" | "merged";
+            /** @enum {string} */
+            groupId?: "survivor" | "merged";
+            /** @enum {string} */
+            tierId?: "survivor" | "merged";
+            /** @enum {string} */
+            priceListId?: "survivor" | "merged";
+            /** @enum {string} */
+            creditLimit?: "survivor" | "merged";
+            /** @enum {string} */
+            paymentTerm?: "survivor" | "merged";
+        };
+        MergeCustomersDto: {
+            /** Format: uuid */
+            survivorId: string;
+            /** Format: uuid */
+            mergedId: string;
+            fieldChoices?: components["schemas"]["MergeFieldChoicesDto"];
+            /** @description true = cho gộp dù hai khách khác SĐT chuẩn hoá (matchedOn = 'manual'). */
+            force?: boolean;
+            /** @description Client sinh; gửi lại cùng key → trả kết quả lần đầu, không gộp lần hai. */
+            idempotencyKey?: string;
+        };
+        MergeResultDto: {
+            logId: string;
+            survivorId: string;
+            mergedId: string;
+            /**
+             * @description 'phone' = cùng SĐT chuẩn hoá; 'manual' = khác SĐT, gộp bằng force.
+             * @enum {string}
+             */
+            matchedOn: "phone" | "manual";
+            /** @description Trường của bản giữ đã lấy giá trị từ bản bị gộp. */
+            fieldsChanged: string[];
+            /** @description Số dòng đã chuyển sang bản giữ theo từng bảng (mọi bảng trong sổ đăng ký). */
+            moved: components["schemas"]["CustomerRefCountDto"][];
+            /** @description Số dòng Ở LẠI bản bị gộp (POSTED / kỳ khoá / trùng khoá / chính sách giữ) — chỉ bảng có n > 0. */
+            kept: components["schemas"]["CustomerRefCountDto"][];
+        };
+        MergeUndoResultDto: {
+            logId: string;
+            survivorId: string;
+            mergedId: string;
+            /** @description Số dòng đã trả về bản bị gộp theo từng bảng (chỉ bảng có n > 0). */
+            restored: components["schemas"]["CustomerRefCountDto"][];
+            /** @description Dòng đã chuyển nhưng KHÔNG trả lại được (đã POSTED / kỳ khoá sau khi gộp) — ở lại bản giữ. */
+            stuck: components["schemas"]["CustomerRefCountDto"][];
+            /** @description Trường của bản giữ đã trả về giá trị trước gộp. */
+            fieldsRestored: string[];
+            /** @description Trường đã bị sửa tiếp sau khi gộp → giữ giá trị hiện tại, không đè. */
+            fieldsNotRestored: string[];
+            undoneAt: string;
+        };
+        MergeLogCustomerDto: {
+            id: string;
+            code: string | null;
+            name: string | null;
+        };
+        MergeLogDto: {
+            id: string;
+            survivor: components["schemas"]["MergeLogCustomerDto"];
+            merged: components["schemas"]["MergeLogCustomerDto"];
+            matchedOn: string;
+            fieldChoices: components["schemas"]["MergeFieldChoicesDto"];
+            fieldsChanged: string[];
+            moved: components["schemas"]["CustomerRefCountDto"][];
+            kept: components["schemas"]["CustomerRefCountDto"][];
+            mergedBy: components["schemas"]["NamedRefDto"] | null;
+            mergedAt: string;
+            undoneAt: string | null;
+            undoneBy: components["schemas"]["NamedRefDto"] | null;
+            /** @description Chưa hoàn tác, bản bị gộp vẫn trỏ về bản giữ, bản giữ chưa bị gộp tiếp. */
+            canUndo: boolean;
+        };
+        MergeLogListDto: {
+            items: components["schemas"]["MergeLogDto"][];
+            total: number;
+        };
+        IssueInvoiceDto: {
+            /** Format: uuid */
+            orderId: string;
+            /** @description Ngày hoá đơn `YYYY-MM-DD`. Bỏ trống = hôm nay. */
+            issueDate?: string;
+            /**
+             * @description `apps/web/CLAUDE.md` luật 4 — dự phòng cho client không đặt được header
+             *     `Idempotency-Key`. Header thắng khi có cả hai.
+             */
+            idempotencyKey?: string;
+        };
+        AllocationDto: {
+            /** Format: uuid */
+            invoiceId: string;
+            /** @description `Decimal(18,4)` dạng CHUỖI — cấm `number` cho tiền (CLAUDE.md). */
+            amount: string;
+        };
+        RecordPaymentDto: {
+            /** Format: uuid */
+            customerId: string;
+            /** @enum {string} */
+            method: "CASH" | "BANK_TRANSFER" | "COD" | "E_WALLET" | "CARD" | "OFFSET";
+            /** @description Số tiền thực nhận, `Decimal(18,4)` dạng chuỗi. */
+            amount: string;
+            /** @description Thời điểm nhận tiền (ISO). Bỏ trống = bây giờ. */
+            paidAt?: string;
+            /** @description Mã giao dịch ngân hàng / số biên lai. */
+            reference?: string;
+            /** @description Cấn trừ vào hoá đơn nào. Bỏ trống = tiền treo, cấn trừ sau. */
+            allocations?: components["schemas"]["AllocationDto"][];
+            idempotencyKey?: string;
+        };
+        ShipmentPackTaskDto: {
+            taskId: string;
+            docNumber: string;
+            /** @enum {string} */
+            status: "CANCELLED" | "PENDING" | "ASSIGNED" | "IN_PROGRESS" | "COMPLETED" | "EXCEPTION";
+        };
+        ShipmentViewDto: {
+            shipmentId: string;
+            docNumber: string;
+            /** @enum {string} */
+            status: "CANCELLED" | "PENDING" | "PICKED_UP" | "IN_TRANSIT" | "DELIVERED" | "FAILED" | "RETURNED";
+            orderId: string | null;
+            carrierId: string | null;
+            carrierCode: string | null;
+            /** @description Mã vận đơn hãng cấp — null = chưa cấp. */
+            trackingNo: string | null;
+            /** @description Decimal(12,4) kg chuỗi. */
+            weightKg: string | null;
+            /** @description Decimal(18,4) chuỗi. */
+            codAmount: string | null;
+            shippedAt: string | null;
+            deliveredAt: string | null;
+            /** @description Lần lấy nhãn in gần nhất (ISO) — null = chưa in. */
+            labelPrintedAt: string | null;
+            labelPrintCount: number;
+            packTask: components["schemas"]["ShipmentPackTaskDto"] | null;
+        };
+        PackDto: {
+            /**
+             * @description Cân nặng kiện hàng, `Decimal(12,4)` dạng CHUỖI — cấm `number` cho số đo
+             *     (CLAUDE.md). Cân ở bàn đóng gói; bỏ trống = chưa cân.
+             */
+            weightKg?: string;
+            /** @description Tiền thu hộ, `Decimal(18,4)` dạng chuỗi. Bỏ trống = không thu hộ. */
+            codAmount?: string;
+        };
+        AssignCarrierDto: {
+            /** @description `wms.Carrier.code` — hãng phải đang active. */
+            carrierCode: string;
+        };
+        UpdateShipmentStatusDto: {
+            /**
+             * @description Trạng thái mới. PENDING không nhận ở đây: rời kho là việc của
+             *     `POST /shipments/:id/ship`, không phải một lần đổi trạng thái tuỳ ý.
+             * @enum {string}
+             */
+            status: "CANCELLED" | "PENDING" | "PICKED_UP" | "IN_TRANSIT" | "DELIVERED" | "FAILED" | "RETURNED";
+        };
+        ShipmentMonitorCountsDto: {
+            /** @description Phiếu giao có task PACK hoàn tất trong ngày. */
+            packed: number;
+            /** @description Phiếu giao rời kho (`shippedAt`) trong ngày — kho bấm bàn giao hoặc hãng báo đã lấy. */
+            handedOver: number;
+            /** @description Hãng đang giữ: PICKED_UP / IN_TRANSIT / FAILED (hiện tại). */
+            holding: number;
+            /** @description Trong số `holding`, rời kho quá `holdDays` ngày. */
+            holdingOverdue: number;
+        };
+        ShipmentMonitorCarrierDto: {
+            /** @description Phiếu giao có task PACK hoàn tất trong ngày. */
+            packed: number;
+            /** @description Phiếu giao rời kho (`shippedAt`) trong ngày — kho bấm bàn giao hoặc hãng báo đã lấy. */
+            handedOver: number;
+            /** @description Hãng đang giữ: PICKED_UP / IN_TRANSIT / FAILED (hiện tại). */
+            holding: number;
+            /** @description Trong số `holding`, rời kho quá `holdDays` ngày. */
+            holdingOverdue: number;
+            /** @description null = phiếu chưa gán hãng. */
+            carrierId: string | null;
+            carrierCode: string | null;
+            carrierName: string | null;
+        };
+        ShipmentMonitorSummaryDto: {
+            date: string;
+            from: string;
+            to: string;
+            holdDays: number;
+            /** @description Mốc tính "hãng đang giữ" (= lúc gọi). */
+            asOf: string;
+            totals: components["schemas"]["ShipmentMonitorCountsDto"];
+            byCarrier: components["schemas"]["ShipmentMonitorCarrierDto"][];
+        };
+        ShipmentMonitorRowDto: {
+            id: string;
+            docNumber: string;
+            orderId: string | null;
+            orderDocNumber: string | null;
+            /** @enum {string} */
+            status: "CANCELLED" | "PENDING" | "PICKED_UP" | "IN_TRANSIT" | "DELIVERED" | "FAILED" | "RETURNED";
+            carrierId: string | null;
+            carrierCode: string | null;
+            carrierName: string | null;
+            trackingNo: string | null;
+            /** @description Lúc task PACK của đơn hoàn tất. */
+            packedAt: string | null;
+            shippedAt: string | null;
+            deliveredAt: string | null;
+            /** @description Mã thô gần nhất hãng trả. */
+            carrierStatusCode: string | null;
+            lastCarrierSyncAt: string | null;
+            /** @description Số ngày hãng đã giữ (từ `shippedAt`); null = hàng chưa rời kho hoặc đã có kết cục. */
+            holdDays: number | null;
+            /** @description Hãng giữ quá ngưỡng `holdDays` của truy vấn. */
+            overdue: boolean;
+        };
+        ShipmentMonitorListDto: {
+            /** @enum {string} */
+            view: "PACKED" | "HANDED_OVER" | "HOLDING" | "OVERDUE";
+            items: components["schemas"]["ShipmentMonitorRowDto"][];
+            total: number;
+        };
+        GoodsIssueListRowDto: {
+            id: string;
+            docNumber: string;
+            /** @enum {string} */
+            kind: "SALES" | "OTHER" | "TRANSFER" | "RETURN_TO_SUPPLIER";
+            /** @enum {string} */
+            status: "DRAFT" | "PENDING_APPROVAL" | "APPROVED" | "POSTED" | "CANCELLED";
+            warehouseId: string;
+            warehouseName: string;
+            refType: string | null;
+            refId: string | null;
+            lineCount: number;
+            totalQtyPlanned: string;
+            totalQtyDone: string;
+            /** @enum {string|null} */
+            pickStatus: "CANCELLED" | "PENDING" | "ASSIGNED" | "IN_PROGRESS" | "COMPLETED" | "EXCEPTION" | null;
+            /** @enum {string|null} */
+            packStatus: "CANCELLED" | "PENDING" | "ASSIGNED" | "IN_PROGRESS" | "COMPLETED" | "EXCEPTION" | null;
+            createdAt: string;
+            postedAt: string | null;
+        };
+        GoodsIssueStatusCountsDto: {
+            DRAFT: number;
+            POSTED: number;
+            CANCELLED: number;
+        };
+        GoodsIssueListResponseDto: {
+            items: components["schemas"]["GoodsIssueListRowDto"][];
+            total: number;
+            statusCounts: components["schemas"]["GoodsIssueStatusCountsDto"];
+        };
+        GoodsIssueLineDto: {
+            id: string;
+            lineNo: number;
+            skuId: string;
+            skuCode: string;
+            skuName: string;
+            lotNumber: string | null;
+            /** @description Vị trí lấy hàng (từ dòng task PICK phản chiếu) — null với dòng thiếu tồn. */
+            locationCode: string | null;
+            /** @description Decimal(18,6) dạng chuỗi. */
+            qtyPlanned: string;
+            /** @description Chốt lúc POST từ dòng task PICK — 0 với dòng thiếu tồn. */
+            qtyDone: string;
+            /** @description Ghi chú EXCEPTION của dòng task (thiếu tồn…) — null nếu bình thường. */
+            exceptionNote: string | null;
+        };
+        GoodsIssueDetailDto: {
+            id: string;
+            docNumber: string;
+            /** @enum {string} */
+            kind: "SALES" | "OTHER" | "TRANSFER" | "RETURN_TO_SUPPLIER";
+            /** @enum {string} */
+            status: "DRAFT" | "PENDING_APPROVAL" | "APPROVED" | "POSTED" | "CANCELLED";
+            warehouseId: string;
+            warehouseName: string;
+            refType: string | null;
+            refId: string | null;
+            note: string | null;
+            createdAt: string;
+            postedAt: string | null;
+            postedByName: string | null;
+            /**
+             * @description Trạng thái task PICK cùng ref — nguồn của nhãn "Chờ pick / Đang pick".
+             * @enum {string|null}
+             */
+            pickStatus: "CANCELLED" | "PENDING" | "ASSIGNED" | "IN_PROGRESS" | "COMPLETED" | "EXCEPTION" | null;
+            /** @enum {string|null} */
+            packStatus: "CANCELLED" | "PENDING" | "ASSIGNED" | "IN_PROGRESS" | "COMPLETED" | "EXCEPTION" | null;
+            lineCount: number;
+            lines: components["schemas"]["GoodsIssueLineDto"][];
+        };
+        StockRowDto: {
+            skuId: string;
+            skuCode: string;
+            skuName: string;
+            /** @description Đơn vị lưu kho — mọi con số dưới đây tính theo đơn vị này. */
+            baseUomId: string;
+            baseUomCode: string;
+            isActive: boolean;
+            /** @description Decimal(18,6) dạng chuỗi. */
+            onHand: string;
+            /** @description Decimal(18,6) dạng chuỗi. */
+            reserved: string;
+            /** @description `onHand - reserved`, Decimal(18,6) dạng chuỗi. Có thể âm nếu tồn bị lệch. */
+            available: string;
+        };
+        StockListResponseDto: {
+            items: components["schemas"]["StockRowDto"][];
+            total: number;
+        };
+        StockByLocationRowDto: {
+            skuId: string;
+            skuCode: string;
+            skuName: string;
+            warehouseId: string;
+            warehouseCode: string;
+            locationId: string;
+            locationCode: string;
+            /** @enum {string} */
+            locationType: "ZONE" | "AISLE" | "RACK" | "BIN" | "STAGING" | "DOCK" | "QUARANTINE";
+            isPickable: boolean;
+            pickSequence: number | null;
+            onHand: string;
+            reserved: string;
+            available: string;
+        };
+        StockByLocationResponseDto: {
+            items: components["schemas"]["StockByLocationRowDto"][];
+            total: number;
+        };
+        StockByLotRowDto: {
+            skuId: string;
+            skuCode: string;
+            skuName: string;
+            /** @description null = tồn không theo lô. */
+            lotId: string | null;
+            lotNumber: string | null;
+            /** @description Hạn dùng, ISO date — sắp xếp tăng dần chính là thứ tự FEFO. */
+            expiryDate: string | null;
+            mfgDate: string | null;
+            onHand: string;
+            reserved: string;
+            available: string;
+        };
+        StockByLotResponseDto: {
+            items: components["schemas"]["StockByLotRowDto"][];
+            total: number;
+        };
+        ReplenishmentRowDto: {
+            skuId: string;
+            skuCode: string;
+            skuName: string;
+            productId: string;
+            /** @description Tên thương mại của sản phẩm cha. */
+            productName: string;
+            baseUomCode: string;
+            /** @description Mức tồn kho đã đặt trên form sản phẩm. */
+            reorderLevel: string;
+            /** @description Tồn thực tế trong kho (ledger). */
+            onHand: string;
+            reserved: string;
+            /** @description `onHand - reserved`. */
+            available: string;
+            /** @description Đã bán HÔM NAY (giờ VN) — đơn không hủy, tính theo ngày đặt. */
+            soldToday: string;
+            /** @description Đã bán HÔM QUA. */
+            sold1d: string;
+            /** @description Đã bán HÔM KIA. */
+            sold2d: string;
+            /** @description Tốc độ bán = (hôm qua + hôm kia) / 2 — cơ sở dự báo. */
+            avgDaily: string;
+            /**
+             * @description Số ngày còn bán được với tốc độ trên = available / avgDaily (làm tròn 1 chữ số).
+             *     null = chưa bán gì hai ngày qua (không dự báo được).
+             */
+            daysLeft: string | null;
+            /** @description Ngày dự kiến bán hết (YYYY-MM-DD, giờ VN); null khi không dự báo được hoặc đã hết. */
+            projectedOutDate: string | null;
+            /** @enum {string} */
+            status: "OK" | "OUT" | "BELOW" | "SOON";
+        };
+        ReplenishmentResponseDto: {
+            items: components["schemas"]["ReplenishmentRowDto"][];
+            /** @description Số dòng khớp bộ lọc (sau `onlyAlert`). */
+            total: number;
+            /** @description Số SKU đang ở trạng thái OUT / BELOW / SOON — không phụ thuộc phân trang, để hiện huy hiệu. */
+            alertCount: number;
+            /** @description Ngày tính (YYYY-MM-DD giờ VN) — "hôm nay" trong các cột bán. */
+            asOf: string;
+        };
+        LotRowDto: {
+            id: string;
+            lotNumber: string;
+            skuId: string;
+            skuCode: string;
+            skuName: string;
+            /** @description ISO date — null nếu không khai. */
+            mfgDate: string | null;
+            expiryDate: string | null;
+            /** @description Tồn gộp của lô (theo bộ lọc kho nếu có) — Decimal(18,6) dạng chuỗi. */
+            onHand: string;
+            reserved: string;
+            available: string;
+            createdAt: string;
+        };
+        LotListResponseDto: {
+            items: components["schemas"]["LotRowDto"][];
+            total: number;
+        };
+        UpdateLotDto: {
+            expiryDate?: string | null;
+            mfgDate?: string | null;
+        };
+        LotDto: {
+            id: string;
+            skuId: string;
+            lotNumber: string;
+            mfgDate: string | null;
+            expiryDate: string | null;
+            createdAt: string;
+        };
+        TeamAssignmentSummaryDto: {
+            teamId: string;
+            code: string;
+            name: string;
+            parentId: string | null;
+            /** @description Khách đang hoạt động thuộc team (mọi owner). */
+            customersInTeam: number;
+            /** @description Khách thuộc team nhưng `ownerIds` rỗng — leader chưa chia cho ai. */
+            unassigned: number;
+        };
+        TeamMemberLoadDto: {
+            userId: string;
+            code: string;
+            fullName: string;
+            /** @enum {string} */
+            role: "LEADER" | "MEMBER";
+            joinedAt: string;
+            /** @description Số khách đang hoạt động của team mà người này là owner. */
+            holding: number;
+        };
+        CustomerAssignmentDto: {
+            id: string;
+            customerId: string;
+            customerCode: string;
+            customerName: string;
+            teamId: string;
+            teamName: string;
+            userId: string | null;
+            userName: string | null;
+            /** @enum {string} */
+            type: "PRIMARY" | "SUPPORT" | "TEMPORARY";
+            assignedBy: string;
+            assignedByName: string;
+            reason: string | null;
+            startAt: string;
+            /** @description null = đang hiệu lực. */
+            endAt: string | null;
+        };
+        CustomerAssignmentListDto: {
+            items: components["schemas"]["CustomerAssignmentDto"][];
+            total: number;
+        };
+        AssignCustomersDto: {
+            customerIds: string[];
+            /**
+             * Format: uuid
+             * @description Team nhận khách — người gọi phải là LEADER team này (hoặc team cha).
+             */
+            teamId: string;
+            /**
+             * Format: uuid
+             * @description Sale phụ trách — phải là thành viên đang hiệu lực của `teamId`.
+             *     Bỏ trống / null = trả khách về "pool" của team: `ownerIds` rỗng, member không thấy.
+             */
+            userId?: string | null;
+            /** @description Lý do (hiện ở lịch sử phân công), ví dụ "Hoàn tác". */
+            reason?: string;
+        };
+        AssignCustomerItemDto: {
+            customerId: string;
+            /** @description Trạng thái TRƯỚC khi gán — client dùng để "Hoàn tác" bằng cách gán ngược lại. */
+            previousTeamId: string | null;
+            previousUserId: string | null;
+            /** @description false = khách đã ở đúng team/owner này, không ghi thêm dòng ledger. */
+            changed: boolean;
+        };
+        AssignCustomersResultDto: {
+            teamId: string;
+            userId: string | null;
+            assigned: number;
+            unchanged: number;
+            items: components["schemas"]["AssignCustomerItemDto"][];
+        };
+        MappingBacklogItemDto: {
+            /** @enum {string} */
+            kind: "sku" | "actor";
+            /** @description bigint → string qua API. */
+            shopId: string;
+            externalId: string;
+            label: string | null;
+            occurrences: number;
+            /** @description Số đơn đang bị giữ vì mục này (actor luôn 0 — thiếu nhân viên không chặn đơn). */
+            blockedCount: number;
+            lastSeenAt: string;
+        };
+        UnmappedSkuDto: {
+            shopId: string;
+            externalVariationId: string;
+            externalProductId: string | null;
+            sourceSkuCode: string | null;
+            sourceBarcode: string | null;
+            sourceName: string | null;
+            /** @description Decimal(18,4) dạng string, hợp đồng liên repo #3. */
+            sourcePrice: string | null;
+            occurrences: number;
+            /** @description Mã đơn nguồn đang bị chặn. */
+            blockedOrders: string[];
+            firstSeenAt: string;
+            lastSeenAt: string;
+        };
+        MapSkuDto: {
+            shopId: number;
+            /** @description variation_id phía nguồn (UUID dạng text, giữ nguyên chuỗi). */
+            externalVariationId: string;
+            /** Format: uuid */
+            skuId: string;
+        };
+        MapSkuResultDto: {
+            externalVariationId: string;
+            skuId: string;
+            skuCode: string;
+            /** @description Số đơn được đánh thức (projected_version = NULL) để transform chạy lại. */
+            wokenOrders: number;
+        };
+        UnmappedActorDto: {
+            shopId: string;
+            fbId: string;
+            externalUserId: string | null;
+            observedName: string | null;
+            observedEmail: string | null;
+            observedPhone: string | null;
+            seenRoles: string[];
+            occurrences: number;
+            firstSeenAt: string;
+            lastSeenAt: string;
+        };
+        MapActorDto: {
+            shopId: number;
+            /** @description Facebook user id toàn cục của nhân viên (khác fb_id khách). */
+            fbId: string;
+            /** Format: uuid */
+            userId: string;
+        };
+        MapActorResultDto: {
+            fbId: string;
+            userId: string;
+            userCode: string;
+        };
+        PancakeShopConfigDto: {
+            /** @description bigint → string qua API. */
+            shopId: string;
+            shopName: string | null;
+            /** @description 4 ký tự cuối của khoá đang dùng, vd "…a9f2". */
+            apiKeyHint: string;
+            /**
+             * @description `env` = server đang lấy khoá từ biến môi trường PANCAKE_API_KEY (thắng DB);
+             *     `db` = dùng khoá nhập ở màn này.
+             * @enum {string}
+             */
+            source: "db" | "env";
+            /** @description false = khoá trong DB không giải mã được (APP_SECRET_KEY đã đổi) — phải nhập lại. */
+            keyReadable: boolean;
+            baseUrl: string | null;
+            requestsPerSecond: number | null;
+            burst: number | null;
+            isActive: boolean;
+            lastVerifiedAt: string | null;
+            /** @description Lỗi của lần kiểm tra kết nối gần nhất (đã che khoá); null nếu lần đó thành công. */
+            lastVerifyError: string | null;
+            updatedAt: string | null;
+            updatedBy: string | null;
+            /** @description Đường nhận webhook, ghép sau URL công khai của API: `https://<api>/pancake-sync/webhook/<shopId>`. */
+            webhookPath: string;
+            /**
+             * @description Shared secret để dán vào cấu hình webhook của Pancake (header `X-Pancake-Secret` hoặc
+             *     query `?secret=`). null = chưa sinh (dòng cũ) và server không đặt PANCAKE_WEBHOOK_SECRET.
+             */
+            webhookSecret: string | null;
+        };
+        PancakeEnvStatusDto: {
+            /** @description PANCAKE_API_KEY có trong env của server API. */
+            hasApiKey: boolean;
+            /** @description PANCAKE_SHOP_ID nếu đặt; null = khoá env áp cho MỌI shop. */
+            shopId: string | null;
+        };
+        PancakeConfigListDto: {
+            items: components["schemas"]["PancakeShopConfigDto"][];
+            env: components["schemas"]["PancakeEnvStatusDto"];
+        };
+        UpsertPancakeConfigDto: {
+            /** @description Tên gợi nhớ hiển thị trên màn hình (không bắt buộc). */
+            shopName?: string | null;
+            /**
+             * @description Khoá API Pancake (Cài đặt › API key trên pos.pages.fm). Bắt buộc khi thêm
+             *     shop mới; bỏ trống khi sửa = giữ khoá đang lưu. Không bao giờ được trả lại.
+             */
+            apiKey?: string;
+            /**
+             * Format: uri
+             * @description Mặc định https://pos.pages.fm/api/v1 — chỉ đổi khi Pancake cấp endpoint riêng.
+             */
+            baseUrl?: string | null;
+            /** @description Số request/giây tối đa (điểm xuất phát WRK-007). Bỏ trống = mặc định của client (2). */
+            requestsPerSecond?: number | null;
+            /** @description Kích thước burst token bucket. Bỏ trống = mặc định (4). */
+            burst?: number | null;
+            /** @description Tắt = giữ cấu hình nhưng mọi lệnh gọi Pancake cho shop này báo chưa cấu hình. */
+            isActive?: boolean;
+        };
+        PancakeVerifyResultDto: {
+            shopId: string;
+            /** @description Số kho Pancake trả về — đủ để biết khoá đúng và shop đúng. */
+            warehouses: number;
+            verifiedAt: string;
+        };
+        PancakeWebhookReceiptDto: {
+            receiptId: string;
+            /** @description orders | customers | products | variations_warehouses | unknown */
+            webhookType: string;
+            externalId: string | null;
+            /** @description true = đã xếp hàng gọi lại Pancake lấy bản chính thống (D-05). */
+            queued: boolean;
+        };
+        ReplayOrderDto: {
+            shopId: number;
+            /** @description Payload đơn nguyên bản — validate nghiệp vụ nằm ở mapper, không ở DTO. */
+            order: {
+                [key: string]: unknown;
+            };
+        };
+        RunTransformDto: {
+            shopId: number;
+            limit?: number;
+        };
+        PancakePushCountsDto: {
+            created: number;
+            updated: number;
+            linked: number;
+            hidden: number;
+            skipped: number;
+            failed: number;
+        };
+        PancakeBulkPushFailureDto: {
+            shopId: string;
+            productId: string;
+            productCode: string;
+            productName: string;
+            reason: string | null;
+        };
+        PancakeBulkPushStatusDto: {
+            /** @enum {string} */
+            state: "completed" | "failed" | "active" | "waiting" | "idle";
+            /** @description Số sản phẩm đã duyệt / tổng — tính theo sản phẩm, không theo shop. */
+            done: number;
+            total: number;
+            counts: components["schemas"]["PancakePushCountsDto"];
+            /** @description Các dòng `failed` (tối đa 50) để người vận hành xem lý do. */
+            failures: components["schemas"]["PancakeBulkPushFailureDto"][];
+            /** @description Lỗi của cả lượt (ném ra khỏi job — mạng / DB), khác với lỗi từng sản phẩm. */
+            error: string | null;
+            startedAt: string | null;
+            finishedAt: string | null;
+        };
+        PancakePushResultDto: {
+            shopId: string;
+            /** @enum {string} */
+            entity: "product" | "warehouse";
+            internalId: string;
+            /**
+             * @description created = POST mới; updated = PUT theo id đã liên kết; linked = chưa liên kết nhưng đã có
+             *     trên Pancake (tìm theo mã) → liên kết rồi PUT, không tạo trùng; hidden = sản phẩm ngừng / xóa → ẩn trên
+             *     POS; skipped = không đẩy (lý do ở `reason`); failed = Pancake từ chối (lý do ở `reason`).
+             * @enum {string}
+             */
+            action: "failed" | "created" | "skipped" | "updated" | "linked" | "hidden";
+            /** @description Id trên Pancake sau khi đẩy (sync.entity_link); null khi chưa liên kết được. */
+            externalId: string | null;
+            reason: string | null;
+        };
+        PancakePushReportDto: {
+            results: components["schemas"]["PancakePushResultDto"][];
+            /** @description Số thực thể ERP đã duyệt. */
+            total: number;
+            failed: number;
+        };
+        TaskRowDto: {
+            id: string;
+            docNumber: string;
+            /** @enum {string} */
+            type: "PUT_AWAY" | "PICK" | "PACK" | "SHIP" | "TRANSFER" | "RECEIVE" | "COUNT" | "REPLENISH";
+            /** @enum {string} */
+            status: "CANCELLED" | "PENDING" | "ASSIGNED" | "IN_PROGRESS" | "COMPLETED" | "EXCEPTION";
+            /** @description Càng lớn càng gấp. */
+            priority: number;
+            /** @description `Task.assignedTo` — null = chưa giao cho ai. */
+            assigneeId: string | null;
+            warehouseId: string;
+            warehouseCode: string;
+            warehouseName: string;
+            waveId: string | null;
+            lineCount: number;
+            /** @description Số dòng EXCEPTION (báo thiếu hàng khi lấy) — cảnh báo trên bảng điều phối. */
+            exceptionLineCount: number;
+            /** @description Tổng số lượng kế hoạch của mọi dòng — Decimal(18,6) dạng chuỗi. */
+            qtyPlanned: string;
+            /** @description Tổng số lượng đã làm — Decimal(18,6) dạng chuỗi. */
+            qtyDone: string;
+            /** @description Chứng từ nguồn ("SalesOrder", "GoodsReceipt"…). */
+            refType: string | null;
+            refId: string | null;
+            createdAt: string;
+            assignedAt: string | null;
+            startedAt: string | null;
+            completedAt: string | null;
+            /** @description Phút kể từ lúc tạo tới lúc xong (hoặc tới bây giờ nếu chưa xong). */
+            ageMinutes: number;
+            /**
+             * @description Phút việc nằm im ở trạng thái hiện tại (chưa giao: từ lúc tạo; đã giao mà
+             *     chưa bắt đầu: từ lúc giao; đang làm: từ lúc bắt đầu). 0 với việc đã kết thúc.
+             */
+            idleMinutes: number;
+        };
+        TaskListResponseDto: {
+            items: components["schemas"]["TaskRowDto"][];
+            total: number;
+        };
+        TaskAssigneeStatsDto: {
+            userId: string;
+            code: string;
+            fullName: string;
+            completed: number;
+        };
+        TaskStatsDto: {
+            /** @enum {string} */
+            type: "PUT_AWAY" | "PICK" | "PACK" | "SHIP" | "TRANSFER" | "RECEIVE" | "COUNT" | "REPLENISH";
+            /** @description YYYY-MM-DD (Asia/Ho_Chi_Minh). */
+            date: string;
+            from: string;
+            to: string;
+            /** @description Tổng việc đã đóng trong ngày (mọi người). */
+            completed: number;
+            byAssignee: components["schemas"]["TaskAssigneeStatsDto"][];
+        };
+        ProductivityDoneDto: {
+            /** @description Số đơn đã lấy (PICK) / đã đóng (PACK) xong. */
+            orders: number;
+            /** @description Số dòng SKU có số lượng > 0. */
+            lines: number;
+            /** @description Tổng số lượng (đơn vị cơ sở), Decimal(18,6) chuỗi. */
+            qty: string;
+            /** @description Số đơn có dòng nhân viên BÁO THIẾU (dòng thiếu tồn do hệ thống không tính). Luôn 0 với PACK. */
+            shortOrders: number;
+            /**
+             * @description Thời gian trung bình / đơn (giây) từ lúc bắt đầu (quét đầu tiên) tới lúc xong. null = không
+             *     có đơn nào đo được (đóng tay / đóng gói không quét ghi bắt đầu = xong nên bị loại).
+             */
+            avgSeconds: number | null;
+        };
+        ProductivityOpenDto: {
+            /** @description Đã giao, chưa bắt đầu. */
+            assigned: number;
+            /** @description Đang làm hoặc đang báo sự cố. */
+            inProgress: number;
+        };
+        ProductivityTotalsDto: {
+            done: components["schemas"]["ProductivityDoneDto"];
+            open: components["schemas"]["ProductivityOpenDto"];
+            /** @description Việc chưa giao cho ai (PENDING) — hàng chờ điều phối. */
+            unassigned: number;
+        };
+        ProductivityRowDto: {
+            userId: string;
+            code: string;
+            fullName: string;
+            roles: string[];
+            done: components["schemas"]["ProductivityDoneDto"];
+            open: components["schemas"]["ProductivityOpenDto"];
+        };
+        ProductivitySectionDto: {
+            totals: components["schemas"]["ProductivityTotalsDto"];
+            /** @description Nhân viên có việc (xong trong khoảng hoặc đang giữ) + mọi người mang role đúng loại việc. */
+            rows: components["schemas"]["ProductivityRowDto"][];
+        };
+        TaskProductivityDto: {
+            /** @description YYYY-MM-DD (Asia/Ho_Chi_Minh), bao gồm hai đầu. */
+            from: string;
+            to: string;
+            warehouseId: string | null;
+            pick: components["schemas"]["ProductivitySectionDto"];
+            pack: components["schemas"]["ProductivitySectionDto"];
+        };
+        TaskAssigneeDto: {
+            id: string;
+            code: string;
+            fullName: string;
+            /** @description Mã role đang giữ (WAREHOUSE / PICKER / PACKER / ADMIN…) — màn hình gợi ý ai lấy, ai đóng. */
+            roles: string[];
+        };
+        PickSuggestionDto: {
+            uomId: string;
+            uomCode: string;
+            containerTypeCode: string | null;
+            /** @description Decimal chuỗi — số ĐVT cơ sở trong một đơn vị cấp này. */
+            factor: string;
+            /** @description Số đơn vị cần lấy ở cấp này (chuỗi số). */
+            count: string;
+        };
+        TaskLineDto: {
+            id: string;
+            lineNo: number;
+            /** @enum {string} */
+            status: "CANCELLED" | "PENDING" | "ASSIGNED" | "IN_PROGRESS" | "COMPLETED" | "EXCEPTION";
+            skuId: string;
+            skuCode: string;
+            skuName: string;
+            /** @description Mọi barcode của SKU — phiếu in mã đầu tiên của ĐVT cơ sở nếu có. */
+            barcodes: string[];
+            lotId: string | null;
+            lotNumber: string | null;
+            /** @description ISO date. */
+            expiryDate: string | null;
+            fromLocationId: string | null;
+            fromLocationCode: string | null;
+            toLocationId: string | null;
+            toLocationCode: string | null;
+            /** @description Thứ tự đi trong kho của vị trí nguồn — nhỏ trước. */
+            pickSequence: number | null;
+            /** @description PLAN-packaging-hierarchy E: thùng/kiện đã allocate (PICK trọn thùng / PUT_AWAY cả cây); null = rời. */
+            containerId: string | null;
+            containerBarcode: string | null;
+            /** @description Gợi ý tổ hợp cho phần còn lại; rỗng khi SKU không có cấp đóng gói. */
+            suggested: components["schemas"]["PickSuggestionDto"][];
+            qtyPlanned: string;
+            qtyDone: string;
+            scannedBarcode: string | null;
+            exceptionNote: string | null;
+        };
+        TaskDetailDto: {
+            id: string;
+            docNumber: string;
+            /** @enum {string} */
+            type: "PUT_AWAY" | "PICK" | "PACK" | "SHIP" | "TRANSFER" | "RECEIVE" | "COUNT" | "REPLENISH";
+            /** @enum {string} */
+            status: "CANCELLED" | "PENDING" | "ASSIGNED" | "IN_PROGRESS" | "COMPLETED" | "EXCEPTION";
+            /** @description Càng lớn càng gấp. */
+            priority: number;
+            /** @description `Task.assignedTo` — null = chưa giao cho ai. */
+            assigneeId: string | null;
+            warehouseId: string;
+            warehouseCode: string;
+            warehouseName: string;
+            waveId: string | null;
+            lineCount: number;
+            /** @description Số dòng EXCEPTION (báo thiếu hàng khi lấy) — cảnh báo trên bảng điều phối. */
+            exceptionLineCount: number;
+            /** @description Tổng số lượng kế hoạch của mọi dòng — Decimal(18,6) dạng chuỗi. */
+            qtyPlanned: string;
+            /** @description Tổng số lượng đã làm — Decimal(18,6) dạng chuỗi. */
+            qtyDone: string;
+            /** @description Chứng từ nguồn ("SalesOrder", "GoodsReceipt"…). */
+            refType: string | null;
+            refId: string | null;
+            createdAt: string;
+            assignedAt: string | null;
+            startedAt: string | null;
+            completedAt: string | null;
+            /** @description Phút kể từ lúc tạo tới lúc xong (hoặc tới bây giờ nếu chưa xong). */
+            ageMinutes: number;
+            /**
+             * @description Phút việc nằm im ở trạng thái hiện tại (chưa giao: từ lúc tạo; đã giao mà
+             *     chưa bắt đầu: từ lúc giao; đang làm: từ lúc bắt đầu). 0 với việc đã kết thúc.
+             */
+            idleMinutes: number;
+            /** @description Tên người đang giữ việc (null khi chưa giao). */
+            assigneeName: string | null;
+            /** @description `SalesOrder.docNumber` khi refType = SalesOrder — mã vạch đơn trên phiếu. */
+            refDocNumber: string | null;
+            /** @description Đã sắp theo `pickSequence` rồi `lineNo`. */
+            lines: components["schemas"]["TaskLineDto"][];
+        };
+        AssignTasksBulkDto: {
+            /** @description Việc cần gán (PENDING → gán; ASSIGNED → đổi người; đang làm / đã xong → báo lỗi từng việc). */
+            taskIds: string[];
+            /**
+             * Format: uuid
+             * @description Nhân viên nhận việc — phải tồn tại và đang active.
+             */
+            userId: string;
+        };
+        TaskStateResultDto: {
+            taskId: string;
+            docNumber: string;
+            /** @enum {string} */
+            status: "CANCELLED" | "PENDING" | "ASSIGNED" | "IN_PROGRESS" | "COMPLETED" | "EXCEPTION";
+            assignedTo: string | null;
+        };
+        AssignTasksBulkFailedDto: {
+            taskId: string;
+            docNumber: string | null;
+            /** @description Mã lỗi nghiệp vụ (TASK_NOT_FOUND, TASK_INVALID_TRANSITION, INVALID_TASK_INPUT…). */
+            code: string;
+            reason: string;
+        };
+        AssignTasksBulkResultDto: {
+            userId: string;
+            assigned: components["schemas"]["TaskStateResultDto"][];
+            failed: components["schemas"]["AssignTasksBulkFailedDto"][];
+        };
+        AssignTaskDto: {
+            /**
+             * Format: uuid
+             * @description Nhân viên kho nhận việc — phải tồn tại và đang active.
+             */
+            userId: string;
+        };
+        ReplanShortageDto: {
+            sourceLineNo: number;
+            skuId: string;
+            /** @description Decimal(18,6) dạng chuỗi. */
+            qty: string;
+        };
+        ReplanPickResultDto: {
+            taskId: string;
+            docNumber: string;
+            /** @description Số dòng thiếu tồn đã được gán vị trí (toàn bộ hoặc một phần). */
+            replanned: number;
+            shortages: components["schemas"]["ReplanShortageDto"][];
+        };
+        WaveSuggestionTaskDto: {
+            taskId: string;
+            docNumber: string;
+            /** @description `SalesOrder.docNumber` — mã đơn. */
+            refDocNumber: string | null;
+            /** @description Decimal(18,6) chuỗi — số ĐVT cơ sở của đơn. */
+            qtyPlanned: string;
+            createdAt: string;
+        };
+        WaveSuggestionDto: {
+            /** @description Khoá ổn định cho UI: `<skuId>|<packLevel>|<taskId đầu>`. */
+            key: string;
+            warehouseId: string;
+            skuId: string;
+            skuCode: string;
+            skuName: string;
+            /** @enum {string} */
+            packLevel: "CARTON" | "PALLET";
+            /** @description Số thùng (CARTON) hoặc số pallet (PALLET) của nhóm. */
+            packCount: number;
+            /** @description Decimal(18,6) chuỗi — số ĐVT cơ sở trong MỘT thùng / MỘT pallet. */
+            unitsPerPack: string;
+            /** @description Σ số lượng của các đơn = `packCount × unitsPerPack`. */
+            qtyPlanned: string;
+            taskCount: number;
+            /** @description Đơn cũ nhất trong nhóm — nhóm sắp theo đây, cũ trước. */
+            oldestCreatedAt: string;
+            tasks: components["schemas"]["WaveSuggestionTaskDto"][];
+        };
+        WaveSuggestionListDto: {
+            items: components["schemas"]["WaveSuggestionDto"][];
+            /** @description Số nhóm cấp thùng TRƯỚC khi lọc `packLevel` — cho badge trên bảng điều phối. */
+            cartonCount: number;
+            /** @description Số nhóm cấp pallet trước khi lọc `packLevel`. */
+            palletCount: number;
+        };
+        WaveDto: {
+            id: string;
+            docNumber: string;
+            warehouseId: string;
+            warehouseCode: string;
+            /** @enum {string} */
+            strategy: "ZONE" | "SINGLE" | "BATCH" | "CLUSTER";
+            /** @enum {string} */
+            status: "CANCELLED" | "PENDING" | "ASSIGNED" | "IN_PROGRESS" | "COMPLETED" | "EXCEPTION";
+            assignedTo: string | null;
+            assigneeName: string | null;
+            taskCount: number;
+            /** @description Số task con đã COMPLETED. */
+            taskDoneCount: number;
+            qtyPlanned: string;
+            qtyDone: string;
+            createdAt: string;
+            assignedAt: string | null;
+            startedAt: string | null;
+            completedAt: string | null;
+            /**
+             * @description Lượt gộp theo cấp đóng gói (từ gợi ý): CARTON (đúng N thùng) / PALLET (đúng một pallet); null = gộp tay.
+             * @enum {string|null}
+             */
+            packLevel: "CARTON" | "PALLET" | null;
+            skuId: string | null;
+            skuCode: string | null;
+            /** @description Số thùng (CARTON) / số pallet (PALLET) của lượt; null với lượt gộp tay. */
+            packCount: number | null;
+            /** @description (Auto-wave cũ) lượt CARTON đã gộp vào lượt PALLET này — không còn ghi mới từ 2026-09-22. */
+            mergedIntoId: string | null;
+            /** @description Người tạo lượt. Trùng người đang giữ = lượt nhân viên TỰ GỘP trên máy PDA (rã được khi chưa quét). */
+            createdBy: string | null;
+        };
+        WaveListResponseDto: {
+            items: components["schemas"]["WaveDto"][];
+            total: number;
+        };
+        WaveTaskDto: {
+            id: string;
+            docNumber: string;
+            /** @enum {string} */
+            status: "CANCELLED" | "PENDING" | "ASSIGNED" | "IN_PROGRESS" | "COMPLETED" | "EXCEPTION";
+            refType: string | null;
+            refId: string | null;
+            refDocNumber: string | null;
+            lineCount: number;
+            qtyPlanned: string;
+            qtyDone: string;
+        };
+        WaveLineShareDto: {
+            taskId: string;
+            taskDocNumber: string;
+            /** @description `SalesOrder.docNumber` — mã đơn. */
+            refDocNumber: string | null;
+            taskLineId: string;
+            qtyPlanned: string;
+            qtyDone: string;
+            /** @enum {string} */
+            lineStatus: "CANCELLED" | "PENDING" | "ASSIGNED" | "IN_PROGRESS" | "COMPLETED" | "EXCEPTION";
+        };
+        WaveLineGroupDto: {
+            /** @description Khoá ổn định của nhóm: `<skuId>|<locationId|->|<lotId|->`. */
+            key: string;
+            skuId: string;
+            skuCode: string;
+            skuName: string;
+            barcodes: string[];
+            locationId: string | null;
+            locationCode: string | null;
+            pickSequence: number | null;
+            lotId: string | null;
+            lotNumber: string | null;
+            /** @description PLAN-packaging-hierarchy E: thùng/kiện đã allocate cho nhóm — quét mã này là lấy cả nhóm. */
+            containerId: string | null;
+            containerBarcode: string | null;
+            /** @description Gợi ý tổ hợp cho phần còn lại ("2 PKG + 3 BOX + 50 PCS"); rỗng khi SKU không có cấp đóng gói. */
+            suggested: components["schemas"]["PickSuggestionDto"][];
+            /** @description Σ kế hoạch của các dòng con — Decimal(18,6) chuỗi. */
+            qtyPlanned: string;
+            qtyDone: string;
+            qtyRemaining: string;
+            /** @description true = mọi dòng con đã COMPLETED. */
+            complete: boolean;
+            shares: components["schemas"]["WaveLineShareDto"][];
+        };
+        WaveDetailDto: {
+            id: string;
+            docNumber: string;
+            warehouseId: string;
+            warehouseCode: string;
+            /** @enum {string} */
+            strategy: "ZONE" | "SINGLE" | "BATCH" | "CLUSTER";
+            /** @enum {string} */
+            status: "CANCELLED" | "PENDING" | "ASSIGNED" | "IN_PROGRESS" | "COMPLETED" | "EXCEPTION";
+            assignedTo: string | null;
+            assigneeName: string | null;
+            taskCount: number;
+            /** @description Số task con đã COMPLETED. */
+            taskDoneCount: number;
+            qtyPlanned: string;
+            qtyDone: string;
+            createdAt: string;
+            assignedAt: string | null;
+            startedAt: string | null;
+            completedAt: string | null;
+            /**
+             * @description Lượt gộp theo cấp đóng gói (từ gợi ý): CARTON (đúng N thùng) / PALLET (đúng một pallet); null = gộp tay.
+             * @enum {string|null}
+             */
+            packLevel: "CARTON" | "PALLET" | null;
+            skuId: string | null;
+            skuCode: string | null;
+            /** @description Số thùng (CARTON) / số pallet (PALLET) của lượt; null với lượt gộp tay. */
+            packCount: number | null;
+            /** @description (Auto-wave cũ) lượt CARTON đã gộp vào lượt PALLET này — không còn ghi mới từ 2026-09-22. */
+            mergedIntoId: string | null;
+            /** @description Người tạo lượt. Trùng người đang giữ = lượt nhân viên TỰ GỘP trên máy PDA (rã được khi chưa quét). */
+            createdBy: string | null;
+            tasks: components["schemas"]["WaveTaskDto"][];
+            /** @description Đã sắp theo lối đi (pickSequence). */
+            lines: components["schemas"]["WaveLineGroupDto"][];
+        };
+        MergeWaveSuggestionDto: {
+            /** Format: uuid */
+            skuId: string;
+            /** @enum {string} */
+            packLevel: "CARTON" | "PALLET";
+            /** @description Số thùng (CARTON) hoặc số pallet (PALLET) mà nhóm gợi ý đã hiển thị. */
+            packCount: number;
+            taskIds: string[];
+            /**
+             * Format: uuid
+             * @description Gán ngay cho nhân viên lấy hàng. Bỏ trống = lượt nằm ở "Chưa gán".
+             */
+            assignedTo?: string;
+        };
+        CreateWaveDto: {
+            taskIds: string[];
+            /**
+             * Format: uuid
+             * @description Gán ngay cho nhân viên (gán wave = gán mọi task con). Bỏ trống = để máy quét claim.
+             */
+            assignedTo?: string;
+        };
+        AssignWaveDto: {
+            /** Format: uuid */
+            userId: string;
         };
         CustomerListItemDto: {
             group: components["schemas"]["CustomerGroupRefDto"] | null;
@@ -4464,17 +5815,11 @@ export interface components {
             items: components["schemas"]["CustomerListItemDto"][];
             total: number;
         };
-        CustomerAddressDto: {
+        CustomerMergeTargetDto: {
             id: string;
-            customerId: string;
-            label: string | null;
-            recipient: string;
-            phone: string;
-            line1: string;
-            hamlet: string | null;
-            ward: string | null;
-            province: string;
-            isDefault: boolean;
+            /** @description null khi khách đích ngoài phạm vi của người xem. */
+            code: string | null;
+            name: string | null;
         };
         CustomerDetailDto: {
             group: components["schemas"]["CustomerGroupRefDto"] | null;
@@ -4501,6 +5846,8 @@ export interface components {
             createdAt: string;
             updatedAt: string;
             addresses: components["schemas"]["CustomerAddressDto"][];
+            /** @description CRM-09 — khách đã bị gộp: khách đích để web chuyển hướng; null = chưa bị gộp. */
+            mergedInto: components["schemas"]["CustomerMergeTargetDto"] | null;
         };
         CreateCustomerDto: {
             code: string;
@@ -5392,136 +6739,6 @@ export interface components {
             sortOrder?: number;
             /** @description false = ngừng dùng: không gắn được vào cấp mới / không tạo container mới; cái đã có giữ nguyên. */
             isActive?: boolean;
-        };
-        StockRowDto: {
-            skuId: string;
-            skuCode: string;
-            skuName: string;
-            /** @description Đơn vị lưu kho — mọi con số dưới đây tính theo đơn vị này. */
-            baseUomId: string;
-            baseUomCode: string;
-            isActive: boolean;
-            /** @description Decimal(18,6) dạng chuỗi. */
-            onHand: string;
-            /** @description Decimal(18,6) dạng chuỗi. */
-            reserved: string;
-            /** @description `onHand - reserved`, Decimal(18,6) dạng chuỗi. Có thể âm nếu tồn bị lệch. */
-            available: string;
-        };
-        StockListResponseDto: {
-            items: components["schemas"]["StockRowDto"][];
-            total: number;
-        };
-        StockByLocationRowDto: {
-            skuId: string;
-            skuCode: string;
-            skuName: string;
-            warehouseId: string;
-            warehouseCode: string;
-            locationId: string;
-            locationCode: string;
-            /** @enum {string} */
-            locationType: "ZONE" | "AISLE" | "RACK" | "BIN" | "STAGING" | "DOCK" | "QUARANTINE";
-            isPickable: boolean;
-            pickSequence: number | null;
-            onHand: string;
-            reserved: string;
-            available: string;
-        };
-        StockByLocationResponseDto: {
-            items: components["schemas"]["StockByLocationRowDto"][];
-            total: number;
-        };
-        StockByLotRowDto: {
-            skuId: string;
-            skuCode: string;
-            skuName: string;
-            /** @description null = tồn không theo lô. */
-            lotId: string | null;
-            lotNumber: string | null;
-            /** @description Hạn dùng, ISO date — sắp xếp tăng dần chính là thứ tự FEFO. */
-            expiryDate: string | null;
-            mfgDate: string | null;
-            onHand: string;
-            reserved: string;
-            available: string;
-        };
-        StockByLotResponseDto: {
-            items: components["schemas"]["StockByLotRowDto"][];
-            total: number;
-        };
-        ReplenishmentRowDto: {
-            skuId: string;
-            skuCode: string;
-            skuName: string;
-            productId: string;
-            /** @description Tên thương mại của sản phẩm cha. */
-            productName: string;
-            baseUomCode: string;
-            /** @description Mức tồn kho đã đặt trên form sản phẩm. */
-            reorderLevel: string;
-            /** @description Tồn thực tế trong kho (ledger). */
-            onHand: string;
-            reserved: string;
-            /** @description `onHand - reserved`. */
-            available: string;
-            /** @description Đã bán HÔM NAY (giờ VN) — đơn không hủy, tính theo ngày đặt. */
-            soldToday: string;
-            /** @description Đã bán HÔM QUA. */
-            sold1d: string;
-            /** @description Đã bán HÔM KIA. */
-            sold2d: string;
-            /** @description Tốc độ bán = (hôm qua + hôm kia) / 2 — cơ sở dự báo. */
-            avgDaily: string;
-            /**
-             * @description Số ngày còn bán được với tốc độ trên = available / avgDaily (làm tròn 1 chữ số).
-             *     null = chưa bán gì hai ngày qua (không dự báo được).
-             */
-            daysLeft: string | null;
-            /** @description Ngày dự kiến bán hết (YYYY-MM-DD, giờ VN); null khi không dự báo được hoặc đã hết. */
-            projectedOutDate: string | null;
-            /** @enum {string} */
-            status: "OK" | "OUT" | "BELOW" | "SOON";
-        };
-        ReplenishmentResponseDto: {
-            items: components["schemas"]["ReplenishmentRowDto"][];
-            /** @description Số dòng khớp bộ lọc (sau `onlyAlert`). */
-            total: number;
-            /** @description Số SKU đang ở trạng thái OUT / BELOW / SOON — không phụ thuộc phân trang, để hiện huy hiệu. */
-            alertCount: number;
-            /** @description Ngày tính (YYYY-MM-DD giờ VN) — "hôm nay" trong các cột bán. */
-            asOf: string;
-        };
-        LotRowDto: {
-            id: string;
-            lotNumber: string;
-            skuId: string;
-            skuCode: string;
-            skuName: string;
-            /** @description ISO date — null nếu không khai. */
-            mfgDate: string | null;
-            expiryDate: string | null;
-            /** @description Tồn gộp của lô (theo bộ lọc kho nếu có) — Decimal(18,6) dạng chuỗi. */
-            onHand: string;
-            reserved: string;
-            available: string;
-            createdAt: string;
-        };
-        LotListResponseDto: {
-            items: components["schemas"]["LotRowDto"][];
-            total: number;
-        };
-        UpdateLotDto: {
-            expiryDate?: string | null;
-            mfgDate?: string | null;
-        };
-        LotDto: {
-            id: string;
-            skuId: string;
-            lotNumber: string;
-            mfgDate: string | null;
-            expiryDate: string | null;
-            createdAt: string;
         };
         ComboListItemDto: {
             /** @description core.Product.id — khoá của mọi endpoint /combos/:id. */
@@ -6823,617 +8040,6 @@ export interface components {
         StuckShipmentListDto: {
             items: components["schemas"]["StuckShipmentDto"][];
             total: number;
-        };
-        ShipmentPackTaskDto: {
-            taskId: string;
-            docNumber: string;
-            /** @enum {string} */
-            status: "CANCELLED" | "PENDING" | "ASSIGNED" | "IN_PROGRESS" | "COMPLETED" | "EXCEPTION";
-        };
-        ShipmentViewDto: {
-            shipmentId: string;
-            docNumber: string;
-            /** @enum {string} */
-            status: "CANCELLED" | "PENDING" | "PICKED_UP" | "IN_TRANSIT" | "DELIVERED" | "FAILED" | "RETURNED";
-            orderId: string | null;
-            carrierId: string | null;
-            carrierCode: string | null;
-            /** @description Mã vận đơn hãng cấp — null = chưa cấp. */
-            trackingNo: string | null;
-            /** @description Decimal(12,4) kg chuỗi. */
-            weightKg: string | null;
-            /** @description Decimal(18,4) chuỗi. */
-            codAmount: string | null;
-            shippedAt: string | null;
-            deliveredAt: string | null;
-            /** @description Lần lấy nhãn in gần nhất (ISO) — null = chưa in. */
-            labelPrintedAt: string | null;
-            labelPrintCount: number;
-            packTask: components["schemas"]["ShipmentPackTaskDto"] | null;
-        };
-        PackDto: {
-            /**
-             * @description Cân nặng kiện hàng, `Decimal(12,4)` dạng CHUỖI — cấm `number` cho số đo
-             *     (CLAUDE.md). Cân ở bàn đóng gói; bỏ trống = chưa cân.
-             */
-            weightKg?: string;
-            /** @description Tiền thu hộ, `Decimal(18,4)` dạng chuỗi. Bỏ trống = không thu hộ. */
-            codAmount?: string;
-        };
-        AssignCarrierDto: {
-            /** @description `wms.Carrier.code` — hãng phải đang active. */
-            carrierCode: string;
-        };
-        UpdateShipmentStatusDto: {
-            /**
-             * @description Trạng thái mới. PENDING không nhận ở đây: rời kho là việc của
-             *     `POST /shipments/:id/ship`, không phải một lần đổi trạng thái tuỳ ý.
-             * @enum {string}
-             */
-            status: "CANCELLED" | "PENDING" | "PICKED_UP" | "IN_TRANSIT" | "DELIVERED" | "FAILED" | "RETURNED";
-        };
-        ShipmentMonitorCountsDto: {
-            /** @description Phiếu giao có task PACK hoàn tất trong ngày. */
-            packed: number;
-            /** @description Phiếu giao rời kho (`shippedAt`) trong ngày — kho bấm bàn giao hoặc hãng báo đã lấy. */
-            handedOver: number;
-            /** @description Hãng đang giữ: PICKED_UP / IN_TRANSIT / FAILED (hiện tại). */
-            holding: number;
-            /** @description Trong số `holding`, rời kho quá `holdDays` ngày. */
-            holdingOverdue: number;
-        };
-        ShipmentMonitorCarrierDto: {
-            /** @description Phiếu giao có task PACK hoàn tất trong ngày. */
-            packed: number;
-            /** @description Phiếu giao rời kho (`shippedAt`) trong ngày — kho bấm bàn giao hoặc hãng báo đã lấy. */
-            handedOver: number;
-            /** @description Hãng đang giữ: PICKED_UP / IN_TRANSIT / FAILED (hiện tại). */
-            holding: number;
-            /** @description Trong số `holding`, rời kho quá `holdDays` ngày. */
-            holdingOverdue: number;
-            /** @description null = phiếu chưa gán hãng. */
-            carrierId: string | null;
-            carrierCode: string | null;
-            carrierName: string | null;
-        };
-        ShipmentMonitorSummaryDto: {
-            date: string;
-            from: string;
-            to: string;
-            holdDays: number;
-            /** @description Mốc tính "hãng đang giữ" (= lúc gọi). */
-            asOf: string;
-            totals: components["schemas"]["ShipmentMonitorCountsDto"];
-            byCarrier: components["schemas"]["ShipmentMonitorCarrierDto"][];
-        };
-        ShipmentMonitorRowDto: {
-            id: string;
-            docNumber: string;
-            orderId: string | null;
-            orderDocNumber: string | null;
-            /** @enum {string} */
-            status: "CANCELLED" | "PENDING" | "PICKED_UP" | "IN_TRANSIT" | "DELIVERED" | "FAILED" | "RETURNED";
-            carrierId: string | null;
-            carrierCode: string | null;
-            carrierName: string | null;
-            trackingNo: string | null;
-            /** @description Lúc task PACK của đơn hoàn tất. */
-            packedAt: string | null;
-            shippedAt: string | null;
-            deliveredAt: string | null;
-            /** @description Mã thô gần nhất hãng trả. */
-            carrierStatusCode: string | null;
-            lastCarrierSyncAt: string | null;
-            /** @description Số ngày hãng đã giữ (từ `shippedAt`); null = hàng chưa rời kho hoặc đã có kết cục. */
-            holdDays: number | null;
-            /** @description Hãng giữ quá ngưỡng `holdDays` của truy vấn. */
-            overdue: boolean;
-        };
-        ShipmentMonitorListDto: {
-            /** @enum {string} */
-            view: "PACKED" | "HANDED_OVER" | "HOLDING" | "OVERDUE";
-            items: components["schemas"]["ShipmentMonitorRowDto"][];
-            total: number;
-        };
-        GoodsIssueListRowDto: {
-            id: string;
-            docNumber: string;
-            /** @enum {string} */
-            kind: "SALES" | "OTHER" | "TRANSFER" | "RETURN_TO_SUPPLIER";
-            /** @enum {string} */
-            status: "DRAFT" | "PENDING_APPROVAL" | "APPROVED" | "POSTED" | "CANCELLED";
-            warehouseId: string;
-            warehouseName: string;
-            refType: string | null;
-            refId: string | null;
-            lineCount: number;
-            totalQtyPlanned: string;
-            totalQtyDone: string;
-            /** @enum {string|null} */
-            pickStatus: "CANCELLED" | "PENDING" | "ASSIGNED" | "IN_PROGRESS" | "COMPLETED" | "EXCEPTION" | null;
-            /** @enum {string|null} */
-            packStatus: "CANCELLED" | "PENDING" | "ASSIGNED" | "IN_PROGRESS" | "COMPLETED" | "EXCEPTION" | null;
-            createdAt: string;
-            postedAt: string | null;
-        };
-        GoodsIssueStatusCountsDto: {
-            DRAFT: number;
-            POSTED: number;
-            CANCELLED: number;
-        };
-        GoodsIssueListResponseDto: {
-            items: components["schemas"]["GoodsIssueListRowDto"][];
-            total: number;
-            statusCounts: components["schemas"]["GoodsIssueStatusCountsDto"];
-        };
-        GoodsIssueLineDto: {
-            id: string;
-            lineNo: number;
-            skuId: string;
-            skuCode: string;
-            skuName: string;
-            lotNumber: string | null;
-            /** @description Vị trí lấy hàng (từ dòng task PICK phản chiếu) — null với dòng thiếu tồn. */
-            locationCode: string | null;
-            /** @description Decimal(18,6) dạng chuỗi. */
-            qtyPlanned: string;
-            /** @description Chốt lúc POST từ dòng task PICK — 0 với dòng thiếu tồn. */
-            qtyDone: string;
-            /** @description Ghi chú EXCEPTION của dòng task (thiếu tồn…) — null nếu bình thường. */
-            exceptionNote: string | null;
-        };
-        GoodsIssueDetailDto: {
-            id: string;
-            docNumber: string;
-            /** @enum {string} */
-            kind: "SALES" | "OTHER" | "TRANSFER" | "RETURN_TO_SUPPLIER";
-            /** @enum {string} */
-            status: "DRAFT" | "PENDING_APPROVAL" | "APPROVED" | "POSTED" | "CANCELLED";
-            warehouseId: string;
-            warehouseName: string;
-            refType: string | null;
-            refId: string | null;
-            note: string | null;
-            createdAt: string;
-            postedAt: string | null;
-            postedByName: string | null;
-            /**
-             * @description Trạng thái task PICK cùng ref — nguồn của nhãn "Chờ pick / Đang pick".
-             * @enum {string|null}
-             */
-            pickStatus: "CANCELLED" | "PENDING" | "ASSIGNED" | "IN_PROGRESS" | "COMPLETED" | "EXCEPTION" | null;
-            /** @enum {string|null} */
-            packStatus: "CANCELLED" | "PENDING" | "ASSIGNED" | "IN_PROGRESS" | "COMPLETED" | "EXCEPTION" | null;
-            lineCount: number;
-            lines: components["schemas"]["GoodsIssueLineDto"][];
-        };
-        TaskRowDto: {
-            id: string;
-            docNumber: string;
-            /** @enum {string} */
-            type: "PUT_AWAY" | "PICK" | "PACK" | "SHIP" | "TRANSFER" | "RECEIVE" | "COUNT" | "REPLENISH";
-            /** @enum {string} */
-            status: "CANCELLED" | "PENDING" | "ASSIGNED" | "IN_PROGRESS" | "COMPLETED" | "EXCEPTION";
-            /** @description Càng lớn càng gấp. */
-            priority: number;
-            /** @description `Task.assignedTo` — null = chưa giao cho ai. */
-            assigneeId: string | null;
-            warehouseId: string;
-            warehouseCode: string;
-            warehouseName: string;
-            waveId: string | null;
-            lineCount: number;
-            /** @description Số dòng EXCEPTION (báo thiếu hàng khi lấy) — cảnh báo trên bảng điều phối. */
-            exceptionLineCount: number;
-            /** @description Tổng số lượng kế hoạch của mọi dòng — Decimal(18,6) dạng chuỗi. */
-            qtyPlanned: string;
-            /** @description Tổng số lượng đã làm — Decimal(18,6) dạng chuỗi. */
-            qtyDone: string;
-            /** @description Chứng từ nguồn ("SalesOrder", "GoodsReceipt"…). */
-            refType: string | null;
-            refId: string | null;
-            createdAt: string;
-            assignedAt: string | null;
-            startedAt: string | null;
-            completedAt: string | null;
-            /** @description Phút kể từ lúc tạo tới lúc xong (hoặc tới bây giờ nếu chưa xong). */
-            ageMinutes: number;
-            /**
-             * @description Phút việc nằm im ở trạng thái hiện tại (chưa giao: từ lúc tạo; đã giao mà
-             *     chưa bắt đầu: từ lúc giao; đang làm: từ lúc bắt đầu). 0 với việc đã kết thúc.
-             */
-            idleMinutes: number;
-        };
-        TaskListResponseDto: {
-            items: components["schemas"]["TaskRowDto"][];
-            total: number;
-        };
-        TaskAssigneeStatsDto: {
-            userId: string;
-            code: string;
-            fullName: string;
-            completed: number;
-        };
-        TaskStatsDto: {
-            /** @enum {string} */
-            type: "PUT_AWAY" | "PICK" | "PACK" | "SHIP" | "TRANSFER" | "RECEIVE" | "COUNT" | "REPLENISH";
-            /** @description YYYY-MM-DD (Asia/Ho_Chi_Minh). */
-            date: string;
-            from: string;
-            to: string;
-            /** @description Tổng việc đã đóng trong ngày (mọi người). */
-            completed: number;
-            byAssignee: components["schemas"]["TaskAssigneeStatsDto"][];
-        };
-        ProductivityDoneDto: {
-            /** @description Số đơn đã lấy (PICK) / đã đóng (PACK) xong. */
-            orders: number;
-            /** @description Số dòng SKU có số lượng > 0. */
-            lines: number;
-            /** @description Tổng số lượng (đơn vị cơ sở), Decimal(18,6) chuỗi. */
-            qty: string;
-            /** @description Số đơn có dòng nhân viên BÁO THIẾU (dòng thiếu tồn do hệ thống không tính). Luôn 0 với PACK. */
-            shortOrders: number;
-            /**
-             * @description Thời gian trung bình / đơn (giây) từ lúc bắt đầu (quét đầu tiên) tới lúc xong. null = không
-             *     có đơn nào đo được (đóng tay / đóng gói không quét ghi bắt đầu = xong nên bị loại).
-             */
-            avgSeconds: number | null;
-        };
-        ProductivityOpenDto: {
-            /** @description Đã giao, chưa bắt đầu. */
-            assigned: number;
-            /** @description Đang làm hoặc đang báo sự cố. */
-            inProgress: number;
-        };
-        ProductivityTotalsDto: {
-            done: components["schemas"]["ProductivityDoneDto"];
-            open: components["schemas"]["ProductivityOpenDto"];
-            /** @description Việc chưa giao cho ai (PENDING) — hàng chờ điều phối. */
-            unassigned: number;
-        };
-        ProductivityRowDto: {
-            userId: string;
-            code: string;
-            fullName: string;
-            roles: string[];
-            done: components["schemas"]["ProductivityDoneDto"];
-            open: components["schemas"]["ProductivityOpenDto"];
-        };
-        ProductivitySectionDto: {
-            totals: components["schemas"]["ProductivityTotalsDto"];
-            /** @description Nhân viên có việc (xong trong khoảng hoặc đang giữ) + mọi người mang role đúng loại việc. */
-            rows: components["schemas"]["ProductivityRowDto"][];
-        };
-        TaskProductivityDto: {
-            /** @description YYYY-MM-DD (Asia/Ho_Chi_Minh), bao gồm hai đầu. */
-            from: string;
-            to: string;
-            warehouseId: string | null;
-            pick: components["schemas"]["ProductivitySectionDto"];
-            pack: components["schemas"]["ProductivitySectionDto"];
-        };
-        TaskAssigneeDto: {
-            id: string;
-            code: string;
-            fullName: string;
-            /** @description Mã role đang giữ (WAREHOUSE / PICKER / PACKER / ADMIN…) — màn hình gợi ý ai lấy, ai đóng. */
-            roles: string[];
-        };
-        PickSuggestionDto: {
-            uomId: string;
-            uomCode: string;
-            containerTypeCode: string | null;
-            /** @description Decimal chuỗi — số ĐVT cơ sở trong một đơn vị cấp này. */
-            factor: string;
-            /** @description Số đơn vị cần lấy ở cấp này (chuỗi số). */
-            count: string;
-        };
-        TaskLineDto: {
-            id: string;
-            lineNo: number;
-            /** @enum {string} */
-            status: "CANCELLED" | "PENDING" | "ASSIGNED" | "IN_PROGRESS" | "COMPLETED" | "EXCEPTION";
-            skuId: string;
-            skuCode: string;
-            skuName: string;
-            /** @description Mọi barcode của SKU — phiếu in mã đầu tiên của ĐVT cơ sở nếu có. */
-            barcodes: string[];
-            lotId: string | null;
-            lotNumber: string | null;
-            /** @description ISO date. */
-            expiryDate: string | null;
-            fromLocationId: string | null;
-            fromLocationCode: string | null;
-            toLocationId: string | null;
-            toLocationCode: string | null;
-            /** @description Thứ tự đi trong kho của vị trí nguồn — nhỏ trước. */
-            pickSequence: number | null;
-            /** @description PLAN-packaging-hierarchy E: thùng/kiện đã allocate (PICK trọn thùng / PUT_AWAY cả cây); null = rời. */
-            containerId: string | null;
-            containerBarcode: string | null;
-            /** @description Gợi ý tổ hợp cho phần còn lại; rỗng khi SKU không có cấp đóng gói. */
-            suggested: components["schemas"]["PickSuggestionDto"][];
-            qtyPlanned: string;
-            qtyDone: string;
-            scannedBarcode: string | null;
-            exceptionNote: string | null;
-        };
-        TaskDetailDto: {
-            id: string;
-            docNumber: string;
-            /** @enum {string} */
-            type: "PUT_AWAY" | "PICK" | "PACK" | "SHIP" | "TRANSFER" | "RECEIVE" | "COUNT" | "REPLENISH";
-            /** @enum {string} */
-            status: "CANCELLED" | "PENDING" | "ASSIGNED" | "IN_PROGRESS" | "COMPLETED" | "EXCEPTION";
-            /** @description Càng lớn càng gấp. */
-            priority: number;
-            /** @description `Task.assignedTo` — null = chưa giao cho ai. */
-            assigneeId: string | null;
-            warehouseId: string;
-            warehouseCode: string;
-            warehouseName: string;
-            waveId: string | null;
-            lineCount: number;
-            /** @description Số dòng EXCEPTION (báo thiếu hàng khi lấy) — cảnh báo trên bảng điều phối. */
-            exceptionLineCount: number;
-            /** @description Tổng số lượng kế hoạch của mọi dòng — Decimal(18,6) dạng chuỗi. */
-            qtyPlanned: string;
-            /** @description Tổng số lượng đã làm — Decimal(18,6) dạng chuỗi. */
-            qtyDone: string;
-            /** @description Chứng từ nguồn ("SalesOrder", "GoodsReceipt"…). */
-            refType: string | null;
-            refId: string | null;
-            createdAt: string;
-            assignedAt: string | null;
-            startedAt: string | null;
-            completedAt: string | null;
-            /** @description Phút kể từ lúc tạo tới lúc xong (hoặc tới bây giờ nếu chưa xong). */
-            ageMinutes: number;
-            /**
-             * @description Phút việc nằm im ở trạng thái hiện tại (chưa giao: từ lúc tạo; đã giao mà
-             *     chưa bắt đầu: từ lúc giao; đang làm: từ lúc bắt đầu). 0 với việc đã kết thúc.
-             */
-            idleMinutes: number;
-            /** @description Tên người đang giữ việc (null khi chưa giao). */
-            assigneeName: string | null;
-            /** @description `SalesOrder.docNumber` khi refType = SalesOrder — mã vạch đơn trên phiếu. */
-            refDocNumber: string | null;
-            /** @description Đã sắp theo `pickSequence` rồi `lineNo`. */
-            lines: components["schemas"]["TaskLineDto"][];
-        };
-        AssignTasksBulkDto: {
-            /** @description Việc cần gán (PENDING → gán; ASSIGNED → đổi người; đang làm / đã xong → báo lỗi từng việc). */
-            taskIds: string[];
-            /**
-             * Format: uuid
-             * @description Nhân viên nhận việc — phải tồn tại và đang active.
-             */
-            userId: string;
-        };
-        TaskStateResultDto: {
-            taskId: string;
-            docNumber: string;
-            /** @enum {string} */
-            status: "CANCELLED" | "PENDING" | "ASSIGNED" | "IN_PROGRESS" | "COMPLETED" | "EXCEPTION";
-            assignedTo: string | null;
-        };
-        AssignTasksBulkFailedDto: {
-            taskId: string;
-            docNumber: string | null;
-            /** @description Mã lỗi nghiệp vụ (TASK_NOT_FOUND, TASK_INVALID_TRANSITION, INVALID_TASK_INPUT…). */
-            code: string;
-            reason: string;
-        };
-        AssignTasksBulkResultDto: {
-            userId: string;
-            assigned: components["schemas"]["TaskStateResultDto"][];
-            failed: components["schemas"]["AssignTasksBulkFailedDto"][];
-        };
-        AssignTaskDto: {
-            /**
-             * Format: uuid
-             * @description Nhân viên kho nhận việc — phải tồn tại và đang active.
-             */
-            userId: string;
-        };
-        ReplanShortageDto: {
-            sourceLineNo: number;
-            skuId: string;
-            /** @description Decimal(18,6) dạng chuỗi. */
-            qty: string;
-        };
-        ReplanPickResultDto: {
-            taskId: string;
-            docNumber: string;
-            /** @description Số dòng thiếu tồn đã được gán vị trí (toàn bộ hoặc một phần). */
-            replanned: number;
-            shortages: components["schemas"]["ReplanShortageDto"][];
-        };
-        WaveSuggestionTaskDto: {
-            taskId: string;
-            docNumber: string;
-            /** @description `SalesOrder.docNumber` — mã đơn. */
-            refDocNumber: string | null;
-            /** @description Decimal(18,6) chuỗi — số ĐVT cơ sở của đơn. */
-            qtyPlanned: string;
-            createdAt: string;
-        };
-        WaveSuggestionDto: {
-            /** @description Khoá ổn định cho UI: `<skuId>|<packLevel>|<taskId đầu>`. */
-            key: string;
-            warehouseId: string;
-            skuId: string;
-            skuCode: string;
-            skuName: string;
-            /** @enum {string} */
-            packLevel: "CARTON" | "PALLET";
-            /** @description Số thùng (CARTON) hoặc số pallet (PALLET) của nhóm. */
-            packCount: number;
-            /** @description Decimal(18,6) chuỗi — số ĐVT cơ sở trong MỘT thùng / MỘT pallet. */
-            unitsPerPack: string;
-            /** @description Σ số lượng của các đơn = `packCount × unitsPerPack`. */
-            qtyPlanned: string;
-            taskCount: number;
-            /** @description Đơn cũ nhất trong nhóm — nhóm sắp theo đây, cũ trước. */
-            oldestCreatedAt: string;
-            tasks: components["schemas"]["WaveSuggestionTaskDto"][];
-        };
-        WaveSuggestionListDto: {
-            items: components["schemas"]["WaveSuggestionDto"][];
-            /** @description Số nhóm cấp thùng TRƯỚC khi lọc `packLevel` — cho badge trên bảng điều phối. */
-            cartonCount: number;
-            /** @description Số nhóm cấp pallet trước khi lọc `packLevel`. */
-            palletCount: number;
-        };
-        WaveDto: {
-            id: string;
-            docNumber: string;
-            warehouseId: string;
-            warehouseCode: string;
-            /** @enum {string} */
-            strategy: "ZONE" | "SINGLE" | "BATCH" | "CLUSTER";
-            /** @enum {string} */
-            status: "CANCELLED" | "PENDING" | "ASSIGNED" | "IN_PROGRESS" | "COMPLETED" | "EXCEPTION";
-            assignedTo: string | null;
-            assigneeName: string | null;
-            taskCount: number;
-            /** @description Số task con đã COMPLETED. */
-            taskDoneCount: number;
-            qtyPlanned: string;
-            qtyDone: string;
-            createdAt: string;
-            assignedAt: string | null;
-            startedAt: string | null;
-            completedAt: string | null;
-            /**
-             * @description Lượt gộp theo cấp đóng gói (từ gợi ý): CARTON (đúng N thùng) / PALLET (đúng một pallet); null = gộp tay.
-             * @enum {string|null}
-             */
-            packLevel: "CARTON" | "PALLET" | null;
-            skuId: string | null;
-            skuCode: string | null;
-            /** @description Số thùng (CARTON) / số pallet (PALLET) của lượt; null với lượt gộp tay. */
-            packCount: number | null;
-            /** @description (Auto-wave cũ) lượt CARTON đã gộp vào lượt PALLET này — không còn ghi mới từ 2026-09-22. */
-            mergedIntoId: string | null;
-            /** @description Người tạo lượt. Trùng người đang giữ = lượt nhân viên TỰ GỘP trên máy PDA (rã được khi chưa quét). */
-            createdBy: string | null;
-        };
-        WaveListResponseDto: {
-            items: components["schemas"]["WaveDto"][];
-            total: number;
-        };
-        WaveTaskDto: {
-            id: string;
-            docNumber: string;
-            /** @enum {string} */
-            status: "CANCELLED" | "PENDING" | "ASSIGNED" | "IN_PROGRESS" | "COMPLETED" | "EXCEPTION";
-            refType: string | null;
-            refId: string | null;
-            refDocNumber: string | null;
-            lineCount: number;
-            qtyPlanned: string;
-            qtyDone: string;
-        };
-        WaveLineShareDto: {
-            taskId: string;
-            taskDocNumber: string;
-            /** @description `SalesOrder.docNumber` — mã đơn. */
-            refDocNumber: string | null;
-            taskLineId: string;
-            qtyPlanned: string;
-            qtyDone: string;
-            /** @enum {string} */
-            lineStatus: "CANCELLED" | "PENDING" | "ASSIGNED" | "IN_PROGRESS" | "COMPLETED" | "EXCEPTION";
-        };
-        WaveLineGroupDto: {
-            /** @description Khoá ổn định của nhóm: `<skuId>|<locationId|->|<lotId|->`. */
-            key: string;
-            skuId: string;
-            skuCode: string;
-            skuName: string;
-            barcodes: string[];
-            locationId: string | null;
-            locationCode: string | null;
-            pickSequence: number | null;
-            lotId: string | null;
-            lotNumber: string | null;
-            /** @description PLAN-packaging-hierarchy E: thùng/kiện đã allocate cho nhóm — quét mã này là lấy cả nhóm. */
-            containerId: string | null;
-            containerBarcode: string | null;
-            /** @description Gợi ý tổ hợp cho phần còn lại ("2 PKG + 3 BOX + 50 PCS"); rỗng khi SKU không có cấp đóng gói. */
-            suggested: components["schemas"]["PickSuggestionDto"][];
-            /** @description Σ kế hoạch của các dòng con — Decimal(18,6) chuỗi. */
-            qtyPlanned: string;
-            qtyDone: string;
-            qtyRemaining: string;
-            /** @description true = mọi dòng con đã COMPLETED. */
-            complete: boolean;
-            shares: components["schemas"]["WaveLineShareDto"][];
-        };
-        WaveDetailDto: {
-            id: string;
-            docNumber: string;
-            warehouseId: string;
-            warehouseCode: string;
-            /** @enum {string} */
-            strategy: "ZONE" | "SINGLE" | "BATCH" | "CLUSTER";
-            /** @enum {string} */
-            status: "CANCELLED" | "PENDING" | "ASSIGNED" | "IN_PROGRESS" | "COMPLETED" | "EXCEPTION";
-            assignedTo: string | null;
-            assigneeName: string | null;
-            taskCount: number;
-            /** @description Số task con đã COMPLETED. */
-            taskDoneCount: number;
-            qtyPlanned: string;
-            qtyDone: string;
-            createdAt: string;
-            assignedAt: string | null;
-            startedAt: string | null;
-            completedAt: string | null;
-            /**
-             * @description Lượt gộp theo cấp đóng gói (từ gợi ý): CARTON (đúng N thùng) / PALLET (đúng một pallet); null = gộp tay.
-             * @enum {string|null}
-             */
-            packLevel: "CARTON" | "PALLET" | null;
-            skuId: string | null;
-            skuCode: string | null;
-            /** @description Số thùng (CARTON) / số pallet (PALLET) của lượt; null với lượt gộp tay. */
-            packCount: number | null;
-            /** @description (Auto-wave cũ) lượt CARTON đã gộp vào lượt PALLET này — không còn ghi mới từ 2026-09-22. */
-            mergedIntoId: string | null;
-            /** @description Người tạo lượt. Trùng người đang giữ = lượt nhân viên TỰ GỘP trên máy PDA (rã được khi chưa quét). */
-            createdBy: string | null;
-            tasks: components["schemas"]["WaveTaskDto"][];
-            /** @description Đã sắp theo lối đi (pickSequence). */
-            lines: components["schemas"]["WaveLineGroupDto"][];
-        };
-        MergeWaveSuggestionDto: {
-            /** Format: uuid */
-            skuId: string;
-            /** @enum {string} */
-            packLevel: "CARTON" | "PALLET";
-            /** @description Số thùng (CARTON) hoặc số pallet (PALLET) mà nhóm gợi ý đã hiển thị. */
-            packCount: number;
-            taskIds: string[];
-            /**
-             * Format: uuid
-             * @description Gán ngay cho nhân viên lấy hàng. Bỏ trống = lượt nằm ở "Chưa gán".
-             */
-            assignedTo?: string;
-        };
-        CreateWaveDto: {
-            taskIds: string[];
-            /**
-             * Format: uuid
-             * @description Gán ngay cho nhân viên (gán wave = gán mọi task con). Bỏ trống = để máy quét claim.
-             */
-            assignedTo?: string;
-        };
-        AssignWaveDto: {
-            /** Format: uuid */
-            userId: string;
         };
         PdaBarcodeDetailDto: {
             code: string;
@@ -8832,38 +9438,6 @@ export interface components {
             status: string;
             adjustedLineCount: number;
         };
-        IssueInvoiceDto: {
-            /** Format: uuid */
-            orderId: string;
-            /** @description Ngày hoá đơn `YYYY-MM-DD`. Bỏ trống = hôm nay. */
-            issueDate?: string;
-            /**
-             * @description `apps/web/CLAUDE.md` luật 4 — dự phòng cho client không đặt được header
-             *     `Idempotency-Key`. Header thắng khi có cả hai.
-             */
-            idempotencyKey?: string;
-        };
-        AllocationDto: {
-            /** Format: uuid */
-            invoiceId: string;
-            /** @description `Decimal(18,4)` dạng CHUỖI — cấm `number` cho tiền (CLAUDE.md). */
-            amount: string;
-        };
-        RecordPaymentDto: {
-            /** Format: uuid */
-            customerId: string;
-            /** @enum {string} */
-            method: "CASH" | "BANK_TRANSFER" | "COD" | "E_WALLET" | "CARD" | "OFFSET";
-            /** @description Số tiền thực nhận, `Decimal(18,4)` dạng chuỗi. */
-            amount: string;
-            /** @description Thời điểm nhận tiền (ISO). Bỏ trống = bây giờ. */
-            paidAt?: string;
-            /** @description Mã giao dịch ngân hàng / số biên lai. */
-            reference?: string;
-            /** @description Cấn trừ vào hoá đơn nào. Bỏ trống = tiền treo, cấn trừ sau. */
-            allocations?: components["schemas"]["AllocationDto"][];
-            idempotencyKey?: string;
-        };
         CreatePaymentLinkDto: {
             /**
              * Format: uuid
@@ -9053,281 +9627,6 @@ export interface components {
              * @description null = gỡ cấp độ.
              */
             tierId?: string | null;
-        };
-        TeamAssignmentSummaryDto: {
-            teamId: string;
-            code: string;
-            name: string;
-            parentId: string | null;
-            /** @description Khách đang hoạt động thuộc team (mọi owner). */
-            customersInTeam: number;
-            /** @description Khách thuộc team nhưng `ownerIds` rỗng — leader chưa chia cho ai. */
-            unassigned: number;
-        };
-        TeamMemberLoadDto: {
-            userId: string;
-            code: string;
-            fullName: string;
-            /** @enum {string} */
-            role: "LEADER" | "MEMBER";
-            joinedAt: string;
-            /** @description Số khách đang hoạt động của team mà người này là owner. */
-            holding: number;
-        };
-        CustomerAssignmentDto: {
-            id: string;
-            customerId: string;
-            customerCode: string;
-            customerName: string;
-            teamId: string;
-            teamName: string;
-            userId: string | null;
-            userName: string | null;
-            /** @enum {string} */
-            type: "PRIMARY" | "SUPPORT" | "TEMPORARY";
-            assignedBy: string;
-            assignedByName: string;
-            reason: string | null;
-            startAt: string;
-            /** @description null = đang hiệu lực. */
-            endAt: string | null;
-        };
-        CustomerAssignmentListDto: {
-            items: components["schemas"]["CustomerAssignmentDto"][];
-            total: number;
-        };
-        AssignCustomersDto: {
-            customerIds: string[];
-            /**
-             * Format: uuid
-             * @description Team nhận khách — người gọi phải là LEADER team này (hoặc team cha).
-             */
-            teamId: string;
-            /**
-             * Format: uuid
-             * @description Sale phụ trách — phải là thành viên đang hiệu lực của `teamId`.
-             *     Bỏ trống / null = trả khách về "pool" của team: `ownerIds` rỗng, member không thấy.
-             */
-            userId?: string | null;
-            /** @description Lý do (hiện ở lịch sử phân công), ví dụ "Hoàn tác". */
-            reason?: string;
-        };
-        AssignCustomerItemDto: {
-            customerId: string;
-            /** @description Trạng thái TRƯỚC khi gán — client dùng để "Hoàn tác" bằng cách gán ngược lại. */
-            previousTeamId: string | null;
-            previousUserId: string | null;
-            /** @description false = khách đã ở đúng team/owner này, không ghi thêm dòng ledger. */
-            changed: boolean;
-        };
-        AssignCustomersResultDto: {
-            teamId: string;
-            userId: string | null;
-            assigned: number;
-            unchanged: number;
-            items: components["schemas"]["AssignCustomerItemDto"][];
-        };
-        MappingBacklogItemDto: {
-            /** @enum {string} */
-            kind: "sku" | "actor";
-            /** @description bigint → string qua API. */
-            shopId: string;
-            externalId: string;
-            label: string | null;
-            occurrences: number;
-            /** @description Số đơn đang bị giữ vì mục này (actor luôn 0 — thiếu nhân viên không chặn đơn). */
-            blockedCount: number;
-            lastSeenAt: string;
-        };
-        UnmappedSkuDto: {
-            shopId: string;
-            externalVariationId: string;
-            externalProductId: string | null;
-            sourceSkuCode: string | null;
-            sourceBarcode: string | null;
-            sourceName: string | null;
-            /** @description Decimal(18,4) dạng string, hợp đồng liên repo #3. */
-            sourcePrice: string | null;
-            occurrences: number;
-            /** @description Mã đơn nguồn đang bị chặn. */
-            blockedOrders: string[];
-            firstSeenAt: string;
-            lastSeenAt: string;
-        };
-        MapSkuDto: {
-            shopId: number;
-            /** @description variation_id phía nguồn (UUID dạng text, giữ nguyên chuỗi). */
-            externalVariationId: string;
-            /** Format: uuid */
-            skuId: string;
-        };
-        MapSkuResultDto: {
-            externalVariationId: string;
-            skuId: string;
-            skuCode: string;
-            /** @description Số đơn được đánh thức (projected_version = NULL) để transform chạy lại. */
-            wokenOrders: number;
-        };
-        UnmappedActorDto: {
-            shopId: string;
-            fbId: string;
-            externalUserId: string | null;
-            observedName: string | null;
-            observedEmail: string | null;
-            observedPhone: string | null;
-            seenRoles: string[];
-            occurrences: number;
-            firstSeenAt: string;
-            lastSeenAt: string;
-        };
-        MapActorDto: {
-            shopId: number;
-            /** @description Facebook user id toàn cục của nhân viên (khác fb_id khách). */
-            fbId: string;
-            /** Format: uuid */
-            userId: string;
-        };
-        MapActorResultDto: {
-            fbId: string;
-            userId: string;
-            userCode: string;
-        };
-        PancakeShopConfigDto: {
-            /** @description bigint → string qua API. */
-            shopId: string;
-            shopName: string | null;
-            /** @description 4 ký tự cuối của khoá đang dùng, vd "…a9f2". */
-            apiKeyHint: string;
-            /**
-             * @description `env` = server đang lấy khoá từ biến môi trường PANCAKE_API_KEY (thắng DB);
-             *     `db` = dùng khoá nhập ở màn này.
-             * @enum {string}
-             */
-            source: "db" | "env";
-            /** @description false = khoá trong DB không giải mã được (APP_SECRET_KEY đã đổi) — phải nhập lại. */
-            keyReadable: boolean;
-            baseUrl: string | null;
-            requestsPerSecond: number | null;
-            burst: number | null;
-            isActive: boolean;
-            lastVerifiedAt: string | null;
-            /** @description Lỗi của lần kiểm tra kết nối gần nhất (đã che khoá); null nếu lần đó thành công. */
-            lastVerifyError: string | null;
-            updatedAt: string | null;
-            updatedBy: string | null;
-            /** @description Đường nhận webhook, ghép sau URL công khai của API: `https://<api>/pancake-sync/webhook/<shopId>`. */
-            webhookPath: string;
-            /**
-             * @description Shared secret để dán vào cấu hình webhook của Pancake (header `X-Pancake-Secret` hoặc
-             *     query `?secret=`). null = chưa sinh (dòng cũ) và server không đặt PANCAKE_WEBHOOK_SECRET.
-             */
-            webhookSecret: string | null;
-        };
-        PancakeEnvStatusDto: {
-            /** @description PANCAKE_API_KEY có trong env của server API. */
-            hasApiKey: boolean;
-            /** @description PANCAKE_SHOP_ID nếu đặt; null = khoá env áp cho MỌI shop. */
-            shopId: string | null;
-        };
-        PancakeConfigListDto: {
-            items: components["schemas"]["PancakeShopConfigDto"][];
-            env: components["schemas"]["PancakeEnvStatusDto"];
-        };
-        UpsertPancakeConfigDto: {
-            /** @description Tên gợi nhớ hiển thị trên màn hình (không bắt buộc). */
-            shopName?: string | null;
-            /**
-             * @description Khoá API Pancake (Cài đặt › API key trên pos.pages.fm). Bắt buộc khi thêm
-             *     shop mới; bỏ trống khi sửa = giữ khoá đang lưu. Không bao giờ được trả lại.
-             */
-            apiKey?: string;
-            /**
-             * Format: uri
-             * @description Mặc định https://pos.pages.fm/api/v1 — chỉ đổi khi Pancake cấp endpoint riêng.
-             */
-            baseUrl?: string | null;
-            /** @description Số request/giây tối đa (điểm xuất phát WRK-007). Bỏ trống = mặc định của client (2). */
-            requestsPerSecond?: number | null;
-            /** @description Kích thước burst token bucket. Bỏ trống = mặc định (4). */
-            burst?: number | null;
-            /** @description Tắt = giữ cấu hình nhưng mọi lệnh gọi Pancake cho shop này báo chưa cấu hình. */
-            isActive?: boolean;
-        };
-        PancakeVerifyResultDto: {
-            shopId: string;
-            /** @description Số kho Pancake trả về — đủ để biết khoá đúng và shop đúng. */
-            warehouses: number;
-            verifiedAt: string;
-        };
-        PancakeWebhookReceiptDto: {
-            receiptId: string;
-            /** @description orders | customers | products | variations_warehouses | unknown */
-            webhookType: string;
-            externalId: string | null;
-            /** @description true = đã xếp hàng gọi lại Pancake lấy bản chính thống (D-05). */
-            queued: boolean;
-        };
-        ReplayOrderDto: {
-            shopId: number;
-            /** @description Payload đơn nguyên bản — validate nghiệp vụ nằm ở mapper, không ở DTO. */
-            order: {
-                [key: string]: unknown;
-            };
-        };
-        RunTransformDto: {
-            shopId: number;
-            limit?: number;
-        };
-        PancakePushCountsDto: {
-            created: number;
-            updated: number;
-            linked: number;
-            hidden: number;
-            skipped: number;
-            failed: number;
-        };
-        PancakeBulkPushFailureDto: {
-            shopId: string;
-            productId: string;
-            productCode: string;
-            productName: string;
-            reason: string | null;
-        };
-        PancakeBulkPushStatusDto: {
-            /** @enum {string} */
-            state: "completed" | "failed" | "active" | "waiting" | "idle";
-            /** @description Số sản phẩm đã duyệt / tổng — tính theo sản phẩm, không theo shop. */
-            done: number;
-            total: number;
-            counts: components["schemas"]["PancakePushCountsDto"];
-            /** @description Các dòng `failed` (tối đa 50) để người vận hành xem lý do. */
-            failures: components["schemas"]["PancakeBulkPushFailureDto"][];
-            /** @description Lỗi của cả lượt (ném ra khỏi job — mạng / DB), khác với lỗi từng sản phẩm. */
-            error: string | null;
-            startedAt: string | null;
-            finishedAt: string | null;
-        };
-        PancakePushResultDto: {
-            shopId: string;
-            /** @enum {string} */
-            entity: "product" | "warehouse";
-            internalId: string;
-            /**
-             * @description created = POST mới; updated = PUT theo id đã liên kết; linked = chưa liên kết nhưng đã có
-             *     trên Pancake (tìm theo mã) → liên kết rồi PUT, không tạo trùng; hidden = sản phẩm ngừng / xóa → ẩn trên
-             *     POS; skipped = không đẩy (lý do ở `reason`); failed = Pancake từ chối (lý do ở `reason`).
-             * @enum {string}
-             */
-            action: "failed" | "created" | "skipped" | "updated" | "linked" | "hidden";
-            /** @description Id trên Pancake sau khi đẩy (sync.entity_link); null khi chưa liên kết được. */
-            externalId: string | null;
-            reason: string | null;
-        };
-        PancakePushReportDto: {
-            results: components["schemas"]["PancakePushResultDto"][];
-            /** @description Số thực thể ERP đã duyệt. */
-            total: number;
-            failed: number;
         };
         HealthReportDto: {
             /** @enum {string} */
@@ -10001,6 +10300,1538 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["PromotionDto"];
+                };
+            };
+        };
+    };
+    CustomerMergeController_list: {
+        parameters: {
+            query: {
+                take: number;
+                skip: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DuplicateGroupListDto"];
+                };
+            };
+        };
+    };
+    CustomerMergeController_compare: {
+        parameters: {
+            query: {
+                ids: string[];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DuplicateCompareDto"];
+                };
+            };
+        };
+    };
+    CustomerMergeController_merge: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MergeCustomersDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MergeResultDto"];
+                };
+            };
+        };
+    };
+    CustomerMergeController_undo: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                logId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MergeUndoResultDto"];
+                };
+            };
+        };
+    };
+    CustomerMergeController_logs: {
+        parameters: {
+            query: {
+                /** @description Lần gộp mà khách này là bản giữ HOẶC bản bị gộp. Bắt buộc nếu không phải super admin. */
+                customerId?: string;
+                take: number;
+                skip: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MergeLogListDto"];
+                };
+            };
+        };
+    };
+    InvoiceController_list: {
+        parameters: {
+            query: {
+                /** @description BẮT BUỘC — công nợ luôn xem theo khách hàng (xem `BillingService.list`). */
+                customerId: string;
+                status?: "DRAFT" | "PENDING_APPROVAL" | "APPROVED" | "POSTED" | "CANCELLED";
+                take?: number;
+                skip?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>[];
+                };
+            };
+        };
+    };
+    InvoiceController_issue: {
+        parameters: {
+            query?: never;
+            header: {
+                "idempotency-key": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["IssueInvoiceDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+        };
+    };
+    InvoiceController_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+        };
+    };
+    PaymentController_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+        };
+    };
+    PaymentController_record: {
+        parameters: {
+            query?: never;
+            header: {
+                "idempotency-key": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RecordPaymentDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+        };
+    };
+    ShippingController_list: {
+        parameters: {
+            query?: {
+                orderId?: string;
+                status?: "CANCELLED" | "PENDING" | "PICKED_UP" | "IN_TRANSIT" | "DELIVERED" | "FAILED" | "RETURNED";
+                take?: number;
+                skip?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+        };
+    };
+    ShippingController_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ShipmentViewDto"];
+                };
+            };
+        };
+    };
+    ShippingController_pack: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PackDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+        };
+    };
+    ShippingController_assignCarrier: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AssignCarrierDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+        };
+    };
+    ShippingController_ship: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+        };
+    };
+    ShippingController_updateStatus: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateShipmentStatusDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+        };
+    };
+    ShipmentMonitorController_summary: {
+        parameters: {
+            query: {
+                /** @description Ngày theo giờ Việt Nam `YYYY-MM-DD` cho số đóng gói / bàn giao; bỏ trống = hôm nay. */
+                date?: string;
+                carrierId?: string;
+                /** @description Hãng giữ quá N ngày kể từ lúc rời kho → cảnh báo. */
+                holdDays: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ShipmentMonitorSummaryDto"];
+                };
+            };
+        };
+    };
+    ShipmentMonitorController_list: {
+        parameters: {
+            query: {
+                /** @description Ngày theo giờ Việt Nam `YYYY-MM-DD` cho số đóng gói / bàn giao; bỏ trống = hôm nay. */
+                date?: string;
+                carrierId?: string;
+                /** @description Hãng giữ quá N ngày kể từ lúc rời kho → cảnh báo. */
+                holdDays: number;
+                /**
+                 * @description PACKED = đóng gói xong trong ngày · HANDED_OVER = rời kho trong ngày · HOLDING = hãng đang
+                 *     giữ (đã rời kho, chưa giao xong / hoàn) · OVERDUE = HOLDING quá `holdDays` ngày.
+                 *     HOLDING / OVERDUE là ảnh chụp HIỆN TẠI, không theo `date`.
+                 */
+                view: "PACKED" | "HANDED_OVER" | "HOLDING" | "OVERDUE";
+                /** @description Mã phiếu giao / mã vận đơn (chứa chuỗi) hoặc đúng số đơn bán. */
+                q?: string;
+                take: number;
+                skip: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ShipmentMonitorListDto"];
+                };
+            };
+        };
+    };
+    GoodsIssueController_list: {
+        parameters: {
+            query: {
+                warehouseId?: string;
+                kind?: "SALES" | "OTHER" | "TRANSFER" | "RETURN_TO_SUPPLIER";
+                status?: "DRAFT" | "PENDING_APPROVAL" | "APPROVED" | "POSTED" | "CANCELLED";
+                /** @description Tìm theo số phiếu (contains, không phân biệt hoa thường). */
+                q?: string;
+                take: number;
+                skip: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GoodsIssueListResponseDto"];
+                };
+            };
+        };
+    };
+    GoodsIssueController_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GoodsIssueDetailDto"];
+                };
+            };
+        };
+    };
+    InventoryController_list: {
+        parameters: {
+            query: {
+                /** @description Lọc theo mã / tên SKU (không phân biệt hoa thường). */
+                q?: string;
+                /** @description Chỉ tính tồn trong kho này (lọc qua `Location.warehouseId`). */
+                warehouseId?: string;
+                take: number;
+                skip: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StockListResponseDto"];
+                };
+            };
+        };
+    };
+    InventoryController_byLocation: {
+        parameters: {
+            query: {
+                /** @description Lọc theo mã / tên SKU (không phân biệt hoa thường). */
+                q?: string;
+                /** @description Chỉ tính tồn trong kho này (lọc qua `Location.warehouseId`). */
+                warehouseId?: string;
+                take: number;
+                skip: number;
+                skuId?: string;
+                locationId?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StockByLocationResponseDto"];
+                };
+            };
+        };
+    };
+    InventoryController_byLot: {
+        parameters: {
+            query: {
+                /** @description Lọc theo mã / tên SKU (không phân biệt hoa thường). */
+                q?: string;
+                /** @description Chỉ tính tồn trong kho này (lọc qua `Location.warehouseId`). */
+                warehouseId?: string;
+                take: number;
+                skip: number;
+                skuId?: string;
+                locationId?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StockByLotResponseDto"];
+                };
+            };
+        };
+    };
+    InventoryController_replenishment: {
+        parameters: {
+            query: {
+                /** @description Lọc theo mã / tên SKU / tên sản phẩm (không phân biệt hoa thường). */
+                q?: string;
+                /** @description Chỉ tính tồn trong kho này; bỏ trống = mọi kho. Số bán vẫn tính toàn hệ thống. */
+                warehouseId?: string;
+                /**
+                 * @description true (mặc định) = chỉ dòng cần chú ý (`OUT` / `BELOW` / `SOON`); false = mọi SKU có mức tồn kho,
+                 *     kể cả dòng đủ hàng (để rà ngưỡng đã đặt).
+                 */
+                onlyAlert: boolean;
+                take: number;
+                skip: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReplenishmentResponseDto"];
+                };
+            };
+        };
+    };
+    LotController_list: {
+        parameters: {
+            query: {
+                /** @description Lọc theo số lô (không phân biệt hoa thường). */
+                q?: string;
+                skuId?: string;
+                /** @description Chỉ tính tồn trong kho này (lọc qua `Location.warehouseId`). */
+                warehouseId?: string;
+                /** @description Lô hết hạn trong N ngày tới (gồm cả đã hết hạn). Bỏ trống = mọi lô. */
+                expiringInDays?: number;
+                /** @description true = chỉ lô còn tồn (onHand > 0). */
+                hasStock?: boolean;
+                take: number;
+                skip: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LotListResponseDto"];
+                };
+            };
+        };
+    };
+    LotController_update: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateLotDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LotDto"];
+                };
+            };
+        };
+    };
+    CustomerAssignmentController_teams: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TeamAssignmentSummaryDto"][];
+                };
+            };
+        };
+    };
+    CustomerAssignmentController_members: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                teamId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TeamMemberLoadDto"][];
+                };
+            };
+        };
+    };
+    CustomerAssignmentController_history: {
+        parameters: {
+            query: {
+                customerId?: string;
+                teamId?: string;
+                /** @description true = chỉ dòng đang hiệu lực (endAt null). */
+                activeOnly?: boolean;
+                take: number;
+                skip: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CustomerAssignmentListDto"];
+                };
+            };
+        };
+    };
+    CustomerAssignmentController_assign: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AssignCustomersDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AssignCustomersResultDto"];
+                };
+            };
+        };
+    };
+    PancakeMappingController_backlog: {
+        parameters: {
+            query: {
+                shopId: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MappingBacklogItemDto"][];
+                };
+            };
+        };
+    };
+    PancakeMappingController_skus: {
+        parameters: {
+            query: {
+                shopId: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UnmappedSkuDto"][];
+                };
+            };
+        };
+    };
+    PancakeMappingController_mapSku: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MapSkuDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MapSkuResultDto"];
+                };
+            };
+        };
+    };
+    PancakeMappingController_actors: {
+        parameters: {
+            query: {
+                shopId: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UnmappedActorDto"][];
+                };
+            };
+        };
+    };
+    PancakeMappingController_mapActor: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MapActorDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MapActorResultDto"];
+                };
+            };
+        };
+    };
+    PancakeConfigController_list: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PancakeConfigListDto"];
+                };
+            };
+        };
+    };
+    PancakeConfigController_upsert: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                shopId: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpsertPancakeConfigDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PancakeShopConfigDto"];
+                };
+            };
+        };
+    };
+    PancakeConfigController_remove: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                shopId: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    PancakeConfigController_rotateWebhookSecret: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                shopId: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PancakeShopConfigDto"];
+                };
+            };
+        };
+    };
+    PancakeConfigController_verify: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                shopId: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PancakeVerifyResultDto"];
+                };
+            };
+        };
+    };
+    PancakeWebhookController_ping: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                shopId: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    PancakeWebhookController_receive: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                shopId: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PancakeWebhookReceiptDto"];
+                };
+            };
+        };
+    };
+    PancakeTransformController_replayOrder: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReplayOrderDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+        };
+    };
+    PancakeTransformController_run: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RunTransformDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+        };
+    };
+    PancakePushController_bulkStatus: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PancakeBulkPushStatusDto"];
+                };
+            };
+        };
+    };
+    PancakePushController_startBulk: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PancakeBulkPushStatusDto"];
+                };
+            };
+        };
+    };
+    PancakePushController_product: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PancakePushResultDto"][];
+                };
+            };
+        };
+    };
+    PancakePushController_allProducts: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PancakePushReportDto"];
+                };
+            };
+        };
+    };
+    PancakePushController_warehouse: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PancakePushResultDto"][];
+                };
+            };
+        };
+    };
+    PancakePushController_allWarehouses: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PancakePushReportDto"];
+                };
+            };
+        };
+    };
+    TaskEngineController_list: {
+        parameters: {
+            query: {
+                status?: "CANCELLED" | "PENDING" | "ASSIGNED" | "IN_PROGRESS" | "COMPLETED" | "EXCEPTION";
+                type?: "PUT_AWAY" | "PICK" | "PACK" | "SHIP" | "TRANSFER" | "RECEIVE" | "COUNT" | "REPLENISH";
+                warehouseId?: string;
+                /** @description Lọc theo người đang giữ việc. */
+                assignedTo?: string;
+                /** @description Chứng từ nguồn: `refType` + `refId` ("SalesOrder" + id đơn) → mọi task của một đơn. */
+                refType?: string;
+                refId?: string;
+                /** @description Tra đúng một số việc (PICK-…, PACK-…) — máy quét đọc mã việc trên phiếu. */
+                docNumber?: string;
+                /**
+                 * @description Đúng N dòng (mỗi dòng = một SKU tại một vị trí) — điều phối gom đơn 1 SKU / 2 SKU… để gộp
+                 *     lượt. `TaskLine.lineNo` đánh 1..N liên tục nên lọc bằng lineNo, không cần đếm.
+                 */
+                lineCount?: number;
+                /** @description Từ N dòng trở lên ("5+ SKU"). Kết hợp với `lineCount` thì `lineCount` thắng. */
+                lineCountMin?: number;
+                take: number;
+                skip: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TaskListResponseDto"];
+                };
+            };
+        };
+    };
+    TaskEngineController_stats: {
+        parameters: {
+            query: {
+                type: "PUT_AWAY" | "PICK" | "PACK" | "SHIP" | "TRANSFER" | "RECEIVE" | "COUNT" | "REPLENISH";
+                /** @description `YYYY-MM-DD` (Asia/Ho_Chi_Minh); bỏ trống = hôm nay. */
+                date?: string;
+                warehouseId?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TaskStatsDto"];
+                };
+            };
+        };
+    };
+    TaskEngineController_productivity: {
+        parameters: {
+            query?: {
+                from?: string;
+                to?: string;
+                warehouseId?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TaskProductivityDto"];
+                };
+            };
+        };
+    };
+    TaskEngineController_assignees: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TaskAssigneeDto"][];
+                };
+            };
+        };
+    };
+    TaskEngineController_detail: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TaskDetailDto"];
+                };
+            };
+        };
+    };
+    TaskEngineController_assignBulk: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AssignTasksBulkDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AssignTasksBulkResultDto"];
+                };
+            };
+        };
+    };
+    TaskEngineController_assign: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AssignTaskDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TaskStateResultDto"];
+                };
+            };
+        };
+    };
+    TaskEngineController_unassign: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TaskStateResultDto"];
+                };
+            };
+        };
+    };
+    TaskEngineController_replanShortages: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReplanPickResultDto"];
+                };
+            };
+        };
+    };
+    WaveController_suggestions: {
+        parameters: {
+            query?: {
+                warehouseId?: string;
+                /** @description Chỉ trả nhóm cấp này; `cartonCount` / `palletCount` vẫn đếm cả hai. */
+                packLevel?: "CARTON" | "PALLET";
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WaveSuggestionListDto"];
+                };
+            };
+        };
+    };
+    WaveController_list: {
+        parameters: {
+            query: {
+                status?: "CANCELLED" | "PENDING" | "ASSIGNED" | "IN_PROGRESS" | "COMPLETED" | "EXCEPTION";
+                /** @description Chỉ lượt gộp theo cấp đóng gói này (CARTON / PALLET). */
+                packLevel?: "CARTON" | "PALLET";
+                warehouseId?: string;
+                assignedTo?: string;
+                take: number;
+                skip: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WaveListResponseDto"];
+                };
+            };
+        };
+    };
+    WaveController_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateWaveDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WaveDetailDto"];
+                };
+            };
+        };
+    };
+    WaveController_detail: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WaveDetailDto"];
+                };
+            };
+        };
+    };
+    WaveController_merge: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MergeWaveSuggestionDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WaveDetailDto"];
+                };
+            };
+        };
+    };
+    WaveController_assign: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AssignWaveDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WaveDetailDto"];
+                };
+            };
+        };
+    };
+    WaveController_unassign: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WaveDetailDto"];
                 };
             };
         };
@@ -11382,175 +13213,6 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ContainerTypeDto"];
-                };
-            };
-        };
-    };
-    InventoryController_list: {
-        parameters: {
-            query: {
-                /** @description Lọc theo mã / tên SKU (không phân biệt hoa thường). */
-                q?: string;
-                /** @description Chỉ tính tồn trong kho này (lọc qua `Location.warehouseId`). */
-                warehouseId?: string;
-                take: number;
-                skip: number;
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["StockListResponseDto"];
-                };
-            };
-        };
-    };
-    InventoryController_byLocation: {
-        parameters: {
-            query: {
-                /** @description Lọc theo mã / tên SKU (không phân biệt hoa thường). */
-                q?: string;
-                /** @description Chỉ tính tồn trong kho này (lọc qua `Location.warehouseId`). */
-                warehouseId?: string;
-                take: number;
-                skip: number;
-                skuId?: string;
-                locationId?: string;
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["StockByLocationResponseDto"];
-                };
-            };
-        };
-    };
-    InventoryController_byLot: {
-        parameters: {
-            query: {
-                /** @description Lọc theo mã / tên SKU (không phân biệt hoa thường). */
-                q?: string;
-                /** @description Chỉ tính tồn trong kho này (lọc qua `Location.warehouseId`). */
-                warehouseId?: string;
-                take: number;
-                skip: number;
-                skuId?: string;
-                locationId?: string;
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["StockByLotResponseDto"];
-                };
-            };
-        };
-    };
-    InventoryController_replenishment: {
-        parameters: {
-            query: {
-                /** @description Lọc theo mã / tên SKU / tên sản phẩm (không phân biệt hoa thường). */
-                q?: string;
-                /** @description Chỉ tính tồn trong kho này; bỏ trống = mọi kho. Số bán vẫn tính toàn hệ thống. */
-                warehouseId?: string;
-                /**
-                 * @description true (mặc định) = chỉ dòng cần chú ý (`OUT` / `BELOW` / `SOON`); false = mọi SKU có mức tồn kho,
-                 *     kể cả dòng đủ hàng (để rà ngưỡng đã đặt).
-                 */
-                onlyAlert: boolean;
-                take: number;
-                skip: number;
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ReplenishmentResponseDto"];
-                };
-            };
-        };
-    };
-    LotController_list: {
-        parameters: {
-            query: {
-                /** @description Lọc theo số lô (không phân biệt hoa thường). */
-                q?: string;
-                skuId?: string;
-                /** @description Chỉ tính tồn trong kho này (lọc qua `Location.warehouseId`). */
-                warehouseId?: string;
-                /** @description Lô hết hạn trong N ngày tới (gồm cả đã hết hạn). Bỏ trống = mọi lô. */
-                expiringInDays?: number;
-                /** @description true = chỉ lô còn tồn (onHand > 0). */
-                hasStock?: boolean;
-                take: number;
-                skip: number;
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["LotListResponseDto"];
-                };
-            };
-        };
-    };
-    LotController_update: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["UpdateLotDto"];
-            };
-        };
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["LotDto"];
                 };
             };
         };
@@ -13371,634 +15033,6 @@ export interface operations {
             };
         };
     };
-    ShippingController_list: {
-        parameters: {
-            query?: {
-                orderId?: string;
-                status?: "CANCELLED" | "PENDING" | "PICKED_UP" | "IN_TRANSIT" | "DELIVERED" | "FAILED" | "RETURNED";
-                take?: number;
-                skip?: number;
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": Record<string, never>;
-                };
-            };
-        };
-    };
-    ShippingController_get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ShipmentViewDto"];
-                };
-            };
-        };
-    };
-    ShippingController_pack: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["PackDto"];
-            };
-        };
-        responses: {
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": Record<string, never>;
-                };
-            };
-        };
-    };
-    ShippingController_assignCarrier: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["AssignCarrierDto"];
-            };
-        };
-        responses: {
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": Record<string, never>;
-                };
-            };
-        };
-    };
-    ShippingController_ship: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": Record<string, never>;
-                };
-            };
-        };
-    };
-    ShippingController_updateStatus: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["UpdateShipmentStatusDto"];
-            };
-        };
-        responses: {
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": Record<string, never>;
-                };
-            };
-        };
-    };
-    ShipmentMonitorController_summary: {
-        parameters: {
-            query: {
-                /** @description Ngày theo giờ Việt Nam `YYYY-MM-DD` cho số đóng gói / bàn giao; bỏ trống = hôm nay. */
-                date?: string;
-                carrierId?: string;
-                /** @description Hãng giữ quá N ngày kể từ lúc rời kho → cảnh báo. */
-                holdDays: number;
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ShipmentMonitorSummaryDto"];
-                };
-            };
-        };
-    };
-    ShipmentMonitorController_list: {
-        parameters: {
-            query: {
-                /** @description Ngày theo giờ Việt Nam `YYYY-MM-DD` cho số đóng gói / bàn giao; bỏ trống = hôm nay. */
-                date?: string;
-                carrierId?: string;
-                /** @description Hãng giữ quá N ngày kể từ lúc rời kho → cảnh báo. */
-                holdDays: number;
-                /**
-                 * @description PACKED = đóng gói xong trong ngày · HANDED_OVER = rời kho trong ngày · HOLDING = hãng đang
-                 *     giữ (đã rời kho, chưa giao xong / hoàn) · OVERDUE = HOLDING quá `holdDays` ngày.
-                 *     HOLDING / OVERDUE là ảnh chụp HIỆN TẠI, không theo `date`.
-                 */
-                view: "PACKED" | "HANDED_OVER" | "HOLDING" | "OVERDUE";
-                /** @description Mã phiếu giao / mã vận đơn (chứa chuỗi) hoặc đúng số đơn bán. */
-                q?: string;
-                take: number;
-                skip: number;
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ShipmentMonitorListDto"];
-                };
-            };
-        };
-    };
-    GoodsIssueController_list: {
-        parameters: {
-            query: {
-                warehouseId?: string;
-                kind?: "SALES" | "OTHER" | "TRANSFER" | "RETURN_TO_SUPPLIER";
-                status?: "DRAFT" | "PENDING_APPROVAL" | "APPROVED" | "POSTED" | "CANCELLED";
-                /** @description Tìm theo số phiếu (contains, không phân biệt hoa thường). */
-                q?: string;
-                take: number;
-                skip: number;
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["GoodsIssueListResponseDto"];
-                };
-            };
-        };
-    };
-    GoodsIssueController_get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["GoodsIssueDetailDto"];
-                };
-            };
-        };
-    };
-    TaskEngineController_list: {
-        parameters: {
-            query: {
-                status?: "CANCELLED" | "PENDING" | "ASSIGNED" | "IN_PROGRESS" | "COMPLETED" | "EXCEPTION";
-                type?: "PUT_AWAY" | "PICK" | "PACK" | "SHIP" | "TRANSFER" | "RECEIVE" | "COUNT" | "REPLENISH";
-                warehouseId?: string;
-                /** @description Lọc theo người đang giữ việc. */
-                assignedTo?: string;
-                /** @description Chứng từ nguồn: `refType` + `refId` ("SalesOrder" + id đơn) → mọi task của một đơn. */
-                refType?: string;
-                refId?: string;
-                /** @description Tra đúng một số việc (PICK-…, PACK-…) — máy quét đọc mã việc trên phiếu. */
-                docNumber?: string;
-                /**
-                 * @description Đúng N dòng (mỗi dòng = một SKU tại một vị trí) — điều phối gom đơn 1 SKU / 2 SKU… để gộp
-                 *     lượt. `TaskLine.lineNo` đánh 1..N liên tục nên lọc bằng lineNo, không cần đếm.
-                 */
-                lineCount?: number;
-                /** @description Từ N dòng trở lên ("5+ SKU"). Kết hợp với `lineCount` thì `lineCount` thắng. */
-                lineCountMin?: number;
-                take: number;
-                skip: number;
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["TaskListResponseDto"];
-                };
-            };
-        };
-    };
-    TaskEngineController_stats: {
-        parameters: {
-            query: {
-                type: "PUT_AWAY" | "PICK" | "PACK" | "SHIP" | "TRANSFER" | "RECEIVE" | "COUNT" | "REPLENISH";
-                /** @description `YYYY-MM-DD` (Asia/Ho_Chi_Minh); bỏ trống = hôm nay. */
-                date?: string;
-                warehouseId?: string;
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["TaskStatsDto"];
-                };
-            };
-        };
-    };
-    TaskEngineController_productivity: {
-        parameters: {
-            query?: {
-                from?: string;
-                to?: string;
-                warehouseId?: string;
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["TaskProductivityDto"];
-                };
-            };
-        };
-    };
-    TaskEngineController_assignees: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["TaskAssigneeDto"][];
-                };
-            };
-        };
-    };
-    TaskEngineController_detail: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["TaskDetailDto"];
-                };
-            };
-        };
-    };
-    TaskEngineController_assignBulk: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["AssignTasksBulkDto"];
-            };
-        };
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["AssignTasksBulkResultDto"];
-                };
-            };
-        };
-    };
-    TaskEngineController_assign: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["AssignTaskDto"];
-            };
-        };
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["TaskStateResultDto"];
-                };
-            };
-        };
-    };
-    TaskEngineController_unassign: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["TaskStateResultDto"];
-                };
-            };
-        };
-    };
-    TaskEngineController_replanShortages: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ReplanPickResultDto"];
-                };
-            };
-        };
-    };
-    WaveController_suggestions: {
-        parameters: {
-            query?: {
-                warehouseId?: string;
-                /** @description Chỉ trả nhóm cấp này; `cartonCount` / `palletCount` vẫn đếm cả hai. */
-                packLevel?: "CARTON" | "PALLET";
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["WaveSuggestionListDto"];
-                };
-            };
-        };
-    };
-    WaveController_list: {
-        parameters: {
-            query: {
-                status?: "CANCELLED" | "PENDING" | "ASSIGNED" | "IN_PROGRESS" | "COMPLETED" | "EXCEPTION";
-                /** @description Chỉ lượt gộp theo cấp đóng gói này (CARTON / PALLET). */
-                packLevel?: "CARTON" | "PALLET";
-                warehouseId?: string;
-                assignedTo?: string;
-                take: number;
-                skip: number;
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["WaveListResponseDto"];
-                };
-            };
-        };
-    };
-    WaveController_create: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["CreateWaveDto"];
-            };
-        };
-        responses: {
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["WaveDetailDto"];
-                };
-            };
-        };
-    };
-    WaveController_detail: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["WaveDetailDto"];
-                };
-            };
-        };
-    };
-    WaveController_merge: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["MergeWaveSuggestionDto"];
-            };
-        };
-        responses: {
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["WaveDetailDto"];
-                };
-            };
-        };
-    };
-    WaveController_assign: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["AssignWaveDto"];
-            };
-        };
-        responses: {
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["WaveDetailDto"];
-                };
-            };
-        };
-    };
-    WaveController_unassign: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["WaveDetailDto"];
-                };
-            };
-        };
-    };
     PdaController_tasks: {
         parameters: {
             query?: {
@@ -15280,123 +16314,6 @@ export interface operations {
             };
         };
     };
-    InvoiceController_list: {
-        parameters: {
-            query: {
-                /** @description BẮT BUỘC — công nợ luôn xem theo khách hàng (xem `BillingService.list`). */
-                customerId: string;
-                status?: "DRAFT" | "PENDING_APPROVAL" | "APPROVED" | "POSTED" | "CANCELLED";
-                take?: number;
-                skip?: number;
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": Record<string, never>[];
-                };
-            };
-        };
-    };
-    InvoiceController_issue: {
-        parameters: {
-            query?: never;
-            header: {
-                "idempotency-key": string;
-            };
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["IssueInvoiceDto"];
-            };
-        };
-        responses: {
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": Record<string, never>;
-                };
-            };
-        };
-    };
-    InvoiceController_get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": Record<string, never>;
-                };
-            };
-        };
-    };
-    PaymentController_get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": Record<string, never>;
-                };
-            };
-        };
-    };
-    PaymentController_record: {
-        parameters: {
-            query?: never;
-            header: {
-                "idempotency-key": string;
-            };
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["RecordPaymentDto"];
-            };
-        };
-        responses: {
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": Record<string, never>;
-                };
-            };
-        };
-    };
     PaymentGatewayController_list: {
         parameters: {
             query?: never;
@@ -16029,513 +16946,6 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["CustomerDto"];
-                };
-            };
-        };
-    };
-    CustomerAssignmentController_teams: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["TeamAssignmentSummaryDto"][];
-                };
-            };
-        };
-    };
-    CustomerAssignmentController_members: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                teamId: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["TeamMemberLoadDto"][];
-                };
-            };
-        };
-    };
-    CustomerAssignmentController_history: {
-        parameters: {
-            query: {
-                customerId?: string;
-                teamId?: string;
-                /** @description true = chỉ dòng đang hiệu lực (endAt null). */
-                activeOnly?: boolean;
-                take: number;
-                skip: number;
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["CustomerAssignmentListDto"];
-                };
-            };
-        };
-    };
-    CustomerAssignmentController_assign: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["AssignCustomersDto"];
-            };
-        };
-        responses: {
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["AssignCustomersResultDto"];
-                };
-            };
-        };
-    };
-    PancakeMappingController_backlog: {
-        parameters: {
-            query: {
-                shopId: number;
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["MappingBacklogItemDto"][];
-                };
-            };
-        };
-    };
-    PancakeMappingController_skus: {
-        parameters: {
-            query: {
-                shopId: number;
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["UnmappedSkuDto"][];
-                };
-            };
-        };
-    };
-    PancakeMappingController_mapSku: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["MapSkuDto"];
-            };
-        };
-        responses: {
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["MapSkuResultDto"];
-                };
-            };
-        };
-    };
-    PancakeMappingController_actors: {
-        parameters: {
-            query: {
-                shopId: number;
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["UnmappedActorDto"][];
-                };
-            };
-        };
-    };
-    PancakeMappingController_mapActor: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["MapActorDto"];
-            };
-        };
-        responses: {
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["MapActorResultDto"];
-                };
-            };
-        };
-    };
-    PancakeConfigController_list: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["PancakeConfigListDto"];
-                };
-            };
-        };
-    };
-    PancakeConfigController_upsert: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                shopId: number;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["UpsertPancakeConfigDto"];
-            };
-        };
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["PancakeShopConfigDto"];
-                };
-            };
-        };
-    };
-    PancakeConfigController_remove: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                shopId: number;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            204: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    PancakeConfigController_rotateWebhookSecret: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                shopId: number;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["PancakeShopConfigDto"];
-                };
-            };
-        };
-    };
-    PancakeConfigController_verify: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                shopId: number;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["PancakeVerifyResultDto"];
-                };
-            };
-        };
-    };
-    PancakeWebhookController_ping: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                shopId: number;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    PancakeWebhookController_receive: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                shopId: number;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["PancakeWebhookReceiptDto"];
-                };
-            };
-        };
-    };
-    PancakeTransformController_replayOrder: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["ReplayOrderDto"];
-            };
-        };
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": Record<string, never>;
-                };
-            };
-        };
-    };
-    PancakeTransformController_run: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["RunTransformDto"];
-            };
-        };
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": Record<string, never>;
-                };
-            };
-        };
-    };
-    PancakePushController_bulkStatus: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["PancakeBulkPushStatusDto"];
-                };
-            };
-        };
-    };
-    PancakePushController_startBulk: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            202: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["PancakeBulkPushStatusDto"];
-                };
-            };
-        };
-    };
-    PancakePushController_product: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["PancakePushResultDto"][];
-                };
-            };
-        };
-    };
-    PancakePushController_allProducts: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["PancakePushReportDto"];
-                };
-            };
-        };
-    };
-    PancakePushController_warehouse: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["PancakePushResultDto"][];
-                };
-            };
-        };
-    };
-    PancakePushController_allWarehouses: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["PancakePushReportDto"];
                 };
             };
         };
