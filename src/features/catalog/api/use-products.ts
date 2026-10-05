@@ -5,6 +5,7 @@ import {
   useQuery,
   useQueryClient,
 } from '@tanstack/react-query';
+import type { EntityOption, EntitySearchResult } from '@/components/data/form';
 import { api, unwrap } from '@/lib/api/client';
 import type { components } from '@/lib/api/schema';
 
@@ -26,6 +27,10 @@ export interface ProductListParams {
   /** Lọc theo danh mục — server gộp CẢ danh mục con (recursive CTE). */
   categoryId?: string;
   brandId?: string;
+  /** RPT-05a — lọc theo nhà cung cấp chính. */
+  supplierId?: string;
+  /** true = chỉ SP đã gán NCC chính, false = chỉ SP chưa gán. */
+  hasSupplier?: boolean;
   isActive?: boolean;
   trackingMode?: TrackingMode;
   /** true = chỉ sản phẩm còn ít nhất một SKU có tồn (onHand > 0). */
@@ -303,6 +308,8 @@ export function useProducts(params: ProductListParams, opts: { enabled?: boolean
               q: params.q || undefined,
               categoryId: params.categoryId,
               brandId: params.brandId,
+              supplierId: params.supplierId,
+              hasSupplier: params.hasSupplier,
               isActive: params.isActive,
               trackingMode: params.trackingMode,
               hasStock: params.hasStock,
@@ -344,6 +351,46 @@ export function useProductDetails(ids: string[]) {
     failed: queries.find((q) => q.isError) ?? null,
     products: queries.flatMap((q) => (q.data ? [q.data] : [])),
   };
+}
+
+/**
+ * RPT-05a — picker "Nhà cung cấp chính" của form sản phẩm: GET /suppliers (q ăn mã/tên),
+ * chỉ NCC đang giao dịch. Hook thuộc catalog (luật 12 — không import features/supplier).
+ */
+export function useSupplierOptionSearch(q: string): EntitySearchResult {
+  const query = useQuery({
+    queryKey: ['catalog', 'suppliers', 'options', q] as const,
+    queryFn: () =>
+      unwrap(
+        api.GET('/suppliers', {
+          params: { query: { q: q || undefined, isActive: true, take: 20, skip: 0 } },
+        }),
+      ),
+    staleTime: 30_000,
+  });
+  const options: EntityOption[] | undefined = query.data?.items.map((s) => ({
+    id: s.id,
+    label: s.name,
+    hint: s.code,
+  }));
+  return { options, isPending: query.isPending, error: query.error };
+}
+
+/**
+ * RPT-05a — option lọc "Nhà cung cấp" của danh sách sản phẩm: tối đa 200 NCC (danh mục nhỏ,
+ * sắp theo tên). Không cần quyền supplier.read thì query lỗi → bộ lọc chỉ còn "Chưa gán NCC".
+ */
+export function useSupplierFilterOptions() {
+  return useQuery({
+    queryKey: ['catalog', 'suppliers', 'filter-options'] as const,
+    queryFn: () =>
+      unwrap(
+        api.GET('/suppliers', {
+          params: { query: { sortBy: 'name', sortDir: 'asc', take: 200, skip: 0 } },
+        }),
+      ),
+    staleTime: 60 * 1000,
+  });
 }
 
 /** GET /brands — danh mục nhỏ, đổi hiếm → cache 60s cho form chọn nhanh. */

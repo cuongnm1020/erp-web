@@ -93,6 +93,8 @@ const PRODUCT = {
   isActive: true,
   category: CATEGORY,
   brand: BRAND,
+  supplierId: uuid(401),
+  supplier: { id: uuid(401), code: 'NCC01', name: 'Phân bón Bình Điền' },
   defaultWarehouseId: WAREHOUSE.id,
   hasVariants: true,
   description: 'Ngòi bi 0.8mm, mực dầu.',
@@ -213,6 +215,11 @@ describe('ProductDetailScreen — C-03 chi tiết sản phẩm (GET /products/:i
     expect(await screen.findByText(WAREHOUSE.name)).toBeInTheDocument();
     expect(screen.getByText(CATEGORY.name)).toBeInTheDocument();
     expect(screen.getByText(BRAND.name)).toBeInTheDocument();
+    // RPT-05a — NCC chính dẫn sang hồ sơ NCC.
+    expect(screen.getByRole('link', { name: 'Phân bón Bình Điền' })).toHaveAttribute(
+      'href',
+      `/catalog/suppliers/${uuid(401)}`,
+    );
     // Tồn tổng hợp lấy theo SKU đang bán đầu tiên (TL08-BLUE), 3 số API trả sẵn.
     expect(await screen.findByText('31.200')).toBeInTheDocument();
     expect(screen.getByText('1.240')).toBeInTheDocument();

@@ -3188,6 +3188,28 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/reports/sales/by-supplier": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * RPT-05c (D-CR3) — doanh thu / giá nhập thuần / chi phí nhập / lãi gộp / SL / số SKU / số đơn
+         *     theo nhà cung cấp chính HIỆN TẠI của sản phẩm, kèm doanh thu kỳ trước. SP chưa gán NCC gom
+         *     dòng "Chưa gán NCC". Chi phí nhập phân bổ sau khi dòng đã đóng gói không phản ánh (giá vốn đã
+         *     niêm phong lúc đóng gói). Phân trang take ≤ 200.
+         */
+        get: operations["SalesReportController_bySupplier"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/reports/sales/rollup/rebuild": {
         parameters: {
             query?: never;
@@ -4696,6 +4718,11 @@ export interface components {
             name?: string;
             decimals?: number;
         };
+        ProductSupplierRefDto: {
+            id: string;
+            code: string;
+            name: string;
+        };
         UomCodeDto: {
             code: string;
         };
@@ -4713,12 +4740,15 @@ export interface components {
             name: string;
             categoryId: string | null;
             brandId: string | null;
+            /** @description RPT-05a — nhà cung cấp chính (mọi SKU thừa kế); null = chưa gán. */
+            supplierId: string | null;
             /** @enum {string} */
             trackingMode: "NONE" | "LOT" | "SERIAL";
             shelfLifeDays: number | null;
             isActive: boolean;
             category: components["schemas"]["ProductCategoryDto"] | null;
             brand: components["schemas"]["BrandDto"] | null;
+            supplier: components["schemas"]["ProductSupplierRefDto"] | null;
             /** @description Chỉ SKU đang active. */
             skus: components["schemas"]["ProductListSkuDto"][];
             /** @description Tổng số SKU (kể cả ngừng bán) — `skus` ở trên chỉ chứa SKU active. */
@@ -4819,12 +4849,15 @@ export interface components {
             name: string;
             categoryId: string | null;
             brandId: string | null;
+            /** @description RPT-05a — nhà cung cấp chính (mọi SKU thừa kế); null = chưa gán. */
+            supplierId: string | null;
             /** @enum {string} */
             trackingMode: "NONE" | "LOT" | "SERIAL";
             shelfLifeDays: number | null;
             isActive: boolean;
             category: components["schemas"]["ProductCategoryDto"] | null;
             brand: components["schemas"]["BrandDto"] | null;
+            supplier: components["schemas"]["ProductSupplierRefDto"] | null;
             defaultWarehouseId: string | null;
             description: string | null;
             ingredients: string | null;
@@ -4862,6 +4895,11 @@ export interface components {
             categoryId?: string;
             /** Format: uuid */
             brandId?: string;
+            /**
+             * Format: uuid
+             * @description RPT-05a — nhà cung cấp chính (mọi SKU thừa kế). Bỏ trống / null = chưa gán.
+             */
+            supplierId?: string | null;
             /** @enum {string} */
             trackingMode?: "NONE" | "LOT" | "SERIAL";
             shelfLifeDays?: number;
@@ -4900,6 +4938,8 @@ export interface components {
             name: string;
             categoryId: string | null;
             brandId: string | null;
+            /** @description RPT-05a — nhà cung cấp chính (mọi SKU thừa kế); null = chưa gán. */
+            supplierId: string | null;
             /** @enum {string} */
             trackingMode: "NONE" | "LOT" | "SERIAL";
             shelfLifeDays: number | null;
@@ -4942,6 +4982,11 @@ export interface components {
             categoryId?: string | null;
             /** Format: uuid */
             brandId?: string | null;
+            /**
+             * Format: uuid
+             * @description RPT-05a — nhà cung cấp chính; null = bỏ gán. Báo cáo theo NCC đọc giá trị HIỆN TẠI.
+             */
+            supplierId?: string | null;
             /**
              * @description Đổi = cascade xuống SKU chưa có movement; SKU đã có movement → 409 kèm danh sách.
              * @enum {string}
@@ -8291,6 +8336,11 @@ export interface components {
             costed: number;
             /** @description Số đơn đã ghi lại cước vận chuyển + trạng thái hoàn. */
             shippingRefreshed: number;
+            /**
+             * @description RPT-05b — số dòng (đã chốt giá vốn từ trước) vừa được ghi phần giá nhập thuần
+             *     `cogsBaseAmount`. Đơn chốt lại giá vốn trong lượt này (`costed`) đã kèm phần thuần, không đếm ở đây.
+             */
+            baseCostedLines: number;
         };
         SalesKpisDto: {
             revenue: string;
@@ -8471,6 +8521,47 @@ export interface components {
             rankBy: "customers" | "qty" | "revenue" | "orders" | "grossProfit";
             /** @description Tối đa `limit` SKU, hạng 1..n. Bằng nhau thì doanh thu cao hơn đứng trước. */
             items: components["schemas"]["SalesTopProductItemDto"][];
+            dataAsOf: string | null;
+        };
+        SalesBySupplierItemDto: {
+            /** @description `id` / `code` null = sản phẩm chưa gán NCC — name "Chưa gán NCC". */
+            key: components["schemas"]["SalesGroupKeyDto"];
+            qty: string;
+            revenue: string;
+            purchaseCost: string;
+            importCost: string;
+            cogs: string;
+            grossProfit: string;
+            marginPct: string | null;
+            sharePct: string | null;
+            skuCount: number;
+            orderCount: number;
+            previousRevenue: string;
+            growthPct: string | null;
+        };
+        SalesBySupplierTotalsDto: {
+            qty: string;
+            revenue: string;
+            purchaseCost: string;
+            importCost: string;
+            cogs: string;
+            grossProfit: string;
+            marginPct: string | null;
+            previousRevenue: string;
+            growthPct: string | null;
+        };
+        SalesBySupplierDto: {
+            from: string;
+            to: string;
+            previousFrom: string;
+            previousTo: string;
+            /** @description Trang hiện tại (skip / take) sau sắp xếp. NCC chỉ bán ở kỳ trước không xuất hiện. */
+            items: components["schemas"]["SalesBySupplierItemDto"][];
+            /** @description Tổng số dòng (trước phân trang). */
+            total: number;
+            /** @description Tổng mọi dòng sau lọc (không chỉ trang hiện tại). */
+            totals: components["schemas"]["SalesBySupplierTotalsDto"];
+            /** @description Như {@link SalesSummaryDto.dataAsOf}. */
             dataAsOf: string | null;
         };
         SalesRollupRebuildDto: {
@@ -10525,6 +10616,10 @@ export interface operations {
                 /** @description Lọc theo category — bao gồm CẢ category con (đệ quy bằng recursive CTE). */
                 categoryId?: string;
                 brandId?: string;
+                /** @description RPT-05a — lọc theo nhà cung cấp chính. */
+                supplierId?: string;
+                /** @description true = chỉ SP đã gán NCC chính, false = chỉ SP CHƯA gán (dọn dữ liệu). */
+                hasSupplier?: boolean;
                 isActive?: boolean;
                 trackingMode?: "NONE" | "LOT" | "SERIAL";
                 /** @description true = chỉ product có ít nhất một SKU còn tồn (onHand > 0). */
@@ -14679,6 +14774,8 @@ export interface operations {
                 /** @description Danh mục sản phẩm — gồm cả danh mục con. */
                 categoryId?: string;
                 brandId?: string;
+                /** @description RPT-05c — nhà cung cấp chính HIỆN TẠI của sản phẩm (`Product.supplierId`). */
+                supplierId?: string;
                 /** @description Sắp xếp theo — mặc định `revenue`. */
                 sort?: "revenue" | "qty" | "grossProfit";
                 /** @description Mặc định `desc`. */
@@ -14758,6 +14855,8 @@ export interface operations {
                 limit?: number;
                 categoryId?: string;
                 brandId?: string;
+                /** @description RPT-05c — nhà cung cấp chính HIỆN TẠI của sản phẩm (`Product.supplierId`). */
+                supplierId?: string;
             };
             header?: never;
             path?: never;
@@ -14771,6 +14870,48 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["SalesTopProductsDto"];
+                };
+            };
+        };
+    };
+    SalesReportController_bySupplier: {
+        parameters: {
+            query: {
+                /** @description `YYYY-MM-DD` — ngày đầu (giờ VN). */
+                from: string;
+                /** @description `YYYY-MM-DD` — ngày cuối, lấy hết ngày đó. `to` = `from` → một ngày. */
+                to: string;
+                /** @description Kênh bán. */
+                channel?: "DIRECT" | "MARKETPLACE" | "WEBSITE" | "POS";
+                /** @description Snapshot `SalesOrder.teamId` lúc tạo đơn. */
+                teamId?: string;
+                /** @description Snapshot `SalesOrder.ownerId` lúc tạo đơn. */
+                ownerId?: string;
+                /** @description Kho lấy hàng chọn trên đơn (`SalesOrder.warehouseId`). */
+                warehouseId?: string;
+                customerId?: string;
+                /** @description Tìm theo mã / tên nhà cung cấp (dòng "Chưa gán NCC" không khớp khi có q). */
+                q?: string;
+                /** @description Sắp xếp theo — mặc định `revenue`. */
+                sort?: "revenue" | "grossProfit" | "qty";
+                /** @description Mặc định `desc`. */
+                order?: "asc" | "desc";
+                /** @description Mặc định 50, tối đa 200. */
+                take?: number;
+                skip?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SalesBySupplierDto"];
                 };
             };
         };

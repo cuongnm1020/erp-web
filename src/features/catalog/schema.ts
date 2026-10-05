@@ -18,6 +18,8 @@ export const createProductSchema = z.object({
   invoiceName: z.string().trim().max(300, 'Tối đa 300 ký tự'),
   categoryId: z.string().optional(),
   brandId: z.string().optional(),
+  /** RPT-05a — nhà cung cấp chính (mọi SKU thừa kế); '' = chưa gán (sửa gửi null để bỏ gán). */
+  supplierId: z.string().optional(),
   trackingMode: z.enum(['NONE', 'LOT', 'SERIAL']),
   shelfLifeDays: z.string().trim().regex(/^\d*$/, 'Nhập số nguyên ngày, không âm'),
   defaultWarehouseId: z.string().optional(),

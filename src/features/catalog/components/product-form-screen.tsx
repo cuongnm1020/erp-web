@@ -8,6 +8,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useFieldArray, useForm, type UseFormReturn } from 'react-hook-form';
 import {
   applyServerErrors,
+  EntityPicker,
   Form,
   FormControl,
   FormDescription,
@@ -49,6 +50,7 @@ import {
   useUpdateProduct,
   useUpdateSku,
   useUploadProductImage,
+  useSupplierOptionSearch,
   useWarehouses,
   type ProductDetail,
 } from '../api/use-products';
@@ -85,7 +87,7 @@ import { UomManagerDialog } from './uom-manager-dialog';
  * - Ma trận thuộc tính sinh biến thể (Màu × Ngòi): API /attributes đã có nhưng màn ma
  *   trận là task riêng → bảng SKU nhập tay, nút "Thêm biến thể".
  * - Giá niêm yết theo biến thể: giá nằm ở bảng giá (PriceList), không phải trên SKU.
- * - NCC chính / Ngưỡng đặt lại: Product chưa có trường tương ứng.
+ * - NCC chính (RPT-05a): picker tìm NCC đang giao dịch; sửa mà bỏ chọn gửi null = bỏ gán.
  * - Nhóm thuế: taxRateId đã lưu được theo SKU nhưng fin.TaxRate chưa có API danh mục
  *   (chờ chốt cách tính thuế với kế toán) → vẫn hiện "Chưa cấu hình".
  * Giữ đúng design: banner lỗi 422 trên đầu "N trường chưa hợp lệ — chưa lưu", lỗi map
@@ -133,6 +135,7 @@ function initialValues(p?: ProductDetail): ProductFormValues {
     reorderLevel: p?.reorderLevel ?? '',
     categoryId: p?.categoryId ?? '',
     brandId: p?.brandId ?? '',
+    supplierId: p?.supplierId ?? '',
     trackingMode: p?.trackingMode ?? 'NONE',
     shelfLifeDays: p?.shelfLifeDays == null ? '' : String(p.shelfLifeDays),
     defaultWarehouseId: p?.defaultWarehouseId ?? '',
@@ -306,6 +309,8 @@ function ProductFormBody({ product }: { product?: ProductDetail }) {
         reorderLevel: v.reorderLevel ? v.reorderLevel : null,
         ...(v.categoryId ? { categoryId: v.categoryId } : {}),
         ...(v.brandId ? { brandId: v.brandId } : {}),
+        // NCC chính: tạo bỏ trống = không gửi; sửa luôn gửi (null = bỏ gán, server khóa theo version).
+        ...(v.supplierId ? { supplierId: v.supplierId } : editing ? { supplierId: null } : {}),
         trackingMode: v.trackingMode,
         ...(v.shelfLifeDays ? { shelfLifeDays: Number.parseInt(v.shelfLifeDays, 10) } : {}),
         ...(v.defaultWarehouseId ? { defaultWarehouseId: v.defaultWarehouseId } : {}),
@@ -335,6 +340,7 @@ function ProductFormBody({ product }: { product?: ProductDetail }) {
               'reorderLevel',
               'categoryId',
               'brandId',
+              'supplierId',
               'trackingMode',
               'searchAliases',
             ],
@@ -359,6 +365,7 @@ function ProductFormBody({ product }: { product?: ProductDetail }) {
               'reorderLevel',
               'categoryId',
               'brandId',
+              'supplierId',
               'trackingMode',
               'searchAliases',
             ],
@@ -678,6 +685,34 @@ function ProductFormBody({ product }: { product?: ProductDetail }) {
                       ))}
                     </SelectContent>
                   </Select>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="supplierId"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Nhà cung cấp chính</FormLabel>
+                  <FormControl>
+                    <EntityPicker
+                      value={field.value ?? ''}
+                      onChange={(id) => field.onChange(id)}
+                      useSearch={useSupplierOptionSearch}
+                      selectedLabel={
+                        product?.supplier && product.supplier.id === field.value
+                          ? product.supplier.name
+                          : undefined
+                      }
+                      placeholder="Chưa gán NCC"
+                      searchPlaceholder="Tìm mã, tên nhà cung cấp…"
+                      emptyText="Không có NCC đang giao dịch khớp"
+                    />
+                  </FormControl>
+                  <FormDescription>
+                    Mọi SKU thừa kế — báo cáo doanh thu theo NCC đọc giá trị này.
+                  </FormDescription>
                   <FormMessage />
                 </FormItem>
               )}

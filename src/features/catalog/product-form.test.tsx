@@ -688,3 +688,108 @@ describe('ProductFormScreen — sửa', () => {
     expect(uploads.filter((u) => u.url === 'sku')).toHaveLength(0);
   });
 });
+
+describe('ProductFormScreen — NCC chính (RPT-05a)', () => {
+  const SUPPLIERS = {
+    items: [
+      { id: 'sup-1', code: 'NCC01', name: 'Phân bón Bình Điền', isActive: true },
+      { id: 'sup-2', code: 'NCC02', name: 'Thuốc BVTV Lộc Trời', isActive: true },
+    ],
+    total: 2,
+  };
+
+  it('tạo: chọn NCC trong picker → POST /products kèm supplierId', async () => {
+    const bodies: unknown[] = [];
+    server.use(
+      ...baseHandlers(),
+      http.get('/api/suppliers', () => HttpResponse.json(SUPPLIERS)),
+      http.post('/api/products', async ({ request }) => {
+        bodies.push(await request.json());
+        return HttpResponse.json({ id: 'p-1', code: 'SP-1' }, { status: 201 });
+      }),
+      http.post('/api/products/:id/skus', () => HttpResponse.json({}, { status: 201 })),
+    );
+    renderApp(<ProductFormScreen />);
+    fill('Tên thương mại *', 'Phân NPK 20-20-15');
+    fireEvent.click(screen.getByRole('combobox', { name: 'Nhà cung cấp chính' }));
+    fireEvent.click(await screen.findByText('Thuốc BVTV Lộc Trời'));
+    expect(screen.getByRole('combobox', { name: 'Nhà cung cấp chính' })).toHaveTextContent(
+      'Thuốc BVTV Lộc Trời',
+    );
+    fireEvent.click(screen.getByRole('button', { name: /Lưu sản phẩm/ }));
+    await waitFor(() => expect(bodies).toHaveLength(1));
+    expect(bodies[0]).toMatchObject({ name: 'Phân NPK 20-20-15', supplierId: 'sup-2' });
+  });
+
+  it('tạo: bỏ trống NCC → POST không có supplierId', async () => {
+    const bodies: Array<Record<string, unknown>> = [];
+    server.use(
+      ...baseHandlers(),
+      http.post('/api/products', async ({ request }) => {
+        bodies.push((await request.json()) as Record<string, unknown>);
+        return HttpResponse.json({ id: 'p-1', code: 'SP-1' }, { status: 201 });
+      }),
+      http.post('/api/products/:id/skus', () => HttpResponse.json({}, { status: 201 })),
+    );
+    renderApp(<ProductFormScreen />);
+    fill('Tên thương mại *', 'Phân NPK 20-20-15');
+    fireEvent.click(screen.getByRole('button', { name: /Lưu sản phẩm/ }));
+    await waitFor(() => expect(bodies).toHaveLength(1));
+    expect(bodies[0]).not.toHaveProperty('supplierId');
+  });
+
+  it('sửa: hiện NCC đang gán; bỏ chọn → PATCH supplierId null kèm version', async () => {
+    const patches: unknown[] = [];
+    server.use(
+      ...baseHandlers(),
+      http.get('/api/products/:id', () =>
+        HttpResponse.json({
+          id: 'p-9',
+          code: 'NPK',
+          name: 'Phân NPK',
+          categoryId: null,
+          brandId: null,
+          supplierId: 'sup-1',
+          supplier: { id: 'sup-1', code: 'NCC01', name: 'Phân bón Bình Điền' },
+          trackingMode: 'NONE',
+          shelfLifeDays: null,
+          isActive: true,
+          category: null,
+          brand: null,
+          searchAliases: [],
+          invoiceName: null,
+          reorderLevel: null,
+          version: 3,
+          images: [],
+          hasVariants: false,
+          skus: [
+            {
+              id: 's-1',
+              productId: 'p-9',
+              code: 'NPK',
+              name: 'Phân NPK',
+              isActive: true,
+              version: 1,
+              baseUom: UOMS[0],
+              barcodes: [],
+              uomConversions: [],
+              images: [],
+            },
+          ],
+        }),
+      ),
+      http.patch('/api/products/:id', async ({ request }) => {
+        patches.push(await request.json());
+        return HttpResponse.json({});
+      }),
+    );
+    renderApp(<ProductFormScreen productId="p-9" />);
+    expect(await screen.findByRole('combobox', { name: 'Nhà cung cấp chính' })).toHaveTextContent(
+      'Phân bón Bình Điền',
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Bỏ chọn' }));
+    fireEvent.click(screen.getByRole('button', { name: /Lưu thay đổi/ }));
+    await waitFor(() => expect(patches).toHaveLength(1));
+    expect(patches[0]).toMatchObject({ version: 3, supplierId: null });
+  });
+});
