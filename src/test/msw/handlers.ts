@@ -24,6 +24,61 @@ export const ME_SALE = {
 
 const CUSTOMER_TYPES = ['RETAIL', 'WHOLESALE', 'DISTRIBUTOR', 'KEY_ACCOUNT'] as const;
 
+/** Đúng shape `CustomerOrderItemDto` (CRM-05) — 25 đơn mới nhất trước; đơn chưa duyệt / hủy netRevenue null. */
+const CUSTOMER_ORDER_STATUSES = [
+  'POSTED',
+  'APPROVED',
+  'PENDING_APPROVAL',
+  'DRAFT',
+  'CANCELLED',
+] as const;
+export function makeCustomerOrders(n: number) {
+  return Array.from({ length: n }, (_, i) => {
+    const status = CUSTOMER_ORDER_STATUSES[i % CUSTOMER_ORDER_STATUSES.length]!;
+    const booked = status === 'POSTED' || status === 'APPROVED';
+    return {
+      id: `so-${String(i + 1).padStart(4, '0')}`,
+      code: `SO-${String(2600 - i)}`,
+      orderDate: new Date(Date.UTC(2026, 8, 30 - i, 3)).toISOString(),
+      status,
+      channel: i % 3 === 0 ? ('MARKETPLACE' as const) : ('DIRECT' as const),
+      total: `${1_250_000 + i * 10_000}.0000`,
+      netRevenue: booked ? `${1_100_000 + i * 10_000}.0000` : null,
+      returnedRevenue: booked ? (i === 0 ? '150000.0000' : '0.0000') : null,
+      itemCount: (i % 4) + 1,
+      owner: i % 2 === 0 ? { id: 'u-sale', name: 'Trần Thị Sale' } : null,
+    };
+  });
+}
+
+/** Đúng shape `CustomerSalesStatsDto` (CRM-05). */
+export const CUSTOMER_STATS = {
+  orderCount: 10,
+  revenue: '12345000.0000',
+  aov: '1234500.0000',
+  firstOrderAt: '2026-01-15T03:00:00.000Z',
+  lastOrderAt: '2026-09-30T03:00:00.000Z',
+  returnedRevenue: '150000.0000',
+  returnedOrderCount: 1,
+  returnRate: '10.00',
+  topSkus: [
+    {
+      skuId: 'sku-1',
+      skuCode: 'PB-NPK-25',
+      name: 'Phân bón NPK 16-16-8 bao 25kg',
+      qty: '40.000000',
+      revenue: '8000000.0000',
+    },
+    {
+      skuId: 'sku-2',
+      skuCode: 'TT-ABA-100',
+      name: 'Thuốc trừ sâu Abamectin 100ml',
+      qty: '12.500000',
+      revenue: '4500000.0000',
+    },
+  ],
+};
+
 /** Đúng shape `CustomerGroupDto` (CRM-01) — nhóm cuối đã ngừng dùng. */
 export const CUSTOMER_GROUPS = [
   {
@@ -976,6 +1031,15 @@ export const handlers = [
       ? HttpResponse.json({ ...found, addresses: makeCustomerAddresses(found.id) })
       : errorEnvelope(404, 'NOT_FOUND');
   }),
+  http.get('/api/customers/:id/stats', () => HttpResponse.json(CUSTOMER_STATS)),
+  http.get('/api/customers/:id/orders', ({ request }) => {
+    const url = new URL(request.url);
+    const status = url.searchParams.get('status');
+    const take = Number(url.searchParams.get('take') ?? 20);
+    const skip = Number(url.searchParams.get('skip') ?? 0);
+    const all = makeCustomerOrders(25).filter((o) => !status || o.status === status);
+    return HttpResponse.json({ items: all.slice(skip, skip + take), total: all.length });
+  }),
   http.get('/api/sales-orders', async ({ request }) => {
     const url = new URL(request.url);
     const take = Number(url.searchParams.get('take') ?? 50);
@@ -1425,6 +1489,24 @@ export const scenario = {
   customerNotFound: http.get('/api/customers/:id', () => errorEnvelope(404, 'NOT_FOUND')),
   customerError: http.get('/api/customers/:id', () => errorEnvelope(500, 'DB_ERROR')),
   customerForbidden: http.get('/api/customers/:id', () => errorEnvelope(403, 'FORBIDDEN')),
+  customerOrdersEmpty: http.get('/api/customers/:id/orders', () =>
+    HttpResponse.json({ items: [], total: 0 }),
+  ),
+  customerOrdersError: http.get('/api/customers/:id/orders', () => errorEnvelope(500, 'DB_ERROR')),
+  customerStatsEmpty: http.get('/api/customers/:id/stats', () =>
+    HttpResponse.json({
+      orderCount: 0,
+      revenue: '0.0000',
+      aov: '0.0000',
+      firstOrderAt: null,
+      lastOrderAt: null,
+      returnedRevenue: '0.0000',
+      returnedOrderCount: 0,
+      returnRate: null,
+      topSkus: [],
+    }),
+  ),
+  customerStatsError: http.get('/api/customers/:id/stats', () => errorEnvelope(500, 'DB_ERROR')),
   meSale: http.get('/api/auth/me', () => HttpResponse.json(ME_SALE)),
 
   usersEmpty: http.get('/api/users', () => HttpResponse.json({ items: [], total: 0 })),

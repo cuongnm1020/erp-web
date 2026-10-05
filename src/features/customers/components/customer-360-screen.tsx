@@ -15,19 +15,19 @@ import { useInvalidateOn } from '@/lib/realtime';
 import { customerKeys, useCustomer, type CustomerDetail } from '../api/use-customers';
 import { customerTypeLabel, customerTypeTone, initialsOf } from '../labels';
 import { formatAddress } from './customer-address-section';
+import { CustomerPurchaseHistory } from './customer-purchase-history';
 import { CustomerTagsEditor } from './customer-segment-fields';
 
 /**
  * B-02 Hồ sơ khách hàng 360 — GET /customers/{id}.
  *
  * Dựng từ `CustomerDetailDto`: hồ sơ, nhóm / cấp độ / tag (CRM-03; gắn/gỡ tag ngay tại đây với
- * quyền customer.update) và địa chỉ giao (mặc định lên đầu). Các mảng còn lại của màn 360 theo
+ * quyền customer.update), địa chỉ giao (mặc định lên đầu) và lịch sử mua hàng (CRM-06). Các mảng còn lại của màn 360 theo
  * thiết kế chưa có endpoint — xem `MISSING`. Luật 2 cấm tự khai shape ở frontend, nên chỗ đó
  * nói thẳng là chưa có dữ liệu thay vì hiển thị số bịa cạnh tên khách thật.
  */
 const MISSING: Array<{ title: string; need: string }> = [
   { title: 'Dòng thời gian hoạt động', need: 'chưa có endpoint hoạt động / ghi chú khách hàng' },
-  { title: 'Đơn gần đây', need: 'chờ API lịch sử mua hàng theo khách (CRM-05 / CRM-06)' },
   { title: 'Công nợ theo tuổi nợ', need: 'chưa có endpoint công nợ theo khách' },
   { title: 'Ticket đang mở', need: 'chưa có module ticket' },
   { title: 'Đồng ý nhận marketing', need: 'chờ API lịch sử đồng ý theo khách (CRM-11)' },
@@ -240,6 +240,8 @@ function Profile({ c }: { c: CustomerDetail }) {
           </Card>
         </div>
       </div>
+
+      <CustomerPurchaseHistory customerId={c.id} />
     </>
   );
 }

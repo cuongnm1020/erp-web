@@ -29,7 +29,7 @@ describe('Customer360Screen — GET /customers/{id} (P1-12)', () => {
     await screen.findByRole('heading', { name: 'Khách hàng 1' });
     expect(screen.getByText('Chưa nối được')).toBeInTheDocument();
     expect(screen.getByText('Công nợ theo tuổi nợ')).toBeInTheDocument();
-    expect(screen.getByText('Đơn gần đây')).toBeInTheDocument();
+    expect(screen.queryByText('Đơn gần đây')).not.toBeInTheDocument();
     expect(screen.queryByText('Địa chỉ giao')).not.toBeInTheDocument();
     expect(screen.queryByText(/SO-2308/)).not.toBeInTheDocument();
   });

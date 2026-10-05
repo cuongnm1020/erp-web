@@ -3091,6 +3091,57 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/reports/sales/summary": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** KPI kỳ đang xem + kỳ trước cùng độ dài. Một ngày: `from` = `to`. */
+        get: operations["SalesReportController_summary"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/customers/{id}/orders": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Đơn của khách, mới nhất trước. Khách ngoài phạm vi → 404. */
+        get: operations["CustomerSalesController_orders"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/customers/{id}/stats": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Chỉ số mua hàng mọi thời điểm (đơn APPROVED / POSTED). Khách ngoài phạm vi → 404. */
+        get: operations["CustomerSalesController_stats"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/transfers": {
         parameters: {
             query?: never;
@@ -8140,6 +8191,83 @@ export interface components {
             costed: number;
             /** @description Số đơn đã ghi lại cước vận chuyển + trạng thái hoàn. */
             shippingRefreshed: number;
+        };
+        SalesKpisDto: {
+            revenue: string;
+            orderCount: number;
+            aov: string;
+            grossProfit: string;
+            cogs: string;
+            returnedRevenue: string;
+            customerCount: number;
+            newCustomerCount: number;
+        };
+        SalesSummaryDto: {
+            /** @description `YYYY-MM-DD` — kỳ đang xem. */
+            from: string;
+            to: string;
+            /** @description Kỳ trước cùng độ dài, liền trước `from`. */
+            previousFrom: string;
+            previousTo: string;
+            current: components["schemas"]["SalesKpisDto"];
+            previous: components["schemas"]["SalesKpisDto"];
+        };
+        CustomerOrderOwnerDto: {
+            id: string;
+            /** @description Họ tên nhân viên (User.fullName). */
+            name: string;
+        };
+        CustomerOrderItemDto: {
+            id: string;
+            /** @description Số chứng từ (SalesOrder.docNumber). */
+            code: string;
+            /** @description ISO datetime. */
+            orderDate: string;
+            /** @enum {string} */
+            status: "DRAFT" | "PENDING_APPROVAL" | "APPROVED" | "POSTED" | "CANCELLED";
+            /** @enum {string} */
+            channel: "DIRECT" | "MARKETPLACE" | "WEBSITE" | "POS";
+            /** @description Tổng tiền trên đơn (gồm thuế, phí ship) — Decimal(18,4). */
+            total: string;
+            /**
+             * @description Doanh thu thuần theo D-CR1 (trừ KM cấp đơn + hàng hoàn, không thuế / phí ship) —
+             *     Decimal(18,4). null khi đơn chưa chốt (DRAFT / PENDING_APPROVAL) hoặc đã hủy.
+             */
+            netRevenue: string | null;
+            /** @description Doanh thu đã loại vì hàng hoàn; null như `netRevenue`. */
+            returnedRevenue: string | null;
+            /** @description Số dòng hàng trên đơn. */
+            itemCount: number;
+            /** @description Snapshot người phụ trách lúc tạo đơn; null = đơn của team / chưa chia. */
+            owner: components["schemas"]["CustomerOrderOwnerDto"] | null;
+        };
+        CustomerOrderListDto: {
+            items: components["schemas"]["CustomerOrderItemDto"][];
+            total: number;
+        };
+        CustomerTopSkuDto: {
+            skuId: string;
+            skuCode: string;
+            name: string;
+            /** @description Số lượng đã mua trừ hàng hoàn (ĐVT cơ sở) — Decimal(18,6). */
+            qty: string;
+            /** @description Doanh thu thuần (đã phân bổ KM cấp đơn, trừ hoàn) — Decimal(18,4). */
+            revenue: string;
+        };
+        CustomerSalesStatsDto: {
+            orderCount: number;
+            revenue: string;
+            /** @description revenue / orderCount; "0.0000" khi chưa có đơn. */
+            aov: string;
+            /** @description ISO datetime — null khi chưa có đơn. */
+            firstOrderAt: string | null;
+            lastOrderAt: string | null;
+            returnedRevenue: string;
+            /** @description Số đơn có hàng hoàn (một phần hoặc ĐVVC hoàn cả đơn). */
+            returnedOrderCount: number;
+            returnRate: string | null;
+            /** @description Top 5 SKU theo doanh thu thuần. */
+            topSkus: components["schemas"]["CustomerTopSkuDto"][];
         };
         TransferListRowDto: {
             id: string;
@@ -14186,6 +14314,89 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ProfitBackfillResultDto"];
+                };
+            };
+        };
+    };
+    SalesReportController_summary: {
+        parameters: {
+            query: {
+                /** @description `YYYY-MM-DD` — ngày đầu (giờ VN). */
+                from: string;
+                /** @description `YYYY-MM-DD` — ngày cuối, lấy hết ngày đó. `to` = `from` → một ngày. */
+                to: string;
+                /** @description Kênh bán. */
+                channel?: "DIRECT" | "MARKETPLACE" | "WEBSITE" | "POS";
+                /** @description Snapshot `SalesOrder.teamId` lúc tạo đơn. */
+                teamId?: string;
+                /** @description Snapshot `SalesOrder.ownerId` lúc tạo đơn. */
+                ownerId?: string;
+                /** @description Kho lấy hàng chọn trên đơn (`SalesOrder.warehouseId`). */
+                warehouseId?: string;
+                customerId?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SalesSummaryDto"];
+                };
+            };
+        };
+    };
+    CustomerSalesController_orders: {
+        parameters: {
+            query: {
+                status?: "DRAFT" | "PENDING_APPROVAL" | "APPROVED" | "POSTED" | "CANCELLED";
+                /** @description `YYYY-MM-DD` (giờ VN) — từ ngày đặt đơn. */
+                from?: string;
+                /** @description `YYYY-MM-DD` (giờ VN) — đến hết ngày này. */
+                to?: string;
+                take: number;
+                skip: number;
+            };
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CustomerOrderListDto"];
+                };
+            };
+        };
+    };
+    CustomerSalesController_stats: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CustomerSalesStatsDto"];
                 };
             };
         };
