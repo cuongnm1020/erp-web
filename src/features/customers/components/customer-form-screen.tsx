@@ -85,7 +85,6 @@ import {
 const PENDING_API: Array<{ title: string; need: string }> = [
   { title: 'Bảng giá áp dụng', need: 'GET /price-lists chưa khai báo kiểu response' },
   { title: 'Người phụ trách', need: 'chưa có danh bạ user để chọn — server tự gán người tạo' },
-  { title: 'Đồng ý nhận marketing (PDPD)', need: 'chưa có DTO consent theo khách' },
 ];
 
 const CREATE_FIELDS = [

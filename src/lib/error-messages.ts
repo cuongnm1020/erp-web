@@ -168,6 +168,10 @@ const MESSAGES: Record<string, string> = {
     'Khách giữ đã bị gộp tiếp vào khách khác — hoàn tác lần gộp sau trước, rồi hoàn tác lần này.',
   TAG_NOT_FOUND: 'Tag không còn tồn tại (có thể vừa bị xóa). Tải lại danh sách tag.',
   INVALID_TIER_PERIOD: 'Kỳ tính doanh số không hợp lệ. Chọn số tháng từ 1 đến 120 rồi chạy lại.',
+  // Đồng ý nhận tin (CRM-13) — trang hủy nhận tin công khai + ghi consent ở hồ sơ khách
+  RATE_LIMITED: 'Bạn thao tác quá nhanh. Đợi khoảng một phút rồi thử lại.',
+  UNSUBSCRIBE_LINK_INVALID:
+    'Link hủy nhận tin không hợp lệ hoặc đã bị sửa. Mở lại đúng link trong tin nhắn / email bạn nhận được.',
   TIER_JOB_ACTOR_NOT_FOUND:
     'Không có tài khoản quản trị đang hoạt động để đứng tên lượt nâng hạng. Báo IT kiểm tra tài khoản admin.',
 };
@@ -179,6 +183,7 @@ const BY_STATUS: Record<number, string> = {
   409: MESSAGES.CONFLICT!,
   413: 'File quá lớn — ảnh tối đa 5MB.',
   422: MESSAGES.VALIDATION!,
+  429: MESSAGES.RATE_LIMITED!,
 };
 
 export function messageForCode(code: string, status?: number): string {

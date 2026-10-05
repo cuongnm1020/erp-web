@@ -4,7 +4,14 @@
  */
 export type GuardDecision = { kind: 'ok' } | { kind: 'login'; next: string } | { kind: 'home' };
 
-const PUBLIC_PREFIXES = ['/login', '/forgot-password', '/reset-password', '/survey/', '/api/'];
+const PUBLIC_PREFIXES = [
+  '/login',
+  '/forgot-password',
+  '/reset-password',
+  '/survey/',
+  '/unsubscribe/',
+  '/api/',
+];
 const PUBLIC_EXACT = new Set(['/403', '/404', '/500']);
 
 export function isPublicPath(pathname: string): boolean {

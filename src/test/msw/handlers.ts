@@ -1181,7 +1181,106 @@ export const STATUS_LOG_FIXTURE = {
   ],
 };
 
+/** CRM-13 — đúng shape `ConsentRecordDto`. */
+export const CONSENT_RECORDS = [
+  {
+    id: '0000cc00-0000-4000-8000-000000000001',
+    customerId: '00000000-0000-4000-8000-000000000001',
+    channel: 'ZALO',
+    granted: false,
+    source: 'UNSUBSCRIBE_LINK',
+    purpose: 'MARKETING',
+    evidence: { ip: '203.0.113.7', userAgent: 'Mozilla/5.0 (iPhone)' },
+    recordedAt: new Date(Date.UTC(2026, 9, 5, 2, 30)).toISOString(),
+    recordedBy: null,
+  },
+  {
+    id: '0000cc00-0000-4000-8000-000000000002',
+    customerId: '00000000-0000-4000-8000-000000000001',
+    channel: 'SMS',
+    granted: true,
+    source: 'PHONE',
+    purpose: 'MARKETING',
+    evidence: { note: 'Ghi âm cuộc gọi CG-0412' },
+    recordedAt: new Date(Date.UTC(2026, 9, 1, 3)).toISOString(),
+    recordedBy: { id: 'u-sale-1', name: 'Trần Thị Mai' },
+  },
+];
+
+/** Đúng shape `CustomerConsentsDto` — đủ 4 kênh, EMAIL / PHONE_CALL chưa ghi nhận. */
+export const CUSTOMER_CONSENTS = {
+  customerId: '00000000-0000-4000-8000-000000000001',
+  current: [
+    { channel: 'EMAIL', granted: null, recordedAt: null, source: null },
+    { channel: 'SMS', granted: true, recordedAt: CONSENT_RECORDS[1]!.recordedAt, source: 'PHONE' },
+    {
+      channel: 'ZALO',
+      granted: false,
+      recordedAt: CONSENT_RECORDS[0]!.recordedAt,
+      source: 'UNSUBSCRIBE_LINK',
+    },
+    { channel: 'PHONE_CALL', granted: null, recordedAt: null, source: null },
+  ],
+  history: { items: CONSENT_RECORDS, total: 2 },
+};
+
+/** Đúng shape `ConsentStateListDto`. */
+export function makeConsentStates(n: number) {
+  const channels = ['EMAIL', 'SMS', 'ZALO', 'PHONE_CALL'] as const;
+  return Array.from({ length: n }, (_, i) => ({
+    id: `0000cc10-0000-4000-8000-${String(i + 1).padStart(12, '0')}`,
+    customer: {
+      id: `00000000-0000-4000-8000-${String(i + 1).padStart(12, '0')}`,
+      code: `KH-${String(i + 1).padStart(6, '0')}`,
+      name: `Khách hàng ${i + 1}`,
+      phone: `09120000${String(i).padStart(2, '0')}`,
+    },
+    channel: channels[i % 4]!,
+    granted: i % 3 !== 0,
+    source: i % 2 === 0 ? 'FORM' : 'PHONE',
+    purpose: 'MARKETING',
+    recordedAt: new Date(Date.UTC(2026, 9, 1 + (i % 5), 3)).toISOString(),
+    recordedBy: i % 3 === 0 ? null : { id: 'u-sale-1', name: 'Trần Thị Mai' },
+  }));
+}
+
+/** Đúng shape `PublicUnsubscribeDto`. */
+export const PUBLIC_UNSUBSCRIBE = {
+  customerName: 'Ng*** V** A',
+  channel: 'SMS',
+  currentlyGranted: true,
+};
+
 export const handlers = [
+  http.get('/api/customers/:id/consents', () => HttpResponse.json(CUSTOMER_CONSENTS)),
+  http.post('/api/customers/:id/consents', async ({ request, params }) => {
+    const body = (await request.json()) as Record<string, unknown>;
+    return HttpResponse.json(
+      {
+        id: '0000cc00-0000-4000-8000-0000000000ff',
+        customerId: params.id,
+        channel: body.channel,
+        granted: body.granted,
+        source: body.source,
+        purpose: body.purpose ?? 'MARKETING',
+        evidence: body.evidence ? { note: body.evidence } : null,
+        recordedAt: new Date(Date.UTC(2026, 9, 6, 3)).toISOString(),
+        recordedBy: { id: 'u-admin', name: 'Quản trị' },
+      },
+      { status: 201 },
+    );
+  }),
+  http.get('/api/consents', ({ request }) => {
+    const url = new URL(request.url);
+    const take = Number(url.searchParams.get('take') ?? 50);
+    const skip = Number(url.searchParams.get('skip') ?? 0);
+    const all = makeConsentStates(60);
+    return HttpResponse.json({ items: all.slice(skip, skip + take), total: all.length });
+  }),
+  http.get('/api/public/unsubscribe/:token', () => HttpResponse.json(PUBLIC_UNSUBSCRIBE)),
+  http.post('/api/public/unsubscribe/:token', () =>
+    HttpResponse.json({ ...PUBLIC_UNSUBSCRIBE, currentlyGranted: false }),
+  ),
   http.get('/api/container-types', () => HttpResponse.json([])),
   http.get('/api/carriers', () => HttpResponse.json(CARRIERS)),
   http.get('/api/pickup-warehouses', () => HttpResponse.json(PICKUP_WAREHOUSES)),

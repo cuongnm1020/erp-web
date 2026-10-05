@@ -2251,6 +2251,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
+        /** Đường cũ (P0-14) — giữ shape row thô; đi qua cùng service có scope với POST /customers/:id/consents. */
         post: operations["NotificationController_recordConsent"];
         delete?: never;
         options?: never;
@@ -2300,6 +2301,58 @@ export interface paths {
         get: operations["NotificationController_logs"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/customers/{id}/consents": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Trạng thái hiện tại 4 kênh (null = chưa từng ghi → coi như từ chối) + lịch sử phân trang. */
+        get: operations["ConsentController_forCustomer"];
+        put?: never;
+        /** Ghi một bản đồng ý / từ chối mới (append-only). Khách đã gộp → ghi vào bản giữ. */
+        post: operations["ConsentController_record"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/consents": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Trạng thái mới nhất mỗi (khách, kênh) trong phạm vi — màn quản lý consent. */
+        get: operations["ConsentController_list"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/public/unsubscribe/{token}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["PublicUnsubscribeController_view"];
+        put?: never;
+        /** Ghi từ chối (source UNSUBSCRIBE_LINK, bằng chứng ip + user agent). Bấm lại không ghi thêm. */
+        post: operations["PublicUnsubscribeController_unsubscribe"];
         delete?: never;
         options?: never;
         head?: never;
@@ -7102,6 +7155,91 @@ export interface components {
             evidence?: {
                 [key: string]: unknown;
             };
+        };
+        CreateCustomerConsentDto: {
+            /** @enum {string} */
+            channel: "EMAIL" | "SMS" | "ZALO" | "PHONE_CALL";
+            /** @description true = đồng ý, false = từ chối / rút lại. */
+            granted: boolean;
+            /** @enum {string} */
+            source: "FORM" | "PHONE" | "ZALO_OA" | "IMPORT" | "UNSUBSCRIBE_LINK" | "ADMIN";
+            /** @description Mặc định `MARKETING`. Chữ in hoa / số / gạch dưới. */
+            purpose?: string;
+            /** @description Ghi chú / mã tham chiếu bằng chứng (số phiếu, link ảnh form, mã cuộc gọi…). */
+            evidence?: string;
+        };
+        ConsentUserRefDto: {
+            id: string;
+            /** @description Họ tên nhân viên (User.fullName). */
+            name: string;
+        };
+        ConsentRecordDto: {
+            /** @description `{ note }` khi nhân viên ghi; `{ ip, userAgent }` khi khách bấm link hủy. */
+            evidence: {
+                [key: string]: unknown;
+            } | null;
+            id: string;
+            customerId: string;
+            /** @enum {string} */
+            channel: "EMAIL" | "SMS" | "ZALO" | "PHONE_CALL";
+            granted: boolean;
+            /** @description FORM | PHONE | ZALO_OA | IMPORT | UNSUBSCRIBE_LINK | ADMIN (bản ghi cũ có thể khác). */
+            source: string;
+            purpose: string;
+            /** @description ISO datetime. */
+            recordedAt: string;
+            /** @description null = khách tự thao tác (link hủy công khai) hoặc hệ thống. */
+            recordedBy: components["schemas"]["ConsentUserRefDto"] | null;
+        };
+        ConsentCurrentDto: {
+            /** @enum {string} */
+            channel: "EMAIL" | "SMS" | "ZALO" | "PHONE_CALL";
+            granted: boolean | null;
+            /** @description ISO datetime; null khi chưa từng ghi. */
+            recordedAt: string | null;
+            source: string | null;
+        };
+        ConsentHistoryPageDto: {
+            items: components["schemas"]["ConsentRecordDto"][];
+            total: number;
+        };
+        CustomerConsentsDto: {
+            customerId: string;
+            /** @description Đủ 4 kênh EMAIL / SMS / ZALO / PHONE_CALL, mục đích MARKETING. */
+            current: components["schemas"]["ConsentCurrentDto"][];
+            /** @description Mọi bản ghi (mọi mục đích), mới nhất trước. */
+            history: components["schemas"]["ConsentHistoryPageDto"];
+        };
+        ConsentCustomerRefDto: {
+            id: string;
+            code: string;
+            name: string;
+            phone: string | null;
+        };
+        ConsentStateItemDto: {
+            /** @description id bản ghi consent mới nhất. */
+            id: string;
+            customer: components["schemas"]["ConsentCustomerRefDto"];
+            /** @enum {string} */
+            channel: "EMAIL" | "SMS" | "ZALO" | "PHONE_CALL";
+            granted: boolean;
+            source: string;
+            purpose: string;
+            /** @description ISO datetime. */
+            recordedAt: string;
+            recordedBy: components["schemas"]["ConsentUserRefDto"] | null;
+        };
+        ConsentStateListDto: {
+            items: components["schemas"]["ConsentStateItemDto"][];
+            total: number;
+        };
+        PublicUnsubscribeDto: {
+            /** @description Tên khách đã che, vd "Ng*** V** A". */
+            customerName: string;
+            /** @enum {string} */
+            channel: "EMAIL" | "SMS" | "ZALO" | "PHONE_CALL";
+            /** @description Trạng thái MARKETING hiện tại của kênh; null = chưa từng ghi (coi như không nhận tin). */
+            currentlyGranted: boolean | null;
         };
         CreateWebhookDto: {
             name: string;
@@ -13900,6 +14038,130 @@ export interface operations {
                 };
                 content: {
                     "application/json": Record<string, never>[];
+                };
+            };
+        };
+    };
+    ConsentController_forCustomer: {
+        parameters: {
+            query: {
+                take: number;
+                skip: number;
+            };
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CustomerConsentsDto"];
+                };
+            };
+        };
+    };
+    ConsentController_record: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateCustomerConsentDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConsentRecordDto"];
+                };
+            };
+        };
+    };
+    ConsentController_list: {
+        parameters: {
+            query: {
+                channel?: "EMAIL" | "SMS" | "ZALO" | "PHONE_CALL";
+                /** @description Lọc theo trạng thái hiện tại. */
+                granted?: boolean;
+                /** @description `YYYY-MM-DD` (giờ VN) — bản ghi hiện tại ghi từ ngày này. */
+                from?: string;
+                /** @description `YYYY-MM-DD` (giờ VN) — đến hết ngày này. */
+                to?: string;
+                /** @description Tìm theo tên / mã / SĐT khách. */
+                q?: string;
+                /** @description Mặc định `MARKETING`. */
+                purpose?: string;
+                take: number;
+                skip: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConsentStateListDto"];
+                };
+            };
+        };
+    };
+    PublicUnsubscribeController_view: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                token: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PublicUnsubscribeDto"];
+                };
+            };
+        };
+    };
+    PublicUnsubscribeController_unsubscribe: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                token: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PublicUnsubscribeDto"];
                 };
             };
         };

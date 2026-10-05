@@ -21,13 +21,7 @@ export function mergeFieldLabel(f: string): string {
   return (MERGE_FIELD_LABEL as Record<string, string>)[f] ?? f;
 }
 
-export const CONSENT_CHANNEL_LABEL: Record<CompareCustomer['consents'][number]['channel'], string> =
-  {
-    EMAIL: 'Email',
-    SMS: 'SMS',
-    ZALO: 'Zalo',
-    PHONE_CALL: 'Gọi điện',
-  };
+export { CONSENT_CHANNEL_LABEL } from '@/lib/shared';
 
 export function sourceLabel(s: CompareCustomer['source']): string {
   return s === 'PANCAKE' ? 'Pancake' : 'Tạo trên ERP';

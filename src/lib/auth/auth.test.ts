@@ -83,6 +83,38 @@ describe('proxy', () => {
     expect(req.headers.get('x-request-id')).toMatch(/[0-9a-f-]{36}/);
   });
 
+  it('route /public/* (CRM-12): chuyển XFF + User-Agent của khách, KHÔNG gắn Bearer', () => {
+    const headers = new Headers({
+      'x-forwarded-for': '203.0.113.7',
+      'user-agent': 'Mozilla/5.0 (iPhone)',
+    });
+    const pub = buildUpstreamRequest({
+      method: 'POST',
+      path: ['public', 'unsubscribe', 'tok_abc'],
+      search: '',
+      headers,
+      body: null,
+      apiUrl: 'http://api',
+      accessToken: 'TOKEN',
+    });
+    expect(pub.url).toBe('http://api/public/unsubscribe/tok_abc');
+    expect(pub.headers.get('x-forwarded-for')).toBe('203.0.113.7');
+    expect(pub.headers.get('user-agent')).toBe('Mozilla/5.0 (iPhone)');
+    expect(pub.headers.has('authorization')).toBe(false);
+
+    const priv = buildUpstreamRequest({
+      method: 'GET',
+      path: ['customers'],
+      search: '',
+      headers,
+      body: null,
+      apiUrl: 'http://api',
+      accessToken: 'TOKEN',
+    });
+    expect(priv.headers.has('x-forwarded-for')).toBe(false);
+    expect(priv.headers.get('authorization')).toBe('Bearer TOKEN');
+  });
+
   it('response: giữ status, content-type, x-request-id; ép no-store', async () => {
     const up = new Response('{"code":"X"}', {
       status: 409,
@@ -106,6 +138,8 @@ describe('route guard', () => {
     ['/login', true, false, 'home'],
     ['/403', false, false, 'ok'],
     ['/survey/abc', false, false, 'ok'],
+    ['/unsubscribe/abc_DEF-123', false, false, 'ok'], // CRM-13: trang hủy nhận tin công khai
+    ['/unsubscribe/abc', true, false, 'ok'],
     ['/', false, false, 'login'],
   ];
   it.each(cases)('%s access=%s refresh=%s → %s', (pathname, hasAccess, hasRefresh, kind) => {

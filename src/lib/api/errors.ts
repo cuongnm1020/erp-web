@@ -92,6 +92,8 @@ function defaultCodeForStatus(status: number): string {
       return 'CONFLICT';
     case 422:
       return 'VALIDATION';
+    case 429:
+      return 'RATE_LIMITED';
     default:
       return status >= 500 ? 'SERVER_ERROR' : 'BAD_REQUEST';
   }

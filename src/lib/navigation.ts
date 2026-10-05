@@ -11,6 +11,7 @@ import {
   Landmark,
   List,
   ListTree,
+  MailCheck,
   MapPin,
   Network,
   Package,
@@ -139,7 +140,13 @@ export const NAV_MODULES: NavModule[] = [
         // CRM-10: chỉ quản trị (customer.merge) — người khác không thấy mục, URL bị chặn.
         ability: { action: 'merge', subject: 'Customer' },
       },
-      // { label: 'Đồng ý marketing', href: '/crm/customers/consent', icon: MailCheck },
+      {
+        label: 'Đồng ý marketing',
+        href: '/crm/customers/consent',
+        icon: MailCheck,
+        // CRM-13: GET /consents cần customer.read — dữ liệu đã scope theo khách người xem phụ trách.
+        ability: { action: 'read', subject: 'Customer' },
+      },
       // {
       //   label: 'Ticket CSKH',
       //   href: '/crm/tickets',
