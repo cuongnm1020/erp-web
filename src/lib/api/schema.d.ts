@@ -2457,6 +2457,27 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/tasks/{id}/replan-shortages": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Lập lại dòng "thiếu tồn" của việc PICK (lỗi thật SOP2610-00005, 2026-10-05: việc sinh lúc vị
+         *     trí chứa hàng đang Ngừng dùng → dòng EXCEPTION không vị trí, không ai sửa được). Chỉ lấy ở vị
+         *     trí pick được — như lúc sinh việc; không đổi trạng thái task, GDN nháp cập nhật cùng transaction.
+         */
+        post: operations["TaskEngineController_replanShortages"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/waves/suggestions": {
         parameters: {
             query?: never;
@@ -6834,6 +6855,19 @@ export interface components {
              * @description Nhân viên kho nhận việc — phải tồn tại và đang active.
              */
             userId: string;
+        };
+        ReplanShortageDto: {
+            sourceLineNo: number;
+            skuId: string;
+            /** @description Decimal(18,6) dạng chuỗi. */
+            qty: string;
+        };
+        ReplanPickResultDto: {
+            taskId: string;
+            docNumber: string;
+            /** @description Số dòng thiếu tồn đã được gán vị trí (toàn bộ hoặc một phần). */
+            replanned: number;
+            shortages: components["schemas"]["ReplanShortageDto"][];
         };
         WaveSuggestionTaskDto: {
             taskId: string;
@@ -12915,6 +12949,27 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["TaskStateResultDto"];
+                };
+            };
+        };
+    };
+    TaskEngineController_replanShortages: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReplanPickResultDto"];
                 };
             };
         };

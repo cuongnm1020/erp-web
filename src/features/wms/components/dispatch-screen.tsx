@@ -46,9 +46,11 @@ import {
   taskKeys,
   useAssignTask,
   useAssignTasksBulk,
+  useReplanShortages,
   useTasks,
   useUnassignTask,
   useWarehouseStaff,
+  type ReplanResult,
   type Task,
   type WarehouseStaff,
 } from '../api/use-tasks';
@@ -199,6 +201,60 @@ export function staffLabel(s: WarehouseStaff): string {
 /** Thẻ gộp được thành lượt: PICK chưa gán, chưa thuộc lượt (server cũng chặn — INVALID_WAVE_INPUT). */
 function waveable(t: Task): boolean {
   return t.type === 'PICK' && t.status === 'PENDING' && t.waveId === null;
+}
+
+/** Câu báo kết quả lập lại dòng thiếu tồn. */
+export function replanMessage(doc: string, r: ReplanResult): { ok: boolean; text: string } {
+  const left = r.shortages.length;
+  if (r.replanned > 0 && left === 0)
+    return { ok: true, text: `Đã lập lại ${r.replanned} dòng — ${doc} lấy được rồi` };
+  if (r.replanned > 0)
+    return { ok: true, text: `Đã lập lại ${r.replanned} dòng, ${doc} vẫn thiếu ${left} dòng` };
+  if (left > 0)
+    return {
+      ok: false,
+      text: `${doc}: kho vẫn chưa đủ hàng ở vị trí đang dùng — nhập hàng hoặc bật lại vị trí trước`,
+    };
+  return {
+    ok: false,
+    text: `${doc}: không có dòng thiếu tồn để lập lại (dòng nhân viên báo thiếu khi lấy giữ nguyên)`,
+  };
+}
+
+/**
+ * Nút "Lập lại" cạnh cảnh báo thiếu — chỉ việc PICK còn mở, không thuộc lượt (server cũng bỏ qua
+ * việc trong lượt / đã xong).
+ */
+function ReplanButton({ task }: { task: Task }) {
+  const replan = useReplanShortages();
+  if (
+    task.type !== 'PICK' ||
+    task.waveId !== null ||
+    task.status === 'COMPLETED' ||
+    task.status === 'CANCELLED'
+  )
+    return null;
+  return (
+    <button
+      type="button"
+      className="text-xs text-primary hover:underline disabled:opacity-50"
+      title="Gán lại vị trí cho dòng thiếu tồn sau khi nhập hàng / bật lại vị trí"
+      aria-label={`Lập lại việc lấy hàng ${task.docNumber}`}
+      disabled={replan.isPending}
+      onClick={() =>
+        replan
+          .mutateAsync(task.id)
+          .then((r) => {
+            const m = replanMessage(task.docNumber, r);
+            if (m.ok) toast.success(m.text);
+            else toast.error(m.text);
+          })
+          .catch((err) => toast.error(messageFor(err)))
+      }
+    >
+      {replan.isPending ? 'Đang lập…' : 'Lập lại'}
+    </button>
+  );
 }
 
 /** Ô "Gán cho…" / "Trả về hàng đợi" của một dòng — chỉ khi có task.assign và việc không thuộc lượt. */
@@ -391,15 +447,18 @@ function buildColumns(
     {
       id: 'exception',
       header: 'Cảnh báo',
-      meta: { width: 130 },
+      meta: { width: staff ? 190 : 130 },
       cell: ({ row }) =>
         row.original.exceptionLineCount > 0 ? (
-          <span
-            className="flex items-center gap-1 rounded-sm bg-warning/15 px-1.5 text-xs font-semibold text-warning-foreground"
-            title="Nhân viên báo thiếu hàng khi lấy — phần thiếu không sang đóng gói"
-          >
-            <AlertTriangle className="h-3.5 w-3.5 text-warning" aria-hidden />
-            thiếu {row.original.exceptionLineCount} dòng
+          <span className="flex items-center gap-2">
+            <span
+              className="flex items-center gap-1 rounded-sm bg-warning/15 px-1.5 text-xs font-semibold text-warning-foreground"
+              title="Thiếu tồn khi tạo việc, hoặc nhân viên báo thiếu khi lấy — phần thiếu không sang đóng gói"
+            >
+              <AlertTriangle className="h-3.5 w-3.5 text-warning" aria-hidden />
+              thiếu {row.original.exceptionLineCount} dòng
+            </span>
+            {staff ? <ReplanButton task={row.original} /> : null}
           </span>
         ) : row.original.status === 'EXCEPTION' ? (
           <AlertTriangle className="h-3.5 w-3.5 text-warning" aria-label="Ngoại lệ" />
