@@ -13,87 +13,79 @@ import { formatMoney, formatQuantity, toDecimal } from '@/lib/format';
 import type { SortState } from '@/lib/url-state';
 import {
   EXPORT_MAX_ROWS,
-  useExportSalesByProduct,
-  useSalesByProduct,
-  type ByProductParams,
-  type ProductGroupBy,
-  type ProductSort,
-  type SalesByProductItem,
+  useExportSalesBySupplier,
+  useSalesBySupplier,
+  type BySupplierParams,
+  type SalesBySupplierItem,
+  type SupplierSort,
 } from '../api/use-sales-report';
 import {
   DataAsOfNotice,
   ExportButton,
   GroupKeyLabel,
-  Segmented,
   count,
   csvMoney,
   csvQty,
   money,
   pct,
   profitCell,
-  SupplierFilterChip,
 } from './report-parts';
 import { useSalesReportState } from './report-state';
 
-const GROUPS: ReadonlyArray<readonly [ProductGroupBy, string]> = [
-  ['sku', 'SKU'],
-  ['product', 'Sản phẩm'],
-  ['category', 'Danh mục'],
-  ['brand', 'Thương hiệu'],
-];
-const GROUP_NOUN: Record<ProductGroupBy, string> = {
-  sku: 'SKU',
-  product: 'sản phẩm',
-  category: 'danh mục',
-  brand: 'thương hiệu',
-};
-const SORTABLE: readonly ProductSort[] = ['revenue', 'qty', 'grossProfit'];
+const SORTABLE: readonly SupplierSort[] = ['revenue', 'grossProfit', 'qty'];
 
-function toProductSort(sort: SortState | null): { sort: ProductSort; order: 'asc' | 'desc' } {
+function toSupplierSort(sort: SortState | null): { sort: SupplierSort; order: 'asc' | 'desc' } {
   if (!sort || !(SORTABLE as readonly string[]).includes(sort.id))
     return { sort: 'revenue', order: 'desc' };
-  return { sort: sort.id as ProductSort, order: sort.desc ? 'desc' : 'asc' };
+  return { sort: sort.id as SupplierSort, order: sort.desc ? 'desc' : 'asc' };
 }
 
 /**
- * Tab "Sản phẩm": doanh thu theo SKU / sản phẩm / danh mục / thương hiệu (đã phân bổ KM cấp đơn).
- * Tìm + sắp xếp + phân trang phía server (luật 8). Xuất CSV toàn bộ kết quả (lặp trang).
+ * Tab "Nhà cung cấp" (RPT-05c / RPT-07): doanh thu, giá nhập thuần, chi phí nhập, lãi gộp theo NCC
+ * chính HIỆN TẠI của sản phẩm (GET /reports/sales/by-supplier). Dòng id null = "Chưa gán NCC".
+ * Tìm + sắp xếp + phân trang phía server (luật 8). "Xem sản phẩm" chuyển sang tab Sản phẩm với
+ * bộ lọc supplierId (chip bỏ được).
  */
-export function SalesProductTab() {
-  const { state, set, setFilters, filter, range } = useSalesReportState();
-  const groupBy: ProductGroupBy = GROUPS.some(([k]) => k === state.filters.group)
-    ? (state.filters.group as ProductGroupBy)
-    : 'sku';
-  const { sort, order } = toProductSort(state.sort);
-  const supplierId = state.filters.supplierId || undefined;
-  const params = useMemo<ByProductParams>(
+export function SalesSupplierTab() {
+  const { state, set, filter, range } = useSalesReportState();
+  const { sort, order } = toSupplierSort(state.sort);
+  const params = useMemo<BySupplierParams>(
     () => ({
-      groupBy,
-      supplierId,
       q: state.q,
       sort,
       order,
       take: state.size,
       skip: (state.page - 1) * state.size,
     }),
-    [groupBy, supplierId, state.q, sort, order, state.size, state.page],
+    [state.q, sort, order, state.size, state.page],
   );
-  const query = useSalesByProduct(filter, params);
-  const exporter = useExportSalesByProduct();
-  const noun = GROUP_NOUN[groupBy];
-  const fallback = groupBy === 'category' ? 'Chưa phân loại' : 'Chưa gán';
+  const query = useSalesBySupplier(filter, params);
+  const exporter = useExportSalesBySupplier();
 
-  const columns = useMemo<ColumnDef<SalesByProductItem, unknown>[]>(
-    () => [
+  const columns = useMemo<ColumnDef<SalesBySupplierItem, unknown>[]>(() => {
+    const viewProducts = (r: SalesBySupplierItem) =>
+      set({
+        page: 1,
+        q: '',
+        sort: { id: 'revenue', desc: true },
+        filters: {
+          ...state.filters,
+          tab: 'product',
+          group: 'product',
+          supplierId: r.key.id ?? undefined,
+          supplierName: r.key.name,
+        },
+      });
+    return [
       {
         id: 'key',
-        header: groupBy === 'sku' ? 'SKU' : GROUPS.find(([k]) => k === groupBy)![1],
+        header: 'Nhà cung cấp',
         cell: ({ row }) => (
           <GroupKeyLabel
             id={row.original.key.id}
             name={row.original.key.name}
             code={row.original.key.code}
-            fallback={fallback}
+            fallback="Chưa gán NCC"
           />
         ),
       },
@@ -110,10 +102,16 @@ export function SalesProductTab() {
         cell: ({ row }) => money(row.original.revenue),
       },
       {
-        id: 'cogs',
-        header: 'Giá vốn',
+        id: 'purchaseCost',
+        header: 'Giá nhập',
         meta: { align: 'right', width: 130 },
-        cell: ({ row }) => money(row.original.cogs),
+        cell: ({ row }) => money(row.original.purchaseCost),
+      },
+      {
+        id: 'importCost',
+        header: 'Chi phí nhập',
+        meta: { align: 'right', width: 120 },
+        cell: ({ row }) => money(row.original.importCost),
       },
       {
         id: 'grossProfit',
@@ -123,15 +121,21 @@ export function SalesProductTab() {
       },
       {
         id: 'marginPct',
-        header: '% lãi',
+        header: 'Biên %',
         meta: { align: 'right', width: 80 },
         cell: ({ row }) => <span className="tabular-nums">{pct(row.original.marginPct)}</span>,
       },
       {
         id: 'sharePct',
-        header: '% đóng góp',
-        meta: { align: 'right', width: 100 },
+        header: 'Tỷ trọng',
+        meta: { align: 'right', width: 90 },
         cell: ({ row }) => <span className="tabular-nums">{pct(row.original.sharePct)}</span>,
+      },
+      {
+        id: 'skuCount',
+        header: 'Số SKU',
+        meta: { align: 'right', width: 80 },
+        cell: ({ row }) => count(row.original.skuCount),
       },
       {
         id: 'orderCount',
@@ -160,9 +164,25 @@ export function SalesProductTab() {
           />
         ),
       },
-    ],
-    [groupBy, fallback],
-  );
+      {
+        id: 'actions',
+        header: '',
+        meta: { title: 'Thao tác', align: 'right', width: 120 },
+        // Dòng "Chưa gán NCC" không có id để lọc — API sản phẩm chỉ nhận supplierId.
+        cell: ({ row }) =>
+          row.original.key.id ? (
+            <Button
+              variant="ghost"
+              size="sm"
+              aria-label={`Xem sản phẩm của ${row.original.key.name}`}
+              onClick={() => viewProducts(row.original)}
+            >
+              Xem sản phẩm
+            </Button>
+          ) : null,
+      },
+    ];
+  }, [set, state.filters]);
 
   const runExport = () =>
     exporter.mutate(
@@ -170,16 +190,19 @@ export function SalesProductTab() {
       {
         onSuccess: ({ items, total }) => {
           downloadCsv(
-            `doanh-thu-theo-${groupBy}${supplierId ? '_ncc' : ''}_${range.from}_${range.to}`,
+            `doanh-thu-theo-ncc_${range.from}_${range.to}`,
             [
-              'Mã',
-              'Tên',
+              'Mã NCC',
+              'Nhà cung cấp',
               'SL bán',
               'Doanh thu',
+              'Giá nhập',
+              'Chi phí nhập',
               'Giá vốn',
               'Lãi gộp',
-              '% lãi',
-              '% đóng góp',
+              'Biên %',
+              'Tỷ trọng %',
+              'Số SKU',
               'Số đơn',
               'Doanh thu kỳ trước',
               'Tăng/giảm %',
@@ -189,10 +212,13 @@ export function SalesProductTab() {
               r.key.name,
               csvQty(r.qty),
               csvMoney(r.revenue),
+              csvMoney(r.purchaseCost),
+              csvMoney(r.importCost),
               csvMoney(r.cogs),
               csvMoney(r.grossProfit),
               r.marginPct ?? '',
               r.sharePct ?? '',
+              r.skuCount,
               r.orderCount,
               csvMoney(r.previousRevenue),
               r.growthPct ?? '',
@@ -213,52 +239,37 @@ export function SalesProductTab() {
         onQChange={(q) => set({ q })}
         values={{}}
         onFilterChange={() => undefined}
-        searchPlaceholder={`Tìm mã / tên ${noun}…`}
+        searchPlaceholder="Tìm mã / tên nhà cung cấp…"
         right={
-          <>
-            {supplierId ? (
-              <SupplierFilterChip
-                name={state.filters.supplierName}
-                onClear={() => setFilters({ supplierId: undefined, supplierName: undefined })}
-              />
-            ) : null}
-            <Segmented
-              label="Xem theo"
-              value={groupBy}
-              options={GROUPS}
-              onChange={(g) => setFilters({ group: g === 'sku' ? undefined : g })}
-            />
-            <ExportButton
-              onClick={runExport}
-              pending={exporter.isPending}
-              title={`Xuất toàn bộ kết quả theo bộ lọc đang xem (tối đa ${formatMoney(String(EXPORT_MAX_ROWS), { unit: '' })} dòng)`}
-            />
-          </>
+          <ExportButton
+            onClick={runExport}
+            pending={exporter.isPending}
+            title={`Xuất toàn bộ kết quả theo bộ lọc đang xem (tối đa ${formatMoney(String(EXPORT_MAX_ROWS), { unit: '' })} dòng)`}
+          />
         }
       />
+      <p className="text-xs text-muted-foreground">
+        Doanh thu gán theo <span className="font-semibold">nhà cung cấp chính hiện tại</span> của
+        sản phẩm — đổi NCC trên sản phẩm thì cả số kỳ trước cũng chuyển theo. Giá nhập / chi phí
+        nhập là giá vốn đã chốt lúc đóng gói: chi phí nhập phân bổ sau khi đơn đã đóng gói không
+        được tính.
+      </p>
       <QueryState
         query={query}
-        skeleton={<ListSkeleton rows={10} columns={10} />}
+        skeleton={<ListSkeleton rows={10} columns={12} />}
         isEmpty={(d) => d.items.length === 0}
         empty={
           <EmptyState
             title={
               state.q
-                ? `Không có ${noun} khớp “${state.q}”`
-                : `Chưa bán ${noun} nào trong khoảng này`
+                ? `Không có nhà cung cấp khớp “${state.q}”`
+                : 'Chưa bán hàng của nhà cung cấp nào trong khoảng này'
             }
             description="Doanh thu tính trên đơn đã chốt theo ngày đặt hàng — đổi khoảng ngày hoặc bộ lọc."
             action={
               state.q ? (
                 <Button variant="outline" onClick={() => set({ q: '' })}>
                   Xóa từ khóa
-                </Button>
-              ) : supplierId ? (
-                <Button
-                  variant="outline"
-                  onClick={() => setFilters({ supplierId: undefined, supplierName: undefined })}
-                >
-                  Bỏ lọc nhà cung cấp
                 </Button>
               ) : undefined
             }
@@ -270,10 +281,10 @@ export function SalesProductTab() {
             <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_minmax(0,22rem)]">
               <section className="rounded-md border bg-card p-3" aria-label="Biểu đồ doanh thu">
                 <h2 className="mb-2 text-sm font-semibold">
-                  Doanh thu {Math.min(10, d.items.length)} dòng đầu trang
+                  Doanh thu {Math.min(10, d.items.length)} nhà cung cấp đầu trang
                 </h2>
                 <BarList
-                  ariaLabel={`Doanh thu theo ${noun}`}
+                  ariaLabel="Doanh thu theo nhà cung cấp"
                   items={d.items.slice(0, 10).map((r, i) => ({
                     key: r.key.id ?? `null-${i}`,
                     label: r.key.name,
@@ -284,11 +295,11 @@ export function SalesProductTab() {
                 />
               </section>
               <section className="flex flex-col gap-1 rounded-md border bg-card p-3 text-sm">
-                <h2 className="text-sm font-semibold">
-                  Tổng {d.total} {noun}
-                </h2>
+                <h2 className="text-sm font-semibold">Tổng {d.total} nhà cung cấp</h2>
                 <Total label="Doanh thu" value={formatMoney(d.totals.revenue)} />
                 <Total label="SL bán" value={formatQuantity(d.totals.qty)} />
+                <Total label="Giá nhập" value={formatMoney(d.totals.purchaseCost)} />
+                <Total label="Chi phí nhập" value={formatMoney(d.totals.importCost)} />
                 <Total label="Giá vốn" value={formatMoney(d.totals.cogs)} />
                 <Total
                   label="Lãi gộp"

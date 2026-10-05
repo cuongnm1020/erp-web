@@ -10,6 +10,7 @@ import { renderApp } from '@/test/render';
 import type {
   SalesByProduct,
   SalesByStaff,
+  SalesBySupplier,
   SalesKpis,
   SalesSummary,
   SalesTimeseries,
@@ -591,7 +592,183 @@ describe('Tab Bán chạy', () => {
     expect(url.get('channel')).toBe('POS');
     expect(url.get('q')).toBeNull();
     expect(url.get('page')).toBeNull();
-    // Không có tab Nhà cung cấp chết (chờ RPT-05c)
-    expect(screen.queryByRole('tab', { name: 'Nhà cung cấp' })).not.toBeInTheDocument();
+  });
+});
+
+const supplierItem = (i: number, over: Partial<SalesBySupplier['items'][number]> = {}) => ({
+  key: { id: `sup-${i}`, code: `NCC${i}`, name: `Nhà cung cấp ${i}` },
+  qty: '10.000000',
+  revenue: `${1000000 - i * 1000}.0000`,
+  purchaseCost: '500000.0000',
+  importCost: '50000.0000',
+  cogs: '550000.0000',
+  grossProfit: '450000.0000',
+  marginPct: '45.00',
+  sharePct: '30.00',
+  skuCount: 4,
+  orderCount: 7,
+  previousRevenue: '800000.0000',
+  growthPct: '25.00',
+  ...over,
+});
+
+const bySupplier = (items: SalesBySupplier['items'], total = items.length): SalesBySupplier => ({
+  ...RANGE,
+  ...PREV,
+  items,
+  total,
+  totals: {
+    qty: '30.000000',
+    revenue: '3000000.0000',
+    purchaseCost: '1500000.0000',
+    importCost: '150000.0000',
+    cogs: '1650000.0000',
+    grossProfit: '1350000.0000',
+    marginPct: '45.00',
+    previousRevenue: '2400000.0000',
+    growthPct: '25.00',
+  },
+  dataAsOf: null,
+});
+
+describe('Tab Nhà cung cấp (RPT-05c)', () => {
+  afterEach(() => {
+    search = '';
+  });
+
+  it('bảng giá nhập / chi phí nhập / lãi gộp + tổng + ghi chú quy NCC hiện tại; sort / trang / tìm phía server', async () => {
+    search = `tab=supplier&q=npk&sort=grossProfit:desc&page=2&size=20&from=${RANGE.from}&to=${RANGE.to}`;
+    const calls: URLSearchParams[] = [];
+    server.use(
+      http.get('/api/reports/sales/by-supplier', ({ request }) => {
+        calls.push(new URL(request.url).searchParams);
+        return HttpResponse.json(
+          bySupplier(
+            [
+              supplierItem(1),
+              supplierItem(2, {
+                key: { id: null, code: null, name: 'Chưa gán NCC' },
+                skuCount: 2,
+              }),
+            ],
+            42,
+          ),
+        );
+      }),
+    );
+    renderApp(<SalesReportScreen />, { me: ME_LEADER });
+    const cell = await screen.findByRole('cell', { name: /Nhà cung cấp 1/ });
+    expect(screen.getByRole('tab', { name: 'Nhà cung cấp' })).toHaveAttribute(
+      'aria-selected',
+      'true',
+    );
+    expect(calls[0]!.get('q')).toBe('npk');
+    expect(calls[0]!.get('sort')).toBe('grossProfit');
+    expect(calls[0]!.get('order')).toBe('desc');
+    expect(calls[0]!.get('skip')).toBe('20');
+    expect(calls[0]!.get('take')).toBe('20');
+    expect(screen.getByRole('columnheader', { name: 'Giá nhập' })).toBeInTheDocument();
+    expect(screen.getByRole('columnheader', { name: 'Chi phí nhập' })).toBeInTheDocument();
+    expect(screen.getByRole('columnheader', { name: 'Tỷ trọng' })).toBeInTheDocument();
+    expect(screen.getByRole('columnheader', { name: 'Số SKU' })).toBeInTheDocument();
+    expect(screen.getByText('Tổng 42 nhà cung cấp')).toBeInTheDocument();
+    expect(screen.getByText(/nhà cung cấp chính hiện tại/)).toBeInTheDocument();
+    expect(screen.getByText(/phân bổ sau khi đơn đã đóng gói không/)).toBeInTheDocument();
+    // Dòng "Chưa gán NCC": in nghiêng, không có nút "Xem sản phẩm"
+    const unassigned = screen.getAllByText('Chưa gán NCC').find((el) => el.closest('td'))!;
+    expect(unassigned).toHaveClass('italic');
+    expect(within(unassigned.closest('tr')!).queryByRole('button')).not.toBeInTheDocument();
+    expect(
+      within(cell.closest('tr')!).getByRole('button', { name: 'Xem sản phẩm của Nhà cung cấp 1' }),
+    ).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /Sắp xếp theo Doanh thu/ }));
+    expect(lastUrl().get('sort')).toMatch(/^revenue/);
+    expect(lastUrl().get('page')).toBeNull();
+  });
+
+  it('"Xem sản phẩm" → tab Sản phẩm (theo sản phẩm) với supplierId + tên NCC trên URL', async () => {
+    search = `tab=supplier&channel=POS&from=${RANGE.from}&to=${RANGE.to}`;
+    server.use(
+      http.get('/api/reports/sales/by-supplier', () =>
+        HttpResponse.json(bySupplier([supplierItem(1)])),
+      ),
+    );
+    renderApp(<SalesReportScreen />, { me: ME_LEADER });
+    fireEvent.click(await screen.findByRole('button', { name: 'Xem sản phẩm của Nhà cung cấp 1' }));
+    const url = lastUrl();
+    expect(url.get('tab')).toBe('product');
+    expect(url.get('group')).toBe('product');
+    expect(url.get('supplierId')).toBe('sup-1');
+    expect(url.get('supplierName')).toBe('Nhà cung cấp 1');
+    expect(url.get('channel')).toBe('POS');
+  });
+
+  it('xuất CSV: cột giá nhập / chi phí nhập / giá vốn, số thô', async () => {
+    search = `tab=supplier&from=${RANGE.from}&to=${RANGE.to}`;
+    server.use(
+      http.get('/api/reports/sales/by-supplier', () =>
+        HttpResponse.json(bySupplier([supplierItem(1)])),
+      ),
+    );
+    renderApp(<SalesReportScreen />, { me: ME_LEADER });
+    await screen.findByRole('cell', { name: /Nhà cung cấp 1/ });
+    fireEvent.click(screen.getByRole('button', { name: /Xuất CSV/ }));
+    await waitFor(() => expect(downloads).toHaveLength(1));
+    expect(downloads[0]!.filename).toBe(`doanh-thu-theo-ncc_${RANGE.from}_${RANGE.to}`);
+    const lines = downloads[0]!.text.split('\r\n');
+    expect(lines[0]).toContain('Giá nhập,Chi phí nhập,Giá vốn,Lãi gộp');
+    expect(lines[1]).toContain('NCC1,Nhà cung cấp 1,10,999000,500000,50000,550000,450000');
+  });
+
+  it('rỗng → EmptyState; lỗi → traceId', async () => {
+    search = `tab=supplier&from=${RANGE.from}&to=${RANGE.to}`;
+    server.use(http.get('/api/reports/sales/by-supplier', () => HttpResponse.json(bySupplier([]))));
+    const { unmount } = renderApp(<SalesReportScreen />, { me: ME_LEADER });
+    expect(
+      await screen.findByText('Chưa bán hàng của nhà cung cấp nào trong khoảng này'),
+    ).toBeInTheDocument();
+    unmount();
+    server.use(http.get('/api/reports/sales/by-supplier', () => errorEnvelope(500, 'DB_ERROR')));
+    renderApp(<SalesReportScreen />, { me: ME_LEADER });
+    expect(screen.getByRole('status', { name: 'Đang tải danh sách' })).toBeInTheDocument();
+    expect(await screen.findByText('trace-db_error')).toBeInTheDocument();
+  });
+
+  it('lọc NCC ở tab Sản phẩm: supplierId vào query, chip bỏ được', async () => {
+    search = `tab=product&supplierId=sup-1&supplierName=${encodeURIComponent('Nhà cung cấp 1')}&from=${RANGE.from}&to=${RANGE.to}`;
+    const calls: URLSearchParams[] = [];
+    server.use(
+      http.get('/api/reports/sales/by-product', ({ request }) => {
+        calls.push(new URL(request.url).searchParams);
+        return HttpResponse.json(byProduct([productItem(1)]));
+      }),
+    );
+    renderApp(<SalesReportScreen />, { me: ME_LEADER });
+    await screen.findByRole('cell', { name: /Danh mục 1/ });
+    expect(calls[0]!.get('supplierId')).toBe('sup-1');
+    fireEvent.click(screen.getByRole('button', { name: 'Bỏ lọc NCC: Nhà cung cấp 1' }));
+    expect(lastUrl().get('supplierId')).toBeNull();
+    expect(lastUrl().get('supplierName')).toBeNull();
+    expect(lastUrl().get('tab')).toBe('product');
+  });
+
+  it('lọc NCC ở tab Bán chạy: supplierId vào query + chip; sang tab Nhân viên thì bỏ lọc NCC', async () => {
+    search = `tab=top&supplierId=sup-1&supplierName=${encodeURIComponent('Nhà cung cấp 1')}&from=${RANGE.from}&to=${RANGE.to}`;
+    const calls: URLSearchParams[] = [];
+    server.use(
+      http.get('/api/reports/sales/top-products', ({ request }) => {
+        calls.push(new URL(request.url).searchParams);
+        return HttpResponse.json(TOP);
+      }),
+    );
+    renderApp(<SalesReportScreen />, { me: ME_LEADER });
+    await screen.findByText('Phân bón NPK 1');
+    expect(calls[0]!.get('supplierId')).toBe('sup-1');
+    expect(screen.getByText('NCC: Nhà cung cấp 1')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('tab', { name: 'Sản phẩm' }));
+    expect(lastUrl().get('supplierId')).toBe('sup-1');
+    fireEvent.click(screen.getByRole('tab', { name: 'Nhân viên' }));
+    expect(lastUrl().get('tab')).toBe('staff');
+    expect(lastUrl().get('supplierId')).toBeNull();
   });
 });

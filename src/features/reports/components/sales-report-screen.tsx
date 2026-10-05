@@ -27,21 +27,22 @@ import {
 import { SalesOverviewTab } from './sales-overview-tab';
 import { SalesProductTab } from './sales-product-tab';
 import { SalesStaffTab } from './sales-staff-tab';
+import { SalesSupplierTab } from './sales-supplier-tab';
 import { SalesTopTab } from './sales-top-tab';
 
-type TabKey = 'overview' | 'product' | 'staff' | 'top';
+type TabKey = 'overview' | 'product' | 'staff' | 'supplier' | 'top';
 
-/**
- * Tab của màn. Chỉ tab đang mở mới gọi API (component tab khác không mount).
- * RPT-05c: thêm { key: 'supplier', label: 'Nhà cung cấp' } (sau 'staff') khi có
- * GET /reports/sales/by-supplier — không hiện tab chết trước đó.
- */
+/** Tab của màn. Chỉ tab đang mở mới gọi API (component tab khác không mount). */
 const TABS: ReadonlyArray<{ key: TabKey; label: string }> = [
   { key: 'overview', label: 'Tổng quan theo thời gian' },
   { key: 'product', label: 'Sản phẩm' },
   { key: 'staff', label: 'Nhân viên' },
+  { key: 'supplier', label: 'Nhà cung cấp' },
   { key: 'top', label: 'Bán chạy' },
 ];
+
+/** Tab nhận bộ lọc NCC chính (supplierId) — tab khác bỏ lọc này khi chuyển sang. */
+const SUPPLIER_FILTER_TABS: ReadonlySet<TabKey> = new Set(['product', 'top']);
 
 const ALL = '__all__';
 
@@ -171,7 +172,13 @@ export function SalesReportScreen() {
                 page: 1,
                 q: '',
                 sort: { id: 'revenue', desc: true },
-                filters: { ...state.filters, tab: t.key === 'overview' ? undefined : t.key },
+                filters: {
+                  ...state.filters,
+                  tab: t.key === 'overview' ? undefined : t.key,
+                  ...(SUPPLIER_FILTER_TABS.has(t.key)
+                    ? {}
+                    : { supplierId: undefined, supplierName: undefined }),
+                },
               })
             }
             className={cn(
@@ -190,6 +197,7 @@ export function SalesReportScreen() {
         {tab === 'overview' ? <SalesOverviewTab /> : null}
         {tab === 'product' ? <SalesProductTab /> : null}
         {tab === 'staff' ? <SalesStaffTab /> : null}
+        {tab === 'supplier' ? <SalesSupplierTab /> : null}
         {tab === 'top' ? <SalesTopTab /> : null}
       </div>
     </div>

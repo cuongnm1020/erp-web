@@ -1,6 +1,6 @@
 'use client';
 
-import { Download } from 'lucide-react';
+import { Download, X } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/cn';
@@ -135,5 +135,24 @@ export function Segmented<T extends string>({
         </Button>
       ))}
     </div>
+  );
+}
+
+/** Chip lọc NCC chính (tab Sản phẩm / Bán chạy) — bấm X để bỏ lọc. */
+export function SupplierFilterChip({ name, onClear }: { name?: string; onClear: () => void }) {
+  const label = `NCC: ${name || 'đã chọn'}`;
+  return (
+    <span className="inline-flex h-8 items-center gap-1 rounded-md border bg-secondary pl-2.5 text-xs font-semibold text-secondary-foreground">
+      {label}
+      <Button
+        variant="ghost"
+        size="sm"
+        className="h-7 w-7 p-0"
+        aria-label={`Bỏ lọc ${label}`}
+        onClick={onClear}
+      >
+        <X aria-hidden />
+      </Button>
+    </span>
   );
 }

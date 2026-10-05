@@ -12,7 +12,8 @@ export const SALES_MAX_DAYS = 366;
 /**
  * Mọi trạng thái màn Báo cáo doanh thu nằm trên URL (luật 8): tab, khoảng ngày, bộ lọc chung, và
  * tham số riêng từng tab. `ownerName` / `teamName` chỉ để hiện chip khi lọc bằng cách bấm vào dòng
- * nhân viên (người không có danh sách nhân viên vẫn thấy mình đang lọc ai).
+ * nhân viên (người không có danh sách nhân viên vẫn thấy mình đang lọc ai); `supplierName` tương tự cho
+ * chip NCC ở tab Sản phẩm / Bán chạy.
  */
 export const REPORT_FILTER_KEYS = [
   'tab',
@@ -26,6 +27,10 @@ export const REPORT_FILTER_KEYS = [
   // Tổng quan
   'gran',
   'metric',
+  // Sản phẩm + Bán chạy: lọc theo NCC chính (từ nút "Xem sản phẩm" ở tab Nhà cung cấp) — tên
+  // chỉ để hiện chip.
+  'supplierId',
+  'supplierName',
   // Sản phẩm
   'group',
   // Nhân viên

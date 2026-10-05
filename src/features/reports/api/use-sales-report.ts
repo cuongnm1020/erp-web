@@ -13,10 +13,13 @@ export type SalesByStaff = components['schemas']['SalesByStaffDto'];
 export type SalesByStaffItem = components['schemas']['SalesByStaffItemDto'];
 export type SalesTopProducts = components['schemas']['SalesTopProductsDto'];
 export type SalesTopProductItem = components['schemas']['SalesTopProductItemDto'];
+export type SalesBySupplier = components['schemas']['SalesBySupplierDto'];
+export type SalesBySupplierItem = components['schemas']['SalesBySupplierItemDto'];
 
 type SummaryQuery = paths['/reports/sales/summary']['get']['parameters']['query'];
 type ByProductQuery = paths['/reports/sales/by-product']['get']['parameters']['query'];
 type TopQuery = paths['/reports/sales/top-products']['get']['parameters']['query'];
+type BySupplierQuery = paths['/reports/sales/by-supplier']['get']['parameters']['query'];
 
 export type SalesChannel = NonNullable<SummaryQuery['channel']>;
 export type Granularity = SalesTimeseries['granularity'];
@@ -24,6 +27,7 @@ export type ProductGroupBy = SalesByProduct['groupBy'];
 export type ProductSort = NonNullable<ByProductQuery['sort']>;
 export type StaffGroupBy = SalesByStaff['groupBy'];
 export type TopRankBy = TopQuery['rankBy'];
+export type SupplierSort = NonNullable<BySupplierQuery['sort']>;
 
 /** Bộ lọc chung của mọi báo cáo bán hàng — đã chuẩn hoá từ URL. */
 export interface SalesFilter {
@@ -37,8 +41,18 @@ export interface SalesFilter {
 
 export interface ByProductParams {
   groupBy: ProductGroupBy;
+  /** RPT-05c — chỉ dòng của SP có NCC chính này (NCC hiện tại). */
+  supplierId?: string;
   q: string;
   sort: ProductSort;
+  order: 'asc' | 'desc';
+  take: number;
+  skip: number;
+}
+
+export interface BySupplierParams {
+  q: string;
+  sort: SupplierSort;
   order: 'asc' | 'desc';
   take: number;
   skip: number;
@@ -53,8 +67,10 @@ export const salesReportKeys = {
   byProduct: (f: SalesFilter, p: ByProductParams) =>
     [...salesReportKeys.all, 'by-product', f, p] as const,
   byStaff: (f: SalesFilter, g: StaffGroupBy) => [...salesReportKeys.all, 'by-staff', f, g] as const,
-  top: (f: SalesFilter, rankBy: TopRankBy, limit: number) =>
-    [...salesReportKeys.all, 'top-products', f, rankBy, limit] as const,
+  bySupplier: (f: SalesFilter, p: BySupplierParams) =>
+    [...salesReportKeys.all, 'by-supplier', f, p] as const,
+  top: (f: SalesFilter, rankBy: TopRankBy, limit: number, supplierId?: string) =>
+    [...salesReportKeys.all, 'top-products', f, rankBy, limit, supplierId ?? null] as const,
   teams: () => [...salesReportKeys.all, 'options', 'teams'] as const,
   owners: () => [...salesReportKeys.all, 'options', 'owners'] as const,
 };
@@ -95,6 +111,7 @@ export function useSalesTimeseries(f: SalesFilter, granularity: Granularity, ena
 const byProductQuery = (f: SalesFilter, p: ByProductParams) => ({
   ...filterQuery(f),
   groupBy: p.groupBy,
+  supplierId: p.supplierId,
   q: p.q || undefined,
   sort: p.sort,
   order: p.order,
@@ -141,6 +158,50 @@ export function useExportSalesByProduct() {
   });
 }
 
+const bySupplierQuery = (f: SalesFilter, p: BySupplierParams) => ({
+  ...filterQuery(f),
+  q: p.q || undefined,
+  sort: p.sort,
+  order: p.order,
+  take: p.take,
+  skip: p.skip,
+});
+
+/**
+ * GET /reports/sales/by-supplier (RPT-05c) — theo NCC chính HIỆN TẠI của sản phẩm; dòng id null =
+ * "Chưa gán NCC". Phân trang + sắp xếp + tìm phía server (take ≤ 200).
+ */
+export function useSalesBySupplier(f: SalesFilter, p: BySupplierParams, enabled = true) {
+  return useQuery({
+    enabled,
+    queryKey: salesReportKeys.bySupplier(f, p),
+    queryFn: () =>
+      unwrap(api.GET('/reports/sales/by-supplier', { params: { query: bySupplierQuery(f, p) } })),
+    placeholderData: keepPreviousData,
+  });
+}
+
+/** Xuất báo cáo theo NCC — như useExportSalesByProduct (lặp trang 200, tối đa EXPORT_MAX_ROWS). */
+export function useExportSalesBySupplier() {
+  return useMutation({
+    mutationFn: async ({ filter, params }: { filter: SalesFilter; params: BySupplierParams }) => {
+      const items: SalesBySupplierItem[] = [];
+      let total = Number.POSITIVE_INFINITY;
+      for (let skip = 0; skip < Math.min(total, EXPORT_MAX_ROWS); skip += EXPORT_PAGE) {
+        const page = await unwrap(
+          api.GET('/reports/sales/by-supplier', {
+            params: { query: bySupplierQuery(filter, { ...params, take: EXPORT_PAGE, skip }) },
+          }),
+        );
+        total = page.total;
+        items.push(...page.items);
+        if (page.items.length < EXPORT_PAGE) break;
+      }
+      return { items, total: Number.isFinite(total) ? total : items.length };
+    },
+  });
+}
+
 /** GET /reports/sales/by-staff — theo người phụ trách hoặc team (snapshot trên đơn), không phân trang. */
 export function useSalesByStaff(f: SalesFilter, groupBy: StaffGroupBy, enabled = true) {
   return useQuery({
@@ -159,15 +220,16 @@ export function useSalesTopProducts(
   f: SalesFilter,
   rankBy: TopRankBy,
   limit: number,
+  supplierId?: string,
   enabled = true,
 ) {
   return useQuery({
     enabled,
-    queryKey: salesReportKeys.top(f, rankBy, limit),
+    queryKey: salesReportKeys.top(f, rankBy, limit, supplierId),
     queryFn: () =>
       unwrap(
         api.GET('/reports/sales/top-products', {
-          params: { query: { ...filterQuery(f), rankBy, limit } },
+          params: { query: { ...filterQuery(f), rankBy, limit, supplierId } },
         }),
       ),
     placeholderData: keepPreviousData,

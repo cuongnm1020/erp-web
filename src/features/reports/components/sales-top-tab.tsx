@@ -29,6 +29,7 @@ import {
   csvQty,
   money,
   profitCell,
+  SupplierFilterChip,
 } from './report-parts';
 import { useSalesReportState } from './report-state';
 
@@ -80,7 +81,8 @@ export function SalesTopTab() {
     : 'revenue';
   const limitRaw = Number.parseInt(state.filters.limit ?? '', 10);
   const limit = (LIMITS as readonly number[]).includes(limitRaw) ? limitRaw : DEFAULT_LIMIT;
-  const query = useSalesTopProducts(filter, rankBy, limit);
+  const supplierId = state.filters.supplierId || undefined;
+  const query = useSalesTopProducts(filter, rankBy, limit, supplierId);
   const rankLabel = RANKS.find(([k]) => k === rankBy)![1];
 
   const columns = useMemo<ColumnDef<SalesTopProductItem, unknown>[]>(
@@ -237,6 +239,12 @@ export function SalesTopTab() {
             ))}
           </SelectContent>
         </Select>
+        {supplierId ? (
+          <SupplierFilterChip
+            name={state.filters.supplierName}
+            onClear={() => setFilters({ supplierId: undefined, supplierName: undefined })}
+          />
+        ) : null}
         {query.data && query.data.items.length > 0 ? (
           <span className="ml-auto">
             <ExportButton onClick={() => exportCsv(query.data.items)} />
@@ -256,6 +264,8 @@ export function SalesTopTab() {
                 variant="outline"
                 onClick={() =>
                   setFilters({
+                    supplierId: undefined,
+                    supplierName: undefined,
                     channel: undefined,
                     teamId: undefined,
                     teamName: undefined,
@@ -264,7 +274,9 @@ export function SalesTopTab() {
                   })
                 }
               >
-                Bỏ lọc kênh / team / nhân viên
+                {supplierId
+                  ? 'Bỏ lọc NCC / kênh / team / nhân viên'
+                  : 'Bỏ lọc kênh / team / nhân viên'}
               </Button>
             }
           />
