@@ -80,6 +80,11 @@ const columns: ColumnDef<SalesOrder, unknown>[] = [
         className="font-mono text-xs text-primary hover:underline"
       >
         {row.original.docNumber}
+        {row.original.pancakeOrderId ? (
+          <span className="block text-muted-foreground">
+            Pancake #{row.original.pancakeOrderId}
+          </span>
+        ) : null}
       </Link>
     ),
   },
@@ -436,7 +441,7 @@ export function OrderListScreen() {
           to: state.filters.to,
         }}
         onFilterChange={setFilter}
-        searchPlaceholder="Tìm theo số đơn, mã hoặc tên khách…"
+        searchPlaceholder="Tìm theo số đơn, mã / tên khách, id đơn Pancake…"
         right={
           customerId ? (
             <Button

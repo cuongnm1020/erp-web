@@ -44,6 +44,16 @@ describe('OrderListScreen — GET /sales-orders (P1-12)', () => {
     expect(link).toHaveAttribute('href', `/crm/orders/${FIRST.id}`);
   });
 
+  it('tìm theo id đơn Pancake (q trên URL → server): ra đúng đơn, cột số đơn hiện "Pancake #id"', async () => {
+    const pancake = makeOrders(60).find((o) => o.pancakeOrderId === '103')!;
+    search = 'q=%23103';
+    renderApp(<OrderListScreen />);
+    await screen.findByText('1 đơn khớp bộ lọc');
+    const link = screen.getByRole('link', { name: new RegExp(pancake.docNumber) });
+    expect(link).toHaveAttribute('href', `/crm/orders/${pancake.id}`);
+    expect(link).toHaveTextContent('Pancake #103');
+  });
+
   it('tab trạng thái đọc từ URL và lọc phía server (luật 8)', async () => {
     search = 'status=POSTED';
     renderApp(<OrderListScreen />);

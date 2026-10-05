@@ -5832,6 +5832,10 @@ export interface components {
             weightKg: string;
             /** @description Tuỳ chọn gửi hãng chọn lúc "Gửi sang ĐVVC"; null = mặc định của hãng. */
             shippingOptions: components["schemas"]["ShippingOptionsViewDto"] | null;
+            /** @description Id đơn bên Pancake (theo shop, số hiện trên màn Pancake) — null = đơn tạo trên ERP. */
+            pancakeOrderId: string | null;
+            /** @description Link mở đơn trên Pancake POS (`…/order?order_id=<id hệ thống>`) — null nếu không phải đơn Pancake. */
+            pancakeOrderLink: string | null;
             /** @description ISO datetime — chỉ có khi đơn POSTED. */
             postedAt: string | null;
             createdAt: string;
@@ -5976,6 +5980,10 @@ export interface components {
             weightKg: string;
             /** @description Tuỳ chọn gửi hãng chọn lúc "Gửi sang ĐVVC"; null = mặc định của hãng. */
             shippingOptions: components["schemas"]["ShippingOptionsViewDto"] | null;
+            /** @description Id đơn bên Pancake (theo shop, số hiện trên màn Pancake) — null = đơn tạo trên ERP. */
+            pancakeOrderId: string | null;
+            /** @description Link mở đơn trên Pancake POS (`…/order?order_id=<id hệ thống>`) — null nếu không phải đơn Pancake. */
+            pancakeOrderLink: string | null;
             /** @description ISO datetime — chỉ có khi đơn POSTED. */
             postedAt: string | null;
             createdAt: string;
@@ -11970,7 +11978,10 @@ export interface operations {
                  */
                 from?: string;
                 to?: string;
-                /** @description Tìm theo số chứng từ, mã hoặc tên khách (không phân biệt hoa thường). */
+                /**
+                 * @description Tìm theo số chứng từ, mã hoặc tên khách (không phân biệt hoa thường) — hoặc id đơn Pancake
+                 *     (id theo shop hoặc id hệ thống trong link đơn, khớp tuyệt đối, cho phép tiền tố `#`).
+                 */
                 q?: string;
                 take: number;
                 skip: number;

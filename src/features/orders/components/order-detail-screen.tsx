@@ -594,6 +594,24 @@ function Detail({ order }: { order: SalesOrderDetail }) {
           <p className="text-sm text-muted-foreground">
             Đặt ngày {formatDate(order.orderDate)} · Kênh {orderChannelLabel(order.channel)} ·{' '}
             {order.lineCount} dòng hàng
+            {order.pancakeOrderId ? (
+              <>
+                {' '}
+                ·{' '}
+                {order.pancakeOrderLink ? (
+                  <a
+                    href={order.pancakeOrderLink}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="text-primary hover:underline"
+                  >
+                    Pancake #{order.pancakeOrderId}
+                  </a>
+                ) : (
+                  <>Pancake #{order.pancakeOrderId}</>
+                )}
+              </>
+            ) : null}
           </p>
         </div>
         <div className="flex shrink-0 gap-2">
