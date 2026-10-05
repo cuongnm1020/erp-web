@@ -98,3 +98,23 @@ export const carrierSettingFormSchema = z
   });
 
 export type CarrierSettingFormValues = z.infer<typeof carrierSettingFormSchema>;
+
+/**
+ * Khớp RegisterDeviceDto / UpdateDeviceDto (luật 11): mã `^[A-Za-z0-9._-]{1,50}$`, serial ≤ 100
+ * (khớp nguyên văn với máy lúc đăng nhập), model ≤ 100. warehouseId / boundUserId '' = không gán.
+ */
+export const pdaDeviceFormSchema = z.object({
+  code: z
+    .string()
+    .trim()
+    .min(1, 'Nhập mã máy')
+    .max(50, 'Tối đa 50 ký tự')
+    .regex(/^[A-Za-z0-9._-]+$/, 'Chỉ gồm chữ, số, dấu chấm, gạch ngang, gạch dưới'),
+  serialNumber: z.string().trim().min(1, 'Nhập serial của máy').max(100, 'Tối đa 100 ký tự'),
+  model: z.string().trim().max(100, 'Tối đa 100 ký tự'),
+  warehouseId: z.string(),
+  boundUserId: z.string(),
+  status: z.enum(['ACTIVE', 'LOST', 'MAINTENANCE', 'RETIRED']),
+});
+
+export type PdaDeviceFormValues = z.infer<typeof pdaDeviceFormSchema>;

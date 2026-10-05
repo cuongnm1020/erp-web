@@ -1213,7 +1213,25 @@ export interface paths {
         };
         get: operations["DeviceController_list"];
         put?: never;
+        /** Đăng ký máy: mã do quản trị đặt (nhập ở màn đăng nhập PDA), serial phải khớp máy thật. Trùng → 409. */
         post: operations["DeviceController_register"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/devices/bulk-delete": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Xóa nhiều thiết bị (kèm lịch sử đăng nhập). Id không thấy → `skipped`. */
+        post: operations["DeviceController_bulkDelete"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1230,7 +1248,7 @@ export interface paths {
         get?: never;
         put?: never;
         post?: never;
-        delete?: never;
+        delete: operations["DeviceController_remove"];
         options?: never;
         head?: never;
         patch: operations["DeviceController_update"];
@@ -5441,6 +5459,32 @@ export interface components {
             unassigned: components["schemas"]["OrgEmployeeDto"][];
             totals: components["schemas"]["OrgTreeTotalsDto"];
         };
+        DeviceBoundUserDto: {
+            id: string;
+            code: string;
+            fullName: string;
+        };
+        DeviceDto: {
+            id: string;
+            code: string;
+            serialNumber: string;
+            model: string | null;
+            warehouseId: string | null;
+            boundUserId: string | null;
+            /** @description Nhân viên được khóa vào máy; null = ai đăng nhập cũng được. */
+            boundUser: components["schemas"]["DeviceBoundUserDto"] | null;
+            /** @enum {string} */
+            status: "ACTIVE" | "LOST" | "MAINTENANCE" | "RETIRED";
+            appVersion: string | null;
+            /** Format: date-time */
+            lastSeenAt: string | null;
+            /** Format: date-time */
+            registeredAt: string;
+        };
+        DeviceListDto: {
+            items: components["schemas"]["DeviceDto"][];
+            total: number;
+        };
         RegisterDeviceDto: {
             code: string;
             serialNumber: string;
@@ -5449,9 +5493,27 @@ export interface components {
             warehouseId?: string;
             /** Format: uuid */
             boundUserId?: string;
+            /** @enum {string} */
+            status?: "ACTIVE" | "LOST" | "MAINTENANCE" | "RETIRED";
+        };
+        BulkDeleteDevicesDto: {
+            ids: string[];
+        };
+        DeletedDeviceDto: {
+            id: string;
+            code: string;
+        };
+        BulkDeleteDevicesResultDto: {
+            /** @description Đã xóa hẳn cùng lịch sử đăng nhập. */
+            deleted: components["schemas"]["DeletedDeviceDto"][];
+            /** @description Không tìm thấy (đã xóa trước đó) — bỏ qua, không lỗi. */
+            skipped: string[];
         };
         UpdateDeviceDto: {
-            model?: string;
+            /** @description Đổi mã: máy đang đăng nhập vẫn chạy (token mang deviceId); lần đăng nhập sau dùng mã mới. */
+            code?: string;
+            serialNumber?: string;
+            model?: string | null;
             /** Format: uuid */
             warehouseId?: string | null;
             /** Format: uuid */
@@ -11022,7 +11084,14 @@ export interface operations {
     };
     DeviceController_list: {
         parameters: {
-            query?: never;
+            query: {
+                /** @description Tìm theo mã, serial, model (không phân biệt hoa thường). */
+                q?: string;
+                status?: "ACTIVE" | "LOST" | "MAINTENANCE" | "RETIRED";
+                warehouseId?: string;
+                take: number;
+                skip: number;
+            };
             header?: never;
             path?: never;
             cookie?: never;
@@ -11034,7 +11103,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": Record<string, never>;
+                    "application/json": components["schemas"]["DeviceListDto"];
                 };
             };
         };
@@ -11053,6 +11122,50 @@ export interface operations {
         };
         responses: {
             201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeviceDto"];
+                };
+            };
+        };
+    };
+    DeviceController_bulkDelete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BulkDeleteDevicesDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BulkDeleteDevicesResultDto"];
+                };
+            };
+        };
+    };
+    DeviceController_remove: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            204: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -11079,7 +11192,9 @@ export interface operations {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["DeviceDto"];
+                };
             };
         };
     };

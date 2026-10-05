@@ -1,401 +1,335 @@
 'use client';
 
-// UI-first từ design canvas — dữ liệu mẫu, chưa nối API (nối ở phase FE-x).
-
-import { AlertTriangle, ChevronDown, Search, X } from 'lucide-react';
+import { Plus, Trash2 } from 'lucide-react';
+import { useMemo, useState } from 'react';
+import { ConfirmDialog } from '@/components/data/confirm-dialog';
+import {
+  DataTable,
+  FilterBar,
+  type ColumnDef,
+  type FilterDef,
+  type RowSelectionState,
+} from '@/components/data/data-table';
 import { RowActions } from '@/components/data/row-actions';
-import { StatusBadge, type StatusTone } from '@/components/data/status-badge';
+import { EmptyState, ListSkeleton, QueryState } from '@/components/data/states';
+import { StatusBadge } from '@/components/data/status-badge';
 import { PageHeader } from '@/components/layout/page-header';
 import { Button } from '@/components/ui/button';
-import { Checkbox } from '@/components/ui/checkbox';
-import { Input } from '@/components/ui/input';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
 import { toast } from '@/components/ui/toaster';
-import { cn } from '@/lib/cn';
+import { messageFor } from '@/lib/error-messages';
 import { formatDateTime } from '@/lib/format';
+import { Can } from '@/lib/permission';
+import { useListState } from '@/lib/url-state';
+import {
+  useAdminWarehouses,
+  useBulkDeletePdaDevices,
+  useDeletePdaDevice,
+  usePdaDevices,
+  type PdaDevice,
+  type PdaDeviceStatus,
+} from '../api/use-pda-devices';
+import { useUsers } from '../api/use-users';
+import { PdaDeviceDialog } from './pda-device-dialog';
+import { DEVICE_STATUS } from './pda-device-status';
 
-interface DeviceRow {
-  code: string;
-  model: string;
-  serial: string;
-  warehouse: string;
-  assignedTo: string | null;
-  lastOnlineAt: string | null;
-  appVersion: string;
-  status: 'online' | 'unassigned' | 'temporary' | 'offline24h';
-  selected?: boolean;
+const FILTER_KEYS = ['status', 'warehouse'] as const;
+type FilterKey = (typeof FILTER_KEYS)[number];
+
+const DEFAULTS = { size: 50, filterKeys: FILTER_KEYS };
+
+function parseStatus(v: string | undefined): PdaDeviceStatus | undefined {
+  return v && v in DEVICE_STATUS ? (v as PdaDeviceStatus) : undefined;
 }
 
-const STATUS_LABEL: Record<DeviceRow['status'], { label: string; tone: StatusTone }> = {
-  online: { label: 'Online', tone: 'ok' },
-  unassigned: { label: 'Chưa gán', tone: 'neutral' },
-  temporary: { label: 'Gán tạm', tone: 'warn' },
-  offline24h: { label: 'Offline > 24h', tone: 'err' },
-};
+const DELETE_NOTE =
+  'Xóa hẳn kèm lịch sử đăng nhập; máy đang đăng nhập sẽ bị đăng xuất ở thao tác kế tiếp. Muốn giữ lịch sử thì chuyển trạng thái Ngừng dùng.';
 
-const SAMPLE_DEVICES: DeviceRow[] = [
-  {
-    code: 'PDA-HN-01',
-    model: 'Zebra TC21',
-    serial: 'SN-481200',
-    warehouse: 'Kho HN-1',
-    assignedTo: 'Trịnh Thị Mai',
-    lastOnlineAt: '2026-08-23T10:01:00+07:00',
-    appVersion: 'v2.3.8',
-    status: 'online',
-  },
-  {
-    code: 'PDA-HN-02',
-    model: 'Zebra TC21',
-    serial: 'SN-481207',
-    warehouse: 'Kho HN-1',
-    assignedTo: 'Đinh Văn Phúc',
-    lastOnlineAt: '2026-08-23T10:04:00+07:00',
-    appVersion: 'v2.4.1',
-    status: 'online',
-  },
-  {
-    code: 'PDA-HN-03',
-    model: 'Honeywell EDA52',
-    serial: 'SN-481214',
-    warehouse: 'Kho HN-1',
-    assignedTo: 'Cao Thị Yến',
-    lastOnlineAt: '2026-08-23T10:07:00+07:00',
-    appVersion: 'v2.4.1',
-    status: 'online',
-  },
-  {
-    code: 'PDA-HN-04',
-    model: 'Zebra TC26',
-    serial: 'SN-481221',
-    warehouse: 'Kho HN-1',
-    assignedTo: null,
-    lastOnlineAt: null,
-    appVersion: 'v2.4.1',
-    status: 'unassigned',
-    selected: true,
-  },
-  {
-    code: 'PDA-HN-05',
-    model: 'Urovo DT50',
-    serial: 'SN-481228',
-    warehouse: 'Kho HN-1',
-    assignedTo: 'Lý Văn Sơn',
-    lastOnlineAt: '2026-08-23T10:13:00+07:00',
-    appVersion: 'v2.3.8',
-    status: 'online',
-  },
-  {
-    code: 'PDA-HN-06',
-    model: 'Zebra TC21',
-    serial: 'SN-481235',
-    warehouse: 'Kho HN-1',
-    assignedTo: 'Nguyễn Văn An',
-    lastOnlineAt: '2026-08-21T16:02:00+07:00',
-    appVersion: 'v2.4.1',
-    status: 'temporary',
-  },
-  {
-    code: 'PDA-HN-07',
-    model: 'Zebra TC21',
-    serial: 'SN-481242',
-    warehouse: 'Kho HN-1',
-    assignedTo: null,
-    lastOnlineAt: null,
-    appVersion: 'v2.4.1',
-    status: 'unassigned',
-  },
-  {
-    code: 'PDA-HN-08',
-    model: 'Honeywell EDA52',
-    serial: 'SN-481249',
-    warehouse: 'Kho HN-1',
-    assignedTo: 'Trần Văn Hải',
-    lastOnlineAt: '2026-08-23T10:22:00+07:00',
-    appVersion: 'v2.4.1',
-    status: 'online',
-  },
-  {
-    code: 'PDA-HCM-01',
-    model: 'Zebra TC21',
-    serial: 'SN-481201',
-    warehouse: 'Kho HCM-2',
-    assignedTo: 'Lương Thị Hoa',
-    lastOnlineAt: '2026-08-23T10:01:00+07:00',
-    appVersion: 'v2.3.8',
-    status: 'online',
-  },
-  {
-    code: 'PDA-HCM-02',
-    model: 'Honeywell EDA52',
-    serial: 'SN-481208',
-    warehouse: 'Kho HCM-2',
-    assignedTo: 'Phan Văn Long',
-    lastOnlineAt: '2026-08-23T10:04:00+07:00',
-    appVersion: 'v2.4.1',
-    status: 'online',
-  },
-  {
-    code: 'PDA-HCM-04',
-    model: 'Urovo DT50',
-    serial: 'SN-481222',
-    warehouse: 'Kho HCM-2',
-    assignedTo: 'Mai Văn Đức',
-    lastOnlineAt: '2026-08-23T10:10:00+07:00',
-    appVersion: 'v2.4.1',
-    status: 'online',
-  },
-  {
-    code: 'PDA-HCM-05',
-    model: 'Zebra TC21',
-    serial: 'SN-481229',
-    warehouse: 'Kho HCM-2',
-    assignedTo: null,
-    lastOnlineAt: null,
-    appVersion: 'v2.3.8',
-    status: 'unassigned',
-  },
-  {
-    code: 'PDA-HCM-09',
-    model: 'Urovo DT50',
-    serial: 'SN-481257',
-    warehouse: 'Kho HCM-2',
-    assignedTo: 'Đỗ Thị Lan',
-    lastOnlineAt: '2026-08-21T16:02:00+07:00',
-    appVersion: 'v2.3.8',
-    status: 'offline24h',
-  },
-  {
-    code: 'PDA-HCM-10',
-    model: 'Zebra TC21',
-    serial: 'SN-481264',
-    warehouse: 'Kho HCM-2',
-    assignedTo: 'Bùi Văn Nhật',
-    lastOnlineAt: '2026-08-23T10:28:00+07:00',
-    appVersion: 'v2.4.1',
-    status: 'online',
-  },
-  {
-    code: 'PDA-HCM-12',
-    model: 'Honeywell EDA52',
-    serial: 'SN-481278',
-    warehouse: 'Kho HCM-2',
-    assignedTo: 'Ngô Văn Hưng',
-    lastOnlineAt: '2026-08-23T10:34:00+07:00',
-    appVersion: 'v2.4.1',
-    status: 'online',
-  },
-];
-
-function FilterChip({ label }: { label: string }) {
-  return (
-    <button
-      type="button"
-      className="inline-flex h-7 items-center gap-1 rounded-md border px-2.5 text-xs text-muted-foreground hover:bg-muted"
-    >
-      {label}
-      <ChevronDown className="h-3 w-3" aria-hidden />
-    </button>
-  );
-}
-
+/**
+ * I-xx Thiết bị PDA — GET /devices (lọc + phân trang server, state trên URL — luật 8).
+ * Đăng ký / sửa qua dialog (mã máy, serial, model, kho, khóa nhân viên, trạng thái);
+ * xóa từng dòng hoặc chọn nhiều rồi "Xóa" (POST /devices/bulk-delete).
+ * Khác mockup vì API chưa có: online realtime, cấu hình chung, bộ lọc đã lưu.
+ */
 export function PdaDevicesScreen() {
+  const { state, set: setUrl, skipTake } = useListState<FilterKey>(DEFAULTS);
+  const [selected, setSelected] = useState<RowSelectionState>({});
+  // Đổi trang / lọc là bỏ chọn — không để id ngoài tầm mắt lọt vào lệnh xóa.
+  const set: typeof setUrl = (patch) => {
+    setSelected({});
+    setUrl(patch);
+  };
+  const [dialog, setDialog] = useState<{ device?: PdaDevice } | null>(null);
+  const [confirmBulk, setConfirmBulk] = useState(false);
+
+  const status = parseStatus(state.filters.status);
+  const params = useMemo(
+    () => ({ q: state.q, status, warehouseId: state.filters.warehouse || undefined, ...skipTake }),
+    [state.q, status, state.filters.warehouse, skipTake],
+  );
+  const query = usePdaDevices(params);
+  const warehouses = useAdminWarehouses();
+  const users = useUsers({
+    isActive: true,
+    sortBy: 'fullName',
+    sortDir: 'asc',
+    take: 200,
+    skip: 0,
+  });
+  const del = useDeletePdaDevice();
+  const bulkDel = useBulkDeletePdaDevices();
+
+  const whById = useMemo(
+    () => new Map((warehouses.data ?? []).map((w) => [w.id, w])),
+    [warehouses.data],
+  );
+
+  const columns = useMemo<ColumnDef<PdaDevice, unknown>[]>(
+    () => [
+      {
+        id: 'code',
+        accessorKey: 'code',
+        header: 'Mã máy',
+        meta: { width: 140 },
+        cell: ({ getValue }) => (
+          <span className="font-mono text-xs text-primary">{getValue() as string}</span>
+        ),
+      },
+      {
+        id: 'model',
+        accessorKey: 'model',
+        header: 'Tên / model',
+        meta: { width: 150 },
+        cell: ({ getValue }) => (getValue() as string | null) ?? '—',
+      },
+      {
+        id: 'serialNumber',
+        accessorKey: 'serialNumber',
+        header: 'Serial',
+        meta: { width: 150 },
+        cell: ({ getValue }) => (
+          <span className="font-mono text-xs text-muted-foreground">{getValue() as string}</span>
+        ),
+      },
+      {
+        id: 'warehouse',
+        header: 'Kho',
+        meta: { width: 150 },
+        cell: ({ row }) => {
+          const id = row.original.warehouseId;
+          if (!id) return <span className="text-muted-foreground">Mọi kho</span>;
+          const w = whById.get(id);
+          return w ? `${w.code} · ${w.name}` : 'Kho khác';
+        },
+      },
+      {
+        id: 'boundUser',
+        header: 'Khóa cho nhân viên',
+        meta: { width: 180 },
+        cell: ({ row }) => {
+          const u = row.original.boundUser;
+          return u ? (
+            <span>
+              {u.fullName} <span className="font-mono text-xs text-muted-foreground">{u.code}</span>
+            </span>
+          ) : (
+            <span className="text-muted-foreground">Ai cũng được</span>
+          );
+        },
+      },
+      {
+        id: 'lastSeenAt',
+        accessorKey: 'lastSeenAt',
+        header: 'Đăng nhập cuối',
+        meta: { width: 140, align: 'right' },
+        cell: ({ getValue }) => {
+          const v = getValue() as string | null;
+          return (
+            <span className="tabular-nums text-muted-foreground">
+              {v ? formatDateTime(v) : '—'}
+            </span>
+          );
+        },
+      },
+      {
+        id: 'appVersion',
+        accessorKey: 'appVersion',
+        header: 'App',
+        meta: { width: 80, align: 'right' },
+        cell: ({ getValue }) => (
+          <span className="tabular-nums">{(getValue() as string | null) ?? '—'}</span>
+        ),
+      },
+      {
+        id: 'status',
+        accessorKey: 'status',
+        header: 'Trạng thái',
+        meta: { width: 110 },
+        cell: ({ getValue }) => {
+          const s = DEVICE_STATUS[getValue() as PdaDeviceStatus];
+          return <StatusBadge tone={s.tone}>{s.label}</StatusBadge>;
+        },
+      },
+      {
+        id: 'actions',
+        header: '',
+        meta: { title: 'Thao tác', width: 80, align: 'right' },
+        cell: ({ row }) => (
+          <Can I="update" a="User">
+            <RowActions
+              onEdit={() => setDialog({ device: row.original })}
+              itemName={`thiết bị ${row.original.code}`}
+              deleteDescription={DELETE_NOTE}
+              onDelete={async () => {
+                try {
+                  await del.mutateAsync(row.original.id);
+                  toast.success(`Đã xóa thiết bị ${row.original.code}`);
+                  setSelected((s) => ({ ...s, [row.original.id]: false }));
+                } catch (err) {
+                  toast.error(messageFor(err));
+                }
+              }}
+            />
+          </Can>
+        ),
+      },
+    ],
+    [whById, del],
+  );
+
+  const filters: FilterDef<FilterKey>[] = [
+    {
+      key: 'status',
+      label: 'Trạng thái',
+      type: 'select',
+      options: (Object.keys(DEVICE_STATUS) as PdaDeviceStatus[]).map((s) => ({
+        value: s,
+        label: DEVICE_STATUS[s].label,
+      })),
+    },
+    {
+      key: 'warehouse',
+      label: 'Kho',
+      type: 'select',
+      options: (warehouses.data ?? []).map((w) => ({
+        value: w.id,
+        label: `${w.code} · ${w.name}`,
+      })),
+    },
+  ];
+
+  const selectedIds = Object.keys(selected).filter((k) => selected[k]);
+  const hasFilter = state.q !== '' || Object.values(state.filters).some(Boolean);
+  const openCreate = () => setDialog({});
+
   return (
     <>
       <PageHeader
         title="Thiết bị PDA"
-        description="22 thiết bị · 17 đang gán · 14 online · 2 offline > 24 giờ"
+        description={query.data ? `${query.data.total} thiết bị` : 'Đang đếm…'}
         breadcrumb={[{ label: 'Quản trị' }, { label: 'Hệ thống' }, { label: 'Thiết bị PDA' }]}
         actions={
-          <>
-            <Button variant="outline">Cấu hình chung</Button>
-            <Button>Đăng ký thiết bị</Button>
-          </>
+          <Can I="update" a="User">
+            <Button size="sm" onClick={openCreate}>
+              <Plus aria-hidden />
+              Đăng ký thiết bị
+            </Button>
+          </Can>
         }
       />
-      <div className="mb-3 flex flex-wrap items-center gap-2">
-        <div className="relative w-72">
-          <Search
-            className="absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground"
-            aria-hidden
-          />
-          <Input className="h-7 pl-8 text-xs" placeholder="Tìm mã thiết bị, serial, tài khoản…" />
-        </div>
-        <FilterChip label="Kho: Tất cả" />
-        <FilterChip label="Trạng thái: Tất cả" />
-        <FilterChip label="Phiên bản app" />
-        <div className="ml-auto text-xs text-muted-foreground">
-          Đã lưu: <span className="font-semibold text-foreground">Mặc định</span>
-        </div>
-      </div>
-      <div className="grid items-start gap-3 xl:grid-cols-[1fr_360px]">
-        <div className="overflow-x-auto rounded-md border bg-card">
-          <Table>
-            <TableHeader className="bg-muted">
-              <TableRow>
-                <TableHead className="w-8 px-2.5">
-                  <Checkbox aria-label="Chọn tất cả" />
-                </TableHead>
-                <TableHead className="px-2.5">Mã thiết bị ↑</TableHead>
-                <TableHead className="px-2.5">Tên / model</TableHead>
-                <TableHead className="px-2.5">Serial</TableHead>
-                <TableHead className="px-2.5">Kho</TableHead>
-                <TableHead className="px-2.5">Tài khoản gán</TableHead>
-                <TableHead className="px-2.5 text-right">Online cuối</TableHead>
-                <TableHead className="px-2.5 text-right">App</TableHead>
-                <TableHead className="px-2.5">Trạng thái</TableHead>
-                <TableHead className="w-20 px-2.5">
-                  <span className="sr-only">Thao tác</span>
-                </TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {SAMPLE_DEVICES.map((d) => {
-                const s = STATUS_LABEL[d.status];
-                return (
-                  <TableRow key={d.code} className={cn(d.selected && 'bg-secondary/50')}>
-                    <TableCell className="px-2.5 py-1.5">
-                      <Checkbox aria-label={`Chọn ${d.code}`} />
-                    </TableCell>
-                    <TableCell className="px-2.5 py-1.5 font-mono text-xs text-primary">
-                      {d.code}
-                    </TableCell>
-                    <TableCell className="px-2.5 py-1.5">{d.model}</TableCell>
-                    <TableCell className="px-2.5 py-1.5 font-mono text-xs text-muted-foreground">
-                      {d.serial}
-                    </TableCell>
-                    <TableCell className="px-2.5 py-1.5">{d.warehouse}</TableCell>
-                    <TableCell className="px-2.5 py-1.5">
-                      {d.assignedTo ?? <span className="text-muted-foreground">—</span>}
-                    </TableCell>
-                    <TableCell className="px-2.5 py-1.5 text-right tabular-nums text-muted-foreground">
-                      {d.lastOnlineAt ? formatDateTime(d.lastOnlineAt) : '—'}
-                    </TableCell>
-                    <TableCell className="px-2.5 py-1.5 text-right tabular-nums">
-                      {d.appVersion}
-                    </TableCell>
-                    <TableCell className="px-2.5 py-1.5">
-                      <StatusBadge tone={s.tone}>{s.label}</StatusBadge>
-                    </TableCell>
-                    <TableCell className="px-2.5 py-1.5">
-                      <RowActions
-                        onEdit={() => toast.info('UI-first — form sửa thiết bị chưa nối API')}
-                        onDelete={() => toast.success(`Đã xóa thiết bị ${d.code} (mẫu)`)}
-                        itemName={`thiết bị ${d.code}`}
-                      />
-                    </TableCell>
-                  </TableRow>
-                );
-              })}
-            </TableBody>
-          </Table>
-          <div className="flex items-center justify-between border-t px-2.5 py-1.5 text-xs text-muted-foreground">
-            <span>Hiển thị 1–22 / 22</span>
-            <span className="flex items-center gap-1">
-              <span className="px-1.5">‹</span>
-              <span className="rounded-sm bg-secondary px-1.5 py-0.5 font-semibold text-primary">
-                1
-              </span>
-              <span className="px-1.5">›</span>
-              <span className="ml-2">40 dòng/trang</span>
-            </span>
-          </div>
-        </div>
 
-        <aside className="rounded-md border bg-card">
-          <div className="flex items-center justify-between border-b px-3 py-2">
-            <h2 className="text-sm font-semibold">Gán tài khoản · PDA-HN-04</h2>
-            <X className="h-4 w-4 text-muted-foreground" aria-hidden />
-          </div>
-          <div className="space-y-3 p-3">
-            <dl className="space-y-1 text-sm">
-              <div className="flex gap-2">
-                <dt className="w-24 shrink-0 text-xs text-muted-foreground">Thiết bị</dt>
-                <dd>Zebra TC26 · SN-481221</dd>
-              </div>
-              <div className="flex gap-2">
-                <dt className="w-24 shrink-0 text-xs text-muted-foreground">Kho</dt>
-                <dd>Kho HN-1</dd>
-              </div>
-              <div className="flex gap-2">
-                <dt className="w-24 shrink-0 text-xs text-muted-foreground">Hiện gán</dt>
-                <dd className="text-muted-foreground">Chưa gán</dd>
-              </div>
-              <div className="flex gap-2">
-                <dt className="w-24 shrink-0 text-xs text-muted-foreground">Online cuối</dt>
-                <dd>21/08/2026 16:02 · app v2.4.1</dd>
-              </div>
-            </dl>
-            <div className="space-y-1">
-              <span className="text-xs text-muted-foreground">
-                Tài khoản kho <span className="text-destructive">*</span>
-              </span>
-              <div className="relative">
-                <Search
-                  className="absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground"
-                  aria-hidden
-                />
-                <Input defaultValue="Cao" className="h-8 pl-8" />
-              </div>
-              <p className="text-xs text-muted-foreground">
-                Chỉ tài khoản vai trò NV kho / Quản lý kho thuộc Kho HN-1
-              </p>
-            </div>
-            <div className="rounded-md border">
-              <Table>
-                <TableBody>
-                  <TableRow className="bg-secondary/50">
-                    <TableCell className="px-2.5 py-1.5">
-                      <span className="block font-semibold">Cao Thị Yến</span>
-                      <span className="font-mono text-xs text-muted-foreground">
-                        NV-0013 · NV kho · Kho HN-1
-                      </span>
-                    </TableCell>
-                    <TableCell className="px-2.5 py-1.5 text-right">
-                      <StatusBadge tone="warn">Đang giữ PDA-HN-03</StatusBadge>
-                    </TableCell>
-                  </TableRow>
-                  <TableRow>
-                    <TableCell className="px-2.5 py-1.5">
-                      <span className="block font-semibold">Cao Văn Thành</span>
-                      <span className="font-mono text-xs text-muted-foreground">
-                        NV-0029 · NV kho · Kho HN-1
-                      </span>
-                    </TableCell>
-                    <TableCell className="px-2.5 py-1.5 text-right">
-                      <StatusBadge tone="neutral">Chưa có PDA</StatusBadge>
-                    </TableCell>
-                  </TableRow>
-                </TableBody>
-              </Table>
-            </div>
-            <div className="flex items-start gap-2 rounded-md border bg-warning/10 px-3 py-2 text-sm text-warning">
-              <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden />
-              <p>
-                <span className="font-semibold">Cao Thị Yến đang giữ PDA-HN-03.</span> Một tài khoản
-                chỉ đăng nhập trên một PDA; gán mới sẽ gỡ PDA-HN-03 và buộc đăng nhập lại.
-              </p>
-            </div>
-            <div className="space-y-1">
-              <span className="text-xs text-muted-foreground">Ghi chú</span>
-              <Input className="h-8" placeholder="Ví dụ: thay máy hỏng pin" />
-            </div>
-          </div>
-          <div className="flex items-center justify-end gap-2 border-t px-3 py-2.5">
-            <Button variant="ghost">
-              Hủy bỏ <kbd className="rounded-sm bg-muted px-1 text-xs">Esc</kbd>
-            </Button>
-            <Button>Gán tài khoản</Button>
-          </div>
-        </aside>
-      </div>
+      <FilterBar
+        q={state.q}
+        onQChange={(q) => set({ q })}
+        filters={filters}
+        values={state.filters}
+        onFilterChange={(patch) => set({ filters: { ...state.filters, ...patch } })}
+        searchPlaceholder="Tìm mã máy, serial, model…"
+      />
+
+      <QueryState
+        query={query}
+        skeleton={<ListSkeleton rows={8} columns={9} />}
+        isEmpty={(d) => d.items.length === 0}
+        empty={
+          <EmptyState
+            title={hasFilter ? 'Không có thiết bị khớp' : 'Chưa đăng ký thiết bị nào'}
+            description={
+              hasFilter
+                ? 'Thử từ khóa hoặc bộ lọc khác.'
+                : 'Đăng ký máy PDA bằng mã máy và serial để nhân viên kho đăng nhập được.'
+            }
+            action={
+              hasFilter ? (
+                <Button variant="outline" onClick={() => set({ q: '', filters: {} })}>
+                  Xóa lọc
+                </Button>
+              ) : (
+                <Can I="update" a="User">
+                  <Button onClick={openCreate}>
+                    <Plus aria-hidden />
+                    Đăng ký thiết bị
+                  </Button>
+                </Can>
+              )
+            }
+          />
+        }
+      >
+        {(data) => (
+          <DataTable
+            columns={columns}
+            rows={data.items}
+            getRowId={(r) => r.id}
+            total={data.total}
+            page={state.page}
+            size={state.size}
+            sort={null}
+            onPageChange={(page) => set({ page })}
+            onSizeChange={(size) => set({ size })}
+            onSortChange={() => undefined}
+            selection={{ selected, onChange: setSelected }}
+            bulkActions={(ids) => (
+              <Can I="update" a="User">
+                <Button size="sm" variant="outline" onClick={() => setConfirmBulk(true)}>
+                  <Trash2 aria-hidden />
+                  Xóa ({ids.length})
+                </Button>
+              </Can>
+            )}
+          />
+        )}
+      </QueryState>
+
+      <ConfirmDialog
+        open={confirmBulk}
+        onOpenChange={setConfirmBulk}
+        title={`Xóa ${selectedIds.length} thiết bị?`}
+        description={DELETE_NOTE}
+        confirmLabel="Xóa"
+        onConfirm={async () => {
+          try {
+            const r = await bulkDel.mutateAsync(selectedIds);
+            toast.success(
+              `Đã xóa ${r.deleted.length} thiết bị` +
+                (r.skipped.length ? ` · bỏ qua ${r.skipped.length} đã xóa trước đó` : ''),
+            );
+            setSelected({});
+          } catch (err) {
+            toast.error(messageFor(err));
+          }
+        }}
+      />
+
+      {dialog ? (
+        <PdaDeviceDialog
+          key={dialog.device?.id ?? 'new'}
+          open
+          onOpenChange={(o) => !o && setDialog(null)}
+          device={dialog.device}
+          warehouses={warehouses.data ?? []}
+          users={users.data?.items ?? []}
+        />
+      ) : null}
     </>
   );
 }
