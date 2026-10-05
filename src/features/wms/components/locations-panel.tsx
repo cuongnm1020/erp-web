@@ -356,8 +356,22 @@ function flatten(
   return out;
 }
 
-function countNodes(nodes: LocationNode[]): number {
-  return nodes.reduce((sum, n) => sum + 1 + countNodes(n.children), 0);
+function countNodes(
+  nodes: LocationNode[],
+  keep: (n: LocationNode) => boolean = () => true,
+): number {
+  return nodes.reduce((sum, n) => sum + (keep(n) ? 1 : 0) + countNodes(n.children, keep), 0);
+}
+
+/**
+ * Bỏ vị trí Ngừng dùng khỏi cây (2026-10-05: lẫn với vị trí đang dùng). Vị trí ngừng dùng mà
+ * còn con đang dùng vẫn giữ làm khung để con không mất chỗ trong cây.
+ */
+function pruneInactive(nodes: LocationNode[]): LocationNode[] {
+  return nodes.flatMap((n) => {
+    const children = pruneInactive(n.children);
+    return n.isActive || children.length > 0 ? [{ ...n, children }] : [];
+  });
 }
 
 /**
@@ -376,7 +390,15 @@ export function LocationsPanel({
   const del = useDeleteLocation(warehouse.id);
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
   const [dialog, setDialog] = useState<DialogState | null>(null);
-  const total = useMemo(() => (query.data ? countNodes(query.data) : 0), [query.data]);
+  const [showInactive, setShowInactive] = useState(false);
+  const active = useMemo(
+    () => (query.data ? countNodes(query.data, (n) => n.isActive) : 0),
+    [query.data],
+  );
+  const inactive = useMemo(
+    () => (query.data ? countNodes(query.data, (n) => !n.isActive) : 0),
+    [query.data],
+  );
 
   const toggle = (node: LocationNode, depth: number) =>
     setExpanded((e) => ({ ...e, [node.id]: !(e[node.id] ?? depth === 0) }));
@@ -387,7 +409,16 @@ export function LocationsPanel({
         <h2 className="text-sm font-semibold">
           Vị trí kho {warehouse.code}
           {query.data ? (
-            <span className="ml-1.5 font-normal text-muted-foreground">{total} vị trí</span>
+            <span className="ml-1.5 font-normal text-muted-foreground">{active} vị trí</span>
+          ) : null}
+          {inactive > 0 ? (
+            <button
+              type="button"
+              className="ml-3 text-xs font-normal text-muted-foreground underline-offset-2 hover:text-foreground hover:underline"
+              onClick={() => setShowInactive((v) => !v)}
+            >
+              {showInactive ? 'Ẩn vị trí ngừng dùng' : `Hiện ${inactive} vị trí ngừng dùng`}
+            </button>
           ) : null}
         </h2>
         {canAdjust ? (
@@ -421,118 +452,137 @@ export function LocationsPanel({
           />
         }
       >
-        {(tree) => (
-          <div className="overflow-x-auto">
-            <Table>
-              <TableHeader>
-                <TableRow className="bg-muted hover:bg-muted">
-                  <TableHead className="px-2.5 text-xs">Mã vị trí</TableHead>
-                  <TableHead className="w-24 px-2.5 text-xs">Loại</TableHead>
-                  <TableHead className="px-2.5 text-xs">SKU cố định</TableHead>
-                  <TableHead className="w-36 px-2.5 text-xs">Barcode</TableHead>
-                  <TableHead className="w-24 px-2.5 text-xs">Thứ tự pick</TableHead>
-                  <TableHead className="w-28 px-2.5 text-xs">Trạng thái</TableHead>
-                  <TableHead className="w-28 px-2.5 text-xs">
-                    <span className="sr-only">Thao tác</span>
-                  </TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {flatten(tree, expanded).map(({ node, depth }) => (
-                  <TableRow key={node.id}>
-                    <TableCell className="px-2.5 py-1.5">
-                      <div className="flex items-center gap-1" style={{ paddingLeft: depth * 20 }}>
-                        {node.children.length > 0 ? (
-                          <button
-                            type="button"
-                            className="rounded-sm text-muted-foreground hover:text-foreground"
-                            onClick={() => toggle(node, depth)}
-                            aria-label={
-                              (expanded[node.id] ?? depth === 0)
-                                ? `Thu gọn ${node.code}`
-                                : `Mở rộng ${node.code}`
-                            }
-                          >
-                            {(expanded[node.id] ?? depth === 0) ? (
-                              <ChevronDown className="h-3.5 w-3.5" aria-hidden />
-                            ) : (
-                              <ChevronRight className="h-3.5 w-3.5" aria-hidden />
-                            )}
-                          </button>
-                        ) : (
-                          <span className="w-3.5" aria-hidden />
-                        )}
-                        <span className="font-mono text-xs font-semibold">{node.code}</span>
-                        {node.children.length > 0 ? (
-                          <span className="text-xs text-muted-foreground">
-                            ({node.children.length})
-                          </span>
-                        ) : null}
-                      </div>
-                    </TableCell>
-                    <TableCell className="px-2.5 py-1.5 text-muted-foreground">
-                      {TYPE_LABEL[node.type]}
-                    </TableCell>
-                    <TableCell className="max-w-56 px-2.5 py-1.5">
-                      {node.fixedSkus.length > 0 ? (
-                        <span
-                          className="block truncate font-mono text-xs"
-                          title={node.fixedSkus.map((s) => `${s.code} — ${s.name}`).join('\n')}
-                        >
-                          {node.fixedSkus.map((s) => s.code).join(', ')}
-                        </span>
-                      ) : (
-                        <span className="text-muted-foreground">—</span>
-                      )}
-                    </TableCell>
-                    <TableCell className="px-2.5 py-1.5 font-mono text-xs text-muted-foreground">
-                      {node.barcode ?? '—'}
-                    </TableCell>
-                    <TableCell className="px-2.5 py-1.5 text-muted-foreground">
-                      {node.pickSequence ?? '—'}
-                    </TableCell>
-                    <TableCell className="px-2.5 py-1.5">
-                      {!node.isActive ? (
-                        <StatusBadge tone="neutral">Ngừng dùng</StatusBadge>
-                      ) : node.isPickable ? (
-                        <StatusBadge tone="ok">Đang dùng</StatusBadge>
-                      ) : (
-                        <StatusBadge tone="warn">Không pick</StatusBadge>
-                      )}
-                    </TableCell>
-                    <TableCell className="px-2.5 py-1.5">
-                      {canAdjust ? (
-                        <div className="flex items-center justify-end">
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-8 w-8"
-                            title="Thêm vị trí con"
-                            aria-label={`Thêm vị trí con trong ${node.code}`}
-                            onClick={() => setDialog({ mode: 'create', parent: node })}
-                          >
-                            <Plus aria-hidden />
-                          </Button>
-                          <RowActions
-                            onEdit={() => setDialog({ mode: 'edit', location: node })}
-                            onDelete={() =>
-                              del
-                                .mutateAsync(node.id)
-                                .then(() => toast.success(`Đã ngừng dùng vị trí ${node.code}`))
-                                .catch((err) => toast.error(messageFor(err)))
-                            }
-                            itemName={`vị trí ${node.code}`}
-                            deleteDescription="Vị trí chuyển Ngừng dùng — tồn kho và chứng từ giữ nguyên. Vị trí còn con đang dùng sẽ bị chặn."
-                          />
-                        </div>
-                      ) : null}
-                    </TableCell>
+        {(all) => {
+          const tree = showInactive ? all : pruneInactive(all);
+          return tree.length === 0 ? (
+            <EmptyState
+              title="Kho chưa có vị trí đang dùng"
+              description={`${inactive} vị trí ngừng dùng đang ẩn. Thêm vị trí mới, hoặc hiện vị trí ngừng dùng để bật lại.`}
+              action={
+                canAdjust ? (
+                  <Button onClick={() => setDialog({ mode: 'create', parent: null })}>
+                    <Plus aria-hidden />
+                    Thêm vị trí
+                  </Button>
+                ) : undefined
+              }
+            />
+          ) : (
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow className="bg-muted hover:bg-muted">
+                    <TableHead className="px-2.5 text-xs">Mã vị trí</TableHead>
+                    <TableHead className="w-24 px-2.5 text-xs">Loại</TableHead>
+                    <TableHead className="px-2.5 text-xs">SKU cố định</TableHead>
+                    <TableHead className="w-36 px-2.5 text-xs">Barcode</TableHead>
+                    <TableHead className="w-24 px-2.5 text-xs">Thứ tự pick</TableHead>
+                    <TableHead className="w-28 px-2.5 text-xs">Trạng thái</TableHead>
+                    <TableHead className="w-28 px-2.5 text-xs">
+                      <span className="sr-only">Thao tác</span>
+                    </TableHead>
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </div>
-        )}
+                </TableHeader>
+                <TableBody>
+                  {flatten(tree, expanded).map(({ node, depth }) => (
+                    <TableRow key={node.id}>
+                      <TableCell className="px-2.5 py-1.5">
+                        <div
+                          className="flex items-center gap-1"
+                          style={{ paddingLeft: depth * 20 }}
+                        >
+                          {node.children.length > 0 ? (
+                            <button
+                              type="button"
+                              className="rounded-sm text-muted-foreground hover:text-foreground"
+                              onClick={() => toggle(node, depth)}
+                              aria-label={
+                                (expanded[node.id] ?? depth === 0)
+                                  ? `Thu gọn ${node.code}`
+                                  : `Mở rộng ${node.code}`
+                              }
+                            >
+                              {(expanded[node.id] ?? depth === 0) ? (
+                                <ChevronDown className="h-3.5 w-3.5" aria-hidden />
+                              ) : (
+                                <ChevronRight className="h-3.5 w-3.5" aria-hidden />
+                              )}
+                            </button>
+                          ) : (
+                            <span className="w-3.5" aria-hidden />
+                          )}
+                          <span className="font-mono text-xs font-semibold">{node.code}</span>
+                          {node.children.length > 0 ? (
+                            <span className="text-xs text-muted-foreground">
+                              ({node.children.length})
+                            </span>
+                          ) : null}
+                        </div>
+                      </TableCell>
+                      <TableCell className="px-2.5 py-1.5 text-muted-foreground">
+                        {TYPE_LABEL[node.type]}
+                      </TableCell>
+                      <TableCell className="max-w-56 px-2.5 py-1.5">
+                        {node.fixedSkus.length > 0 ? (
+                          <span
+                            className="block truncate font-mono text-xs"
+                            title={node.fixedSkus.map((s) => `${s.code} — ${s.name}`).join('\n')}
+                          >
+                            {node.fixedSkus.map((s) => s.code).join(', ')}
+                          </span>
+                        ) : (
+                          <span className="text-muted-foreground">—</span>
+                        )}
+                      </TableCell>
+                      <TableCell className="px-2.5 py-1.5 font-mono text-xs text-muted-foreground">
+                        {node.barcode ?? '—'}
+                      </TableCell>
+                      <TableCell className="px-2.5 py-1.5 text-muted-foreground">
+                        {node.pickSequence ?? '—'}
+                      </TableCell>
+                      <TableCell className="px-2.5 py-1.5">
+                        {!node.isActive ? (
+                          <StatusBadge tone="neutral">Ngừng dùng</StatusBadge>
+                        ) : node.isPickable ? (
+                          <StatusBadge tone="ok">Đang dùng</StatusBadge>
+                        ) : (
+                          <StatusBadge tone="warn">Không pick</StatusBadge>
+                        )}
+                      </TableCell>
+                      <TableCell className="px-2.5 py-1.5">
+                        {canAdjust ? (
+                          <div className="flex items-center justify-end">
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8"
+                              title="Thêm vị trí con"
+                              aria-label={`Thêm vị trí con trong ${node.code}`}
+                              onClick={() => setDialog({ mode: 'create', parent: node })}
+                            >
+                              <Plus aria-hidden />
+                            </Button>
+                            <RowActions
+                              onEdit={() => setDialog({ mode: 'edit', location: node })}
+                              onDelete={() =>
+                                del
+                                  .mutateAsync(node.id)
+                                  .then(() => toast.success(`Đã ngừng dùng vị trí ${node.code}`))
+                                  .catch((err) => toast.error(messageFor(err)))
+                              }
+                              itemName={`vị trí ${node.code}`}
+                              deleteDescription="Vị trí chuyển Ngừng dùng — tồn kho và chứng từ giữ nguyên. Vị trí còn con đang dùng sẽ bị chặn."
+                            />
+                          </div>
+                        ) : null}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          );
+        }}
       </QueryState>
 
       {dialog ? (

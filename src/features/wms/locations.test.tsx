@@ -97,14 +97,52 @@ describe('LocationsPanel — cây vị trí kho + CRUD', () => {
   it('kho chọn qua ?wh= hiện cây: node gốc mở sẵn, node sâu đóng, mở bằng chevron', async () => {
     renderApp(<WarehousesScreen />);
     expect(await screen.findByText('Vị trí kho WH01')).toBeInTheDocument();
-    expect(await screen.findByText('4 vị trí')).toBeInTheDocument();
+    // Đếm chỉ vị trí đang dùng — khu tập kết ST Ngừng dùng bị ẩn mặc định.
+    expect(await screen.findByText('3 vị trí')).toBeInTheDocument();
     // depth 0 mở sẵn → thấy A01; depth 1 đóng → chưa thấy BIN
     expect(screen.getByText('A01')).toBeInTheDocument();
     expect(screen.queryByText('A01-01')).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Mở rộng A01' }));
     expect(screen.getByText('A01-01')).toBeInTheDocument();
-    // Trạng thái Ngừng dùng của khu tập kết
+    expect(screen.queryByText('ST')).not.toBeInTheDocument();
+    expect(screen.queryByText('Ngừng dùng')).not.toBeInTheDocument();
+  });
+
+  it('vị trí Ngừng dùng ẩn mặc định; nút "Hiện N vị trí ngừng dùng" bật/tắt', async () => {
+    renderApp(<WarehousesScreen />);
+    await screen.findByText('A01');
+    fireEvent.click(screen.getByRole('button', { name: 'Hiện 1 vị trí ngừng dùng' }));
+    expect(screen.getByText('ST')).toBeInTheDocument();
     expect(screen.getByText('Ngừng dùng')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Ẩn vị trí ngừng dùng' }));
+    expect(screen.queryByText('ST')).not.toBeInTheDocument();
+  });
+
+  it('vị trí ngừng dùng còn con đang dùng vẫn giữ làm khung; tất cả ngừng dùng → trống + gợi ý', async () => {
+    server.use(
+      http.get('/api/warehouses/:id/locations/tree', () =>
+        HttpResponse.json([
+          loc('z-x', 'ZX', 'ZONE', [loc('a-x', 'AX', 'AISLE')], { isActive: false }),
+          loc('st-x', 'SX', 'STAGING', [], { isActive: false }),
+        ]),
+      ),
+    );
+    const { unmount } = renderApp(<WarehousesScreen />);
+    expect(await screen.findByText('AX')).toBeInTheDocument();
+    expect(screen.getByText('ZX')).toBeInTheDocument();
+    expect(screen.queryByText('SX')).not.toBeInTheDocument();
+    expect(screen.getByText('1 vị trí')).toBeInTheDocument();
+    unmount();
+
+    server.use(
+      http.get('/api/warehouses/:id/locations/tree', () =>
+        HttpResponse.json([loc('st-x', 'SX', 'STAGING', [], { isActive: false })]),
+      ),
+    );
+    renderApp(<WarehousesScreen />);
+    expect(await screen.findByText('Kho chưa có vị trí đang dùng')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Hiện 1 vị trí ngừng dùng' }));
+    expect(screen.getByText('SX')).toBeInTheDocument();
   });
 
   it('thêm vị trí gốc: dialog → POST /warehouses/:id/locations không parentId', async () => {
@@ -272,14 +310,15 @@ describe('LocationsPanel — cây vị trí kho + CRUD', () => {
     );
     renderApp(<WarehousesScreen />);
     await screen.findByText('Vị trí kho WH01');
-    await screen.findByText('ST');
-    // Dòng ST (không con, đang Ngừng dùng) — nút Xóa thứ hai trong panel (A, A01, ST)
+    await screen.findByText('A01');
+    fireEvent.click(screen.getByRole('button', { name: 'Mở rộng A01' }));
+    // Dòng A01-01 (ô kệ lá, đang dùng) — nút Xóa cuối trong panel (A, A01, A01-01)
     const deleteButtons = screen.getAllByRole('button', { name: 'Xóa' });
     fireEvent.click(deleteButtons[deleteButtons.length - 1]!);
-    expect(await screen.findByText('Xóa vị trí ST?')).toBeInTheDocument();
+    expect(await screen.findByText('Xóa vị trí A01-01?')).toBeInTheDocument();
     const confirmButtons = screen.getAllByRole('button', { name: 'Xóa' });
     fireEvent.click(confirmButtons[confirmButtons.length - 1]!);
-    await waitFor(() => expect(deleted).toEqual(['st-1']));
+    await waitFor(() => expect(deleted).toEqual(['b-01']));
   });
 
   it('không có stock.adjust → chỉ xem cây, không có nút thêm/sửa/xóa (luật 7)', async () => {
