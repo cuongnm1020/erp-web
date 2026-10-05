@@ -1,6 +1,16 @@
+import Decimal from 'decimal.js';
 import { z } from 'zod';
-import { codeSchema, idSchema, moneySchema, phoneSchema } from '@/lib/shared';
+import {
+  codeSchema,
+  customerGroupSchema,
+  customerTagSchema,
+  customerTierSchema,
+  idSchema,
+  moneySchema,
+  phoneSchema,
+} from '@/lib/shared';
 import type { CreateCustomerInput, Customer, UpdateCustomerInput } from './api/use-customers';
+import type { CreateCustomerTierInput, UpdateCustomerTierInput } from './api/use-segments';
 
 /**
  * Khớp CreateCustomerDto / UpdateCustomerDto của apps/api (luật 11 — luật nghiệp vụ lấy từ
@@ -86,5 +96,62 @@ export function toUpdateCustomerBody(
     ...(dirty.paymentTerm && v.paymentTerm
       ? { paymentTerm: Number.parseInt(v.paymentTerm, 10) }
       : {}),
+  };
+}
+
+// ─────────────── Nhóm / cấp độ / tag (CRM-02) ───────────────
+// Luật nghiệp vụ lấy từ lib/shared/customer-segments; ở đây chỉ thêm định dạng nhập liệu
+// riêng của form (CK nhập theo %, API nhận tỷ lệ Decimal(6,4)).
+
+export const groupFormSchema = customerGroupSchema;
+export type GroupFormValues = z.infer<typeof groupFormSchema>;
+
+export const tierFormSchema = customerTierSchema.extend({
+  /** % chiết khấu, '' = không có ưu đãi. 0–100, tối đa 2 số lẻ (= 4 số lẻ của tỷ lệ). */
+  discountPercent: z
+    .string()
+    .trim()
+    .regex(/^(\d{1,3}(\.\d{1,2})?)?$/, 'Nhập % (tối đa 2 số lẻ)')
+    .refine((v) => v === '' || new Decimal(v).lte(100), 'Tối đa 100%'),
+});
+export type TierFormValues = z.infer<typeof tierFormSchema>;
+
+export const tagFormSchema = customerTagSchema;
+export type TagFormValues = z.infer<typeof tagFormSchema>;
+
+/** "5" (%) → "0.0500" (tỷ lệ Decimal(6,4)); '' → undefined. */
+export function percentToRate(percent: string): string | undefined {
+  if (percent.trim() === '') return undefined;
+  return new Decimal(percent).div(100).toFixed(4);
+}
+
+/** "0.0500" → "5"; null → ''. */
+export function rateToPercent(rate: string | null): string {
+  if (rate === null) return '';
+  return new Decimal(rate).mul(100).toDecimalPlaces(2).toString();
+}
+
+export function toTierBody(v: TierFormValues): CreateCustomerTierInput {
+  const rate = percentToRate(v.discountPercent);
+  return {
+    code: v.code,
+    name: v.name,
+    minRevenue: v.minRevenue,
+    // Số thứ hạng (không phải tiền/số lượng) → Number.parseInt là đúng chỗ (luật 10).
+    sortOrder: Number.parseInt(v.sortOrder, 10),
+    ...(rate !== undefined ? { discountRate: rate } : {}),
+  };
+}
+
+/**
+ * PATCH tier: UpdateCustomerTierDto không nhận null cho discountRate → xóa trắng ô % nghĩa là
+ * gửi "0.0000" (không ưu đãi), không có cách trả về null qua PATCH.
+ */
+export function toUpdateTierBody(v: TierFormValues): UpdateCustomerTierInput {
+  return {
+    name: v.name,
+    minRevenue: v.minRevenue,
+    sortOrder: Number.parseInt(v.sortOrder, 10),
+    discountRate: percentToRate(v.discountPercent) ?? '0.0000',
   };
 }

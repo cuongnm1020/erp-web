@@ -144,6 +144,17 @@ const MESSAGES: Record<string, string> = {
   DEPARTMENT_NOT_EMPTY:
     'Phòng ban còn phòng ban con hoặc còn nhân sự. Chuyển họ sang phòng ban khác rồi xóa lại.',
   ROLE_IN_USE: 'Vai trò đang gán cho người dùng. Gỡ vai trò khỏi họ ở màn Nhân viên rồi xóa lại.',
+  // Nhóm / cấp độ / tag khách hàng (/crm/segments)
+  GROUP_IN_USE:
+    'Nhóm vẫn còn khách hàng nên không xóa hẳn được. Chuyển khách sang nhóm khác, hoặc chỉ ngừng dùng nhóm.',
+  TIER_IN_USE:
+    'Cấp độ vẫn đang gán cho khách hàng nên không xóa được. Gỡ cấp khỏi các khách (hoặc chạy nâng hạng) rồi xóa lại.',
+  CUSTOMER_GROUP_NOT_FOUND: 'Nhóm khách hàng không còn tồn tại. Tải lại danh sách nhóm.',
+  CUSTOMER_TIER_NOT_FOUND: 'Cấp độ khách hàng không còn tồn tại. Tải lại danh sách cấp độ.',
+  TAG_NOT_FOUND: 'Tag không còn tồn tại (có thể vừa bị xóa). Tải lại danh sách tag.',
+  INVALID_TIER_PERIOD: 'Kỳ tính doanh số không hợp lệ. Chọn số tháng từ 1 đến 120 rồi chạy lại.',
+  TIER_JOB_ACTOR_NOT_FOUND:
+    'Không có tài khoản quản trị đang hoạt động để đứng tên lượt nâng hạng. Báo IT kiểm tra tài khoản admin.',
 };
 
 const BY_STATUS: Record<number, string> = {

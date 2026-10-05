@@ -24,9 +24,109 @@ export const ME_SALE = {
 
 const CUSTOMER_TYPES = ['RETAIL', 'WHOLESALE', 'DISTRIBUTOR', 'KEY_ACCOUNT'] as const;
 
-/** Đúng shape `CustomerDto` trong openapi.json — đổi DTO ở backend thì sửa cả đây. */
+/** Đúng shape `CustomerGroupDto` (CRM-01) — nhóm cuối đã ngừng dùng. */
+export const CUSTOMER_GROUPS = [
+  {
+    id: '000000c1-0000-4000-8000-000000000001',
+    code: 'DAILY',
+    name: 'Đại lý',
+    description: 'Đại lý cấp 1, cấp 2',
+    isActive: true,
+  },
+  {
+    id: '000000c1-0000-4000-8000-000000000002',
+    code: 'TRANGTRAI',
+    name: 'Trang trại',
+    description: null,
+    isActive: true,
+  },
+  {
+    id: '000000c1-0000-4000-8000-000000000003',
+    code: 'CU',
+    name: 'Nhóm cũ',
+    description: null,
+    isActive: false,
+  },
+];
+
+/** Đúng shape `CustomerTierDto`. */
+export const CUSTOMER_TIERS = [
+  {
+    id: '000000c2-0000-4000-8000-000000000001',
+    code: 'SILVER',
+    name: 'Bạc',
+    minRevenue: '100000000.0000',
+    discountRate: '0.0100',
+    sortOrder: 10,
+  },
+  {
+    id: '000000c2-0000-4000-8000-000000000002',
+    code: 'GOLD',
+    name: 'Vàng',
+    minRevenue: '300000000.0000',
+    discountRate: null,
+    sortOrder: 20,
+  },
+];
+
+/** Đúng shape `TagDto`. */
+export const CUSTOMER_TAGS = [
+  { id: '000000c3-0000-4000-8000-000000000001', code: 'vip', name: 'Khách VIP', color: '#dc2626' },
+  {
+    id: '000000c3-0000-4000-8000-000000000002',
+    code: 'vu-dong-xuan',
+    name: 'Vụ Đông Xuân',
+    color: null,
+  },
+];
+
+/** Đúng shape `TierPromotionResultDto`. */
+export function makeTierPromotionResult(dryRun: boolean, allowDemotion = false) {
+  return {
+    from: '2025-10-05T17:00:00.000Z',
+    to: '2026-10-05T17:00:00.000Z',
+    dryRun,
+    allowDemotion,
+    actorId: 'u-admin',
+    tiersConfigured: CUSTOMER_TIERS.length,
+    customersEvaluated: 237,
+    promoted: 2,
+    demoted: 0,
+    unchanged: 235,
+    changes: [
+      {
+        customerId: '00000000-0000-4000-8000-000000000000',
+        customerCode: 'KH00001',
+        revenue: '350000000.0000',
+        fromTierId: CUSTOMER_TIERS[0]!.id,
+        fromTierCode: 'SILVER',
+        toTierId: CUSTOMER_TIERS[1]!.id,
+        toTierCode: 'GOLD',
+        direction: 'PROMOTE',
+      },
+      {
+        customerId: '00000000-0000-4000-8000-000000000001',
+        customerCode: 'KH00002',
+        revenue: '120000000.0000',
+        fromTierId: null,
+        fromTierCode: null,
+        toTierId: CUSTOMER_TIERS[0]!.id,
+        toTierCode: 'SILVER',
+        direction: 'PROMOTE',
+      },
+    ],
+  };
+}
+
+/**
+ * Đúng shape `CustomerListItemDto` trong openapi.json (CustomerDto + group/tier/tags, CRM-03) —
+ * đổi DTO ở backend thì sửa cả đây. Khách chẵn thuộc nhóm Đại lý; khách đầu cấp Bạc + tag VIP.
+ */
 export function makeCustomers(n: number) {
   return Array.from({ length: n }, (_, i) => ({
+    group: i % 2 === 0 ? { id: CUSTOMER_GROUPS[0]!.id, code: 'DAILY', name: 'Đại lý' } : null,
+    tier: i === 0 ? { id: CUSTOMER_TIERS[0]!.id, code: 'SILVER', name: 'Bạc' } : null,
+    tags: i === 0 ? [CUSTOMER_TAGS[0]!] : [],
     id: `00000000-0000-4000-8000-${String(i).padStart(12, '0')}`,
     code: `KH${String(i + 1).padStart(5, '0')}`,
     name: `Khách hàng ${i + 1}`,
@@ -34,8 +134,8 @@ export function makeCustomers(n: number) {
     phone: `09${String(10000000 + i).slice(0, 8)}`,
     email: i % 3 === 0 ? `kh${i + 1}@example.com` : null,
     type: CUSTOMER_TYPES[i % CUSTOMER_TYPES.length]!,
-    groupId: null,
-    tierId: null,
+    groupId: i % 2 === 0 ? CUSTOMER_GROUPS[0]!.id : null,
+    tierId: i === 0 ? CUSTOMER_TIERS[0]!.id : null,
     isActive: i % 10 !== 9,
     mergedIntoId: null,
     teamIds: ['t-hn'],
@@ -842,6 +942,19 @@ export const handlers = [
     let all = makeCustomers(237);
     if (q)
       all = all.filter((c) => c.name.toLowerCase().includes(q) || c.code.toLowerCase().includes(q));
+    const groupId = url.searchParams.get('groupId');
+    const tierId = url.searchParams.get('tierId');
+    const type = url.searchParams.get('type');
+    const tagIds = url.searchParams.getAll('tagIds').flatMap((t) => t.split(','));
+    if (groupId) all = all.filter((c) => c.groupId === groupId);
+    if (tierId) all = all.filter((c) => c.tierId === tierId);
+    if (type) all = all.filter((c) => c.type === type);
+    if (tagIds.length > 0)
+      all = all.filter((c) =>
+        url.searchParams.get('tagMatch') === 'all'
+          ? tagIds.every((t) => c.tags.some((x) => x.id === t))
+          : c.tags.some((x) => tagIds.includes(x.id)),
+      );
     all = [...all].sort((a, b) => {
       const x = String(a[sortBy as keyof typeof a] ?? '');
       const y = String(b[sortBy as keyof typeof b] ?? '');
@@ -849,6 +962,12 @@ export const handlers = [
     });
     return HttpResponse.json({ items: all.slice(skip, skip + take), total: all.length });
   }),
+  http.get('/api/customer-groups', ({ request }) => {
+    const all = new URL(request.url).searchParams.get('includeInactive') === 'true';
+    return HttpResponse.json(all ? CUSTOMER_GROUPS : CUSTOMER_GROUPS.filter((g) => g.isActive));
+  }),
+  http.get('/api/customer-tiers', () => HttpResponse.json(CUSTOMER_TIERS)),
+  http.get('/api/customer-tags', () => HttpResponse.json(CUSTOMER_TAGS)),
   http.get('/api/customers/:id', async ({ params }) => {
     await delay(50);
     const found = makeCustomers(237).find((c) => c.id === params.id);

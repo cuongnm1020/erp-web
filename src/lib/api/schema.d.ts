@@ -3478,7 +3478,10 @@ export interface paths {
         get: operations["CustomerGroupController_get"];
         put?: never;
         post?: never;
-        /** Ngừng dùng nhóm. KHÔNG có hard delete — xem CustomerCatalogService. */
+        /**
+         * Mặc định: ngừng dùng nhóm (giữ bản ghi). `?hard=true` (CRM-01): xoá hẳn — chỉ khi
+         *     KHÔNG còn khách nào thuộc nhóm, ngược lại 409 `GROUP_IN_USE` (FK RESTRICT ở DB).
+         */
         delete: operations["CustomerGroupController_deactivate"];
         options?: never;
         head?: never;
@@ -3511,7 +3514,8 @@ export interface paths {
         get: operations["CustomerTierController_get"];
         put?: never;
         post?: never;
-        delete?: never;
+        /** Xoá cứng một cấp. Còn khách mang cấp này → 409 `TIER_IN_USE`, không xoá gì. */
+        delete: operations["CustomerTierController_remove"];
         options?: never;
         head?: never;
         patch: operations["CustomerTierController_update"];
@@ -4241,7 +4245,27 @@ export interface components {
             /** @description false = ngừng chạy (không xoá — PromotionUsage giữ lịch sử đối soát). */
             isActive?: boolean;
         };
-        CustomerDto: {
+        CustomerGroupRefDto: {
+            id: string;
+            code: string;
+            name: string;
+        };
+        CustomerTierRefDto: {
+            id: string;
+            code: string;
+            name: string;
+        };
+        CustomerTagRefDto: {
+            id: string;
+            code: string;
+            name: string;
+            /** @description #rrggbb */
+            color: string | null;
+        };
+        CustomerListItemDto: {
+            group: components["schemas"]["CustomerGroupRefDto"] | null;
+            tier: components["schemas"]["CustomerTierRefDto"] | null;
+            tags: components["schemas"]["CustomerTagRefDto"][];
             id: string;
             code: string;
             name: string;
@@ -4264,7 +4288,7 @@ export interface components {
             updatedAt: string;
         };
         CustomerListResponseDto: {
-            items: components["schemas"]["CustomerDto"][];
+            items: components["schemas"]["CustomerListItemDto"][];
             total: number;
         };
         CustomerAddressDto: {
@@ -4280,6 +4304,9 @@ export interface components {
             isDefault: boolean;
         };
         CustomerDetailDto: {
+            group: components["schemas"]["CustomerGroupRefDto"] | null;
+            tier: components["schemas"]["CustomerTierRefDto"] | null;
+            tags: components["schemas"]["CustomerTagRefDto"][];
             id: string;
             code: string;
             name: string;
@@ -4322,6 +4349,28 @@ export interface components {
             priceListId?: string;
             creditLimit?: string;
             paymentTerm?: number;
+        };
+        CustomerDto: {
+            id: string;
+            code: string;
+            name: string;
+            taxCode: string | null;
+            phone: string | null;
+            email: string | null;
+            /** @enum {string} */
+            type: "RETAIL" | "WHOLESALE" | "DISTRIBUTOR" | "KEY_ACCOUNT";
+            groupId: string | null;
+            tierId: string | null;
+            isActive: boolean;
+            mergedIntoId: string | null;
+            teamIds: string[];
+            ownerIds: string[];
+            priceListId: string | null;
+            /** @description Decimal(18,4) dạng string */
+            creditLimit: string | null;
+            paymentTerm: number | null;
+            createdAt: string;
+            updatedAt: string;
         };
         UpdateCustomerDto: {
             name?: string;
@@ -8361,6 +8410,14 @@ export interface components {
             /** @description Bỏ qua dedupe: báo lại kể cả khi đúng tập lệch này vừa được báo. */
             force?: boolean;
         };
+        CustomerGroupDto: {
+            id: string;
+            code: string;
+            name: string;
+            description: string | null;
+            /** @description false = đã ngừng dùng (DELETE mặc định chỉ ngừng dùng, không xoá cứng). */
+            isActive: boolean;
+        };
         CreateCustomerGroupDto: {
             code: string;
             name: string;
@@ -8371,6 +8428,17 @@ export interface components {
             description?: string;
             /** @description Ngừng dùng nhóm. KHÔNG có hard delete — xem ghi chú ở CustomerCatalogService. */
             isActive?: boolean;
+        };
+        CustomerTierDto: {
+            id: string;
+            code: string;
+            name: string;
+            /** @description Ngưỡng doanh số kỳ để đạt cấp. Decimal(18,4) dạng string. */
+            minRevenue: string;
+            /** @description Decimal(6,4) dạng string, vd "0.05" = 5%. Chưa áp vào giá. */
+            discountRate: string | null;
+            /** @description Thứ hạng: càng lớn càng cao. */
+            sortOrder: number;
         };
         CreateCustomerTierDto: {
             code: string;
@@ -8403,6 +8471,41 @@ export interface components {
              */
             allowDemotion?: boolean;
         };
+        TierPromotionChangeDto: {
+            customerId: string;
+            customerCode: string;
+            /** @description Doanh số kỳ, Decimal(18,4) dạng string. */
+            revenue: string;
+            fromTierId: string | null;
+            fromTierCode: string | null;
+            toTierId: string;
+            toTierCode: string;
+            /** @enum {string} */
+            direction: "PROMOTE" | "DEMOTE";
+        };
+        TierPromotionResultDto: {
+            /** @description Kỳ tính doanh số, nửa mở `[from, to)`, ISO 8601. */
+            from: string;
+            to: string;
+            dryRun: boolean;
+            allowDemotion: boolean;
+            /** @description User đứng tên lượt chạy. */
+            actorId: string;
+            tiersConfigured: number;
+            /** @description Số khách trong scope của người bấm được đánh giá. */
+            customersEvaluated: number;
+            promoted: number;
+            demoted: number;
+            unchanged: number;
+            changes: components["schemas"]["TierPromotionChangeDto"][];
+        };
+        TagDto: {
+            id: string;
+            code: string;
+            name: string;
+            /** @description #rrggbb */
+            color: string | null;
+        };
         CreateTagDto: {
             code: string;
             name: string;
@@ -8412,8 +8515,42 @@ export interface components {
             name?: string;
             color?: string;
         };
+        DeleteTagResultDto: {
+            id: string;
+            /** @description Số dòng gán (khách đang mang tag) bị cascade xoá theo. */
+            unassigned: number;
+        };
+        CustomerSegmentCardDto: {
+            id: string;
+            code: string;
+            name: string;
+            phone: string | null;
+            /** @enum {string} */
+            type: "RETAIL" | "WHOLESALE" | "DISTRIBUTOR" | "KEY_ACCOUNT";
+            groupId: string | null;
+            tierId: string | null;
+            isActive: boolean;
+            teamIds: string[];
+            ownerIds: string[];
+            tagIds: string[];
+        };
+        CustomerSegmentListResponseDto: {
+            items: components["schemas"]["CustomerSegmentCardDto"][];
+            total: number;
+        };
+        CustomerTagAssignmentDto: {
+            customerId: string;
+            tagId: string;
+            taggedBy: string | null;
+            taggedAt: string;
+            tag: components["schemas"]["TagDto"];
+        };
         AssignTagsDto: {
             tagIds: string[];
+        };
+        UnassignTagResultDto: {
+            /** @description 0 = tag chưa gán (idempotent). */
+            removed: number;
         };
         SetCustomerSegmentDto: {
             /**
@@ -9391,6 +9528,22 @@ export interface operations {
                 /** @description true = chưa chia cho ai (`ownerIds` rỗng); false = đã có người phụ trách. */
                 unassigned?: boolean;
                 isActive?: boolean;
+                groupId?: string;
+                tierId?: string;
+                /** @description Lặp `tagIds=a&tagIds=b` hoặc `tagIds=a,b`. */
+                tagIds?: string[];
+                /** @description `any` (mặc định) = có ít nhất một tag; `all` = có đủ mọi tag. */
+                tagMatch?: "any" | "all";
+                /**
+                 * @description Tỉnh/thành của BẤT KỲ địa chỉ nào của khách — so khớp nguyên tên, không phân biệt
+                 *     hoa thường (`CustomerAddress.province` lưu tên tỉnh, vd "Hà Nội", không có mã).
+                 */
+                province?: string;
+                type?: "RETAIL" | "WHOLESALE" | "DISTRIBUTOR" | "KEY_ACCOUNT";
+                /** @description Ngày tạo từ (YYYY-MM-DD, giờ VN, bao gồm). */
+                createdFrom?: string;
+                /** @description Ngày tạo đến (YYYY-MM-DD, giờ VN, bao gồm cả ngày này). */
+                createdTo?: string;
                 q?: string;
                 take: number;
                 skip: number;
@@ -14624,7 +14777,7 @@ export interface operations {
     CustomerGroupController_list: {
         parameters: {
             query?: {
-                includeInactive?: string;
+                includeInactive?: "true" | "false";
             };
             header?: never;
             path?: never;
@@ -14636,7 +14789,9 @@ export interface operations {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["CustomerGroupDto"][];
+                };
             };
         };
     };
@@ -14657,7 +14812,9 @@ export interface operations {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["CustomerGroupDto"];
+                };
             };
         };
     };
@@ -14676,13 +14833,17 @@ export interface operations {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["CustomerGroupDto"];
+                };
             };
         };
     };
     CustomerGroupController_deactivate: {
         parameters: {
-            query?: never;
+            query?: {
+                hard?: "true" | "false";
+            };
             header?: never;
             path: {
                 id: string;
@@ -14695,7 +14856,9 @@ export interface operations {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["CustomerGroupDto"];
+                };
             };
         };
     };
@@ -14718,7 +14881,9 @@ export interface operations {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["CustomerGroupDto"];
+                };
             };
         };
     };
@@ -14735,7 +14900,9 @@ export interface operations {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["CustomerTierDto"][];
+                };
             };
         };
     };
@@ -14756,7 +14923,9 @@ export interface operations {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["CustomerTierDto"];
+                };
             };
         };
     };
@@ -14775,7 +14944,30 @@ export interface operations {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["CustomerTierDto"];
+                };
+            };
+        };
+    };
+    CustomerTierController_remove: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CustomerTierDto"];
+                };
             };
         };
     };
@@ -14798,7 +14990,9 @@ export interface operations {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["CustomerTierDto"];
+                };
             };
         };
     };
@@ -14820,7 +15014,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": Record<string, never>;
+                    "application/json": components["schemas"]["TierPromotionResultDto"];
                 };
             };
         };
@@ -14838,7 +15032,9 @@ export interface operations {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["TagDto"][];
+                };
             };
         };
     };
@@ -14859,7 +15055,9 @@ export interface operations {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["TagDto"];
+                };
             };
         };
     };
@@ -14878,7 +15076,9 @@ export interface operations {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["DeleteTagResultDto"];
+                };
             };
         };
     };
@@ -14901,7 +15101,9 @@ export interface operations {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["TagDto"];
+                };
             };
         };
     };
@@ -14933,7 +15135,9 @@ export interface operations {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["CustomerSegmentListResponseDto"];
+                };
             };
         };
     };
@@ -14953,7 +15157,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": Record<string, never>[];
+                    "application/json": components["schemas"]["CustomerTagAssignmentDto"][];
                 };
             };
         };
@@ -14978,7 +15182,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": Record<string, never>[];
+                    "application/json": components["schemas"]["CustomerTagAssignmentDto"][];
                 };
             };
         };
@@ -14999,7 +15203,9 @@ export interface operations {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["UnassignTagResultDto"];
+                };
             };
         };
     };
@@ -15022,7 +15228,9 @@ export interface operations {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["CustomerDto"];
+                };
             };
         };
     };
