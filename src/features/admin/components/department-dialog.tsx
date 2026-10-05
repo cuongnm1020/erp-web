@@ -64,6 +64,7 @@ export function DepartmentDialog({
   departments,
   users,
   department,
+  defaultParentId,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -71,6 +72,8 @@ export function DepartmentDialog({
   users: UserListItem[];
   /** Có = sửa; không = tạo mới. */
   department?: Department;
+  /** Tạo mới: chọn sẵn phòng ban cha (thêm phòng ban con từ Sơ đồ nhân sự). */
+  defaultParentId?: string;
 }) {
   const editing = department !== undefined;
   const create = useCreateDepartment();
@@ -82,8 +85,9 @@ export function DepartmentDialog({
     defaultValues: {
       code: department?.code ?? '',
       name: department?.name ?? '',
-      parentId: department?.parentId ?? '',
+      parentId: department?.parentId ?? defaultParentId ?? '',
       managerId: department?.managerId ?? '',
+      sortOrder: String(department?.sortOrder ?? ''),
       isActive: department?.isActive ?? true,
     },
   });
@@ -99,7 +103,7 @@ export function DepartmentDialog({
   const onSubmit = form.handleSubmit((v) => {
     const onError = (err: unknown) =>
       applyServerErrors(form, err as ApiError, {
-        knownFields: ['code', 'name', 'parentId', 'managerId', 'isActive'],
+        knownFields: ['code', 'name', 'parentId', 'managerId', 'sortOrder', 'isActive'],
       });
     if (editing) {
       update.mutate(
@@ -107,6 +111,7 @@ export function DepartmentDialog({
           name: v.name,
           parentId: v.parentId || null,
           managerId: v.managerId || null,
+          sortOrder: v.sortOrder ? Number(v.sortOrder) : 0,
           isActive: v.isActive,
         },
         {
@@ -125,6 +130,7 @@ export function DepartmentDialog({
         name: v.name,
         ...(v.parentId ? { parentId: v.parentId } : {}),
         ...(v.managerId ? { managerId: v.managerId } : {}),
+        ...(v.sortOrder ? { sortOrder: Number(v.sortOrder) } : {}),
       },
       {
         onSuccess: () => {
@@ -239,6 +245,20 @@ export function DepartmentDialog({
                       ))}
                     </SelectContent>
                   </Select>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="sortOrder"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Thứ tự trên sơ đồ</FormLabel>
+                  <FormControl>
+                    <Input {...field} inputMode="numeric" placeholder="0" className="w-28" />
+                  </FormControl>
+                  <FormDescription>Số nhỏ đứng trước trong các phòng ban cùng cấp</FormDescription>
                   <FormMessage />
                 </FormItem>
               )}

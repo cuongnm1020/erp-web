@@ -643,6 +643,14 @@ const ORG_EMP = (i: number, departmentId: string | null, isActive = true) => ({
   email: `nv${i}@erp.local`,
   isActive,
   departmentId,
+  createdById: null,
+  canManage: true,
+});
+/** Field sơ đồ nhân sự của node phòng ban (GET /org/tree). */
+const ORG_DEPT_EXTRA = (managerName: string | null, sortOrder = 0) => ({
+  managerName,
+  sortOrder,
+  canAddMembers: true,
 });
 export const ORG_TREE_FIXTURE = {
   departments: [
@@ -652,6 +660,7 @@ export const ORG_TREE_FIXTURE = {
       name: 'Kinh doanh',
       isActive: true,
       managerId: uuid('0000000e', 1),
+      ...ORG_DEPT_EXTRA('Nguyễn Văn Lãnh'),
       members: [ORG_EMP(1, uuid('0000000c', 0))],
       memberCount: 3,
       children: [
@@ -661,6 +670,7 @@ export const ORG_TREE_FIXTURE = {
           name: 'Kinh doanh Hà Nội',
           isActive: true,
           managerId: null,
+          ...ORG_DEPT_EXTRA(null),
           members: [ORG_EMP(2, uuid('0000000c', 1)), ORG_EMP(3, uuid('0000000c', 1))],
           memberCount: 2,
           children: [],
@@ -723,21 +733,56 @@ export const ORG_TREE_FIXTURE = {
   totals: { employees: 4, departments: 2, teams: 3 },
 };
 
-/** Đúng shape `StuckShipmentDto`. */
-export function makeStuckShipments(n: number) {
+/**
+ * Đúng shape `ShipmentMonitorRowDto` — phiếu hãng đang giữ, giữ 3, 4, 5… ngày (dòng 0 = 3 ngày).
+ * `overdue` tính theo ngưỡng `holdDays` như API.
+ */
+export function makeMonitorRows(n: number, holdDays = 5) {
   return Array.from({ length: n }, (_, i) => ({
     id: uuid('0000000e', i),
     docNumber: `DN-2608-${String(i + 1).padStart(5, '0')}`,
     orderId: uuid('00000001', i),
+    orderDocNumber: `SO-2608-${String(i + 1).padStart(5, '0')}`,
     status: (['PICKED_UP', 'IN_TRANSIT', 'FAILED'] as const)[i % 3]!,
+    carrierId: uuid('0000000c', 0),
     carrierCode: 'GHTK',
     carrierName: 'Giao Hàng Tiết Kiệm',
     trackingNo: `S${String(i + 1).padStart(8, '0')}.HN`,
-    shippedAt: new Date(Date.UTC(2026, 7, 20) - i * 86_400_000).toISOString(),
+    packedAt: new Date(Date.UTC(2026, 7, 20, 2) - (3 + i) * 86_400_000).toISOString(),
+    shippedAt: new Date(Date.UTC(2026, 7, 20, 3) - (3 + i) * 86_400_000).toISOString(),
+    deliveredAt: null,
     lastCarrierSyncAt: i % 2 === 0 ? new Date(Date.UTC(2026, 7, 27)).toISOString() : null,
     carrierStatusCode: String(4 + (i % 3)),
-    daysSinceShipped: 6 + i,
+    holdDays: 3 + i,
+    overdue: 3 + i >= holdDays,
   }));
+}
+
+/** Đúng shape `ShipmentMonitorSummaryDto` cho 12 phiếu của {@link makeMonitorRows}. */
+export function makeMonitorSummary(holdDays = 5, date = '2026-08-20') {
+  const rows = makeMonitorRows(12, holdDays);
+  const counts = {
+    packed: 42,
+    handedOver: 37,
+    holding: rows.length,
+    holdingOverdue: rows.filter((r) => r.overdue).length,
+  };
+  return {
+    date,
+    from: `${date}T00:00:00+07:00`,
+    to: `${date}T24:00:00+07:00`,
+    holdDays,
+    asOf: new Date(Date.UTC(2026, 7, 20, 5)).toISOString(),
+    totals: counts,
+    byCarrier: [
+      {
+        carrierId: uuid('0000000c', 0),
+        carrierCode: 'GHTK',
+        carrierName: 'Giao Hàng Tiết Kiệm',
+        ...counts,
+      },
+    ],
+  };
 }
 
 /** Đúng shape `CarrierStatusLogListDto`. */
@@ -1047,13 +1092,30 @@ export const handlers = [
     );
   }),
   http.get('/api/permissions', () => HttpResponse.json(PERMISSIONS_FIXTURE)),
-  http.get('/api/carriers/stuck-shipments', async ({ request }) => {
+  http.get('/api/shipment-monitor/summary', ({ request }) => {
     const url = new URL(request.url);
-    const days = Number(url.searchParams.get('days') ?? 5);
+    const holdDays = Number(url.searchParams.get('holdDays') ?? 5);
+    return HttpResponse.json(
+      makeMonitorSummary(holdDays, url.searchParams.get('date') ?? '2026-08-20'),
+    );
+  }),
+  http.get('/api/shipment-monitor', ({ request }) => {
+    const url = new URL(request.url);
+    const holdDays = Number(url.searchParams.get('holdDays') ?? 5);
+    const view = url.searchParams.get('view') ?? 'HOLDING';
+    const q = url.searchParams.get('q')?.toLowerCase();
     const skip = Number(url.searchParams.get('skip') ?? 0);
     const take = Number(url.searchParams.get('take') ?? 50);
-    const all = makeStuckShipments(12).filter((s) => s.daysSinceShipped >= days);
-    return HttpResponse.json({ items: all.slice(skip, skip + take), total: all.length });
+    const all = makeMonitorRows(12, holdDays)
+      .filter((r) => view !== 'OVERDUE' || r.overdue)
+      .filter(
+        (r) =>
+          !q ||
+          r.docNumber.toLowerCase().includes(q) ||
+          r.trackingNo.toLowerCase().includes(q) ||
+          r.orderDocNumber.toLowerCase() === q,
+      );
+    return HttpResponse.json({ view, items: all.slice(skip, skip + take), total: all.length });
   }),
   // Việc đã giao cho tôi (GET /pda/tasks, màn pick cột "Việc được giao") — mặc định rỗng.
   http.get('/api/pda/tasks', () => HttpResponse.json([])),

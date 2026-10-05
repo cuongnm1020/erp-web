@@ -68,6 +68,13 @@ const config: Config = {
           DEFAULT: 'hsl(var(--info))',
           foreground: 'hsl(var(--info-foreground))',
         },
+        // Sơ đồ nhân sự — màu theo khối (globals.css --branch-N / --branch-N-weak)
+        branch: Object.fromEntries(
+          [1, 2, 3, 4, 5, 6, 7, 8].map((n) => [
+            n,
+            { DEFAULT: `hsl(var(--branch-${n}))`, weak: `hsl(var(--branch-${n}-weak))` },
+          ]),
+        ),
       },
       borderRadius: {
         lg: 'var(--radius)',

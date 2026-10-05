@@ -163,3 +163,18 @@ export function useUnassignTask() {
     onSuccess: () => void qc.invalidateQueries({ queryKey: taskKeys.all }),
   });
 }
+
+export type ReplanResult = components['schemas']['ReplanPickResultDto'];
+
+/**
+ * POST /tasks/:id/replan-shortages — lập lại dòng "thiếu tồn" (chưa có vị trí, chưa lấy gì) của
+ * việc PICK sau khi nhập hàng / bật lại vị trí (lỗi thật SOP2610-00005, 2026-10-05).
+ */
+export function useReplanShortages() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (taskId: string) =>
+      unwrap(api.POST('/tasks/{id}/replan-shortages', { params: { path: { id: taskId } } })),
+    onSuccess: () => void qc.invalidateQueries({ queryKey: taskKeys.all }),
+  });
+}

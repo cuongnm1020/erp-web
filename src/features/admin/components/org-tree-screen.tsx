@@ -5,20 +5,23 @@ import {
   ChevronsDownUp,
   ChevronsUpDown,
   Folder,
+  ListTree,
   Network,
   Search,
   User,
   Users,
 } from 'lucide-react';
 import Link from 'next/link';
-import { useMemo, useState } from 'react';
+import { type ReactNode, useMemo, useState } from 'react';
 import { EmptyState, ListSkeleton, QueryState } from '@/components/data/states';
 import { StatusBadge } from '@/components/data/status-badge';
 import { PageHeader } from '@/components/layout/page-header';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
+import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/cn';
+import { Can } from '@/lib/permission';
 import { useListState } from '@/lib/url-state';
 import {
   useOrgTree,
@@ -28,6 +31,7 @@ import {
   type OrgTeamNode,
   type OrgTree,
 } from '../api/use-org-tree';
+import { OrgChartView } from './org-chart-view';
 
 /**
  * Cây nhân sự — hai trục cạnh nhau: phòng ban (cơ cấu tổ chức, mỗi người ≤ 1 phòng ban) và
@@ -38,7 +42,7 @@ import {
  * team đã ngừng hoạt động (mặc định ẩn — server lọc, không lọc ở client theo quyền, luật 7).
  * Danh bạ nội bộ vài trăm người nên tải nguyên cây — không phải danh sách lớn cần phân trang.
  */
-const DEFAULTS = { filterKeys: ['inactive'] as const };
+const DEFAULTS = { filterKeys: ['inactive', 'view', 'dept'] as const };
 
 const TEAM_TYPE_LABEL: Record<OrgTeamNode['type'], string> = {
   SALES: 'Kinh doanh',
@@ -52,34 +56,53 @@ const TEAM_TYPE_LABEL: Record<OrgTeamNode['type'], string> = {
 const UNASSIGNED_ID = '__unassigned';
 
 export function OrgTreeScreen() {
-  const { state, set } = useListState<'inactive'>(DEFAULTS);
+  const { state, set } = useListState<'inactive' | 'view' | 'dept'>(DEFAULTS);
   const includeInactive = state.filters.inactive === '1';
+  const view: 'chart' | 'list' = state.filters.view === 'list' ? 'list' : 'chart';
   const tree = useOrgTree(includeInactive);
+  // `set({ filters })` thay cả nhóm filter → luôn gộp với filter đang có.
+  const setFilter = (patch: Partial<Record<'inactive' | 'view' | 'dept', string | undefined>>) =>
+    set({ filters: { ...state.filters, ...patch } });
+  const switcher = (
+    <ViewSwitch
+      view={view}
+      onChange={(v) => setFilter({ view: v === 'list' ? 'list' : undefined })}
+    />
+  );
 
   return (
     <QueryState
       query={tree}
       skeleton={
         <>
-          <PageHeader
-            title="Cây nhân sự"
-            breadcrumb={[{ label: 'Quản trị' }, { label: 'Cây nhân sự' }]}
-          />
-          <div className="grid gap-3 xl:grid-cols-2">
-            <ListSkeleton rows={10} columns={2} />
-            <ListSkeleton rows={10} columns={2} />
-          </div>
+          <PageHeader title="Sơ đồ nhân sự" breadcrumb={BREADCRUMB} actions={switcher} />
+          {view === 'chart' ? (
+            <div className="grid gap-3 xl:grid-cols-[minmax(0,1fr)_22rem]">
+              <Skeleton className="h-96 w-full" />
+              <Skeleton className="h-96 w-full" />
+            </div>
+          ) : (
+            <div className="grid gap-3 xl:grid-cols-2">
+              <ListSkeleton rows={10} columns={2} />
+              <ListSkeleton rows={10} columns={2} />
+            </div>
+          )}
         </>
       }
+      // Sơ đồ tự có màn trống kèm nút "Thêm phòng ban" (OrgChartView) — chỉ danh sách dùng màn này.
       isEmpty={(d) =>
-        d.totals.employees === 0 && d.departments.length === 0 && d.teams.length === 0
+        view === 'list' &&
+        d.totals.employees === 0 &&
+        d.departments.length === 0 &&
+        d.teams.length === 0
       }
       empty={
         <>
           <PageHeader
-            title="Cây nhân sự"
+            title="Sơ đồ nhân sự"
             description="Chưa có dữ liệu"
-            breadcrumb={[{ label: 'Quản trị' }, { label: 'Cây nhân sự' }]}
+            breadcrumb={BREADCRUMB}
+            actions={switcher}
           />
           <EmptyState
             title="Chưa có dữ liệu nhân sự"
@@ -93,16 +116,81 @@ export function OrgTreeScreen() {
         </>
       }
     >
-      {(data) => (
-        <OrgTreeBody
-          data={data}
-          q={state.q}
-          onQChange={(q) => set({ q })}
-          includeInactive={includeInactive}
-          onIncludeInactiveChange={(on) => set({ filters: { inactive: on ? '1' : undefined } })}
-        />
-      )}
+      {(data) =>
+        view === 'chart' ? (
+          <>
+            <PageHeader
+              title="Sơ đồ nhân sự"
+              description={`${data.totals.employees} nhân sự · ${data.totals.departments} phòng ban`}
+              breadcrumb={BREADCRUMB}
+              actions={
+                <>
+                  <label className="flex items-center gap-2 text-sm">
+                    <Checkbox
+                      checked={includeInactive}
+                      onCheckedChange={(v) => setFilter({ inactive: v === true ? '1' : undefined })}
+                      aria-label="Hiện đã ngừng hoạt động"
+                    />
+                    Hiện đã ngừng hoạt động
+                  </label>
+                  {switcher}
+                </>
+              }
+            />
+            <OrgChartView
+              data={data}
+              selectedId={state.filters.dept ?? null}
+              onSelect={(id) => setFilter({ dept: id ?? undefined })}
+            />
+          </>
+        ) : (
+          <OrgTreeBody
+            data={data}
+            q={state.q}
+            onQChange={(q) => set({ q })}
+            includeInactive={includeInactive}
+            onIncludeInactiveChange={(on) => setFilter({ inactive: on ? '1' : undefined })}
+            switcher={switcher}
+          />
+        )
+      }
     </QueryState>
+  );
+}
+
+const BREADCRUMB = [{ label: 'Quản trị' }, { label: 'Sơ đồ nhân sự' }];
+
+/** Chuyển giữa sơ đồ (mặc định) và danh sách hai cột phòng ban / team — lưu ở `?view=list`. */
+function ViewSwitch({
+  view,
+  onChange,
+}: {
+  view: 'chart' | 'list';
+  onChange: (view: 'chart' | 'list') => void;
+}) {
+  return (
+    <div className="inline-flex rounded-md border p-0.5" role="group" aria-label="Kiểu xem">
+      <Button
+        size="sm"
+        variant={view === 'chart' ? 'secondary' : 'ghost'}
+        className="h-7"
+        aria-pressed={view === 'chart'}
+        onClick={() => onChange('chart')}
+      >
+        <Network aria-hidden />
+        Sơ đồ
+      </Button>
+      <Button
+        size="sm"
+        variant={view === 'list' ? 'secondary' : 'ghost'}
+        className="h-7"
+        aria-pressed={view === 'list'}
+        onClick={() => onChange('list')}
+      >
+        <ListTree aria-hidden />
+        Danh sách
+      </Button>
+    </div>
   );
 }
 
@@ -112,12 +200,14 @@ function OrgTreeBody({
   onQChange,
   includeInactive,
   onIncludeInactiveChange,
+  switcher,
 }: {
   data: OrgTree;
   q: string;
   onQChange: (q: string) => void;
   includeInactive: boolean;
   onIncludeInactiveChange: (on: boolean) => void;
+  switcher: ReactNode;
 }) {
   // Node đang THU GỌN (mặc định mở hết — người dùng nhìn toàn cảnh rồi gấp bớt).
   const [collapsed, setCollapsed] = useState<ReadonlySet<string>>(new Set());
@@ -132,6 +222,9 @@ function OrgTreeBody({
         name: 'Chưa có phòng ban',
         isActive: true,
         managerId: null,
+        managerName: null,
+        sortOrder: Number.MAX_SAFE_INTEGER,
+        canAddMembers: false,
         members: data.unassigned,
         memberCount: data.unassigned.length,
         children: [],
@@ -160,16 +253,21 @@ function OrgTreeBody({
   return (
     <>
       <PageHeader
-        title="Cây nhân sự"
+        title="Sơ đồ nhân sự"
         description={`${data.totals.employees} nhân viên · ${data.totals.departments} phòng ban · ${data.totals.teams} team`}
-        breadcrumb={[{ label: 'Quản trị' }, { label: 'Cây nhân sự' }]}
+        breadcrumb={BREADCRUMB}
         actions={
-          <Button variant="outline" size="sm" asChild>
-            <Link href="/admin/teams">
-              <Network aria-hidden />
-              Quản lý phòng ban
-            </Link>
-          </Button>
+          <>
+            <Can I="read" a="User">
+              <Button variant="outline" size="sm" asChild>
+                <Link href="/admin/teams">
+                  <Network aria-hidden />
+                  Quản lý phòng ban
+                </Link>
+              </Button>
+            </Can>
+            {switcher}
+          </>
         }
       />
 

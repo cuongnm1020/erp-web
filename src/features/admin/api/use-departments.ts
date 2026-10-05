@@ -15,12 +15,16 @@ export const departmentKeys = {
   teams: () => ['admin', 'teams'] as const,
 };
 
-/** GET /departments — cây phòng ban kèm số nhân viên (`_count.members`). Danh mục nhỏ, cache 5 phút. */
-export function useDepartments() {
+/**
+ * GET /departments — cây phòng ban kèm số nhân viên (`_count.members`). Danh mục nhỏ, cache 5 phút.
+ * `enabled: false` khi màn không cần (trưởng phòng không có user.read — tránh 403 vô ích).
+ */
+export function useDepartments(enabled = true) {
   return useQuery({
     queryKey: departmentKeys.all,
     queryFn: () => unwrap(api.GET('/departments')),
     staleTime: 5 * 60 * 1000,
+    enabled,
   });
 }
 
@@ -79,7 +83,20 @@ export function useAssignUserToDepartment() {
   });
 }
 
-/** Gỡ khỏi phòng ban = PATCH /users/{id} { departmentId: null } — API phòng ban không có DELETE. */
+/** DELETE /departments/{id} — chỉ phòng ban trống; còn con / nhân sự → 409 DEPARTMENT_NOT_EMPTY. */
+export function useDeleteDepartment() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) =>
+      unwrap(api.DELETE('/departments/{id}', { params: { path: { id } } })),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: departmentKeys.all });
+      void qc.invalidateQueries({ queryKey: orgTreeKeys.all });
+    },
+  });
+}
+
+/** Gỡ khỏi phòng ban = PATCH /users/{id} { departmentId: null }. */
 export function useRemoveUserFromDepartment() {
   const qc = useQueryClient();
   return useMutation({

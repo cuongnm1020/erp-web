@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ME_SALE } from '@/test/msw/handlers';
 import { server } from '@/test/msw/server';
 import { renderApp } from '@/test/render';
+import { toast } from '@/components/ui/toaster';
 import { WarehousesScreen } from './components/warehouses-screen';
 
 // Radix Select cần ResizeObserver — jsdom không có
@@ -331,5 +332,35 @@ describe('LocationsPanel — cây vị trí kho + CRUD', () => {
     expect(screen.queryByRole('button', { name: /Thêm vị trí con/ })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Sửa' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Xóa' })).not.toBeInTheDocument();
+  });
+
+  it('409 LOCATION_HAS_STOCK khi ngừng dùng vị trí còn hàng → toast nêu số sản phẩm', async () => {
+    server.use(
+      http.delete('/api/warehouses/locations/:locationId', () =>
+        HttpResponse.json(
+          {
+            statusCode: 409,
+            code: 'LOCATION_HAS_STOCK',
+            message: 'x',
+            details: { locationCode: 'A01-01', onHand: '1000.000000', skuCount: 1 },
+          },
+          { status: 409 },
+        ),
+      ),
+    );
+    const error = vi.spyOn(toast, 'error');
+    renderApp(<WarehousesScreen />);
+    await screen.findByText('A01');
+    fireEvent.click(screen.getByRole('button', { name: 'Mở rộng A01' }));
+    const deleteButtons = screen.getAllByRole('button', { name: 'Xóa' });
+    fireEvent.click(deleteButtons[deleteButtons.length - 1]!);
+    await screen.findByText('Xóa vị trí A01-01?');
+    const confirmButtons = screen.getAllByRole('button', { name: 'Xóa' });
+    fireEvent.click(confirmButtons[confirmButtons.length - 1]!);
+    await waitFor(() =>
+      expect(error).toHaveBeenCalledWith(
+        'Vị trí A01-01 còn 1.000 sản phẩm (1 SKU) — chuyển hàng đi trước khi ngừng dùng.',
+      ),
+    );
   });
 });

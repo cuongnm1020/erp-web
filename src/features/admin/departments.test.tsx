@@ -30,6 +30,7 @@ const SALES = {
   name: 'Kinh doanh',
   parentId: null,
   managerId: '00000000-0000-4000-8000-0000000b0001',
+  sortOrder: 0,
   isActive: true,
   _count: { members: 2 },
 };
@@ -38,6 +39,7 @@ const SALES_HN = {
   code: 'SALES-HN',
   name: 'Kinh doanh Hà Nội',
   parentId: SALES.id,
+  sortOrder: 5,
   managerId: null,
   isActive: false,
   _count: { members: 0 },
@@ -167,7 +169,13 @@ describe('TeamsScreen — Phòng ban & team (I-05)', () => {
     expect(calls[0]).toEqual({
       method: 'PATCH',
       url: `/departments/${SALES_HN.id}`,
-      body: { name: 'KD Hà Nội', parentId: SALES.id, managerId: null, isActive: true },
+      body: {
+        name: 'KD Hà Nội',
+        parentId: SALES.id,
+        managerId: null,
+        sortOrder: 5, // prefill từ phòng ban
+        isActive: true,
+      },
     });
   });
 

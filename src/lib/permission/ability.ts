@@ -27,7 +27,10 @@ export function parsePermission(code: string): { action: AppAction; subject: App
 }
 
 export function buildAbility(
-  me: Pick<AuthMe, 'permissions' | 'hasGlobalAccess'> | null,
+  me:
+    | (Pick<AuthMe, 'permissions' | 'hasGlobalAccess'> &
+        Partial<Pick<AuthMe, 'managesDepartments'>>)
+    | null,
 ): AppAbility {
   const rules: Array<{ action: AppAction; subject: AppSubject }> = [];
   if (me?.hasGlobalAccess) rules.push({ action: 'manage', subject: 'all' });
@@ -35,6 +38,9 @@ export function buildAbility(
     const p = parsePermission(code);
     if (p) rules.push(p);
   }
+  // Sơ đồ nhân sự: user.read HOẶC đang là trưởng phòng (GET /org/tree cho phép cả hai).
+  if (me?.managesDepartments || me?.permissions.includes('user.read'))
+    rules.push({ action: 'view', subject: 'OrgChart' });
   return createMongoAbility<[AppAction, AppSubject]>(rules);
 }
 

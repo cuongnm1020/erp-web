@@ -45,7 +45,8 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { toast } from '@/components/ui/toaster';
-import type { ApiError } from '@/lib/api/errors';
+import { isApiError, type ApiError } from '@/lib/api/errors';
+import { formatQuantity } from '@/lib/format';
 import { messageFor } from '@/lib/error-messages';
 import { codeSchema } from '@/lib/shared';
 import {
@@ -86,6 +87,18 @@ type LocationValues = z.infer<typeof locationSchema>;
 type DialogState =
   { mode: 'create'; parent: LocationNode | null } | { mode: 'edit'; location: LocationNode };
 
+/**
+ * 409 LOCATION_HAS_STOCK (vị trí còn hàng không ngừng dùng được — lỗi thật DEFAULT 2026-10-05):
+ * dựng câu có số lượng từ `details`; lỗi khác → câu chuẩn theo mã.
+ */
+export function locationErrorMessage(err: unknown): string {
+  if (isApiError(err) && err.code === 'LOCATION_HAS_STOCK') {
+    const d = (err.details ?? {}) as { locationCode?: string; onHand?: string; skuCount?: number };
+    return `Vị trí ${d.locationCode ?? ''} còn ${formatQuantity(d.onHand ?? '0')} sản phẩm (${d.skuCount ?? 0} SKU) — chuyển hàng đi trước khi ngừng dùng.`;
+  }
+  return messageFor(err);
+}
+
 function LocationFormDialog({
   warehouse,
   state,
@@ -121,10 +134,15 @@ function LocationFormDialog({
       toast.success(msg);
       onClose();
     };
-    const fail = (err: unknown) =>
+    const fail = (err: unknown) => {
+      if (isApiError(err) && err.code === 'LOCATION_HAS_STOCK') {
+        form.setError('root.server', { message: locationErrorMessage(err) });
+        return;
+      }
       applyServerErrors(form, err as ApiError, {
         knownFields: ['code', 'type', 'barcode', 'pickSequence', 'fixedSkuIds'],
       });
+    };
     const pickSequence = v.pickSequence === '' ? undefined : Number(v.pickSequence);
     if (editing && location) {
       update.mutate(
@@ -568,7 +586,7 @@ export function LocationsPanel({
                                 del
                                   .mutateAsync(node.id)
                                   .then(() => toast.success(`Đã ngừng dùng vị trí ${node.code}`))
-                                  .catch((err) => toast.error(messageFor(err)))
+                                  .catch((err) => toast.error(locationErrorMessage(err)))
                               }
                               itemName={`vị trí ${node.code}`}
                               deleteDescription="Vị trí chuyển Ngừng dùng — tồn kho và chứng từ giữ nguyên. Vị trí còn con đang dùng sẽ bị chặn."

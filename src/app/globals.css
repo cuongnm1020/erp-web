@@ -10,7 +10,15 @@
 @layer base {
   :root {
     /* Inter self-host qua next/font (--font-inter, app/layout.tsx); thiếu thì về system sans. */
-    --font-sans: var(--font-inter, ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif);
+    --font-sans: var(
+      --font-inter,
+      ui-sans-serif,
+      system-ui,
+      -apple-system,
+      'Segoe UI',
+      Roboto,
+      sans-serif
+    );
     --font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
 
     /* --bg-page */
@@ -50,6 +58,23 @@
     --input: 217 14% 81%;
     --ring: 212 69% 39%;
     --radius: 0.25rem;
+    /* Sơ đồ nhân sự: mỗi khối một màu (đậm = viền/nhãn, nhạt = nền ô) */
+    --branch-1: 140 45% 34%;
+    --branch-1-weak: 140 45% 92%;
+    --branch-2: 38 80% 38%;
+    --branch-2-weak: 42 85% 90%;
+    --branch-3: 230 55% 48%;
+    --branch-3-weak: 230 70% 94%;
+    --branch-4: 0 62% 48%;
+    --branch-4-weak: 0 75% 94%;
+    --branch-5: 90 35% 32%;
+    --branch-5-weak: 90 35% 90%;
+    --branch-6: 200 70% 38%;
+    --branch-6-weak: 200 75% 93%;
+    --branch-7: 175 60% 30%;
+    --branch-7-weak: 175 55% 91%;
+    --branch-8: 300 45% 42%;
+    --branch-8-weak: 300 50% 94%;
   }
 
   .dark {
@@ -78,6 +103,22 @@
     --border: 217 33% 17%;
     --input: 217 33% 17%;
     --ring: 213 27% 84%;
+    --branch-1: 140 45% 60%;
+    --branch-1-weak: 140 30% 16%;
+    --branch-2: 40 80% 60%;
+    --branch-2-weak: 40 40% 16%;
+    --branch-3: 230 70% 72%;
+    --branch-3-weak: 230 35% 20%;
+    --branch-4: 0 70% 68%;
+    --branch-4-weak: 0 35% 18%;
+    --branch-5: 90 35% 60%;
+    --branch-5-weak: 90 20% 16%;
+    --branch-6: 200 70% 65%;
+    --branch-6-weak: 200 40% 17%;
+    --branch-7: 175 50% 55%;
+    --branch-7-weak: 175 35% 15%;
+    --branch-8: 300 45% 70%;
+    --branch-8-weak: 300 25% 18%;
   }
 
   * {
@@ -130,5 +171,60 @@
       transition-duration: 0.01ms !important;
       scroll-behavior: auto !important;
     }
+  }
+}
+
+@layer components {
+  /*
+   * Sơ đồ nhân sự (features/admin/components/org-chart.tsx): cây dọc, đường nối vẽ bằng
+   * ::before/::after — mỗi <li> vẽ nửa thanh ngang trái/phải + đoạn dọc xuống ô của nó.
+   */
+  .org-chart ul {
+    @apply relative flex justify-center pt-5;
+  }
+  .org-chart li {
+    @apply relative flex flex-col items-center px-1.5 pt-5;
+  }
+  .org-chart li::before,
+  .org-chart li::after {
+    content: '';
+    @apply absolute top-0 h-5 w-1/2 border-t border-input;
+  }
+  .org-chart li::before {
+    @apply right-1/2;
+  }
+  .org-chart li::after {
+    @apply left-1/2 border-l;
+  }
+  .org-chart li:only-child::before,
+  .org-chart li:only-child::after {
+    @apply hidden;
+  }
+  .org-chart li:only-child {
+    @apply pt-0;
+  }
+  .org-chart li:first-child::before,
+  .org-chart li:last-child::after {
+    @apply border-0;
+  }
+  .org-chart li:last-child::before {
+    @apply rounded-tr border-r;
+  }
+  .org-chart li:first-child::after {
+    @apply rounded-tl;
+  }
+  .org-chart ul ul::before {
+    content: '';
+    @apply absolute left-1/2 top-0 h-5 border-l border-input;
+  }
+  .org-chart > ul {
+    @apply pt-0;
+  }
+  .org-chart > ul > li {
+    @apply pt-0;
+  }
+  .org-chart > ul > li::before,
+  .org-chart > ul > li::after {
+    @apply hidden;
   }
 }

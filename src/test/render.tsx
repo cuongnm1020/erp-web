@@ -7,7 +7,10 @@ import { RealtimeProvider, type RealtimeSocket } from '@/lib/realtime';
 import { ME_ADMIN } from './msw/handlers';
 
 export interface AppRenderOptions extends Omit<RenderOptions, 'wrapper'> {
-  me?: Pick<AuthMe, 'permissions' | 'hasGlobalAccess'> | null;
+  me?:
+    | (Pick<AuthMe, 'permissions' | 'hasGlobalAccess'> &
+        Partial<Pick<AuthMe, 'managesDepartments'>>)
+    | null;
   socket?: RealtimeSocket;
   queryClient?: QueryClient;
 }

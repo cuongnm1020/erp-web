@@ -17,7 +17,11 @@ export function AbilityProvider({
   me,
   children,
 }: {
-  me: Pick<AuthMe, 'permissions' | 'hasGlobalAccess'> | null | undefined;
+  me:
+    | (Pick<AuthMe, 'permissions' | 'hasGlobalAccess'> &
+        Partial<Pick<AuthMe, 'managesDepartments'>>)
+    | null
+    | undefined;
   children: ReactNode;
 }) {
   const ability = useMemo(() => (me ? buildAbility(me) : EMPTY_ABILITY), [me]);

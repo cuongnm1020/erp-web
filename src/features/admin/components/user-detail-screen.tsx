@@ -27,7 +27,7 @@ import {
 import { toast } from '@/components/ui/toaster';
 import { messageFor } from '@/lib/error-messages';
 import { formatDate, formatDateTime } from '@/lib/format';
-import { Can, useAbility } from '@/lib/permission';
+import { useAbility } from '@/lib/permission';
 import { useRoles } from '../api/use-roles';
 import { useAssignRoles, useUpdateUser, useUser, type UserDetail } from '../api/use-users';
 import { UserPermissionMatrix } from './user-permission-matrix';
@@ -195,8 +195,9 @@ export function UserDetailScreen({ id }: { id: string }) {
   const ability = useAbility();
   const [editOpen, setEditOpen] = useState(false);
 
-  const canEditUser = ability.can('update', 'User');
-  const canEditPerms = canEditUser && ability.can('update', 'Role');
+  // `user.canManage` (server): chỉ người tạo tài khoản / superadmin được sửa — CASL chỉ cho biết
+  // có quyền chung, còn tài khoản cụ thể này có phải "của mình" hay không thì server quyết.
+  const canEditPerms = (canManage: boolean) => canManage && ability.can('update', 'Role');
 
   return (
     <QueryState
@@ -216,44 +217,52 @@ export function UserDetailScreen({ id }: { id: string }) {
               { label: user.code },
             ]}
             actions={
-              <Can I="update" a="User">
-                {user.isActive ? (
-                  <Button
-                    variant="outline"
-                    disabled={update.isPending}
-                    onClick={() =>
-                      update.mutate(
-                        { isActive: false },
-                        {
-                          onSuccess: () => toast.success('Đã khóa tài khoản'),
-                          onError: (err) => toast.error(messageFor(err)),
-                        },
-                      )
-                    }
-                  >
-                    Khóa tài khoản
-                  </Button>
-                ) : (
-                  <Button
-                    variant="outline"
-                    disabled={update.isPending}
-                    onClick={() =>
-                      update.mutate(
-                        { isActive: true },
-                        {
-                          onSuccess: () => toast.success('Đã mở khóa tài khoản'),
-                          onError: (err) => toast.error(messageFor(err)),
-                        },
-                      )
-                    }
-                  >
-                    Mở khóa
-                  </Button>
-                )}
-                <Button onClick={() => setEditOpen(true)}>Sửa thông tin</Button>
-              </Can>
+              user.canManage ? (
+                <>
+                  {user.isActive ? (
+                    <Button
+                      variant="outline"
+                      disabled={update.isPending}
+                      onClick={() =>
+                        update.mutate(
+                          { isActive: false },
+                          {
+                            onSuccess: () => toast.success('Đã khóa tài khoản'),
+                            onError: (err) => toast.error(messageFor(err)),
+                          },
+                        )
+                      }
+                    >
+                      Khóa tài khoản
+                    </Button>
+                  ) : (
+                    <Button
+                      variant="outline"
+                      disabled={update.isPending}
+                      onClick={() =>
+                        update.mutate(
+                          { isActive: true },
+                          {
+                            onSuccess: () => toast.success('Đã mở khóa tài khoản'),
+                            onError: (err) => toast.error(messageFor(err)),
+                          },
+                        )
+                      }
+                    >
+                      Mở khóa
+                    </Button>
+                  )}
+                  <Button onClick={() => setEditOpen(true)}>Sửa thông tin</Button>
+                </>
+              ) : null
             }
           />
+          {user.canManage ? null : (
+            <p className="mb-3 rounded-md border bg-muted px-3 py-2 text-sm text-muted-foreground">
+              Chỉ xem: bạn chỉ sửa, khóa hay phân quyền được nhân sự do chính mình tạo
+              {user.createdBy ? ` — tài khoản này do ${user.createdBy.fullName} tạo.` : '.'}
+            </p>
+          )}
 
           <div className="mb-3 grid gap-3 lg:grid-cols-3">
             <section className="rounded-md border bg-card p-3">
@@ -270,12 +279,13 @@ export function UserDetailScreen({ id }: { id: string }) {
                 <InfoRow label="Họ tên" value={user.fullName} />
                 <InfoRow label="Email" value={user.email} />
                 <InfoRow label="Phòng ban" value={user.department?.name ?? '—'} />
+                <InfoRow label="Người tạo" value={user.createdBy?.fullName ?? '—'} />
                 <InfoRow label="Tạo lúc" value={formatDateTime(user.createdAt)} />
                 <InfoRow label="Cập nhật" value={formatDateTime(user.updatedAt)} />
               </dl>
             </section>
 
-            <RolesSection user={user} canEdit={canEditPerms} />
+            <RolesSection user={user} canEdit={canEditPerms(user.canManage)} />
 
             <section className="rounded-md border bg-card p-3">
               <h2 className="mb-2 text-sm font-semibold">Team</h2>
@@ -315,7 +325,7 @@ export function UserDetailScreen({ id }: { id: string }) {
 
           <section>
             <h2 className="mb-2 text-sm font-semibold">Phân quyền</h2>
-            <UserPermissionMatrix userId={user.id} canEdit={canEditPerms} />
+            <UserPermissionMatrix userId={user.id} canEdit={canEditPerms(user.canManage)} />
           </section>
 
           <EditDialog user={user} open={editOpen} onOpenChange={setEditOpen} />

@@ -382,6 +382,72 @@ describe('DispatchScreen — gán / trả việc (POST /tasks/:id/assign|unassig
   });
 });
 
+describe('Lập lại dòng thiếu tồn (POST /tasks/:id/replan-shortages, 2026-10-05)', () => {
+  it('việc PICK có dòng thiếu → nút "Lập lại" → POST → toast theo kết quả; việc đã xong / thuộc lượt không có nút', async () => {
+    search = 'status=ASSIGNED';
+    const base = ALL.find((t) => t.status === 'ASSIGNED')!;
+    const short = {
+      ...base,
+      id: 'short-1',
+      docNumber: 'PICK2610-00005',
+      type: 'PICK',
+      waveId: null,
+      exceptionLineCount: 1,
+    };
+    const inWave = {
+      ...base,
+      id: 'wave-t',
+      docNumber: 'PICK-W',
+      type: 'PICK',
+      waveId: 'w1',
+      exceptionLineCount: 1,
+    };
+    const posted: string[] = [];
+    server.use(
+      http.get('/api/tasks', () => HttpResponse.json({ items: [short, inWave], total: 2 })),
+      http.post('/api/tasks/:id/replan-shortages', ({ params }) => {
+        posted.push(params.id as string);
+        return HttpResponse.json(
+          { taskId: params.id, docNumber: 'PICK2610-00005', replanned: 1, shortages: [] },
+          { status: 201 },
+        );
+      }),
+    );
+    const success = vi.spyOn(toast, 'success');
+    renderApp(<DispatchScreen />);
+    const btn = await screen.findByRole('button', { name: 'Lập lại việc lấy hàng PICK2610-00005' });
+    expect(
+      screen.queryByRole('button', { name: 'Lập lại việc lấy hàng PICK-W' }),
+    ).not.toBeInTheDocument();
+    fireEvent.click(btn);
+    await waitFor(() => expect(posted).toEqual(['short-1']));
+    await waitFor(() =>
+      expect(success).toHaveBeenCalledWith('Đã lập lại 1 dòng — PICK2610-00005 lấy được rồi'),
+    );
+  });
+
+  it('replanMessage: vẫn thiếu / không có dòng thiếu tồn → câu rõ ràng, không báo thành công', async () => {
+    const { replanMessage } = await import('./components/dispatch-screen');
+    const r = (replanned: number, left: number) => ({
+      taskId: 't',
+      docNumber: 'P',
+      replanned,
+      shortages: Array.from({ length: left }, (_, i) => ({
+        sourceLineNo: i + 1,
+        skuId: 's',
+        qty: '1.000000',
+      })),
+    });
+    expect(replanMessage('P', r(1, 1))).toEqual({
+      ok: true,
+      text: 'Đã lập lại 1 dòng, P vẫn thiếu 1 dòng',
+    });
+    expect(replanMessage('P', r(0, 1)).ok).toBe(false);
+    expect(replanMessage('P', r(0, 1)).text).toContain('kho vẫn chưa đủ hàng');
+    expect(replanMessage('P', r(0, 0)).text).toContain('không có dòng thiếu tồn');
+  });
+});
+
 describe('Gợi ý gộp theo cấp đóng gói (PLAN-packaging-hierarchy §12, 2026-09-22)', () => {
   const CARTON_WAVE = {
     id: '00000000-0000-4000-8000-00000000e701',
