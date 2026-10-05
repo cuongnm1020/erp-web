@@ -4,7 +4,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { Info } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useEffect, useRef, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { useForm } from 'react-hook-form';
 import {
   applyServerErrors,
@@ -30,15 +30,24 @@ import {
 } from '@/components/ui/select';
 import { toast } from '@/components/ui/toaster';
 import { isApiError, type ApiError } from '@/lib/api/errors';
+import { messageFor } from '@/lib/error-messages';
 import { Can, useAbility } from '@/lib/permission';
 import {
   useCreateCustomer,
   useCustomer,
   useUpdateCustomer,
   type CustomerDetail,
+  type CustomerTagRef,
 } from '../api/use-customers';
+import { useAssignCustomerTags, useSetCustomerSegment } from '../api/use-segments';
 import { useTeams } from '../api/use-teams';
 import { CustomerAddressSection } from './customer-address-section';
+import {
+  CustomerSegmentEditor,
+  CustomerTagsEditor,
+  SegmentSelects,
+  TagPicker,
+} from './customer-segment-fields';
 import { CUSTOMER_TYPE_OPTIONS } from '../labels';
 import {
   createCustomerSchema,
@@ -59,8 +68,12 @@ import {
  *   RETAIL/WHOLESALE/DISTRIBUTOR/KEY_ACCOUNT → Select với nhãn tiếng Việt từ labels.ts.
  * - SĐT: canvas đánh dấu bắt buộc kèm "dò trùng khi lưu"; CreateCustomerDto để optional và
  *   chưa có API dò trùng → không bắt buộc, không hứa dò trùng (bỏ cả alert dò trùng).
- * - BỎ HẲN, không để nút chết (xem PENDING_API): nhóm/cấp độ/tag, bảng giá áp dụng,
- *   người phụ trách, đồng ý nhận marketing (PDPD).
+ * - BỎ HẲN, không để nút chết (xem PENDING_API): bảng giá áp dụng, người phụ trách,
+ *   đồng ý nhận marketing (PDPD).
+ * - Nhóm / cấp độ / tag (CRM-04): API gán qua /customer-segments (quyền customer.update), không
+ *   nằm trong Create/UpdateCustomerDto. Chế độ SỬA: lưu ngay từng thay đổi như địa chỉ. Chế độ
+ *   TẠO: giữ lựa chọn tạm, sau khi POST /customers thành công mới PATCH nhóm/cấp + gắn tag cho
+ *   id mới; bước này lỗi thì khách vẫn đã lưu — báo rõ để gắn lại ở màn sửa.
  * - Địa chỉ giao hàng (2026-09-15): nối thật ở chế độ SỬA — `CustomerAddressSection`
  *   (POST/PATCH/DELETE /customers/{id}/addresses…). Chế độ tạo chưa có id khách nên chỉ nhắc
  *   "lưu rồi thêm địa chỉ".
@@ -70,7 +83,6 @@ import {
  *   GET /price-lists khai báo kiểu response.
  */
 const PENDING_API: Array<{ title: string; need: string }> = [
-  { title: 'Nhóm, cấp độ & tag', need: 'chưa có endpoint nhóm / cấp độ / tag khách hàng' },
   { title: 'Bảng giá áp dụng', need: 'GET /price-lists chưa khai báo kiểu response' },
   { title: 'Người phụ trách', need: 'chưa có danh bạ user để chọn — server tự gán người tạo' },
   { title: 'Đồng ý nhận marketing (PDPD)', need: 'chưa có DTO consent theo khách' },
@@ -121,6 +133,14 @@ function Section({ title, children }: { title: string; children: ReactNode }) {
   );
 }
 
+interface SegmentDraft {
+  groupId: string | null;
+  tierId: string | null;
+  tags: CustomerTagRef[];
+}
+
+const EMPTY_SEGMENT: SegmentDraft = { groupId: null, tierId: null, tags: [] };
+
 function CustomerFormBody({ customer }: { customer?: CustomerDetail }) {
   const editing = customer !== undefined;
   const router = useRouter();
@@ -130,7 +150,30 @@ function CustomerFormBody({ customer }: { customer?: CustomerDetail }) {
   const teams = useTeams({ enabled: !editing });
   const create = useCreateCustomer();
   const update = useUpdateCustomer(customer?.id ?? '');
-  const isPending = create.isPending || update.isPending;
+  const setSegment = useSetCustomerSegment();
+  const assignTags = useAssignCustomerTags();
+  const [segment, setSegmentDraft] = useState<SegmentDraft>(EMPTY_SEGMENT);
+  const isPending =
+    create.isPending || update.isPending || setSegment.isPending || assignTags.isPending;
+
+  /** Sau khi tạo: gắn nhóm/cấp/tag đã chọn cho id mới. Lỗi không chặn — khách đã lưu rồi. */
+  const applySegment = async (customerId: string) => {
+    if (!canUpdate) return;
+    try {
+      if (segment.groupId || segment.tierId)
+        await setSegment.mutateAsync({
+          customerId,
+          ...(segment.groupId ? { groupId: segment.groupId } : {}),
+          ...(segment.tierId ? { tierId: segment.tierId } : {}),
+        });
+      if (segment.tags.length > 0)
+        await assignTags.mutateAsync({ customerId, tagIds: segment.tags.map((t) => t.id) });
+    } catch (err) {
+      toast.error('Đã lưu khách hàng nhưng chưa gắn được nhóm / cấp độ / tag', {
+        description: `${messageFor(err)} Gắn lại ở màn Sửa khách hàng.`,
+      });
+    }
+  };
 
   const form = useForm<CustomerFormValues>({
     resolver: zodResolver(editing ? editCustomerFormSchema : createCustomerSchema),
@@ -140,10 +183,13 @@ function CustomerFormBody({ customer }: { customer?: CustomerDetail }) {
   const save = (v: CustomerFormValues, andNew: boolean) => {
     if (!editing) {
       create.mutate(toCreateCustomerBody(v), {
-        onSuccess: (c) => {
+        onSuccess: async (c) => {
           toast.success('Đã lưu khách hàng', { description: `${c.code} · ${c.name}` });
-          if (andNew) form.reset(initialValues());
-          else router.push(`/crm/customers/${c.id}`);
+          await applySegment(c.id);
+          if (andNew) {
+            form.reset(initialValues());
+            setSegmentDraft(EMPTY_SEGMENT);
+          } else router.push(`/crm/customers/${c.id}`);
         },
         onError: (err) => applyServerErrors(form, err as ApiError, { knownFields: CREATE_FIELDS }),
       });
@@ -408,6 +454,53 @@ function CustomerFormBody({ customer }: { customer?: CustomerDetail }) {
                   </FormItem>
                 )}
               />
+            </Section>
+
+            <Section title="Nhóm, cấp độ & tag">
+              {!canUpdate ? (
+                <p className="col-span-2 text-sm text-muted-foreground">
+                  Cần quyền sửa khách hàng để gắn nhóm, cấp độ và tag.
+                </p>
+              ) : editing ? (
+                <>
+                  <CustomerSegmentEditor
+                    customerId={customer.id}
+                    groupId={customer.groupId}
+                    tierId={customer.tierId}
+                    canUpdate={canUpdate}
+                  />
+                  <div className="col-span-2 flex flex-col gap-1.5">
+                    <span className="text-sm font-medium">Tag</span>
+                    <CustomerTagsEditor
+                      customerId={customer.id}
+                      tags={customer.tags}
+                      canUpdate={canUpdate}
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      Nhóm, cấp độ và tag lưu ngay khi chọn — không cần bấm Lưu thay đổi.
+                    </p>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <SegmentSelects
+                    groupId={segment.groupId}
+                    tierId={segment.tierId}
+                    onGroupChange={(groupId) => setSegmentDraft((s) => ({ ...s, groupId }))}
+                    onTierChange={(tierId) => setSegmentDraft((s) => ({ ...s, tierId }))}
+                  />
+                  <div className="col-span-2 flex flex-col gap-1.5">
+                    <span className="text-sm font-medium">Tag</span>
+                    <TagPicker
+                      selected={segment.tags}
+                      onAdd={(tag) => setSegmentDraft((s) => ({ ...s, tags: [...s.tags, tag] }))}
+                      onRemove={(id) =>
+                        setSegmentDraft((s) => ({ ...s, tags: s.tags.filter((t) => t.id !== id) }))
+                      }
+                    />
+                  </div>
+                </>
+              )}
             </Section>
           </div>
 
