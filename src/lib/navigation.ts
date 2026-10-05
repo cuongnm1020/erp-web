@@ -282,12 +282,12 @@ export const NAV_MODULES: NavModule[] = [
       //   icon: BarChart3,
       //   ability: { action: 'read', subject: 'Stock' },
       // },
-      // {
-      //   label: 'Theo dõi giao hàng',
-      //   href: '/wms/shipping',
-      //   icon: PackageCheck,
-      //   ability: { action: 'read', subject: 'Shipment' },
-      // },
+      {
+        label: 'Theo dõi giao hàng',
+        href: '/wms/shipping',
+        icon: Truck,
+        ability: { action: 'read', subject: 'Shipment' },
+      },
       {
         label: 'Cảnh báo nhập hàng',
         href: '/wms/reorder-points',

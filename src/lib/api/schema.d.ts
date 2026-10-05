@@ -2284,6 +2284,38 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/shipment-monitor/summary": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["ShipmentMonitorController_summary"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/shipment-monitor": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["ShipmentMonitorController_list"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/goods-issues": {
         parameters: {
             query?: never;
@@ -6553,6 +6585,69 @@ export interface components {
              * @enum {string}
              */
             status: "CANCELLED" | "PENDING" | "PICKED_UP" | "IN_TRANSIT" | "DELIVERED" | "FAILED" | "RETURNED";
+        };
+        ShipmentMonitorCountsDto: {
+            /** @description Phiếu giao có task PACK hoàn tất trong ngày. */
+            packed: number;
+            /** @description Phiếu giao rời kho (`shippedAt`) trong ngày — kho bấm bàn giao hoặc hãng báo đã lấy. */
+            handedOver: number;
+            /** @description Hãng đang giữ: PICKED_UP / IN_TRANSIT / FAILED (hiện tại). */
+            holding: number;
+            /** @description Trong số `holding`, rời kho quá `holdDays` ngày. */
+            holdingOverdue: number;
+        };
+        ShipmentMonitorCarrierDto: {
+            /** @description Phiếu giao có task PACK hoàn tất trong ngày. */
+            packed: number;
+            /** @description Phiếu giao rời kho (`shippedAt`) trong ngày — kho bấm bàn giao hoặc hãng báo đã lấy. */
+            handedOver: number;
+            /** @description Hãng đang giữ: PICKED_UP / IN_TRANSIT / FAILED (hiện tại). */
+            holding: number;
+            /** @description Trong số `holding`, rời kho quá `holdDays` ngày. */
+            holdingOverdue: number;
+            /** @description null = phiếu chưa gán hãng. */
+            carrierId: string | null;
+            carrierCode: string | null;
+            carrierName: string | null;
+        };
+        ShipmentMonitorSummaryDto: {
+            date: string;
+            from: string;
+            to: string;
+            holdDays: number;
+            /** @description Mốc tính "hãng đang giữ" (= lúc gọi). */
+            asOf: string;
+            totals: components["schemas"]["ShipmentMonitorCountsDto"];
+            byCarrier: components["schemas"]["ShipmentMonitorCarrierDto"][];
+        };
+        ShipmentMonitorRowDto: {
+            id: string;
+            docNumber: string;
+            orderId: string | null;
+            orderDocNumber: string | null;
+            /** @enum {string} */
+            status: "CANCELLED" | "PENDING" | "PICKED_UP" | "IN_TRANSIT" | "DELIVERED" | "FAILED" | "RETURNED";
+            carrierId: string | null;
+            carrierCode: string | null;
+            carrierName: string | null;
+            trackingNo: string | null;
+            /** @description Lúc task PACK của đơn hoàn tất. */
+            packedAt: string | null;
+            shippedAt: string | null;
+            deliveredAt: string | null;
+            /** @description Mã thô gần nhất hãng trả. */
+            carrierStatusCode: string | null;
+            lastCarrierSyncAt: string | null;
+            /** @description Số ngày hãng đã giữ (từ `shippedAt`); null = hàng chưa rời kho hoặc đã có kết cục. */
+            holdDays: number | null;
+            /** @description Hãng giữ quá ngưỡng `holdDays` của truy vấn. */
+            overdue: boolean;
+        };
+        ShipmentMonitorListDto: {
+            /** @enum {string} */
+            view: "PACKED" | "HANDED_OVER" | "HOLDING" | "OVERDUE";
+            items: components["schemas"]["ShipmentMonitorRowDto"][];
+            total: number;
         };
         GoodsIssueListRowDto: {
             id: string;
@@ -12706,6 +12801,66 @@ export interface operations {
                 };
                 content: {
                     "application/json": Record<string, never>;
+                };
+            };
+        };
+    };
+    ShipmentMonitorController_summary: {
+        parameters: {
+            query: {
+                /** @description Ngày theo giờ Việt Nam `YYYY-MM-DD` cho số đóng gói / bàn giao; bỏ trống = hôm nay. */
+                date?: string;
+                carrierId?: string;
+                /** @description Hãng giữ quá N ngày kể từ lúc rời kho → cảnh báo. */
+                holdDays: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ShipmentMonitorSummaryDto"];
+                };
+            };
+        };
+    };
+    ShipmentMonitorController_list: {
+        parameters: {
+            query: {
+                /** @description Ngày theo giờ Việt Nam `YYYY-MM-DD` cho số đóng gói / bàn giao; bỏ trống = hôm nay. */
+                date?: string;
+                carrierId?: string;
+                /** @description Hãng giữ quá N ngày kể từ lúc rời kho → cảnh báo. */
+                holdDays: number;
+                /**
+                 * @description PACKED = đóng gói xong trong ngày · HANDED_OVER = rời kho trong ngày · HOLDING = hãng đang
+                 *     giữ (đã rời kho, chưa giao xong / hoàn) · OVERDUE = HOLDING quá `holdDays` ngày.
+                 *     HOLDING / OVERDUE là ảnh chụp HIỆN TẠI, không theo `date`.
+                 */
+                view: "PACKED" | "HANDED_OVER" | "HOLDING" | "OVERDUE";
+                /** @description Mã phiếu giao / mã vận đơn (chứa chuỗi) hoặc đúng số đơn bán. */
+                q?: string;
+                take: number;
+                skip: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ShipmentMonitorListDto"];
                 };
             };
         };

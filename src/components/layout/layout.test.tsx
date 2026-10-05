@@ -63,9 +63,11 @@ describe('visibleModules', () => {
     expect(requiredAbilityFor('/fin/invoices')).toEqual({ action: 'read', subject: 'Invoice' });
   });
 
-  it('chỉ có shipment.read → module Kho ẩn (Theo dõi giao hàng đã rút khỏi menu, commit 45e2880)', () => {
+  it('chỉ có shipment.read → module Kho chỉ hiện Theo dõi giao hàng (bật lại 2026-10-05)', () => {
     const mods = visibleModules((a, s) => a === 'read' && s === 'Shipment');
-    expect(mods.map((m) => m.label)).not.toContain('Kho');
+    expect(mods.find((m) => m.label === 'Kho')?.children?.map((c) => c.label)).toEqual([
+      'Theo dõi giao hàng',
+    ]);
   });
 
   it('task.read (PICKER) không mở Bảng điều phối — cần task.read_all (2026-09-15)', () => {
@@ -121,8 +123,8 @@ describe('requiredAbilityFor — quyền mở trang theo URL', () => {
     expect(requiredAbilityFor('/catalog/products')).toEqual({ action: 'read', subject: 'Product' });
   });
 
-  it('route đã rút khỏi menu (/wms/shipping) → không còn gate phía web; API vẫn chặn', () => {
-    expect(requiredAbilityFor('/wms/shipping')).toBeNull();
+  it('/wms/shipping cần shipment.read', () => {
+    expect(requiredAbilityFor('/wms/shipping')).toEqual({ action: 'read', subject: 'Shipment' });
   });
 
   it("route ngoài nav hoặc chưa có quyền backend → null ('/' chỉ khớp chính xác)", () => {
