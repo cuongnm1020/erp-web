@@ -118,6 +118,10 @@ export function makeOrders(n: number) {
     lineWeightKg: LINE_WEIGHTS[i % 5]!,
     weightKg: i % 4 === 0 ? '1.0000' : LINE_WEIGHTS[i % 5]!,
     shippingOptions: null,
+    // Mỗi đơn thứ 7 đồng bộ từ Pancake (id theo shop = 100 + i).
+    pancakeOrderId: i % 7 === 3 ? String(100 + i) : null,
+    pancakeOrderLink:
+      i % 7 === 3 ? `https://pos.pages.fm/shop/715130909/order?order_id=9${100 + i}` : null,
     postedAt:
       ORDER_STATUSES[i % ORDER_STATUSES.length] === 'POSTED' ? '2026-08-24T02:00:00.000Z' : null,
     createdAt: new Date(Date.UTC(2026, 7, 23) - i * 3_600_000).toISOString(),
@@ -825,7 +829,10 @@ export const handlers = [
     let all = makeOrders(60);
     if (q)
       all = all.filter(
-        (o) => o.docNumber.toLowerCase().includes(q) || o.customer.name.toLowerCase().includes(q),
+        (o) =>
+          o.docNumber.toLowerCase().includes(q) ||
+          o.customer.name.toLowerCase().includes(q) ||
+          o.pancakeOrderId === q.replace(/^#/, ''),
       );
     if (status) all = all.filter((o) => o.status === status);
     if (customerId) all = all.filter((o) => o.customer.id === customerId);
