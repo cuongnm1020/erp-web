@@ -93,8 +93,18 @@ describe('visibleModules', () => {
     ]);
   });
 
-  it('admin thấy 6 module (Giá & KM, Tài chính đang ẩn)', () => {
-    expect(visibleModules(() => true)).toHaveLength(6);
+  it('admin thấy 7 module (Giá & KM, Tài chính đang ẩn; có Báo cáo)', () => {
+    expect(visibleModules(() => true)).toHaveLength(7);
+  });
+
+  it('Báo cáo (RPT-07): Doanh thu theo report.sales, Lợi nhuận theo report.profit; URL vẫn gate', () => {
+    const leader = visibleModules((a, s) => s === 'Report' && a === 'sales');
+    expect(leader.find((m) => m.label === 'Báo cáo')?.children?.map((c) => c.label)).toEqual([
+      'Doanh thu bán hàng',
+    ]);
+    expect(visibleModules(() => false).map((m) => m.label)).not.toContain('Báo cáo');
+    expect(requiredAbilityFor('/reports/sales')).toEqual({ action: 'sales', subject: 'Report' });
+    expect(requiredAbilityFor('/fin/profit')).toEqual({ action: 'profit', subject: 'Report' });
   });
 });
 
@@ -154,10 +164,10 @@ describe('<Sidebar>', () => {
     expect(screen.queryByText('Tài chính')).not.toBeInTheDocument();
   });
 
-  it('admin thấy 6 nhóm/mục; Giá & KM và Tài chính đang ẩn', () => {
+  it('admin thấy 7 nhóm/mục; Giá & KM và Tài chính đang ẩn', () => {
     renderSidebar(ADMIN);
     expect(screen.getByRole('link', { name: 'Tổng quan' })).toBeInTheDocument();
-    for (const l of ['Bán hàng', 'Khách hàng', 'Sản phẩm', 'Kho', 'Quản trị']) {
+    for (const l of ['Bán hàng', 'Khách hàng', 'Sản phẩm', 'Kho', 'Báo cáo', 'Quản trị']) {
       expect(screen.getByText(l)).toBeInTheDocument();
     }
     expect(screen.queryByText('Giá & KM')).not.toBeInTheDocument();

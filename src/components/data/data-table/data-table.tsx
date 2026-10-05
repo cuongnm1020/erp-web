@@ -65,6 +65,8 @@ export interface DataTableProps<T> {
   bulkActions?: (selectedIds: string[]) => ReactNode;
   /** Chiều cao vùng cuộn khi virtualize. */
   maxHeight?: string;
+  /** false = bảng không phân trang (API trả đủ dòng, ví dụ báo cáo theo nhân viên) — ẩn thanh trang. */
+  pagination?: boolean;
   className?: string;
 }
 
@@ -88,6 +90,7 @@ export function DataTable<T>({
   onRowClick,
   bulkActions,
   maxHeight = '70vh',
+  pagination = true,
   className,
 }: DataTableProps<T>) {
   // Cột chọn chỉ dùng row/table API, không đọc `selection` — memo theo cờ bật/tắt, KHÔNG theo
@@ -272,14 +275,16 @@ export function DataTable<T>({
           </TableBody>
         </Table>
       </div>
-      <DataTablePagination
-        page={page}
-        size={size}
-        total={total}
-        selectedCount={selectedIds.length}
-        onPageChange={onPageChange}
-        onSizeChange={onSizeChange}
-      />
+      {pagination ? (
+        <DataTablePagination
+          page={page}
+          size={size}
+          total={total}
+          selectedCount={selectedIds.length}
+          onPageChange={onPageChange}
+          onSizeChange={onSizeChange}
+        />
+      ) : null}
     </div>
   );
 }

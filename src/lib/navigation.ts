@@ -2,6 +2,7 @@ import type { LucideIcon } from 'lucide-react';
 import {
   Barcode,
   Boxes,
+  ChartLine,
   Columns3,
   Gauge,
   Gift,
@@ -339,6 +340,29 @@ export const NAV_MODULES: NavModule[] = [
     ],
   },
   {
+    // RPT-07 (2026-10-05): nhóm Báo cáo — module không gắn ability, tự ẩn khi không có mục con
+    // nào được phép. "Lợi nhuận" vẫn nằm trong nhóm Tài chính (đang ẩn) để gate URL như cũ, và
+    // hiện ở đây cho người có report.profit.
+    label: 'Báo cáo',
+    href: '/reports/sales',
+    icon: ChartLine,
+    shortcut: 'g b',
+    children: [
+      {
+        label: 'Doanh thu bán hàng',
+        href: '/reports/sales',
+        icon: ChartLine,
+        ability: { action: 'sales', subject: 'Report' },
+      },
+      {
+        label: 'Lợi nhuận',
+        href: '/fin/profit',
+        icon: Percent,
+        ability: { action: 'profit', subject: 'Report' },
+      },
+    ],
+  },
+  {
     // Không gắn ability ở module: trưởng phòng (không có user.read) vẫn thấy Sơ đồ nhân sự;
     // module tự ẩn khi mọi mục con bị ẩn. Mục con trước đây dựa vào cổng module → gắn read User.
     label: 'Quản trị',
@@ -494,6 +518,7 @@ export const SEGMENT_LABELS: Record<string, string> = {
   loyalty: 'Tích điểm',
   commission: 'Hoa hồng',
   reports: 'Báo cáo',
+  sales: 'Doanh thu bán hàng',
   dashboard: 'Tổng quan',
   users: 'Nhân viên',
   teams: 'Phòng ban & team',

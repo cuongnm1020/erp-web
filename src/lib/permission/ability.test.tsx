@@ -30,6 +30,18 @@ describe('buildAbility', () => {
     expect(a.can('read', 'Role')).toBe(false);
   });
 
+  it('report.sales / report.sales_all → (sales | sales_all, Report) — RPT-07', () => {
+    const leader = buildAbility({ permissions: ['report.sales'], hasGlobalAccess: false });
+    expect(leader.can('sales', 'Report')).toBe(true);
+    expect(leader.can('sales_all', 'Report')).toBe(false);
+    expect(leader.can('profit', 'Report')).toBe(false);
+    const manager = buildAbility({
+      permissions: ['report.sales', 'report.sales_all'],
+      hasGlobalAccess: false,
+    });
+    expect(manager.can('sales_all', 'Report')).toBe(true);
+  });
+
   it('hasGlobalAccess → manage all', () => {
     const a = buildAbility(ADMIN);
     expect(a.can('delete', 'Customer')).toBe(true);

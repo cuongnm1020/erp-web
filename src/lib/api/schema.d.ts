@@ -3108,6 +3108,106 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/reports/sales/timeseries": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * RPT-02 — doanh thu / số đơn / AOV / lãi gộp / hàng hoàn theo ngày | tuần | tháng, kèm kỳ trước
+         *     cùng số ngày (so theo chỉ số điểm).
+         */
+        get: operations["SalesReportController_timeseries"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/reports/sales/by-product": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * RPT-03 — SL / doanh thu (đã phân bổ KM đơn) / giá vốn / lãi gộp / % đóng góp theo SKU, sản
+         *     phẩm, danh mục hoặc thương hiệu, kèm doanh thu kỳ trước. Phân trang take ≤ 200.
+         */
+        get: operations["SalesReportController_byProduct"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/reports/sales/by-staff": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * RPT-04 — doanh thu / số đơn / AOV / lãi gộp / số khách / khách mới / hàng hoàn theo người phụ
+         *     trách hoặc team (snapshot trên đơn), kèm doanh thu kỳ trước.
+         */
+        get: operations["SalesReportController_byStaff"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/reports/sales/top-products": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * RPT-06 — top SKU theo SL / doanh thu / lãi gộp / số đơn / số khách, kèm hạng + giá trị kỳ
+         *     trước và % tăng giảm.
+         */
+        get: operations["SalesReportController_topProducts"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/reports/sales/rollup/rebuild": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * RPT-01b — đánh dấu tính lại bảng tổng hợp ngày cho `from`..`to` (backfill sau deploy / sau
+         *     sửa dữ liệu ngoài luồng). Worker xử lý dần; trong lúc chưa xong báo cáo tự chạy truy vấn sống.
+         */
+        post: operations["SalesReportController_rebuild"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/customers/{id}/orders": {
         parameters: {
             query?: never;
@@ -8211,6 +8311,177 @@ export interface components {
             previousTo: string;
             current: components["schemas"]["SalesKpisDto"];
             previous: components["schemas"]["SalesKpisDto"];
+            /**
+             * @description RPT-01b — số liệu đọc từ bảng tổng hợp ngày (người xem toàn công ty) đúng đến thời điểm này
+             *     (ISO, tính lại mỗi 5 phút); null = truy vấn sống, số liệu tức thời. Số khách luôn đếm sống.
+             */
+            dataAsOf: string | null;
+        };
+        SalesTimeseriesPointDto: {
+            period: string;
+            revenue: string;
+            orderCount: number;
+            aov: string;
+            grossProfit: string;
+            returnedRevenue: string;
+        };
+        SalesTimeseriesTotalsDto: {
+            revenue: string;
+            orderCount: number;
+            aov: string;
+            grossProfit: string;
+            returnedRevenue: string;
+        };
+        SalesTimeseriesDto: {
+            from: string;
+            to: string;
+            /** @description Kỳ trước cùng số ngày, liền trước `from`. */
+            previousFrom: string;
+            previousTo: string;
+            /** @enum {string} */
+            granularity: "day" | "week" | "month";
+            points: components["schemas"]["SalesTimeseriesPointDto"][];
+            /**
+             * @description Cùng độ chia trên kỳ trước — so theo CHỈ SỐ với `points` (điểm thứ i ↔ điểm thứ i). Kỳ trước
+             *     cắt theo số ngày nên số điểm tuần / tháng có thể lệch một so với `points`.
+             */
+            previousPoints: components["schemas"]["SalesTimeseriesPointDto"][];
+            totals: components["schemas"]["SalesTimeseriesTotalsDto"];
+            previousTotals: components["schemas"]["SalesTimeseriesTotalsDto"];
+            /** @description Như {@link SalesSummaryDto.dataAsOf}. */
+            dataAsOf: string | null;
+        };
+        SalesGroupKeyDto: {
+            id: string | null;
+            /** @description Mã SKU / sản phẩm / danh mục / thương hiệu; null với nhóm chưa gán. */
+            code: string | null;
+            name: string;
+        };
+        SalesByProductItemDto: {
+            key: components["schemas"]["SalesGroupKeyDto"];
+            qty: string;
+            revenue: string;
+            cogs: string;
+            grossProfit: string;
+            marginPct: string | null;
+            sharePct: string | null;
+            orderCount: number;
+            previousRevenue: string;
+            growthPct: string | null;
+        };
+        SalesByProductTotalsDto: {
+            qty: string;
+            revenue: string;
+            cogs: string;
+            grossProfit: string;
+            marginPct: string | null;
+            previousRevenue: string;
+            growthPct: string | null;
+        };
+        SalesByProductDto: {
+            from: string;
+            to: string;
+            previousFrom: string;
+            previousTo: string;
+            /** @enum {string} */
+            groupBy: "brand" | "product" | "sku" | "category";
+            /** @description Trang hiện tại (skip / take) sau khi sắp xếp. Nhóm chỉ bán ở kỳ trước không xuất hiện. */
+            items: components["schemas"]["SalesByProductItemDto"][];
+            /** @description Tổng số nhóm (trước phân trang). */
+            total: number;
+            /** @description Tổng mọi nhóm sau lọc (không chỉ trang hiện tại). */
+            totals: components["schemas"]["SalesByProductTotalsDto"];
+            dataAsOf: string | null;
+        };
+        SalesStaffKeyDto: {
+            id: string | null;
+            name: string;
+        };
+        SalesByStaffItemDto: {
+            key: components["schemas"]["SalesStaffKeyDto"];
+            revenue: string;
+            orderCount: number;
+            aov: string;
+            grossProfit: string;
+            customerCount: number;
+            newCustomerCount: number;
+            returnedRevenue: string;
+            returnedOrderCount: number;
+            returnRate: string | null;
+            previousRevenue: string;
+            growthPct: string | null;
+        };
+        SalesByStaffTotalsDto: {
+            revenue: string;
+            orderCount: number;
+            aov: string;
+            grossProfit: string;
+            customerCount: number;
+            newCustomerCount: number;
+            returnedRevenue: string;
+            returnedOrderCount: number;
+            returnRate: string | null;
+            previousRevenue: string;
+            growthPct: string | null;
+        };
+        SalesByStaffDto: {
+            from: string;
+            to: string;
+            previousFrom: string;
+            previousTo: string;
+            /** @enum {string} */
+            groupBy: "team" | "owner";
+            /**
+             * @description Sắp doanh thu giảm dần ("Chưa gán" đứng sau khi bằng nhau). Gồm cả người / team chỉ có doanh
+             *     số kỳ trước (số kỳ này 0). Nhân viên chỉ thấy dòng của mình; trưởng nhóm thấy team mình.
+             */
+            items: components["schemas"]["SalesByStaffItemDto"][];
+            totals: components["schemas"]["SalesByStaffTotalsDto"];
+            dataAsOf: string | null;
+        };
+        SalesTopSkuRefDto: {
+            id: string;
+            code: string;
+            name: string;
+        };
+        SalesTopProductRefDto: {
+            id: string;
+            name: string;
+        };
+        SalesTopProductItemDto: {
+            rank: number;
+            sku: components["schemas"]["SalesTopSkuRefDto"];
+            product: components["schemas"]["SalesTopProductRefDto"];
+            qty: string;
+            revenue: string;
+            grossProfit: string;
+            orderCount: number;
+            customerCount: number;
+            value: string;
+            previousRank: number | null;
+            previousValue: string | null;
+            growthPct: string | null;
+        };
+        SalesTopProductsDto: {
+            from: string;
+            to: string;
+            previousFrom: string;
+            previousTo: string;
+            /** @enum {string} */
+            rankBy: "customers" | "qty" | "revenue" | "orders" | "grossProfit";
+            /** @description Tối đa `limit` SKU, hạng 1..n. Bằng nhau thì doanh thu cao hơn đứng trước. */
+            items: components["schemas"]["SalesTopProductItemDto"][];
+            dataAsOf: string | null;
+        };
+        SalesRollupRebuildDto: {
+            from: string;
+            to: string;
+        };
+        SalesRollupRebuildResultDto: {
+            from: string;
+            to: string;
+            /** @description Số ngày đã đánh dấu tính lại — worker xử lý dần (job `sales-rollup`). */
+            days: number;
         };
         CustomerOrderOwnerDto: {
             id: string;
@@ -14347,6 +14618,182 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["SalesSummaryDto"];
+                };
+            };
+        };
+    };
+    SalesReportController_timeseries: {
+        parameters: {
+            query: {
+                /** @description `YYYY-MM-DD` — ngày đầu (giờ VN). */
+                from: string;
+                /** @description `YYYY-MM-DD` — ngày cuối, lấy hết ngày đó. `to` = `from` → một ngày. */
+                to: string;
+                /** @description Kênh bán. */
+                channel?: "DIRECT" | "MARKETPLACE" | "WEBSITE" | "POS";
+                /** @description Snapshot `SalesOrder.teamId` lúc tạo đơn. */
+                teamId?: string;
+                /** @description Snapshot `SalesOrder.ownerId` lúc tạo đơn. */
+                ownerId?: string;
+                /** @description Kho lấy hàng chọn trên đơn (`SalesOrder.warehouseId`). */
+                warehouseId?: string;
+                customerId?: string;
+                /** @description `day` | `week` (tuần bắt đầu thứ Hai, giờ VN) | `month`. */
+                granularity: "day" | "week" | "month";
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SalesTimeseriesDto"];
+                };
+            };
+        };
+    };
+    SalesReportController_byProduct: {
+        parameters: {
+            query: {
+                /** @description `YYYY-MM-DD` — ngày đầu (giờ VN). */
+                from: string;
+                /** @description `YYYY-MM-DD` — ngày cuối, lấy hết ngày đó. `to` = `from` → một ngày. */
+                to: string;
+                /** @description Kênh bán. */
+                channel?: "DIRECT" | "MARKETPLACE" | "WEBSITE" | "POS";
+                /** @description Snapshot `SalesOrder.teamId` lúc tạo đơn. */
+                teamId?: string;
+                /** @description Snapshot `SalesOrder.ownerId` lúc tạo đơn. */
+                ownerId?: string;
+                /** @description Kho lấy hàng chọn trên đơn (`SalesOrder.warehouseId`). */
+                warehouseId?: string;
+                customerId?: string;
+                groupBy: "sku" | "product" | "category" | "brand";
+                /** @description Tìm theo mã / tên của NHÓM đang xem (SKU, sản phẩm, danh mục hoặc thương hiệu). */
+                q?: string;
+                /** @description Danh mục sản phẩm — gồm cả danh mục con. */
+                categoryId?: string;
+                brandId?: string;
+                /** @description Sắp xếp theo — mặc định `revenue`. */
+                sort?: "revenue" | "qty" | "grossProfit";
+                /** @description Mặc định `desc`. */
+                order?: "asc" | "desc";
+                /** @description Mặc định 50, tối đa 200. */
+                take?: number;
+                skip?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SalesByProductDto"];
+                };
+            };
+        };
+    };
+    SalesReportController_byStaff: {
+        parameters: {
+            query: {
+                /** @description `YYYY-MM-DD` — ngày đầu (giờ VN). */
+                from: string;
+                /** @description `YYYY-MM-DD` — ngày cuối, lấy hết ngày đó. `to` = `from` → một ngày. */
+                to: string;
+                /** @description Kênh bán. */
+                channel?: "DIRECT" | "MARKETPLACE" | "WEBSITE" | "POS";
+                /** @description Snapshot `SalesOrder.teamId` lúc tạo đơn. */
+                teamId?: string;
+                /** @description Snapshot `SalesOrder.ownerId` lúc tạo đơn. */
+                ownerId?: string;
+                /** @description Kho lấy hàng chọn trên đơn (`SalesOrder.warehouseId`). */
+                warehouseId?: string;
+                customerId?: string;
+                groupBy: "owner" | "team";
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SalesByStaffDto"];
+                };
+            };
+        };
+    };
+    SalesReportController_topProducts: {
+        parameters: {
+            query: {
+                /** @description `YYYY-MM-DD` — ngày đầu (giờ VN). */
+                from: string;
+                /** @description `YYYY-MM-DD` — ngày cuối, lấy hết ngày đó. `to` = `from` → một ngày. */
+                to: string;
+                /** @description Kênh bán. */
+                channel?: "DIRECT" | "MARKETPLACE" | "WEBSITE" | "POS";
+                /** @description Snapshot `SalesOrder.teamId` lúc tạo đơn. */
+                teamId?: string;
+                /** @description Snapshot `SalesOrder.ownerId` lúc tạo đơn. */
+                ownerId?: string;
+                /** @description Kho lấy hàng chọn trên đơn (`SalesOrder.warehouseId`). */
+                warehouseId?: string;
+                customerId?: string;
+                rankBy: "qty" | "revenue" | "grossProfit" | "orders" | "customers";
+                /** @description Mặc định 20, tối đa 100. */
+                limit?: number;
+                categoryId?: string;
+                brandId?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SalesTopProductsDto"];
+                };
+            };
+        };
+    };
+    SalesReportController_rebuild: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SalesRollupRebuildDto"];
+            };
+        };
+        responses: {
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SalesRollupRebuildResultDto"];
                 };
             };
         };
