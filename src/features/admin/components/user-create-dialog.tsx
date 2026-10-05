@@ -31,6 +31,7 @@ import {
 } from '@/components/ui/select';
 import { toast } from '@/components/ui/toaster';
 import type { ApiError } from '@/lib/api/errors';
+import { useAbility } from '@/lib/permission';
 import { useDepartments } from '../api/use-departments';
 import { useRoles } from '../api/use-roles';
 import { useCreateUser } from '../api/use-users';
@@ -38,17 +39,25 @@ import { createUserSchema, type CreateUserValues } from '../schema';
 
 const NO_DEPT = '__none__';
 
-/** I-02 Thêm nhân viên — POST /users. Sau khi tạo, phân quyền chi tiết ở màn chi tiết. */
+/**
+ * I-02 Thêm nhân viên — POST /users. Sau khi tạo, phân quyền chi tiết ở màn chi tiết.
+ * `fixedDepartment`: mở từ một ô trên Sơ đồ nhân sự → phòng ban cố định, không tải danh sách
+ * phòng ban (trưởng phòng không có user.read). Vai trò chỉ hiện khi người xem đọc được vai trò.
+ */
 export function UserCreateDialog({
   open,
   onOpenChange,
+  fixedDepartment,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  fixedDepartment?: { id: string; name: string };
 }) {
+  const ability = useAbility();
   const create = useCreateUser();
-  const departments = useDepartments();
-  const roles = useRoles();
+  const departments = useDepartments(fixedDepartment === undefined);
+  const canReadRoles = ability.can('read', 'Role');
+  const roles = useRoles(canReadRoles);
 
   const form = useForm<CreateUserValues>({
     resolver: zodResolver(createUserSchema),
@@ -57,7 +66,7 @@ export function UserCreateDialog({
       fullName: '',
       email: '',
       password: '',
-      departmentId: '',
+      departmentId: fixedDepartment?.id ?? '',
       roleCodes: [],
     },
   });
@@ -75,7 +84,7 @@ export function UserCreateDialog({
       {
         onSuccess: (u) => {
           toast.success('Đã tạo nhân viên', { description: `${u.code} · ${u.fullName}` });
-          form.reset();
+          form.reset({ ...form.formState.defaultValues, departmentId: fixedDepartment?.id ?? '' });
           onOpenChange(false);
         },
         onError: (err) => {
@@ -95,7 +104,9 @@ export function UserCreateDialog({
         <DialogHeader>
           <DialogTitle>Thêm nhân viên</DialogTitle>
           <DialogDescription>
-            Tài khoản mới đăng nhập bằng mã nhân viên và mật khẩu bên dưới.
+            {fixedDepartment
+              ? `Thêm vào ${fixedDepartment.name}. Tài khoản mới đăng nhập bằng mã nhân viên và mật khẩu bên dưới; bạn sẽ là người quản lý tài khoản này.`
+              : 'Tài khoản mới đăng nhập bằng mã nhân viên và mật khẩu bên dưới.'}
           </DialogDescription>
         </DialogHeader>
         <Form {...form}>
@@ -152,65 +163,69 @@ export function UserCreateDialog({
                 </FormItem>
               )}
             />
-            <FormField
-              control={form.control}
-              name="departmentId"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Phòng ban</FormLabel>
-                  <Select
-                    value={field.value || NO_DEPT}
-                    onValueChange={(v) => field.onChange(v === NO_DEPT ? '' : v)}
-                  >
-                    <FormControl>
-                      <SelectTrigger>
-                        <SelectValue placeholder="— Không thuộc phòng ban —" />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      <SelectItem value={NO_DEPT}>— Không thuộc phòng ban —</SelectItem>
-                      {(departments.data ?? []).map((d) => (
-                        <SelectItem key={d.id} value={d.id}>
-                          {d.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            <FormField
-              control={form.control}
-              name="roleCodes"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Vai trò</FormLabel>
-                  <div className="grid grid-cols-2 gap-1.5">
-                    {(roles.data ?? []).map((r) => {
-                      const checked = field.value.includes(r.code);
-                      return (
-                        <label key={r.code} className="flex items-center gap-2 text-sm">
-                          <Checkbox
-                            checked={checked}
-                            onCheckedChange={(v) =>
-                              field.onChange(
-                                v === true
-                                  ? [...field.value, r.code]
-                                  : field.value.filter((c) => c !== r.code),
-                              )
-                            }
-                            aria-label={r.name}
-                          />
-                          {r.name}
-                        </label>
-                      );
-                    })}
-                  </div>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+            {fixedDepartment ? null : (
+              <FormField
+                control={form.control}
+                name="departmentId"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Phòng ban</FormLabel>
+                    <Select
+                      value={field.value || NO_DEPT}
+                      onValueChange={(v) => field.onChange(v === NO_DEPT ? '' : v)}
+                    >
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="— Không thuộc phòng ban —" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value={NO_DEPT}>— Không thuộc phòng ban —</SelectItem>
+                        {(departments.data ?? []).map((d) => (
+                          <SelectItem key={d.id} value={d.id}>
+                            {d.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            )}
+            {canReadRoles ? (
+              <FormField
+                control={form.control}
+                name="roleCodes"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Vai trò</FormLabel>
+                    <div className="grid grid-cols-2 gap-1.5">
+                      {(roles.data ?? []).map((r) => {
+                        const checked = field.value.includes(r.code);
+                        return (
+                          <label key={r.code} className="flex items-center gap-2 text-sm">
+                            <Checkbox
+                              checked={checked}
+                              onCheckedChange={(v) =>
+                                field.onChange(
+                                  v === true
+                                    ? [...field.value, r.code]
+                                    : field.value.filter((c) => c !== r.code),
+                                )
+                              }
+                              aria-label={r.name}
+                            />
+                            {r.name}
+                          </label>
+                        );
+                      })}
+                    </div>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            ) : null}
             {rootError ? <p className="text-sm text-destructive">{rootError}</p> : null}
             <DialogFooter>
               <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>

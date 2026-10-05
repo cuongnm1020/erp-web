@@ -23,10 +23,17 @@ const EMPTY_TREE = {
 
 beforeEach(() => {
   replace.mockClear();
-  search = '';
+  // Mặc định màn mở dạng sơ đồ (org-chart.test.tsx); các test này kiểm dạng danh sách.
+  search = 'view=list';
 });
 
-describe('Cây nhân sự (/admin/org-tree)', () => {
+/** URL gọi router.replace gần nhất, tách query để so không phụ thuộc thứ tự param. */
+const lastReplaceQuery = () => {
+  const url = replace.mock.calls.at(-1)?.[0] as string;
+  return Object.fromEntries(new URLSearchParams(url.split('?')[1] ?? ''));
+};
+
+describe('Sơ đồ nhân sự — dạng danh sách (/admin/org-tree?view=list)', () => {
   it('dựng cây phòng ban lồng nhau: trưởng phòng đứng đầu, phòng ban con dưới, người chưa có phòng ban ở nhóm riêng', async () => {
     renderApp(<OrgTreeScreen />);
     const deptTree = await screen.findByRole('tree', { name: 'Theo phòng ban' });
@@ -82,7 +89,7 @@ describe('Cây nhân sự (/admin/org-tree)', () => {
   });
 
   it('?q= lọc nhân viên trong cả hai cây, giữ cha để thấy đường đi; ô tìm ghi lên URL', async () => {
-    search = 'q=hoa';
+    search = 'view=list&q=hoa';
     renderApp(<OrgTreeScreen />);
     const deptTree = await screen.findByRole('tree', { name: 'Theo phòng ban' });
     expect(within(deptTree).getByRole('link', { name: 'Trần Thị Hoa' })).toBeInTheDocument();
@@ -100,13 +107,11 @@ describe('Cây nhân sự (/admin/org-tree)', () => {
     fireEvent.change(screen.getByRole('textbox', { name: 'Tìm nhân viên' }), {
       target: { value: 'tuấn' },
     });
-    await waitFor(() =>
-      expect(replace).toHaveBeenCalledWith('/admin/org-tree?q=tu%E1%BA%A5n', { scroll: false }),
-    );
+    await waitFor(() => expect(lastReplaceQuery()).toEqual({ view: 'list', q: 'tuấn' }));
   });
 
   it('khớp tên phòng ban / team thì giữ nguyên toàn bộ thành viên của node đó', async () => {
-    search = 'q=kho';
+    search = 'view=list&q=kho';
     renderApp(<OrgTreeScreen />);
     const teamTree = await screen.findByRole('tree', { name: 'Theo team' });
     const wh = within(teamTree).getByRole('treeitem', { name: 'Kho' });
@@ -124,14 +129,15 @@ describe('Cây nhân sự (/admin/org-tree)', () => {
         return HttpResponse.json(ORG_TREE_FIXTURE);
       }),
     );
-    search = 'inactive=1';
+    search = 'view=list&inactive=1';
     renderApp(<OrgTreeScreen />);
     await screen.findByRole('tree', { name: 'Theo phòng ban' });
     expect(queries).toEqual(['true']);
     const box = screen.getByRole('checkbox', { name: 'Hiện đã ngừng hoạt động' });
     expect(box).toHaveAttribute('aria-checked', 'true');
     fireEvent.click(box);
-    await waitFor(() => expect(replace).toHaveBeenCalledWith('/admin/org-tree', { scroll: false }));
+    // Bỏ tick → mất ?inactive, giữ nguyên kiểu xem
+    await waitFor(() => expect(lastReplaceQuery()).toEqual({ view: 'list' }));
   });
 
   it('nhân viên / phòng ban đã ngừng được đánh dấu chứ không ẩn ở client', async () => {

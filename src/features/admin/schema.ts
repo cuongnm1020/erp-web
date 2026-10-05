@@ -14,6 +14,19 @@ export const createUserSchema = z.object({
 export type CreateUserValues = z.infer<typeof createUserSchema>;
 
 /**
+ * Sửa nhân sự từ Sơ đồ nhân sự — khớp UpdateUserDto. Mật khẩu để trống = giữ nguyên;
+ * departmentId '' = bỏ khỏi phòng ban (chỉ người có user.update làm được, server kiểm).
+ */
+export const editStaffSchema = z.object({
+  fullName: createUserSchema.shape.fullName,
+  email: createUserSchema.shape.email,
+  departmentId: z.string(),
+  password: z.union([z.literal(''), createUserSchema.shape.password]),
+});
+
+export type EditStaffValues = z.infer<typeof editStaffSchema>;
+
+/**
  * Khớp CreateDepartmentDto / UpdateDepartmentDto (luật 11). `code` chỉ nhập lúc tạo (bất biến sau đó);
  * parentId / managerId để '' = không có → submit đổi thành undefined (tạo) hoặc null (sửa).
  */
@@ -22,6 +35,11 @@ export const departmentFormSchema = z.object({
   name: z.string().trim().min(1, 'Nhập tên phòng ban').max(200, 'Tối đa 200 ký tự'),
   parentId: z.string(),
   managerId: z.string(),
+  /** Thứ tự trên sơ đồ (0–9999, nhỏ đứng trước) — chuỗi để ô trống = 0. */
+  sortOrder: z
+    .string()
+    .trim()
+    .regex(/^\d{0,4}$/, 'Nhập số nguyên 0–9999'),
   isActive: z.boolean(),
 });
 

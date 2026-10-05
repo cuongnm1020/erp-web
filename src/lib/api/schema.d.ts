@@ -141,6 +141,10 @@ export interface paths {
         };
         get: operations["UserController_list"];
         put?: never;
+        /**
+         * Không gắn @RequirePermission: trưởng phòng (không có user.create) vẫn thêm được nhân sự vào
+         *     phòng ban mình phụ trách — StaffAccessService kiểm trong service.
+         */
         post: operations["UserController_create"];
         delete?: never;
         options?: never;
@@ -161,6 +165,7 @@ export interface paths {
         delete?: never;
         options?: never;
         head?: never;
+        /** Không gắn @RequirePermission — chỉ người tạo tài khoản (hoặc superadmin) sửa được, kiểm trong service. */
         patch: operations["UserController_update"];
         trace?: never;
     };
@@ -1166,7 +1171,8 @@ export interface paths {
         get?: never;
         put?: never;
         post?: never;
-        delete?: never;
+        /** Xóa phòng ban trống (409 DEPARTMENT_NOT_EMPTY nếu còn phòng ban con / nhân sự). */
+        delete: operations["DepartmentController_remove"];
         options?: never;
         head?: never;
         patch: operations["DepartmentController_update"];
@@ -1180,6 +1186,7 @@ export interface paths {
             cookie?: never;
         };
         get?: never;
+        /** Không gắn @RequirePermission — trưởng phòng chuyển nhân sự mình tạo vào phòng ban mình phụ trách. */
         put: operations["DepartmentController_assign"];
         post?: never;
         delete?: never;
@@ -1195,6 +1202,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
+        /** `user.read` HOẶC đang là trưởng phòng — kiểm trong service. */
         get: operations["OrgTreeController_tree"];
         put?: never;
         post?: never;
@@ -3974,6 +3982,8 @@ export interface components {
             /** @description Team user là LEADER (+ team con) — bất biến 9 */
             leaderTeamIds: string[];
             hasGlobalAccess: boolean;
+            /** @description Đang là trưởng phòng ít nhất một phòng ban — web hiện Sơ đồ nhân sự dù không có user.read. */
+            managesDepartments: boolean;
             deviceId?: string;
         };
         PermissionDto: {
@@ -4017,6 +4027,10 @@ export interface components {
             /** @description Quyền hiệu lực sau khi gán (đã tính override). */
             permissions: string[];
         };
+        UserCreatorDto: {
+            id: string;
+            fullName: string;
+        };
         UserListItemDto: {
             id: string;
             code: string;
@@ -4027,6 +4041,9 @@ export interface components {
             roleCodes: string[];
             isActive: boolean;
             isSuperAdmin: boolean;
+            createdBy: components["schemas"]["UserCreatorDto"] | null;
+            /** @description Người đang gọi được sửa / khóa / chuyển phòng ban tài khoản này (chỉ để ẩn nút — server vẫn kiểm). */
+            canManage: boolean;
             createdAt: string;
             updatedAt: string;
         };
@@ -4077,6 +4094,9 @@ export interface components {
             deny: string[];
             isActive: boolean;
             isSuperAdmin: boolean;
+            createdBy: components["schemas"]["UserCreatorDto"] | null;
+            /** @description Người đang gọi được sửa / khóa / chuyển phòng ban tài khoản này (chỉ để ẩn nút — server vẫn kiểm). */
+            canManage: boolean;
             createdAt: string;
             updatedAt: string;
         };
@@ -5437,6 +5457,7 @@ export interface components {
             name: string;
             parentId: string | null;
             managerId: string | null;
+            sortOrder: number;
             isActive: boolean;
             _count: components["schemas"]["DepartmentCountDto"];
         };
@@ -5445,8 +5466,13 @@ export interface components {
             name: string;
             /** Format: uuid */
             parentId?: string;
-            /** Format: uuid */
+            /**
+             * Format: uuid
+             * @description Trưởng phòng — được thêm nhân sự vào phòng ban này và các phòng ban con.
+             */
             managerId?: string;
+            /** @description Thứ tự giữa các phòng ban cùng cha trên sơ đồ (nhỏ đứng trước). */
+            sortOrder?: number;
         };
         UpdateDepartmentDto: {
             name?: string;
@@ -5454,6 +5480,7 @@ export interface components {
             parentId?: string | null;
             /** Format: uuid */
             managerId?: string | null;
+            sortOrder?: number;
             isActive?: boolean;
         };
         OrgEmployeeDto: {
@@ -5463,6 +5490,10 @@ export interface components {
             email: string;
             isActive: boolean;
             departmentId: string | null;
+            /** @description Người tạo tài khoản (NULL = tạo trước khi ghi nhận / từ seed — chỉ superadmin quản lý). */
+            createdById: string | null;
+            /** @description Người đang xem được sửa / khóa / chuyển phòng ban người này (chỉ để ẩn nút — server vẫn kiểm). */
+            canManage: boolean;
         };
         OrgDepartmentNodeDto: {
             id: string;
@@ -5470,6 +5501,12 @@ export interface components {
             name: string;
             isActive: boolean;
             managerId: string | null;
+            /** @description Tên trưởng phòng (kể cả khi trưởng phòng đã khóa / thuộc phòng ban khác). */
+            managerName: string | null;
+            /** @description Thứ tự giữa các phòng ban cùng cha (nhỏ đứng trước). */
+            sortOrder: number;
+            /** @description Người đang xem được thêm nhân sự vào phòng ban này (user.create hoặc là trưởng phòng / phòng cha). */
+            canAddMembers: boolean;
             /** @description Nhân viên thuộc TRỰC TIẾP phòng ban này (trưởng phòng xếp đầu, rồi theo tên). */
             members: components["schemas"]["OrgEmployeeDto"][];
             /** @description Tổng nhân viên của phòng ban + toàn bộ phòng ban con. */
@@ -5483,6 +5520,10 @@ export interface components {
             email: string;
             isActive: boolean;
             departmentId: string | null;
+            /** @description Người tạo tài khoản (NULL = tạo trước khi ghi nhận / từ seed — chỉ superadmin quản lý). */
+            createdById: string | null;
+            /** @description Người đang xem được sửa / khóa / chuyển phòng ban người này (chỉ để ẩn nút — server vẫn kiểm). */
+            canManage: boolean;
             /** @enum {string} */
             role: "LEADER" | "MEMBER";
             joinedAt: string;
@@ -11147,6 +11188,25 @@ export interface operations {
         };
         responses: {
             201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    DepartmentController_remove: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            204: {
                 headers: {
                     [name: string]: unknown;
                 };

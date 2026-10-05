@@ -1,6 +1,8 @@
 'use client';
 
+import { MoreHorizontal, Pencil, Trash2 } from 'lucide-react';
 import { Fragment, useMemo, useState } from 'react';
+import { ConfirmDialog } from '@/components/data/confirm-dialog';
 import { QueryState } from '@/components/data/states';
 import { StatusBadge } from '@/components/data/status-badge';
 import { PageHeader } from '@/components/layout/page-header';
@@ -14,6 +16,12 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
@@ -29,7 +37,7 @@ import { messageFor } from '@/lib/error-messages';
 import { Can, useAbility } from '@/lib/permission';
 import { cn } from '@/lib/cn';
 import { usePermissions, type Permission } from '../api/use-permissions';
-import { useCreateRole, useUpdateRole, type Role } from '../api/use-roles';
+import { useCreateRole, useDeleteRole, useUpdateRole, type Role } from '../api/use-roles';
 import { actionLabel, moduleLabel } from '../labels';
 import { useRoles } from '../api/use-roles';
 
@@ -100,9 +108,125 @@ function CreateRoleDialog({
   );
 }
 
+/** Sửa tên / mô tả vai trò — PUT /roles/:code không kèm `permissions` (giữ nguyên quyền). */
+function EditRoleDialog({
+  role,
+  onOpenChange,
+}: {
+  role: Role;
+  onOpenChange: (o: boolean) => void;
+}) {
+  const update = useUpdateRole();
+  const [name, setName] = useState(role.name);
+  const [description, setDescription] = useState(role.description ?? '');
+  return (
+    <Dialog open onOpenChange={(o) => !update.isPending && onOpenChange(o)}>
+      <DialogContent className="sm:max-w-sm">
+        <DialogHeader>
+          <DialogTitle>Sửa vai trò {role.code}</DialogTitle>
+          <DialogDescription>Mã vai trò không đổi được. Quyền sửa trên ma trận.</DialogDescription>
+        </DialogHeader>
+        <div className="space-y-3">
+          <label className="block text-sm">
+            Tên hiển thị
+            <Input value={name} onChange={(e) => setName(e.target.value)} autoFocus />
+          </label>
+          <label className="block text-sm">
+            Mô tả
+            <Input
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              placeholder="Không bắt buộc"
+            />
+          </label>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" disabled={update.isPending} onClick={() => onOpenChange(false)}>
+            Hủy
+          </Button>
+          <Button
+            disabled={update.isPending || !name.trim()}
+            onClick={() =>
+              update.mutate(
+                {
+                  code: role.code,
+                  name: name.trim(),
+                  description: description.trim() || undefined,
+                },
+                {
+                  onSuccess: () => {
+                    toast.success('Đã lưu thay đổi', {
+                      description: `${role.code} · ${name.trim()}`,
+                    });
+                    onOpenChange(false);
+                  },
+                  onError: (err) => toast.error(messageFor(err)),
+                },
+              )
+            }
+          >
+            Lưu thay đổi
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+/** Menu trên đầu cột vai trò: sửa tên / mô tả, xóa (409 ROLE_IN_USE nếu còn người giữ). */
+function RoleMenu({ role }: { role: Role }) {
+  const remove = useDeleteRole();
+  const [editing, setEditing] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  return (
+    <>
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-6 w-6"
+            aria-label={`Thao tác vai trò ${role.name}`}
+          >
+            <MoreHorizontal className="h-4 w-4" aria-hidden />
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="center">
+          <DropdownMenuItem onSelect={() => setEditing(true)}>
+            <Pencil aria-hidden />
+            Sửa vai trò
+          </DropdownMenuItem>
+          <DropdownMenuItem className="text-destructive" onSelect={() => setDeleting(true)}>
+            <Trash2 aria-hidden />
+            Xóa vai trò
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
+      {editing ? <EditRoleDialog role={role} onOpenChange={setEditing} /> : null}
+      <ConfirmDialog
+        open={deleting}
+        onOpenChange={setDeleting}
+        title={`Xóa vai trò ${role.name}?`}
+        description={
+          role.memberCount > 0
+            ? `Vai trò đang gán cho ${role.memberCount} người — gỡ vai trò khỏi họ ở màn Nhân viên trước, nếu không sẽ không xóa được.`
+            : 'Vai trò và các quyền đã tick sẽ bị xóa. Không hoàn tác được.'
+        }
+        confirmLabel="Xóa vai trò"
+        onConfirm={() =>
+          remove.mutateAsync(role.code).then(
+            () => toast.success('Đã xóa vai trò', { description: role.code }),
+            (err: unknown) => toast.error(messageFor(err)),
+          )
+        }
+      />
+    </>
+  );
+}
+
 /**
  * I-03 Ma trận vai trò × quyền — GET /roles + GET /permissions, lưu PUT /roles/:code
- * (thay toàn bộ danh sách permission của từng role có thay đổi).
+ * (thay toàn bộ danh sách permission của từng role có thay đổi). Đầu cột có menu sửa / xóa vai trò.
  */
 export function RolesScreen() {
   const roles = useRoles();
@@ -209,7 +333,12 @@ export function RolesScreen() {
                   <TableHead className="min-w-64 px-2.5">Quyền</TableHead>
                   {roleList.map((r) => (
                     <TableHead key={r.code} className="px-2.5 text-center">
-                      <div className="font-semibold">{r.name}</div>
+                      <div className="flex items-center justify-center gap-0.5">
+                        <span className="font-semibold">{r.name}</span>
+                        <Can I="update" a="Role">
+                          <RoleMenu role={r} />
+                        </Can>
+                      </div>
                       <div className="text-xs font-normal text-muted-foreground">
                         {r.memberCount} người
                       </div>

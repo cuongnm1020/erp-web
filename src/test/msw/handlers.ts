@@ -643,6 +643,14 @@ const ORG_EMP = (i: number, departmentId: string | null, isActive = true) => ({
   email: `nv${i}@erp.local`,
   isActive,
   departmentId,
+  createdById: null,
+  canManage: true,
+});
+/** Field sơ đồ nhân sự của node phòng ban (GET /org/tree). */
+const ORG_DEPT_EXTRA = (managerName: string | null, sortOrder = 0) => ({
+  managerName,
+  sortOrder,
+  canAddMembers: true,
 });
 export const ORG_TREE_FIXTURE = {
   departments: [
@@ -652,6 +660,7 @@ export const ORG_TREE_FIXTURE = {
       name: 'Kinh doanh',
       isActive: true,
       managerId: uuid('0000000e', 1),
+      ...ORG_DEPT_EXTRA('Nguyễn Văn Lãnh'),
       members: [ORG_EMP(1, uuid('0000000c', 0))],
       memberCount: 3,
       children: [
@@ -661,6 +670,7 @@ export const ORG_TREE_FIXTURE = {
           name: 'Kinh doanh Hà Nội',
           isActive: true,
           managerId: null,
+          ...ORG_DEPT_EXTRA(null),
           members: [ORG_EMP(2, uuid('0000000c', 1)), ORG_EMP(3, uuid('0000000c', 1))],
           memberCount: 2,
           children: [],

@@ -135,6 +135,15 @@ const MESSAGES: Record<string, string> = {
     'Nhóm này đã thay đổi từ lúc hiển thị (có đơn bị huỷ, đã gán hoặc đã vào lượt khác). Danh sách gợi ý đã tải lại — chọn lại nhóm.',
   SYNC_ACTOR_NOT_FOUND: 'Tài khoản hệ thống cho đồng bộ chưa được tạo. Báo IT chạy seed dữ liệu.',
   SYNC_ACTOR_MISCONFIGURED: 'Tài khoản hệ thống cho đồng bộ đang sai cấu hình. Báo IT kiểm tra.',
+  // Sơ đồ nhân sự — ai được quản lý ai (StaffAccessService)
+  STAFF_NOT_OWNED:
+    'Bạn chỉ quản lý được nhân sự do chính mình tạo. Nhờ người đã tạo tài khoản này hoặc quản trị hệ thống.',
+  DEPARTMENT_NOT_MANAGED:
+    'Bạn chỉ thêm / chuyển nhân sự vào phòng ban mình phụ trách. Chọn phòng ban khác.',
+  ROLE_ESCALATION: 'Không gán được vai trò có quyền bạn không có. Bỏ chọn vai trò đó.',
+  DEPARTMENT_NOT_EMPTY:
+    'Phòng ban còn phòng ban con hoặc còn nhân sự. Chuyển họ sang phòng ban khác rồi xóa lại.',
+  ROLE_IN_USE: 'Vai trò đang gán cho người dùng. Gỡ vai trò khỏi họ ở màn Nhân viên rồi xóa lại.',
 };
 
 const BY_STATUS: Record<number, string> = {

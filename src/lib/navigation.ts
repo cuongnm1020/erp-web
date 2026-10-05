@@ -339,10 +339,11 @@ export const NAV_MODULES: NavModule[] = [
     ],
   },
   {
+    // Không gắn ability ở module: trưởng phòng (không có user.read) vẫn thấy Sơ đồ nhân sự;
+    // module tự ẩn khi mọi mục con bị ẩn. Mục con trước đây dựa vào cổng module → gắn read User.
     label: 'Quản trị',
-    href: '/admin/users',
+    href: '/admin/org-tree',
     icon: Settings,
-    ability: { action: 'read', subject: 'User' },
     shortcut: 'g q',
     children: [
       {
@@ -351,12 +352,17 @@ export const NAV_MODULES: NavModule[] = [
         icon: UserCog,
         ability: { action: 'read', subject: 'User' },
       },
-      { label: 'Phòng ban & team', href: '/admin/teams', icon: Network },
       {
-        label: 'Cây nhân sự',
+        label: 'Phòng ban & team',
+        href: '/admin/teams',
+        icon: Network,
+        ability: { action: 'read', subject: 'User' },
+      },
+      {
+        label: 'Sơ đồ nhân sự',
         href: '/admin/org-tree',
         icon: ListTree,
-        ability: { action: 'read', subject: 'User' },
+        ability: { action: 'view', subject: 'OrgChart' },
       },
       {
         label: 'Vai trò & quyền',
@@ -364,7 +370,12 @@ export const NAV_MODULES: NavModule[] = [
         icon: ShieldCheck,
         ability: { action: 'read', subject: 'Role' },
       },
-      { label: 'Thiết bị PDA', href: '/admin/pda-devices', icon: Smartphone },
+      {
+        label: 'Thiết bị PDA',
+        href: '/admin/pda-devices',
+        icon: Smartphone,
+        ability: { action: 'read', subject: 'User' },
+      },
       {
         label: 'Nhật ký audit',
         href: '/admin/audit',
