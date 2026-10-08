@@ -47,6 +47,7 @@ import {
   useAssignTask,
   useAssignTasksBulk,
   useReplanShortages,
+  useTaskCounts,
   useTasks,
   useUnassignTask,
   useWarehouseStaff,
@@ -561,6 +562,12 @@ export function DispatchScreen() {
     ...lineFilter(lines),
     ...skipTake,
   });
+  // Số việc của MỌI tab trạng thái (cùng bộ lọc) — trước đây chỉ tab đang mở có số, nên việc
+  // nằm ở "Đã giao" bị tưởng là mất.
+  const tabCounts = useTaskCounts(
+    TABS.map((t) => t.status),
+    { type, warehouseId, assignedTo, ...lineFilter(lines) },
+  );
   // Gợi ý gộp: luôn gọi (không lọc cấp) để hai tab hiện số nhóm; mở tab nào thì lọc đúng cấp đó.
   const suggestions = useWaveSuggestions({ warehouseId, packLevel: merge ?? undefined });
 
@@ -692,10 +699,12 @@ export function DispatchScreen() {
         ) : null}
       </div>
 
-      {/* Tab trạng thái trên URL — chỉ tab đang mở tải dữ liệu; số đếm là `total` của tab đó. */}
+      {/* Tab trạng thái trên URL — chỉ tab đang mở tải bảng; tab nào cũng có số đếm (take=1). */}
       <div className="flex border-b" role="tablist" aria-label="Trạng thái điều phối">
-        {TABS.map((t) => {
+        {TABS.map((t, i) => {
           const active = merge === null && t.status === status;
+          const countQuery = tabCounts[i]!;
+          const count = countQuery.data;
           return (
             <button
               key={t.status}
@@ -717,11 +726,16 @@ export function DispatchScreen() {
               )}
             >
               {t.title}
-              {active ? (
-                <span className="rounded-full bg-muted px-1.5 text-xs font-normal tabular-nums text-muted-foreground">
-                  {query.data ? query.data.total : query.error ? '—' : '…'}
-                </span>
-              ) : null}
+              <span
+                className={cn(
+                  'rounded-full px-1.5 text-xs font-normal tabular-nums',
+                  count && !active
+                    ? 'bg-primary/10 text-primary'
+                    : 'bg-muted text-muted-foreground',
+                )}
+              >
+                {count ?? (countQuery.error ? '—' : '…')}
+              </span>
             </button>
           );
         })}
