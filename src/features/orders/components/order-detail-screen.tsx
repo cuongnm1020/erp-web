@@ -53,6 +53,7 @@ import {
   orderChannelLabel,
   orderStatusLabel,
   orderStatusTone,
+  manualDiscountNote,
 } from '../labels';
 import { groupOrderLines } from '../combo-lines';
 import { OrderPrintSheet } from './order-print-sheet';
@@ -666,7 +667,15 @@ function Detail({ order }: { order: SalesOrderDetail }) {
 
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <KpiCard label="Tạm tính" value={money(order.subtotal)} detail="trước thuế và vận chuyển" />
-        <KpiCard label="Chiết khấu" value={money(order.discount)} detail="giảm trừ khuyến mãi" />
+        <KpiCard
+          label="Chiết khấu"
+          value={money(order.discount)}
+          detail={
+            manualDiscountNote(order)
+              ? `khuyến mãi + ${manualDiscountNote(order)}`
+              : 'giảm trừ khuyến mãi'
+          }
+        />
         <KpiCard label="Thuế" value={money(order.taxAmount)} detail="theo dòng hàng" />
         <KpiCard label="Tổng cộng" value={money(order.total)} detail={order.currencyCode} />
       </div>
