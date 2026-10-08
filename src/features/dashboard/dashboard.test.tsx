@@ -130,6 +130,8 @@ const ORDERS: SalesOrderList = {
       lineCount: 2,
       subtotal: '1596400.0000',
       discount: '0.0000',
+      manualDiscount: '0.0000',
+      manualDiscountRate: null,
       taxAmount: '0.0000',
       shippingFee: '0.0000',
       total: '1596400.0000',

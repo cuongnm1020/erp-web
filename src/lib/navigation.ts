@@ -1,7 +1,9 @@
 import type { LucideIcon } from 'lucide-react';
 import {
+  ArrowLeftRight,
   Barcode,
   Boxes,
+  CalendarClock,
   ChartLine,
   Columns3,
   Gauge,
@@ -23,13 +25,16 @@ import {
   Plus,
   ReceiptText,
   Repeat,
+  ScanBarcode,
   ScrollText,
   Settings,
   ShieldCheck,
   ShoppingCart,
   Smartphone,
   Star,
+  Table2,
   Tag,
+  Tags,
   TicketPercent,
   TrendingDown,
   TrendingUp,
@@ -132,7 +137,13 @@ export const NAV_MODULES: NavModule[] = [
         // Chỉ leader (customer.assign) — member không có mục này trong sidebar.
         ability: { action: 'assign', subject: 'Customer' },
       },
-      // { label: 'Nhóm · cấp độ · tag', href: '/crm/segments', icon: Tags },
+      {
+        label: 'Nhóm · cấp độ · tag',
+        href: '/crm/segments',
+        icon: Tags,
+        // CRM-02: nút tạo/sửa/xoá trong màn tự gate theo create/update/delete Customer.
+        ability: { action: 'read', subject: 'Customer' },
+      },
       {
         label: 'Gộp khách trùng',
         href: '/crm/customers/duplicates',
@@ -185,12 +196,12 @@ export const NAV_MODULES: NavModule[] = [
         icon: Barcode,
         ability: { action: 'read', subject: 'Product' },
       },
-      // {
-      //   label: 'Lô & hạn dùng',
-      //   href: '/catalog/lots',
-      //   icon: CalendarClock,
-      //   ability: { action: 'read', subject: 'Stock' },
-      // },
+      {
+        label: 'Lô & hạn dùng',
+        href: '/catalog/lots',
+        icon: CalendarClock,
+        ability: { action: 'read', subject: 'Stock' },
+      },
       {
         label: 'Nhà cung cấp',
         href: '/catalog/suppliers',
@@ -267,24 +278,30 @@ export const NAV_MODULES: NavModule[] = [
         icon: PackagePlus,
         ability: { action: 'execute', subject: 'Task' },
       },
-      // {
-      //   label: 'Chuyển kho',
-      //   href: '/wms/transfers',
-      //   icon: ArrowLeftRight,
-      //   ability: { action: 'read', subject: 'Stock' },
-      // },
+      {
+        label: 'Lấy hàng (PDA)',
+        href: '/pda/pick',
+        icon: ScanBarcode,
+        ability: { action: 'execute', subject: 'Task' },
+      },
+      {
+        label: 'Chuyển kho',
+        href: '/wms/transfers',
+        icon: ArrowLeftRight,
+        ability: { action: 'read', subject: 'Stock' },
+      },
       // {
       //   label: 'Purchase order',
       //   href: '/wms/po',
       //   icon: ClipboardList,
       //   ability: { action: 'read', subject: 'PurchaseOrder' },
       // },
-      // {
-      //   label: 'Kiểm kê',
-      //   href: '/wms/stocktake',
-      //   icon: Table2,
-      //   ability: { action: 'read', subject: 'Stock' },
-      // },
+      {
+        label: 'Kiểm kê',
+        href: '/wms/stocktake',
+        icon: Table2,
+        ability: { action: 'read', subject: 'Stock' },
+      },
       // {
       //   label: 'Điều chỉnh tồn',
       //   href: '/wms/adjustments',

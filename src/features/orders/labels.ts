@@ -1,4 +1,6 @@
+import Decimal from 'decimal.js';
 import type { StatusTone } from '@/components/data/status-badge';
+import { formatMoney } from '@/lib/format';
 import type { SalesOrderChannel, SalesOrderDetail, SalesOrderStatus } from './api/use-orders';
 
 /**
@@ -155,4 +157,18 @@ export function manualFulfilTargets(status: OrderFulfilmentStatus): FulfilTarget
     default:
       return [];
   }
+}
+
+/**
+ * Phần giảm giá cấp đơn sale nhập tay (đã nằm trong `discount`): "giảm tay 15.000" hoặc
+ * "giảm tay 10% = 27.000". null = đơn không có giảm tay.
+ */
+export function manualDiscountNote(
+  o: Pick<SalesOrderDetail, 'manualDiscount' | 'manualDiscountRate'>,
+): string | null {
+  if (!o.manualDiscount || new Decimal(o.manualDiscount).isZero()) return null;
+  const amount = formatMoney(o.manualDiscount, { unit: '' });
+  if (!o.manualDiscountRate) return `giảm tay ${amount}`;
+  const pct = new Decimal(o.manualDiscountRate).mul(100).toDecimalPlaces(2).toString();
+  return `giảm tay ${pct}% = ${amount}`;
 }

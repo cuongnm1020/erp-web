@@ -46,6 +46,7 @@ import {
   orderStatusLabel,
   orderStatusTone,
   type FulfilTarget,
+  manualDiscountNote,
 } from '../labels';
 
 /**
@@ -469,6 +470,11 @@ function Editor({ order }: { order: SalesOrderDetail }) {
             <div className="py-1">
               <Row label="Tạm tính">{money(order.subtotal)} ₫</Row>
               <Row label="Giảm giá">{money(order.discount)} ₫</Row>
+              {manualDiscountNote(order) ? (
+                <p className="px-3 pb-1 text-right text-xs text-muted-foreground">
+                  trong đó {manualDiscountNote(order)} ₫
+                </p>
+              ) : null}
               <Row label="Phí vận chuyển (thu khách)">{money(order.shippingFee)} ₫</Row>
               <Row label="Thuế">{money(order.taxAmount)} ₫</Row>
             </div>

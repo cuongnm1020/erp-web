@@ -53,8 +53,10 @@ import {
   createOrderSchema,
   EMPTY_LINE,
   ORDER_CHANNELS,
+  previewManualDiscount,
   toCreateOrderBody,
   type CreateOrderValues,
+  type ManualDiscountType,
 } from '../schema';
 
 /**
@@ -101,6 +103,8 @@ export function OrderCreateScreen() {
       addressId: '',
       channel: 'DIRECT',
       shippingFee: '',
+      manualDiscountType: 'AMOUNT',
+      manualDiscountValue: '',
       lines: [EMPTY_LINE],
     },
   });
@@ -108,6 +112,8 @@ export function OrderCreateScreen() {
   const customerId = useWatch({ control: form.control, name: 'customerId' });
   const channel = useWatch({ control: form.control, name: 'channel' });
   const shippingFee = useWatch({ control: form.control, name: 'shippingFee' });
+  const manualType = useWatch({ control: form.control, name: 'manualDiscountType' });
+  const manualValue = useWatch({ control: form.control, name: 'manualDiscountValue' });
   // Địa chỉ giao của khách đã chọn (GET /customers/{id} có `addresses`): đổi khách → chọn lại
   // địa chỉ mặc định; không có mặc định mà chỉ một địa chỉ → địa chỉ đó; còn lại để trống
   // (server cũng tự rơi về mặc định nếu client không gửi).
@@ -131,9 +137,17 @@ export function OrderCreateScreen() {
     return { value: sum.toFixed(4), missing: totals.length - known.length };
   }, [lineTotals, lines.fields]);
   const shipValid = /^\d{1,14}(\.\d{1,4})?$/.test(shippingFee ?? '');
+  const manualPreview = previewManualDiscount(manualType, manualValue, subtotal.value);
+  const manualTooBig =
+    manualPreview !== null &&
+    subtotal.value !== null &&
+    new Decimal(manualPreview).greaterThan(subtotal.value);
   const grandTotal =
     subtotal.value !== null
-      ? new Decimal(subtotal.value).plus(shipValid ? (shippingFee as string) : '0').toFixed(4)
+      ? new Decimal(subtotal.value)
+          .minus(manualPreview ?? '0')
+          .plus(shipValid ? (shippingFee as string) : '0')
+          .toFixed(4)
       : null;
 
   const prefilled = useRef(false);
@@ -145,6 +159,18 @@ export function OrderCreateScreen() {
       addressId: source.data.addressId ?? '',
       channel: source.data.channel,
       shippingFee: source.data.shippingFee,
+      // Giảm tay cấp đơn của đơn cũ: theo % thì giữ %, không thì giữ số tiền.
+      ...(source.data.manualDiscountRate
+        ? {
+            manualDiscountType: 'PERCENT' as const,
+            manualDiscountValue: new Decimal(source.data.manualDiscountRate).mul(100).toString(),
+          }
+        : {
+            manualDiscountType: 'AMOUNT' as const,
+            manualDiscountValue: new Decimal(source.data.manualDiscount || 0).isZero()
+              ? ''
+              : new Decimal(source.data.manualDiscount).toString(),
+          }),
       // Dòng quà do KM sinh — engine sẽ tự sinh lại nếu còn KM; dòng thành phần combo gộp
       // về một dòng combo (server bung lại khi chốt).
       lines: collapseComboLines(source.data.lines.filter((l) => !l.isGift)).map((l) => ({
@@ -191,7 +217,7 @@ export function OrderCreateScreen() {
             }
           }
           applyServerErrors(form, err as ApiError, {
-            knownFields: ['customerId', 'channel', 'shippingFee', 'lines'],
+            knownFields: ['customerId', 'channel', 'shippingFee', 'manualDiscountValue', 'lines'],
           });
           const root = form.formState.errors.root?.server?.message;
           if (root) toast.error(root);
@@ -350,6 +376,61 @@ export function OrderCreateScreen() {
                 <dt className="text-muted-foreground">Khuyến mãi</dt>
                 <dd className="text-xs text-muted-foreground">tính khi chốt</dd>
               </div>
+              <div className="flex items-start justify-between gap-3">
+                <dt className="shrink-0 pt-2 text-muted-foreground">Giảm giá</dt>
+                <dd className="flex w-44 flex-col items-end gap-1">
+                  <div className="flex w-full gap-1">
+                    <DiscountTypeToggle
+                      value={manualType}
+                      onChange={(t) => {
+                        form.setValue('manualDiscountType', t);
+                        form.setValue('manualDiscountValue', '');
+                        form.clearErrors('manualDiscountValue');
+                      }}
+                    />
+                    <FormField
+                      control={form.control}
+                      name="manualDiscountValue"
+                      render={({ field }) => (
+                        <FormItem className="min-w-0 flex-1">
+                          <FormLabel className="sr-only">
+                            {manualType === 'PERCENT' ? 'Giảm giá (%)' : 'Giảm giá (số tiền)'}
+                          </FormLabel>
+                          <FormControl>
+                            {manualType === 'PERCENT' ? (
+                              <Input
+                                inputMode="decimal"
+                                placeholder="0"
+                                className="text-right tabular-nums"
+                                value={field.value ?? ''}
+                                onChange={field.onChange}
+                                onBlur={field.onBlur}
+                                name={field.name}
+                                ref={field.ref}
+                              />
+                            ) : (
+                              <MoneyInput value={field.value ?? ''} onChange={field.onChange} />
+                            )}
+                          </FormControl>
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+                  {form.formState.errors.manualDiscountValue ? (
+                    <p className="text-right text-xs text-destructive">
+                      {form.formState.errors.manualDiscountValue.message}
+                    </p>
+                  ) : manualTooBig ? (
+                    <p className="text-right text-xs text-destructive">
+                      Vượt tạm tính — hệ thống sẽ từ chối khi chốt.
+                    </p>
+                  ) : manualPreview !== null && manualType === 'PERCENT' ? (
+                    <p className="text-xs tabular-nums text-muted-foreground">
+                      −{formatMoney(manualPreview, { unit: '' })}
+                    </p>
+                  ) : null}
+                </dd>
+              </div>
               <div className="flex items-center justify-between">
                 <dt className="text-muted-foreground">Thuế (VAT)</dt>
                 <dd className="text-xs text-muted-foreground">chưa cấu hình</dd>
@@ -380,7 +461,8 @@ export function OrderCreateScreen() {
               </div>
               <p className="text-xs text-muted-foreground">
                 Giá xem trước theo bảng giá của khách; số CUỐI do hệ thống chốt khi bấm Chốt đơn
-                (gồm khuyến mãi). Đơn vượt ngưỡng sẽ tự chuyển chờ duyệt.
+                (gồm khuyến mãi — giảm giá tay tính trên phần còn lại sau khuyến mãi). Đơn vượt
+                ngưỡng sẽ tự chuyển chờ duyệt.
               </p>
             </dl>
           </section>
@@ -436,6 +518,45 @@ export function OrderCreateScreen() {
         </section>
       </form>
     </Form>
+  );
+}
+
+/** Chọn giảm theo số tiền (₫) hay theo %. */
+function DiscountTypeToggle({
+  value,
+  onChange,
+}: {
+  value: ManualDiscountType;
+  onChange: (t: ManualDiscountType) => void;
+}) {
+  const options: { type: ManualDiscountType; label: string; title: string }[] = [
+    { type: 'AMOUNT', label: '₫', title: 'Giảm theo số tiền' },
+    { type: 'PERCENT', label: '%', title: 'Giảm theo phần trăm' },
+  ];
+  return (
+    <div
+      role="radiogroup"
+      aria-label="Kiểu giảm giá"
+      className="flex h-9 shrink-0 rounded-md border"
+    >
+      {options.map((o) => (
+        <button
+          key={o.type}
+          type="button"
+          role="radio"
+          aria-checked={value === o.type}
+          title={o.title}
+          onClick={() => onChange(o.type)}
+          className={
+            value === o.type
+              ? 'w-7 rounded-md bg-primary text-xs font-semibold text-primary-foreground'
+              : 'w-7 rounded-md text-xs text-muted-foreground hover:bg-muted'
+          }
+        >
+          {o.label}
+        </button>
+      ))}
+    </div>
   );
 }
 

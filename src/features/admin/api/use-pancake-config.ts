@@ -70,3 +70,60 @@ export function useVerifyPancakeConfig() {
     onSettled: () => void qc.invalidateQueries({ queryKey: pancakeConfigKeys.all }),
   });
 }
+
+export type PancakeShopProducts = components['schemas']['PancakeShopProductsDto'];
+export type PancakeShopProduct = components['schemas']['PancakeShopProductDto'];
+export type UpdateShopProductsInput = components['schemas']['UpdateShopProductsDto'];
+export type ProductPickItem = components['schemas']['ProductListItemDto'];
+
+export const pancakeShopProductKeys = {
+  detail: (shopId: string) => [...pancakeConfigKeys.all, 'products', shopId] as const,
+};
+
+/** GET /pancake-sync/config/{shopId}/products — sản phẩm bán trên shop (POS) này. */
+export function usePancakeShopProducts(shopId: string) {
+  return useQuery({
+    queryKey: pancakeShopProductKeys.detail(shopId),
+    queryFn: () =>
+      unwrap(
+        api.GET('/pancake-sync/config/{shopId}/products', {
+          params: { path: { shopId: Number(shopId) } },
+        }),
+      ),
+  });
+}
+
+/**
+ * PUT /pancake-sync/config/{shopId}/products — ghi đè danh sách gán. Server xếp đẩy lại các sản
+ * phẩm bị ảnh hưởng lên Pancake (`queued`).
+ */
+export function useUpdatePancakeShopProducts(shopId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: UpdateShopProductsInput) =>
+      unwrap(
+        api.PUT('/pancake-sync/config/{shopId}/products', {
+          params: { path: { shopId: Number(shopId) } },
+          body: input,
+        }),
+      ),
+    onSuccess: () => void qc.invalidateQueries({ queryKey: pancakeShopProductKeys.detail(shopId) }),
+  });
+}
+
+/** GET /products?q= — tìm sản phẩm (kể cả combo) để gán cho shop; phân trang phía server. */
+export function useProductPickSearch(q: string, enabled: boolean) {
+  return useQuery({
+    queryKey: ['admin', 'pancake-config', 'product-pick', q] as const,
+    queryFn: () =>
+      unwrap(
+        api.GET('/products', {
+          params: {
+            query: { q: q || undefined, take: 50, skip: 0, sortBy: 'code', sortDir: 'asc' },
+          },
+        }),
+      ),
+    enabled,
+    placeholderData: (prev) => prev,
+  });
+}

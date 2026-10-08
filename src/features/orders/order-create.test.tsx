@@ -10,7 +10,7 @@ import {
 import { server } from '@/test/msw/server';
 import { renderApp } from '@/test/render';
 import { OrderCreateScreen } from './components/order-create-screen';
-import { toCreateOrderBody } from './schema';
+import { previewManualDiscount, toCreateOrderBody } from './schema';
 
 // Radix Select (team trong dialog Khách mới) cần ResizeObserver + scrollIntoView — jsdom không có.
 vi.stubGlobal(
@@ -71,6 +71,8 @@ describe('toCreateOrderBody — CK% form → tỉ lệ API', () => {
       customerId: 'c1',
       channel: 'DIRECT',
       shippingFee: '',
+      manualDiscountType: 'AMOUNT',
+      manualDiscountValue: '',
       lines: [
         { skuId: 's1', uomId: 'u1', qty: '2', discountPercent: '5' },
         { skuId: 's2', uomId: 'u2', qty: '10', discountPercent: '' },
@@ -91,9 +93,37 @@ describe('toCreateOrderBody — CK% form → tỉ lệ API', () => {
         customerId: 'c1',
         channel: 'POS',
         shippingFee: '30000',
+        manualDiscountType: 'AMOUNT',
         lines: [{ skuId: 's1', uomId: 'u1', qty: '1', discountPercent: '12.5' }],
       }).lines[0]!.discountPercent,
     ).toBe('0.125');
+  });
+
+  it('giảm giá cấp đơn: số tiền gửi nguyên; "%" → tỉ lệ; 0 / rỗng → bỏ field', () => {
+    const base = {
+      customerId: 'c1',
+      channel: 'DIRECT' as const,
+      lines: [{ skuId: 's1', uomId: 'u1', qty: '1' }],
+    };
+    expect(
+      toCreateOrderBody({ ...base, manualDiscountType: 'AMOUNT', manualDiscountValue: '15000' }),
+    ).toMatchObject({ manualDiscountType: 'AMOUNT', manualDiscountValue: '15000' });
+    expect(
+      toCreateOrderBody({ ...base, manualDiscountType: 'PERCENT', manualDiscountValue: '12.5' }),
+    ).toMatchObject({ manualDiscountType: 'PERCENT', manualDiscountValue: '0.125' });
+    for (const v of ['', '0']) {
+      expect(
+        toCreateOrderBody({ ...base, manualDiscountType: 'PERCENT', manualDiscountValue: v }),
+      ).not.toHaveProperty('manualDiscountType');
+    }
+  });
+
+  it('previewManualDiscount: % trên tạm tính; nhập sai → null', () => {
+    expect(previewManualDiscount('PERCENT', '10', '270000.0000')).toBe('27000.0000');
+    expect(previewManualDiscount('AMOUNT', '5000', '270000.0000')).toBe('5000.0000');
+    expect(previewManualDiscount('PERCENT', '100', '270000.0000')).toBeNull();
+    expect(previewManualDiscount('AMOUNT', '-1', '270000.0000')).toBeNull();
+    expect(previewManualDiscount('AMOUNT', '5000', null)).toBeNull();
   });
 });
 
@@ -131,6 +161,8 @@ describe('OrderCreateScreen — POST /sales-orders (D-01)', () => {
             status: 'APPROVED',
             subtotal: '1',
             discount: '0',
+            manualDiscount: '0.0000',
+            manualDiscountRate: null,
             taxAmount: '0',
             shippingFee: '0',
             total: '1',
@@ -190,6 +222,62 @@ describe('OrderCreateScreen — POST /sales-orders (D-01)', () => {
     );
   });
 
+  it('giảm giá cấp đơn theo %: xem trước số tiền giảm, Tổng tạm tính trừ theo, body gửi tỉ lệ', async () => {
+    search = `from=${ORDER.id}`;
+    const bodies: unknown[] = [];
+    server.use(
+      ...skuHandlers(),
+      http.get('/api/prices/resolve', () =>
+        HttpResponse.json({ priceListId: 'pl-1', listPrice: '100000', maxDiscount: '0.15' }),
+      ),
+      http.post('/api/sales-orders', async ({ request }) => {
+        bodies.push(await request.json());
+        return HttpResponse.json(
+          { orderId: 'new-order-2', docNumber: 'SO2610-00001', status: 'APPROVED' },
+          { status: 201 },
+        );
+      }),
+    );
+    renderApp(<OrderCreateScreen />);
+    await waitFor(() =>
+      expect(screen.getAllByLabelText('Số lượng')[0]).toHaveValue(REAL_LINES[0]!.qty),
+    );
+    const subtotal = REAL_LINES.reduce((acc, l) => acc + Number(l.qty) * 100_000, 0);
+    const vnd = (n: number) => new Intl.NumberFormat('vi-VN').format(n);
+    await waitFor(() => expect(screen.getAllByText(vnd(subtotal)).length).toBeGreaterThan(0));
+
+    fireEvent.click(screen.getByRole('radio', { name: '%' }));
+    fireEvent.change(screen.getByLabelText('Giảm giá (%)'), { target: { value: '10' } });
+    expect(await screen.findByText(`−${vnd(subtotal / 10)}`)).toBeInTheDocument();
+    const ship = Number(DETAIL.shippingFee);
+    expect(screen.getAllByText(vnd(subtotal - subtotal / 10 + ship)).length).toBeGreaterThan(0);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Chốt đơn' }));
+    await waitFor(() => expect(bodies).toHaveLength(1));
+    expect(bodies[0]).toMatchObject({ manualDiscountType: 'PERCENT', manualDiscountValue: '0.1' });
+  });
+
+  it('giảm giá % ≥ 100 → lỗi tại ô, KHÔNG gọi API', async () => {
+    search = `from=${ORDER.id}`;
+    const posts: unknown[] = [];
+    server.use(
+      ...skuHandlers(),
+      http.post('/api/sales-orders', () => {
+        posts.push(1);
+        return HttpResponse.json({});
+      }),
+    );
+    renderApp(<OrderCreateScreen />);
+    await waitFor(() =>
+      expect(screen.getAllByLabelText('Số lượng')[0]).toHaveValue(REAL_LINES[0]!.qty),
+    );
+    fireEvent.click(screen.getByRole('radio', { name: '%' }));
+    fireEvent.change(screen.getByLabelText('Giảm giá (%)'), { target: { value: '100' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Chốt đơn' }));
+    expect(await screen.findByText('Giảm % từ 0 đến dưới 100')).toBeInTheDocument();
+    expect(posts).toHaveLength(0);
+  });
+
   it('CK% vượt trần bảng giá → cảnh báo đỏ ngay tại dòng', async () => {
     search = `from=${ORDER.id}`;
     server.use(
@@ -237,6 +325,8 @@ describe('OrderCreateScreen — POST /sales-orders (D-01)', () => {
             status: 'APPROVED',
             subtotal: '1',
             discount: '0',
+            manualDiscount: '0.0000',
+            manualDiscountRate: null,
             taxAmount: '0',
             shippingFee: '0',
             total: '1',

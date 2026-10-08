@@ -913,6 +913,27 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/pancake-sync/config/{shopId}/products": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Sản phẩm bán trên shop (POS) này — `restricted = false` = bán mọi sản phẩm. */
+        get: operations["PancakeConfigController_shopProducts"];
+        /**
+         * Gán sản phẩm cho shop (ghi đè danh sách). Worker đẩy lại các sản phẩm bị ảnh hưởng: được
+         *     gán → tạo / hiện trên POS; bỏ gán → ẩn. Trả `queued` = số sản phẩm đã xếp đẩy.
+         */
+        put: operations["PancakeConfigController_replaceShopProducts"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/pancake-sync/webhook/{shopId}": {
         parameters: {
             query?: never;
@@ -1849,6 +1870,24 @@ export interface paths {
         options?: never;
         head?: never;
         patch: operations["WarehouseController_update"];
+        trace?: never;
+    };
+    "/warehouses/{id}/layout-image": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Ảnh phối cảnh 3D mặt bằng kho — multipart field "file" (jpg/png/webp ≤ 10MB), thay ảnh cũ. */
+        put: operations["WarehouseController_setLayoutImage"];
+        post?: never;
+        /** Gỡ ảnh 3D mặt bằng (S3 + DB). Idempotent. */
+        delete: operations["WarehouseController_removeLayoutImage"];
+        options?: never;
+        head?: never;
+        patch?: never;
         trace?: never;
     };
     "/warehouses/{id}/locations/tree": {
@@ -5361,6 +5400,32 @@ export interface components {
             warehouses: number;
             verifiedAt: string;
         };
+        PancakeShopProductDto: {
+            id: string;
+            code: string;
+            name: string;
+            isCombo: boolean;
+            isActive: boolean;
+        };
+        PancakeShopProductsDto: {
+            shopId: string;
+            /** @description false = shop bán mọi sản phẩm (mặc định); true = chỉ các sản phẩm trong `products`. */
+            restricted: boolean;
+            /** @description Sản phẩm đã gán (chưa xoá), xếp theo mã. */
+            products: components["schemas"]["PancakeShopProductDto"][];
+            updatedAt: string | null;
+            updatedBy: string | null;
+            /**
+             * @description Chỉ có ở PUT: số sản phẩm đã xếp đẩy lại lên shop (thêm vào → đẩy lên / hiện lại, bỏ ra →
+             *     ẩn). Chạy nền ở worker; 0 = không có gì đổi.
+             */
+            queued?: number;
+        };
+        UpdateShopProductsDto: {
+            restricted: boolean;
+            /** @description core.Product.id — sản phẩm thường hoặc combo, chưa xoá. */
+            productIds: string[];
+        };
         PancakeWebhookReceiptDto: {
             receiptId: string;
             /** @description orders | customers | products | variations_warehouses | unknown */
@@ -6706,6 +6771,8 @@ export interface components {
             isActive: boolean;
             /** @description Kho mặc định hệ thống — đơn đồng bộ từ Pancake giữ chỗ và gán kho này. Tối đa một kho. */
             isDefault: boolean;
+            /** @description Ảnh phối cảnh 3D mặt bằng kho — presigned URL hết hạn ~1h, đừng cache lâu. Null = chưa có. */
+            layoutImageUrl: string | null;
         };
         CreateWarehouseDto: {
             code: string;
@@ -7520,8 +7587,12 @@ export interface components {
             lineCount: number;
             /** @description Decimal(18,4) dạng chuỗi. Đã gồm chiết khấu tay từng dòng. */
             subtotal: string;
-            /** @description Decimal(18,4) dạng chuỗi. Giảm trừ từ khuyến mãi. */
+            /** @description Decimal(18,4) dạng chuỗi. Giảm trừ cấp đơn = khuyến mãi + giảm giá tay (`manualDiscount`). */
             discount: string;
+            /** @description Decimal(18,4) dạng chuỗi. Phần giảm giá cấp đơn sale nhập tay — đã nằm trong `discount`. */
+            manualDiscount: string;
+            /** @description Tỉ lệ 0..1 dạng chuỗi khi sale giảm theo %; null = nhập số tiền (hoặc không giảm). */
+            manualDiscountRate: string | null;
             /** @description Decimal(18,4) dạng chuỗi. */
             taxAmount: string;
             /** @description Decimal(18,4) dạng chuỗi. */
@@ -7668,8 +7739,12 @@ export interface components {
             lineCount: number;
             /** @description Decimal(18,4) dạng chuỗi. Đã gồm chiết khấu tay từng dòng. */
             subtotal: string;
-            /** @description Decimal(18,4) dạng chuỗi. Giảm trừ từ khuyến mãi. */
+            /** @description Decimal(18,4) dạng chuỗi. Giảm trừ cấp đơn = khuyến mãi + giảm giá tay (`manualDiscount`). */
             discount: string;
+            /** @description Decimal(18,4) dạng chuỗi. Phần giảm giá cấp đơn sale nhập tay — đã nằm trong `discount`. */
+            manualDiscount: string;
+            /** @description Tỉ lệ 0..1 dạng chuỗi khi sale giảm theo %; null = nhập số tiền (hoặc không giảm). */
+            manualDiscountRate: string | null;
             /** @description Decimal(18,4) dạng chuỗi. */
             taxAmount: string;
             /** @description Decimal(18,4) dạng chuỗi. */
@@ -7801,6 +7876,14 @@ export interface components {
             couponCode?: string;
             promotionIds?: string[];
             /**
+             * @description Giảm giá cấp đơn sale chủ động áp (2026-10-08), tính trên tạm tính SAU khuyến mãi:
+             *     `AMOUNT` = số tiền (Decimal(18,4) chuỗi, ≤ tạm tính còn lại); `PERCENT` = tỉ lệ 0..<1
+             *     (`"0.05"` = 5%) — cùng quy ước với `lines[].discountPercent`. Đi kèm `manualDiscountValue`.
+             * @enum {string}
+             */
+            manualDiscountType?: "AMOUNT" | "PERCENT";
+            manualDiscountValue?: string;
+            /**
              * @description Khoá chống tạo trùng do client sinh (`apps/web/CLAUDE.md` luật 4). Header
              *     `Idempotency-Key` được ưu tiên; trường này là đường dự phòng cho client
              *     không đặt được header.
@@ -7859,8 +7942,10 @@ export interface components {
             status: "DRAFT" | "PENDING_APPROVAL" | "APPROVED" | "POSTED" | "CANCELLED";
             /** @description Decimal(18,4) dạng chuỗi. Đã gồm chiết khấu tay từng dòng. */
             subtotal: string;
-            /** @description Decimal(18,4) dạng chuỗi. Giảm trừ từ khuyến mãi. */
+            /** @description Decimal(18,4) dạng chuỗi. Giảm trừ cấp đơn = khuyến mãi + giảm giá tay (`manualDiscount`). */
             discount: string;
+            /** @description Decimal(18,4) dạng chuỗi. Phần giảm giá cấp đơn sale nhập tay — đã nằm trong `discount`. */
+            manualDiscount: string;
             /** @description Decimal(18,4) dạng chuỗi. */
             taxAmount: string;
             /** @description Decimal(18,4) dạng chuỗi. */
@@ -11456,6 +11541,52 @@ export interface operations {
             };
         };
     };
+    PancakeConfigController_shopProducts: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                shopId: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PancakeShopProductsDto"];
+                };
+            };
+        };
+    };
+    PancakeConfigController_replaceShopProducts: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                shopId: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateShopProductsDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PancakeShopProductsDto"];
+                };
+            };
+        };
+    };
     PancakeWebhookController_ping: {
         parameters: {
             query?: never;
@@ -13199,7 +13330,9 @@ export interface operations {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["WarehouseSummaryDto"];
+                };
             };
         };
     };
@@ -13244,6 +13377,53 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["WarehouseSummaryDto"];
                 };
+            };
+        };
+    };
+    WarehouseController_setLayoutImage: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": {
+                    /** Format: binary */
+                    file: string;
+                };
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WarehouseSummaryDto"];
+                };
+            };
+        };
+    };
+    WarehouseController_removeLayoutImage: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };

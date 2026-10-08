@@ -54,6 +54,7 @@ import {
   type Warehouse,
 } from '../api/use-warehouses';
 import { LocationsPanel } from './locations-panel';
+import { WarehouseLayoutImage } from './warehouse-layout-image';
 
 /**
  * G-02 Kho & vị trí — nối API thật: GET/POST/PATCH/DELETE /warehouses; chọn một kho
@@ -476,7 +477,10 @@ export function WarehousesScreen() {
       </QueryState>
 
       {selected ? (
-        <LocationsPanel warehouse={selected} canAdjust={canAdjust} />
+        <>
+          <WarehouseLayoutImage warehouse={selected} canAdjust={canAdjust} />
+          <LocationsPanel warehouse={selected} canAdjust={canAdjust} />
+        </>
       ) : query.data && query.data.length > 0 ? (
         <p className="mt-3 text-sm text-muted-foreground">
           Chọn một kho trong bảng để xem và quản lý vị trí (khu / dãy / kệ / ô kệ).
