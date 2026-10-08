@@ -24,9 +24,164 @@ export const ME_SALE = {
 
 const CUSTOMER_TYPES = ['RETAIL', 'WHOLESALE', 'DISTRIBUTOR', 'KEY_ACCOUNT'] as const;
 
-/** Đúng shape `CustomerDto` trong openapi.json — đổi DTO ở backend thì sửa cả đây. */
+/** Đúng shape `CustomerOrderItemDto` (CRM-05) — 25 đơn mới nhất trước; đơn chưa duyệt / hủy netRevenue null. */
+const CUSTOMER_ORDER_STATUSES = [
+  'POSTED',
+  'APPROVED',
+  'PENDING_APPROVAL',
+  'DRAFT',
+  'CANCELLED',
+] as const;
+export function makeCustomerOrders(n: number) {
+  return Array.from({ length: n }, (_, i) => {
+    const status = CUSTOMER_ORDER_STATUSES[i % CUSTOMER_ORDER_STATUSES.length]!;
+    const booked = status === 'POSTED' || status === 'APPROVED';
+    return {
+      id: `so-${String(i + 1).padStart(4, '0')}`,
+      code: `SO-${String(2600 - i)}`,
+      orderDate: new Date(Date.UTC(2026, 8, 30 - i, 3)).toISOString(),
+      status,
+      channel: i % 3 === 0 ? ('MARKETPLACE' as const) : ('DIRECT' as const),
+      total: `${1_250_000 + i * 10_000}.0000`,
+      netRevenue: booked ? `${1_100_000 + i * 10_000}.0000` : null,
+      returnedRevenue: booked ? (i === 0 ? '150000.0000' : '0.0000') : null,
+      itemCount: (i % 4) + 1,
+      owner: i % 2 === 0 ? { id: 'u-sale', name: 'Trần Thị Sale' } : null,
+    };
+  });
+}
+
+/** Đúng shape `CustomerSalesStatsDto` (CRM-05). */
+export const CUSTOMER_STATS = {
+  orderCount: 10,
+  revenue: '12345000.0000',
+  aov: '1234500.0000',
+  firstOrderAt: '2026-01-15T03:00:00.000Z',
+  lastOrderAt: '2026-09-30T03:00:00.000Z',
+  returnedRevenue: '150000.0000',
+  returnedOrderCount: 1,
+  returnRate: '10.00',
+  topSkus: [
+    {
+      skuId: 'sku-1',
+      skuCode: 'PB-NPK-25',
+      name: 'Phân bón NPK 16-16-8 bao 25kg',
+      qty: '40.000000',
+      revenue: '8000000.0000',
+    },
+    {
+      skuId: 'sku-2',
+      skuCode: 'TT-ABA-100',
+      name: 'Thuốc trừ sâu Abamectin 100ml',
+      qty: '12.500000',
+      revenue: '4500000.0000',
+    },
+  ],
+};
+
+/** Đúng shape `CustomerGroupDto` (CRM-01) — nhóm cuối đã ngừng dùng. */
+export const CUSTOMER_GROUPS = [
+  {
+    id: '000000c1-0000-4000-8000-000000000001',
+    code: 'DAILY',
+    name: 'Đại lý',
+    description: 'Đại lý cấp 1, cấp 2',
+    isActive: true,
+  },
+  {
+    id: '000000c1-0000-4000-8000-000000000002',
+    code: 'TRANGTRAI',
+    name: 'Trang trại',
+    description: null,
+    isActive: true,
+  },
+  {
+    id: '000000c1-0000-4000-8000-000000000003',
+    code: 'CU',
+    name: 'Nhóm cũ',
+    description: null,
+    isActive: false,
+  },
+];
+
+/** Đúng shape `CustomerTierDto`. */
+export const CUSTOMER_TIERS = [
+  {
+    id: '000000c2-0000-4000-8000-000000000001',
+    code: 'SILVER',
+    name: 'Bạc',
+    minRevenue: '100000000.0000',
+    discountRate: '0.0100',
+    sortOrder: 10,
+  },
+  {
+    id: '000000c2-0000-4000-8000-000000000002',
+    code: 'GOLD',
+    name: 'Vàng',
+    minRevenue: '300000000.0000',
+    discountRate: null,
+    sortOrder: 20,
+  },
+];
+
+/** Đúng shape `TagDto`. */
+export const CUSTOMER_TAGS = [
+  { id: '000000c3-0000-4000-8000-000000000001', code: 'vip', name: 'Khách VIP', color: '#dc2626' },
+  {
+    id: '000000c3-0000-4000-8000-000000000002',
+    code: 'vu-dong-xuan',
+    name: 'Vụ Đông Xuân',
+    color: null,
+  },
+];
+
+/** Đúng shape `TierPromotionResultDto`. */
+export function makeTierPromotionResult(dryRun: boolean, allowDemotion = false) {
+  return {
+    from: '2025-10-05T17:00:00.000Z',
+    to: '2026-10-05T17:00:00.000Z',
+    dryRun,
+    allowDemotion,
+    actorId: 'u-admin',
+    tiersConfigured: CUSTOMER_TIERS.length,
+    customersEvaluated: 237,
+    promoted: 2,
+    demoted: 0,
+    unchanged: 235,
+    changes: [
+      {
+        customerId: '00000000-0000-4000-8000-000000000000',
+        customerCode: 'KH00001',
+        revenue: '350000000.0000',
+        fromTierId: CUSTOMER_TIERS[0]!.id,
+        fromTierCode: 'SILVER',
+        toTierId: CUSTOMER_TIERS[1]!.id,
+        toTierCode: 'GOLD',
+        direction: 'PROMOTE',
+      },
+      {
+        customerId: '00000000-0000-4000-8000-000000000001',
+        customerCode: 'KH00002',
+        revenue: '120000000.0000',
+        fromTierId: null,
+        fromTierCode: null,
+        toTierId: CUSTOMER_TIERS[0]!.id,
+        toTierCode: 'SILVER',
+        direction: 'PROMOTE',
+      },
+    ],
+  };
+}
+
+/**
+ * Đúng shape `CustomerListItemDto` trong openapi.json (CustomerDto + group/tier/tags, CRM-03) —
+ * đổi DTO ở backend thì sửa cả đây. Khách chẵn thuộc nhóm Đại lý; khách đầu cấp Bạc + tag VIP.
+ */
 export function makeCustomers(n: number) {
   return Array.from({ length: n }, (_, i) => ({
+    group: i % 2 === 0 ? { id: CUSTOMER_GROUPS[0]!.id, code: 'DAILY', name: 'Đại lý' } : null,
+    tier: i === 0 ? { id: CUSTOMER_TIERS[0]!.id, code: 'SILVER', name: 'Bạc' } : null,
+    tags: i === 0 ? [CUSTOMER_TAGS[0]!] : [],
     id: `00000000-0000-4000-8000-${String(i).padStart(12, '0')}`,
     code: `KH${String(i + 1).padStart(5, '0')}`,
     name: `Khách hàng ${i + 1}`,
@@ -34,8 +189,8 @@ export function makeCustomers(n: number) {
     phone: `09${String(10000000 + i).slice(0, 8)}`,
     email: i % 3 === 0 ? `kh${i + 1}@example.com` : null,
     type: CUSTOMER_TYPES[i % CUSTOMER_TYPES.length]!,
-    groupId: null,
-    tierId: null,
+    groupId: i % 2 === 0 ? CUSTOMER_GROUPS[0]!.id : null,
+    tierId: i === 0 ? CUSTOMER_TIERS[0]!.id : null,
     isActive: i % 10 !== 9,
     mergedIntoId: null,
     teamIds: ['t-hn'],
@@ -47,6 +202,213 @@ export function makeCustomers(n: number) {
     updatedAt: new Date(Date.UTC(2026, 5, 1) + i * 3_600_000).toISOString(),
   }));
 }
+
+/**
+ * CRM-07..09 gộp khách trùng — đúng shape DuplicateGroupDto / CustomerCompareItemDto /
+ * MergeResultDto / MergeLogDto trong openapi.json. Nhóm 1 có 2 hồ sơ (A giữ gợi ý, B gộp vào),
+ * nhóm 2 có 3 hồ sơ.
+ */
+export const DUP_A = '0000dd00-0000-4000-8000-00000000000a';
+export const DUP_B = '0000dd00-0000-4000-8000-00000000000b';
+export const DUP_C = '0000dd00-0000-4000-8000-00000000000c';
+export const DUP_D = '0000dd00-0000-4000-8000-00000000000d';
+export const DUP_E = '0000dd00-0000-4000-8000-00000000000e';
+export const MERGE_LOG_ID = '0000dd00-0000-4000-8000-0000000000f1';
+
+function dupCustomer(
+  id: string,
+  code: string,
+  name: string,
+  phone: string,
+  extra: Partial<{ orderCount: number; revenue: string; source: 'PANCAKE' | 'MANUAL' }> = {},
+) {
+  return {
+    id,
+    code,
+    name,
+    phone,
+    email: null,
+    createdAt: '2026-08-23T03:00:00.000Z',
+    orderCount: extra.orderCount ?? 0,
+    lastOrderAt: extra.orderCount ? '2026-09-30T03:00:00.000Z' : null,
+    revenue: extra.revenue ?? '0',
+    owners: [{ id: 'u-sale', name: 'Nguyễn Văn An' }],
+    teams: [{ id: 't-hn', name: 'Team Hà Nội' }],
+    source: extra.source ?? 'MANUAL',
+  };
+}
+
+export const DUPLICATE_GROUPS = {
+  items: [
+    {
+      phone: '0912345678',
+      suggestedSurvivorId: DUP_A,
+      customers: [
+        dupCustomer(DUP_A, 'KH-004512', 'Cửa hàng VTNN Minh Tâm', '0912345678', {
+          orderCount: 47,
+          revenue: '184250000.0000',
+        }),
+        dupCustomer(DUP_B, 'KH-013207', 'Minh Tâm HN', '0912 345 678', {
+          orderCount: 1,
+          revenue: '2140000.0000',
+          source: 'PANCAKE',
+        }),
+      ],
+    },
+    {
+      phone: '0987445020',
+      suggestedSurvivorId: DUP_D,
+      customers: [
+        dupCustomer(DUP_C, 'KH-000101', 'CH Tuấn Kiệt', '0987445020'),
+        dupCustomer(DUP_D, 'KH-000102', 'Cửa hàng VTNN Tuấn Kiệt', '0987445020', {
+          orderCount: 9,
+          revenue: '12000000.0000',
+        }),
+        dupCustomer(DUP_E, 'KH-000103', 'Tuấn Kiệt 2', '0987445020'),
+      ],
+    },
+  ],
+  total: 2,
+};
+
+function compareItem(id: string) {
+  const isA = id === DUP_A;
+  const base = {
+    id,
+    code: isA ? 'KH-004512' : id === DUP_B ? 'KH-013207' : `KH-${id.slice(-3)}`,
+    name: isA ? 'Cửa hàng VTNN Minh Tâm' : id === DUP_B ? 'Minh Tâm HN' : `Khách ${id.slice(-1)}`,
+    taxCode: null,
+    phone: '0912345678',
+    email: isA ? null : 'minhtam.hn@gmail.com',
+    type: isA ? ('DISTRIBUTOR' as const) : ('RETAIL' as const),
+    groupId: isA ? CUSTOMER_GROUPS[0]!.id : null,
+    tierId: isA ? CUSTOMER_TIERS[0]!.id : null,
+    isActive: true,
+    mergedIntoId: null,
+    teamIds: ['t-hn'],
+    ownerIds: ['u-sale'],
+    priceListId: null,
+    creditLimit: isA ? '50000000.0000' : null,
+    paymentTerm: 30,
+    createdAt: '2026-01-02T03:00:00.000Z',
+    updatedAt: '2026-09-02T03:00:00.000Z',
+  };
+  return {
+    ...base,
+    normalizedPhone: '0912345678',
+    group: isA ? { id: CUSTOMER_GROUPS[0]!.id, code: 'DAILY', name: 'Đại lý' } : null,
+    tier: isA ? { id: CUSTOMER_TIERS[0]!.id, code: 'SILVER', name: 'Bạc' } : null,
+    tags: isA ? [CUSTOMER_TAGS[0]!] : [],
+    addresses: makeCustomerAddresses(id).slice(0, isA ? 2 : 1),
+    owners: [{ id: 'u-sale', name: 'Nguyễn Văn An' }],
+    teams: [{ id: 't-hn', name: 'Team Hà Nội' }],
+    source: isA ? ('MANUAL' as const) : ('PANCAKE' as const),
+    pancake: isA
+      ? null
+      : {
+          source: 'PANCAKE',
+          shopId: '715130909',
+          externalId: 'c-778',
+          fbId: '1234',
+          conversationLink: 'https://pancake.vn/conv/778',
+        },
+    consents: isA
+      ? [
+          {
+            channel: 'EMAIL' as const,
+            granted: true,
+            source: 'form',
+            recordedAt: '2026-05-01T03:00:00.000Z',
+          },
+        ]
+      : [],
+    orders: isA
+      ? {
+          total: 47,
+          posted: 45,
+          open: 2,
+          lastOrderAt: '2026-09-30T03:00:00.000Z',
+          revenue: '184250000.0000',
+        }
+      : {
+          total: 3,
+          posted: 2,
+          open: 1,
+          lastOrderAt: '2026-09-01T03:00:00.000Z',
+          revenue: '2140000',
+        },
+    openInvoices: isA ? 1 : 0,
+    references: [
+      { key: 'core.SalesOrder.customerId', label: 'Đơn bán', count: isA ? 47 : 3 },
+      { key: 'crm.Ticket.customerId', label: 'Ticket', count: 0 },
+    ],
+  };
+}
+
+export function makeDuplicateCompare(ids: string[]) {
+  return { customers: ids.map(compareItem), samePhone: true };
+}
+
+export const MERGE_RESULT = {
+  logId: MERGE_LOG_ID,
+  survivorId: DUP_A,
+  mergedId: DUP_B,
+  matchedOn: 'phone' as const,
+  fieldsChanged: ['email'],
+  moved: [
+    { key: 'core.SalesOrder.customerId', label: 'Đơn bán', count: 1 },
+    { key: 'core.CustomerAddress.customerId', label: 'Địa chỉ giao', count: 1 },
+    { key: 'crm.Ticket.customerId', label: 'Ticket', count: 0 },
+  ],
+  kept: [{ key: 'core.SalesOrder.customerId', label: 'Đơn bán', count: 2 }],
+};
+
+export const MERGE_UNDO_RESULT = {
+  logId: MERGE_LOG_ID,
+  survivorId: DUP_A,
+  mergedId: DUP_B,
+  restored: [{ key: 'core.SalesOrder.customerId', label: 'Đơn bán', count: 1 }],
+  stuck: [],
+  fieldsRestored: ['email'],
+  fieldsNotRestored: [],
+  undoneAt: '2026-10-06T04:00:00.000Z',
+};
+
+export const MERGE_LOGS = {
+  items: [
+    {
+      id: MERGE_LOG_ID,
+      survivor: { id: DUP_A, code: 'KH-004512', name: 'Cửa hàng VTNN Minh Tâm' },
+      merged: { id: DUP_B, code: 'KH-013207', name: 'Minh Tâm HN' },
+      matchedOn: 'phone',
+      fieldChoices: { email: 'merged' as const },
+      fieldsChanged: ['email'],
+      moved: MERGE_RESULT.moved,
+      kept: MERGE_RESULT.kept,
+      mergedBy: { id: 'u-admin', name: 'Quản trị' },
+      mergedAt: '2026-10-06T03:00:00.000Z',
+      undoneAt: null,
+      undoneBy: null,
+      canUndo: true,
+    },
+    {
+      id: '0000dd00-0000-4000-8000-0000000000f2',
+      survivor: { id: DUP_D, code: 'KH-000102', name: 'Cửa hàng VTNN Tuấn Kiệt' },
+      merged: { id: DUP_C, code: null, name: null },
+      matchedOn: 'manual',
+      fieldChoices: {},
+      fieldsChanged: [],
+      moved: [],
+      kept: [],
+      mergedBy: null,
+      mergedAt: '2026-10-01T03:00:00.000Z',
+      undoneAt: '2026-10-02T03:00:00.000Z',
+      undoneBy: { id: 'u-admin', name: 'Quản trị' },
+      canUndo: false,
+    },
+  ],
+  total: 2,
+};
 
 /** Đúng shape `CustomerAddressDto` — hai địa chỉ, địa chỉ đầu là mặc định. */
 export function makeCustomerAddresses(customerId: string) {
@@ -819,7 +1181,106 @@ export const STATUS_LOG_FIXTURE = {
   ],
 };
 
+/** CRM-13 — đúng shape `ConsentRecordDto`. */
+export const CONSENT_RECORDS = [
+  {
+    id: '0000cc00-0000-4000-8000-000000000001',
+    customerId: '00000000-0000-4000-8000-000000000001',
+    channel: 'ZALO',
+    granted: false,
+    source: 'UNSUBSCRIBE_LINK',
+    purpose: 'MARKETING',
+    evidence: { ip: '203.0.113.7', userAgent: 'Mozilla/5.0 (iPhone)' },
+    recordedAt: new Date(Date.UTC(2026, 9, 5, 2, 30)).toISOString(),
+    recordedBy: null,
+  },
+  {
+    id: '0000cc00-0000-4000-8000-000000000002',
+    customerId: '00000000-0000-4000-8000-000000000001',
+    channel: 'SMS',
+    granted: true,
+    source: 'PHONE',
+    purpose: 'MARKETING',
+    evidence: { note: 'Ghi âm cuộc gọi CG-0412' },
+    recordedAt: new Date(Date.UTC(2026, 9, 1, 3)).toISOString(),
+    recordedBy: { id: 'u-sale-1', name: 'Trần Thị Mai' },
+  },
+];
+
+/** Đúng shape `CustomerConsentsDto` — đủ 4 kênh, EMAIL / PHONE_CALL chưa ghi nhận. */
+export const CUSTOMER_CONSENTS = {
+  customerId: '00000000-0000-4000-8000-000000000001',
+  current: [
+    { channel: 'EMAIL', granted: null, recordedAt: null, source: null },
+    { channel: 'SMS', granted: true, recordedAt: CONSENT_RECORDS[1]!.recordedAt, source: 'PHONE' },
+    {
+      channel: 'ZALO',
+      granted: false,
+      recordedAt: CONSENT_RECORDS[0]!.recordedAt,
+      source: 'UNSUBSCRIBE_LINK',
+    },
+    { channel: 'PHONE_CALL', granted: null, recordedAt: null, source: null },
+  ],
+  history: { items: CONSENT_RECORDS, total: 2 },
+};
+
+/** Đúng shape `ConsentStateListDto`. */
+export function makeConsentStates(n: number) {
+  const channels = ['EMAIL', 'SMS', 'ZALO', 'PHONE_CALL'] as const;
+  return Array.from({ length: n }, (_, i) => ({
+    id: `0000cc10-0000-4000-8000-${String(i + 1).padStart(12, '0')}`,
+    customer: {
+      id: `00000000-0000-4000-8000-${String(i + 1).padStart(12, '0')}`,
+      code: `KH-${String(i + 1).padStart(6, '0')}`,
+      name: `Khách hàng ${i + 1}`,
+      phone: `09120000${String(i).padStart(2, '0')}`,
+    },
+    channel: channels[i % 4]!,
+    granted: i % 3 !== 0,
+    source: i % 2 === 0 ? 'FORM' : 'PHONE',
+    purpose: 'MARKETING',
+    recordedAt: new Date(Date.UTC(2026, 9, 1 + (i % 5), 3)).toISOString(),
+    recordedBy: i % 3 === 0 ? null : { id: 'u-sale-1', name: 'Trần Thị Mai' },
+  }));
+}
+
+/** Đúng shape `PublicUnsubscribeDto`. */
+export const PUBLIC_UNSUBSCRIBE = {
+  customerName: 'Ng*** V** A',
+  channel: 'SMS',
+  currentlyGranted: true,
+};
+
 export const handlers = [
+  http.get('/api/customers/:id/consents', () => HttpResponse.json(CUSTOMER_CONSENTS)),
+  http.post('/api/customers/:id/consents', async ({ request, params }) => {
+    const body = (await request.json()) as Record<string, unknown>;
+    return HttpResponse.json(
+      {
+        id: '0000cc00-0000-4000-8000-0000000000ff',
+        customerId: params.id,
+        channel: body.channel,
+        granted: body.granted,
+        source: body.source,
+        purpose: body.purpose ?? 'MARKETING',
+        evidence: body.evidence ? { note: body.evidence } : null,
+        recordedAt: new Date(Date.UTC(2026, 9, 6, 3)).toISOString(),
+        recordedBy: { id: 'u-admin', name: 'Quản trị' },
+      },
+      { status: 201 },
+    );
+  }),
+  http.get('/api/consents', ({ request }) => {
+    const url = new URL(request.url);
+    const take = Number(url.searchParams.get('take') ?? 50);
+    const skip = Number(url.searchParams.get('skip') ?? 0);
+    const all = makeConsentStates(60);
+    return HttpResponse.json({ items: all.slice(skip, skip + take), total: all.length });
+  }),
+  http.get('/api/public/unsubscribe/:token', () => HttpResponse.json(PUBLIC_UNSUBSCRIBE)),
+  http.post('/api/public/unsubscribe/:token', () =>
+    HttpResponse.json({ ...PUBLIC_UNSUBSCRIBE, currentlyGranted: false }),
+  ),
   http.get('/api/container-types', () => HttpResponse.json([])),
   http.get('/api/carriers', () => HttpResponse.json(CARRIERS)),
   http.get('/api/pickup-warehouses', () => HttpResponse.json(PICKUP_WAREHOUSES)),
@@ -842,6 +1303,19 @@ export const handlers = [
     let all = makeCustomers(237);
     if (q)
       all = all.filter((c) => c.name.toLowerCase().includes(q) || c.code.toLowerCase().includes(q));
+    const groupId = url.searchParams.get('groupId');
+    const tierId = url.searchParams.get('tierId');
+    const type = url.searchParams.get('type');
+    const tagIds = url.searchParams.getAll('tagIds').flatMap((t) => t.split(','));
+    if (groupId) all = all.filter((c) => c.groupId === groupId);
+    if (tierId) all = all.filter((c) => c.tierId === tierId);
+    if (type) all = all.filter((c) => c.type === type);
+    if (tagIds.length > 0)
+      all = all.filter((c) =>
+        url.searchParams.get('tagMatch') === 'all'
+          ? tagIds.every((t) => c.tags.some((x) => x.id === t))
+          : c.tags.some((x) => tagIds.includes(x.id)),
+      );
     all = [...all].sort((a, b) => {
       const x = String(a[sortBy as keyof typeof a] ?? '');
       const y = String(b[sortBy as keyof typeof b] ?? '');
@@ -849,13 +1323,41 @@ export const handlers = [
     });
     return HttpResponse.json({ items: all.slice(skip, skip + take), total: all.length });
   }),
+  http.get('/api/customer-groups', ({ request }) => {
+    const all = new URL(request.url).searchParams.get('includeInactive') === 'true';
+    return HttpResponse.json(all ? CUSTOMER_GROUPS : CUSTOMER_GROUPS.filter((g) => g.isActive));
+  }),
+  http.get('/api/customer-tiers', () => HttpResponse.json(CUSTOMER_TIERS)),
+  http.get('/api/customer-tags', () => HttpResponse.json(CUSTOMER_TAGS)),
+  // Gộp khách trùng — khai TRƯỚC /customers/:id (giống thứ tự đăng ký module ở API).
+  http.get('/api/customers/duplicates', () => HttpResponse.json(DUPLICATE_GROUPS)),
+  http.get('/api/customers/duplicates/compare', ({ request }) => {
+    const ids = new URL(request.url).searchParams.getAll('ids').flatMap((x) => x.split(','));
+    return HttpResponse.json(makeDuplicateCompare(ids));
+  }),
+  http.get('/api/customers/merge-logs', () => HttpResponse.json(MERGE_LOGS)),
+  http.post('/api/customers/merge', () => HttpResponse.json(MERGE_RESULT, { status: 201 })),
+  http.post('/api/customers/merge/:logId/undo', () => HttpResponse.json(MERGE_UNDO_RESULT)),
   http.get('/api/customers/:id', async ({ params }) => {
     await delay(50);
     const found = makeCustomers(237).find((c) => c.id === params.id);
     // CustomerDetailDto = CustomerDto + addresses (danh sách không kèm).
     return found
-      ? HttpResponse.json({ ...found, addresses: makeCustomerAddresses(found.id) })
+      ? HttpResponse.json({
+          ...found,
+          addresses: makeCustomerAddresses(found.id),
+          mergedInto: null,
+        })
       : errorEnvelope(404, 'NOT_FOUND');
+  }),
+  http.get('/api/customers/:id/stats', () => HttpResponse.json(CUSTOMER_STATS)),
+  http.get('/api/customers/:id/orders', ({ request }) => {
+    const url = new URL(request.url);
+    const status = url.searchParams.get('status');
+    const take = Number(url.searchParams.get('take') ?? 20);
+    const skip = Number(url.searchParams.get('skip') ?? 0);
+    const all = makeCustomerOrders(25).filter((o) => !status || o.status === status);
+    return HttpResponse.json({ items: all.slice(skip, skip + take), total: all.length });
   }),
   http.get('/api/sales-orders', async ({ request }) => {
     const url = new URL(request.url);
@@ -1306,6 +1808,24 @@ export const scenario = {
   customerNotFound: http.get('/api/customers/:id', () => errorEnvelope(404, 'NOT_FOUND')),
   customerError: http.get('/api/customers/:id', () => errorEnvelope(500, 'DB_ERROR')),
   customerForbidden: http.get('/api/customers/:id', () => errorEnvelope(403, 'FORBIDDEN')),
+  customerOrdersEmpty: http.get('/api/customers/:id/orders', () =>
+    HttpResponse.json({ items: [], total: 0 }),
+  ),
+  customerOrdersError: http.get('/api/customers/:id/orders', () => errorEnvelope(500, 'DB_ERROR')),
+  customerStatsEmpty: http.get('/api/customers/:id/stats', () =>
+    HttpResponse.json({
+      orderCount: 0,
+      revenue: '0.0000',
+      aov: '0.0000',
+      firstOrderAt: null,
+      lastOrderAt: null,
+      returnedRevenue: '0.0000',
+      returnedOrderCount: 0,
+      returnRate: null,
+      topSkus: [],
+    }),
+  ),
+  customerStatsError: http.get('/api/customers/:id/stats', () => errorEnvelope(500, 'DB_ERROR')),
   meSale: http.get('/api/auth/me', () => HttpResponse.json(ME_SALE)),
 
   usersEmpty: http.get('/api/users', () => HttpResponse.json({ items: [], total: 0 })),

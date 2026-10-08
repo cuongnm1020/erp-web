@@ -113,11 +113,13 @@ const PRODUCTS = [
     name: 'Bút bi Thiên Long TL-08',
     categoryId: CATEGORY.id,
     brandId: BRAND.id,
+    supplierId: uuid(401),
     trackingMode: 'NONE',
     shelfLifeDays: null,
     isActive: true,
     category: CATEGORY,
     brand: BRAND,
+    supplier: { id: uuid(401), code: 'NCC01', name: 'Phân bón Bình Điền' },
     skus: [
       { id: uuid(1), code: 'TL08-BLUE', name: 'TL-08 xanh', baseUom: { code: 'cái' } },
       { id: uuid(4), code: 'TL08-RED', name: 'TL-08 đỏ', baseUom: { code: 'cái' } },
@@ -139,11 +141,13 @@ const PRODUCTS = [
     name: 'Băng keo trong 48mm × 100y Tiến Phát',
     categoryId: null,
     brandId: null,
+    supplierId: null,
     trackingMode: 'LOT',
     shelfLifeDays: 720,
     isActive: true,
     category: null,
     brand: null,
+    supplier: null,
     skus: [{ id: uuid(2), code: 'TP-BK48-100', name: 'BK 48', baseUom: { code: 'cây' } }],
     skuCount: 1,
     hasVariants: false,
@@ -231,6 +235,27 @@ describe('ProductListScreen — góc nhìn Sản phẩm (mặc định, GET /pro
     expect(last.get('trackingMode')).toBe('LOT');
     expect(last.get('hasStock')).toBe('true');
     expect(last.get('isActive')).toBe('true');
+  });
+
+  it('RPT-05a: cột NCC chính (tên / "Chưa gán"); ?supplier=<id> → supplierId, ?supplier=none → hasSupplier=false', async () => {
+    renderApp(<ProductListScreen />);
+    expect(await screen.findByText('Phân bón Bình Điền')).toBeInTheDocument();
+    expect(screen.getByText('Chưa gán')).toBeInTheDocument();
+    expect(productCalls.at(-1)!.get('supplierId')).toBeNull();
+  });
+
+  it('RPT-05a: lọc NCC trên URL đi xuống server', async () => {
+    search = `supplier=${uuid(401)}`;
+    const { unmount } = renderApp(<ProductListScreen />);
+    await screen.findByText(FIRST_PRODUCT.code);
+    expect(productCalls.at(-1)!.get('supplierId')).toBe(uuid(401));
+    expect(productCalls.at(-1)!.get('hasSupplier')).toBeNull();
+    unmount();
+    search = 'supplier=none';
+    renderApp(<ProductListScreen />);
+    await screen.findByText(FIRST_PRODUCT.code);
+    await waitFor(() => expect(productCalls.at(-1)!.get('hasSupplier')).toBe('false'));
+    expect(productCalls.at(-1)!.get('supplierId')).toBeNull();
   });
 
   it('sort trên URL → sortBy/sortDir gửi lên API (?sort=createdAt:desc)', async () => {

@@ -1,7 +1,13 @@
 import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import { http, HttpResponse } from 'msw';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { errorEnvelope, makeCustomerAddresses, makeCustomers } from '@/test/msw/handlers';
+import {
+  CUSTOMER_GROUPS,
+  CUSTOMER_TAGS,
+  errorEnvelope,
+  makeCustomerAddresses,
+  makeCustomers,
+} from '@/test/msw/handlers';
 import { server } from '@/test/msw/server';
 import { renderApp } from '@/test/render';
 import { CustomerFormScreen } from './components/customer-form-screen';
@@ -275,5 +281,92 @@ describe('CustomerFormScreen — địa chỉ giao hàng (POST/PATCH/DELETE /cus
     expect(screen.queryByRole('button', { name: /Thêm địa chỉ/ })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /Sửa địa chỉ/ })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /Xóa địa chỉ/ })).not.toBeInTheDocument();
+  });
+});
+
+describe('CustomerFormScreen — nhóm / cấp độ / tag (CRM-04)', () => {
+  const CUST = makeCustomers(1)[0]!; // nhóm Đại lý, cấp Bạc, tag Khách VIP
+
+  it('tạo: chọn nhóm + gắn tag → POST /customers rồi PATCH segment + POST tags cho id mới', async () => {
+    const calls: Array<{ url: string; body: unknown }> = [];
+    server.use(
+      teamsHandler,
+      http.post('/api/customers', async ({ request }) => {
+        const body = (await request.json()) as Record<string, unknown>;
+        calls.push({ url: 'POST /customers', body });
+        return HttpResponse.json(
+          { ...makeCustomers(1)[0]!, id: 'new-cust-2', code: body.code, name: body.name },
+          { status: 201 },
+        );
+      }),
+      http.patch('/api/customer-segments/:id', async ({ request, params }) => {
+        calls.push({ url: `PATCH ${params.id as string}`, body: await request.json() });
+        return HttpResponse.json({});
+      }),
+      http.post('/api/customer-segments/:id/tags', async ({ request, params }) => {
+        calls.push({ url: `TAGS ${params.id as string}`, body: await request.json() });
+        return HttpResponse.json([], { status: 201 });
+      }),
+    );
+    renderApp(<CustomerFormScreen />);
+    await fillCreateForm();
+    await waitFor(() =>
+      expect(screen.getByRole('combobox', { name: 'Nhóm khách' })).not.toBeDisabled(),
+    );
+    fireEvent.click(screen.getByRole('combobox', { name: 'Nhóm khách' }));
+    fireEvent.click(await screen.findByRole('option', { name: 'Trang trại' }));
+    fireEvent.click(screen.getByRole('button', { name: /Gắn tag/ }));
+    fireEvent.click(await screen.findByRole('button', { name: /Vụ Đông Xuân/ }));
+    clickSave(/Lưu khách hàng/);
+    await waitFor(() => expect(calls).toHaveLength(3));
+    expect(calls[1]).toEqual({
+      url: 'PATCH new-cust-2',
+      body: { groupId: CUSTOMER_GROUPS[1]!.id },
+    });
+    expect(calls[2]).toEqual({
+      url: 'TAGS new-cust-2',
+      body: { tagIds: [CUSTOMER_TAGS[1]!.id] },
+    });
+    await waitFor(() => expect(push).toHaveBeenCalledWith('/crm/customers/new-cust-2'));
+  });
+
+  it('sửa: đổi nhóm lưu ngay qua PATCH /customer-segments; gỡ tag qua DELETE; không PATCH khách', async () => {
+    const calls: string[] = [];
+    server.use(
+      http.patch('/api/customers/:id', () => {
+        calls.push('PATCH customer');
+        return HttpResponse.json({});
+      }),
+      http.patch('/api/customer-segments/:id', async ({ request }) => {
+        calls.push(`SEGMENT ${JSON.stringify(await request.json())}`);
+        return HttpResponse.json({});
+      }),
+      http.delete('/api/customer-segments/:id/tags/:tagId', ({ params }) => {
+        calls.push(`UNTAG ${params.tagId as string}`);
+        return HttpResponse.json({ removed: 1 });
+      }),
+    );
+    renderApp(<CustomerFormScreen customerId={CUST.id} />);
+    expect(await screen.findByText('Khách VIP')).toBeInTheDocument();
+    // Chờ danh mục nhóm về (select khóa khi đang tải) — trigger hiện tên nhóm hiện tại.
+    await waitFor(() =>
+      expect(screen.getByRole('combobox', { name: 'Nhóm khách' })).toHaveTextContent('Đại lý'),
+    );
+    fireEvent.click(screen.getByRole('combobox', { name: 'Nhóm khách' }));
+    fireEvent.click(await screen.findByRole('option', { name: 'Chưa xếp nhóm' }));
+    await waitFor(() => expect(calls).toEqual(['SEGMENT {"groupId":null}']));
+    fireEvent.click(screen.getByRole('button', { name: 'Gỡ tag Khách VIP' }));
+    await waitFor(() => expect(calls).toContain(`UNTAG ${CUSTOMER_TAGS[0]!.id}`));
+    expect(calls).not.toContain('PATCH customer');
+  });
+
+  it('không có customer.update → không gắn được nhóm / tag', async () => {
+    renderApp(<CustomerFormScreen customerId={CUST.id} />, {
+      me: { permissions: ['customer.read'], hasGlobalAccess: false },
+    });
+    expect(
+      await screen.findByText('Cần quyền sửa khách hàng để gắn nhóm, cấp độ và tag.'),
+    ).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Gắn tag/ })).not.toBeInTheDocument();
   });
 });

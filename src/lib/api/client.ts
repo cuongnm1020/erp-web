@@ -138,3 +138,14 @@ export const api: ApiClient = createApiClient({
   baseUrl: typeof window === 'undefined' ? '/api' : `${window.location.origin}/api`,
   refresh: typeof window === 'undefined' ? undefined : defaultBrowserRefresh,
 });
+
+/**
+ * Client cho trang CÔNG KHAI (vd /unsubscribe/[token]) — vẫn qua proxy Next (route /public/*
+ * chuyển tiếp IP + User-Agent của khách, không gắn Bearer), nhưng không refresh phiên và không
+ * đá về /login khi gặp 401: người mở link là khách hàng, không phải nhân viên.
+ */
+export const publicApi: ApiClient = createApiClient({
+  baseUrl: typeof window === 'undefined' ? '/api' : `${window.location.origin}/api`,
+  refresh: undefined,
+  onUnauthorized: () => undefined,
+});

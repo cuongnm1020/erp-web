@@ -47,8 +47,8 @@ import {
 
 /**
  * C-03 Chi tiết sản phẩm — nối API thật (GET /products/{id} + /stock*).
- * Layout theo design canvas cũ; các cột chưa có API (giá vốn TB, NCC chính,
- * ngưỡng đặt lại, cờ Bán/Mua/Kho theo ĐVT) đã bỏ — bổ sung khi backend sẵn sàng.
+ * Layout theo design canvas cũ; NCC chính (RPT-05a) dẫn sang hồ sơ NCC. Các cột chưa có API
+ * (giá vốn TB, ngưỡng đặt lại, cờ Bán/Mua/Kho theo ĐVT) đã bỏ — bổ sung khi backend sẵn sàng.
  */
 type TabKey = 'info' | 'variants' | 'barcodes' | 'units' | 'stock';
 
@@ -141,6 +141,19 @@ function DetailBody({ product }: { product: ProductDetail }) {
             <dl className="mt-3 space-y-1.5 text-sm">
               <InfoRow label="Danh mục">{product.category?.name ?? '—'}</InfoRow>
               <InfoRow label="Thương hiệu">{product.brand?.name ?? '—'}</InfoRow>
+              <InfoRow label="NCC chính">
+                {product.supplier ? (
+                  <Link
+                    href={`/catalog/suppliers/${product.supplier.id}`}
+                    className="text-primary hover:underline"
+                    title={product.supplier.code}
+                  >
+                    {product.supplier.name}
+                  </Link>
+                ) : (
+                  <span className="text-muted-foreground">Chưa gán</span>
+                )}
+              </InfoRow>
               <InfoRow label="ĐVT cơ bản">{skus[0]?.baseUom.code ?? '—'}</InfoRow>
               <InfoRow label="Theo dõi lô">
                 {TRACKING_LABEL[product.trackingMode]}

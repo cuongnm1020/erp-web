@@ -342,7 +342,7 @@ export function ProfitScreen() {
       {
         onSuccess: (r) =>
           toast.success('Đã chốt số liệu cho đơn cũ', {
-            description: `Quét ${r.scanned} đơn · chốt giá vốn ${r.costed} đơn · cập nhật cước ${r.shippingRefreshed} đơn`,
+            description: `Quét ${r.scanned} đơn · chốt giá vốn ${r.costed} đơn · cập nhật cước ${r.shippingRefreshed} đơn · ghi giá nhập thuần ${r.baseCostedLines} dòng`,
           }),
         onError: (err) => toast.error(messageFor(err)),
       },

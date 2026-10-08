@@ -38,6 +38,9 @@ describe('visibleModules', () => {
     const orders = mods.find((m) => m.label === 'Bán hàng')!;
     expect(orders.children?.map((c) => c.label)).not.toContain('Tạo đơn');
     expect(orders.children?.map((c) => c.label)).toContain('Đơn hàng');
+    // Không có customer.merge → không thấy Gộp khách trùng.
+    const customers = mods.find((m) => m.label === 'Khách hàng')!;
+    expect(customers.children?.map((c) => c.label)).not.toContain('Gộp khách trùng');
     // Không có product.read / stock.read → cả module ẩn (mọi con đều bị ẩn)
     expect(labels).not.toContain('Sản phẩm');
     expect(labels).not.toContain('Kho');
@@ -54,6 +57,12 @@ describe('visibleModules', () => {
     expect(labels).not.toContain('Tài chính');
     const children = mods.flatMap((m) => m.children ?? []).map((c) => c.label);
     expect(children).not.toContain('Phân công');
+    // CRM-10: mục hiện với customer.merge (ở đây ability = true).
+    expect(children).toContain('Gộp khách trùng');
+    expect(requiredAbilityFor('/crm/customers/duplicates')).toEqual({
+      action: 'merge',
+      subject: 'Customer',
+    });
     expect(children).not.toContain('Tồn kho');
     expect(mods.find((m) => m.label === 'Kho')?.href).toBe('/wms/warehouses');
     expect(requiredAbilityFor('/crm/customers/assign')).toEqual({
@@ -93,8 +102,18 @@ describe('visibleModules', () => {
     ]);
   });
 
-  it('admin thấy 6 module (Giá & KM, Tài chính đang ẩn)', () => {
-    expect(visibleModules(() => true)).toHaveLength(6);
+  it('admin thấy 7 module (Giá & KM, Tài chính đang ẩn; có Báo cáo)', () => {
+    expect(visibleModules(() => true)).toHaveLength(7);
+  });
+
+  it('Báo cáo (RPT-07): Doanh thu theo report.sales, Lợi nhuận theo report.profit; URL vẫn gate', () => {
+    const leader = visibleModules((a, s) => s === 'Report' && a === 'sales');
+    expect(leader.find((m) => m.label === 'Báo cáo')?.children?.map((c) => c.label)).toEqual([
+      'Doanh thu bán hàng',
+    ]);
+    expect(visibleModules(() => false).map((m) => m.label)).not.toContain('Báo cáo');
+    expect(requiredAbilityFor('/reports/sales')).toEqual({ action: 'sales', subject: 'Report' });
+    expect(requiredAbilityFor('/fin/profit')).toEqual({ action: 'profit', subject: 'Report' });
   });
 });
 
@@ -154,10 +173,10 @@ describe('<Sidebar>', () => {
     expect(screen.queryByText('Tài chính')).not.toBeInTheDocument();
   });
 
-  it('admin thấy 6 nhóm/mục; Giá & KM và Tài chính đang ẩn', () => {
+  it('admin thấy 7 nhóm/mục; Giá & KM và Tài chính đang ẩn', () => {
     renderSidebar(ADMIN);
     expect(screen.getByRole('link', { name: 'Tổng quan' })).toBeInTheDocument();
-    for (const l of ['Bán hàng', 'Khách hàng', 'Sản phẩm', 'Kho', 'Quản trị']) {
+    for (const l of ['Bán hàng', 'Khách hàng', 'Sản phẩm', 'Kho', 'Báo cáo', 'Quản trị']) {
       expect(screen.getByText(l)).toBeInTheDocument();
     }
     expect(screen.queryByText('Giá & KM')).not.toBeInTheDocument();

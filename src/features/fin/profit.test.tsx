@@ -4,6 +4,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { ME_SALE } from '@/test/msw/handlers';
 import { server } from '@/test/msw/server';
 import { renderApp } from '@/test/render';
+import { toast } from '@/components/ui/toaster';
 import type { ProfitReport } from './api/use-profit';
 import { ProfitScreen } from './components/profit-screen';
 
@@ -211,18 +212,31 @@ describe('ProfitScreen — GET /reports/profit', () => {
 
   it('"Chốt giá vốn đơn cũ" gọi POST /reports/profit/backfill với khoảng ngày đang xem', async () => {
     search = 'from=2026-09-01&to=2026-09-30';
+    const success = vi.spyOn(toast, 'success').mockImplementation(() => '' as never);
     const bodies: unknown[] = [];
     server.use(
       http.get('/api/reports/profit', () => HttpResponse.json(BY_ORDER)),
       http.post('/api/reports/profit/backfill', async ({ request }) => {
         bodies.push(await request.json());
-        return HttpResponse.json({ scanned: 10, costed: 8, shippingRefreshed: 6 });
+        return HttpResponse.json({
+          scanned: 10,
+          costed: 8,
+          shippingRefreshed: 6,
+          baseCostedLines: 4,
+        });
       }),
     );
     renderApp(<ProfitScreen />);
     await screen.findByText('SO2610-00001');
     fireEvent.click(screen.getByRole('button', { name: 'Chốt giá vốn đơn cũ' }));
     await waitFor(() => expect(bodies).toEqual([{ from: '2026-09-01', to: '2026-09-30' }]));
+    await waitFor(() =>
+      expect(success).toHaveBeenCalledWith('Đã chốt số liệu cho đơn cũ', {
+        description:
+          'Quét 10 đơn · chốt giá vốn 8 đơn · cập nhật cước 6 đơn · ghi giá nhập thuần 4 dòng',
+      }),
+    );
+    success.mockRestore();
   });
 
   it('không có quyền report.profit → màn "không có quyền", không gọi API', async () => {

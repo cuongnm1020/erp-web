@@ -1,10 +1,17 @@
 import { fireEvent, screen, waitFor } from '@testing-library/react';
 import { http, HttpResponse } from 'msw';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { ME_SALE, makeCustomers, scenario } from '@/test/msw/handlers';
+import {
+  CUSTOMER_GROUPS,
+  CUSTOMER_TAGS,
+  CUSTOMER_TIERS,
+  ME_SALE,
+  makeCustomers,
+  scenario,
+} from '@/test/msw/handlers';
 import { server } from '@/test/msw/server';
 import { renderApp } from '@/test/render';
-import { CustomerListScreen } from './components/customer-list-screen';
+import { CustomerListScreen, toCustomerFilterParams } from './components/customer-list-screen';
 
 const replace = vi.fn();
 let search = '';
@@ -116,5 +123,57 @@ describe('CustomerListScreen — GET /customers (P1-12)', () => {
     await waitFor(() =>
       expect(screen.queryByText(`Xóa khách hàng ${FIRST.code}?`)).not.toBeInTheDocument(),
     );
+  });
+
+  it('CRM-04: filter trên URL → gửi đúng query GET /customers (server-side, luật 8)', async () => {
+    const seen: URLSearchParams[] = [];
+    server.use(
+      http.get('/api/customers', ({ request }) => {
+        seen.push(new URL(request.url).searchParams);
+        return HttpResponse.json({ items: makeCustomers(1), total: 1 });
+      }),
+    );
+    search = `group=${CUSTOMER_GROUPS[0]!.id}&tier=${CUSTOMER_TIERS[0]!.id}&tags=${CUSTOMER_TAGS[0]!.id},${CUSTOMER_TAGS[1]!.id}&tagMatch=all&province=H%C3%A0%20N%E1%BB%99i&type=WHOLESALE&from=2026-01-01&to=2026-03-31`;
+    renderApp(<CustomerListScreen />);
+    await screen.findByText('Khách hàng 1');
+    const q = seen[seen.length - 1]!;
+    expect(q.get('groupId')).toBe(CUSTOMER_GROUPS[0]!.id);
+    expect(q.get('tierId')).toBe(CUSTOMER_TIERS[0]!.id);
+    expect(q.getAll('tagIds')).toEqual([CUSTOMER_TAGS[0]!.id, CUSTOMER_TAGS[1]!.id]);
+    expect(q.get('tagMatch')).toBe('all');
+    expect(q.get('province')).toBe('Hà Nội');
+    expect(q.get('type')).toBe('WHOLESALE');
+    expect(q.get('createdFrom')).toBe('2026-01-01');
+    expect(q.get('createdTo')).toBe('2026-03-31');
+    expect(screen.getByText('1 khách khớp bộ lọc')).toBeInTheDocument();
+  });
+
+  it('CRM-04: giá trị lạ trên URL bị bỏ, không gửi lên API', () => {
+    expect(
+      toCustomerFilterParams({ type: 'HACK', from: '01/02/2026', tags: '', tagMatch: 'all' }),
+    ).toEqual({
+      groupId: undefined,
+      tierId: undefined,
+      tagIds: undefined,
+      tagMatch: undefined,
+      province: undefined,
+      type: undefined,
+      createdFrom: undefined,
+      createdTo: undefined,
+    });
+  });
+
+  it('CRM-04: dòng hiện nhóm, cấp độ và tag; chọn nhóm ghi lên URL', async () => {
+    renderApp(<CustomerListScreen />);
+    await screen.findByText('Khách hàng 1');
+    expect(screen.getAllByText('Đại lý').length).toBeGreaterThan(0);
+    expect(screen.getByText('Bạc')).toBeInTheDocument();
+    expect(screen.getByText('Khách VIP')).toBeInTheDocument();
+    replace.mockClear();
+    fireEvent.click(screen.getByRole('combobox', { name: 'Nhóm' }));
+    fireEvent.click(await screen.findByRole('option', { name: 'Trang trại' }));
+    expect(replace).toHaveBeenCalledWith(`/crm/customers?group=${CUSTOMER_GROUPS[1]!.id}`, {
+      scroll: false,
+    });
   });
 });

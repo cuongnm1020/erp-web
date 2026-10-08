@@ -1,6 +1,6 @@
 'use client';
 
-import { Info, Pencil, Plus } from 'lucide-react';
+import { GitMerge, History, Info, MapPin, Pencil, Plus } from 'lucide-react';
 import Link from 'next/link';
 import type { ReactNode } from 'react';
 import { KpiCard } from '@/components/data/kpi-card';
@@ -10,28 +10,27 @@ import { Breadcrumb } from '@/components/layout/breadcrumb';
 import { Button } from '@/components/ui/button';
 import { isApiError } from '@/lib/api/errors';
 import { formatDate, formatDateTime, formatMoney, formatPhone } from '@/lib/format';
-import { Can } from '@/lib/permission';
+import { Can, useAbility } from '@/lib/permission';
 import { useInvalidateOn } from '@/lib/realtime';
-import { customerKeys, useCustomer, type Customer } from '../api/use-customers';
+import { customerKeys, useCustomer, type CustomerDetail } from '../api/use-customers';
 import { customerTypeLabel, customerTypeTone, initialsOf } from '../labels';
+import { formatAddress } from './customer-address-section';
+import { CustomerConsentCard } from './customer-consent-card';
+import { CustomerPurchaseHistory } from './customer-purchase-history';
+import { CustomerTagsEditor } from './customer-segment-fields';
 
 /**
  * B-02 Hồ sơ khách hàng 360 — GET /customers/{id}.
  *
- * Hiện chỉ dựng phần hồ sơ vì đó là toàn bộ những gì API mô tả được: `CustomerDto` là DTO
- * DUY NHẤT có kiểu response trong openapi.json. Các mảng còn lại của màn 360 theo thiết kế
- * (dòng thời gian hoạt động, đơn gần đây, công nợ theo tuổi nợ, ticket đang mở, địa chỉ giao,
- * đồng ý nhận marketing) chưa có endpoint hoặc chưa có DTO response — xem `MISSING` bên dưới.
- * Luật 2 cấm tự khai shape ở frontend, nên chỗ đó nói thẳng là chưa có dữ liệu thay vì
- * hiển thị số bịa cạnh tên khách thật.
+ * Dựng từ `CustomerDetailDto`: hồ sơ, nhóm / cấp độ / tag (CRM-03; gắn/gỡ tag ngay tại đây với
+ * quyền customer.update), địa chỉ giao (mặc định lên đầu), đồng ý nhận tin (CRM-13) và lịch sử mua hàng (CRM-06). Các mảng còn lại của màn 360 theo
+ * thiết kế chưa có endpoint — xem `MISSING`. Luật 2 cấm tự khai shape ở frontend, nên chỗ đó
+ * nói thẳng là chưa có dữ liệu thay vì hiển thị số bịa cạnh tên khách thật.
  */
 const MISSING: Array<{ title: string; need: string }> = [
   { title: 'Dòng thời gian hoạt động', need: 'chưa có endpoint hoạt động / ghi chú khách hàng' },
-  { title: 'Đơn gần đây', need: 'GET /sales-orders chưa khai báo kiểu response' },
   { title: 'Công nợ theo tuổi nợ', need: 'chưa có endpoint công nợ theo khách' },
   { title: 'Ticket đang mở', need: 'chưa có module ticket' },
-  { title: 'Địa chỉ giao', need: 'CustomerDto chưa trả danh sách địa chỉ' },
-  { title: 'Đồng ý nhận marketing', need: 'GET /notifications/consents chưa khai báo kiểu' },
 ];
 
 function Card({
@@ -67,9 +66,47 @@ function Field({ label, children }: { label: string; children: ReactNode }) {
   );
 }
 
-function Profile({ c }: { c: Customer }) {
+/**
+ * CRM-09/10 — hồ sơ đã bị gộp: báo rõ và dẫn sang khách giữ (không tự chuyển trang — đơn đã
+ * chốt trước khi gộp vẫn nằm ở hồ sơ này, người xem có thể cần đối chiếu).
+ * `code`/`name` null = khách giữ ngoài phạm vi người xem → không có link.
+ */
+function MergedBanner({ target }: { target: NonNullable<CustomerDetail['mergedInto']> }) {
+  return (
+    <div
+      role="status"
+      className="flex flex-wrap items-center gap-2 rounded-md border border-warning/40 bg-warning/10 px-3 py-2 text-sm"
+    >
+      <GitMerge className="h-4 w-4 shrink-0 text-warning" aria-hidden />
+      {target.code ? (
+        <span>
+          Khách này đã được gộp vào{' '}
+          <Link href={`/crm/customers/${target.id}`} className="font-semibold hover:underline">
+            <span className="font-mono text-xs">{target.code}</span> · {target.name}
+          </Link>
+          . Đơn đã chốt trước khi gộp vẫn nằm ở hồ sơ này; đơn mới lên ở khách giữ.
+        </span>
+      ) : (
+        <span>
+          Khách này đã được gộp vào một khách khác ngoài phạm vi bạn phụ trách. Đơn đã chốt trước
+          khi gộp vẫn nằm ở hồ sơ này.
+        </span>
+      )}
+      {target.code ? (
+        <Button size="sm" variant="outline" className="ml-auto" asChild>
+          <Link href={`/crm/customers/${target.id}`}>Mở hồ sơ khách giữ</Link>
+        </Button>
+      ) : null}
+    </div>
+  );
+}
+
+function Profile({ c }: { c: CustomerDetail }) {
+  const ability = useAbility();
+  const canUpdate = ability.can('update', 'Customer');
   return (
     <>
+      {c.mergedInto ? <MergedBanner target={c.mergedInto} /> : null}
       <section className="flex items-center gap-4 rounded-md border bg-card px-4 py-3">
         <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-secondary text-sm font-semibold text-primary">
           {initialsOf(c.name)}
@@ -96,6 +133,14 @@ function Profile({ c }: { c: Customer }) {
           </p>
         </div>
         <div className="flex shrink-0 items-center gap-2">
+          <Can I="merge" a="Customer">
+            <Button variant="outline" size="sm" asChild>
+              <Link href={`/crm/customers/duplicates?tab=history&customerId=${c.id}`}>
+                <History aria-hidden />
+                Lịch sử gộp
+              </Link>
+            </Button>
+          </Can>
           <Can I="update" a="Customer">
             <Button variant="outline" size="sm" asChild>
               <Link href={`/crm/customers/${c.id}/edit`}>
@@ -155,35 +200,94 @@ function Profile({ c }: { c: Customer }) {
             <Field label="Bảng giá riêng">
               {c.priceListId ? 'có bảng giá riêng' : 'theo bảng giá chung'}
             </Field>
-            <Field label="Nhóm khách">{c.groupId ? 'đã xếp nhóm' : 'chưa xếp nhóm'}</Field>
-            <Field label="Cấp độ">{c.tierId ? 'đã xếp cấp độ' : 'chưa xếp cấp độ'}</Field>
+            <Field label="Nhóm khách">
+              {c.group ? (
+                c.group.name
+              ) : (
+                <span className="text-muted-foreground">chưa xếp nhóm</span>
+              )}
+            </Field>
+            <Field label="Cấp độ">
+              {c.tier ? (
+                <StatusBadge tone="brand">{c.tier.name}</StatusBadge>
+              ) : (
+                <span className="text-muted-foreground">chưa xếp cấp độ</span>
+              )}
+            </Field>
             <Field label="Cập nhật gần nhất">{formatDateTime(c.updatedAt)}</Field>
           </dl>
         </Card>
 
-        <Card
-          className="lg:col-span-2"
-          title={
-            <span className="flex items-center gap-1.5">
-              <Info className="h-3.5 w-3.5 text-muted-foreground" aria-hidden />
-              Chưa nối được
-            </span>
-          }
-        >
-          <ul className="flex flex-col gap-2 px-3 py-3 text-sm">
-            {MISSING.map((m) => (
-              <li key={m.title} className="flex flex-col">
-                <span className="font-medium">{m.title}</span>
-                <span className="text-xs text-muted-foreground">{m.need}</span>
-              </li>
-            ))}
-          </ul>
-          <p className="border-t px-3 py-2 text-xs text-muted-foreground">
-            Luật 2: shape response phải sinh từ OpenAPI của apps/api. Khi backend khai báo DTO cho
-            các endpoint trên thì các thẻ này nối được ngay, không cần sửa gì ở màn hình.
-          </p>
-        </Card>
+        <div className="flex flex-col gap-3 lg:col-span-2">
+          <Card title="Tag">
+            <div className="px-3 py-3">
+              <CustomerTagsEditor customerId={c.id} tags={c.tags} canUpdate={canUpdate} />
+            </div>
+          </Card>
+          <Card title={`Địa chỉ giao hàng (${c.addresses.length})`}>
+            {c.addresses.length === 0 ? (
+              <div className="flex flex-col items-start gap-2 px-3 py-3 text-sm text-muted-foreground">
+                <p>Chưa có địa chỉ giao — thêm để lên đơn và cấp vận đơn.</p>
+                <Can I="update" a="Customer">
+                  <Button variant="outline" size="sm" asChild>
+                    <Link href={`/crm/customers/${c.id}/edit`}>
+                      <Plus aria-hidden />
+                      Thêm địa chỉ
+                    </Link>
+                  </Button>
+                </Can>
+              </div>
+            ) : (
+              <ul className="divide-y">
+                {c.addresses.map((a) => (
+                  <li key={a.id} className="flex gap-2 px-3 py-2 text-sm">
+                    <MapPin
+                      className="mt-0.5 h-3.5 w-3.5 shrink-0 text-muted-foreground"
+                      aria-hidden
+                    />
+                    <div className="min-w-0 flex-1">
+                      <div className="flex flex-wrap items-center gap-1.5">
+                        <span className="font-medium">{a.recipient}</span>
+                        <span className="font-mono text-xs">{formatPhone(a.phone)}</span>
+                        {a.label ? (
+                          <span className="text-xs text-muted-foreground">· {a.label}</span>
+                        ) : null}
+                        {a.isDefault ? <StatusBadge tone="ok">Mặc định</StatusBadge> : null}
+                      </div>
+                      <p className="text-muted-foreground">{formatAddress(a)}</p>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </Card>
+          <Card
+            title={
+              <span className="flex items-center gap-1.5">
+                <Info className="h-3.5 w-3.5 text-muted-foreground" aria-hidden />
+                Chưa nối được
+              </span>
+            }
+          >
+            <ul className="flex flex-col gap-2 px-3 py-3 text-sm">
+              {MISSING.map((m) => (
+                <li key={m.title} className="flex flex-col">
+                  <span className="font-medium">{m.title}</span>
+                  <span className="text-xs text-muted-foreground">{m.need}</span>
+                </li>
+              ))}
+            </ul>
+            <p className="border-t px-3 py-2 text-xs text-muted-foreground">
+              Luật 2: shape response phải sinh từ OpenAPI của apps/api. Khi backend khai báo DTO cho
+              các endpoint trên thì các thẻ này nối được ngay, không cần sửa gì ở màn hình.
+            </p>
+          </Card>
+        </div>
       </div>
+
+      <CustomerConsentCard customerId={c.id} />
+
+      <CustomerPurchaseHistory customerId={c.id} />
     </>
   );
 }

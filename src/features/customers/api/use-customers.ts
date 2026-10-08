@@ -3,6 +3,9 @@ import { api, unwrap } from '@/lib/api/client';
 import type { components, paths } from '@/lib/api/schema';
 
 export type Customer = components['schemas']['CustomerDto'];
+/** Dòng của GET /customers — CustomerDto + group/tier/tags (CRM-03). */
+export type CustomerListItem = components['schemas']['CustomerListItemDto'];
+export type CustomerTagRef = components['schemas']['CustomerTagRefDto'];
 /** GET /customers/{id} — CustomerDto kèm `addresses` (danh sách không kèm). */
 export type CustomerDetail = components['schemas']['CustomerDetailDto'];
 export type CustomerAddress = components['schemas']['CustomerAddressDto'];
@@ -17,6 +20,9 @@ export type CustomerSortBy = NonNullable<
 export type CustomerSortDir = NonNullable<
   NonNullable<paths['/customers']['get']['parameters']['query']>['sortDir']
 >;
+export type CustomerTagMatch = NonNullable<
+  NonNullable<paths['/customers']['get']['parameters']['query']>['tagMatch']
+>;
 
 export interface CustomerListParams {
   q?: string;
@@ -28,6 +34,17 @@ export interface CustomerListParams {
   /** true = chưa có người phụ trách (ownerIds rỗng); false = đã phân. */
   unassigned?: boolean;
   isActive?: boolean;
+  /** CRM-03 — lọc theo nhóm / cấp / tag / tỉnh / loại / ngày tạo; API AND với scope. */
+  groupId?: string;
+  tierId?: string;
+  tagIds?: string[];
+  tagMatch?: CustomerTagMatch;
+  /** Tên tỉnh/thành, so khớp nguyên tên (không phân biệt hoa thường) trên mọi địa chỉ. */
+  province?: string;
+  type?: Customer['type'];
+  /** YYYY-MM-DD theo ngày VN, bao gồm hai đầu. */
+  createdFrom?: string;
+  createdTo?: string;
   take: number;
   skip: number;
 }
@@ -60,6 +77,14 @@ export function useCustomers(params: CustomerListParams) {
               ownerId: params.ownerId,
               unassigned: params.unassigned,
               isActive: params.isActive,
+              groupId: params.groupId,
+              tierId: params.tierId,
+              tagIds: params.tagIds && params.tagIds.length > 0 ? params.tagIds : undefined,
+              tagMatch: params.tagIds && params.tagIds.length > 0 ? params.tagMatch : undefined,
+              province: params.province || undefined,
+              type: params.type,
+              createdFrom: params.createdFrom,
+              createdTo: params.createdTo,
               take: params.take,
               skip: params.skip,
             },

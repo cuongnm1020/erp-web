@@ -29,6 +29,7 @@ import {
   useDeleteProduct,
   useProducts,
   useSkus,
+  useSupplierFilterOptions,
   useUpdateSku,
   type ProductListItem,
   type SkuListRow,
@@ -49,12 +50,23 @@ import { PancakeSyncButton } from './pancake-sync-button';
  *   mọi kho (đúng design/Products/ProductList@2x.png). API này chỉ nhận q + status,
  *   sắp cố định theo mã SKU — không cột sortable, không hứa hão.
  *
+ * Cả hai góc nhìn (và số đếm SKU trên tiêu đề) gửi `isCombo=false`: combo chỉ quản lý ở
+ * /catalog/combos. Ô tìm sản phẩm khi lên đơn và màn in tem không lọc nên vẫn thấy combo.
+ *
  * Khác design vì API chưa có: ngưỡng đặt lại ("7 dưới ngưỡng"), bộ lọc đã lưu,
  * chọn cột, giá niêm yết trong bảng, bulk cập nhật giá / in tem.
  */
 const DEFAULTS = {
   size: 50,
-  filterKeys: ['view', 'status', 'categoryId', 'brandId', 'trackingMode', 'stock'] as const,
+  filterKeys: [
+    'view',
+    'status',
+    'categoryId',
+    'brandId',
+    'supplier',
+    'trackingMode',
+    'stock',
+  ] as const,
 };
 
 type ProductFilter = (typeof DEFAULTS.filterKeys)[number];
@@ -73,6 +85,9 @@ const TRACKING_LABELS: Record<TrackingMode, string> = {
   LOT: 'Lô / HSD',
   SERIAL: 'Serial',
 };
+
+/** Giá trị URL `?supplier=none` = lọc sản phẩm CHƯA gán NCC chính (hasSupplier=false). */
+const SUPPLIER_NONE = 'none';
 
 /** Cột được sort phía server trên GET /products — id cột = sortBy gửi lên API. */
 const PRODUCT_SORTABLE = new Set(['code', 'name', 'createdAt']);
@@ -126,6 +141,19 @@ const productColumns: ColumnDef<ProductListItem, unknown>[] = [
     header: 'Thương hiệu',
     meta: { width: 130 },
     cell: ({ row }) => row.original.brand?.name ?? '—',
+  },
+  {
+    id: 'supplier',
+    header: 'NCC chính',
+    meta: { width: 160 },
+    cell: ({ row }) =>
+      row.original.supplier ? (
+        <span className="block max-w-[160px] truncate" title={row.original.supplier.code}>
+          {row.original.supplier.name}
+        </span>
+      ) : (
+        <span className="text-muted-foreground">Chưa gán</span>
+      ),
   },
   {
     id: 'skus',
@@ -551,9 +579,9 @@ export function ProductListScreen() {
   const setFilter = (patch: Partial<Record<ProductFilter, string | undefined>>) =>
     set({ filters: { ...state.filters, ...patch } });
 
-  // Hai query đếm tí hon (take 1) cho dòng mô tả "X SKU đang bán · Y ngừng bán".
-  const activeCount = useSkus({ status: 'active', take: 1, skip: 0 });
-  const inactiveCount = useSkus({ status: 'inactive', take: 1, skip: 0 });
+  // Hai query đếm tí hon (take 1) cho dòng mô tả "X SKU đang bán · Y ngừng bán" — không tính combo.
+  const activeCount = useSkus({ status: 'active', isCombo: false, take: 1, skip: 0 });
+  const inactiveCount = useSkus({ status: 'inactive', isCombo: false, take: 1, skip: 0 });
 
   const hasFilter =
     state.q !== '' ||
@@ -686,6 +714,8 @@ function ProductView({
 }) {
   const categories = useCategories();
   const brands = useBrands();
+  const suppliers = useSupplierFilterOptions();
+  const supplierFilter = state.filters.supplier;
   // Chỉ cột nằm trong whitelist sort của API mới gửi lên — cột khác bấm không có tác dụng.
   const sort = state.sort && PRODUCT_SORTABLE.has(state.sort.id) ? state.sort : null;
   const params = useMemo(
@@ -693,14 +723,18 @@ function ProductView({
       q: state.q,
       categoryId: state.filters.categoryId,
       brandId: state.filters.brandId,
+      supplierId: supplierFilter && supplierFilter !== SUPPLIER_NONE ? supplierFilter : undefined,
+      hasSupplier: supplierFilter === SUPPLIER_NONE ? false : undefined,
       isActive: status === undefined ? undefined : status === 'active',
       trackingMode: parseTracking(state.filters.trackingMode),
       hasStock: state.filters.stock === 'in' ? true : undefined,
+      // Combo quản lý riêng ở /catalog/combos — màn này chỉ sản phẩm thường.
+      isCombo: false,
       sortBy: sort ? (sort.id as 'createdAt' | 'name' | 'code') : undefined,
       sortDir: sort ? (sort.desc ? ('desc' as const) : ('asc' as const)) : undefined,
       ...skipTake,
     }),
-    [state.q, state.filters, status, sort, skipTake],
+    [state.q, state.filters, supplierFilter, status, sort, skipTake],
   );
   const query = useProducts(params);
 
@@ -716,6 +750,15 @@ function ProductView({
       label: 'Thương hiệu',
       type: 'select',
       options: (brands.data ?? []).map((b) => ({ value: b.id, label: b.name })),
+    },
+    {
+      key: 'supplier',
+      label: 'NCC chính',
+      type: 'select',
+      options: [
+        { value: SUPPLIER_NONE, label: 'Chưa gán NCC' },
+        ...(suppliers.data?.items ?? []).map((x) => ({ value: x.id, label: x.name })),
+      ],
     },
     {
       key: 'trackingMode',
@@ -745,6 +788,7 @@ function ProductView({
           status: state.filters.status,
           categoryId: state.filters.categoryId,
           brandId: state.filters.brandId,
+          supplier: state.filters.supplier,
           trackingMode: state.filters.trackingMode,
           stock: state.filters.stock,
         }}
@@ -754,7 +798,7 @@ function ProductView({
 
       <QueryState
         query={query}
-        skeleton={<ListSkeleton rows={12} columns={9} />}
+        skeleton={<ListSkeleton rows={12} columns={10} />}
         isEmpty={(d) => d.items.length === 0}
         empty={
           <EmptyState
@@ -820,7 +864,10 @@ function SkuView({
   onClearFilters,
 }: ViewProps) {
   const [selected, setSelected] = useState<RowSelectionState>({});
-  const params = useMemo(() => ({ q: state.q, status, ...skipTake }), [state.q, status, skipTake]);
+  const params = useMemo(
+    () => ({ q: state.q, status, isCombo: false, ...skipTake }),
+    [state.q, status, skipTake],
+  );
   const query = useSkus(params);
 
   return (

@@ -1,336 +1,235 @@
 'use client';
 
-// UI-first từ design canvas — dữ liệu mẫu, chưa nối API (nối ở phase FE-1).
-import { ChevronDown, Search, X } from 'lucide-react';
+import { MailCheck } from 'lucide-react';
+import Link from 'next/link';
+import { useMemo } from 'react';
+import { DataTable, FilterBar, type ColumnDef } from '@/components/data/data-table';
+import { EmptyState, ListSkeleton, QueryState } from '@/components/data/states';
+import { StatusBadge } from '@/components/data/status-badge';
 import { PageHeader } from '@/components/layout/page-header';
-import { RowActions } from '@/components/data/row-actions';
-import { StatusBadge, type StatusTone } from '@/components/data/status-badge';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
+import { formatDateTime, formatPhone, groupVi } from '@/lib/format';
+import { useListState } from '@/lib/url-state';
+import { useConsents, type ConsentListParams, type ConsentStateItem } from '../api/use-consents';
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
-import { toast } from '@/components/ui/toaster';
+  CONSENT_CHANNELS,
+  consentChannelLabel,
+  consentPurposeLabel,
+  consentSourceLabel,
+  consentStateLabel,
+  consentStateTone,
+} from '../consent-labels';
 
-type ConsentValue = 'Đồng ý' | 'Từ chối' | 'Chưa hỏi';
+/**
+ * B-05 Đồng ý nhận marketing (PDPD) — GET /consents (CRM-11).
+ * Mỗi dòng = trạng thái MỚI NHẤT của một (khách, kênh), mục đích MARKETING, đã được API scope
+ * theo khách người xem phụ trách (luật 7 — không lọc lại ở đây). Khách chưa từng được hỏi không
+ * có dòng nào: họ coi như không nhận tin.
+ *
+ * Bộ lọc trên URL (luật 8): ?channel=SMS&granted=true&from=2026-10-01&to=2026-10-31&q=...&page=2
+ */
+const FILTER_KEYS = ['channel', 'granted', 'from', 'to'] as const;
+type ConsentFilter = (typeof FILTER_KEYS)[number];
+const DEFAULTS = { size: 50, sort: null, filterKeys: FILTER_KEYS };
+const DATE_KEY = /^\d{4}-\d{2}-\d{2}$/;
 
-interface ConsentRow {
-  code: string;
-  name: string;
-  email: ConsentValue;
-  sms: ConsentValue;
-  zalo: ConsentValue;
-  source: string;
-  updatedAt: string;
-  evidence: string;
+/** Filter trên URL → tham số API. Giá trị lạ (dán link tay) bị bỏ, không gửi lên. */
+export function toConsentFilterParams(
+  f: Partial<Record<ConsentFilter, string>>,
+): Omit<ConsentListParams, 'take' | 'skip' | 'q'> {
+  const channel = (CONSENT_CHANNELS as readonly string[]).includes(f.channel ?? '')
+    ? (f.channel as ConsentListParams['channel'])
+    : undefined;
+  return {
+    channel,
+    granted: f.granted === 'true' ? true : f.granted === 'false' ? false : undefined,
+    from: f.from && DATE_KEY.test(f.from) ? f.from : undefined,
+    to: f.to && DATE_KEY.test(f.to) ? f.to : undefined,
+  };
 }
 
-const CONSENT_TONE: Record<ConsentValue, StatusTone> = {
-  'Đồng ý': 'ok',
-  'Từ chối': 'err',
-  'Chưa hỏi': 'neutral',
-};
-
-const SAMPLE_CONSENTS: ConsentRow[] = [
+const columns: ColumnDef<ConsentStateItem, unknown>[] = [
   {
-    code: 'KH-004512',
-    name: 'Cửa hàng VTNN Minh Tâm',
-    email: 'Đồng ý',
-    sms: 'Đồng ý',
-    zalo: 'Từ chối',
-    source: 'Form đăng ký web',
-    updatedAt: '12/05/2026',
-    evidence: 'Bản ghi form',
+    id: 'code',
+    header: 'Mã KH',
+    meta: { width: 120 },
+    cell: ({ row }) => (
+      <Link
+        href={`/crm/customers/${row.original.customer.id}`}
+        className="font-mono text-xs text-primary hover:underline"
+      >
+        {row.original.customer.code}
+      </Link>
+    ),
   },
   {
-    code: 'KH-003201',
-    name: 'HTX Nông nghiệp Kim Quan',
-    email: 'Đồng ý',
-    sms: 'Đồng ý',
-    zalo: 'Đồng ý',
-    source: 'Điều khoản hợp đồng đại lý',
-    updatedAt: '03/01/2026',
-    evidence: 'HĐ số 12/2026',
+    id: 'name',
+    header: 'Khách hàng',
+    meta: { width: 260 },
+    cell: ({ row }) => (
+      <Link href={`/crm/customers/${row.original.customer.id}`} className="hover:underline">
+        {row.original.customer.name}
+      </Link>
+    ),
   },
   {
-    code: 'KH-006104',
-    name: 'Đại lý VTNN Hồng Hà Thạch Thất',
-    email: 'Đồng ý',
-    sms: 'Từ chối',
-    zalo: 'Đồng ý',
-    source: 'Cuộc gọi CSKH (ghi âm)',
-    updatedAt: '02/03/2026',
-    evidence: 'Ghi âm 1:42',
+    id: 'phone',
+    header: 'Điện thoại',
+    meta: { width: 130 },
+    cell: ({ row }) => (
+      <span className="font-mono text-xs">{formatPhone(row.original.customer.phone)}</span>
+    ),
   },
   {
-    code: 'KH-013207',
-    name: 'Đại lý VTNN An Nhiên',
-    email: 'Chưa hỏi',
-    sms: 'Chưa hỏi',
-    zalo: 'Chưa hỏi',
-    source: '—',
-    updatedAt: '—',
-    evidence: '—',
+    id: 'channel',
+    header: 'Kênh',
+    meta: { width: 100 },
+    cell: ({ row }) => consentChannelLabel(row.original.channel),
   },
   {
-    code: 'KH-005870',
-    name: 'Trang trại sầu riêng Bảy Hùng',
-    email: 'Đồng ý',
-    sms: 'Chưa hỏi',
-    zalo: 'Chưa hỏi',
-    source: 'Email xác nhận của văn thư',
-    updatedAt: '20/04/2026',
-    evidence: 'Email lưu',
+    id: 'granted',
+    header: 'Trạng thái',
+    meta: { width: 110 },
+    cell: ({ row }) => (
+      <StatusBadge tone={consentStateTone(row.original.granted)}>
+        {consentStateLabel(row.original.granted)}
+      </StatusBadge>
+    ),
   },
   {
-    code: 'KH-002018',
-    name: 'Công ty CP Nông nghiệp Thành Công',
-    email: 'Đồng ý',
-    sms: 'Đồng ý',
-    zalo: 'Đồng ý',
-    source: 'Điều khoản hợp đồng đại lý',
-    updatedAt: '15/01/2026',
-    evidence: 'HĐ số 03/2026',
+    id: 'source',
+    header: 'Nguồn',
+    meta: { width: 150 },
+    cell: ({ row }) => consentSourceLabel(row.original.source),
   },
   {
-    code: 'KH-007332',
-    name: 'Nhà vườn Tiền Phong',
-    email: 'Từ chối',
-    sms: 'Từ chối',
-    zalo: 'Đồng ý',
-    source: 'Tin nhắn Zalo OA',
-    updatedAt: '08/06/2026',
-    evidence: 'Ảnh chụp tin',
+    id: 'purpose',
+    header: 'Mục đích',
+    meta: { width: 110 },
+    cell: ({ row }) => consentPurposeLabel(row.original.purpose),
   },
   {
-    code: 'KH-008015',
-    name: 'Cửa hàng VTNN Sao Mai',
-    email: 'Chưa hỏi',
-    sms: 'Đồng ý',
-    zalo: 'Đồng ý',
-    source: 'Cuộc gọi CSKH (ghi âm)',
-    updatedAt: '11/02/2026',
-    evidence: 'Ghi âm 0:58',
+    id: 'recordedAt',
+    header: 'Cập nhật',
+    meta: { width: 140 },
+    cell: ({ row }) => (
+      <span className="tabular-nums">{formatDateTime(row.original.recordedAt)}</span>
+    ),
   },
   {
-    code: 'KH-004877',
-    name: 'HTX Rau sạch An Phát',
-    email: 'Đồng ý',
-    sms: 'Chưa hỏi',
-    zalo: 'Từ chối',
-    source: 'Form đăng ký web',
-    updatedAt: '27/03/2026',
-    evidence: 'Bản ghi form',
-  },
-  {
-    code: 'KH-009210',
-    name: 'Nhà vườn cà phê Quang Minh',
-    email: 'Chưa hỏi',
-    sms: 'Chưa hỏi',
-    zalo: 'Đồng ý',
-    source: 'Tin nhắn Zalo OA',
-    updatedAt: '19/05/2026',
-    evidence: 'Ảnh chụp tin',
-  },
-  {
-    code: 'KH-010388',
-    name: 'Đại lý VTNN Tân Tiến',
-    email: 'Từ chối',
-    sms: 'Từ chối',
-    zalo: 'Từ chối',
-    source: 'Yêu cầu qua điện thoại (ghi âm)',
-    updatedAt: '30/06/2026',
-    evidence: 'Ghi âm 0:40',
-  },
-  {
-    code: 'KH-002990',
-    name: 'Công ty TNHH Nông sản Đức Thịnh',
-    email: 'Đồng ý',
-    sms: 'Đồng ý',
-    zalo: 'Đồng ý',
-    source: 'Form đăng ký web',
-    updatedAt: '14/02/2026',
-    evidence: 'Bản ghi form',
-  },
-  {
-    code: 'KH-007801',
-    name: 'Vườn cam Cao Phong',
-    email: 'Đồng ý',
-    sms: 'Đồng ý',
-    zalo: 'Đồng ý',
-    source: 'Điều khoản hợp đồng chuỗi',
-    updatedAt: '09/01/2026',
-    evidence: 'HĐ số 02/2026',
-  },
-  {
-    code: 'KH-012063',
-    name: 'Cửa hàng VTNN Thu Hương',
-    email: 'Từ chối',
-    sms: 'Chưa hỏi',
-    zalo: 'Đồng ý',
-    source: 'Tin nhắn Zalo OA',
-    updatedAt: '21/07/2026',
-    evidence: 'Ảnh chụp tin',
+    id: 'recordedBy',
+    header: 'Người ghi',
+    meta: { width: 160 },
+    cell: ({ row }) =>
+      row.original.recordedBy ? (
+        row.original.recordedBy.name
+      ) : (
+        <span className="text-muted-foreground">Khách tự thao tác</span>
+      ),
   },
 ];
 
-function ConsentBadge({ value }: { value: ConsentValue }) {
-  return <StatusBadge tone={CONSENT_TONE[value]}>{value}</StatusBadge>;
-}
-
 export function MarketingConsentScreen() {
+  const { state, set, skipTake } = useListState<ConsentFilter>(DEFAULTS);
+  const filterParams = useMemo(() => toConsentFilterParams(state.filters), [state.filters]);
+  const params = useMemo(
+    () => ({ q: state.q, ...filterParams, ...skipTake }),
+    [state.q, filterParams, skipTake],
+  );
+  const query = useConsents(params);
+  const filtered = state.q !== '' || Object.keys(state.filters).length > 0;
+  const clearAll = () => set({ q: '', filters: {} });
+
   return (
     <>
       <PageHeader
         title="Đồng ý nhận marketing (PDPD)"
-        description="1.240 KH trong team · chỉ gửi được chiến dịch tới kênh có trạng thái “Đồng ý” · bằng chứng lưu 5 năm"
+        description={
+          query.data
+            ? `${groupVi(String(query.data.total))} trạng thái ${filtered ? 'khớp bộ lọc' : 'trong phạm vi bạn phụ trách'} · chỉ gửi chiến dịch tới kênh “Đồng ý”`
+            : 'Đang tải trạng thái đồng ý…'
+        }
         breadcrumb={[
           { label: 'Khách hàng', href: '/crm/customers' },
           { label: 'Đồng ý marketing' },
         ]}
-        actions={
-          <>
-            <Button variant="outline" size="sm">
-              Nhập cập nhật từ CSV
-            </Button>
-            <Button variant="outline" size="sm">
-              Xuất danh sách gửi được
-            </Button>
-          </>
-        }
       />
 
-      <div className="mb-3 flex flex-wrap items-center gap-2 rounded-md border bg-card p-1.5">
-        <div className="relative w-60">
-          <Search
-            className="absolute left-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground"
-            aria-hidden
-          />
-          <Input className="h-7 pl-7 text-xs" placeholder="Tìm theo tên, SĐT, mã KH…" />
-        </div>
-        <button
-          type="button"
-          className="inline-flex h-7 items-center gap-1 whitespace-nowrap rounded-md border border-input bg-card px-2 text-xs"
-        >
-          Kênh: Tất cả <ChevronDown className="h-3 w-3 text-muted-foreground" aria-hidden />
-        </button>
-        <button
-          type="button"
-          className="inline-flex h-7 items-center gap-1 whitespace-nowrap rounded-md border border-primary bg-secondary px-2 text-xs font-semibold text-primary"
-        >
-          Trạng thái: Chưa hỏi <X className="h-3 w-3" aria-hidden />
-        </button>
-        <button
-          type="button"
-          className="inline-flex h-7 items-center gap-1 whitespace-nowrap rounded-md border border-input bg-card px-2 text-xs"
-        >
-          Nguồn <ChevronDown className="h-3 w-3 text-muted-foreground" aria-hidden />
-        </button>
-        <button
-          type="button"
-          className="inline-flex h-7 items-center gap-1 whitespace-nowrap rounded-md border border-input bg-card px-2 text-xs"
-        >
-          Cập nhật trước <ChevronDown className="h-3 w-3 text-muted-foreground" aria-hidden />
-        </button>
-        <span className="ml-auto text-xs text-muted-foreground">
-          Đồng ý ít nhất 1 kênh: <span className="font-semibold text-foreground">918 / 1.240</span>
-        </span>
-      </div>
+      <FilterBar<ConsentFilter>
+        q={state.q}
+        onQChange={(q) => set({ q })}
+        values={state.filters}
+        onFilterChange={(patch) => set({ filters: { ...state.filters, ...patch } })}
+        searchPlaceholder="Tìm theo tên, SĐT, mã KH…"
+        filters={[
+          {
+            key: 'channel',
+            label: 'Kênh',
+            type: 'select',
+            options: CONSENT_CHANNELS.map((c) => ({ value: c, label: consentChannelLabel(c) })),
+          },
+          {
+            key: 'granted',
+            label: 'Trạng thái',
+            type: 'select',
+            options: [
+              { value: 'true', label: 'Đồng ý' },
+              { value: 'false', label: 'Từ chối' },
+            ],
+          },
+          { key: 'from', label: 'Cập nhật từ ngày', type: 'date' },
+          { key: 'to', label: 'Cập nhật đến ngày', type: 'date' },
+        ]}
+      />
 
-      <div className="rounded-md border bg-card">
-        <div className="overflow-x-auto">
-          <Table className="text-sm">
-            <TableHeader>
-              <TableRow className="bg-muted hover:bg-muted">
-                <TableHead className="px-2.5 text-xs">Mã KH</TableHead>
-                <TableHead className="px-2.5 text-xs">Khách hàng</TableHead>
-                <TableHead className="px-2.5 text-xs">Email</TableHead>
-                <TableHead className="px-2.5 text-xs">SMS</TableHead>
-                <TableHead className="px-2.5 text-xs">Zalo</TableHead>
-                <TableHead className="px-2.5 text-xs">Nguồn đồng ý</TableHead>
-                <TableHead className="px-2.5 text-xs">Cập nhật</TableHead>
-                <TableHead className="px-2.5 text-xs">Bằng chứng</TableHead>
-                <TableHead className="w-11 px-2.5 text-xs">
-                  <span className="sr-only">Thao tác</span>
-                </TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {SAMPLE_CONSENTS.map((c) => (
-                <TableRow key={c.code}>
-                  <TableCell className="px-2.5 py-1.5 font-mono text-xs text-primary">
-                    {c.code}
-                  </TableCell>
-                  <TableCell className="max-w-72 truncate px-2.5 py-1.5">{c.name}</TableCell>
-                  <TableCell className="px-2.5 py-1.5">
-                    <ConsentBadge value={c.email} />
-                  </TableCell>
-                  <TableCell className="px-2.5 py-1.5">
-                    <ConsentBadge value={c.sms} />
-                  </TableCell>
-                  <TableCell className="px-2.5 py-1.5">
-                    <ConsentBadge value={c.zalo} />
-                  </TableCell>
-                  <TableCell
-                    className={
-                      c.source === '—' ? 'px-2.5 py-1.5 text-muted-foreground' : 'px-2.5 py-1.5'
-                    }
-                  >
-                    {c.source}
-                  </TableCell>
-                  <TableCell
-                    className={
-                      c.updatedAt === '—'
-                        ? 'px-2.5 py-1.5 text-muted-foreground'
-                        : 'px-2.5 py-1.5 tabular-nums'
-                    }
-                  >
-                    {c.updatedAt}
-                  </TableCell>
-                  <TableCell className="px-2.5 py-1.5">
-                    {c.evidence === '—' ? (
-                      <span className="text-muted-foreground">—</span>
-                    ) : (
-                      <button type="button" className="text-primary hover:underline">
-                        {c.evidence}
-                      </button>
-                    )}
-                  </TableCell>
-                  <TableCell className="px-2.5 py-1.5">
-                    <RowActions
-                      onEdit={() =>
-                        toast.info('UI-first — form sửa trạng thái đồng ý chưa nối API')
-                      }
-                    />
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </div>
-        <div className="flex items-center gap-3 border-t px-3 py-1.5 text-xs text-muted-foreground">
-          <span>Đang hiện 20 / 1.240 KH trong team</span>
-          <div className="ml-auto flex items-center gap-1.5">
-            <span className="mr-2">40 dòng/trang</span>
-            <Button variant="outline" size="sm" className="h-6 px-2 text-xs" disabled>
-              ← Trước
-            </Button>
-            <Button variant="outline" size="sm" className="h-6 px-2 text-xs">
-              Tiếp →
-            </Button>
-          </div>
-        </div>
-      </div>
+      <QueryState
+        query={query}
+        skeleton={<ListSkeleton rows={12} columns={9} />}
+        isEmpty={(d) => d.items.length === 0}
+        empty={
+          <EmptyState
+            icon={MailCheck}
+            title={filtered ? 'Không có trạng thái nào khớp' : 'Chưa ghi nhận đồng ý nào'}
+            description={
+              filtered
+                ? 'Thử bỏ bớt bộ lọc hoặc đổi từ khóa.'
+                : 'Mở hồ sơ khách và bấm “Ghi nhận thay đổi” ở thẻ Đồng ý nhận tin.'
+            }
+            action={
+              filtered ? (
+                <Button variant="outline" onClick={clearAll}>
+                  Xóa lọc
+                </Button>
+              ) : (
+                <Button variant="outline" asChild>
+                  <Link href="/crm/customers">Về danh sách khách hàng</Link>
+                </Button>
+              )
+            }
+          />
+        }
+      >
+        {(data) => (
+          <DataTable
+            columns={columns}
+            rows={data.items}
+            getRowId={(r) => r.id}
+            total={data.total}
+            page={state.page}
+            size={state.size}
+            sort={null}
+            onPageChange={(page) => set({ page })}
+            onSizeChange={(size) => set({ size })}
+            onSortChange={() => undefined}
+          />
+        )}
+      </QueryState>
 
       <p className="mt-2 rounded-md bg-muted px-3 py-2 text-xs text-muted-foreground">
-        “Xuất danh sách gửi được” chỉ xuất KH có kênh Đồng ý — chiến dịch không bao giờ chạm tới “Từ
-        chối” và “Chưa hỏi” (PDPD). Đổi trạng thái bắt buộc kèm nguồn + bằng chứng; lịch sử thay đổi
-        giữ trong audit log.
+        Mỗi dòng là trạng thái mới nhất của một khách trên một kênh. Khách chưa từng được hỏi không
+        có dòng nào và coi như không nhận tin — chiến dịch không bao giờ chạm tới “Từ chối” hoặc
+        chưa ghi nhận. Đổi trạng thái ở hồ sơ khách, kèm nguồn + ghi chú bằng chứng; lịch sử giữ
+        nguyên, không sửa được.
       </p>
     </>
   );
