@@ -1,6 +1,6 @@
 'use client';
 
-import { Copy, Info, KeyRound, PlugZap, Plus, RefreshCw } from 'lucide-react';
+import { Copy, Info, KeyRound, PackageCheck, PlugZap, Plus, RefreshCw } from 'lucide-react';
 import { useState } from 'react';
 import { ConfirmDialog } from '@/components/data/confirm-dialog';
 import { RowActions } from '@/components/data/row-actions';
@@ -8,6 +8,7 @@ import { EmptyState, ListSkeleton, QueryState } from '@/components/data/states';
 import { StatusBadge } from '@/components/data/status-badge';
 import { PageHeader } from '@/components/layout/page-header';
 import { Button } from '@/components/ui/button';
+import { Skeleton } from '@/components/ui/skeleton';
 import {
   Table,
   TableBody,
@@ -24,12 +25,14 @@ import { Can } from '@/lib/permission';
 import {
   useDeletePancakeConfig,
   usePancakeConfig,
+  usePancakeShopProducts,
   useRotatePancakeWebhookSecret,
   useVerifyPancakeConfig,
   type PancakeConfigList,
   type PancakeShopConfig,
 } from '../api/use-pancake-config';
 import { PancakeConfigDialog } from './pancake-config-dialog';
+import { PancakeShopProductsDialog } from './pancake-shop-products-dialog';
 
 /**
  * Kết nối Pancake POS — GET/PUT/DELETE /pancake-sync/config, POST …/verify.
@@ -134,6 +137,7 @@ function EnvNotice({ env }: { env: PancakeConfigList['env'] | undefined }) {
 
 function ShopTable({ items }: { items: PancakeShopConfig[] }) {
   const [editing, setEditing] = useState<PancakeShopConfig | null>(null);
+  const [catalogShop, setCatalogShop] = useState<PancakeShopConfig | null>(null);
   const remove = useDeletePancakeConfig();
   const verify = useVerifyPancakeConfig();
   const [verifying, setVerifying] = useState<string | null>(null);
@@ -160,6 +164,7 @@ function ShopTable({ items }: { items: PancakeShopConfig[] }) {
               <TableHead>Khoá API</TableHead>
               <TableHead>Trạng thái</TableHead>
               <TableHead>Kiểm tra kết nối</TableHead>
+              <TableHead>Sản phẩm bán</TableHead>
               <TableHead>Webhook (dán vào Pancake)</TableHead>
               <TableHead className="text-right">Giới hạn</TableHead>
               <TableHead>Cập nhật</TableHead>
@@ -205,6 +210,9 @@ function ShopTable({ items }: { items: PancakeShopConfig[] }) {
                     ) : (
                       <span className="text-sm text-muted-foreground">Chưa kiểm tra</span>
                     )}
+                  </TableCell>
+                  <TableCell>
+                    <ShopCatalogCell shop={shop} onEdit={() => setCatalogShop(shop)} />
                   </TableCell>
                   <TableCell className="max-w-sm">
                     <WebhookCell shop={shop} canRotate={dbRow} />
@@ -260,7 +268,44 @@ function ShopTable({ items }: { items: PancakeShopConfig[] }) {
       {editing ? (
         <PancakeConfigDialog open onOpenChange={(o) => !o && setEditing(null)} config={editing} />
       ) : null}
+      {catalogShop ? (
+        <PancakeShopProductsDialog
+          key={catalogShop.shopId}
+          shop={catalogShop}
+          open
+          onOpenChange={(o) => !o && setCatalogShop(null)}
+        />
+      ) : null}
     </>
+  );
+}
+
+/** "Tất cả" / "N sản phẩm" + nút mở dialog gán sản phẩm cho shop. */
+function ShopCatalogCell({ shop, onEdit }: { shop: PancakeShopConfig; onEdit: () => void }) {
+  const q = usePancakeShopProducts(shop.shopId);
+  return (
+    <div className="flex items-center gap-2 whitespace-nowrap">
+      {q.isPending ? (
+        <Skeleton className="h-5 w-20" />
+      ) : q.isError ? (
+        <span className="text-sm text-destructive">Không tải được</span>
+      ) : q.data.restricted ? (
+        <StatusBadge tone="brand">{q.data.products.length} sản phẩm</StatusBadge>
+      ) : (
+        <StatusBadge tone="neutral">Tất cả sản phẩm</StatusBadge>
+      )}
+      <Can I="config" a="Sync">
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={onEdit}
+          aria-label={`Chọn sản phẩm bán cho shop ${shop.shopId}`}
+        >
+          <PackageCheck aria-hidden />
+          Chọn
+        </Button>
+      </Can>
+    </div>
   );
 }
 

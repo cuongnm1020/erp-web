@@ -1659,6 +1659,33 @@ export const handlers = [
     });
   }),
   http.delete('/api/pancake-sync/config/:shopId', () => new HttpResponse(null, { status: 204 })),
+  // Sản phẩm bán trên shop: mặc định bán tất cả; PUT trả lại đúng danh sách gửi lên.
+  http.get('/api/pancake-sync/config/:shopId/products', ({ params }) =>
+    HttpResponse.json({
+      shopId: String(params.shopId),
+      restricted: false,
+      products: [],
+      updatedAt: null,
+      updatedBy: null,
+    }),
+  ),
+  http.put('/api/pancake-sync/config/:shopId/products', async ({ params, request }) => {
+    const body = (await request.json()) as { restricted: boolean; productIds: string[] };
+    return HttpResponse.json({
+      shopId: String(params.shopId),
+      restricted: body.restricted,
+      products: body.productIds.map((id) => ({
+        id,
+        code: id,
+        name: id,
+        isCombo: false,
+        isActive: true,
+      })),
+      updatedAt: '2026-10-08T08:00:00.000Z',
+      updatedBy: null,
+      queued: body.productIds.length,
+    });
+  }),
   http.post('/api/pancake-sync/config/:shopId/webhook-secret', ({ params }) =>
     HttpResponse.json({
       ...PANCAKE_SHOP_FIXTURE,

@@ -200,4 +200,55 @@ describe('PancakeConfigScreen — /pancake-sync/config', () => {
       expect.objectContaining({ description: expect.stringMatching(/3 kho/) }),
     );
   });
+
+  it('sản phẩm bán: mặc định "Tất cả"; chọn "Chỉ sản phẩm được chọn" + tick → PUT đúng body, toast số sản phẩm xếp đẩy', async () => {
+    const puts: unknown[] = [];
+    const product = (id: string, code: string, name: string) => ({
+      id,
+      code,
+      name,
+      isCombo: false,
+      isActive: true,
+    });
+    server.use(
+      http.get('/api/products', () =>
+        HttpResponse.json({
+          items: [
+            product('p-1', 'SP-0001', 'Phân bón lá A'),
+            product('p-2', 'SP-0002', 'Thuốc trừ sâu B'),
+          ],
+          total: 2,
+        }),
+      ),
+      http.put('/api/pancake-sync/config/:shopId/products', async ({ request }) => {
+        const body = (await request.json()) as { restricted: boolean; productIds: string[] };
+        puts.push(body);
+        return HttpResponse.json({
+          shopId: '407957969',
+          restricted: body.restricted,
+          products: [product('p-1', 'SP-0001', 'Phân bón lá A')],
+          updatedAt: '2026-10-08T08:00:00.000Z',
+          updatedBy: null,
+          queued: 12,
+        });
+      }),
+    );
+    renderApp(<PancakeConfigScreen />);
+    await screen.findByText('Shop chính');
+    expect((await screen.findAllByText('Tất cả sản phẩm')).length).toBeGreaterThan(0);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Chọn sản phẩm bán cho shop 407957969' }));
+    fireEvent.click(await screen.findByRole('radio', { name: /Chỉ sản phẩm được chọn/ }));
+    fireEvent.click(await screen.findByRole('checkbox', { name: 'Chọn SP-0001' }));
+    expect(screen.getByText('Đã chọn · 1')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Lưu sản phẩm bán' }));
+
+    await waitFor(() => expect(puts).toEqual([{ restricted: true, productIds: ['p-1'] }]));
+    await waitFor(() =>
+      expect(toastSuccess).toHaveBeenCalledWith(
+        'Đã lưu sản phẩm bán',
+        expect.objectContaining({ description: expect.stringMatching(/12 sản phẩm/) }),
+      ),
+    );
+  });
 });
