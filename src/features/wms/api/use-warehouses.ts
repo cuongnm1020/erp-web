@@ -74,3 +74,41 @@ export function useDeleteWarehouse() {
     onSuccess: () => void qc.invalidateQueries({ queryKey: warehouseKeys.all }),
   });
 }
+
+/** Ảnh 3D mặt bằng kho: jpg/png/webp ≤ 10MB (khớp server, luật 11). */
+export const LAYOUT_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
+export const LAYOUT_IMAGE_MAX_BYTES = 10 * 1024 * 1024;
+
+/**
+ * PUT /warehouses/{id}/layout-image — multipart 'file', thay ảnh cũ. `layoutImageUrl` là
+ * presigned S3 hết hạn ~1h — chỉ hiển thị, đừng cất lâu.
+ */
+export function useUploadWarehouseLayoutImage() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, file }: { id: string; file: File }) => {
+      const fd = new FormData();
+      fd.append('file', file);
+      return unwrap(
+        api.PUT('/warehouses/{id}/layout-image', {
+          params: { path: { id } },
+          body: fd as never,
+          // Giữ nguyên FormData + bỏ Content-Type json để browser tự đặt multipart boundary
+          bodySerializer: (body: unknown) => body as FormData,
+          headers: { 'Content-Type': null },
+        }),
+      );
+    },
+    onSuccess: () => void qc.invalidateQueries({ queryKey: warehouseKeys.all }),
+  });
+}
+
+/** DELETE /warehouses/{id}/layout-image — gỡ ảnh 3D (S3 + DB). */
+export function useDeleteWarehouseLayoutImage() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) =>
+      unwrap(api.DELETE('/warehouses/{id}/layout-image', { params: { path: { id } } })),
+    onSuccess: () => void qc.invalidateQueries({ queryKey: warehouseKeys.all }),
+  });
+}

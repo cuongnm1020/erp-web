@@ -1851,6 +1851,24 @@ export interface paths {
         patch: operations["WarehouseController_update"];
         trace?: never;
     };
+    "/warehouses/{id}/layout-image": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Ảnh phối cảnh 3D mặt bằng kho — multipart field "file" (jpg/png/webp ≤ 10MB), thay ảnh cũ. */
+        put: operations["WarehouseController_setLayoutImage"];
+        post?: never;
+        /** Gỡ ảnh 3D mặt bằng (S3 + DB). Idempotent. */
+        delete: operations["WarehouseController_removeLayoutImage"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/warehouses/{id}/locations/tree": {
         parameters: {
             query?: never;
@@ -6706,6 +6724,8 @@ export interface components {
             isActive: boolean;
             /** @description Kho mặc định hệ thống — đơn đồng bộ từ Pancake giữ chỗ và gán kho này. Tối đa một kho. */
             isDefault: boolean;
+            /** @description Ảnh phối cảnh 3D mặt bằng kho — presigned URL hết hạn ~1h, đừng cache lâu. Null = chưa có. */
+            layoutImageUrl: string | null;
         };
         CreateWarehouseDto: {
             code: string;
@@ -13199,7 +13219,9 @@ export interface operations {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["WarehouseSummaryDto"];
+                };
             };
         };
     };
@@ -13244,6 +13266,53 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["WarehouseSummaryDto"];
                 };
+            };
+        };
+    };
+    WarehouseController_setLayoutImage: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": {
+                    /** Format: binary */
+                    file: string;
+                };
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WarehouseSummaryDto"];
+                };
+            };
+        };
+    };
+    WarehouseController_removeLayoutImage: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };
