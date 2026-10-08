@@ -2996,6 +2996,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/carriers/vnpost/orders": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Danh sách đơn trên hệ thống VNPost (portal MyVNP) — chỉ đọc, gọi thẳng hãng mỗi lần.
+         *     Mặc định 7 ngày gần nhất theo giờ VN; khoảng tối đa 31 ngày. Hãng lỗi → 502.
+         */
+        get: operations["CarrierController_listVnpostOrders"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/carriers/{code}/quote": {
         parameters: {
             query?: never;
@@ -8098,6 +8118,51 @@ export interface components {
             configured: boolean;
             webhook: boolean;
         };
+        /**
+         * @description Trạng thái quy đổi; `null` = mã chưa có trong bảng ánh xạ.
+         * @enum {string}
+         */
+        ShipmentStatus: "PENDING" | "PICKED_UP" | "IN_TRANSIT" | "DELIVERED" | "FAILED" | "RETURNED" | "CANCELLED";
+        VnpostOrderDto: {
+            /** @description Trạng thái quy đổi; `null` = mã chưa có trong bảng ánh xạ. */
+            status: components["schemas"]["ShipmentStatus"] | null;
+            /** @description Dòng gốc hãng trả — trường của VNPost chưa đối chiếu đủ, giữ để tra. */
+            raw: {
+                [key: string]: unknown;
+            };
+            orderHdrId: string | null;
+            /** @description Mã bưu gửi (= `Shipment.trackingNo` nếu đơn tạo từ ERP). */
+            itemCode: string | null;
+            saleOrderCode: string | null;
+            batchCode: string | null;
+            /** @description Mã trạng thái gốc của hãng. */
+            carrierStatusCode: string | null;
+            statusName: string | null;
+            senderName: string | null;
+            senderPhone: string | null;
+            receiverName: string | null;
+            receiverPhone: string | null;
+            receiverAddress: string | null;
+            serviceCode: string | null;
+            codAmount: string | null;
+            totalFee: string | null;
+            weightGram: string | null;
+            /** @description ISO 8601. */
+            createdAt: string | null;
+            /** @description Lần cập nhật cuối trên VNPost (ISO 8601) — trường lọc ngày của danh sách. */
+            updatedAt: string | null;
+        };
+        VnpostOrderListDto: {
+            items: components["schemas"]["VnpostOrderDto"][];
+            /** @description Tổng số đơn khớp bộ lọc (`totalElements` của hãng, hoặc số khớp khi lọc phía ERP). */
+            total: number;
+            /** @description Có `q`/`status` mà khoảng ngày quá 5.000 đơn → chỉ lọc trong 5.000 đơn đầu; thu hẹp ngày. */
+            truncated: boolean;
+            take: number;
+            skip: number;
+            from: string;
+            to: string;
+        };
         CarrierAddressDto: {
             provinceCode?: string;
             wardCode?: string;
@@ -12593,6 +12658,11 @@ export interface operations {
                 trackingMode?: "NONE" | "LOT" | "SERIAL";
                 /** @description true = chỉ product có ít nhất một SKU còn tồn (onHand > 0). */
                 hasStock?: boolean;
+                /**
+                 * @description false = chỉ sản phẩm thường (màn Sản phẩm — combo quản lý riêng ở /combos), true = chỉ combo;
+                 *     bỏ trống = cả hai (ô tìm sản phẩm khi lên đơn vẫn cần thấy combo).
+                 */
+                isCombo?: boolean;
                 /** @description Mặc định false — bản ghi xóa mềm ẩn khỏi mọi list. */
                 includeDeleted?: boolean;
                 /** @description Bỏ trống → `code` (giữ thứ tự cũ cho client hiện tại). */
@@ -12760,6 +12830,8 @@ export interface operations {
                 q?: string;
                 /** @description Lọc theo trạng thái bán — bỏ trống = cả hai. */
                 status?: "active" | "inactive";
+                /** @description false = bỏ SKU combo (màn Sản phẩm), true = chỉ SKU combo; bỏ trống = cả hai. */
+                isCombo?: boolean;
                 take: number;
                 skip: number;
             };
@@ -15106,6 +15178,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["CarrierDto"][];
+                };
+            };
+        };
+    };
+    CarrierController_listVnpostOrders: {
+        parameters: {
+            query: {
+                /** @description Mã trạng thái VNPost, vd `3,4` */
+                status?: string;
+                /** @description Cập nhật từ ngày (giờ VN) `YYYY-MM-DD`. Bỏ trống = 6 ngày trước `to`. */
+                from?: string;
+                /** @description Cập nhật đến ngày (giờ VN) `YYYY-MM-DD`. Bỏ trống = hôm nay. */
+                to?: string;
+                /** @description Mã bưu gửi / mã đơn hàng / tên hoặc SĐT người nhận (VNPost che một phần SĐT). */
+                q?: string;
+                /** @description VNPost phân trang theo trang → `skip` nên là bội số của `take`. */
+                take: number;
+                skip: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VnpostOrderListDto"];
                 };
             };
         };

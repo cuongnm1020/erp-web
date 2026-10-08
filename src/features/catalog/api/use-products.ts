@@ -35,6 +35,8 @@ export interface ProductListParams {
   trackingMode?: TrackingMode;
   /** true = chỉ sản phẩm còn ít nhất một SKU có tồn (onHand > 0). */
   hasStock?: boolean;
+  /** false = bỏ combo (màn Sản phẩm — combo ở /catalog/combos); bỏ trống = cả hai. */
+  isCombo?: boolean;
   sortBy?: 'createdAt' | 'name' | 'code';
   sortDir?: 'asc' | 'desc';
   take: number;
@@ -44,6 +46,8 @@ export interface ProductListParams {
 export interface SkuListParams {
   q?: string;
   status?: 'active' | 'inactive';
+  /** false = bỏ SKU combo; bỏ trống = cả hai. */
+  isCombo?: boolean;
   take: number;
   skip: number;
 }
@@ -74,6 +78,7 @@ export function useSkus(params: SkuListParams) {
             query: {
               q: params.q || undefined,
               status: params.status,
+              isCombo: params.isCombo,
               take: params.take,
               skip: params.skip,
             },
@@ -313,6 +318,7 @@ export function useProducts(params: ProductListParams, opts: { enabled?: boolean
               isActive: params.isActive,
               trackingMode: params.trackingMode,
               hasStock: params.hasStock,
+              isCombo: params.isCombo,
               sortBy: params.sortBy,
               sortDir: params.sortDir,
               take: params.take,
