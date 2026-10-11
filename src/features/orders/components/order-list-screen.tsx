@@ -6,7 +6,6 @@ import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
 import { DataTable, FilterBar, type ColumnDef } from '@/components/data/data-table';
 import { EmptyState, ListSkeleton, QueryState } from '@/components/data/states';
-import { StatusBadge } from '@/components/data/status-badge';
 import { PageHeader } from '@/components/layout/page-header';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -38,16 +37,9 @@ import {
   type OrderFlow,
   type SalesOrderListItem,
 } from '../api/use-orders';
-import {
-  fulfilmentLabel,
-  ORDER_FLOW_TABS,
-  orderFlowLabel,
-  orderFlowTone,
-  parseOrderFlow,
-  parseOrderStatus,
-} from '../labels';
+import { fulfilmentLabel, ORDER_FLOW_TABS, parseOrderFlow, parseOrderStatus } from '../labels';
 import { BulkShippingDialog } from './bulk-shipping-dialog';
-import { OrderQuickView, TelcoBadge } from './order-quick-view';
+import { FlowBadge, OrderQuickView, TelcoBadge } from './order-quick-view';
 import { SendToCarrierMenu } from './send-to-carrier-menu';
 
 /**
@@ -227,7 +219,7 @@ const buildColumns = (
       const o = row.original;
       return (
         <span title={o.fulfilmentStatus ? fulfilmentLabel(o.fulfilmentStatus) : undefined}>
-          <StatusBadge tone={orderFlowTone(o.flow)}>{orderFlowLabel(o.flow)}</StatusBadge>
+          <FlowBadge flow={o.flow} />
         </span>
       );
     },

@@ -3,7 +3,6 @@
 import * as DialogPrimitive from '@radix-ui/react-dialog';
 import { X } from 'lucide-react';
 import Link from 'next/link';
-import { StatusBadge } from '@/components/data/status-badge';
 import { Button } from '@/components/ui/button';
 import { DialogOverlay, DialogPortal } from '@/components/ui/dialog';
 import { messageFor } from '@/lib/error-messages';
@@ -16,8 +15,9 @@ import {
 } from '@/lib/format';
 import { useShipmentStatusLog } from '@/features/wms/api/use-shipping';
 import { shipmentStatusBadge } from '@/features/wms/labels';
-import { useOrder, type SalesOrderListItem } from '../api/use-orders';
-import { orderFlowLabel, orderFlowTone } from '../labels';
+import { cn } from '@/lib/cn';
+import { useOrder, type OrderFlow, type SalesOrderListItem } from '../api/use-orders';
+import { orderFlowClass, orderFlowLabel, telcoClass } from '../labels';
 
 /**
  * Xem nhanh một đơn từ danh sách (khung bên phải) — người nhận, sản phẩm, tiền, vận chuyển,
@@ -59,7 +59,7 @@ function Body({ row }: { row: SalesOrderListItem }) {
             <DialogPrimitive.Title className="font-mono text-base font-semibold">
               {row.docNumber}
             </DialogPrimitive.Title>
-            <StatusBadge tone={orderFlowTone(row.flow)}>{orderFlowLabel(row.flow)}</StatusBadge>
+            <FlowBadge flow={row.flow} />
           </div>
           <p className="text-xs text-muted-foreground">
             {row.pancakeOrderId ? `Pancake #${row.pancakeOrderId}` : 'Tạo trong ERP'} · tạo{' '}
@@ -204,11 +204,30 @@ function Money({ label, value, strong }: { label: string; value: string; strong?
   );
 }
 
-/** Nhãn nhà mạng cạnh SĐT — dùng chung bảng + xem nhanh. */
+/** Nhãn nhà mạng cạnh SĐT — mỗi nhà mạng một màu nền; dùng chung bảng + xem nhanh. */
 export function TelcoBadge({ name }: { name: string }) {
   return (
-    <span className="flex-none whitespace-nowrap rounded-sm border px-1 text-xs font-semibold leading-4 text-muted-foreground">
+    <span
+      className={cn(
+        'flex-none whitespace-nowrap rounded-sm px-1 text-xs font-semibold leading-4',
+        telcoClass(name),
+      )}
+    >
       {name}
+    </span>
+  );
+}
+
+/** Chip trạng thái đơn — mỗi trạng thái một màu chữ (token --flow-*); dùng chung bảng + xem nhanh. */
+export function FlowBadge({ flow }: { flow: OrderFlow }) {
+  return (
+    <span
+      className={cn(
+        'inline-flex h-5 items-center whitespace-nowrap rounded-sm px-1.5 text-xs font-semibold',
+        orderFlowClass(flow),
+      )}
+    >
+      {orderFlowLabel(flow)}
     </span>
   );
 }

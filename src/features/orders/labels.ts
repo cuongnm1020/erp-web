@@ -203,19 +203,41 @@ export const ORDER_FLOW_TABS: ReadonlyArray<{
   { flow: 'CANCELLED', label: 'Đã hủy', group: 'done' },
 ];
 
-const FLOW_TONE: Record<OrderFlow, StatusTone> = {
-  PENDING_APPROVAL: 'warn',
-  WAREHOUSE: 'neutral',
-  PICKING: 'brand',
-  PACKED: 'neutral',
-  PICKED_UP: 'brand',
-  IN_TRANSIT: 'brand',
-  OUT_FOR_DELIVERY: 'brand',
-  DELIVERED: 'ok',
-  RETURNED: 'warn',
-  CARRIER_CANCELLED: 'err',
-  CANCELLED: 'neutral',
+/**
+ * Mỗi trạng thái một màu chữ, nền cùng màu 10% (token --flow-* trong globals.css). Viết nguyên
+ * class — Tailwind chỉ sinh class thấy được trong mã nguồn.
+ */
+const FLOW_CLASS: Record<OrderFlow, string> = {
+  PENDING_APPROVAL: 'bg-flow-pending/10 text-flow-pending',
+  WAREHOUSE: 'bg-flow-warehouse/10 text-flow-warehouse',
+  PICKING: 'bg-flow-picking/10 text-flow-picking',
+  PACKED: 'bg-flow-packed/10 text-flow-packed',
+  PICKED_UP: 'bg-flow-picked-up/10 text-flow-picked-up',
+  IN_TRANSIT: 'bg-flow-in-transit/10 text-flow-in-transit',
+  OUT_FOR_DELIVERY: 'bg-flow-out-for-delivery/10 text-flow-out-for-delivery',
+  DELIVERED: 'bg-flow-delivered/10 text-flow-delivered',
+  RETURNED: 'bg-flow-returned/10 text-flow-returned',
+  CARRIER_CANCELLED: 'bg-flow-carrier-cancelled/10 text-flow-carrier-cancelled',
+  CANCELLED: 'bg-flow-cancelled/10 text-flow-cancelled',
 };
+
+export function orderFlowClass(f: OrderFlow): string {
+  return FLOW_CLASS[f];
+}
+
+/** Màu chữ của nhà mạng + nền cùng màu 15% (token --telco-*). Không nhận ra → xám. */
+const TELCO_CLASS: Record<string, string> = {
+  Viettel: 'bg-telco-viettel/15 text-telco-viettel',
+  Vina: 'bg-telco-vina/15 text-telco-vina',
+  Mobi: 'bg-telco-mobi/15 text-telco-mobi',
+  Vnmb: 'bg-telco-vnmb/15 text-telco-vnmb',
+  Gmobile: 'bg-telco-gmobile/15 text-telco-gmobile',
+  iTel: 'bg-telco-itel/15 text-telco-itel',
+};
+
+export function telcoClass(name: string): string {
+  return TELCO_CLASS[name] ?? 'bg-muted text-muted-foreground';
+}
 
 export function parseOrderFlow(v: string | undefined): OrderFlow | undefined {
   return ORDER_FLOW_TABS.find((t) => t.flow === v)?.flow;
@@ -223,8 +245,4 @@ export function parseOrderFlow(v: string | undefined): OrderFlow | undefined {
 
 export function orderFlowLabel(f: OrderFlow): string {
   return ORDER_FLOW_TABS.find((t) => t.flow === f)?.label ?? f;
-}
-
-export function orderFlowTone(f: OrderFlow): StatusTone {
-  return FLOW_TONE[f];
 }
