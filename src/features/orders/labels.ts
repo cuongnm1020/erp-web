@@ -1,7 +1,12 @@
 import Decimal from 'decimal.js';
 import type { StatusTone } from '@/components/data/status-badge';
 import { formatMoney } from '@/lib/format';
-import type { SalesOrderChannel, SalesOrderDetail, SalesOrderStatus } from './api/use-orders';
+import type {
+  OrderFlow,
+  SalesOrderChannel,
+  SalesOrderDetail,
+  SalesOrderStatus,
+} from './api/use-orders';
 
 /**
  * Nhãn tiếng Việt theo cái người dùng điều khiển, không theo enum của DB.
@@ -175,4 +180,51 @@ export function manualDiscountNote(
   if (!o.manualDiscountRate) return `giảm tay ${amount}`;
   const pct = new Decimal(o.manualDiscountRate).mul(100).toDecimalPlaces(2).toString();
   return `giảm tay ${pct}% = ${amount}`;
+}
+
+// ── Tab danh sách đơn (2026-10-12) — luồng chung, docs/carrier-status-mapping.md ở apps/api ──
+
+/** Thứ tự tab; `group` tách ba nhóm bằng vạch: ở kho / đang đi đường / đã xong. */
+export const ORDER_FLOW_TABS: ReadonlyArray<{
+  flow: OrderFlow;
+  label: string;
+  group: 'warehouse' | 'shipping' | 'done';
+}> = [
+  { flow: 'PENDING_APPROVAL', label: 'Chờ duyệt', group: 'warehouse' },
+  { flow: 'WAREHOUSE', label: 'Chờ xử lý kho', group: 'warehouse' },
+  { flow: 'PICKING', label: 'Đang pick', group: 'warehouse' },
+  { flow: 'PACKED', label: 'Đã đóng gói', group: 'warehouse' },
+  { flow: 'PICKED_UP', label: 'Đã lấy hàng', group: 'shipping' },
+  { flow: 'IN_TRANSIT', label: 'Đang vận chuyển', group: 'shipping' },
+  { flow: 'OUT_FOR_DELIVERY', label: 'Đang giao hàng', group: 'shipping' },
+  { flow: 'DELIVERED', label: 'Thành công', group: 'done' },
+  { flow: 'RETURNED', label: 'Sự cố hoàn', group: 'done' },
+  { flow: 'CARRIER_CANCELLED', label: 'Hãng hủy', group: 'done' },
+  { flow: 'CANCELLED', label: 'Đã hủy', group: 'done' },
+];
+
+const FLOW_TONE: Record<OrderFlow, StatusTone> = {
+  PENDING_APPROVAL: 'warn',
+  WAREHOUSE: 'neutral',
+  PICKING: 'brand',
+  PACKED: 'neutral',
+  PICKED_UP: 'brand',
+  IN_TRANSIT: 'brand',
+  OUT_FOR_DELIVERY: 'brand',
+  DELIVERED: 'ok',
+  RETURNED: 'warn',
+  CARRIER_CANCELLED: 'err',
+  CANCELLED: 'neutral',
+};
+
+export function parseOrderFlow(v: string | undefined): OrderFlow | undefined {
+  return ORDER_FLOW_TABS.find((t) => t.flow === v)?.flow;
+}
+
+export function orderFlowLabel(f: OrderFlow): string {
+  return ORDER_FLOW_TABS.find((t) => t.flow === f)?.label ?? f;
+}
+
+export function orderFlowTone(f: OrderFlow): StatusTone {
+  return FLOW_TONE[f];
 }

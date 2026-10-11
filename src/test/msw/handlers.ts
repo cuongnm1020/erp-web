@@ -488,7 +488,57 @@ export function makeOrders(n: number) {
       ORDER_STATUSES[i % ORDER_STATUSES.length] === 'POSTED' ? '2026-08-24T02:00:00.000Z' : null,
     createdAt: new Date(Date.UTC(2026, 7, 23) - i * 3_600_000).toISOString(),
     updatedAt: new Date(Date.UTC(2026, 7, 23) - i * 1_800_000).toISOString(),
+    // Màn Quản lý đơn hàng (2026-10-12) — tab theo trạng thái chứng từ + kho / giao hàng.
+    ...orderListExtras(i, ORDER_STATUSES[i % ORDER_STATUSES.length]!),
   }));
+}
+
+/** Tab của fixture: chứng từ hủy / chưa duyệt thắng; đơn đã duyệt xoay vòng trạng thái kho. */
+const FIXTURE_FLOWS = ['WAREHOUSE', 'PACKED', 'OUT_FOR_DELIVERY', 'DELIVERED', 'RETURNED'] as const;
+const FIXTURE_PHONES = ['0912345678', '0386000104', '0908000110', null] as const;
+
+function orderListExtras(i: number, status: (typeof ORDER_STATUSES)[number]) {
+  const flow =
+    status === 'CANCELLED'
+      ? ('CANCELLED' as const)
+      : status === 'DRAFT' || status === 'PENDING_APPROVAL'
+        ? ('PENDING_APPROVAL' as const)
+        : FIXTURE_FLOWS[i % FIXTURE_FLOWS.length]!;
+  const shipped = flow === 'OUT_FOR_DELIVERY' || flow === 'DELIVERED' || flow === 'RETURNED';
+  return {
+    flow,
+    fulfilmentStatus:
+      flow === 'PENDING_APPROVAL' || flow === 'CANCELLED'
+        ? null
+        : flow === 'WAREHOUSE'
+          ? ('NOT_STARTED' as const)
+          : flow,
+    statusChangedAt: shipped ? new Date(Date.UTC(2026, 7, 24) - i * 600_000).toISOString() : null,
+    phone: FIXTURE_PHONES[i % FIXTURE_PHONES.length]!,
+    recipientName: null,
+    addressLine: `Thôn ${(i % 9) + 1}, X. Ea Kar`,
+    province: 'Đắk Lắk',
+    product: {
+      name: `Sản phẩm 1`,
+      qty: '10',
+      uomCode: 'cái',
+      moreCount: (i % 9) + 1 - 1,
+    },
+    shipment: shipped
+      ? {
+          status: flow === 'OUT_FOR_DELIVERY' ? ('OUT_FOR_DELIVERY' as const) : flow,
+          carrierCode: 'GHTK',
+          carrierName: 'Giao Hàng Tiết Kiệm',
+          trackingNo: `S2311.HN.${1000 + i}`,
+          shipFee: '30000.0000',
+          codAmount: '200000.0000',
+          collectedAmount:
+            flow === 'DELIVERED' ? '170000.0000' : flow === 'RETURNED' ? '-30000.0000' : null,
+        }
+      : null,
+    ownerName: i % 3 === 0 ? null : 'Nguyễn Văn Sale',
+    note: i % 6 === 0 ? 'Gọi trước khi giao' : null,
+  };
 }
 
 /** Đúng shape `SalesOrderDetailDto` — header + `SalesOrderLineDto[]`. */
@@ -1360,6 +1410,25 @@ export const handlers = [
     const all = makeCustomerOrders(25).filter((o) => !status || o.status === status);
     return HttpResponse.json({ items: all.slice(skip, skip + take), total: all.length });
   }),
+  // Đếm tab (khai TRƯỚC /sales-orders/:id). Fixture không lọc thêm — đếm trên cả 60 đơn.
+  http.get('/api/sales-orders/flow-counts', () => {
+    const all = makeOrders(60);
+    const count = (f: string) => all.filter((o) => o.flow === f).length;
+    return HttpResponse.json({
+      total: all.length,
+      PENDING_APPROVAL: count('PENDING_APPROVAL'),
+      WAREHOUSE: count('WAREHOUSE'),
+      PICKING: count('PICKING'),
+      PACKED: count('PACKED'),
+      PICKED_UP: count('PICKED_UP'),
+      IN_TRANSIT: count('IN_TRANSIT'),
+      OUT_FOR_DELIVERY: count('OUT_FOR_DELIVERY'),
+      DELIVERED: count('DELIVERED'),
+      RETURNED: count('RETURNED'),
+      CARRIER_CANCELLED: count('CARRIER_CANCELLED'),
+      CANCELLED: count('CANCELLED'),
+    });
+  }),
   http.get('/api/sales-orders', async ({ request }) => {
     const url = new URL(request.url);
     const take = Number(url.searchParams.get('take') ?? 50);
@@ -1383,6 +1452,8 @@ export const handlers = [
           o.pancakeOrderId === q.replace(/^#/, ''),
       );
     if (status) all = all.filter((o) => o.status === status);
+    const flow = url.searchParams.get('flow');
+    if (flow) all = all.filter((o) => o.flow === flow);
     if (customerId) all = all.filter((o) => o.customer.id === customerId);
     // Fixture thôi — so sánh bằng Number là đủ, không phải tiền.
     if (weightMin) all = all.filter((o) => Number(o.weightKg) >= Number(weightMin));

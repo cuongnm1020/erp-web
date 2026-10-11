@@ -10,6 +10,7 @@ import {
   formatTime,
   normalizePhone,
   parseMoneyInput,
+  phoneCarrier,
   toLocalDateKey,
 } from './index';
 
@@ -122,5 +123,13 @@ describe('phone', () => {
     expect(formatPhone('ext 123')).toBe('ext 123');
     expect(formatPhone('')).toBe('—');
     expect(formatPhone(null)).toBe('—');
+  });
+  it('phoneCarrier: nhà mạng rút gọn theo đầu số; số bàn / lạ → null', () => {
+    expect(phoneCarrier('0386 000 104')).toBe('Viettel');
+    expect(phoneCarrier('+84912345678')).toBe('Vina');
+    expect(phoneCarrier('0908000110')).toBe('Mobi');
+    expect(phoneCarrier('0588354567')).toBe('Vnmb');
+    expect(phoneCarrier('02438123456')).toBeNull();
+    expect(phoneCarrier(null)).toBeNull();
   });
 });
