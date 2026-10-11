@@ -27,7 +27,7 @@ export function ScanQtyBar({
         <span className="text-muted-foreground">Số lượng</span>
         {waiting ? (
           <span className="truncate font-mono text-xs" aria-live="polite">
-            Đã quét {ctl.pending} — nhập số rồi Enter
+            Đang đếm {ctl.pending} — quét tiếp để cộng, hoặc gõ tổng rồi Enter
           </span>
         ) : (
           <span className="text-xs text-muted-foreground">Quét mã trước, mặc định 1</span>

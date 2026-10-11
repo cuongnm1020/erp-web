@@ -284,6 +284,61 @@ describe('Trạm đóng gói — quét đơn → quét SKU → tự đóng dòng
     expect(keys.size).toBe(3);
   });
 
+  /** Máy quét bắn mã vào ô đang focus (ô số lượng sau lần quét đầu) rồi Enter. */
+  const scanIntoQty = async (code: string) => {
+    const q = await screen.findByLabelText('Số lượng lần quét này');
+    fireEvent.change(q, { target: { value: code } });
+    fireEvent.keyDown(q, { key: 'Enter' });
+  };
+  const scanBodies = () => scans as Array<{ barcode: string; qty?: string }>;
+
+  it('mỗi lần quét gửi ngay +1, ô số lượng đếm tổng (2026-10-12)', async () => {
+    server.use(...scanFlow(WAYBILL_ISSUED));
+    renderApp(<PackStationScreen />);
+    scan('SO2609-00007');
+    await screen.findAllByText('Sản phẩm A');
+
+    scan('BC-B');
+    await waitFor(() => expect(scans).toHaveLength(1));
+    expect(scanBodies()[0]).toMatchObject({ barcode: 'BC-B', qty: '1' });
+    expect(await screen.findByText(/Đang đếm BC-B/)).toBeInTheDocument();
+    expect(await screen.findByLabelText('Số lượng lần quét này')).toHaveValue('1');
+
+    // Lần 2: máy quét bắn mã vào ô số lượng đang focus → gửi tiếp +1 (B đủ 2 → dòng tự đóng)
+    await scanIntoQty('BC-B');
+    await waitFor(() => expect(scans).toHaveLength(2));
+    expect(scanBodies()[1]).toMatchObject({ barcode: 'BC-B', qty: '1' });
+  });
+
+  it('quét một lần + gõ tổng + Enter → gửi phần còn thiếu để tổng đúng số đã gõ', async () => {
+    server.use(...scanFlow(WAYBILL_ISSUED));
+    renderApp(<PackStationScreen />);
+    scan('SO2609-00007');
+    await screen.findAllByText('Sản phẩm A');
+
+    scanSku('BC-B', '2');
+    await waitFor(() => expect(scans).toHaveLength(2));
+    expect(scanBodies()).toMatchObject([
+      { barcode: 'BC-B', qty: '1' },
+      { barcode: 'BC-B', qty: '1' },
+    ]);
+  });
+
+  it('gõ tổng nhỏ hơn số đã gửi → báo lỗi, không gửi', async () => {
+    server.use(...scanFlow(WAYBILL_ISSUED));
+    renderApp(<PackStationScreen />);
+    scan('SO2609-00007');
+    await screen.findAllByText('Sản phẩm A');
+
+    scan('BC-B');
+    await waitFor(() => expect(scans).toHaveLength(1));
+    const q = await screen.findByLabelText('Số lượng lần quét này');
+    fireEvent.change(q, { target: { value: '0.5' } });
+    fireEvent.keyDown(q, { key: 'Enter' });
+    expect(await screen.findByText(/Đã ghi nhận 1/)).toBeInTheDocument();
+    expect(scans).toHaveLength(1);
+  });
+
   it('sai SKU → banner đỏ, không cộng; mã lạ của đơn → không gọi server', async () => {
     server.use(...scanFlow(WAYBILL_ISSUED));
     renderApp(<PackStationScreen />);
