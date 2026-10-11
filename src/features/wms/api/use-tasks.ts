@@ -31,6 +31,8 @@ export interface TaskListParams {
   lineCount?: number;
   /** Từ N dòng trở lên ("5+"). */
   lineCountMin?: number;
+  /** Cùng mức gấp: `oldest` (mặc định API) = việc cũ trước, `newest` = việc mới tạo lên đầu. */
+  sort?: 'oldest' | 'newest';
   take: number;
   skip: number;
 }
@@ -47,8 +49,8 @@ export const taskKeys = {
 };
 
 /**
- * GET /tasks — bảng điều phối. API sắp `priority` giảm dần rồi `createdAt` tăng dần:
- * gấp trước, cùng mức gấp thì việc cũ trước.
+ * GET /tasks — bảng điều phối. API sắp `priority` giảm dần rồi `createdAt` (tăng dần mặc định,
+ * giảm dần khi `sort=newest`): gấp trước, cùng mức gấp thì việc cũ / mới trước.
  *
  * `wms.Task` KHÔNG có cột hạn chót/SLA, nên API trả `ageMinutes` (tuổi việc) và
  * `idleMinutes` (nằm im ở trạng thái hiện tại) thay vì cờ "quá hạn". Màn hình hiển thị
@@ -71,6 +73,7 @@ export function useTasks(params: TaskListParams) {
               docNumber: params.docNumber || undefined,
               lineCount: params.lineCount,
               lineCountMin: params.lineCountMin,
+              sort: params.sort,
               take: params.take,
               skip: params.skip,
             },

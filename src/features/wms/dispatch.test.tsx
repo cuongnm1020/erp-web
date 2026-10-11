@@ -272,6 +272,10 @@ describe('DispatchScreen — gán / trả việc (POST /tasks/:id/assign|unassig
     expect(seen.every((q) => q.get('lineCount') === '1' && q.get('lineCountMin') === null)).toBe(
       true,
     );
+    // Bảng việc xin API xếp việc mới nhất lên đầu (cùng mức gấp).
+    expect(seen.filter((q) => q.get('take') !== '1').every((q) => q.get('sort') === 'newest')).toBe(
+      true,
+    );
     // Chỉ còn dòng 1 SKU trong bảng.
     const one = PENDING.find((t) => t.lineCount === 1)!;
     const two = PENDING.find((t) => t.lineCount === 2)!;

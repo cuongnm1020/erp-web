@@ -569,6 +569,7 @@ export function DispatchScreen() {
     warehouseId,
     assignedTo,
     ...lineFilter(lines),
+    sort: 'newest',
     ...skipTake,
   });
   // Số việc của MỌI tab trạng thái (cùng bộ lọc) — trước đây chỉ tab đang mở có số, nên việc
@@ -623,7 +624,7 @@ export function DispatchScreen() {
     <div className="flex flex-col gap-3">
       <PageHeader
         title="Điều phối kho"
-        description="Việc gấp trước, cùng mức gấp thì việc cũ trước — đúng thứ tự API trả về."
+        description="Việc gấp trước, cùng mức gấp thì việc mới nhất lên đầu — đúng thứ tự API trả về."
         breadcrumb={[{ label: 'Kho' }, { label: 'Điều phối' }]}
         actions={
           <span className="flex items-center gap-1.5 text-xs text-muted-foreground">

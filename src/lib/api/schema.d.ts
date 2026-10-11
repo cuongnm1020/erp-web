@@ -11813,6 +11813,11 @@ export interface operations {
                 lineCount?: number;
                 /** @description Từ N dòng trở lên ("5+ SKU"). Kết hợp với `lineCount` thì `lineCount` thắng. */
                 lineCountMin?: number;
+                /**
+                 * @description Cùng mức gấp (`priority` giảm dần) thì: `oldest` = việc cũ trước (mặc định khi bỏ trống — thứ tự máy quét /
+                 *     hàng đợi), `newest` = việc mới tạo lên đầu (bảng điều phối).
+                 */
+                sort?: "oldest" | "newest";
                 take: number;
                 skip: number;
             };
