@@ -102,10 +102,11 @@ const SHIPMENT_STATUS_LABEL: Record<
 > = {
   PENDING: 'Chờ lấy',
   PICKED_UP: 'Đã lấy hàng',
-  IN_TRANSIT: 'Đang giao',
-  DELIVERED: 'Đã giao',
+  IN_TRANSIT: 'Đang vận chuyển',
+  OUT_FOR_DELIVERY: 'Đang giao hàng',
+  DELIVERED: 'Thành công',
   FAILED: 'Giao lỗi',
-  RETURNED: 'Đã hoàn',
+  RETURNED: 'Sự cố hoàn',
   CANCELLED: 'Đã hủy theo đơn',
 };
 
@@ -568,6 +569,7 @@ const RETURNABLE_FULFILMENT: ReadonlySet<SalesOrderDetail['fulfilment']['status'
   'PACKED',
   'SHIPPED',
   'IN_TRANSIT',
+  'OUT_FOR_DELIVERY',
   'DELIVERED',
   'FAILED',
   'RETURNED',
