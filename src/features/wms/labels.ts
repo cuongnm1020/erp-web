@@ -117,6 +117,7 @@ export const SHIPMENT_STATUS_BADGE: Record<string, { label: string; tone: Status
   DELIVERED: { label: 'Thành công', tone: 'ok' },
   FAILED: { label: 'Giao lỗi', tone: 'err' },
   RETURNED: { label: 'Sự cố hoàn', tone: 'warn' },
+  CARRIER_CANCELLED: { label: 'Hãng hủy', tone: 'err' },
   CANCELLED: { label: 'Đã hủy', tone: 'neutral' },
 };
 

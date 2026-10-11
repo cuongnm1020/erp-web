@@ -114,6 +114,7 @@ const FULFILMENT_LABEL: Record<OrderFulfilmentStatus, string> = {
   DELIVERED: 'Thành công',
   FAILED: 'Giao thất bại',
   RETURNED: 'Sự cố hoàn',
+  CARRIER_CANCELLED: 'Hãng hủy',
   CANCELLED: 'Đã hủy việc kho',
 };
 
@@ -129,6 +130,7 @@ const FULFILMENT_TONE: Record<OrderFulfilmentStatus, StatusTone> = {
   DELIVERED: 'ok',
   FAILED: 'err',
   RETURNED: 'warn',
+  CARRIER_CANCELLED: 'err',
   CANCELLED: 'neutral',
 };
 

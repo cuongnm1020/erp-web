@@ -4892,7 +4892,7 @@ export interface components {
             shipmentId: string;
             docNumber: string;
             /** @enum {string} */
-            status: "CANCELLED" | "PENDING" | "PICKED_UP" | "IN_TRANSIT" | "OUT_FOR_DELIVERY" | "DELIVERED" | "FAILED" | "RETURNED";
+            status: "CANCELLED" | "PENDING" | "PICKED_UP" | "IN_TRANSIT" | "OUT_FOR_DELIVERY" | "DELIVERED" | "FAILED" | "RETURNED" | "CARRIER_CANCELLED";
             orderId: string | null;
             carrierId: string | null;
             carrierCode: string | null;
@@ -4928,7 +4928,7 @@ export interface components {
              *     `POST /shipments/:id/ship`, không phải một lần đổi trạng thái tuỳ ý.
              * @enum {string}
              */
-            status: "CANCELLED" | "PENDING" | "PICKED_UP" | "IN_TRANSIT" | "OUT_FOR_DELIVERY" | "DELIVERED" | "FAILED" | "RETURNED";
+            status: "CANCELLED" | "PENDING" | "PICKED_UP" | "IN_TRANSIT" | "OUT_FOR_DELIVERY" | "DELIVERED" | "FAILED" | "RETURNED" | "CARRIER_CANCELLED";
         };
         ShipmentMonitorCountsDto: {
             /** @description Phiếu giao có task PACK hoàn tất trong ngày. */
@@ -4970,7 +4970,7 @@ export interface components {
             orderId: string | null;
             orderDocNumber: string | null;
             /** @enum {string} */
-            status: "CANCELLED" | "PENDING" | "PICKED_UP" | "IN_TRANSIT" | "OUT_FOR_DELIVERY" | "DELIVERED" | "FAILED" | "RETURNED";
+            status: "CANCELLED" | "PENDING" | "PICKED_UP" | "IN_TRANSIT" | "OUT_FOR_DELIVERY" | "DELIVERED" | "FAILED" | "RETURNED" | "CARRIER_CANCELLED";
             carrierId: string | null;
             carrierCode: string | null;
             carrierName: string | null;
@@ -7649,7 +7649,7 @@ export interface components {
         };
         OrderFulfilmentDto: {
             /** @enum {string} */
-            status: "CANCELLED" | "PICKED" | "IN_TRANSIT" | "OUT_FOR_DELIVERY" | "DELIVERED" | "FAILED" | "RETURNED" | "PACKED" | "NOT_STARTED" | "PICKING" | "PACKING" | "SHIPPED";
+            status: "CANCELLED" | "PICKED" | "IN_TRANSIT" | "OUT_FOR_DELIVERY" | "DELIVERED" | "FAILED" | "RETURNED" | "CARRIER_CANCELLED" | "PACKED" | "NOT_STARTED" | "PICKING" | "PACKING" | "SHIPPED";
             pickTaskId: string | null;
             pickTaskDocNumber: string | null;
             packTaskId: string | null;
@@ -7669,7 +7669,7 @@ export interface components {
             id: string;
             docNumber: string;
             /** @enum {string} */
-            status: "CANCELLED" | "PENDING" | "PICKED_UP" | "IN_TRANSIT" | "OUT_FOR_DELIVERY" | "DELIVERED" | "FAILED" | "RETURNED";
+            status: "CANCELLED" | "PENDING" | "PICKED_UP" | "IN_TRANSIT" | "OUT_FOR_DELIVERY" | "DELIVERED" | "FAILED" | "RETURNED" | "CARRIER_CANCELLED";
             /** @description Hãng đã gán trên phiếu (có thể khác hãng chọn trên đơn nếu kho đổi lúc đóng gói). */
             carrierCode: string | null;
             /** @description Mã vận đơn hãng cấp — null = chưa cấp (chưa đóng gói, hoặc hãng lỗi đang chờ). */
@@ -8209,7 +8209,7 @@ export interface components {
          * @description Trạng thái quy đổi; `null` = mã chưa có trong bảng ánh xạ.
          * @enum {string}
          */
-        ShipmentStatus: "PENDING" | "PICKED_UP" | "IN_TRANSIT" | "OUT_FOR_DELIVERY" | "DELIVERED" | "FAILED" | "RETURNED" | "CANCELLED";
+        ShipmentStatus: "PENDING" | "PICKED_UP" | "IN_TRANSIT" | "OUT_FOR_DELIVERY" | "DELIVERED" | "FAILED" | "RETURNED" | "CARRIER_CANCELLED" | "CANCELLED";
         VnpostOrderDto: {
             /** @description Trạng thái quy đổi; `null` = mã chưa có trong bảng ánh xạ. */
             status: components["schemas"]["ShipmentStatus"] | null;
@@ -8298,7 +8298,7 @@ export interface components {
             /** @description Mã thô của hãng. */
             carrierStatusCode: string;
             /** @enum {string|null} */
-            mappedStatus: "CANCELLED" | "PENDING" | "PICKED_UP" | "IN_TRANSIT" | "OUT_FOR_DELIVERY" | "DELIVERED" | "FAILED" | "RETURNED" | null;
+            mappedStatus: "CANCELLED" | "PENDING" | "PICKED_UP" | "IN_TRANSIT" | "OUT_FOR_DELIVERY" | "DELIVERED" | "FAILED" | "RETURNED" | "CARRIER_CANCELLED" | null;
             /** @enum {string} */
             outcome: "APPLIED" | "DUPLICATE" | "REJECTED_UNMAPPED" | "REJECTED_TRANSITION" | "NOT_FOUND";
             note: string | null;
@@ -8316,7 +8316,7 @@ export interface components {
             docNumber: string;
             orderId: string | null;
             /** @enum {string} */
-            status: "CANCELLED" | "PENDING" | "PICKED_UP" | "IN_TRANSIT" | "OUT_FOR_DELIVERY" | "DELIVERED" | "FAILED" | "RETURNED";
+            status: "CANCELLED" | "PENDING" | "PICKED_UP" | "IN_TRANSIT" | "OUT_FOR_DELIVERY" | "DELIVERED" | "FAILED" | "RETURNED" | "CARRIER_CANCELLED";
             carrierCode: string | null;
             carrierName: string | null;
             trackingNo: string | null;
@@ -8514,7 +8514,7 @@ export interface components {
             docNumber: string;
             trackingNo: string | null;
             /** @enum {string} */
-            status: "CANCELLED" | "PENDING" | "PICKED_UP" | "IN_TRANSIT" | "OUT_FOR_DELIVERY" | "DELIVERED" | "FAILED" | "RETURNED";
+            status: "CANCELLED" | "PENDING" | "PICKED_UP" | "IN_TRANSIT" | "OUT_FOR_DELIVERY" | "DELIVERED" | "FAILED" | "RETURNED" | "CARRIER_CANCELLED";
             orderId: string | null;
             /** @description Task PACK của đơn (nếu có) — quét vận đơn ở bàn đóng gói cũng mở được việc. */
             tasks: components["schemas"]["PdaTaskRefDto"][];
@@ -10826,7 +10826,7 @@ export interface operations {
         parameters: {
             query?: {
                 orderId?: string;
-                status?: "CANCELLED" | "PENDING" | "PICKED_UP" | "IN_TRANSIT" | "OUT_FOR_DELIVERY" | "DELIVERED" | "FAILED" | "RETURNED";
+                status?: "CANCELLED" | "PENDING" | "PICKED_UP" | "IN_TRANSIT" | "OUT_FOR_DELIVERY" | "DELIVERED" | "FAILED" | "RETURNED" | "CARRIER_CANCELLED";
                 take?: number;
                 skip?: number;
             };
