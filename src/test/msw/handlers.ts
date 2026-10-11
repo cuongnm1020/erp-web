@@ -877,6 +877,7 @@ export function makeTasks(n: number) {
       qtyDone: done ? String(((i % 12) + 1) * 10) : String((i % 12) * 3),
       refType: i % 2 === 0 ? 'SalesOrder' : 'GoodsReceipt',
       refId: uuid('00000001', i),
+      refDocNumber: i % 2 === 0 ? `SO2608-${String(i + 1).padStart(5, '0')}` : null,
       createdAt: new Date(Date.UTC(2026, 7, 23, 2) + i * 60_000).toISOString(),
       assignedAt: status === 'PENDING' ? null : new Date(Date.UTC(2026, 7, 23, 3)).toISOString(),
       startedAt:

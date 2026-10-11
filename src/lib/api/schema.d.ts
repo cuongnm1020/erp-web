@@ -5521,6 +5521,8 @@ export interface components {
             /** @description Chứng từ nguồn ("SalesOrder", "GoodsReceipt"…). */
             refType: string | null;
             refId: string | null;
+            /** @description `SalesOrder.docNumber` khi refType = SalesOrder — để điều phối thấy việc thuộc đơn nào. */
+            refDocNumber: string | null;
             createdAt: string;
             assignedAt: string | null;
             startedAt: string | null;
@@ -5673,6 +5675,8 @@ export interface components {
             /** @description Chứng từ nguồn ("SalesOrder", "GoodsReceipt"…). */
             refType: string | null;
             refId: string | null;
+            /** @description `SalesOrder.docNumber` khi refType = SalesOrder — để điều phối thấy việc thuộc đơn nào. */
+            refDocNumber: string | null;
             createdAt: string;
             assignedAt: string | null;
             startedAt: string | null;
@@ -5686,8 +5690,6 @@ export interface components {
             idleMinutes: number;
             /** @description Tên người đang giữ việc (null khi chưa giao). */
             assigneeName: string | null;
-            /** @description `SalesOrder.docNumber` khi refType = SalesOrder — mã vạch đơn trên phiếu. */
-            refDocNumber: string | null;
             /** @description Đã sắp theo `pickSequence` rồi `lineNo`. */
             lines: components["schemas"]["TaskLineDto"][];
         };

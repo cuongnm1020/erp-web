@@ -106,6 +106,14 @@ describe('DispatchScreen — GET /tasks (P1-12)', () => {
     }
   });
 
+  it('cột Chứng từ: việc của đơn bán hiện mã đơn (refDocNumber) làm link sang đơn', async () => {
+    search = '';
+    renderApp(<DispatchScreen />);
+    const so = PENDING.find((t) => t.refType === 'SalesOrder' && t.refDocNumber)!;
+    const link = await screen.findByRole('link', { name: so.refDocNumber! });
+    expect(link).toHaveAttribute('href', `/crm/orders/${so.refId}`);
+  });
+
   it('lọc loại việc đọc từ URL và gửi xuống server (luật 8)', async () => {
     search = 'type=PICK';
     renderApp(<DispatchScreen />);

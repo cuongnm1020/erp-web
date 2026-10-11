@@ -96,7 +96,8 @@ import { WavePrintSheet } from './wave-print-sheet';
  * Bỏ so với bản UI-first vì `TaskRowDto` không có trường tương ứng:
  * - Làn "Hoàn thành hôm nay": `GET /tasks` không lọc theo ngày.
  * - Bảng nhân viên (tên, ca trực, tiến độ từng người): chỉ có `assigneeId` (UUID).
- * - Số chứng từ nguồn (SO-…/GRN-…): DTO trả `refType` + `refId` (UUID); hiện link "Đơn bán".
+ * - Số chứng từ nguồn của phiếu nhập (GRN-…): DTO chỉ trả `refType` + `refId` (UUID). Việc của
+ *   đơn bán thì có `refDocNumber` (mã đơn) — hiện mã đơn làm link sang đơn.
  * - "Ưu tiên Cao/TB/Thấp": `priority` là số nguyên, không có thang bậc; hiện đúng con số.
  *
  * Gán việc: dòng PENDING có ô "Gán cho…" (POST /tasks/:id/assign), dòng ASSIGNED có
@@ -385,11 +386,19 @@ function buildColumns(
     {
       id: 'ref',
       header: 'Chứng từ',
-      meta: { width: 100 },
+      meta: { width: 150 },
       cell: ({ row }) =>
         row.original.refType === 'SalesOrder' && row.original.refId ? (
-          <Link href={`/crm/orders/${row.original.refId}`} className="text-primary hover:underline">
-            Đơn bán
+          <Link
+            href={`/crm/orders/${row.original.refId}`}
+            className="text-primary hover:underline"
+            title="Mở đơn bán"
+          >
+            {row.original.refDocNumber ? (
+              <span className="font-mono text-xs">{row.original.refDocNumber}</span>
+            ) : (
+              'Đơn bán'
+            )}
           </Link>
         ) : (
           <span className="text-muted-foreground">{row.original.refType ?? '—'}</span>
