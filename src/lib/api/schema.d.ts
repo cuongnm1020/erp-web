@@ -3307,6 +3307,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/pda/packed/{taskId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Đơn đã đóng gói: dòng đã đóng + phiếu giao (hãng, vận đơn) — trạm đóng gói mở lại để
+         *     xem và in lại nhãn. Quyền `shipment.pack` (cùng quyền in nhãn), không giới hạn người đóng.
+         */
+        get: operations["PdaController_packed"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/pda/tasks/{id}": {
         parameters: {
             query?: never;
@@ -8624,6 +8644,22 @@ export interface components {
             wave: components["schemas"]["PdaResolveWaveDto"] | null;
             location: components["schemas"]["PdaResolveLocationDto"] | null;
             shipment: components["schemas"]["PdaResolveShipmentDto"] | null;
+        };
+        PdaPackedOrderDto: {
+            id: string;
+            docNumber: string;
+            /** @description Tên khách in trên phiếu — đọc vượt scope có chủ đích (như resolve), chỉ tên. */
+            customerName: string | null;
+        };
+        PdaPackedDto: {
+            task: components["schemas"]["PdaTaskDto"];
+            order: components["schemas"]["PdaPackedOrderDto"] | null;
+            /** @description Người đóng gói (người giữ việc PACK). */
+            packedByName: string | null;
+            /** @description Lúc đóng xong (ISO) — null khi việc chưa xong. */
+            completedAt: string | null;
+            /** @description Phiếu giao còn hiệu lực của đơn — null khi chưa sinh hoặc đã hủy. */
+            shipment: components["schemas"]["ShipmentViewDto"] | null;
         };
         SelfMergeWaveDto: {
             taskIds: string[];
@@ -15846,6 +15882,27 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["PdaResolveResultDto"];
+                };
+            };
+        };
+    };
+    PdaController_packed: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                taskId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PdaPackedDto"];
                 };
             };
         };

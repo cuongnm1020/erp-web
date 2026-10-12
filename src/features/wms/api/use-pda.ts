@@ -28,6 +28,7 @@ export const pdaKeys = {
   myTasks: () => [...pdaKeys.all, 'my-tasks'] as const,
   myWaves: () => [...pdaKeys.all, 'my-waves'] as const,
   stats: (type: string, date: string | null) => [...pdaKeys.all, 'stats', type, date] as const,
+  packed: (taskId: string) => [...pdaKeys.all, 'packed', taskId] as const,
 };
 
 /**
@@ -104,6 +105,21 @@ export function useShipment(shipmentId: string | null, opts: { poll?: boolean } 
   });
 }
 
+/**
+ * GET /pda/packed/:taskId — đơn đã đóng gói: dòng đã đóng + phiếu giao, để xem lại và in lại
+ * nhãn vận đơn (chưa kịp in, máy in lỗi, hãng chưa cấp lúc đóng). Quyền shipment.pack.
+ */
+export function usePackedView(taskId: string | null) {
+  return useQuery({
+    queryKey: pdaKeys.packed(taskId ?? ''),
+    queryFn: () =>
+      unwrap(api.GET('/pda/packed/{taskId}', { params: { path: { taskId: taskId ?? '' } } })),
+    enabled: taskId !== null && taskId !== '',
+  });
+}
+
+export type PdaPacked = components['schemas']['PdaPackedDto'];
+
 /** POST /shipments/:id/waybill — chọn hãng tại chỗ khi đóng gói xong mà đơn chưa gán hãng. */
 export function useRequestWaybill() {
   const qc = useQueryClient();
@@ -115,7 +131,11 @@ export function useRequestWaybill() {
           body: { carrierCode },
         }),
       ),
-    onSuccess: (r) => void qc.invalidateQueries({ queryKey: pdaKeys.shipment(r.shipmentId) }),
+    onSuccess: (r) => {
+      void qc.invalidateQueries({ queryKey: pdaKeys.shipment(r.shipmentId) });
+      // Màn xem lại đơn đã đóng đọc phiếu giao qua /pda/packed — làm tươi để hiện vận đơn mới.
+      void qc.invalidateQueries({ queryKey: [...pdaKeys.all, 'packed'] });
+    },
   });
 }
 

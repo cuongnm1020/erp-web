@@ -51,11 +51,14 @@ export function LabelPrintDialog({
   waybill,
   orderId,
   onClose,
+  closeLabel = 'Đóng và quét đơn tiếp',
 }: {
   open: boolean;
   waybill: PdaWaybill | null;
   orderId: string | null;
   onClose: () => void;
+  /** Nhãn nút đóng — mở lại từ "Đã đóng gói" thì không phải "quét đơn tiếp". */
+  closeLabel?: string;
 }) {
   const [pageSize, setPageSize] = useState<PageSize>('A6');
   useEffect(() => setPageSize(readPageSize()), []);
@@ -104,6 +107,7 @@ export function LabelPrintDialog({
         ) : local.outcome === 'NO_CARRIER' ? (
           <CarrierPicker
             shipmentId={local.shipmentId}
+            currentCarrier={local.carrierCode}
             onIssued={(r) =>
               setLocal({
                 ...local,
@@ -144,7 +148,7 @@ export function LabelPrintDialog({
 
         <DialogFooter>
           <Button variant="outline" onClick={onClose}>
-            Đóng và quét đơn tiếp
+            {closeLabel}
           </Button>
         </DialogFooter>
       </DialogContent>
@@ -242,9 +246,12 @@ function LabelFrame({
 
 function CarrierPicker({
   shipmentId,
+  currentCarrier = null,
   onIssued,
 }: {
   shipmentId: string;
+  /** Hãng đã gán nhưng chưa cấp vận đơn (lỗi lúc đóng) — chọn sẵn để xin lại. */
+  currentCarrier?: string | null;
   onIssued: (r: {
     outcome: PdaWaybill['outcome'];
     trackingNo: string | null;
@@ -254,13 +261,15 @@ function CarrierPicker({
 }) {
   const carriers = useCarriers();
   const request = useRequestWaybill();
-  const [code, setCode] = useState('');
+  const [code, setCode] = useState(currentCarrier ?? '');
   const options = (carriers.data ?? []).filter((c) => c.isActive);
 
   return (
     <div className="flex flex-col gap-3">
       <p className="text-sm">
-        Đơn chưa gán hãng vận chuyển. Chọn hãng để xin vận đơn ngay cho kiện này.
+        {currentCarrier
+          ? `Hãng ${currentCarrier} chưa cấp vận đơn cho kiện này. Xin lại vận đơn (đổi hãng được).`
+          : 'Đơn chưa gán hãng vận chuyển. Chọn hãng để xin vận đơn ngay cho kiện này.'}
       </p>
       <div className="flex flex-wrap items-center gap-2">
         <Select value={code} onValueChange={setCode}>

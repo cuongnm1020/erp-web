@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
 import { newIdempotencyKey } from '@/lib/api/client';
 import { isApiError } from '@/lib/api/errors';
 import { beep } from '@/lib/beep';
@@ -60,7 +60,15 @@ export const sameCode = (a: string | null | undefined, b: string): boolean =>
  *
  * `idempotencyKey` sinh lúc quét (luật 4). Sai SKU / quá số lượng → bíp lỗi + câu từ bộ dịch.
  */
-export function useScanSession(kind: 'PICK' | 'PACK') {
+export function useScanSession(
+  kind: 'PICK' | 'PACK',
+  opts: {
+    /** PACK: quét trúng đơn ĐÃ đóng gói → màn mở xem lại / in lại nhãn (2026-10-12). */
+    onPacked?: (packTaskId: string) => void;
+  } = {},
+) {
+  const onPackedRef = useRef(opts.onPacked);
+  onPackedRef.current = opts.onPacked;
   const resolve = useResolveCode();
   const claim = useClaimTask();
   const scanMut = usePdaScan();
@@ -119,6 +127,14 @@ export function useScanSession(kind: 'PICK' | 'PACK') {
               (t) => t.type === 'PACK' && t.status === 'COMPLETED',
             );
             setPhase('idle');
+            if (kind === 'PACK' && packDone && !pickOpen && onPackedRef.current) {
+              setFeedback({
+                kind: 'info',
+                text: `Đơn ${r.order.docNumber} đã đóng gói xong — xem lại hoặc in lại nhãn.`,
+              });
+              onPackedRef.current(packDone.id);
+              return;
+            }
             setFeedback({
               kind: 'info',
               text:
@@ -145,6 +161,19 @@ export function useScanSession(kind: 'PICK' | 'PACK') {
         } else if (r.kind === 'shipment' && r.shipment) {
           nextOrder = { id: r.shipment.orderId, docNumber: null, customerName: null };
           ref = pickTask(r.shipment.tasks);
+          // Quét vận đơn của kiện đã đóng → xem lại / in lại nhãn.
+          const packDone = r.shipment.tasks.find(
+            (t) => t.type === 'PACK' && t.status === 'COMPLETED',
+          );
+          if (!ref && kind === 'PACK' && packDone && onPackedRef.current) {
+            setPhase('idle');
+            setFeedback({
+              kind: 'info',
+              text: `Kiện ${r.shipment.docNumber} đã đóng gói xong — xem lại hoặc in lại nhãn.`,
+            });
+            onPackedRef.current(packDone.id);
+            return;
+          }
         } else if (r.kind === 'sku') {
           setPhase('idle');
           setFeedback({ kind: 'info', text: 'Đây là mã sản phẩm — quét mã đơn hàng trước.' });
