@@ -9172,6 +9172,8 @@ export interface components {
             uomId: string | null;
             /** @description C3 — hệ số snapshot lúc tạo (qty nhập = qtyBase / factor). */
             factor: string | null;
+            /** @description Mã ĐVT client đã nhập (vd THUNG) — null = ĐVT cơ sở. Đi cùng uomId (2026-10-12, nhân bản phiếu). */
+            uomCode: string | null;
             /** @description PLAN-packaging-hierarchy D — vỏ thùng/pallet đã tạo cho dòng (in tem LPN); null = hàng rời. */
             packaging: components["schemas"]["ReceiptLinePackagingDto"] | null;
         };

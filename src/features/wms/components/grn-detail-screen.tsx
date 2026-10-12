@@ -1,6 +1,6 @@
 'use client';
 
-import { Box, Lock, Printer } from 'lucide-react';
+import { Box, CopyPlus, Lock, Printer } from 'lucide-react';
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { DetailSkeleton, QueryState } from '@/components/data/states';
@@ -313,36 +313,49 @@ export function GrnDetailScreen({ id }: { id: string }) {
           { label: receipt?.docNumber ?? '…' },
         ]}
         actions={
-          receipt && canReceive && receipt.status === 'DRAFT' ? (
+          receipt && canReceive ? (
             <>
+              {/* Nhân bản: form tạo phiếu điền sẵn dòng của phiếu này (mọi trạng thái). */}
               <Button
                 variant="outline"
                 size="sm"
-                disabled={cancel.isPending || post.isPending}
-                onClick={() =>
-                  cancel
-                    .mutateAsync(receipt.id)
-                    .then(() => {
-                      toast.success(`Đã hủy phiếu nhập ${receipt.docNumber}`);
-                      router.push('/wms/grn');
-                    })
-                    .catch((err) => toast.error(messageFor(err)))
-                }
+                onClick={() => router.push(`/wms/grn/new?from=${receipt.id}`)}
               >
-                Hủy phiếu
+                <CopyPlus aria-hidden />
+                Nhân bản
               </Button>
-              <Button
-                size="sm"
-                disabled={post.isPending || cancel.isPending}
-                onClick={() =>
-                  post
-                    .mutateAsync(receipt.id)
-                    .then(() => toast.success(`Đã post phiếu ${receipt.docNumber}`))
-                    .catch((err) => toast.error(messageFor(err)))
-                }
-              >
-                {post.isPending ? 'Đang post…' : 'Post phiếu'}
-              </Button>
+              {receipt.status === 'DRAFT' ? (
+                <>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    disabled={cancel.isPending || post.isPending}
+                    onClick={() =>
+                      cancel
+                        .mutateAsync(receipt.id)
+                        .then(() => {
+                          toast.success(`Đã hủy phiếu nhập ${receipt.docNumber}`);
+                          router.push('/wms/grn');
+                        })
+                        .catch((err) => toast.error(messageFor(err)))
+                    }
+                  >
+                    Hủy phiếu
+                  </Button>
+                  <Button
+                    size="sm"
+                    disabled={post.isPending || cancel.isPending}
+                    onClick={() =>
+                      post
+                        .mutateAsync(receipt.id)
+                        .then(() => toast.success(`Đã post phiếu ${receipt.docNumber}`))
+                        .catch((err) => toast.error(messageFor(err)))
+                    }
+                  >
+                    {post.isPending ? 'Đang post…' : 'Post phiếu'}
+                  </Button>
+                </>
+              ) : null}
             </>
           ) : undefined
         }

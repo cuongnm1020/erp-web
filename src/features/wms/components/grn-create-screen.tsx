@@ -18,6 +18,7 @@ import {
   FormMessage,
 } from '@/components/data/form';
 import { ScanInput } from '@/components/data/scan-input';
+import { EmptyState, FormSkeleton, QueryState } from '@/components/data/states';
 import { PageHeader } from '@/components/layout/page-header';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -48,7 +49,12 @@ import {
   useSkuSearch,
   type ScannedBarcode,
 } from '../api/use-locations';
-import { useCreateReceipt, usePostReceipt } from '../api/use-receipts';
+import {
+  useCreateReceipt,
+  usePostReceipt,
+  useReceipt,
+  type ReceiptDetail,
+} from '../api/use-receipts';
 import { isOperationalWarehouse, useWarehouses } from '../api/use-warehouses';
 
 /** Cùng regex với quantitySchema — dùng để guard trước khi new Decimal(). */
@@ -193,7 +199,56 @@ function TotalValue({ form }: { form: UseFormReturn<ReceiptValues> }) {
   return <b className="tabular-nums">{formatMoney(sum.toFixed(4))}</b>;
 }
 
-export function GrnCreateScreen() {
+/**
+ * Nhân bản phiếu nhập (2026-10-12): dòng của phiếu gốc → dòng form, theo đúng ĐVT đã nhập
+ * (thùng / pallet: SL = qtyBase / factor, đơn giá = giá mỗi đơn vị × factor) và quy cách thùng.
+ * Số lô / HSD để trống — lô mới cho lần nhận mới; dòng gốc có số lô thì vẫn đòi nhập lô. Ngày
+ * nhập = hôm nay; phiếu theo PO được nhân bản thành phiếu NHẬP TỰ DO (form chưa chọn PO).
+ */
+export function receiptToFormValues(r: ReceiptDetail): ReceiptValues {
+  return {
+    warehouseId: r.warehouseId,
+    receivedAt: todayKey(),
+    note: r.note ?? '',
+    lines: r.lines.map((l) => {
+      const factor = l.uomCode && l.factor ? new Decimal(l.factor) : new Decimal(1);
+      const cost = l.unitCost ? new Decimal(l.unitCost).mul(factor) : null;
+      return {
+        ...EMPTY_LINE,
+        skuId: l.skuId,
+        skuLabel: l.skuName,
+        tracking: l.lotNumber ? 'LOT' : 'NONE',
+        qty: new Decimal(l.qtyBase).div(factor).toString(),
+        uom: l.uomCode ?? '',
+        factor: factor.toString(),
+        baseUomCode: l.baseUomCode,
+        unitCost: cost ? cost.toDecimalPlaces(4).toString() : '',
+        ...(l.packaging
+          ? { packType: l.packaging.containerType, packQtyPer: l.packaging.qtyPerContainer }
+          : {}),
+      };
+    }),
+  };
+}
+
+export function GrnCreateScreen({ copyFromId }: { copyFromId?: string }) {
+  const copying = copyFromId !== undefined && copyFromId !== '';
+  const source = useReceipt(copying ? copyFromId : '');
+  if (!copying) return <GrnCreateForm />;
+  return (
+    <QueryState query={source} skeleton={<FormSkeleton fields={6} />}>
+      {(r) =>
+        r ? (
+          <GrnCreateForm copyOf={r} />
+        ) : (
+          <EmptyState title="Không tìm thấy phiếu gốc" description="Phiếu có thể đã bị xóa." />
+        )
+      }
+    </QueryState>
+  );
+}
+
+function GrnCreateForm({ copyOf }: { copyOf?: ReceiptDetail }) {
   const router = useRouter();
   const warehouses = useWarehouses();
   const containerTypes = useContainerTypes();
@@ -205,12 +260,14 @@ export function GrnCreateScreen() {
 
   const form = useForm<ReceiptValues>({
     resolver: zodResolver(receiptSchema),
-    defaultValues: {
-      warehouseId: '',
-      receivedAt: todayKey(),
-      note: '',
-      lines: [EMPTY_LINE],
-    },
+    defaultValues: copyOf
+      ? receiptToFormValues(copyOf)
+      : {
+          warehouseId: '',
+          receivedAt: todayKey(),
+          note: '',
+          lines: [EMPTY_LINE],
+        },
   });
   const { fields, append, remove } = useFieldArray({ control: form.control, name: 'lines' });
   const lookupBarcode = useBarcodeLookup();
@@ -330,7 +387,11 @@ export function GrnCreateScreen() {
     <>
       <PageHeader
         title="Tạo phiếu nhập kho"
-        description="Số phiếu cấp tự động khi lưu · nhập tự do (nhập theo PO chờ P2-01)"
+        description={
+          copyOf
+            ? `Nhân bản từ ${copyOf.docNumber} · ${copyOf.lines.length} dòng — kiểm lại số lượng, đơn giá, nhập số lô mới rồi lưu`
+            : 'Số phiếu cấp tự động khi lưu · nhập tự do (nhập theo PO chờ P2-01)'
+        }
         breadcrumb={[
           { label: 'Kho' },
           { label: 'Nhập kho', href: '/wms/grn' },
