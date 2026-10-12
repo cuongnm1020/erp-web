@@ -82,12 +82,13 @@ const PICK_TASK = {
   ],
 };
 
-/** Quét mã SKU → ô số lượng nhận focus → gõ số → Enter (2026-09-22). */
+/** Quét mã SKU (gửi ngay 1) → gõ tổng → Enter = gửi phần còn thiếu (2026-10-12). */
 const scanQty = (code: string, qty: string) => {
   const input = screen.getByLabelText(/Quét/);
   fireEvent.change(input, { target: { value: code } });
   fireEvent.keyDown(input, { key: 'Enter' });
-  const q = screen.getByLabelText('Số lượng lần quét này');
+  const q = screen.queryByLabelText('Số lượng lần quét này');
+  if (!q) return;
   fireEvent.change(q, { target: { value: qty } });
   fireEvent.keyDown(q, { key: 'Enter' });
 };
@@ -188,10 +189,10 @@ describe('Màn pick trên PDA — quét đơn → dòng theo lối đi → quét
     // Mã vạch SKU đang lấy hiện để đối chiếu với tem trên hàng
     expect(screen.getByRole('img', { name: 'Mã vạch BC-X' })).toBeInTheDocument();
 
-    // Quét SKU → ô số lượng chờ → gõ 2 → Enter = lấy 2 một lần (không bấm +/−)
+    // Quét SKU → gửi ngay 1 → gõ tổng 2 → Enter = gửi thêm 1 (2026-10-12)
     scan('BC-X');
-    expect(screen.getByText(/Đã quét BC-X/)).toBeInTheDocument();
-    const q = screen.getByLabelText('Số lượng lần quét này');
+    expect(await screen.findByText(/Đang đếm BC-X/)).toBeInTheDocument();
+    const q = await screen.findByLabelText('Số lượng lần quét này');
     fireEvent.change(q, { target: { value: '2' } });
     fireEvent.keyDown(q, { key: 'Enter' });
     // Dòng X đủ → dòng hiện tại chuyển sang B-02-01
@@ -235,13 +236,15 @@ describe('Màn pick trên PDA — quét đơn → dòng theo lối đi → quét
     scan('PICK2609-00009');
     await screen.findAllByText('A-01-03');
     scan('BC-X');
-    const q = screen.getByLabelText('Số lượng lần quét này');
+    // Lần quét gửi ngay (+1); số ≤ 0 gõ sau đó không gọi thêm
+    await waitFor(() => expect(bodies).toHaveLength(1));
+    const q = await screen.findByLabelText('Số lượng lần quét này');
     fireEvent.change(q, { target: { value: '0' } });
     fireEvent.keyDown(q, { key: 'Enter' });
     expect(await screen.findByText('Nhập số lượng lớn hơn 0')).toBeInTheDocument();
-    expect(bodies).toHaveLength(0);
+    expect(bodies).toHaveLength(1);
     fireEvent.keyDown(q, { key: 'Escape' });
-    expect(screen.queryByText(/Đã quét BC-X/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Đang đếm BC-X/)).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: /^Lấy/ })).toBeDisabled();
   });
 

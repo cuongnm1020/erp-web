@@ -2798,6 +2798,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/sales-orders/flow-counts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Số đơn từng tab của danh sách (cùng bộ lọc với GET /sales-orders, bỏ qua `flow`, `take`,
+         *     `skip`) — khai TRƯỚC `:id`.
+         */
+        get: operations["SalesOrderController_flowCounts"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/sales-orders/{id}": {
         parameters: {
             query?: never;
@@ -3279,6 +3299,26 @@ export interface paths {
          *     vận đơn. Một điểm vào cho PDA lẫn trạm đóng gói web. 404 khi không khớp gì.
          */
         get: operations["PdaController_resolve"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/pda/packed/{taskId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Đơn đã đóng gói: dòng đã đóng + phiếu giao (hãng, vận đơn) — trạm đóng gói mở lại để
+         *     xem và in lại nhãn. Quyền `shipment.pack` (cùng quyền in nhãn), không giới hạn người đóng.
+         */
+        get: operations["PdaController_packed"];
         put?: never;
         post?: never;
         delete?: never;
@@ -4892,7 +4932,7 @@ export interface components {
             shipmentId: string;
             docNumber: string;
             /** @enum {string} */
-            status: "CANCELLED" | "PENDING" | "PICKED_UP" | "IN_TRANSIT" | "DELIVERED" | "FAILED" | "RETURNED";
+            status: "CANCELLED" | "PENDING" | "IN_TRANSIT" | "OUT_FOR_DELIVERY" | "DELIVERED" | "FAILED" | "RETURNED" | "CARRIER_CANCELLED" | "PICKED_UP";
             orderId: string | null;
             carrierId: string | null;
             carrierCode: string | null;
@@ -4928,7 +4968,7 @@ export interface components {
              *     `POST /shipments/:id/ship`, không phải một lần đổi trạng thái tuỳ ý.
              * @enum {string}
              */
-            status: "CANCELLED" | "PENDING" | "PICKED_UP" | "IN_TRANSIT" | "DELIVERED" | "FAILED" | "RETURNED";
+            status: "CANCELLED" | "PENDING" | "IN_TRANSIT" | "OUT_FOR_DELIVERY" | "DELIVERED" | "FAILED" | "RETURNED" | "CARRIER_CANCELLED" | "PICKED_UP";
         };
         ShipmentMonitorCountsDto: {
             /** @description Phiếu giao có task PACK hoàn tất trong ngày. */
@@ -4970,7 +5010,7 @@ export interface components {
             orderId: string | null;
             orderDocNumber: string | null;
             /** @enum {string} */
-            status: "CANCELLED" | "PENDING" | "PICKED_UP" | "IN_TRANSIT" | "DELIVERED" | "FAILED" | "RETURNED";
+            status: "CANCELLED" | "PENDING" | "IN_TRANSIT" | "OUT_FOR_DELIVERY" | "DELIVERED" | "FAILED" | "RETURNED" | "CARRIER_CANCELLED" | "PICKED_UP";
             carrierId: string | null;
             carrierCode: string | null;
             carrierName: string | null;
@@ -5521,6 +5561,8 @@ export interface components {
             /** @description Chứng từ nguồn ("SalesOrder", "GoodsReceipt"…). */
             refType: string | null;
             refId: string | null;
+            /** @description `SalesOrder.docNumber` khi refType = SalesOrder — để điều phối thấy việc thuộc đơn nào. */
+            refDocNumber: string | null;
             createdAt: string;
             assignedAt: string | null;
             startedAt: string | null;
@@ -5673,6 +5715,8 @@ export interface components {
             /** @description Chứng từ nguồn ("SalesOrder", "GoodsReceipt"…). */
             refType: string | null;
             refId: string | null;
+            /** @description `SalesOrder.docNumber` khi refType = SalesOrder — để điều phối thấy việc thuộc đơn nào. */
+            refDocNumber: string | null;
             createdAt: string;
             assignedAt: string | null;
             startedAt: string | null;
@@ -5686,8 +5730,6 @@ export interface components {
             idleMinutes: number;
             /** @description Tên người đang giữ việc (null khi chưa giao). */
             assigneeName: string | null;
-            /** @description `SalesOrder.docNumber` khi refType = SalesOrder — mã vạch đơn trên phiếu. */
-            refDocNumber: string | null;
             /** @description Đã sắp theo `pickSequence` rồi `lineNo`. */
             lines: components["schemas"]["TaskLineDto"][];
         };
@@ -6892,13 +6934,13 @@ export interface components {
             baseUomCode: string;
             baseUomId: string;
             /**
-             * @description Giá bán MỘT combo trong bảng giá mặc định = componentsPrice − discountAmount (hệ thống tự
-             *     tính, không nhập tay). null = còn thành phần chưa có giá lẻ.
+             * @description Giá bán MỘT combo trong bảng giá mặc định = componentsPrice − discountAmount (nhập giảm giá
+             *     hoặc nhập thẳng giá bán — server quy về chênh lệch). null = còn thành phần chưa có giá lẻ.
              */
             salePrice: string | null;
             /** @description Σ(giá lẻ thành phần × số lượng) trước giảm — null khi còn thành phần chưa có giá. */
             componentsPrice: string | null;
-            /** @description Số tiền giảm cho MỘT combo — Decimal(18,4) chuỗi. */
+            /** @description Chênh lệch giảm cho MỘT combo — Decimal(18,4) chuỗi; ÂM = phụ phí (giá bán > tổng thành phần). */
             discountAmount: string;
             /** @description Combo miễn ship — gợi ý cho sale khi lên đơn. */
             freeShipping: boolean;
@@ -6943,13 +6985,13 @@ export interface components {
             baseUomCode: string;
             baseUomId: string;
             /**
-             * @description Giá bán MỘT combo trong bảng giá mặc định = componentsPrice − discountAmount (hệ thống tự
-             *     tính, không nhập tay). null = còn thành phần chưa có giá lẻ.
+             * @description Giá bán MỘT combo trong bảng giá mặc định = componentsPrice − discountAmount (nhập giảm giá
+             *     hoặc nhập thẳng giá bán — server quy về chênh lệch). null = còn thành phần chưa có giá lẻ.
              */
             salePrice: string | null;
             /** @description Σ(giá lẻ thành phần × số lượng) trước giảm — null khi còn thành phần chưa có giá. */
             componentsPrice: string | null;
-            /** @description Số tiền giảm cho MỘT combo — Decimal(18,4) chuỗi. */
+            /** @description Chênh lệch giảm cho MỘT combo — Decimal(18,4) chuỗi; ÂM = phụ phí (giá bán > tổng thành phần). */
             discountAmount: string;
             /** @description Combo miễn ship — gợi ý cho sale khi lên đơn. */
             freeShipping: boolean;
@@ -6994,6 +7036,13 @@ export interface components {
              *     thống tính: Σ(giá bán lẻ thành phần × số lượng) − discountAmount.
              */
             discountAmount?: string;
+            /**
+             * @description Giá bán MỘT combo nhập tay — Decimal(18,4) chuỗi, ≥ 0; thay cho `discountAmount` (gửi cả hai
+             *     → 422). Được phép LỚN HƠN tổng giá lẻ thành phần (cộng chi phí phát sinh ngoài). Server quy
+             *     về chênh lệch: discountAmount = Σ(giá lẻ × định mức) − salePrice (âm = phụ phí), nên giá
+             *     combo vẫn chạy theo giá lẻ thành phần khi chúng đổi.
+             */
+            salePrice?: string;
             /** @description Combo miễn ship — gợi ý cho sale khi lên đơn (sale quyết định phí ship cuối). */
             freeShipping?: boolean;
             /** @description Tên dân dã / viết tắt cho ô tìm kiếm. */
@@ -7012,6 +7061,8 @@ export interface components {
             isActive?: boolean;
             /** @description Xem CreateComboDto.discountAmount. */
             discountAmount?: string;
+            /** @description Xem CreateComboDto.salePrice. */
+            salePrice?: string;
             freeShipping?: boolean;
             searchAliases?: string[];
             components?: components["schemas"]["ComboComponentInputDto"][];
@@ -7550,6 +7601,30 @@ export interface components {
         CloseContainerDto: {
             idempotencyKey?: string;
         };
+        SalesOrderListProductDto: {
+            name: string;
+            /** @description Số lượng theo đơn vị bán của dòng — Decimal(18,6) chuỗi. */
+            qty: string;
+            uomCode: string | null;
+            /** @description Số dòng sản phẩm khác ngoài dòng này. */
+            moreCount: number;
+        };
+        SalesOrderListShipmentDto: {
+            /** @enum {string} */
+            status: "CANCELLED" | "PENDING" | "IN_TRANSIT" | "OUT_FOR_DELIVERY" | "DELIVERED" | "FAILED" | "RETURNED" | "CARRIER_CANCELLED" | "PICKED_UP";
+            carrierCode: string | null;
+            carrierName: string | null;
+            trackingNo: string | null;
+            /** @description Phí VC = cước + phụ phí + phí COD hãng tính (chi phí của shop) — Decimal(18,4) chuỗi; null = hãng chưa báo cước. */
+            shipFee: string | null;
+            /** @description COD trên phiếu giao — Decimal(18,4) chuỗi. */
+            codAmount: string | null;
+            /**
+             * @description Thực thu từ ĐVVC (ƯỚC TÍNH) = COD − phí VC khi giao thành công; = −phí VC khi hoàn; null khi
+             *     chưa kết thúc. Chưa có đối soát tiền thật với hãng.
+             */
+            collectedAmount: string | null;
+        };
         SalesOrderCustomerDto: {
             id: string;
             code: string;
@@ -7574,7 +7649,31 @@ export interface components {
             heightCm?: number | null;
             note?: string | null;
         };
-        SalesOrderHeaderDto: {
+        SalesOrderListItemDto: {
+            /**
+             * @description Tab của đơn — `flowOf(status, fulfilmentStatus)`.
+             * @enum {string}
+             */
+            flow: "PENDING_APPROVAL" | "CANCELLED" | "WAREHOUSE" | "PICKING" | "PACKED" | "IN_TRANSIT" | "OUT_FOR_DELIVERY" | "DELIVERED" | "RETURNED" | "CARRIER_CANCELLED" | "PICKED_UP";
+            /**
+             * @description Trạng thái kho / giao hàng chi tiết (snapshot) — null = chưa tính (coi như NOT_STARTED).
+             * @enum {string|null}
+             */
+            fulfilmentStatus: "CANCELLED" | "NOT_STARTED" | "PICKING" | "PICKED" | "PACKING" | "PACKED" | "SHIPPED" | "IN_TRANSIT" | "OUT_FOR_DELIVERY" | "DELIVERED" | "FAILED" | "RETURNED" | "CARRIER_CANCELLED" | null;
+            /** @description Lần cuối trạng thái kho đổi (cột "Cập nhật TT"); null = chưa có snapshot → dùng updatedAt. */
+            statusChangedAt: string | null;
+            /** @description SĐT người nhận (địa chỉ giao hiệu lực), không có thì SĐT khách. */
+            phone: string | null;
+            recipientName: string | null;
+            /** @description Địa chỉ nhận: số nhà / thôn / xã. */
+            addressLine: string | null;
+            province: string | null;
+            product: components["schemas"]["SalesOrderListProductDto"] | null;
+            shipment: components["schemas"]["SalesOrderListShipmentDto"] | null;
+            /** @description Tên người phụ trách (core.User.fullName của ownerId). */
+            ownerName: string | null;
+            /** @description Ghi chú gửi hãng / ghi chú in trên đơn (shippingOptions.note). */
+            note: string | null;
             id: string;
             docNumber: string;
             customer: components["schemas"]["SalesOrderCustomerDto"];
@@ -7627,8 +7726,23 @@ export interface components {
             updatedAt: string;
         };
         SalesOrderListResponseDto: {
-            items: components["schemas"]["SalesOrderHeaderDto"][];
+            items: components["schemas"]["SalesOrderListItemDto"][];
             total: number;
+        };
+        SalesOrderFlowCountsDto: {
+            /** @description Tất cả (khớp tab "Tất cả"). */
+            total: number;
+            PENDING_APPROVAL: number;
+            WAREHOUSE: number;
+            PICKING: number;
+            PACKED: number;
+            PICKED_UP: number;
+            IN_TRANSIT: number;
+            OUT_FOR_DELIVERY: number;
+            DELIVERED: number;
+            RETURNED: number;
+            CARRIER_CANCELLED: number;
+            CANCELLED: number;
         };
         SalesOrderAddressDto: {
             id: string;
@@ -7647,7 +7761,7 @@ export interface components {
         };
         OrderFulfilmentDto: {
             /** @enum {string} */
-            status: "CANCELLED" | "PICKED" | "IN_TRANSIT" | "DELIVERED" | "FAILED" | "RETURNED" | "PACKED" | "NOT_STARTED" | "PICKING" | "PACKING" | "SHIPPED";
+            status: "CANCELLED" | "NOT_STARTED" | "PICKING" | "PICKED" | "PACKING" | "PACKED" | "SHIPPED" | "IN_TRANSIT" | "OUT_FOR_DELIVERY" | "DELIVERED" | "FAILED" | "RETURNED" | "CARRIER_CANCELLED";
             pickTaskId: string | null;
             pickTaskDocNumber: string | null;
             packTaskId: string | null;
@@ -7667,7 +7781,7 @@ export interface components {
             id: string;
             docNumber: string;
             /** @enum {string} */
-            status: "CANCELLED" | "PENDING" | "PICKED_UP" | "IN_TRANSIT" | "DELIVERED" | "FAILED" | "RETURNED";
+            status: "CANCELLED" | "PENDING" | "IN_TRANSIT" | "OUT_FOR_DELIVERY" | "DELIVERED" | "FAILED" | "RETURNED" | "CARRIER_CANCELLED" | "PICKED_UP";
             /** @description Hãng đã gán trên phiếu (có thể khác hãng chọn trên đơn nếu kho đổi lúc đóng gói). */
             carrierCode: string | null;
             /** @description Mã vận đơn hãng cấp — null = chưa cấp (chưa đóng gói, hoặc hãng lỗi đang chờ). */
@@ -7727,6 +7841,17 @@ export interface components {
             pickedQty: string;
         };
         SalesOrderDetailDto: {
+            /** @description Địa chỉ giao hiệu lực — null = khách chưa có địa chỉ dùng được (tra cước / cấp vận đơn sẽ 422). */
+            shippingAddress: components["schemas"]["SalesOrderAddressDto"] | null;
+            /** @description Trạng thái kho (pick / đóng gói / giao) — suy từ task + phiếu giao. */
+            fulfilment: components["schemas"]["OrderFulfilmentDto"];
+            /** @description Hãng đã chọn (tra theo carrierId) — null = chưa chọn hoặc hãng đã tắt. */
+            carrier: components["schemas"]["SalesOrderCarrierDto"] | null;
+            /** @description Kho lấy hàng đã chọn (tra theo warehouseId) — null = chưa chọn. */
+            warehouse: components["schemas"]["SalesOrderWarehouseDto"] | null;
+            /** @description Phiếu giao của đơn — null = kho chưa pick xong (chưa có phiếu). */
+            shipment: components["schemas"]["SalesOrderShipmentDto"] | null;
+            lines: components["schemas"]["SalesOrderLineDto"][];
             id: string;
             docNumber: string;
             customer: components["schemas"]["SalesOrderCustomerDto"];
@@ -7777,17 +7902,6 @@ export interface components {
             postedAt: string | null;
             createdAt: string;
             updatedAt: string;
-            /** @description Địa chỉ giao hiệu lực — null = khách chưa có địa chỉ dùng được (tra cước / cấp vận đơn sẽ 422). */
-            shippingAddress: components["schemas"]["SalesOrderAddressDto"] | null;
-            /** @description Trạng thái kho (pick / đóng gói / giao) — suy từ task + phiếu giao. */
-            fulfilment: components["schemas"]["OrderFulfilmentDto"];
-            /** @description Hãng đã chọn (tra theo carrierId) — null = chưa chọn hoặc hãng đã tắt. */
-            carrier: components["schemas"]["SalesOrderCarrierDto"] | null;
-            /** @description Kho lấy hàng đã chọn (tra theo warehouseId) — null = chưa chọn. */
-            warehouse: components["schemas"]["SalesOrderWarehouseDto"] | null;
-            /** @description Phiếu giao của đơn — null = kho chưa pick xong (chưa có phiếu). */
-            shipment: components["schemas"]["SalesOrderShipmentDto"] | null;
-            lines: components["schemas"]["SalesOrderLineDto"][];
         };
         FulfilOrderDto: {
             /**
@@ -8207,7 +8321,7 @@ export interface components {
          * @description Trạng thái quy đổi; `null` = mã chưa có trong bảng ánh xạ.
          * @enum {string}
          */
-        ShipmentStatus: "PENDING" | "PICKED_UP" | "IN_TRANSIT" | "DELIVERED" | "FAILED" | "RETURNED" | "CANCELLED";
+        ShipmentStatus: "PENDING" | "PICKED_UP" | "IN_TRANSIT" | "OUT_FOR_DELIVERY" | "DELIVERED" | "FAILED" | "RETURNED" | "CARRIER_CANCELLED" | "CANCELLED";
         VnpostOrderDto: {
             /** @description Trạng thái quy đổi; `null` = mã chưa có trong bảng ánh xạ. */
             status: components["schemas"]["ShipmentStatus"] | null;
@@ -8296,7 +8410,7 @@ export interface components {
             /** @description Mã thô của hãng. */
             carrierStatusCode: string;
             /** @enum {string|null} */
-            mappedStatus: "CANCELLED" | "PENDING" | "PICKED_UP" | "IN_TRANSIT" | "DELIVERED" | "FAILED" | "RETURNED" | null;
+            mappedStatus: "CANCELLED" | "PENDING" | "IN_TRANSIT" | "OUT_FOR_DELIVERY" | "DELIVERED" | "FAILED" | "RETURNED" | "CARRIER_CANCELLED" | "PICKED_UP" | null;
             /** @enum {string} */
             outcome: "APPLIED" | "DUPLICATE" | "REJECTED_UNMAPPED" | "REJECTED_TRANSITION" | "NOT_FOUND";
             note: string | null;
@@ -8314,7 +8428,7 @@ export interface components {
             docNumber: string;
             orderId: string | null;
             /** @enum {string} */
-            status: "CANCELLED" | "PENDING" | "PICKED_UP" | "IN_TRANSIT" | "DELIVERED" | "FAILED" | "RETURNED";
+            status: "CANCELLED" | "PENDING" | "IN_TRANSIT" | "OUT_FOR_DELIVERY" | "DELIVERED" | "FAILED" | "RETURNED" | "CARRIER_CANCELLED" | "PICKED_UP";
             carrierCode: string | null;
             carrierName: string | null;
             trackingNo: string | null;
@@ -8512,7 +8626,7 @@ export interface components {
             docNumber: string;
             trackingNo: string | null;
             /** @enum {string} */
-            status: "CANCELLED" | "PENDING" | "PICKED_UP" | "IN_TRANSIT" | "DELIVERED" | "FAILED" | "RETURNED";
+            status: "CANCELLED" | "PENDING" | "IN_TRANSIT" | "OUT_FOR_DELIVERY" | "DELIVERED" | "FAILED" | "RETURNED" | "CARRIER_CANCELLED" | "PICKED_UP";
             orderId: string | null;
             /** @description Task PACK của đơn (nếu có) — quét vận đơn ở bàn đóng gói cũng mở được việc. */
             tasks: components["schemas"]["PdaTaskRefDto"][];
@@ -8530,6 +8644,22 @@ export interface components {
             wave: components["schemas"]["PdaResolveWaveDto"] | null;
             location: components["schemas"]["PdaResolveLocationDto"] | null;
             shipment: components["schemas"]["PdaResolveShipmentDto"] | null;
+        };
+        PdaPackedOrderDto: {
+            id: string;
+            docNumber: string;
+            /** @description Tên khách in trên phiếu — đọc vượt scope có chủ đích (như resolve), chỉ tên. */
+            customerName: string | null;
+        };
+        PdaPackedDto: {
+            task: components["schemas"]["PdaTaskDto"];
+            order: components["schemas"]["PdaPackedOrderDto"] | null;
+            /** @description Người đóng gói (người giữ việc PACK). */
+            packedByName: string | null;
+            /** @description Lúc đóng xong (ISO) — null khi việc chưa xong. */
+            completedAt: string | null;
+            /** @description Phiếu giao còn hiệu lực của đơn — null khi chưa sinh hoặc đã hủy. */
+            shipment: components["schemas"]["ShipmentViewDto"] | null;
         };
         SelfMergeWaveDto: {
             taskIds: string[];
@@ -10824,7 +10954,7 @@ export interface operations {
         parameters: {
             query?: {
                 orderId?: string;
-                status?: "CANCELLED" | "PENDING" | "PICKED_UP" | "IN_TRANSIT" | "DELIVERED" | "FAILED" | "RETURNED";
+                status?: "CANCELLED" | "PENDING" | "IN_TRANSIT" | "OUT_FOR_DELIVERY" | "DELIVERED" | "FAILED" | "RETURNED" | "CARRIER_CANCELLED" | "PICKED_UP";
                 take?: number;
                 skip?: number;
             };
@@ -11811,6 +11941,11 @@ export interface operations {
                 lineCount?: number;
                 /** @description Từ N dòng trở lên ("5+ SKU"). Kết hợp với `lineCount` thì `lineCount` thắng. */
                 lineCountMin?: number;
+                /**
+                 * @description Cùng mức gấp (`priority` giảm dần) thì: `oldest` = việc cũ trước (mặc định khi bỏ trống — thứ tự máy quét /
+                 *     hàng đợi), `newest` = việc mới tạo lên đầu (bảng điều phối).
+                 */
+                sort?: "oldest" | "newest";
                 take: number;
                 skip: number;
             };
@@ -14974,6 +15109,11 @@ export interface operations {
     SalesOrderController_list: {
         parameters: {
             query: {
+                /**
+                 * @description Tab của danh sách đơn (2026-10-12) — gộp trạng thái chứng từ + kho / giao hàng
+                 *     (`flowOf` trong sales-order-flow.ts). Đếm từng tab: GET /sales-orders/flow-counts.
+                 */
+                flow?: "PENDING_APPROVAL" | "WAREHOUSE" | "PICKING" | "PACKED" | "PICKED_UP" | "IN_TRANSIT" | "OUT_FOR_DELIVERY" | "DELIVERED" | "RETURNED" | "CARRIER_CANCELLED" | "CANCELLED";
                 customerId?: string;
                 status?: "DRAFT" | "PENDING_APPROVAL" | "APPROVED" | "POSTED" | "CANCELLED";
                 /** @description Lọc theo cân nặng gửi hãng HIỆU LỰC (đặt tay, không thì Σ dòng) — kg, chuỗi decimal, cận dưới (≥). */
@@ -14990,9 +15130,16 @@ export interface operations {
                  */
                 from?: string;
                 to?: string;
+                /** @description Kho lấy hàng chọn trên đơn (wms.Warehouse.id). */
+                warehouseId?: string;
+                /** @description Nguồn đơn: `PANCAKE` = đồng bộ từ Pancake, `ERP` = tạo trong ERP. */
+                source?: "PANCAKE" | "ERP";
+                /** @description Người phụ trách (SalesOrder.ownerId). */
+                ownerId?: string;
                 /**
-                 * @description Tìm theo số chứng từ, mã hoặc tên khách (không phân biệt hoa thường) — hoặc id đơn Pancake
-                 *     (id theo shop hoặc id hệ thống trong link đơn, khớp tuyệt đối, cho phép tiền tố `#`).
+                 * @description Tìm theo số chứng từ, mã hoặc tên khách (không phân biệt hoa thường), SĐT khách, mã vận đơn —
+                 *     hoặc id đơn Pancake (id theo shop hoặc id hệ thống trong link đơn, khớp tuyệt đối, cho phép
+                 *     tiền tố `#`).
                  */
                 q?: string;
                 take: number;
@@ -15035,6 +15182,61 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["CreateOrderResultDto"];
+                };
+            };
+        };
+    };
+    SalesOrderController_flowCounts: {
+        parameters: {
+            query: {
+                /**
+                 * @description Tab của danh sách đơn (2026-10-12) — gộp trạng thái chứng từ + kho / giao hàng
+                 *     (`flowOf` trong sales-order-flow.ts). Đếm từng tab: GET /sales-orders/flow-counts.
+                 */
+                flow?: "PENDING_APPROVAL" | "WAREHOUSE" | "PICKING" | "PACKED" | "PICKED_UP" | "IN_TRANSIT" | "OUT_FOR_DELIVERY" | "DELIVERED" | "RETURNED" | "CARRIER_CANCELLED" | "CANCELLED";
+                customerId?: string;
+                status?: "DRAFT" | "PENDING_APPROVAL" | "APPROVED" | "POSTED" | "CANCELLED";
+                /** @description Lọc theo cân nặng gửi hãng HIỆU LỰC (đặt tay, không thì Σ dòng) — kg, chuỗi decimal, cận dưới (≥). */
+                weightMin?: string;
+                /** @description Cận trên (≤), kg. Cùng giá trị với weightMin = lọc đúng một mức cân. */
+                weightMax?: string;
+                /** @description Chỉ đơn CHƯA chọn hãng (`true`) — gom đơn cần gán hãng. */
+                noCarrier?: string;
+                /** @description Đơn ĐÃ gán hãng này (wms.Carrier.id). Kết hợp được với from/to. */
+                carrierId?: string;
+                /**
+                 * @description Khoảng `orderDate` (ISO): `from` ≤ orderDate. `to` là NGÀY (`YYYY-MM-DD`) thì lấy hết ngày đó
+                 *     (< to + 1 ngày, giờ Việt Nam); là datetime thì ≤ to.
+                 */
+                from?: string;
+                to?: string;
+                /** @description Kho lấy hàng chọn trên đơn (wms.Warehouse.id). */
+                warehouseId?: string;
+                /** @description Nguồn đơn: `PANCAKE` = đồng bộ từ Pancake, `ERP` = tạo trong ERP. */
+                source?: "PANCAKE" | "ERP";
+                /** @description Người phụ trách (SalesOrder.ownerId). */
+                ownerId?: string;
+                /**
+                 * @description Tìm theo số chứng từ, mã hoặc tên khách (không phân biệt hoa thường), SĐT khách, mã vận đơn —
+                 *     hoặc id đơn Pancake (id theo shop hoặc id hệ thống trong link đơn, khớp tuyệt đối, cho phép
+                 *     tiền tố `#`).
+                 */
+                q?: string;
+                take: number;
+                skip: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SalesOrderFlowCountsDto"];
                 };
             };
         };
@@ -15680,6 +15882,27 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["PdaResolveResultDto"];
+                };
+            };
+        };
+    };
+    PdaController_packed: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                taskId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PdaPackedDto"];
                 };
             };
         };

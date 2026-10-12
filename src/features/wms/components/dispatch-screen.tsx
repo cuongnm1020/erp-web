@@ -47,6 +47,7 @@ import {
   useAssignTask,
   useAssignTasksBulk,
   useReplanShortages,
+  useTaskCounts,
   useTasks,
   useUnassignTask,
   useWarehouseStaff,
@@ -95,7 +96,8 @@ import { WavePrintSheet } from './wave-print-sheet';
  * Bỏ so với bản UI-first vì `TaskRowDto` không có trường tương ứng:
  * - Làn "Hoàn thành hôm nay": `GET /tasks` không lọc theo ngày.
  * - Bảng nhân viên (tên, ca trực, tiến độ từng người): chỉ có `assigneeId` (UUID).
- * - Số chứng từ nguồn (SO-…/GRN-…): DTO trả `refType` + `refId` (UUID); hiện link "Đơn bán".
+ * - Số chứng từ nguồn của phiếu nhập (GRN-…): DTO chỉ trả `refType` + `refId` (UUID). Việc của
+ *   đơn bán thì có `refDocNumber` (mã đơn) — hiện mã đơn làm link sang đơn.
  * - "Ưu tiên Cao/TB/Thấp": `priority` là số nguyên, không có thang bậc; hiện đúng con số.
  *
  * Gán việc: dòng PENDING có ô "Gán cho…" (POST /tasks/:id/assign), dòng ASSIGNED có
@@ -384,11 +386,19 @@ function buildColumns(
     {
       id: 'ref',
       header: 'Chứng từ',
-      meta: { width: 100 },
+      meta: { width: 150 },
       cell: ({ row }) =>
         row.original.refType === 'SalesOrder' && row.original.refId ? (
-          <Link href={`/crm/orders/${row.original.refId}`} className="text-primary hover:underline">
-            Đơn bán
+          <Link
+            href={`/crm/orders/${row.original.refId}`}
+            className="text-primary hover:underline"
+            title="Mở đơn bán"
+          >
+            {row.original.refDocNumber ? (
+              <span className="font-mono text-xs">{row.original.refDocNumber}</span>
+            ) : (
+              'Đơn bán'
+            )}
           </Link>
         ) : (
           <span className="text-muted-foreground">{row.original.refType ?? '—'}</span>
@@ -559,8 +569,15 @@ export function DispatchScreen() {
     warehouseId,
     assignedTo,
     ...lineFilter(lines),
+    sort: 'newest',
     ...skipTake,
   });
+  // Số việc của MỌI tab trạng thái (cùng bộ lọc) — trước đây chỉ tab đang mở có số, nên việc
+  // nằm ở "Đã giao" bị tưởng là mất.
+  const tabCounts = useTaskCounts(
+    TABS.map((t) => t.status),
+    { type, warehouseId, assignedTo, ...lineFilter(lines) },
+  );
   // Gợi ý gộp: luôn gọi (không lọc cấp) để hai tab hiện số nhóm; mở tab nào thì lọc đúng cấp đó.
   const suggestions = useWaveSuggestions({ warehouseId, packLevel: merge ?? undefined });
 
@@ -607,7 +624,7 @@ export function DispatchScreen() {
     <div className="flex flex-col gap-3">
       <PageHeader
         title="Điều phối kho"
-        description="Việc gấp trước, cùng mức gấp thì việc cũ trước — đúng thứ tự API trả về."
+        description="Việc gấp trước, cùng mức gấp thì việc mới nhất lên đầu — đúng thứ tự API trả về."
         breadcrumb={[{ label: 'Kho' }, { label: 'Điều phối' }]}
         actions={
           <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
@@ -692,10 +709,12 @@ export function DispatchScreen() {
         ) : null}
       </div>
 
-      {/* Tab trạng thái trên URL — chỉ tab đang mở tải dữ liệu; số đếm là `total` của tab đó. */}
+      {/* Tab trạng thái trên URL — chỉ tab đang mở tải bảng; tab nào cũng có số đếm (take=1). */}
       <div className="flex border-b" role="tablist" aria-label="Trạng thái điều phối">
-        {TABS.map((t) => {
+        {TABS.map((t, i) => {
           const active = merge === null && t.status === status;
+          const countQuery = tabCounts[i]!;
+          const count = countQuery.data;
           return (
             <button
               key={t.status}
@@ -717,11 +736,16 @@ export function DispatchScreen() {
               )}
             >
               {t.title}
-              {active ? (
-                <span className="rounded-full bg-muted px-1.5 text-xs font-normal tabular-nums text-muted-foreground">
-                  {query.data ? query.data.total : query.error ? '—' : '…'}
-                </span>
-              ) : null}
+              <span
+                className={cn(
+                  'rounded-full px-1.5 text-xs font-normal tabular-nums',
+                  count && !active
+                    ? 'bg-primary/10 text-primary'
+                    : 'bg-muted text-muted-foreground',
+                )}
+              >
+                {count ?? (countQuery.error ? '—' : '…')}
+              </span>
             </button>
           );
         })}

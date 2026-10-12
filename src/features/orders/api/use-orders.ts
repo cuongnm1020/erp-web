@@ -3,7 +3,11 @@ import { api, idempotency, unwrap } from '@/lib/api/client';
 import type { components } from '@/lib/api/schema';
 
 /** Luật 2: shape response chỉ lấy từ schema.d.ts sinh bởi OpenAPI, không khai lại. */
-export type SalesOrder = components['schemas']['SalesOrderHeaderDto'];
+/**
+ * Một đơn trên danh sách (GET /sales-orders) — `SalesOrderListItemDto` là header của đơn cộng các
+ * trường của màn Quản lý đơn hàng (2026-10-12); spec không còn tách riêng `SalesOrderHeaderDto`.
+ */
+export type SalesOrder = components['schemas']['SalesOrderListItemDto'];
 export type SalesOrderDetail = components['schemas']['SalesOrderDetailDto'];
 export type SalesOrderLine = components['schemas']['SalesOrderLineDto'];
 export type SalesOrderListResponse = components['schemas']['SalesOrderListResponseDto'];
@@ -11,9 +15,19 @@ export type ShippingQuote = components['schemas']['ShippingQuoteResultDto'];
 export type PickupWarehouse = components['schemas']['PickupWarehouseDto'];
 export type SalesOrderStatus = SalesOrder['status'];
 export type SalesOrderChannel = SalesOrder['channel'];
+/** Một dòng danh sách đơn — header + SĐT, địa chỉ, sản phẩm đầu, phiếu giao, tab (2026-10-12). */
+export type SalesOrderListItem = SalesOrder;
+export type OrderFlow = SalesOrderListItem['flow'];
+export type OrderFlowCounts = components['schemas']['SalesOrderFlowCountsDto'];
 
 export interface OrderListParams {
   q?: string;
+  /** Tab của danh sách (gộp trạng thái chứng từ + kho / giao hàng). */
+  flow?: OrderFlow;
+  /** Kho lấy hàng chọn trên đơn. */
+  warehouseId?: string;
+  /** Nguồn: PANCAKE = đồng bộ từ Pancake, ERP = tạo trong ERP. */
+  source?: 'PANCAKE' | 'ERP';
   status?: SalesOrderStatus;
   customerId?: string;
   /** Cân nặng gửi hãng hiệu lực (kg, chuỗi decimal) — cận dưới / cận trên. */
@@ -35,6 +49,9 @@ export const orderKeys = {
   all: ['crm', 'orders'] as const,
   lists: () => [...orderKeys.all, 'list'] as const,
   list: (p: OrderListParams) => [...orderKeys.lists(), p] as const,
+  /** Đếm tab nằm dưới prefix `lists` — invalidate danh sách là đếm lại luôn. */
+  flowCounts: (p: Omit<OrderListParams, 'flow' | 'take' | 'skip'>) =>
+    [...orderKeys.lists(), 'flow-counts', p] as const,
   details: () => [...orderKeys.all, 'detail'] as const,
   detail: (id: string) => [...orderKeys.details(), id] as const,
   shippingQuote: (
@@ -63,23 +80,47 @@ export function orderListQuery(params: OrderListParams) {
       unwrap(
         api.GET('/sales-orders', {
           params: {
-            query: {
-              q: params.q || undefined,
-              status: params.status,
-              customerId: params.customerId || undefined,
-              weightMin: params.weightMin || undefined,
-              weightMax: params.weightMax || undefined,
-              noCarrier: params.noCarrier ? 'true' : undefined,
-              carrierId: params.carrierId || undefined,
-              from: params.from || undefined,
-              to: params.to || undefined,
-              take: params.take,
-              skip: params.skip,
-            },
+            query: { ...listQuery(params), take: params.take, skip: params.skip },
           },
         }),
       ),
   };
+}
+
+/** Bộ lọc chung của danh sách + đếm tab (không gồm phân trang). */
+function listQuery(params: Omit<OrderListParams, 'take' | 'skip'>) {
+  return {
+    q: params.q || undefined,
+    flow: params.flow,
+    warehouseId: params.warehouseId || undefined,
+    source: params.source,
+    status: params.status,
+    customerId: params.customerId || undefined,
+    weightMin: params.weightMin || undefined,
+    weightMax: params.weightMax || undefined,
+    noCarrier: params.noCarrier ? ('true' as const) : undefined,
+    carrierId: params.carrierId || undefined,
+    from: params.from || undefined,
+    to: params.to || undefined,
+  };
+}
+
+/**
+ * GET /sales-orders/flow-counts — số đơn từng tab với cùng bộ lọc (server bỏ qua `flow`). Scope
+ * theo người gọi ở API như danh sách (luật 7).
+ */
+export function useOrderFlowCounts(params: Omit<OrderListParams, 'flow' | 'take' | 'skip'>) {
+  return useQuery({
+    queryKey: orderKeys.flowCounts(params),
+    queryFn: () =>
+      unwrap(
+        api.GET('/sales-orders/flow-counts', {
+          // take / skip vô nghĩa với đếm — spec vẫn đòi vì dùng chung DTO lọc với danh sách.
+          params: { query: { ...listQuery(params), take: 1, skip: 0 } },
+        }),
+      ),
+    placeholderData: keepPreviousData,
+  });
 }
 
 /**

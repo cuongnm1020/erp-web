@@ -1,4 +1,10 @@
-import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import {
+  keepPreviousData,
+  useMutation,
+  useQueries,
+  useQuery,
+  useQueryClient,
+} from '@tanstack/react-query';
 import { api, unwrap } from '@/lib/api/client';
 import type { components } from '@/lib/api/schema';
 
@@ -25,6 +31,8 @@ export interface TaskListParams {
   lineCount?: number;
   /** Từ N dòng trở lên ("5+"). */
   lineCountMin?: number;
+  /** Cùng mức gấp: `oldest` (mặc định API) = việc cũ trước, `newest` = việc mới tạo lên đầu. */
+  sort?: 'oldest' | 'newest';
   take: number;
   skip: number;
 }
@@ -36,11 +44,13 @@ export const taskKeys = {
   list: (p: TaskListParams) => [...taskKeys.lists(), p] as const,
   details: () => [...taskKeys.all, 'detail'] as const,
   detail: (id: string) => [...taskKeys.details(), id] as const,
+  counts: () => [...taskKeys.all, 'count'] as const,
+  count: (p: Omit<TaskListParams, 'take' | 'skip'>) => [...taskKeys.counts(), p] as const,
 };
 
 /**
- * GET /tasks — bảng điều phối. API sắp `priority` giảm dần rồi `createdAt` tăng dần:
- * gấp trước, cùng mức gấp thì việc cũ trước.
+ * GET /tasks — bảng điều phối. API sắp `priority` giảm dần rồi `createdAt` (tăng dần mặc định,
+ * giảm dần khi `sort=newest`): gấp trước, cùng mức gấp thì việc cũ / mới trước.
  *
  * `wms.Task` KHÔNG có cột hạn chót/SLA, nên API trả `ageMinutes` (tuổi việc) và
  * `idleMinutes` (nằm im ở trạng thái hiện tại) thay vì cờ "quá hạn". Màn hình hiển thị
@@ -63,6 +73,7 @@ export function useTasks(params: TaskListParams) {
               docNumber: params.docNumber || undefined,
               lineCount: params.lineCount,
               lineCountMin: params.lineCountMin,
+              sort: params.sort,
               take: params.take,
               skip: params.skip,
             },
@@ -70,6 +81,42 @@ export function useTasks(params: TaskListParams) {
         }),
       ),
     placeholderData: keepPreviousData,
+  });
+}
+
+/**
+ * Số việc theo từng trạng thái cho thanh tab điều phối — `GET /tasks?take=1` với cùng bộ lọc,
+ * chỉ đọc `total` (API chưa có endpoint đếm riêng). Key nằm dưới ['wms','tasks'] nên socket
+ * việc invalidate prefix là số đếm tự tải lại cùng bảng.
+ */
+export function useTaskCounts(
+  statuses: readonly TaskStatus[],
+  params: Omit<TaskListParams, 'status' | 'take' | 'skip'>,
+) {
+  return useQueries({
+    queries: statuses.map((status) => ({
+      queryKey: taskKeys.count({ ...params, status }),
+      queryFn: async () => {
+        const page = await unwrap(
+          api.GET('/tasks', {
+            params: {
+              query: {
+                status,
+                type: params.type,
+                warehouseId: params.warehouseId || undefined,
+                assignedTo: params.assignedTo || undefined,
+                lineCount: params.lineCount,
+                lineCountMin: params.lineCountMin,
+                take: 1,
+                skip: 0,
+              },
+            },
+          }),
+        );
+        return page.total;
+      },
+      placeholderData: keepPreviousData,
+    })),
   });
 }
 

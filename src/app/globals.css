@@ -75,6 +75,25 @@
     --branch-7-weak: 175 55% 91%;
     --branch-8: 300 45% 42%;
     --branch-8-weak: 300 50% 94%;
+    /* Tab / trạng thái đơn (2026-10-12): mỗi trạng thái một màu chữ, nền = cùng màu 10% */
+    --flow-pending: 36 85% 34%;
+    --flow-warehouse: 215 14% 38%;
+    --flow-picking: 262 52% 46%;
+    --flow-packed: 231 50% 46%;
+    --flow-picked-up: 199 85% 32%;
+    --flow-in-transit: 212 69% 39%;
+    --flow-out-for-delivery: 174 70% 27%;
+    --flow-delivered: 145 60% 28%;
+    --flow-returned: 22 85% 40%;
+    --flow-carrier-cancelled: 352 68% 44%;
+    --flow-cancelled: 220 8% 45%;
+    /* Nhà mạng cạnh SĐT: chữ = màu đậm, nền = cùng màu 15% */
+    --telco-viettel: 0 70% 40%;
+    --telco-vina: 210 80% 38%;
+    --telco-mobi: 160 70% 27%;
+    --telco-vnmb: 28 90% 37%;
+    --telco-gmobile: 45 90% 30%;
+    --telco-itel: 280 50% 45%;
   }
 
   .dark {
@@ -119,6 +138,23 @@
     --branch-7-weak: 175 35% 15%;
     --branch-8: 300 45% 70%;
     --branch-8-weak: 300 25% 18%;
+    --flow-pending: 40 85% 62%;
+    --flow-warehouse: 215 15% 68%;
+    --flow-picking: 262 70% 74%;
+    --flow-packed: 231 70% 74%;
+    --flow-picked-up: 199 80% 64%;
+    --flow-in-transit: 212 80% 68%;
+    --flow-out-for-delivery: 174 55% 55%;
+    --flow-delivered: 145 50% 58%;
+    --flow-returned: 24 85% 64%;
+    --flow-carrier-cancelled: 352 75% 70%;
+    --flow-cancelled: 220 10% 62%;
+    --telco-viettel: 0 70% 68%;
+    --telco-vina: 210 80% 70%;
+    --telco-mobi: 160 55% 55%;
+    --telco-vnmb: 28 85% 64%;
+    --telco-gmobile: 45 85% 60%;
+    --telco-itel: 280 55% 74%;
   }
 
   * {

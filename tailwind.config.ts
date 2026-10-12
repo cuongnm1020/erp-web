@@ -68,6 +68,29 @@ const config: Config = {
           DEFAULT: 'hsl(var(--info))',
           foreground: 'hsl(var(--info-foreground))',
         },
+        // Trạng thái đơn (tab danh sách đơn) — mỗi trạng thái một màu (globals.css --flow-*).
+        flow: Object.fromEntries(
+          [
+            'pending',
+            'warehouse',
+            'picking',
+            'packed',
+            'picked-up',
+            'in-transit',
+            'out-for-delivery',
+            'delivered',
+            'returned',
+            'carrier-cancelled',
+            'cancelled',
+          ].map((k) => [k, `hsl(var(--flow-${k}))`]),
+        ),
+        // Nhà mạng cạnh SĐT (globals.css --telco-*).
+        telco: Object.fromEntries(
+          ['viettel', 'vina', 'mobi', 'vnmb', 'gmobile', 'itel'].map((k) => [
+            k,
+            `hsl(var(--telco-${k}))`,
+          ]),
+        ),
         // Sơ đồ nhân sự — màu theo khối (globals.css --branch-N / --branch-N-weak)
         branch: Object.fromEntries(
           [1, 2, 3, 4, 5, 6, 7, 8].map((n) => [

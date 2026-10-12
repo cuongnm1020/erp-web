@@ -49,17 +49,59 @@ describe('OrderListScreen — GET /sales-orders (P1-12)', () => {
     search = 'q=%23103';
     renderApp(<OrderListScreen />);
     await screen.findByText('1 đơn khớp bộ lọc');
-    const link = screen.getByRole('link', { name: new RegExp(pancake.docNumber) });
+    const link = screen.getByRole('link', { name: pancake.docNumber });
     expect(link).toHaveAttribute('href', `/crm/orders/${pancake.id}`);
-    expect(link).toHaveTextContent('Pancake #103');
+    expect(screen.getByText('Pancake #103')).toBeInTheDocument();
   });
 
-  it('tab trạng thái đọc từ URL và lọc phía server (luật 8)', async () => {
-    search = 'status=POSTED';
+  it('tab theo luồng đơn đọc ?flow= từ URL, lọc phía server; mỗi tab có số đếm từ API (luật 8)', async () => {
+    const all = makeOrders(60);
+    const delivered = all.filter((o) => o.flow === 'DELIVERED').length;
+    search = 'flow=DELIVERED';
     renderApp(<OrderListScreen />);
-    await screen.findByText('12 đơn khớp bộ lọc');
-    const tab = screen.getByRole('tab', { name: 'Đã chốt' });
+    await screen.findByText(`${delivered} đơn khớp bộ lọc`);
+    const tab = screen.getByRole('tab', { name: new RegExp(`^Thành công\\s*${delivered}$`) });
     expect(tab).toHaveAttribute('aria-selected', 'true');
+    // Số đếm của tab khác + tab Tất cả cũng có (GET /sales-orders/flow-counts).
+    const pending = all.filter((o) => o.flow === 'PENDING_APPROVAL').length;
+    expect(
+      await screen.findByRole('tab', { name: new RegExp(`^Chờ duyệt\\s*${pending}$`) }),
+    ).toHaveAttribute('aria-selected', 'false');
+    expect(screen.getByRole('tab', { name: /^Tất cả\s*60$/ })).toBeInTheDocument();
+    // Bấm tab → ghi ?flow= lên URL.
+    replace.mockClear();
+    fireEvent.click(screen.getByRole('tab', { name: /^Sự cố hoàn/ }));
+    await waitFor(() => expect(replace).toHaveBeenCalled());
+    expect(String(replace.mock.calls.at(-1)![0])).toContain('flow=RETURNED');
+  });
+
+  it('SĐT hiện đủ trên một dòng kèm nhà mạng rút gọn (Viettel / Vina / Mobi)', async () => {
+    search = '';
+    renderApp(<OrderListScreen />);
+    await screen.findByText(FIRST.docNumber);
+    // i=0 → 0912345678 (Vinaphone), i=1 → 0386… (Viettel), i=2 → 0908… (Mobifone).
+    expect(screen.getAllByText('0912 345 678').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('Vina').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('Viettel').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('Mobi').length).toBeGreaterThan(0);
+  });
+
+  it('bấm vào dòng → xem nhanh bên phải (người nhận, sản phẩm, tiền, hãng); Đóng thì tắt', async () => {
+    search = 'flow=DELIVERED';
+    renderApp(<OrderListScreen />);
+    const row = makeOrders(60).find((o) => o.flow === 'DELIVERED')!;
+    fireEvent.click(await screen.findByText(row.shipment!.trackingNo!));
+    const panel = await screen.findByRole('dialog');
+    expect(panel).toHaveTextContent(row.docNumber);
+    expect(panel).toHaveTextContent('Thành công');
+    expect(panel).toHaveTextContent('Giao Hàng Tiết Kiệm');
+    expect(panel).toHaveTextContent('170.000');
+    expect(await screen.findByRole('link', { name: 'Mở đơn đầy đủ' })).toHaveAttribute(
+      'href',
+      `/crm/orders/${row.id}`,
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Đóng xem nhanh' }));
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
   });
 
   it('sale không có sales_order.create → nút tạo đơn ẩn (luật 7)', async () => {

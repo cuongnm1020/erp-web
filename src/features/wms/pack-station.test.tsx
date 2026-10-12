@@ -284,6 +284,61 @@ describe('Trạm đóng gói — quét đơn → quét SKU → tự đóng dòng
     expect(keys.size).toBe(3);
   });
 
+  /** Máy quét bắn mã vào ô đang focus (ô số lượng sau lần quét đầu) rồi Enter. */
+  const scanIntoQty = async (code: string) => {
+    const q = await screen.findByLabelText('Số lượng lần quét này');
+    fireEvent.change(q, { target: { value: code } });
+    fireEvent.keyDown(q, { key: 'Enter' });
+  };
+  const scanBodies = () => scans as Array<{ barcode: string; qty?: string }>;
+
+  it('mỗi lần quét gửi ngay +1, ô số lượng đếm tổng (2026-10-12)', async () => {
+    server.use(...scanFlow(WAYBILL_ISSUED));
+    renderApp(<PackStationScreen />);
+    scan('SO2609-00007');
+    await screen.findAllByText('Sản phẩm A');
+
+    scan('BC-B');
+    await waitFor(() => expect(scans).toHaveLength(1));
+    expect(scanBodies()[0]).toMatchObject({ barcode: 'BC-B', qty: '1' });
+    expect(await screen.findByText(/Đang đếm BC-B/)).toBeInTheDocument();
+    expect(await screen.findByLabelText('Số lượng lần quét này')).toHaveValue('1');
+
+    // Lần 2: máy quét bắn mã vào ô số lượng đang focus → gửi tiếp +1 (B đủ 2 → dòng tự đóng)
+    await scanIntoQty('BC-B');
+    await waitFor(() => expect(scans).toHaveLength(2));
+    expect(scanBodies()[1]).toMatchObject({ barcode: 'BC-B', qty: '1' });
+  });
+
+  it('quét một lần + gõ tổng + Enter → gửi phần còn thiếu để tổng đúng số đã gõ', async () => {
+    server.use(...scanFlow(WAYBILL_ISSUED));
+    renderApp(<PackStationScreen />);
+    scan('SO2609-00007');
+    await screen.findAllByText('Sản phẩm A');
+
+    scanSku('BC-B', '2');
+    await waitFor(() => expect(scans).toHaveLength(2));
+    expect(scanBodies()).toMatchObject([
+      { barcode: 'BC-B', qty: '1' },
+      { barcode: 'BC-B', qty: '1' },
+    ]);
+  });
+
+  it('gõ tổng nhỏ hơn số đã gửi → báo lỗi, không gửi', async () => {
+    server.use(...scanFlow(WAYBILL_ISSUED));
+    renderApp(<PackStationScreen />);
+    scan('SO2609-00007');
+    await screen.findAllByText('Sản phẩm A');
+
+    scan('BC-B');
+    await waitFor(() => expect(scans).toHaveLength(1));
+    const q = await screen.findByLabelText('Số lượng lần quét này');
+    fireEvent.change(q, { target: { value: '0.5' } });
+    fireEvent.keyDown(q, { key: 'Enter' });
+    expect(await screen.findByText(/Đã ghi nhận 1/)).toBeInTheDocument();
+    expect(scans).toHaveLength(1);
+  });
+
   it('sai SKU → banner đỏ, không cộng; mã lạ của đơn → không gọi server', async () => {
     server.use(...scanFlow(WAYBILL_ISSUED));
     renderApp(<PackStationScreen />);
@@ -440,5 +495,128 @@ describe('Trạm đóng gói — màn chờ hai cột "Chờ đóng gói" / "Đ�
     expect(done).toHaveTextContent('SO2609-00001');
     fireEvent.click(screen.getByRole('button', { name: 'Mở SO2609-00011' }));
     await waitFor(() => expect(resolved).toEqual(['SO2609-00011']));
+  });
+});
+
+describe('Trạm đóng gói — xem lại đơn đã đóng, in lại nhãn (2026-10-12)', () => {
+  const PACKED = (trackingNo: string | null, carrierCode: string | null = 'GHTK') => ({
+    task: {
+      ...PACK_TASK,
+      taskId: 'pack-d1',
+      docNumber: 'PACK2609-00001',
+      status: 'COMPLETED',
+      lines: PACK_TASK.lines.map((l) => ({ ...l, status: 'COMPLETED', qtyDone: l.qtyPlanned })),
+    },
+    order: { id: ORDER_ID, docNumber: 'SO2609-00001', customerName: 'Công ty Mai Linh' },
+    packedByName: 'packer.01',
+    completedAt: '2026-09-15T03:00:00.000Z',
+    shipment: { ...SHIPMENT(trackingNo), carrierCode, carrierId: carrierCode ? 'c-ghtk' : null },
+  });
+  const idle = (packed: ReturnType<typeof PACKED>) => [
+    http.get('/api/pda/queue', () =>
+      HttpResponse.json({ type: 'PACK', warehouseId: null, waiting: 0, mine: 0, items: [] }),
+    ),
+    http.get('/api/pda/stats', () =>
+      HttpResponse.json({
+        userId: 'u-admin',
+        type: 'PACK',
+        date: '2026-09-15',
+        from: '2026-09-14T17:00:00.000Z',
+        to: '2026-09-15T17:00:00.000Z',
+        completed: 1,
+        items: [
+          {
+            taskId: 'pack-d1',
+            docNumber: 'PACK2609-00001',
+            refDocNumber: 'SO2609-00001',
+            completedAt: '2026-09-15T03:00:00.000Z',
+          },
+        ],
+      }),
+    ),
+    http.get('/api/pda/packed/:taskId', ({ params }) =>
+      params.taskId === 'pack-d1'
+        ? HttpResponse.json(packed)
+        : HttpResponse.json(
+            { statusCode: 404, code: 'TASK_NOT_FOUND', message: 'x' },
+            { status: 404, headers: { 'x-request-id': 'trace-404' } },
+          ),
+    ),
+  ];
+
+  it('bấm đơn trong "Đã đóng gói hôm nay" → xem dòng + vận đơn → "In lại nhãn vận đơn" → iframe nhãn', async () => {
+    server.use(...idle(PACKED('S00000001.SG.A1')));
+    renderApp(<PackStationScreen />);
+    fireEvent.click(await screen.findByRole('button', { name: 'Xem lại SO2609-00001' }));
+    const dialog = await screen.findByRole('dialog', { name: /SO2609-00001 · đã đóng gói/ });
+    await waitFor(() => expect(dialog).toHaveTextContent('S00000001.SG.A1'));
+    expect(dialog).toHaveTextContent('Công ty Mai Linh');
+    expect(dialog).toHaveTextContent('đóng bởi packer.01');
+    expect(dialog).toHaveTextContent('Sản phẩm A');
+    expect(dialog).toHaveTextContent('DN2609-00001');
+    expect(replace).toHaveBeenCalledWith('/wms/pack?packed=pack-d1', { scroll: false });
+
+    fireEvent.click(screen.getByRole('button', { name: /In lại nhãn vận đơn/ }));
+    const frame = await screen.findByTitle('Nhãn vận đơn S00000001.SG.A1');
+    expect(frame.getAttribute('src')).toContain(`/api/shipments/${SHIPMENT_ID}/label?pageSize=A6`);
+    // Đóng popup nhãn → quay lại màn xem đơn
+    fireEvent.click(screen.getByRole('button', { name: 'Xong' }));
+    expect(
+      await screen.findByRole('dialog', { name: /SO2609-00001 · đã đóng gói/ }),
+    ).toBeInTheDocument();
+  });
+
+  it('hãng chưa cấp vận đơn lúc đóng → "Xin vận đơn và in nhãn" → chọn sẵn hãng cũ → POST waybill → nhãn', async () => {
+    const requests: unknown[] = [];
+    server.use(
+      ...idle(PACKED(null)),
+      http.post('/api/shipments/:id/waybill', async ({ request }) => {
+        requests.push(await request.json());
+        return HttpResponse.json({
+          shipmentId: SHIPMENT_ID,
+          shipmentDocNumber: 'DN2609-00001',
+          carrierCode: 'GHTK',
+          outcome: 'ISSUED',
+          trackingNo: 'S00000003.SG',
+          reason: null,
+          jobId: null,
+        });
+      }),
+    );
+    renderApp(<PackStationScreen />);
+    fireEvent.click(await screen.findByRole('button', { name: 'Xem lại SO2609-00001' }));
+    const dialog = await screen.findByRole('dialog', { name: /đã đóng gói/ });
+    await waitFor(() => expect(dialog).toHaveTextContent('Chưa có — cần xin lại'));
+    fireEvent.click(screen.getByRole('button', { name: /Xin vận đơn và in nhãn/ }));
+    expect(await screen.findByText(/Hãng GHTK chưa cấp vận đơn/)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Xin vận đơn' }));
+    await waitFor(() => expect(requests).toEqual([{ carrierCode: 'GHTK' }]));
+    expect(await screen.findByTitle('Nhãn vận đơn S00000003.SG')).toBeInTheDocument();
+  });
+
+  it('quét lại mã đơn đã đóng gói → mở màn xem lại thay vì báo lỗi', async () => {
+    server.use(
+      ...idle(PACKED('S00000001.SG.A1')),
+      http.get('/api/pda/resolve/:code', () =>
+        HttpResponse.json({
+          ...RESOLVE_ORDER,
+          code: 'SO2609-00001',
+          order: {
+            ...RESOLVE_ORDER.order,
+            docNumber: 'SO2609-00001',
+            tasks: [
+              { ...RESOLVE_ORDER.order.tasks[0]!, status: 'COMPLETED' },
+              { ...RESOLVE_ORDER.order.tasks[1]!, id: 'pack-d1', status: 'COMPLETED' },
+            ],
+          },
+        }),
+      ),
+    );
+    renderApp(<PackStationScreen />);
+    const input = screen.getByLabelText(/Quét/);
+    fireEvent.change(input, { target: { value: 'SO2609-00001' } });
+    fireEvent.keyDown(input, { key: 'Enter' });
+    const dialog = await screen.findByRole('dialog', { name: /SO2609-00001 · đã đóng gói/ });
+    await waitFor(() => expect(dialog).toHaveTextContent('S00000001.SG.A1'));
   });
 });

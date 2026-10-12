@@ -1,6 +1,7 @@
 'use client';
 
 import { zodResolver } from '@hookform/resolvers/zod';
+import Decimal from 'decimal.js';
 import { Plus, X } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
@@ -60,12 +61,16 @@ import {
  * - Định mức theo ĐVT cơ sở của SKU thành phần (không quy đổi). "Còn bán được" tính ngay
  *   từ khả dụng của thành phần đã chọn — cùng công thức với cột trên danh sách.
  * - PATCH bắt buộc `version` (optimistic locking) — 409 → banner + tải lại, không retry (luật 6).
- * - Giá combo không nhập tay (COMBO-1): server tính Σ(giá lẻ thành phần × định mức) − giảm giá,
- *   ghi bảng giá mặc định và đẩy lên Pancake đúng giá đó. Form chỉ nhập "Giảm giá"; giá xem
- *   trước tính được khi biết giá lẻ thành phần (combo đang sửa), combo mới thì tính khi lưu.
+ * - Giá combo (COMBO-1): server tính Σ(giá lẻ thành phần × định mức) − giảm giá, ghi bảng giá
+ *   mặc định và đẩy lên Pancake đúng giá đó. Nhập "Giá bán" (COMBO-4) thì gửi `salePrice` thay
+ *   "Giảm giá" — được lớn hơn tổng thành phần (cộng chi phí ngoài), server lưu phần chênh (âm =
+ *   phụ phí) nên giá vẫn chạy theo giá lẻ thành phần. Khi sửa, combo đang phụ phí đổ vào "Giá
+ *   bán", còn lại đổ vào "Giảm giá". Giá xem trước tính được khi biết giá lẻ thành phần (combo
+ *   đang sửa), combo mới thì tính khi lưu.
  * - "Miễn ship" = gợi ý cho sale khi lên đơn, sale vẫn quyết định phí ship cuối.
  */
 function initialValues(c?: ComboDetail): ComboFormValues {
+  const surcharge = c !== undefined && c.discountAmount.startsWith('-');
   return {
     code: c?.code ?? '',
     name: c?.name ?? '',
@@ -73,7 +78,8 @@ function initialValues(c?: ComboDetail): ComboFormValues {
     brandId: c?.brandId ?? '',
     description: c?.description ?? '',
     searchAliases: c?.searchAliases.join(', ') ?? '',
-    discountAmount: c && c.discountAmount !== '0' ? c.discountAmount : '',
+    discountAmount: c && c.discountAmount !== '0' && !surcharge ? c.discountAmount : '',
+    salePrice: surcharge ? (c.salePrice ?? '') : '',
     freeShipping: c?.freeShipping ?? false,
     isActive: c?.isActive ?? true,
     components: c
@@ -123,7 +129,9 @@ function ComboFormBody({ combo }: { combo?: ComboDetail }) {
   const components = useWatch({ control: form.control, name: 'components' });
   const available = comboAvailableFromRows(components ?? []);
   const discount = useWatch({ control: form.control, name: 'discountAmount' });
-  const price = comboPriceFromRows(components ?? [], discount ?? '');
+  const salePrice = useWatch({ control: form.control, name: 'salePrice' });
+  const manualPrice = (salePrice ?? '') !== '';
+  const price = comboPriceFromRows(components ?? [], discount ?? '', salePrice ?? '');
   const saving = create.isPending || update.isPending;
 
   const onSubmit = form.handleSubmit(async (v) => {
@@ -135,7 +143,7 @@ function ComboFormBody({ combo }: { combo?: ComboDetail }) {
       ...(v.brandId ? { brandId: v.brandId } : {}),
       ...(v.description ? { description: v.description } : {}),
       searchAliases: parseAliases(v.searchAliases),
-      discountAmount: v.discountAmount || '0',
+      ...(v.salePrice ? { salePrice: v.salePrice } : { discountAmount: v.discountAmount || '0' }),
       freeShipping: v.freeShipping,
     };
     try {
@@ -167,6 +175,7 @@ function ComboFormBody({ combo }: { combo?: ComboDetail }) {
           'categoryId',
           'brandId',
           'discountAmount',
+          'salePrice',
           'freeShipping',
           'searchAliases',
           'components',
@@ -292,6 +301,29 @@ function ComboFormBody({ combo }: { combo?: ComboDetail }) {
             />
             <FormField
               control={form.control}
+              name="salePrice"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Giá bán</FormLabel>
+                  <FormControl>
+                    <MoneyInput
+                      aria-label="Giá bán"
+                      value={field.value ?? ''}
+                      onChange={field.onChange}
+                      placeholder={price && !manualPrice ? formatMoney(price.salePrice) : 'Tự tính'}
+                    />
+                  </FormControl>
+                  <FormDescription>
+                    {manualPrice && price
+                      ? manualPriceNote(price.componentsPrice, price.salePrice)
+                      : 'Bỏ trống = tự tính theo giảm giá. Được nhập cao hơn tổng giá thành phần để cộng chi phí phát sinh.'}
+                  </FormDescription>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
               name="discountAmount"
               render={({ field }) => (
                 <FormItem>
@@ -299,15 +331,18 @@ function ComboFormBody({ combo }: { combo?: ComboDetail }) {
                   <FormControl>
                     <MoneyInput
                       aria-label="Giảm giá"
-                      value={field.value ?? ''}
+                      value={manualPrice ? '' : (field.value ?? '')}
                       onChange={field.onChange}
                       placeholder="0"
+                      disabled={manualPrice}
                     />
                   </FormControl>
                   <FormDescription>
-                    {price
-                      ? `Giá combo = ${formatMoney(price.componentsPrice)} − giảm = ${formatMoney(price.salePrice)}`
-                      : 'Giá combo = tổng giá lẻ thành phần − giảm giá (tính khi lưu, đẩy lên Pancake giá này)'}
+                    {manualPrice
+                      ? 'Đang dùng giá bán nhập tay — xóa giá bán để tính theo giảm giá.'
+                      : price
+                        ? `Giá combo = ${formatMoney(price.componentsPrice)} − giảm = ${formatMoney(price.salePrice)}`
+                        : 'Giá combo = tổng giá lẻ thành phần − giảm giá (tính khi lưu, đẩy lên Pancake giá này)'}
                   </FormDescription>
                   <FormMessage />
                 </FormItem>
@@ -504,6 +539,16 @@ function ComboFormBody({ combo }: { combo?: ComboDetail }) {
       </form>
     </Form>
   );
+}
+
+/** Mô tả giá bán nhập tay so với tổng giá lẻ thành phần — phần chênh server giữ khi giá lẻ đổi. */
+function manualPriceNote(componentsPrice: string, salePrice: string): string {
+  const diff = new Decimal(salePrice).minus(componentsPrice);
+  const base = `Tổng thành phần ${formatMoney(componentsPrice)}`;
+  if (diff.isZero()) return `${base} · bằng giá bán`;
+  return diff.isPositive()
+    ? `${base} · phụ phí ${formatMoney(diff.toString(), { signed: true })}`
+    : `${base} · giảm ${formatMoney(diff.abs().toString())}`;
 }
 
 function ComponentRow({

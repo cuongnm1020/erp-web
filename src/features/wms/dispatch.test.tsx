@@ -31,13 +31,14 @@ const ALL = makeTasks(40);
 const PENDING = ALL.filter((t) => t.status === 'PENDING');
 
 describe('DispatchScreen — GET /tasks (P1-12)', () => {
-  it('loading → MỘT bảng của tab đang mở (mặc định Chưa gán), chỉ gọi API cho tab đó; tab khác bấm mới gọi (2026-09-22)', async () => {
+  it('loading → MỘT bảng của tab đang mở (mặc định Chưa gán), chỉ tải bảng cho tab đó; tab nào cũng có số đếm (2026-10-08)', async () => {
     search = '';
     const seen: string[] = [];
+    const counted: string[] = [];
     server.use(
       http.get('/api/tasks', ({ request }) => {
         const q = new URL(request.url).searchParams;
-        seen.push(q.get('status') ?? '');
+        (q.get('take') === '1' ? counted : seen).push(q.get('status') ?? '');
         const items = ALL.filter((t) => t.status === q.get('status'));
         return HttpResponse.json({
           items: items.slice(0, Number(q.get('take'))),
@@ -51,10 +52,21 @@ describe('DispatchScreen — GET /tasks (P1-12)', () => {
     for (const label of ['Chưa gán', 'Đã giao', 'Đang làm', 'Ngoại lệ']) {
       expect(screen.getByRole('tab', { name: new RegExp(label) })).toBeInTheDocument();
     }
-    // Chỉ tab Chưa gán gọi API; số đếm trên tab = total của API.
+    // Chỉ tab Chưa gán tải bảng; số đếm của cả bốn tab = total của API (take=1).
     expect(new Set(seen)).toEqual(new Set(['PENDING']));
+    expect(new Set(counted)).toEqual(new Set(['PENDING', 'ASSIGNED', 'IN_PROGRESS', 'EXCEPTION']));
     expect(screen.getByRole('tab', { name: /Chưa gán/ })).toHaveAttribute('aria-selected', 'true');
-    expect(screen.getByRole('tab', { name: /Chưa gán/ })).toHaveTextContent(String(PENDING.length));
+    for (const [label, st] of [
+      ['Chưa gán', 'PENDING'],
+      ['Đã giao', 'ASSIGNED'],
+      ['Đang làm', 'IN_PROGRESS'],
+      ['Ngoại lệ', 'EXCEPTION'],
+    ] as const) {
+      const n = ALL.filter((t) => t.status === st).length;
+      await waitFor(() =>
+        expect(screen.getByRole('tab', { name: new RegExp(label) })).toHaveTextContent(String(n)),
+      );
+    }
     // Bảng phân trang phía server (luật 8): 20 dòng / trang.
     expect(screen.getAllByRole('row').length).toBe(Math.min(PENDING.length, 20) + 1);
     // Bấm tab khác → ghi ?status= lên URL (tab chỉ tải khi mở).
@@ -64,13 +76,13 @@ describe('DispatchScreen — GET /tasks (P1-12)', () => {
     );
   });
 
-  it('tab trên URL: ?status=EXCEPTION → chỉ tải ngoại lệ, tab đó được chọn', async () => {
+  it('tab trên URL: ?status=EXCEPTION → chỉ tải bảng ngoại lệ, tab đó được chọn', async () => {
     search = 'status=EXCEPTION';
     const seen: string[] = [];
     server.use(
       http.get('/api/tasks', ({ request }) => {
         const q = new URL(request.url).searchParams;
-        seen.push(q.get('status') ?? '');
+        if (q.get('take') !== '1') seen.push(q.get('status') ?? '');
         const items = ALL.filter((t) => t.status === q.get('status'));
         return HttpResponse.json({ items, total: items.length });
       }),
@@ -92,6 +104,14 @@ describe('DispatchScreen — GET /tasks (P1-12)', () => {
     for (const row of screen.getAllByRole('row')) {
       expect(row.textContent).not.toMatch(/quá hạn|SLA|trễ/i);
     }
+  });
+
+  it('cột Chứng từ: việc của đơn bán hiện mã đơn (refDocNumber) làm link sang đơn', async () => {
+    search = '';
+    renderApp(<DispatchScreen />);
+    const so = PENDING.find((t) => t.refType === 'SalesOrder' && t.refDocNumber)!;
+    const link = await screen.findByRole('link', { name: so.refDocNumber! });
+    expect(link).toHaveAttribute('href', `/crm/orders/${so.refId}`);
   });
 
   it('lọc loại việc đọc từ URL và gửi xuống server (luật 8)', async () => {
@@ -250,6 +270,10 @@ describe('DispatchScreen — gán / trả việc (POST /tasks/:id/assign|unassig
     );
     await waitFor(() => expect(seen.length).toBeGreaterThanOrEqual(1));
     expect(seen.every((q) => q.get('lineCount') === '1' && q.get('lineCountMin') === null)).toBe(
+      true,
+    );
+    // Bảng việc xin API xếp việc mới nhất lên đầu (cùng mức gấp).
+    expect(seen.filter((q) => q.get('take') !== '1').every((q) => q.get('sort') === 'newest')).toBe(
       true,
     );
     // Chỉ còn dòng 1 SKU trong bảng.

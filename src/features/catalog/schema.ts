@@ -401,8 +401,9 @@ export const comboComponentRowSchema = z.object({
 
 /**
  * Khớp CreateComboDto / UpdateComboDto (luật 11). `version` không nằm trong form — lấy từ
- * ComboDetailDto lúc submit. Giá combo KHÔNG nhập tay (COMBO-1): server tính
- * Σ(giá lẻ thành phần × định mức) − discountAmount, ghi vào bảng giá mặc định và đẩy lên Pancake.
+ * ComboDetailDto lúc submit. Giá combo = Σ(giá lẻ thành phần × định mức) − discountAmount (COMBO-1),
+ * server ghi vào bảng giá mặc định và đẩy lên Pancake. Nhập `salePrice` (COMBO-4) thì server tự
+ * quy ra chênh lệch — được LỚN HƠN tổng thành phần (cộng chi phí ngoài, chênh lệch âm = phụ phí).
  */
 export const comboFormSchema = z
   .object({
@@ -415,6 +416,10 @@ export const comboFormSchema = z
     /** Giảm giá cho MỘT combo — Decimal(18,4) ≥ 0; '' = 0. */
     discountAmount: moneySchema
       .refine((v) => !v.startsWith('-'), 'Giảm giá không được âm')
+      .or(z.literal('')),
+    /** Giá bán MỘT combo nhập tay — Decimal(18,4) ≥ 0; '' = tính theo giảm giá. Thắng `discountAmount`. */
+    salePrice: moneySchema
+      .refine((v) => !v.startsWith('-'), 'Giá bán không được âm')
       .or(z.literal('')),
     freeShipping: z.boolean(),
     isActive: z.boolean(),
@@ -471,17 +476,22 @@ export function comboAvailableFromRows(
 
 /**
  * Giá combo xem trước = Σ(giá lẻ × định mức) − giảm giá, cùng công thức server
- * (PricingService.refreshComboPrices). Dòng chưa biết giá / định mức sai → null (không đoán).
+ * (PricingService.refreshComboPrices); nhập giá bán thì giá = giá bán. Dòng chưa biết giá /
+ * định mức sai → null (không đoán).
  */
 export function comboPriceFromRows(
   rows: readonly { qty: string; unitPrice: string }[],
   discount: string,
+  salePrice = '',
 ): { componentsPrice: string; salePrice: string } | null {
   if (rows.length === 0) return null;
   let sum = new Decimal(0);
   for (const r of rows) {
     if (!/^\d+(\.\d+)?$/.test(r.unitPrice) || !/^\d+(\.\d+)?$/.test(r.qty)) return null;
     sum = sum.plus(new Decimal(r.unitPrice).mul(r.qty));
+  }
+  if (/^\d+(\.\d+)?$/.test(salePrice)) {
+    return { componentsPrice: sum.toFixed(4), salePrice: new Decimal(salePrice).toFixed(4) };
   }
   const d = /^\d+(\.\d+)?$/.test(discount) ? new Decimal(discount) : new Decimal(0);
   return { componentsPrice: sum.toFixed(4), salePrice: sum.minus(d).toFixed(4) };

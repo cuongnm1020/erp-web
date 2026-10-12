@@ -12,4 +12,4 @@ export {
   TZ,
 } from './date';
 export type { DateInput } from './date';
-export { formatPhone, normalizePhone } from './phone';
+export { formatPhone, normalizePhone, phoneCarrier } from './phone';

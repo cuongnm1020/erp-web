@@ -1,7 +1,12 @@
 import Decimal from 'decimal.js';
 import type { StatusTone } from '@/components/data/status-badge';
 import { formatMoney } from '@/lib/format';
-import type { SalesOrderChannel, SalesOrderDetail, SalesOrderStatus } from './api/use-orders';
+import type {
+  OrderFlow,
+  SalesOrderChannel,
+  SalesOrderDetail,
+  SalesOrderStatus,
+} from './api/use-orders';
 
 /**
  * Nhãn tiếng Việt theo cái người dùng điều khiển, không theo enum của DB.
@@ -108,11 +113,13 @@ const FULFILMENT_LABEL: Record<OrderFulfilmentStatus, string> = {
   PICKED: 'Đã pick xong',
   PACKING: 'Đang đóng gói',
   PACKED: 'Đã đóng gói',
-  SHIPPED: 'Đã giao hãng',
-  IN_TRANSIT: 'Đang giao',
-  DELIVERED: 'Đã giao',
+  SHIPPED: 'Đã lấy hàng',
+  IN_TRANSIT: 'Đang vận chuyển',
+  OUT_FOR_DELIVERY: 'Đang giao hàng',
+  DELIVERED: 'Thành công',
   FAILED: 'Giao thất bại',
-  RETURNED: 'Đã hoàn',
+  RETURNED: 'Sự cố hoàn',
+  CARRIER_CANCELLED: 'Hãng hủy',
   CANCELLED: 'Đã hủy việc kho',
 };
 
@@ -124,9 +131,11 @@ const FULFILMENT_TONE: Record<OrderFulfilmentStatus, StatusTone> = {
   PACKED: 'ok',
   SHIPPED: 'ok',
   IN_TRANSIT: 'brand',
+  OUT_FOR_DELIVERY: 'brand',
   DELIVERED: 'ok',
   FAILED: 'err',
   RETURNED: 'warn',
+  CARRIER_CANCELLED: 'err',
   CANCELLED: 'neutral',
 };
 
@@ -171,4 +180,69 @@ export function manualDiscountNote(
   if (!o.manualDiscountRate) return `giảm tay ${amount}`;
   const pct = new Decimal(o.manualDiscountRate).mul(100).toDecimalPlaces(2).toString();
   return `giảm tay ${pct}% = ${amount}`;
+}
+
+// ── Tab danh sách đơn (2026-10-12) — luồng chung, docs/carrier-status-mapping.md ở apps/api ──
+
+/** Thứ tự tab; `group` tách ba nhóm bằng vạch: ở kho / đang đi đường / đã xong. */
+export const ORDER_FLOW_TABS: ReadonlyArray<{
+  flow: OrderFlow;
+  label: string;
+  group: 'warehouse' | 'shipping' | 'done';
+}> = [
+  { flow: 'PENDING_APPROVAL', label: 'Chờ duyệt', group: 'warehouse' },
+  { flow: 'WAREHOUSE', label: 'Chờ xử lý kho', group: 'warehouse' },
+  { flow: 'PICKING', label: 'Đang pick', group: 'warehouse' },
+  { flow: 'PACKED', label: 'Đã đóng gói', group: 'warehouse' },
+  { flow: 'PICKED_UP', label: 'Đã lấy hàng', group: 'shipping' },
+  { flow: 'IN_TRANSIT', label: 'Đang vận chuyển', group: 'shipping' },
+  { flow: 'OUT_FOR_DELIVERY', label: 'Đang giao hàng', group: 'shipping' },
+  { flow: 'DELIVERED', label: 'Thành công', group: 'done' },
+  { flow: 'RETURNED', label: 'Sự cố hoàn', group: 'done' },
+  { flow: 'CARRIER_CANCELLED', label: 'Hãng hủy', group: 'done' },
+  { flow: 'CANCELLED', label: 'Đã hủy', group: 'done' },
+];
+
+/**
+ * Mỗi trạng thái một màu chữ, nền cùng màu 10% (token --flow-* trong globals.css). Viết nguyên
+ * class — Tailwind chỉ sinh class thấy được trong mã nguồn.
+ */
+const FLOW_CLASS: Record<OrderFlow, string> = {
+  PENDING_APPROVAL: 'bg-flow-pending/10 text-flow-pending',
+  WAREHOUSE: 'bg-flow-warehouse/10 text-flow-warehouse',
+  PICKING: 'bg-flow-picking/10 text-flow-picking',
+  PACKED: 'bg-flow-packed/10 text-flow-packed',
+  PICKED_UP: 'bg-flow-picked-up/10 text-flow-picked-up',
+  IN_TRANSIT: 'bg-flow-in-transit/10 text-flow-in-transit',
+  OUT_FOR_DELIVERY: 'bg-flow-out-for-delivery/10 text-flow-out-for-delivery',
+  DELIVERED: 'bg-flow-delivered/10 text-flow-delivered',
+  RETURNED: 'bg-flow-returned/10 text-flow-returned',
+  CARRIER_CANCELLED: 'bg-flow-carrier-cancelled/10 text-flow-carrier-cancelled',
+  CANCELLED: 'bg-flow-cancelled/10 text-flow-cancelled',
+};
+
+export function orderFlowClass(f: OrderFlow): string {
+  return FLOW_CLASS[f];
+}
+
+/** Màu chữ của nhà mạng + nền cùng màu 15% (token --telco-*). Không nhận ra → xám. */
+const TELCO_CLASS: Record<string, string> = {
+  Viettel: 'bg-telco-viettel/15 text-telco-viettel',
+  Vina: 'bg-telco-vina/15 text-telco-vina',
+  Mobi: 'bg-telco-mobi/15 text-telco-mobi',
+  Vnmb: 'bg-telco-vnmb/15 text-telco-vnmb',
+  Gmobile: 'bg-telco-gmobile/15 text-telco-gmobile',
+  iTel: 'bg-telco-itel/15 text-telco-itel',
+};
+
+export function telcoClass(name: string): string {
+  return TELCO_CLASS[name] ?? 'bg-muted text-muted-foreground';
+}
+
+export function parseOrderFlow(v: string | undefined): OrderFlow | undefined {
+  return ORDER_FLOW_TABS.find((t) => t.flow === v)?.flow;
+}
+
+export function orderFlowLabel(f: OrderFlow): string {
+  return ORDER_FLOW_TABS.find((t) => t.flow === f)?.label ?? f;
 }

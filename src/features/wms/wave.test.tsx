@@ -263,11 +263,10 @@ describe('Màn pick — lượt gộp: quét mã WAVE → nhận lượt → qu�
     expect(screen.getAllByText('Nước suối Lavie 500ml').length).toBeGreaterThan(0);
     expect(screen.getByText('Trên kệ còn', { exact: false })).toHaveTextContent('24');
     expect(screen.getByText('SO-1 0/2')).toBeInTheDocument();
-    // Quét SKU → gõ 3 → Enter (2026-09-22): một lần cho cả nhóm
-    scan('BC-W');
+    // Gõ 3 trước rồi quét SKU (2026-10-12): một lần gửi 3 cho cả nhóm
     const q = screen.getByLabelText('Số lượng lần quét này');
     fireEvent.change(q, { target: { value: '3' } });
-    fireEvent.keyDown(q, { key: 'Enter' });
+    scan('BC-W');
     await waitFor(() =>
       expect(scans).toEqual([
         expect.objectContaining({ barcode: 'BC-W', qty: '3', locationId: 'loc-1' }),

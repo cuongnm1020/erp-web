@@ -7,6 +7,7 @@ import {
   Keyboard,
   MapPin,
   PackageCheck,
+  Printer,
   WifiOff,
 } from 'lucide-react';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
@@ -28,6 +29,7 @@ import { usePdaQueue, usePdaStats } from '../api/use-pda';
 import { useScanSession } from '../scan-session';
 import { useScanQty } from '../use-scan-qty';
 import { LabelPrintDialog } from './label-print-dialog';
+import { PackedOrderDialog } from './packed-order-dialog';
 import { PdaListColumn } from './pda-list-column';
 import { ScanQtyBar } from './scan-qty-bar';
 import { SkuBarcodes } from './sku-barcodes';
@@ -51,7 +53,20 @@ export function PackStationScreen() {
   const router = useRouter();
   const pathname = usePathname();
   const search = useSearchParams();
-  const s = useScanSession('PACK');
+  // Đơn đã đóng đang xem lại (?packed=<taskId>, luật 8) — quét lại mã đơn đã đóng cũng mở vào đây.
+  const [packedId, setPackedId] = useState<string | null>(search.get('packed'));
+  const setParam = (key: string, value: string | null) => {
+    const params = new URLSearchParams(search);
+    if (value) params.set(key, value);
+    else params.delete(key);
+    const qs = params.toString();
+    router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
+  };
+  const openPacked = (id: string | null) => {
+    setPackedId(id);
+    setParam('packed', id);
+  };
+  const s = useScanSession('PACK', { onPacked: openPacked });
   const scanRef = useRef<ScanInputHandle>(null);
   const scanQty = useScanQty({
     lines: s.task?.lines ?? [],
@@ -86,12 +101,10 @@ export function PackStationScreen() {
     // eslint-disable-next-line react-hooks/exhaustive-deps -- chỉ theo URL lúc vào màn
   }, [urlOrder, canExecute]);
 
-  const setUrlOrder = (doc: string | null) => {
-    const params = new URLSearchParams(search);
-    if (doc) params.set('order', doc);
-    else params.delete('order');
-    const qs = params.toString();
-    router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
+  const setUrlOrder = (doc: string | null) => setParam('order', doc);
+  const closePacked = () => {
+    openPacked(null);
+    scanRef.current?.focus();
   };
 
   useEffect(() => {
@@ -116,7 +129,7 @@ export function PackStationScreen() {
       if (e.key === 'F2') {
         e.preventDefault();
         scanRef.current?.focus();
-      } else if (e.key === 'Escape' && !labelOpen && !help) {
+      } else if (e.key === 'Escape' && !labelOpen && !help && !packedId) {
         clearOrder();
       } else if (e.key === '?' && !(e.target instanceof HTMLInputElement)) {
         setHelp(true);
@@ -125,7 +138,7 @@ export function PackStationScreen() {
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [labelOpen, help]);
+  }, [labelOpen, help, packedId]);
 
   const onScan = (code: string) => {
     if (s.phase === 'ready' && s.task) {
@@ -265,19 +278,24 @@ export function PackStationScreen() {
                 empty="Hôm nay chưa đóng gói xong đơn nào."
               >
                 {doneToday.data?.items.map((d) => (
-                  <li
-                    key={d.taskId}
-                    className="flex min-h-12 items-center justify-between gap-2 px-3 py-2"
-                  >
-                    <span className="flex flex-col">
-                      <span className="font-mono font-semibold">
-                        {d.refDocNumber ?? d.docNumber}
+                  <li key={d.taskId}>
+                    <button
+                      type="button"
+                      className="flex min-h-12 w-full items-center justify-between gap-2 px-3 py-2 text-left hover:bg-muted"
+                      onClick={() => openPacked(d.taskId)}
+                      aria-label={`Xem lại ${d.refDocNumber ?? d.docNumber}`}
+                    >
+                      <span className="flex flex-col">
+                        <span className="font-mono font-semibold">
+                          {d.refDocNumber ?? d.docNumber}
+                        </span>
+                        <span className="text-xs text-muted-foreground">{d.docNumber}</span>
                       </span>
-                      <span className="text-xs text-muted-foreground">{d.docNumber}</span>
-                    </span>
-                    <span className="text-xs text-muted-foreground">
-                      {formatDateTime(d.completedAt)}
-                    </span>
+                      <span className="flex items-center gap-2 text-xs text-muted-foreground">
+                        {formatDateTime(d.completedAt)}
+                        <Printer className="h-4 w-4" aria-hidden />
+                      </span>
+                    </button>
                   </li>
                 ))}
               </PdaListColumn>
@@ -378,7 +396,7 @@ export function PackStationScreen() {
             phase === 'ready' ? 'Quét mã vạch sản phẩm…' : 'Quét mã đơn / mã việc / vận đơn…'
           }
           onScan={onScan}
-          paused={labelOpen || help || scanQty.pending !== null}
+          paused={labelOpen || help || scanQty.pending !== null || packedId !== null}
           disabled={phase === 'opening' || phase === 'done'}
         />
         {phase === 'done' ? (
@@ -396,6 +414,8 @@ export function PackStationScreen() {
         )}
       </footer>
 
+      <PackedOrderDialog taskId={packedId} onClose={closePacked} />
+
       <LabelPrintDialog
         open={labelOpen}
         waybill={s.completion?.waybill ?? null}
@@ -411,11 +431,13 @@ export function PackStationScreen() {
           </DialogHeader>
           <dl className="grid grid-cols-[6rem_1fr] gap-y-1 text-sm">
             <dt className="font-mono">Enter</dt>
-            <dd>Gửi mã vừa quét / gõ. Sau khi quét SKU: gõ số lượng rồi Enter để đóng số đó</dd>
+            <dd>
+              Gửi mã vừa quét / gõ. Mỗi lần quét SKU = đóng 1; gõ tổng số rồi Enter để đóng đủ số đó
+            </dd>
             <dt className="font-mono">F2</dt>
             <dd>Về ô quét</dd>
             <dt className="font-mono">Esc</dt>
-            <dd>Đang chờ số lượng: bỏ mã vừa quét. Ngược lại: bỏ đơn đang mở, quét đơn khác</dd>
+            <dd>Đang đếm một mã: thôi đếm. Ngược lại: bỏ đơn đang mở, quét đơn khác</dd>
             <dt className="font-mono">?</dt>
             <dd>Bảng này</dd>
           </dl>

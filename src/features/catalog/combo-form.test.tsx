@@ -187,6 +187,32 @@ describe('ComboFormScreen — tạo combo (POST /combos)', () => {
     await waitFor(() => expect(push).toHaveBeenCalledWith('/catalog/combos'));
   });
 
+  it('nhập "Giá bán" → khóa "Giảm giá", POST gửi salePrice thay discountAmount', async () => {
+    const bodies: unknown[] = [];
+    server.use(
+      ...baseHandlers(),
+      http.post('/api/combos', async ({ request }) => {
+        bodies.push(await request.json());
+        return HttpResponse.json(
+          { id: uuid(200), code: 'CB-0002', name: 'Combo phí ngoài', components: [] },
+          { status: 201 },
+        );
+      }),
+    );
+    renderApp(<ComboFormScreen />);
+    fill('Tên combo *', 'Combo phí ngoài');
+    fill('Giảm giá', '10000');
+    fill('Giá bán', '250000');
+    expect(screen.getByLabelText('Giảm giá')).toBeDisabled();
+    fireEvent.click(screen.getAllByRole('combobox', { name: 'SKU thành phần' })[0]!);
+    fireEvent.click(await screen.findByText('Thuốc trừ sâu A'));
+    await screen.findByText('SKU-A');
+    fireEvent.click(screen.getByRole('button', { name: /Lưu combo/ }));
+    await waitFor(() => expect(bodies).toHaveLength(1));
+    expect(bodies[0]).toMatchObject({ name: 'Combo phí ngoài', salePrice: '250000' });
+    expect(bodies[0]).not.toHaveProperty('discountAmount');
+  });
+
   it('trùng SKU ở hai dòng → lỗi ngay trên dòng sau, không gọi API', async () => {
     const posts: unknown[] = [];
     server.use(
@@ -212,48 +238,49 @@ describe('ComboFormScreen — tạo combo (POST /combos)', () => {
   });
 });
 
+/** Đúng shape `ComboDetailDto` — 2 × 60.000 − 10.000 = 110.000. */
+const COMBO_DETAIL = {
+  id: uuid(300),
+  skuId: uuid(301),
+  code: 'CB-0001',
+  name: 'Combo A+B',
+  isActive: true,
+  baseUomCode: 'PCS',
+  baseUomId: uuid(9),
+  salePrice: '110000',
+  componentsPrice: '120000',
+  discountAmount: '10000',
+  freeShipping: false,
+  componentCount: 1,
+  available: '50',
+  version: 3,
+  createdAt: '2026-09-18T00:00:00.000Z',
+  updatedAt: '2026-09-18T00:00:00.000Z',
+  categoryId: null,
+  brandId: null,
+  description: null,
+  searchAliases: ['combo a'],
+  components: [
+    {
+      skuId: uuid(1),
+      code: 'SKU-A',
+      name: 'Thuốc trừ sâu A',
+      baseUomCode: 'chai',
+      qty: '2',
+      unitPrice: '60000',
+      available: '100',
+      isActive: true,
+    },
+  ],
+};
+
 describe('ComboFormScreen — sửa combo (PATCH /combos/{id})', () => {
   it('đổ sẵn thành phần từ chi tiết; lưu gửi version + components thay toàn bộ', async () => {
     push.mockClear();
     const patches: unknown[] = [];
     server.use(
       ...baseHandlers(),
-      http.get('/api/combos/:id', () =>
-        HttpResponse.json({
-          id: uuid(300),
-          skuId: uuid(301),
-          code: 'CB-0001',
-          name: 'Combo A+B',
-          isActive: true,
-          baseUomCode: 'PCS',
-          baseUomId: uuid(9),
-          salePrice: '110000',
-          componentsPrice: '120000',
-          discountAmount: '10000',
-          freeShipping: false,
-          componentCount: 1,
-          available: '50',
-          version: 3,
-          createdAt: '2026-09-18T00:00:00.000Z',
-          updatedAt: '2026-09-18T00:00:00.000Z',
-          categoryId: null,
-          brandId: null,
-          description: null,
-          searchAliases: ['combo a'],
-          components: [
-            {
-              skuId: uuid(1),
-              code: 'SKU-A',
-              name: 'Thuốc trừ sâu A',
-              baseUomCode: 'chai',
-              qty: '2',
-              unitPrice: '60000',
-              available: '100',
-              isActive: true,
-            },
-          ],
-        }),
-      ),
+      http.get('/api/combos/:id', () => HttpResponse.json(COMBO_DETAIL)),
       http.patch('/api/combos/:id', async ({ request }) => {
         patches.push(await request.json());
         return HttpResponse.json({ id: uuid(300), code: 'CB-0001', name: 'Combo A+B v2' });
@@ -282,5 +309,29 @@ describe('ComboFormScreen — sửa combo (PATCH /combos/{id})', () => {
       components: [{ skuId: uuid(1), qty: '5' }],
     });
     await waitFor(() => expect(push).toHaveBeenCalledWith('/catalog/combos'));
+  });
+
+  it('combo đang phụ phí (discountAmount âm) → đổ vào "Giá bán", PATCH gửi salePrice', async () => {
+    const patches: unknown[] = [];
+    server.use(
+      ...baseHandlers(),
+      http.get('/api/combos/:id', () =>
+        HttpResponse.json({ ...COMBO_DETAIL, salePrice: '135000', discountAmount: '-15000' }),
+      ),
+      http.patch('/api/combos/:id', async ({ request }) => {
+        patches.push(await request.json());
+        return HttpResponse.json({ id: uuid(300), code: 'CB-0001', name: 'Combo A+B' });
+      }),
+    );
+    renderApp(<ComboFormScreen comboId={uuid(300)} />);
+    expect(await screen.findByLabelText('Giá bán')).toHaveValue('135.000');
+    expect(screen.getByLabelText('Giảm giá')).toBeDisabled();
+    expect(
+      screen.getByText(/Tổng thành phần .*120\.000.* · phụ phí \+15\.000/),
+    ).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /Lưu thay đổi/ }));
+    await waitFor(() => expect(patches).toHaveLength(1));
+    expect(patches[0]).toMatchObject({ version: 3, salePrice: '135000' });
+    expect(patches[0]).not.toHaveProperty('discountAmount');
   });
 });
