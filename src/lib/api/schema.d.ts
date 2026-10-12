@@ -1991,6 +1991,22 @@ export interface paths {
         patch: operations["ContainerTypeController_update"];
         trace?: never;
     };
+    "/public/product-images/{file}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["PublicProductImageController_redirect"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/combos": {
         parameters: {
             query?: never;
@@ -13823,6 +13839,26 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["ContainerTypeDto"];
                 };
+            };
+        };
+    };
+    PublicProductImageController_redirect: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                file: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Redirect tới link ảnh S3 đã ký (1 giờ) */
+            302: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };
