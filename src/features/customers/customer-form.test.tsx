@@ -203,6 +203,7 @@ describe('CustomerFormScreen — địa chỉ giao hàng (POST/PATCH/DELETE /cus
     fill(/^SĐT người nhận/, '0987654321');
     fill(/^Địa chỉ/, '5 Trần Phú');
     fill(/^Tỉnh \/ thành/, 'Hà Nội');
+    fill(/^Quận \/ huyện cũ/, 'Quận Hoàn Kiếm');
     fireEvent.click(screen.getByRole('checkbox', { name: /mặc định/ }));
     fireEvent.click(screen.getByRole('button', { name: 'Thêm địa chỉ' }));
     await waitFor(() => expect(posted).toHaveLength(1));
@@ -213,6 +214,7 @@ describe('CustomerFormScreen — địa chỉ giao hàng (POST/PATCH/DELETE /cus
         phone: '0987654321',
         line1: '5 Trần Phú',
         province: 'Hà Nội',
+        district: 'Quận Hoàn Kiếm',
         isDefault: true,
       },
     });

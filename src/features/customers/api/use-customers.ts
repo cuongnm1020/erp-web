@@ -9,7 +9,7 @@ export type CustomerTagRef = components['schemas']['CustomerTagRefDto'];
 /** GET /customers/{id} — CustomerDto kèm `addresses` (danh sách không kèm). */
 export type CustomerDetail = components['schemas']['CustomerDetailDto'];
 export type CustomerAddress = components['schemas']['CustomerAddressDto'];
-export type AddressInput = components['schemas']['AddressDto'];
+export type AddressInput = components['schemas']['CustomerAddressInputDto'];
 export type UpdateAddressInput = components['schemas']['UpdateAddressDto'];
 export type CustomerListResponse = components['schemas']['CustomerListResponseDto'];
 

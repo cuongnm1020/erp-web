@@ -69,6 +69,8 @@ const addressSchema = z.object({
   hamlet: z.string().trim().max(100),
   ward: z.string().trim().max(100),
   province: z.string().trim().min(1, 'Nhập tỉnh/thành').max(100),
+  // Quận/huyện CŨ — không phải cấp địa chỉ, chỉ gửi kèm cho hãng (GHTK cần khi không có tên đường).
+  district: z.string().trim().max(100),
   isDefault: z.boolean(),
 });
 type AddressValues = z.infer<typeof addressSchema>;
@@ -81,6 +83,7 @@ const ADDRESS_FIELDS = [
   'hamlet',
   'ward',
   'province',
+  'district',
   'isDefault',
 ] as const;
 
@@ -93,6 +96,7 @@ function toValues(a?: CustomerAddress): AddressValues {
     hamlet: a?.hamlet ?? '',
     ward: a?.ward ?? '',
     province: a?.province ?? '',
+    district: a?.district ?? '',
     isDefault: a?.isDefault ?? false,
   };
 }
@@ -107,6 +111,7 @@ export function toAddAddressBody(v: AddressValues): AddressInput {
     ...(v.hamlet ? { hamlet: v.hamlet } : {}),
     ...(v.ward ? { ward: v.ward } : {}),
     province: v.province,
+    ...(v.district ? { district: v.district } : {}),
     isDefault: v.isDefault,
   };
 }
@@ -306,6 +311,23 @@ function AddressDialog({
                 )}
               />
             </div>
+            <FormField
+              control={form.control}
+              name="district"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Quận / huyện cũ</FormLabel>
+                  <FormControl>
+                    <Input placeholder="Huyện Ea H'Leo" {...field} />
+                  </FormControl>
+                  <p className="text-xs text-muted-foreground">
+                    Không bắt buộc. Điền khi địa chỉ không có tên đường — GHTK cần để định vị, thiếu
+                    sẽ từ chối tạo vận đơn.
+                  </p>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
             <FormField
               control={form.control}
               name="isDefault"
