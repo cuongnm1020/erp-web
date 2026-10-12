@@ -954,6 +954,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/pancake-sync/shops": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["PancakeShopsController_list"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/pancake-sync/webhook/{shopId}": {
         parameters: {
             query?: never;
@@ -1998,7 +2014,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get: operations["PublicProductImageController_redirect"];
+        get: operations["PublicProductImageController_image"];
         put?: never;
         post?: never;
         delete?: never;
@@ -5531,6 +5547,14 @@ export interface components {
             restricted: boolean;
             /** @description core.Product.id — sản phẩm thường hoặc combo, chưa xoá. */
             productIds: string[];
+        };
+        PancakeShopOptionDto: {
+            /** @description Mã shop Pancake (bigint dạng chuỗi) — giá trị gửi vào `pancakeShopId` của GET /sales-orders. */
+            shopId: string;
+            /** @description Tên gợi nhớ khai ở màn Kết nối Pancake; null = chưa đặt / shop đã gỡ kết nối. */
+            shopName: string | null;
+            /** @description Đang kết nối (bật). false = đã tắt / gỡ kết nối nhưng vẫn còn đơn cũ. */
+            isActive: boolean;
         };
         PancakeWebhookReceiptDto: {
             receiptId: string;
@@ -11817,6 +11841,25 @@ export interface operations {
             };
         };
     };
+    PancakeShopsController_list: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PancakeShopOptionDto"][];
+                };
+            };
+        };
+    };
     PancakeWebhookController_ping: {
         parameters: {
             query?: never;
@@ -13842,7 +13885,7 @@ export interface operations {
             };
         };
     };
-    PublicProductImageController_redirect: {
+    PublicProductImageController_image: {
         parameters: {
             query?: never;
             header?: never;
@@ -13853,8 +13896,8 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description Redirect tới link ảnh S3 đã ký (1 giờ) */
-            302: {
+            /** @description Nội dung ảnh (image/jpeg | image/png | image/webp) */
+            200: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -15254,6 +15297,11 @@ export interface operations {
                 warehouseId?: string;
                 /** @description Nguồn đơn: `PANCAKE` = đồng bộ từ Pancake, `ERP` = tạo trong ERP. */
                 source?: "PANCAKE" | "ERP";
+                /**
+                 * @description Chỉ đơn đồng bộ từ MỘT shop (POS) Pancake — mã shop Pancake (số nguyên dương, chuỗi). Danh
+                 *     sách POS: GET /pancake-sync/shops. Kèm `source=ERP` thì không đơn nào khớp.
+                 */
+                pancakeShopId?: string;
                 /** @description Người phụ trách (SalesOrder.ownerId). */
                 ownerId?: string;
                 /**
@@ -15334,6 +15382,11 @@ export interface operations {
                 warehouseId?: string;
                 /** @description Nguồn đơn: `PANCAKE` = đồng bộ từ Pancake, `ERP` = tạo trong ERP. */
                 source?: "PANCAKE" | "ERP";
+                /**
+                 * @description Chỉ đơn đồng bộ từ MỘT shop (POS) Pancake — mã shop Pancake (số nguyên dương, chuỗi). Danh
+                 *     sách POS: GET /pancake-sync/shops. Kèm `source=ERP` thì không đơn nào khớp.
+                 */
+                pancakeShopId?: string;
                 /** @description Người phụ trách (SalesOrder.ownerId). */
                 ownerId?: string;
                 /**

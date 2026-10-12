@@ -1429,6 +1429,13 @@ export const handlers = [
       CANCELLED: count('CANCELLED'),
     });
   }),
+  // POS Pancake cho bộ lọc đơn — đúng shape PancakeShopOptionDto.
+  http.get('/api/pancake-sync/shops', () =>
+    HttpResponse.json([
+      { shopId: '715130909', shopName: 'Thiên Nông chính', isActive: true },
+      { shopId: '407957969', shopName: null, isActive: false },
+    ]),
+  ),
   http.get('/api/sales-orders', async ({ request }) => {
     const url = new URL(request.url);
     const take = Number(url.searchParams.get('take') ?? 50);

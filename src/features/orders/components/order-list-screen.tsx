@@ -34,6 +34,7 @@ import {
   orderKeys,
   useOrderFlowCounts,
   useOrders,
+  usePancakeShops,
   type OrderFlow,
   type SalesOrderListItem,
 } from '../api/use-orders';
@@ -470,12 +471,15 @@ export function OrderListScreen() {
   const noCarrier = state.filters.noCarrier === 'true';
   const carrierId = state.filters.carrierId ?? '';
   const warehouseId = state.filters.warehouseId ?? '';
+  // Ô "Nguồn" gộp cả POS: `POS:<mã shop>` = đơn Pancake của đúng POS đó (URL giữ một khoá).
+  const posShopId = /^POS:(\d+)$/.exec(state.filters.source ?? '')?.[1] ?? '';
   const source: 'PANCAKE' | 'ERP' | undefined =
-    state.filters.source === 'PANCAKE'
+    state.filters.source === 'PANCAKE' || posShopId
       ? 'PANCAKE'
       : state.filters.source === 'ERP'
         ? 'ERP'
         : undefined;
+  const pancakeShops = usePancakeShops();
   const from = state.filters.from ?? '';
   const to = state.filters.to ?? '';
   const filterParams = useMemo(
@@ -489,6 +493,7 @@ export function OrderListScreen() {
       carrierId,
       warehouseId,
       source,
+      pancakeShopId: posShopId || undefined,
       from,
       to,
     }),
@@ -502,6 +507,7 @@ export function OrderListScreen() {
       carrierId,
       warehouseId,
       source,
+      posShopId,
       from,
       to,
     ],
@@ -603,7 +609,11 @@ export function OrderListScreen() {
             label: 'Nguồn',
             type: 'select',
             options: [
-              { value: 'PANCAKE', label: 'Pancake' },
+              { value: 'PANCAKE', label: 'Pancake (mọi POS)' },
+              ...(pancakeShops.data ?? []).map((s) => ({
+                value: `POS:${s.shopId}`,
+                label: `Pancake · ${s.shopName ?? `POS ${s.shopId}`}${s.isActive ? '' : ' (đã ngắt)'}`,
+              })),
               { value: 'ERP', label: 'Tạo trong ERP' },
             ],
           },

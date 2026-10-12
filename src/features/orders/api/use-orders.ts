@@ -28,6 +28,8 @@ export interface OrderListParams {
   warehouseId?: string;
   /** Nguồn: PANCAKE = đồng bộ từ Pancake, ERP = tạo trong ERP. */
   source?: 'PANCAKE' | 'ERP';
+  /** Chỉ đơn của một POS Pancake (mã shop) — danh sách POS: usePancakeShops. */
+  pancakeShopId?: string;
   status?: SalesOrderStatus;
   customerId?: string;
   /** Cân nặng gửi hãng hiệu lực (kg, chuỗi decimal) — cận dưới / cận trên. */
@@ -94,6 +96,7 @@ function listQuery(params: Omit<OrderListParams, 'take' | 'skip'>) {
     flow: params.flow,
     warehouseId: params.warehouseId || undefined,
     source: params.source,
+    pancakeShopId: params.pancakeShopId || undefined,
     status: params.status,
     customerId: params.customerId || undefined,
     weightMin: params.weightMin || undefined,
@@ -109,6 +112,20 @@ function listQuery(params: Omit<OrderListParams, 'take' | 'skip'>) {
  * GET /sales-orders/flow-counts — số đơn từng tab với cùng bộ lọc (server bỏ qua `flow`). Scope
  * theo người gọi ở API như danh sách (luật 7).
  */
+export type PancakeShopOption = components['schemas']['PancakeShopOptionDto'];
+
+/**
+ * GET /pancake-sync/shops — POS Pancake để lọc đơn (mã + tên, không khoá). Quyền xem đơn là đủ;
+ * danh mục ít đổi nên giữ 5 phút.
+ */
+export function usePancakeShops() {
+  return useQuery({
+    queryKey: [...orderKeys.all, 'pancake-shops'] as const,
+    queryFn: () => unwrap(api.GET('/pancake-sync/shops')),
+    staleTime: 5 * 60_000,
+  });
+}
+
 export function useOrderFlowCounts(params: Omit<OrderListParams, 'flow' | 'take' | 'skip'>) {
   return useQuery({
     queryKey: orderKeys.flowCounts(params),
