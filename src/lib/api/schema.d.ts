@@ -879,6 +879,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/pancake-sync/config/{shopId}/duplicate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Nhân bản kết nối sang shop mới: chép khoá (phía server), endpoint, giới hạn và — mặc định —
+         *     danh sách sản phẩm bán. Webhook secret sinh mới. Shop đích đã có → 409.
+         */
+        post: operations["PancakeConfigController_duplicate"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/pancake-sync/config/{shopId}/webhook-secret": {
         parameters: {
             query?: never;
@@ -5433,6 +5453,16 @@ export interface components {
             burst?: number | null;
             /** @description Tắt = giữ cấu hình nhưng mọi lệnh gọi Pancake cho shop này báo chưa cấu hình. */
             isActive?: boolean;
+        };
+        DuplicatePancakeConfigDto: {
+            /** @description Mã shop Pancake mới. */
+            targetShopId: number;
+            /** @description Tên gợi nhớ shop mới — bỏ trống = "<tên shop gốc> (bản sao)". */
+            shopName?: string | null;
+            /** @description Khoá API riêng cho shop mới — bỏ trống = dùng lại khoá của shop gốc. */
+            apiKey?: string;
+            /** @description Chép cả chế độ + danh sách sản phẩm bán của shop gốc. Mặc định true. */
+            copyProducts?: boolean;
         };
         PancakeVerifyResultDto: {
             shopId: string;
@@ -11626,6 +11656,31 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+        };
+    };
+    PancakeConfigController_duplicate: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                shopId: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DuplicatePancakeConfigDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PancakeShopConfigDto"];
+                };
             };
         };
     };

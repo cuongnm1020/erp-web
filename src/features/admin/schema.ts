@@ -95,6 +95,22 @@ export const createPancakeConfigSchema = pancakeConfigFormSchema.extend({
 export type PancakeConfigFormValues = z.infer<typeof pancakeConfigFormSchema>;
 
 /**
+ * Nhân bản kết nối sang shop mới — khớp DuplicatePancakeConfigDto (luật 11). Khoá trống = dùng
+ * lại khoá shop gốc (server tự chép, không qua trình duyệt).
+ */
+export const duplicatePancakeConfigSchema = z.object({
+  targetShopId: z
+    .string()
+    .trim()
+    .regex(/^[1-9]\d{0,15}$/, 'Mã shop là số nguyên dương'),
+  shopName: z.string().trim().max(200, 'Tối đa 200 ký tự'),
+  apiKey: pancakeConfigFormSchema.shape.apiKey,
+  copyProducts: z.boolean(),
+});
+
+export type DuplicatePancakeConfigValues = z.infer<typeof duplicatePancakeConfigSchema>;
+
+/**
  * Sửa kết nối một hãng vận chuyển — khớp UpdateCarrierSettingDto (luật 11). Ô trống = giữ
  * nguyên; `clear` = các trường bỏ giá trị đã nhập ở màn hình (rơi về env). Trường hiện ra tuỳ
  * hãng (server trả `fields`) nên `values` là record theo khoá trường.

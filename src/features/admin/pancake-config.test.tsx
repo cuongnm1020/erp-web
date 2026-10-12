@@ -251,4 +251,45 @@ describe('PancakeConfigScreen — /pancake-sync/config', () => {
       ),
     );
   });
+
+  it('nhân bản: chỉ nhập mã shop mới → POST …/duplicate không kèm apiKey (server chép khoá), mặc định chép sản phẩm', async () => {
+    const seen: { shopId: string; body: Record<string, unknown> }[] = [];
+    server.use(
+      http.post('/api/pancake-sync/config/:shopId/duplicate', async ({ params, request }) => {
+        const body = (await request.json()) as Record<string, unknown>;
+        seen.push({ shopId: String(params.shopId), body });
+        return HttpResponse.json(
+          { ...PANCAKE_SHOP_FIXTURE, shopId: String(body.targetShopId), shopName: body.shopName },
+          { status: 201 },
+        );
+      }),
+    );
+    renderApp(<PancakeConfigScreen />);
+    await screen.findByText('Shop chính');
+    fireEvent.click(screen.getByRole('button', { name: 'Nhân bản kết nối shop 407957969' }));
+    const dialog = await screen.findByRole('dialog');
+    expect(dialog).toHaveTextContent('Nhân bản kết nối shop 407957969');
+    expect(screen.getByLabelText(/Tên gợi nhớ/)).toHaveValue('Shop chính (bản sao)');
+    expect(screen.getByLabelText(/Khoá API/)).toHaveAttribute('placeholder', 'Dùng lại khoá …a9f2');
+
+    // Mã shop sai → chặn ở form, không gọi API.
+    fireEvent.change(screen.getByLabelText(/Mã shop mới/), { target: { value: 'abc' } });
+    fireEvent.submit(screen.getByRole('button', { name: 'Nhân bản' }).closest('form')!);
+    expect(await screen.findByText('Mã shop là số nguyên dương')).toBeInTheDocument();
+    expect(seen).toHaveLength(0);
+
+    fireEvent.change(screen.getByLabelText(/Mã shop mới/), { target: { value: '500600700' } });
+    fireEvent.submit(screen.getByRole('button', { name: 'Nhân bản' }).closest('form')!);
+    await waitFor(() => expect(seen).toHaveLength(1));
+    expect(seen[0]).toEqual({
+      shopId: '407957969',
+      body: { targetShopId: 500600700, shopName: 'Shop chính (bản sao)', copyProducts: true },
+    });
+    await waitFor(() =>
+      expect(toastSuccess).toHaveBeenCalledWith(
+        'Đã nhân bản kết nối',
+        expect.objectContaining({ description: expect.stringMatching(/Shop 500600700/) }),
+      ),
+    );
+  });
 });

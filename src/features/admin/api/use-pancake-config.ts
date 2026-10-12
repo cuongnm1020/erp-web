@@ -35,6 +35,26 @@ export function useUpsertPancakeConfig() {
   });
 }
 
+export type DuplicatePancakeConfigInput = components['schemas']['DuplicatePancakeConfigDto'];
+
+/**
+ * POST /pancake-sync/config/{shopId}/duplicate — tạo shop mới chép khoá (phía server), giới hạn,
+ * danh sách sản phẩm của shop gốc. Shop đích đã có → 409.
+ */
+export function useDuplicatePancakeConfig() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ shopId, input }: { shopId: number; input: DuplicatePancakeConfigInput }) =>
+      unwrap(
+        api.POST('/pancake-sync/config/{shopId}/duplicate', {
+          params: { path: { shopId } },
+          body: input,
+        }),
+      ),
+    onSuccess: () => void qc.invalidateQueries({ queryKey: pancakeConfigKeys.all }),
+  });
+}
+
 export function useDeletePancakeConfig() {
   const qc = useQueryClient();
   return useMutation({
