@@ -73,6 +73,8 @@ const MESSAGES: Record<string, string> = {
   CARRIER_SECRET_KEY_MISSING:
     'Server chưa có APP_SECRET_KEY để mã hoá token hãng. Báo IT đặt biến môi trường rồi khởi động lại API.',
   CARRIER_API_ERROR: 'Hãng vận chuyển không phản hồi hoặc trả lỗi. Thử lại sau ít phút.',
+  CARRIER_REJECTED:
+    'Hãng vận chuyển từ chối dữ liệu đơn (thường là địa chỉ giao). Sửa đơn theo lý do hãng báo rồi xin vận đơn lại.',
   CARRIER_OPERATION_UNSUPPORTED:
     'Hãng này không hỗ trợ thao tác vừa gọi (tra cước / in nhãn). Chọn hãng khác hoặc làm tay.',
   CARRIER_NOT_FOUND: 'Hãng vận chuyển không tồn tại hoặc đã tắt. Tải lại danh sách hãng.',
@@ -196,8 +198,28 @@ export function messageForCode(code: string, status?: number): string {
 
 /** Câu hiển thị cho mọi lỗi — ApiError hoặc lỗi JS bất kỳ. Không bao giờ trả message thô. */
 export function messageFor(err: unknown): string {
-  if (err instanceof ApiError) return messageForCode(err.code, err.status);
+  if (err instanceof ApiError) {
+    const base = messageForCode(err.code, err.status);
+    const said = carrierReasonOf(err);
+    return said ? `${base} ${carrierSaid(said)}` : base;
+  }
   return MESSAGES.SERVER_ERROR!;
+}
+
+/**
+ * Câu NGUYÊN VĂN của hãng vận chuyển khi hãng từ chối dữ liệu (`CARRIER_REJECTED`,
+ * `details.carrierMessage`). Đây là lời của hãng — dữ liệu để biết sửa gì trên đơn — không phải
+ * `message` của server, nên được hiện (luật 6 vẫn giữ: câu chính vẫn đi qua bảng mã).
+ */
+export function carrierReasonOf(err: unknown): string | null {
+  if (!(err instanceof ApiError) || err.code !== 'CARRIER_REJECTED') return null;
+  const m = (err.details as { carrierMessage?: unknown } | null | undefined)?.carrierMessage;
+  return typeof m === 'string' && m.trim() ? m.trim() : null;
+}
+
+/** `Hãng báo: "…".` — một cách trình bày cho mọi màn. */
+export function carrierSaid(reason: string): string {
+  return `Hãng báo: “${reason}”.`;
 }
 
 export function hasMessageFor(code: string): boolean {

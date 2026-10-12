@@ -1,6 +1,6 @@
 'use client';
 
-import { AlertTriangle, ChevronDown, ChevronRight, Layers, Printer } from 'lucide-react';
+import { AlertTriangle, ChevronDown, ChevronRight, Layers, Printer, RefreshCw } from 'lucide-react';
 import Link from 'next/link';
 import { Fragment, useMemo, useState } from 'react';
 import { DataTable, type ColumnDef } from '@/components/data/data-table';
@@ -35,7 +35,7 @@ import {
 } from '@/components/ui/table';
 import { isApiError } from '@/lib/api/errors';
 import { cn } from '@/lib/cn';
-import { formatDateTime, formatQuantity } from '@/lib/format';
+import { formatDateTime, formatQuantity, formatTime } from '@/lib/format';
 import { usePrint } from '@/lib/print';
 import { useInvalidateOn, useRealtime } from '@/lib/realtime';
 import { useListState } from '@/lib/url-state';
@@ -55,6 +55,11 @@ import {
   type Task,
   type WarehouseStaff,
 } from '../api/use-tasks';
+import {
+  DISPATCH_REFRESH_MS,
+  useDispatchAutoRefresh,
+  useDispatchAutoRefreshPref,
+} from '../api/use-dispatch-auto-refresh';
 import { useWarehouses } from '../api/use-warehouses';
 import {
   useAssignWave,
@@ -616,6 +621,8 @@ export function DispatchScreen() {
     [taskKeys.all, waveKeys.all],
   );
   const { connected } = useRealtime();
+  const [autoRefresh, setAutoRefresh] = useDispatchAutoRefreshPref();
+  const { refresh } = useDispatchAutoRefresh(autoRefresh);
 
   const setFilter = (patch: Partial<Record<DispatchFilter, string | undefined>>) =>
     set({ filters: { ...state.filters, ...patch } });
@@ -627,16 +634,44 @@ export function DispatchScreen() {
         description="Việc gấp trước, cùng mức gấp thì việc mới nhất lên đầu — đúng thứ tự API trả về."
         breadcrumb={[{ label: 'Kho' }, { label: 'Điều phối' }]}
         actions={
-          <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
-            <span
-              className={cn(
-                'inline-block h-2 w-2 rounded-full',
-                connected ? 'bg-success' : 'bg-muted-foreground',
-              )}
-              aria-hidden
-            />
-            {connected ? 'Realtime đang bật' : 'Chưa kết nối realtime'}
-          </span>
+          <div className="flex flex-wrap items-center gap-3">
+            <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
+              <span
+                className={cn(
+                  'inline-block h-2 w-2 rounded-full',
+                  connected ? 'bg-success' : 'bg-muted-foreground',
+                )}
+                aria-hidden
+              />
+              {connected ? 'Realtime đang bật' : 'Chưa kết nối realtime'}
+            </span>
+            <label className="flex cursor-pointer items-center gap-1.5 text-xs">
+              <Checkbox
+                checked={autoRefresh}
+                onCheckedChange={(v) => setAutoRefresh(v === true)}
+                aria-label="Tự tải lại"
+              />
+              Tự tải lại mỗi {DISPATCH_REFRESH_MS / 1000} giây
+            </label>
+            <span className="text-xs tabular-nums text-muted-foreground" aria-live="polite">
+              {query.dataUpdatedAt
+                ? `Cập nhật ${formatTime(query.dataUpdatedAt, { seconds: true })}`
+                : ''}
+            </span>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={refresh}
+              disabled={query.isFetching}
+              aria-label="Tải lại bảng điều phối"
+            >
+              <RefreshCw
+                aria-hidden
+                className={query.isFetching ? 'animate-spin motion-reduce:animate-none' : undefined}
+              />
+              Tải lại
+            </Button>
+          </div>
         }
       />
 

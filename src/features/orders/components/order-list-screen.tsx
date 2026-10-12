@@ -42,6 +42,7 @@ import { fulfilmentLabel, ORDER_FLOW_TABS, parseOrderFlow, parseOrderStatus } fr
 import { BulkCancelDialog } from './bulk-cancel-dialog';
 import { BulkShippingDialog } from './bulk-shipping-dialog';
 import { FlowBadge, OrderQuickView, TelcoBadge } from './order-quick-view';
+import { PancakeOrderResyncButton } from './pancake-order-resync-button';
 import { SendToCarrierMenu } from './send-to-carrier-menu';
 
 /**
@@ -555,14 +556,19 @@ export function OrderListScreen() {
         }
         breadcrumb={[{ label: 'Bán hàng' }, { label: 'Đơn hàng' }]}
         actions={
-          <Can I="create" a="SalesOrder">
-            <Button size="sm" asChild>
-              <Link href="/crm/orders/new">
-                <Plus aria-hidden />
-                Tạo đơn
-              </Link>
-            </Button>
-          </Can>
+          <>
+            <Can I="map" a="Sync">
+              <PancakeOrderResyncButton defaultShopId={posShopId} />
+            </Can>
+            <Can I="create" a="SalesOrder">
+              <Button size="sm" asChild>
+                <Link href="/crm/orders/new">
+                  <Plus aria-hidden />
+                  Tạo đơn
+                </Link>
+              </Button>
+            </Can>
+          </>
         }
       />
 

@@ -1021,6 +1021,28 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/pancake-sync/transform/orders/resync": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Trạng thái / kết quả lượt đồng bộ lại gần nhất của POS — web hỏi định kỳ khi đang chạy. */
+        get: operations["PancakeTransformController_resyncStatus"];
+        put?: never;
+        /**
+         * Nút "Đồng bộ đơn từ Pancake" ở danh sách đơn: xếp job nền ghi đè các đơn "Chờ xử lý kho"
+         *     của một POS theo bản Pancake mới nhất. Đang chạy → trả trạng thái lượt đó. Khai báo TRƯỚC
+         *     `orders` cho dễ đọc (khác path nên không đụng nhau).
+         */
+        post: operations["PancakeTransformController_startResync"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/pancake-sync/transform/orders": {
         parameters: {
             query?: never;
@@ -5632,6 +5654,39 @@ export interface components {
             externalId: string | null;
             /** @description true = đã xếp hàng gọi lại Pancake lấy bản chính thống (D-05). */
             queued: boolean;
+        };
+        ResyncOrdersDto: {
+            shopId: number;
+        };
+        PancakeOrderResyncCountsDto: {
+            /** @description Đã ghi đè theo bản Pancake mới nhất. */
+            updated: number;
+            /** @description Kho đã bắt đầu làm (nhận việc pick / đóng gói) lúc tới lượt — không ghi đè. */
+            skipped: number;
+            /** @description PICK chờ được sinh lại vì dòng đơn đổi. */
+            pickReplanned: number;
+            failed: number;
+        };
+        PancakeOrderResyncItemDto: {
+            orderId: string;
+            docNumber: string;
+            externalId: string;
+            reason: string;
+        };
+        PancakeOrderResyncStatusDto: {
+            shopId: string;
+            /** @enum {string} */
+            state: "completed" | "failed" | "active" | "waiting" | "idle";
+            done: number;
+            total: number;
+            counts: components["schemas"]["PancakeOrderResyncCountsDto"];
+            /** @description Đơn lỗi / bỏ qua kèm lý do (tối đa 50). */
+            failures: components["schemas"]["PancakeOrderResyncItemDto"][];
+            skippedOrders: components["schemas"]["PancakeOrderResyncItemDto"][];
+            /** @description Lỗi của cả lượt (ném ra khỏi job), khác lỗi từng đơn. */
+            error: string | null;
+            startedAt: string | null;
+            finishedAt: string | null;
         };
         ReplayOrderDto: {
             shopId: number;
@@ -12009,6 +12064,50 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["PancakeWebhookReceiptDto"];
+                };
+            };
+        };
+    };
+    PancakeTransformController_resyncStatus: {
+        parameters: {
+            query: {
+                shopId: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PancakeOrderResyncStatusDto"];
+                };
+            };
+        };
+    };
+    PancakeTransformController_startResync: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ResyncOrdersDto"];
+            };
+        };
+        responses: {
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PancakeOrderResyncStatusDto"];
                 };
             };
         };

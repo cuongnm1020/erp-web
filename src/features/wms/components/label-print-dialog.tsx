@@ -20,7 +20,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { toast } from '@/components/ui/toaster';
-import { messageFor, messageForCode } from '@/lib/error-messages';
+import { carrierSaid, messageFor, messageForCode } from '@/lib/error-messages';
 import { labelUrl, useRequestWaybill, useShipment, type PdaWaybill } from '../api/use-pda';
 import { useCarriers } from '../api/use-shipping';
 
@@ -124,6 +124,9 @@ export function LabelPrintDialog({
             <p className="mt-1 text-muted-foreground">
               {local.errorCode ? messageForCode(local.errorCode) : (local.reason ?? '')}
             </p>
+            {local.errorCode === 'CARRIER_REJECTED' && local.reason ? (
+              <p className="mt-1 font-medium">{carrierSaid(local.reason)}</p>
+            ) : null}
             {orderId ? (
               <a
                 href={`/crm/orders/${orderId}/edit`}
@@ -171,8 +174,10 @@ function LabelFrame({
 }) {
   const frame = useRef<HTMLIFrameElement | null>(null);
   const [state, setState] = useState<'loading' | 'ready' | 'unsupported' | 'error'>('loading');
+  // "Tải lại nhãn" dựng lại iframe qua `key`, KHÔNG thêm query chống cache: API validate
+  // query chặt (forbidNonWhitelisted) → `&n=` bị 400; nhãn đã trả `Cache-Control: no-store`.
   const [nonce, setNonce] = useState(0);
-  const src = `${labelUrl(shipmentId, pageSize)}&n=${nonce}`;
+  const src = labelUrl(shipmentId, pageSize);
 
   // Hãng nội bộ (MANUAL) không có nhãn → 501: hiện mã vận đơn nội bộ để chép tay, không nhúng iframe.
   const supported = carrierCode !== 'MANUAL';
@@ -214,7 +219,13 @@ function LabelFrame({
           <Printer aria-hidden />
           In lại
         </Button>
-        <Button variant="ghost" onClick={() => setNonce((n) => n + 1)}>
+        <Button
+          variant="ghost"
+          onClick={() => {
+            setState('loading');
+            setNonce((n) => n + 1);
+          }}
+        >
           Tải lại nhãn
         </Button>
         {state === 'loading' ? (
@@ -222,6 +233,7 @@ function LabelFrame({
         ) : null}
       </div>
       <iframe
+        key={nonce}
         ref={frame}
         title={`Nhãn vận đơn ${trackingNo}`}
         src={src}

@@ -286,6 +286,39 @@ describe('ProductDetailScreen — C-03 chi tiết sản phẩm (GET /products/:i
     );
   });
 
+  it('tab Barcode: "A5 ngang" → tờ in A5 landscape, mã QR cỡ lớn + tên sản phẩm, mã, SKU, cấp (2026-10-12)', async () => {
+    const qrSku = {
+      ...SKU_BLUE,
+      barcodes: [{ ...SKU_BLUE.barcodes[0]!, code: 'TL08-BLUE', type: 'QR' }],
+    };
+    server.use(
+      http.get('/api/products/:id', () =>
+        HttpResponse.json({ ...PRODUCT, skus: [qrSku, SKU_RED] }),
+      ),
+    );
+    let snap = { size: null as string | null, text: '', qr: 0 };
+    window.print = vi.fn(() => {
+      const root = document.querySelector('[data-print-root]');
+      snap = {
+        size: root?.getAttribute('data-print-size') ?? null,
+        text: root?.querySelector('[data-product-code-sheet]')?.textContent ?? '',
+        qr: root?.querySelectorAll('[data-barcode="qrcode"] svg').length ?? 0,
+      };
+    });
+    renderApp(<ProductDetailScreen productId={PRODUCT.id} />);
+    await screen.findByText(PRODUCT.name);
+    fireEvent.click(screen.getByRole('tab', { name: /Barcode/ }));
+    fireEvent.click(screen.getByRole('button', { name: 'In TL08-BLUE khổ A5 ngang' }));
+    await waitFor(() => expect(window.print).toHaveBeenCalledTimes(1));
+    expect(snap.size).toBe('A5_LANDSCAPE');
+    expect(snap.qr).toBe(1);
+    expect(snap.text).toContain(PRODUCT.name);
+    expect(snap.text).toContain('TL08-BLUE');
+    expect(snap.text).toContain(`SKU ${SKU_BLUE.code} · Sản phẩm · cái`);
+    // In xong → tờ in gỡ khỏi DOM.
+    await waitFor(() => expect(document.querySelector('[data-print-root]')).toBeNull());
+  });
+
   it('tab Barcode: quét mã NSX vào ô của cấp thùng → POST /skus/:id/barcodes với ĐVT thùng, mã 13 số = EAN13', async () => {
     const posts: Array<{ id: string; body: unknown }> = [];
     server.use(

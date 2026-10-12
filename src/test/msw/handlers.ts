@@ -1436,6 +1436,21 @@ export const handlers = [
       { shopId: '407957969', shopName: null, isActive: false },
     ]),
   ),
+  // Đồng bộ lại đơn Pancake theo POS — mặc định chưa chạy lần nào (PancakeOrderResyncStatusDto).
+  http.get('/api/pancake-sync/transform/orders/resync', ({ request }) =>
+    HttpResponse.json({
+      shopId: new URL(request.url).searchParams.get('shopId') ?? '',
+      state: 'idle',
+      done: 0,
+      total: 0,
+      counts: { updated: 0, skipped: 0, pickReplanned: 0, failed: 0 },
+      failures: [],
+      skippedOrders: [],
+      error: null,
+      startedAt: null,
+      finishedAt: null,
+    }),
+  ),
   http.get('/api/sales-orders', async ({ request }) => {
     const url = new URL(request.url);
     const take = Number(url.searchParams.get('take') ?? 50);

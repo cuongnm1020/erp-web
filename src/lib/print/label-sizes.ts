@@ -4,8 +4,9 @@
  * - `SKU_50x30`: cuộn tem nhiệt 2 cột (khổ cuộn ~104 mm, mỗi tem 50×30 mm, khe 2 mm) —
  *   một "trang" = một hàng 2 tem (quyết định PLAN-barcode-pick-pack 3).
  * - `A6`: nhãn vận chuyển GHTK, dọc (quyết định 2). `A5`: phiếu đơn / phiếu pick.
+ * - `A5_LANDSCAPE`: một mã QR / barcode sản phẩm cỡ lớn trên A5 ngang.
  */
-export type LabelSizeId = 'SKU_50x30' | 'A6' | 'A5';
+export type LabelSizeId = 'SKU_50x30' | 'A6' | 'A5' | 'A5_LANDSCAPE';
 
 export interface LabelSize {
   id: LabelSizeId;
@@ -30,4 +31,6 @@ export const LABEL_SIZES: Record<LabelSizeId, LabelSize> = {
   },
   A6: { id: 'A6', label: 'A6 dọc', pageSize: 'A6 portrait', columns: 1 },
   A5: { id: 'A5', label: 'A5 dọc', pageSize: 'A5 portrait', columns: 1 },
+  // Mã QR sản phẩm cỡ lớn dán kệ / thùng (2026-10-12) — 210×148 mm.
+  A5_LANDSCAPE: { id: 'A5_LANDSCAPE', label: 'A5 ngang', pageSize: 'A5 landscape', columns: 1 },
 };
