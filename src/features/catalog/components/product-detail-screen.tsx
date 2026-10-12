@@ -1,10 +1,11 @@
 'use client';
 
 import Decimal from 'decimal.js';
-import { Printer, ScanBarcode } from 'lucide-react';
+import { Printer, QrCode, ScanBarcode } from 'lucide-react';
 import Link from 'next/link';
 import { Fragment, useState } from 'react';
 import { Barcode } from '@/components/data/barcode';
+import { PrintSheet } from '@/components/data/print-sheet';
 import { DetailSkeleton, EmptyState, ListSkeleton, QueryState } from '@/components/data/states';
 import { PageHeader } from '@/components/layout/page-header';
 import { StatusBadge } from '@/components/data/status-badge';
@@ -31,6 +32,7 @@ import { cn } from '@/lib/cn';
 import { messageFor } from '@/lib/error-messages';
 import { formatDate, formatDateTime, formatMoney, formatQuantity } from '@/lib/format';
 import { Can } from '@/lib/permission';
+import { usePrint } from '@/lib/print';
 import {
   useAddBarcode,
   useContainerTypes,
@@ -44,6 +46,7 @@ import {
   useSkuStockSummary,
   type StockByLocationRow,
 } from '../api/use-product-stock';
+import { ProductCodeSheet, type ProductCodeSheetData } from './product-code-sheet';
 
 /**
  * C-03 Chi tiết sản phẩm — nối API thật (GET /products/{id} + /stock*).
@@ -475,7 +478,7 @@ function BarcodesTab({ product, skus }: { product: ProductDetail; skus: Sku[] })
             <TableHead className={cn(HEAD, 'w-36')}>Cấp</TableHead>
             <TableHead className={HEAD}>Barcode</TableHead>
             <TableHead className={cn(HEAD, 'w-24')}>Loại</TableHead>
-            <TableHead className={cn(HEAD, 'w-24 text-right')}>In tem</TableHead>
+            <TableHead className={cn(HEAD, 'w-52 text-right')}>In tem</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -510,8 +513,24 @@ function SkuBarcodeRows({
 }) {
   const printHref = (barcodeId: string) =>
     `/catalog/barcode-print?productId=${product.id}&skuIds=${sku.id}&barcodeId=${barcodeId}`;
+  // In một mã cỡ lớn trên A5 ngang — dán kệ / thùng, quét từ xa.
+  const printer = usePrint();
+  const [sheet, setSheet] = useState<ProductCodeSheetData | null>(null);
+  const printA5 = (b: Sku['barcodes'][number], level: BarcodeLevel) => {
+    setSheet({
+      code: b.code,
+      type: b.type,
+      productName: product.name,
+      skuCode: sku.code,
+      levelLabel: `${level.label} · ${level.uomCode ?? sku.baseUom.code}${level.hint ? ` ${level.hint}` : ''}`,
+    });
+    printer.print();
+  };
   return (
     <>
+      <PrintSheet open={printer.open && sheet !== null} onDone={printer.done} size="A5_LANDSCAPE">
+        {sheet ? <ProductCodeSheet data={sheet} /> : null}
+      </PrintSheet>
       {showSkuHeader ? (
         <TableRow className="bg-muted/50 hover:bg-muted/50">
           <TableCell colSpan={4} className="px-2.5 py-1 font-mono text-xs font-semibold">
@@ -545,11 +564,22 @@ function SkuBarcodeRows({
                   <StatusBadge tone="neutral">{b.type}</StatusBadge>
                 </TableCell>
                 <TableCell className="px-2.5 py-1.5 text-right">
-                  <Button variant="outline" size="sm" asChild>
-                    <Link href={printHref(b.id)} aria-label={`In tem ${b.code}`}>
-                      <Printer /> In
-                    </Link>
-                  </Button>
+                  <div className="flex justify-end gap-1.5">
+                    <Button variant="outline" size="sm" asChild>
+                      <Link href={printHref(b.id)} aria-label={`In tem ${b.code}`}>
+                        <Printer /> In
+                      </Link>
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => printA5(b, level)}
+                      aria-label={`In ${b.code} khổ A5 ngang`}
+                      title="In mã cỡ lớn trên giấy A5 quay ngang"
+                    >
+                      <QrCode /> A5 ngang
+                    </Button>
+                  </div>
                 </TableCell>
               </TableRow>
             ))}
