@@ -20,7 +20,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { toast } from '@/components/ui/toaster';
-import { messageFor, messageForCode } from '@/lib/error-messages';
+import { carrierSaid, messageFor, messageForCode } from '@/lib/error-messages';
 import { labelUrl, useRequestWaybill, useShipment, type PdaWaybill } from '../api/use-pda';
 import { useCarriers } from '../api/use-shipping';
 
@@ -124,6 +124,9 @@ export function LabelPrintDialog({
             <p className="mt-1 text-muted-foreground">
               {local.errorCode ? messageForCode(local.errorCode) : (local.reason ?? '')}
             </p>
+            {local.errorCode === 'CARRIER_REJECTED' && local.reason ? (
+              <p className="mt-1 font-medium">{carrierSaid(local.reason)}</p>
+            ) : null}
             {orderId ? (
               <a
                 href={`/crm/orders/${orderId}/edit`}

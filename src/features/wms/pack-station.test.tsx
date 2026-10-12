@@ -1,6 +1,8 @@
 import { fireEvent, screen, waitFor } from '@testing-library/react';
 import { http, HttpResponse } from 'msw';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { ApiError } from '@/lib/api/errors';
+import { messageFor } from '@/lib/error-messages';
 import { ME_SALE } from '@/test/msw/handlers';
 import { server } from '@/test/msw/server';
 import { renderApp } from '@/test/render';
@@ -379,6 +381,44 @@ describe('Trạm đóng gói — quét đơn → quét SKU → tự đóng dòng
       await screen.findByTitle('Nhãn vận đơn S00000009.SG', undefined, { timeout: 8000 }),
     ).toBeInTheDocument();
   }, 15000);
+
+  it('FAILED CARRIER_REJECTED → câu theo mã + NGUYÊN VĂN lời hãng (DN2610-00007), link sửa đơn', async () => {
+    server.use(
+      ...scanFlow({
+        ...WAYBILL_ISSUED,
+        outcome: 'FAILED',
+        trackingNo: null,
+        reason: 'Địa chỉ nhận hàng không hợp lệ',
+        errorCode: 'CARRIER_REJECTED',
+      }),
+    );
+    renderApp(<PackStationScreen />);
+    scan('SO2609-00007');
+    await screen.findAllByText('Sản phẩm A');
+    scanSku('BC-A');
+    scanSku('BC-B');
+    await waitFor(() => expect(scans).toHaveLength(2));
+    scanSku('BC-B');
+    expect(await screen.findByText(/chưa xin được vận đơn/)).toBeInTheDocument();
+    expect(screen.getByText(/Hãng vận chuyển từ chối dữ liệu đơn/)).toBeInTheDocument();
+    expect(screen.getByText('Hãng báo: “Địa chỉ nhận hàng không hợp lệ”.')).toBeInTheDocument();
+  });
+
+  it('messageFor: CARRIER_REJECTED kèm lời hãng; mã khác không lộ message thô (luật 6)', () => {
+    const rejected = new ApiError(
+      422,
+      'CARRIER_REJECTED',
+      'Hãng GHTK từ chối tạo vận đơn: Sai xã',
+      { carrierMessage: 'Sai xã' },
+      't-1',
+    );
+    expect(messageFor(rejected)).toBe(
+      'Hãng vận chuyển từ chối dữ liệu đơn (thường là địa chỉ giao). Sửa đơn theo lý do hãng báo rồi xin vận đơn lại. Hãng báo: “Sai xã”.',
+    );
+    const other = new ApiError(502, 'CARRIER_API_ERROR', 'raw', { carrierMessage: 'x' }, 't-2');
+    expect(messageFor(other)).not.toContain('x”');
+    expect(messageFor(other)).not.toContain('raw');
+  });
 
   it('NO_CARRIER → chọn hãng tại chỗ → POST /shipments/:id/waybill → iframe nhãn', async () => {
     const requests: unknown[] = [];
