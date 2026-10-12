@@ -6914,13 +6914,13 @@ export interface components {
             baseUomCode: string;
             baseUomId: string;
             /**
-             * @description Giá bán MỘT combo trong bảng giá mặc định = componentsPrice − discountAmount (hệ thống tự
-             *     tính, không nhập tay). null = còn thành phần chưa có giá lẻ.
+             * @description Giá bán MỘT combo trong bảng giá mặc định = componentsPrice − discountAmount (nhập giảm giá
+             *     hoặc nhập thẳng giá bán — server quy về chênh lệch). null = còn thành phần chưa có giá lẻ.
              */
             salePrice: string | null;
             /** @description Σ(giá lẻ thành phần × số lượng) trước giảm — null khi còn thành phần chưa có giá. */
             componentsPrice: string | null;
-            /** @description Số tiền giảm cho MỘT combo — Decimal(18,4) chuỗi. */
+            /** @description Chênh lệch giảm cho MỘT combo — Decimal(18,4) chuỗi; ÂM = phụ phí (giá bán > tổng thành phần). */
             discountAmount: string;
             /** @description Combo miễn ship — gợi ý cho sale khi lên đơn. */
             freeShipping: boolean;
@@ -6965,13 +6965,13 @@ export interface components {
             baseUomCode: string;
             baseUomId: string;
             /**
-             * @description Giá bán MỘT combo trong bảng giá mặc định = componentsPrice − discountAmount (hệ thống tự
-             *     tính, không nhập tay). null = còn thành phần chưa có giá lẻ.
+             * @description Giá bán MỘT combo trong bảng giá mặc định = componentsPrice − discountAmount (nhập giảm giá
+             *     hoặc nhập thẳng giá bán — server quy về chênh lệch). null = còn thành phần chưa có giá lẻ.
              */
             salePrice: string | null;
             /** @description Σ(giá lẻ thành phần × số lượng) trước giảm — null khi còn thành phần chưa có giá. */
             componentsPrice: string | null;
-            /** @description Số tiền giảm cho MỘT combo — Decimal(18,4) chuỗi. */
+            /** @description Chênh lệch giảm cho MỘT combo — Decimal(18,4) chuỗi; ÂM = phụ phí (giá bán > tổng thành phần). */
             discountAmount: string;
             /** @description Combo miễn ship — gợi ý cho sale khi lên đơn. */
             freeShipping: boolean;
@@ -7016,6 +7016,13 @@ export interface components {
              *     thống tính: Σ(giá bán lẻ thành phần × số lượng) − discountAmount.
              */
             discountAmount?: string;
+            /**
+             * @description Giá bán MỘT combo nhập tay — Decimal(18,4) chuỗi, ≥ 0; thay cho `discountAmount` (gửi cả hai
+             *     → 422). Được phép LỚN HƠN tổng giá lẻ thành phần (cộng chi phí phát sinh ngoài). Server quy
+             *     về chênh lệch: discountAmount = Σ(giá lẻ × định mức) − salePrice (âm = phụ phí), nên giá
+             *     combo vẫn chạy theo giá lẻ thành phần khi chúng đổi.
+             */
+            salePrice?: string;
             /** @description Combo miễn ship — gợi ý cho sale khi lên đơn (sale quyết định phí ship cuối). */
             freeShipping?: boolean;
             /** @description Tên dân dã / viết tắt cho ô tìm kiếm. */
@@ -7034,6 +7041,8 @@ export interface components {
             isActive?: boolean;
             /** @description Xem CreateComboDto.discountAmount. */
             discountAmount?: string;
+            /** @description Xem CreateComboDto.salePrice. */
+            salePrice?: string;
             freeShipping?: boolean;
             searchAliases?: string[];
             components?: components["schemas"]["ComboComponentInputDto"][];
