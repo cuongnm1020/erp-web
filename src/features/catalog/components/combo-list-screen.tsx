@@ -1,6 +1,6 @@
 'use client';
 
-import { Plus } from 'lucide-react';
+import { CopyPlus, Plus } from 'lucide-react';
 import Link from 'next/link';
 import { useMemo } from 'react';
 import { DataTable, FilterBar, type ColumnDef, type FilterDef } from '@/components/data/data-table';
@@ -106,7 +106,7 @@ const columns: ColumnDef<ComboListItem, unknown>[] = [
   {
     id: 'actions',
     header: '',
-    meta: { title: 'Thao tác', width: 80, align: 'right' },
+    meta: { title: 'Thao tác', width: 112, align: 'right' },
     cell: ({ row }) => <ComboRowActions combo={row.original} />,
   },
 ];
@@ -116,25 +116,38 @@ function ComboRowActions({ combo }: { combo: ComboListItem }) {
   const del = useDeleteCombo();
   const canUpdate = ability.can('update', 'Product');
   const canDelete = ability.can('delete', 'Product');
-  if (!canUpdate && !canDelete) return null;
+  const canCreate = ability.can('create', 'Product');
+  if (!canUpdate && !canDelete && !canCreate) return null;
   return (
-    <RowActions
-      editHref={canUpdate ? `/catalog/combos/${combo.id}/edit` : undefined}
-      itemName={`combo ${combo.code}`}
-      deleteDescription="Xóa mềm: ẩn khỏi danh sách và ô tìm sản phẩm khi lên đơn. Đơn đã tạo giữ nguyên dòng thành phần."
-      onDelete={
-        canDelete
-          ? async () => {
-              try {
-                await del.mutateAsync(combo.id);
-                toast.success(`Đã xóa combo ${combo.code}`);
-              } catch (err) {
-                toast.error(messageFor(err));
+    <div className="flex justify-end gap-1" onClick={(e) => e.stopPropagation()}>
+      {canCreate ? (
+        <Button variant="ghost" size="icon" className="h-8 w-8" asChild title="Nhân bản">
+          <Link
+            href={`/catalog/combos/new?from=${combo.id}`}
+            aria-label={`Nhân bản combo ${combo.code}`}
+          >
+            <CopyPlus aria-hidden />
+          </Link>
+        </Button>
+      ) : null}
+      <RowActions
+        editHref={canUpdate ? `/catalog/combos/${combo.id}/edit` : undefined}
+        itemName={`combo ${combo.code}`}
+        deleteDescription="Xóa mềm: ẩn khỏi danh sách và ô tìm sản phẩm khi lên đơn. Đơn đã tạo giữ nguyên dòng thành phần."
+        onDelete={
+          canDelete
+            ? async () => {
+                try {
+                  await del.mutateAsync(combo.id);
+                  toast.success(`Đã xóa combo ${combo.code}`);
+                } catch (err) {
+                  toast.error(messageFor(err));
+                }
               }
-            }
-          : undefined
-      }
-    />
+            : undefined
+        }
+      />
+    </div>
   );
 }
 
