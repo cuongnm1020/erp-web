@@ -2937,6 +2937,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/sales-orders/bulk-cancel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Hủy nhiều đơn chọn trên danh sách — từng đơn như POST /:id/cancel (một transaction, nhả giữ
+         *     chỗ, OrderCancelled). Đơn không hủy được (đã đóng gói, đã hoàn tất…) nằm ở `failed`.
+         */
+        post: operations["SalesOrderController_bulkCancel"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/sales-orders/{id}/cancel": {
         parameters: {
             query?: never;
@@ -8238,7 +8258,8 @@ export interface components {
             /** @description Đơn không gửi được (đã post/hủy, ngoài scope, thiếu địa chỉ giao…) — phần còn lại vẫn gửi. */
             failed: components["schemas"]["BulkUpdateFailedItemDto"][];
         };
-        CancelOrderDto: {
+        BulkCancelOrdersDto: {
+            orderIds: string[];
             reason?: string;
         };
         CancelOrderResultDto: {
@@ -8247,6 +8268,14 @@ export interface components {
             /** @enum {string} */
             status: "DRAFT" | "PENDING_APPROVAL" | "APPROVED" | "POSTED" | "CANCELLED";
             releasedReservationIds: string[];
+        };
+        BulkCancelOrdersResultDto: {
+            cancelled: components["schemas"]["CancelOrderResultDto"][];
+            /** @description Đơn không hủy được (ORDER_ALREADY_PACKED, INVALID_TRANSITION, NOT_FOUND…). */
+            failed: components["schemas"]["BulkUpdateFailedItemDto"][];
+        };
+        CancelOrderDto: {
+            reason?: string;
         };
         OrderDecisionDto: {
             /** Format: uuid */
@@ -15437,6 +15466,29 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["SendOrdersToCarrierResultDto"];
+                };
+            };
+        };
+    };
+    SalesOrderController_bulkCancel: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BulkCancelOrdersDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BulkCancelOrdersResultDto"];
                 };
             };
         };
