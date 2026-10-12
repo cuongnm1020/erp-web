@@ -1991,6 +1991,22 @@ export interface paths {
         patch: operations["ContainerTypeController_update"];
         trace?: never;
     };
+    "/public/product-images/{file}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["PublicProductImageController_redirect"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/combos": {
         parameters: {
             query?: never;
@@ -2931,6 +2947,26 @@ export interface paths {
          *     đơn chưa có phiếu → SAVED, vận đơn cấp lúc đóng gói. Đơn hỏng nằm ở `failed`.
          */
         post: operations["SalesOrderController_sendToCarrier"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/sales-orders/bulk-cancel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Hủy nhiều đơn chọn trên danh sách — từng đơn như POST /:id/cancel (một transaction, nhả giữ
+         *     chỗ, OrderCancelled). Đơn không hủy được (đã đóng gói, đã hoàn tất…) nằm ở `failed`.
+         */
+        post: operations["SalesOrderController_bulkCancel"];
         delete?: never;
         options?: never;
         head?: never;
@@ -8238,7 +8274,8 @@ export interface components {
             /** @description Đơn không gửi được (đã post/hủy, ngoài scope, thiếu địa chỉ giao…) — phần còn lại vẫn gửi. */
             failed: components["schemas"]["BulkUpdateFailedItemDto"][];
         };
-        CancelOrderDto: {
+        BulkCancelOrdersDto: {
+            orderIds: string[];
             reason?: string;
         };
         CancelOrderResultDto: {
@@ -8247,6 +8284,14 @@ export interface components {
             /** @enum {string} */
             status: "DRAFT" | "PENDING_APPROVAL" | "APPROVED" | "POSTED" | "CANCELLED";
             releasedReservationIds: string[];
+        };
+        BulkCancelOrdersResultDto: {
+            cancelled: components["schemas"]["CancelOrderResultDto"][];
+            /** @description Đơn không hủy được (ORDER_ALREADY_PACKED, INVALID_TRANSITION, NOT_FOUND…). */
+            failed: components["schemas"]["BulkUpdateFailedItemDto"][];
+        };
+        CancelOrderDto: {
+            reason?: string;
         };
         OrderDecisionDto: {
             /** Format: uuid */
@@ -13797,6 +13842,26 @@ export interface operations {
             };
         };
     };
+    PublicProductImageController_redirect: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                file: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Redirect tới link ảnh S3 đã ký (1 giờ) */
+            302: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
     ComboController_list: {
         parameters: {
             query: {
@@ -15437,6 +15502,29 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["SendOrdersToCarrierResultDto"];
+                };
+            };
+        };
+    };
+    SalesOrderController_bulkCancel: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BulkCancelOrdersDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BulkCancelOrdersResultDto"];
                 };
             };
         };

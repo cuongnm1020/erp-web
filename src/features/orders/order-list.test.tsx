@@ -231,6 +231,79 @@ describe('OrderListScreen — cân nặng gửi hãng + gán hãng hàng loạt'
     expect(toastError).not.toHaveBeenCalled();
     await waitFor(() => expect(screen.queryByRole('toolbar')).not.toBeInTheDocument());
   });
+
+  it('chọn 3 đơn (1 đã hủy) → "Hủy đơn" → POST /sales-orders/bulk-cancel chỉ 2 đơn còn hủy được + lý do, báo đơn lỗi, bỏ chọn', async () => {
+    search = '';
+    toastSuccess.mockClear();
+    const bodies: Record<string, unknown>[] = [];
+    server.use(
+      http.post('/api/sales-orders/bulk-cancel', async ({ request }) => {
+        const body = (await request.json()) as Record<string, unknown>;
+        bodies.push(body);
+        const [first, second] = body.orderIds as string[];
+        return HttpResponse.json(
+          {
+            cancelled: [
+              {
+                orderId: first,
+                docNumber: 'SO-A',
+                status: 'CANCELLED',
+                releasedReservationIds: [],
+              },
+            ],
+            failed: [
+              {
+                orderId: second,
+                docNumber: 'SO-B',
+                code: 'ORDER_ALREADY_PACKED',
+                message: 'đã đóng gói',
+              },
+            ],
+          },
+          { status: 201 },
+        );
+      }),
+    );
+    renderApp(<OrderListScreen />);
+    await screen.findByText(FIRST.docNumber);
+    const rows = makeOrders(5);
+    expect(rows[4]!.status).toBe('CANCELLED');
+    // i=0 DRAFT, i=1 PENDING_APPROVAL hủy được; i=4 đã hủy → bỏ qua ở client.
+    for (const i of [0, 1, 4]) {
+      fireEvent.click(screen.getAllByRole('checkbox', { name: 'Chọn dòng' })[i]!);
+    }
+    expect(await screen.findByRole('toolbar')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /Hủy đơn/ }));
+    const dialog = await screen.findByRole('dialog');
+    expect(dialog).toHaveTextContent('Hủy 2 đơn đã chọn?');
+    expect(dialog).toHaveTextContent('1 đơn đã hủy hoặc kho đã đóng gói sẽ bị bỏ qua');
+    fireEvent.change(screen.getByLabelText('Lý do hủy (tùy chọn)'), {
+      target: { value: ' Khách đổi ý ' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Hủy 2 đơn' }));
+
+    await waitFor(() => expect(bodies).toHaveLength(1));
+    expect(bodies[0]).toEqual({ orderIds: [rows[0]!.id, rows[1]!.id], reason: 'Khách đổi ý' });
+    await waitFor(() =>
+      expect(toastSuccess).toHaveBeenCalledWith(
+        'Đã hủy 1 đơn',
+        expect.objectContaining({ description: '1 đơn không hủy được: SO-B' }),
+      ),
+    );
+    await waitFor(() => expect(screen.queryByRole('toolbar')).not.toBeInTheDocument());
+  });
+
+  it('không có quyền sales_order.cancel → thanh chọn không có nút "Hủy đơn" (luật 7)', async () => {
+    search = '';
+    renderApp(<OrderListScreen />, {
+      me: { ...ME_SALE, permissions: ['sales_order.read', 'sales_order.update'] },
+    });
+    await screen.findByText(FIRST.docNumber);
+    fireEvent.click(screen.getAllByRole('checkbox', { name: 'Chọn dòng' })[0]!);
+    expect(await screen.findByRole('toolbar')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Gán hãng \/ cân nặng/ })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Hủy đơn/ })).not.toBeInTheDocument();
+  });
 });
 
 describe('OrderListScreen — lọc theo hãng + thời gian (2026-09-19)', () => {

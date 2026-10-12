@@ -102,6 +102,29 @@ export function orderEditable(status: SalesOrderStatus): boolean {
   return status !== 'POSTED' && status !== 'CANCELLED';
 }
 
+/** Kho đã đóng gói trở đi — tồn đã trừ, server chặn hủy (ORDER_ALREADY_PACKED). */
+const PACKED_OR_LATER: ReadonlySet<string> = new Set([
+  'PACKED',
+  'SHIPPED',
+  'IN_TRANSIT',
+  'OUT_FOR_DELIVERY',
+  'DELIVERED',
+  'FAILED',
+  'RETURNED',
+  'CARRIER_CANCELLED',
+]);
+
+/**
+ * Gợi ý đơn còn hủy được trên danh sách: chưa hủy và kho chưa đóng gói. Chỉ để bỏ bớt đơn chắc
+ * chắn hỏng trước khi gửi — server vẫn là nơi quyết định (đơn lệch pha về `failed`).
+ */
+export function orderCancellable(
+  status: SalesOrderStatus,
+  fulfilmentStatus: string | null,
+): boolean {
+  return status !== 'CANCELLED' && !(fulfilmentStatus && PACKED_OR_LATER.has(fulfilmentStatus));
+}
+
 // ── Trạng thái KHO của đơn (fulfilment) — suy từ task PICK/PACK + phiếu giao ở server ──
 
 export type OrderFulfilmentStatus = SalesOrderDetail['fulfilment']['status'];

@@ -180,6 +180,24 @@ export function useBulkUpdateOrders() {
   });
 }
 
+export type BulkCancelOrdersBody = components['schemas']['BulkCancelOrdersDto'];
+
+/**
+ * POST /sales-orders/bulk-cancel — hủy các đơn chọn trên danh sách, cùng một lý do. Server hủy
+ * từng đơn (nhả giữ chỗ), đơn không hủy được về `failed`. Không optimistic (luật 5: đụng tồn).
+ */
+export function useBulkCancelOrders() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (body: BulkCancelOrdersBody) =>
+      unwrap(api.POST('/sales-orders/bulk-cancel', { body })),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: orderKeys.lists() });
+      void qc.invalidateQueries({ queryKey: orderKeys.details() });
+    },
+  });
+}
+
 /** GET /sales-orders/{id} — 404 khi đơn thuộc khách ngoài scope của người đang xem. */
 export function useOrder(id: string) {
   return useQuery({

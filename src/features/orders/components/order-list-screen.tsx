@@ -38,6 +38,7 @@ import {
   type SalesOrderListItem,
 } from '../api/use-orders';
 import { fulfilmentLabel, ORDER_FLOW_TABS, parseOrderFlow, parseOrderStatus } from '../labels';
+import { BulkCancelDialog } from './bulk-cancel-dialog';
 import { BulkShippingDialog } from './bulk-shipping-dialog';
 import { FlowBadge, OrderQuickView, TelcoBadge } from './order-quick-view';
 import { SendToCarrierMenu } from './send-to-carrier-menu';
@@ -701,6 +702,12 @@ export function OrderListScreen() {
                     onDone={() => setSelected({})}
                   />
                   <BulkShippingDialog
+                    rows={data.items.filter((r) => ids.includes(r.id))}
+                    onDone={() => setSelected({})}
+                  />
+                </Can>
+                <Can I="cancel" a="SalesOrder">
+                  <BulkCancelDialog
                     rows={data.items.filter((r) => ids.includes(r.id))}
                     onDone={() => setSelected({})}
                   />
