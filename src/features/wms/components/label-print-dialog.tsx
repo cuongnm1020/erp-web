@@ -171,8 +171,10 @@ function LabelFrame({
 }) {
   const frame = useRef<HTMLIFrameElement | null>(null);
   const [state, setState] = useState<'loading' | 'ready' | 'unsupported' | 'error'>('loading');
+  // "Tải lại nhãn" dựng lại iframe qua `key`, KHÔNG thêm query chống cache: API validate
+  // query chặt (forbidNonWhitelisted) → `&n=` bị 400; nhãn đã trả `Cache-Control: no-store`.
   const [nonce, setNonce] = useState(0);
-  const src = `${labelUrl(shipmentId, pageSize)}&n=${nonce}`;
+  const src = labelUrl(shipmentId, pageSize);
 
   // Hãng nội bộ (MANUAL) không có nhãn → 501: hiện mã vận đơn nội bộ để chép tay, không nhúng iframe.
   const supported = carrierCode !== 'MANUAL';
@@ -214,7 +216,13 @@ function LabelFrame({
           <Printer aria-hidden />
           In lại
         </Button>
-        <Button variant="ghost" onClick={() => setNonce((n) => n + 1)}>
+        <Button
+          variant="ghost"
+          onClick={() => {
+            setState('loading');
+            setNonce((n) => n + 1);
+          }}
+        >
           Tải lại nhãn
         </Button>
         {state === 'loading' ? (
@@ -222,6 +230,7 @@ function LabelFrame({
         ) : null}
       </div>
       <iframe
+        key={nonce}
         ref={frame}
         title={`Nhãn vận đơn ${trackingNo}`}
         src={src}

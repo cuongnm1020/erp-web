@@ -275,7 +275,8 @@ describe('Trạm đóng gói — quét đơn → quét SKU → tự đóng dòng
 
     // Popup nhãn: iframe trỏ vào proxy nhãn, khổ A6 dọc
     const frame = await screen.findByTitle('Nhãn vận đơn S00000001.SG.A1');
-    expect(frame.getAttribute('src')).toContain(
+    // Đúng nguyên URL — API chặn query lạ (forbidNonWhitelisted), thêm `&n=` là 400.
+    expect(frame.getAttribute('src')).toBe(
       `/api/shipments/${SHIPMENT_ID}/label?pageSize=A6&orientation=portrait`,
     );
     expect(screen.getByText('Đóng và quét đơn tiếp')).toBeInTheDocument();
