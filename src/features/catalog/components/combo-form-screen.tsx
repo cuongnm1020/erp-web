@@ -2,7 +2,7 @@
 
 import { zodResolver } from '@hookform/resolvers/zod';
 import Decimal from 'decimal.js';
-import { Plus, X } from 'lucide-react';
+import { CopyPlus, Plus, X } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useEffect, useRef } from 'react';
@@ -68,6 +68,8 @@ import {
  *   bán", còn lại đổ vào "Giảm giá". Giá xem trước tính được khi biết giá lẻ thành phần (combo
  *   đang sửa), combo mới thì tính khi lưu.
  * - "Miễn ship" = gợi ý cho sale khi lên đơn, sale vẫn quyết định phí ship cuối.
+ * - Nhân bản (`/catalog/combos/new?from=<id>`): form TẠO điền sẵn từ combo gốc — thành phần,
+ *   giá, mô tả…; mã để trống (server sinh), tên thêm "(bản sao)". Lưu là POST như tạo mới.
  */
 function initialValues(c?: ComboDetail): ComboFormValues {
   const surcharge = c !== undefined && c.discountAmount.startsWith('-');
@@ -96,9 +98,30 @@ function initialValues(c?: ComboDetail): ComboFormValues {
   };
 }
 
-export function ComboFormScreen({ comboId }: { comboId?: string }) {
+export function ComboFormScreen({
+  comboId,
+  copyFromId,
+}: {
+  comboId?: string;
+  /** Nhân bản: id combo gốc để điền sẵn form tạo. */
+  copyFromId?: string;
+}) {
   const editing = comboId !== undefined && comboId !== '';
-  const query = useCombo(comboId ?? '');
+  const copying = !editing && copyFromId !== undefined && copyFromId !== '';
+  const query = useCombo(editing ? comboId : copying ? copyFromId : '');
+  if (copying) {
+    return (
+      <QueryState query={query} skeleton={<DetailSkeleton fields={6} />}>
+        {(c) =>
+          c ? (
+            <ComboFormBody copyOf={c} />
+          ) : (
+            <EmptyState title="Không tìm thấy combo gốc" description="Combo có thể đã bị xóa." />
+          )
+        }
+      </QueryState>
+    );
+  }
   if (!editing) return <ComboFormBody />;
   return (
     <QueryState query={query} skeleton={<DetailSkeleton fields={6} />}>
@@ -113,7 +136,7 @@ export function ComboFormScreen({ comboId }: { comboId?: string }) {
   );
 }
 
-function ComboFormBody({ combo }: { combo?: ComboDetail }) {
+function ComboFormBody({ combo, copyOf }: { combo?: ComboDetail; copyOf?: ComboDetail }) {
   const editing = combo !== undefined;
   const router = useRouter();
   const create = useCreateCombo();
@@ -123,7 +146,14 @@ function ComboFormBody({ combo }: { combo?: ComboDetail }) {
 
   const form = useForm<ComboFormValues>({
     resolver: zodResolver(comboFormSchema),
-    defaultValues: initialValues(combo),
+    defaultValues: copyOf
+      ? {
+          ...initialValues(copyOf),
+          code: '',
+          name: `${copyOf.name} (bản sao)`.slice(0, 300),
+          isActive: true,
+        }
+      : initialValues(combo),
   });
   const rows = useFieldArray({ control: form.control, name: 'components' });
   const components = useWatch({ control: form.control, name: 'components' });
@@ -212,7 +242,9 @@ function ComboFormBody({ combo }: { combo?: ComboDetail }) {
           description={
             editing
               ? `${combo.code} · ${combo.components.length} thành phần · còn bán được ${formatQuantity(combo.available)}`
-              : 'Chọn SKU thành phần và định mức cho MỘT combo — tồn và pick vẫn tính trên thành phần'
+              : copyOf
+                ? `Nhân bản từ ${copyOf.code} · ${copyOf.name} — sửa lại tên, thành phần, giá rồi lưu thành combo mới`
+                : 'Chọn SKU thành phần và định mức cho MỘT combo — tồn và pick vẫn tính trên thành phần'
           }
           breadcrumb={[
             { label: 'Sản phẩm', href: '/catalog/products' },
@@ -224,6 +256,16 @@ function ComboFormBody({ combo }: { combo?: ComboDetail }) {
               <Button variant="ghost" size="sm" asChild>
                 <Link href="/catalog/combos">Hủy bỏ</Link>
               </Button>
+              {editing ? (
+                <Can I="create" a="Product">
+                  <Button variant="outline" size="sm" asChild>
+                    <Link href={`/catalog/combos/new?from=${combo.id}`}>
+                      <CopyPlus aria-hidden />
+                      Nhân bản
+                    </Link>
+                  </Button>
+                </Can>
+              ) : null}
               <Can I={editing ? 'update' : 'create'} a="Product">
                 <Button size="sm" type="submit" form="combo-form" disabled={saving}>
                   {saving ? 'Đang lưu…' : saveLabel}{' '}

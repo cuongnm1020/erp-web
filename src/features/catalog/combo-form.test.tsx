@@ -311,6 +311,38 @@ describe('ComboFormScreen — sửa combo (PATCH /combos/{id})', () => {
     await waitFor(() => expect(push).toHaveBeenCalledWith('/catalog/combos'));
   });
 
+  it('nhân bản (?from=): form tạo điền sẵn, mã trống, tên "(bản sao)" → POST combo mới', async () => {
+    push.mockClear();
+    const bodies: unknown[] = [];
+    server.use(
+      ...baseHandlers(),
+      http.get('/api/combos/:id', () => HttpResponse.json(COMBO_DETAIL)),
+      http.post('/api/combos', async ({ request }) => {
+        bodies.push(await request.json());
+        return HttpResponse.json(
+          { id: uuid(400), code: 'CB-0009', name: 'Combo A+B (bản sao)', components: [] },
+          { status: 201 },
+        );
+      }),
+    );
+    renderApp(<ComboFormScreen copyFromId={uuid(300)} />);
+    expect(await screen.findByDisplayValue('Combo A+B (bản sao)')).toBeInTheDocument();
+    expect(screen.getByText(/Nhân bản từ CB-0001/)).toBeInTheDocument();
+    expect(screen.getByLabelText('Mã combo')).toHaveValue('');
+    expect(screen.getByLabelText('Mã combo')).not.toBeDisabled();
+    expect(screen.getByText('SKU-A')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /Lưu combo/ }));
+    await waitFor(() => expect(bodies).toHaveLength(1));
+    expect(bodies[0]).toEqual({
+      name: 'Combo A+B (bản sao)',
+      searchAliases: ['combo a'],
+      discountAmount: '10000',
+      freeShipping: false,
+      components: [{ skuId: uuid(1), qty: '2' }],
+    });
+    await waitFor(() => expect(push).toHaveBeenCalledWith('/catalog/combos'));
+  });
+
   it('combo đang phụ phí (discountAmount âm) → đổ vào "Giá bán", PATCH gửi salePrice', async () => {
     const patches: unknown[] = [];
     server.use(

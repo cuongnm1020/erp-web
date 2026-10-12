@@ -1,6 +1,15 @@
 'use client';
 
-import { Copy, Info, KeyRound, PackageCheck, PlugZap, Plus, RefreshCw } from 'lucide-react';
+import {
+  Copy,
+  CopyPlus,
+  Info,
+  KeyRound,
+  PackageCheck,
+  PlugZap,
+  Plus,
+  RefreshCw,
+} from 'lucide-react';
 import { useState } from 'react';
 import { ConfirmDialog } from '@/components/data/confirm-dialog';
 import { RowActions } from '@/components/data/row-actions';
@@ -32,6 +41,7 @@ import {
   type PancakeShopConfig,
 } from '../api/use-pancake-config';
 import { PancakeConfigDialog } from './pancake-config-dialog';
+import { PancakeDuplicateDialog } from './pancake-duplicate-dialog';
 import { PancakeShopProductsDialog } from './pancake-shop-products-dialog';
 
 /**
@@ -138,6 +148,7 @@ function EnvNotice({ env }: { env: PancakeConfigList['env'] | undefined }) {
 function ShopTable({ items }: { items: PancakeShopConfig[] }) {
   const [editing, setEditing] = useState<PancakeShopConfig | null>(null);
   const [catalogShop, setCatalogShop] = useState<PancakeShopConfig | null>(null);
+  const [duplicating, setDuplicating] = useState<PancakeShopConfig | null>(null);
   const remove = useDeletePancakeConfig();
   const verify = useVerifyPancakeConfig();
   const [verifying, setVerifying] = useState<string | null>(null);
@@ -239,6 +250,17 @@ function ShopTable({ items }: { items: PancakeShopConfig[] }) {
                           />
                           Kiểm tra kết nối
                         </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8"
+                          title="Nhân bản sang shop mới"
+                          aria-label={`Nhân bản kết nối shop ${shop.shopId}`}
+                          disabled={!shop.keyReadable}
+                          onClick={() => setDuplicating(shop)}
+                        >
+                          <CopyPlus aria-hidden />
+                        </Button>
                         {dbRow ? (
                           <RowActions
                             onEdit={() => setEditing(shop)}
@@ -267,6 +289,14 @@ function ShopTable({ items }: { items: PancakeShopConfig[] }) {
       </div>
       {editing ? (
         <PancakeConfigDialog open onOpenChange={(o) => !o && setEditing(null)} config={editing} />
+      ) : null}
+      {duplicating ? (
+        <PancakeDuplicateDialog
+          key={duplicating.shopId}
+          source={duplicating}
+          open
+          onOpenChange={(o) => !o && setDuplicating(null)}
+        />
       ) : null}
       {catalogShop ? (
         <PancakeShopProductsDialog
