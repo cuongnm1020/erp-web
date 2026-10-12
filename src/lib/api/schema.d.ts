@@ -847,6 +847,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/pancake-sync/mapping/staff": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Nhân viên Pancake mọi POS + tài khoản ERP đang gắn (tự tạo / gán tay / còn chờ). */
+        get: operations["PancakeMappingController_staff"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/pancake-sync/mapping/staff/relink": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Chuyển nhân viên Pancake sang tài khoản ERP khác (mọi POS); đơn liên quan chiếu lại. */
+        post: operations["PancakeMappingController_relinkStaff"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/pancake-sync/config": {
         parameters: {
             query?: never;
@@ -5444,6 +5478,41 @@ export interface components {
             fbId: string;
             userId: string;
             userCode: string;
+        };
+        PancakeStaffUserDto: {
+            id: string;
+            code: string;
+            fullName: string;
+            isActive: boolean;
+        };
+        PancakeStaffDto: {
+            /** @description Khoá nhân viên: fb_id (hoặc id Pancake khi không có fb_id). */
+            fbId: string;
+            externalUserId: string | null;
+            /** @description Tên / SĐT Pancake gửi về gần nhất (từ hàng chờ). */
+            observedName: string | null;
+            observedPhone: string | null;
+            /** @description Vai trò đã thấy trên đơn: seller / creator / care / marketer. */
+            seenRoles: string[];
+            /** @description POS đã thấy nhân viên này (mã shop). */
+            shopIds: string[];
+            /** @description null = chưa gắn tài khoản (người tạo / chăm sóc / marketer chưa khai). */
+            user: components["schemas"]["PancakeStaffUserDto"] | null;
+            /** @description true = tài khoản do đồng bộ tự tạo — kiểm xem có trùng người đã có tài khoản không. */
+            autoCreated: boolean;
+        };
+        RelinkStaffDto: {
+            /** @description fb_id nhân viên (hoặc id Pancake khi không có fb_id) — đúng khoá trong danh sách staff. */
+            fbId: string;
+            /** Format: uuid */
+            userId: string;
+        };
+        RelinkStaffResultDto: {
+            fbId: string;
+            userId: string;
+            userCode: string;
+            /** @description Số POS đã chuyển sang tài khoản mới. */
+            shops: number;
         };
         PancakeShopConfigDto: {
             /** @description bigint → string qua API. */
@@ -11661,6 +11730,48 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["MapActorResultDto"];
+                };
+            };
+        };
+    };
+    PancakeMappingController_staff: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PancakeStaffDto"][];
+                };
+            };
+        };
+    };
+    PancakeMappingController_relinkStaff: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RelinkStaffDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RelinkStaffResultDto"];
                 };
             };
         };

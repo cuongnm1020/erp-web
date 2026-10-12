@@ -1,7 +1,7 @@
 import { fireEvent, screen, waitFor } from '@testing-library/react';
 import { http, HttpResponse } from 'msw';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { ME_SALE, PANCAKE_SHOP_FIXTURE, scenario } from '@/test/msw/handlers';
+import { makeUsers, ME_SALE, PANCAKE_SHOP_FIXTURE, scenario } from '@/test/msw/handlers';
 import { server } from '@/test/msw/server';
 import { renderApp } from '@/test/render';
 import { PancakeConfigScreen } from './components/pancake-config-screen';
@@ -46,8 +46,11 @@ describe('PancakeConfigScreen — /pancake-sync/config', () => {
     expect(screen.getByText('Đang bật')).toBeInTheDocument();
     expect(screen.getByText('Tắt')).toBeInTheDocument();
     expect(screen.getByText(/Pancake từ chối khoá API/)).toBeInTheDocument();
-    // Không có banner env khi server không đặt PANCAKE_API_KEY.
-    expect(screen.queryByRole('status')).not.toBeInTheDocument();
+    // Không có banner env khi server không đặt PANCAKE_API_KEY (skeleton mục nhân viên cũng mang
+    // role="status" nên tìm theo nội dung banner).
+    expect(
+      screen.queryByText(/Server API đang dùng khoá từ biến môi trường/),
+    ).not.toBeInTheDocument();
   });
 
   it('không có sync.config → ẩn nút Thêm shop và cụm thao tác (luật 7)', async () => {
@@ -80,7 +83,9 @@ describe('PancakeConfigScreen — /pancake-sync/config', () => {
     renderApp(<PancakeConfigScreen />);
     // Chờ dữ liệu về trước: skeleton cũng mang role="status".
     expect(await screen.findByText('từ env')).toBeInTheDocument();
-    expect(screen.getByRole('status')).toHaveTextContent('PANCAKE_API_KEY');
+    expect(
+      screen.getAllByRole('status').some((el) => el.textContent?.includes('PANCAKE_API_KEY')),
+    ).toBe(true);
     expect(screen.queryByRole('button', { name: 'Sửa' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Xóa' })).not.toBeInTheDocument();
     // Vẫn kiểm tra được kết nối bằng khoá env.
@@ -250,6 +255,54 @@ describe('PancakeConfigScreen — /pancake-sync/config', () => {
         expect.objectContaining({ description: expect.stringMatching(/12 sản phẩm/) }),
       ),
     );
+  });
+
+  it('nhân viên Pancake: chưa gắn / tự tạo hiện rõ; gắn tài khoản → POST staff/relink đúng body', async () => {
+    const seen: Record<string, unknown>[] = [];
+    server.use(
+      http.post('/api/pancake-sync/mapping/staff/relink', async ({ request }) => {
+        const body = (await request.json()) as Record<string, unknown>;
+        seen.push(body);
+        return HttpResponse.json(
+          { fbId: body.fbId, userId: body.userId, userCode: 'nv.002', shops: 1 },
+          { status: 201 },
+        );
+      }),
+    );
+    renderApp(<PancakeConfigScreen />);
+    expect(await screen.findByText('Marketer Chờ')).toBeInTheDocument();
+    expect(screen.getByText('Chưa gắn')).toBeInTheDocument();
+    expect(screen.getByText('pc.nguyen.manh.cuong')).toBeInTheDocument();
+    expect(screen.getByText('Tự tạo')).toBeInTheDocument();
+    expect(screen.getByText('Tạo đơn, Chốt đơn')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Gắn tài khoản cho Nguyen Manh Cuong' }));
+    const dialog = await screen.findByRole('dialog');
+    expect(dialog).toHaveTextContent('Gắn tài khoản ERP cho Nguyen Manh Cuong');
+    expect(dialog).toHaveTextContent('Tài khoản tự tạo pc.nguyen.manh.cuong vẫn giữ');
+    const submit = screen.getByRole('button', { name: 'Gắn tài khoản' });
+    expect(submit).toBeDisabled();
+
+    fireEvent.click(screen.getByLabelText('Tài khoản ERP'));
+    fireEvent.click(await screen.findByText('Nhân viên 2'));
+    await waitFor(() => expect(submit).toBeEnabled());
+    fireEvent.click(submit);
+    await waitFor(() => expect(seen).toHaveLength(1));
+    expect(seen[0]).toEqual({ fbId: '1660224970965826', userId: makeUsers(2)[1]!.id });
+    await waitFor(() =>
+      expect(toastSuccess).toHaveBeenCalledWith(
+        'Đã gắn tài khoản',
+        expect.objectContaining({ description: expect.stringMatching(/nv\.002 ở 1 POS/) }),
+      ),
+    );
+  });
+
+  it('không có sync.map → không có nút Gắn tài khoản (luật 7)', async () => {
+    renderApp(<PancakeConfigScreen />, {
+      me: { ...ME_SALE, permissions: ['sync.read', 'sync.config'] },
+    });
+    expect(await screen.findByText('Marketer Chờ')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Gắn tài khoản cho/ })).not.toBeInTheDocument();
   });
 
   it('nhân bản: chỉ nhập mã shop mới → POST …/duplicate không kèm apiKey (server chép khoá), mặc định chép sản phẩm', async () => {
