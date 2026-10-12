@@ -1429,6 +1429,13 @@ export const handlers = [
       CANCELLED: count('CANCELLED'),
     });
   }),
+  // POS Pancake cho bộ lọc đơn — đúng shape PancakeShopOptionDto.
+  http.get('/api/pancake-sync/shops', () =>
+    HttpResponse.json([
+      { shopId: '715130909', shopName: 'Thiên Nông chính', isActive: true },
+      { shopId: '407957969', shopName: null, isActive: false },
+    ]),
+  ),
   http.get('/api/sales-orders', async ({ request }) => {
     const url = new URL(request.url);
     const take = Number(url.searchParams.get('take') ?? 50);
@@ -1720,6 +1727,8 @@ export const handlers = [
 
   // ── Quản trị: kết nối Pancake ──
   http.get('/api/pancake-sync/config', () => HttpResponse.json(PANCAKE_CONFIG_FIXTURE)),
+  // Nhân viên Pancake ↔ tài khoản ERP — đúng shape PancakeStaffDto.
+  http.get('/api/pancake-sync/mapping/staff', () => HttpResponse.json(PANCAKE_STAFF_FIXTURE)),
   http.put('/api/pancake-sync/config/:shopId', async ({ params, request }) => {
     const body = (await request.json()) as Record<string, unknown>;
     const apiKey = typeof body.apiKey === 'string' ? body.apiKey : null;
@@ -1878,6 +1887,34 @@ export const PANCAKE_SHOP_FIXTURE = {
   webhookPath: '/pancake-sync/webhook/407957969',
   webhookSecret: 'a1b2c3d4e5f60718293a4b5c6d7e8f90a1b2c3d4e5f60718',
 };
+
+export const PANCAKE_STAFF_FIXTURE = [
+  {
+    fbId: '888000111222',
+    externalUserId: null,
+    observedName: 'Marketer Chờ',
+    observedPhone: '0900000000',
+    seenRoles: ['marketer'],
+    shopIds: ['407957969'],
+    user: null,
+    autoCreated: false,
+  },
+  {
+    fbId: '1660224970965826',
+    externalUserId: '4fc6cdb6-5b09-4d1b-8a78-34bf0adbc751',
+    observedName: 'Nguyen Manh Cuong',
+    observedPhone: '84977191246',
+    seenRoles: ['creator', 'seller'],
+    shopIds: ['407957969'],
+    user: {
+      id: '00000099-0000-4000-8000-000000000001',
+      code: 'pc.nguyen.manh.cuong',
+      fullName: 'Nguyen Manh Cuong',
+      isActive: true,
+    },
+    autoCreated: true,
+  },
+];
 
 export const PANCAKE_CONFIG_FIXTURE = {
   items: [

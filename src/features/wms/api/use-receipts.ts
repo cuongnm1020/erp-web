@@ -34,6 +34,7 @@ export function useReceipt(id: string) {
   return useQuery({
     queryKey: receiptKeys.detail(id),
     queryFn: () => unwrap(api.GET('/goods-receipts/{id}', { params: { path: { id } } })),
+    enabled: id !== '',
   });
 }
 

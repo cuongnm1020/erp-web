@@ -327,6 +327,41 @@ describe('OrderListScreen — lọc theo hãng + thời gian (2026-09-19)', () =
     expect(screen.getByLabelText('Đến ngày')).toHaveValue('2026-08-22');
   });
 
+  it('lọc theo POS Pancake: ô Nguồn liệt kê từng POS; source=POS:<mã> → gửi source=PANCAKE + pancakeShopId cho danh sách và đếm tab', async () => {
+    search = 'source=POS:715130909';
+    const seen: string[] = [];
+    const onRequest = ({ request }: { request: Request }) => {
+      if (new URL(request.url).pathname.startsWith('/api/sales-orders')) seen.push(request.url);
+    };
+    server.events.on('request:start', onRequest);
+    try {
+      renderApp(<OrderListScreen />);
+      const box = await screen.findByRole('combobox', { name: 'Nguồn' });
+      await waitFor(() => expect(box).toHaveTextContent('Pancake · Thiên Nông chính'));
+      await waitFor(() => expect(seen.length).toBeGreaterThanOrEqual(2));
+      const list = seen.find((u) => new URL(u).pathname === '/api/sales-orders')!;
+      const counts = seen.find((u) => new URL(u).pathname === '/api/sales-orders/flow-counts')!;
+      for (const u of [list, counts]) {
+        const p = new URL(u).searchParams;
+        expect(p.get('source')).toBe('PANCAKE');
+        expect(p.get('pancakeShopId')).toBe('715130909');
+      }
+
+      // Chọn POS khác (đã ngắt, chưa đặt tên) → URL đổi sang mã đó.
+      replace.mockClear();
+      fireEvent.click(box);
+      fireEvent.click(
+        await screen.findByRole('option', { name: 'Pancake · POS 407957969 (đã ngắt)' }),
+      );
+      await waitFor(() => expect(replace).toHaveBeenCalled());
+      expect(decodeURIComponent(String(replace.mock.calls.at(-1)![0]))).toContain(
+        'source=POS:407957969',
+      );
+    } finally {
+      server.events.removeListener('request:start', onRequest);
+    }
+  });
+
   it('chọn "Chưa gán hãng" → URL noCarrier=true và bỏ carrierId (hai key loại trừ nhau)', async () => {
     search = 'carrierId=c-ghtk';
     renderApp(<OrderListScreen />);

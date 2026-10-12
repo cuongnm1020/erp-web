@@ -3,7 +3,7 @@ import { http, HttpResponse } from 'msw';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { server } from '@/test/msw/server';
 import { renderApp } from '@/test/render';
-import { GrnCreateScreen } from './components/grn-create-screen';
+import { GrnCreateScreen, receiptToFormValues } from './components/grn-create-screen';
 import { GrnDetailScreen } from './components/grn-detail-screen';
 import { GrnListScreen } from './components/grn-list-screen';
 
@@ -498,6 +498,115 @@ describe('GrnDetailScreen — GET /goods-receipts/:id', () => {
     expect(screen.getByText('+ Nhập')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Post phiếu' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Hủy phiếu' })).not.toBeInTheDocument();
+  });
+});
+
+describe('Nhân bản phiếu nhập (?from=) — 2026-10-12', () => {
+  beforeEach(() => {
+    push.mockClear();
+    server.use(
+      http.get('/api/warehouses', () => HttpResponse.json(WAREHOUSES)),
+      http.get('/api/skus', () => HttpResponse.json(SKU_LIST)),
+      http.get('/api/container-types', () => HttpResponse.json(CONTAINER_TYPES)),
+      http.get('/api/skus/:id/conversions', () => HttpResponse.json(CONVERSIONS)),
+    );
+  });
+
+  it('receiptToFormValues: dòng theo thùng → SL thùng + đơn giá mỗi thùng + quy cách; lô để trống nhưng vẫn đòi lô', () => {
+    const v = receiptToFormValues({
+      ...DETAIL_DRAFT,
+      status: 'POSTED',
+      lines: [
+        {
+          ...DETAIL_PACKED.lines[0]!,
+          qtyBase: '20',
+          unitCost: '34000',
+          uomId: 'u-box',
+          uomCode: 'BOX',
+          factor: '10.000000',
+          packaging: { ...DETAIL_PACKED.lines[0]!.packaging, qtyPerContainer: '10' },
+        },
+        {
+          ...DETAIL_DRAFT.lines[0]!,
+          lotNumber: null,
+          uomId: null,
+          uomCode: null,
+          factor: null,
+          packaging: null,
+        },
+      ],
+    } as Parameters<typeof receiptToFormValues>[0]);
+    expect(v.warehouseId).toBe('wh-1');
+    expect(v.note).toBe('Xe 29H-512.44');
+    expect(v.receivedAt).toBe(new Date().toISOString().slice(0, 10));
+    expect(v.lines[0]).toMatchObject({
+      skuId: 'sku-1',
+      qty: '2',
+      uom: 'BOX',
+      factor: '10',
+      unitCost: '340000',
+      tracking: 'LOT',
+      lotNumber: '',
+      expiryDate: '',
+      packType: 'CARTON',
+      packQtyPer: '10',
+    });
+    expect(v.lines[1]).toMatchObject({
+      qty: '50',
+      uom: '',
+      factor: '1',
+      tracking: 'NONE',
+      packType: '',
+    });
+  });
+
+  it('form nhân bản: điền sẵn kho + ghi chú + dòng; dòng có lô bắt nhập lô mới; lưu → POST phiếu mới', async () => {
+    const posts: unknown[] = [];
+    server.use(
+      http.get('/api/goods-receipts/:id', () => HttpResponse.json(DETAIL_DRAFT)),
+      http.post('/api/goods-receipts', async ({ request }) => {
+        posts.push(await request.json());
+        return HttpResponse.json(
+          { receiptId: 'r-10', docNumber: 'GRN2610-00010', status: 'DRAFT', warehouseId: 'wh-1' },
+          { status: 201 },
+        );
+      }),
+    );
+    renderApp(<GrnCreateScreen copyFromId="r-1" />);
+    expect(await screen.findByText(/Nhân bản từ GRN2608-00087 · 1 dòng/)).toBeInTheDocument();
+    expect(screen.getByDisplayValue('Xe 29H-512.44')).toBeInTheDocument();
+    expect(screen.getByText('Giấy A4 Double A 80gsm')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Lưu nháp' }));
+    expect(await screen.findByText('SKU theo lô — bắt buộc số lô')).toBeInTheDocument();
+    expect(posts).toHaveLength(0);
+
+    fireEvent.change(screen.getByPlaceholderText('L2608'), { target: { value: 'L2610' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Lưu nháp' }));
+    await waitFor(() => expect(posts).toHaveLength(1));
+    expect(posts[0]).toEqual({
+      warehouseId: 'wh-1',
+      receivedAt: new Date().toISOString().slice(0, 10),
+      note: 'Xe 29H-512.44',
+      lines: [{ skuId: 'sku-1', qty: '50', unitCost: '340000', lotNumber: 'L2610' }],
+    });
+    await waitFor(() => expect(push).toHaveBeenCalledWith('/wms/grn/r-10'));
+  });
+
+  it('chi tiết phiếu (kể cả đã post) có nút "Nhân bản" → /wms/grn/new?from=<id>', async () => {
+    server.use(
+      http.get('/api/goods-receipts/:id', () =>
+        HttpResponse.json({
+          ...DETAIL_DRAFT,
+          status: 'POSTED',
+          postedAt: '2026-08-23T10:12:00.000Z',
+        }),
+      ),
+      http.get('/api/goods-receipts/:id/movements', () => HttpResponse.json([])),
+    );
+    renderApp(<GrnDetailScreen id="r-1" />);
+    fireEvent.click(await screen.findByRole('button', { name: 'Nhân bản' }));
+    expect(push).toHaveBeenCalledWith('/wms/grn/new?from=r-1');
   });
 });
 

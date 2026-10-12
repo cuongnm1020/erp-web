@@ -847,6 +847,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/pancake-sync/mapping/staff": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Nhân viên Pancake mọi POS + tài khoản ERP đang gắn (tự tạo / gán tay / còn chờ). */
+        get: operations["PancakeMappingController_staff"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/pancake-sync/mapping/staff/relink": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Chuyển nhân viên Pancake sang tài khoản ERP khác (mọi POS); đơn liên quan chiếu lại. */
+        post: operations["PancakeMappingController_relinkStaff"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/pancake-sync/config": {
         parameters: {
             query?: never;
@@ -947,6 +981,22 @@ export interface paths {
          *     gán → tạo / hiện trên POS; bỏ gán → ẩn. Trả `queued` = số sản phẩm đã xếp đẩy.
          */
         put: operations["PancakeConfigController_replaceShopProducts"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/pancake-sync/shops": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["PancakeShopsController_list"];
+        put?: never;
         post?: never;
         delete?: never;
         options?: never;
@@ -1998,7 +2048,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get: operations["PublicProductImageController_redirect"];
+        get: operations["PublicProductImageController_image"];
         put?: never;
         post?: never;
         delete?: never;
@@ -5429,6 +5479,41 @@ export interface components {
             userId: string;
             userCode: string;
         };
+        PancakeStaffUserDto: {
+            id: string;
+            code: string;
+            fullName: string;
+            isActive: boolean;
+        };
+        PancakeStaffDto: {
+            /** @description Khoá nhân viên: fb_id (hoặc id Pancake khi không có fb_id). */
+            fbId: string;
+            externalUserId: string | null;
+            /** @description Tên / SĐT Pancake gửi về gần nhất (từ hàng chờ). */
+            observedName: string | null;
+            observedPhone: string | null;
+            /** @description Vai trò đã thấy trên đơn: seller / creator / care / marketer. */
+            seenRoles: string[];
+            /** @description POS đã thấy nhân viên này (mã shop). */
+            shopIds: string[];
+            /** @description null = chưa gắn tài khoản (người tạo / chăm sóc / marketer chưa khai). */
+            user: components["schemas"]["PancakeStaffUserDto"] | null;
+            /** @description true = tài khoản do đồng bộ tự tạo — kiểm xem có trùng người đã có tài khoản không. */
+            autoCreated: boolean;
+        };
+        RelinkStaffDto: {
+            /** @description fb_id nhân viên (hoặc id Pancake khi không có fb_id) — đúng khoá trong danh sách staff. */
+            fbId: string;
+            /** Format: uuid */
+            userId: string;
+        };
+        RelinkStaffResultDto: {
+            fbId: string;
+            userId: string;
+            userCode: string;
+            /** @description Số POS đã chuyển sang tài khoản mới. */
+            shops: number;
+        };
         PancakeShopConfigDto: {
             /** @description bigint → string qua API. */
             shopId: string;
@@ -5531,6 +5616,14 @@ export interface components {
             restricted: boolean;
             /** @description core.Product.id — sản phẩm thường hoặc combo, chưa xoá. */
             productIds: string[];
+        };
+        PancakeShopOptionDto: {
+            /** @description Mã shop Pancake (bigint dạng chuỗi) — giá trị gửi vào `pancakeShopId` của GET /sales-orders. */
+            shopId: string;
+            /** @description Tên gợi nhớ khai ở màn Kết nối Pancake; null = chưa đặt / shop đã gỡ kết nối. */
+            shopName: string | null;
+            /** @description Đang kết nối (bật). false = đã tắt / gỡ kết nối nhưng vẫn còn đơn cũ. */
+            isActive: boolean;
         };
         PancakeWebhookReceiptDto: {
             receiptId: string;
@@ -9079,6 +9172,8 @@ export interface components {
             uomId: string | null;
             /** @description C3 — hệ số snapshot lúc tạo (qty nhập = qtyBase / factor). */
             factor: string | null;
+            /** @description Mã ĐVT client đã nhập (vd THUNG) — null = ĐVT cơ sở. Đi cùng uomId (2026-10-12, nhân bản phiếu). */
+            uomCode: string | null;
             /** @description PLAN-packaging-hierarchy D — vỏ thùng/pallet đã tạo cho dòng (in tem LPN); null = hàng rời. */
             packaging: components["schemas"]["ReceiptLinePackagingDto"] | null;
         };
@@ -11641,6 +11736,48 @@ export interface operations {
             };
         };
     };
+    PancakeMappingController_staff: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PancakeStaffDto"][];
+                };
+            };
+        };
+    };
+    PancakeMappingController_relinkStaff: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RelinkStaffDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RelinkStaffResultDto"];
+                };
+            };
+        };
+    };
     PancakeConfigController_list: {
         parameters: {
             query?: never;
@@ -11813,6 +11950,25 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["PancakeShopProductsDto"];
+                };
+            };
+        };
+    };
+    PancakeShopsController_list: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PancakeShopOptionDto"][];
                 };
             };
         };
@@ -13842,7 +13998,7 @@ export interface operations {
             };
         };
     };
-    PublicProductImageController_redirect: {
+    PublicProductImageController_image: {
         parameters: {
             query?: never;
             header?: never;
@@ -13853,8 +14009,8 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description Redirect tới link ảnh S3 đã ký (1 giờ) */
-            302: {
+            /** @description Nội dung ảnh (image/jpeg | image/png | image/webp) */
+            200: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -15254,6 +15410,11 @@ export interface operations {
                 warehouseId?: string;
                 /** @description Nguồn đơn: `PANCAKE` = đồng bộ từ Pancake, `ERP` = tạo trong ERP. */
                 source?: "PANCAKE" | "ERP";
+                /**
+                 * @description Chỉ đơn đồng bộ từ MỘT shop (POS) Pancake — mã shop Pancake (số nguyên dương, chuỗi). Danh
+                 *     sách POS: GET /pancake-sync/shops. Kèm `source=ERP` thì không đơn nào khớp.
+                 */
+                pancakeShopId?: string;
                 /** @description Người phụ trách (SalesOrder.ownerId). */
                 ownerId?: string;
                 /**
@@ -15334,6 +15495,11 @@ export interface operations {
                 warehouseId?: string;
                 /** @description Nguồn đơn: `PANCAKE` = đồng bộ từ Pancake, `ERP` = tạo trong ERP. */
                 source?: "PANCAKE" | "ERP";
+                /**
+                 * @description Chỉ đơn đồng bộ từ MỘT shop (POS) Pancake — mã shop Pancake (số nguyên dương, chuỗi). Danh
+                 *     sách POS: GET /pancake-sync/shops. Kèm `source=ERP` thì không đơn nào khớp.
+                 */
+                pancakeShopId?: string;
                 /** @description Người phụ trách (SalesOrder.ownerId). */
                 ownerId?: string;
                 /**

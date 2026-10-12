@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api, unwrap } from '@/lib/api/client';
+import type { EntityOption, EntitySearchResult } from '@/components/data/form';
 import type { components } from '@/lib/api/schema';
 
 export type PancakeShopConfig = components['schemas']['PancakeShopConfigDto'];
@@ -146,4 +147,55 @@ export function useProductPickSearch(q: string, enabled: boolean) {
     enabled,
     placeholderData: (prev) => prev,
   });
+}
+
+// ── Nhân viên Pancake ↔ tài khoản ERP (2026-10-12) ───────────────────────────
+
+export type PancakeStaff = components['schemas']['PancakeStaffDto'];
+export type RelinkStaffInput = components['schemas']['RelinkStaffDto'];
+
+export const pancakeStaffKeys = {
+  list: () => [...pancakeConfigKeys.all, 'staff'] as const,
+  userSearch: (q: string) => [...pancakeConfigKeys.all, 'staff', 'user-search', q] as const,
+};
+
+/** GET /pancake-sync/mapping/staff — nhân viên Pancake mọi POS + tài khoản ERP đang gắn. */
+export function usePancakeStaff() {
+  return useQuery({
+    queryKey: pancakeStaffKeys.list(),
+    queryFn: () => unwrap(api.GET('/pancake-sync/mapping/staff')),
+  });
+}
+
+/**
+ * POST /pancake-sync/mapping/staff/relink — gắn nhân viên Pancake sang tài khoản ERP khác (mọi POS);
+ * server đánh thức đơn liên quan để người phụ trách đổi theo.
+ */
+export function useRelinkPancakeStaff() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (body: RelinkStaffInput) =>
+      unwrap(api.POST('/pancake-sync/mapping/staff/relink', { body })),
+    onSuccess: () => void qc.invalidateQueries({ queryKey: pancakeStaffKeys.list() }),
+  });
+}
+
+/** Tìm tài khoản ERP đang hoạt động để gắn (EntityPicker) — GET /users?q=. */
+export function useStaffUserSearch(q: string): EntitySearchResult {
+  const query = useQuery({
+    queryKey: pancakeStaffKeys.userSearch(q),
+    queryFn: () =>
+      unwrap(
+        api.GET('/users', {
+          params: { query: { q: q || undefined, isActive: true, take: 20, skip: 0 } },
+        }),
+      ),
+    staleTime: 30_000,
+  });
+  const options: EntityOption[] | undefined = query.data?.items.map((u) => ({
+    id: u.id,
+    label: u.fullName,
+    hint: u.code,
+  }));
+  return { options, isPending: query.isPending, error: query.error };
 }
