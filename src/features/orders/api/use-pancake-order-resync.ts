@@ -28,19 +28,35 @@ export function usePancakeOrderResyncStatus(shopId: string) {
   });
 }
 
+export interface StartPancakeResyncInput {
+  shopId: string;
+  /** Có cả hai (`YYYY-MM-DD`, giờ VN) → quét mọi đơn Pancake cập nhật trong khoảng, kể cả đơn ERP chưa có. */
+  fromDate?: string;
+  toDate?: string;
+}
+
+/** Khoảng tối đa server nhận (RESYNC_MAX_DAYS bên api). */
+export const RESYNC_MAX_DAYS = 31;
+
 /**
- * POST /pancake-sync/transform/orders/resync — xếp job nền ghi đè các đơn "Chờ xử lý kho" của POS
- * theo bản Pancake mới nhất. Không phải chứng từ nên không cần Idempotency-Key: server dùng jobId
- * theo shop, đang chạy thì bấm lại chỉ trả trạng thái lượt đó.
+ * POST /pancake-sync/transform/orders/resync — xếp job nền: không khoảng ngày thì ghi đè các đơn
+ * "Chờ xử lý kho" của POS; có khoảng ngày thì lấy mọi đơn Pancake cập nhật trong khoảng (tạo đơn
+ * ERP chưa có). Không phải chứng từ nên không cần Idempotency-Key: server dùng jobId theo shop,
+ * đang chạy thì bấm lại chỉ trả trạng thái lượt đó.
  */
 export function useStartPancakeOrderResync() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (shopId: string) =>
+    mutationFn: ({ shopId, fromDate, toDate }: StartPancakeResyncInput) =>
       unwrap(
-        api.POST('/pancake-sync/transform/orders/resync', { body: { shopId: Number(shopId) } }),
+        api.POST('/pancake-sync/transform/orders/resync', {
+          body: {
+            shopId: Number(shopId),
+            ...(fromDate && toDate ? { fromDate, toDate } : {}),
+          },
+        }),
       ),
-    onSuccess: (_d, shopId) =>
+    onSuccess: (_d, { shopId }) =>
       void qc.invalidateQueries({ queryKey: pancakeResyncKeys.shop(shopId) }),
   });
 }

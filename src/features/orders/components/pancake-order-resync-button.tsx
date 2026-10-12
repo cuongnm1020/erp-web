@@ -15,8 +15,10 @@ import {
 } from '@/components/ui/dialog';
 import { toast } from '@/components/ui/toaster';
 import { messageFor } from '@/lib/error-messages';
-import { formatDateTime } from '@/lib/format';
+import { formatDateTime, toLocalDateKey } from '@/lib/format';
+import { Input } from '@/components/ui/input';
 import {
+  RESYNC_MAX_DAYS,
   isResyncRunning,
   usePancakeOrderResyncStatus,
   useStartPancakeOrderResync,
@@ -25,15 +27,35 @@ import {
 import { orderKeys, usePancakeShops } from '../api/use-orders';
 
 const COUNT_LABELS: Array<[keyof PancakeOrderResyncStatus['counts'], string]> = [
-  ['updated', 'Đã ghi đè'],
+  ['created', 'Đơn mới tạo'],
+  ['updated', 'Đã cập nhật'],
+  ['shippedExternal', 'Đã gửi qua Pancake (không trừ tồn)'],
   ['pickReplanned', 'Sinh lại việc lấy hàng'],
-  ['skipped', 'Bỏ qua — kho đã làm'],
+  ['skipped', 'Đơn bỏ qua'],
   ['failed', 'Lỗi'],
 ];
 
 function summary(s: PancakeOrderResyncStatus): string {
   const c = s.counts;
-  return `${s.total} đơn: ${c.updated} ghi đè, ${c.skipped} bỏ qua, ${c.failed} lỗi`;
+  const created = c.created > 0 ? `${c.created} đơn mới, ` : '';
+  const shipped = c.shippedExternal > 0 ? `${c.shippedExternal} đã gửi qua Pancake, ` : '';
+  return `${s.total} đơn: ${created}${c.updated} cập nhật, ${shipped}${c.skipped} bỏ qua, ${c.failed} lỗi`;
+}
+
+type Mode = 'waiting' | 'range';
+
+/** `YYYY-MM-DD` hôm nay (giờ VN) lùi `days` ngày. */
+function dayKey(daysAgo: number): string {
+  return toLocalDateKey(new Date(Date.now() - daysAgo * 86_400_000)) ?? '';
+}
+
+/** Lỗi khoảng ngày (cùng luật server) — null = hợp lệ. */
+export function rangeError(fromDate: string, toDate: string): string | null {
+  if (!fromDate || !toDate) return 'Chọn đủ từ ngày và đến ngày';
+  const days = (Date.parse(toDate) - Date.parse(fromDate)) / 86_400_000;
+  if (!Number.isFinite(days) || days < 0) return 'Từ ngày phải trước hoặc bằng đến ngày';
+  if (days + 1 > RESYNC_MAX_DAYS) return `Khoảng ngày tối đa ${RESYNC_MAX_DAYS} ngày`;
+  return null;
 }
 
 /**
@@ -47,6 +69,10 @@ export function PancakeOrderResyncButton({ defaultShopId = '' }: { defaultShopId
   const shops = usePancakeShops();
   const active = (shops.data ?? []).filter((s) => s.isActive);
   const [picked, setPicked] = useState('');
+  const [mode, setMode] = useState<Mode>('waiting');
+  const [fromDate, setFromDate] = useState(() => dayKey(2));
+  const [toDate, setToDate] = useState(() => dayKey(0));
+  const invalidRange = mode === 'range' ? rangeError(fromDate, toDate) : null;
   const shopId = picked || defaultShopId || (active.length === 1 ? (active[0]?.shopId ?? '') : '');
   const status = usePancakeOrderResyncStatus(shopId);
   const start = useStartPancakeOrderResync();
@@ -75,10 +101,13 @@ export function PancakeOrderResyncButton({ defaultShopId = '' }: { defaultShopId
   };
 
   const onStart = () =>
-    start.mutate(shopId, {
-      onSuccess: () => toast.success(`Đã bắt đầu đồng bộ đơn từ ${shopName(shopId)}`),
-      onError: (err) => toast.error(messageFor(err)),
-    });
+    start.mutate(
+      { shopId, ...(mode === 'range' ? { fromDate, toDate } : {}) },
+      {
+        onSuccess: () => toast.success(`Đã bắt đầu đồng bộ đơn từ ${shopName(shopId)}`),
+        onError: (err) => toast.error(messageFor(err)),
+      },
+    );
 
   return (
     <>
@@ -94,12 +123,72 @@ export function PancakeOrderResyncButton({ defaultShopId = '' }: { defaultShopId
           <DialogHeader>
             <DialogTitle>Đồng bộ đơn từ Pancake</DialogTitle>
             <DialogDescription>
-              Lấy lại từ Pancake các đơn đang <strong>Chờ xử lý kho</strong> của POS đã chọn và ghi
-              đè thông tin trên hệ thống: khách, địa chỉ giao, sản phẩm, tiền, trạng thái. Đơn kho
-              đã nhận việc lấy hàng hoặc đã đóng gói được giữ nguyên. Địa chỉ và trạng thái đã sửa
-              tay trên hệ thống không bị ghi đè. Chạy nền, có thể đóng cửa sổ này.
+              Lấy lại đơn của POS đã chọn từ Pancake. Đơn <strong>Chờ xử lý kho</strong> được ghi đè
+              khách, địa chỉ giao, sản phẩm, tiền, trạng thái; đơn kho đã nhận việc lấy hàng hoặc đã
+              đóng gói giữ nguyên. Đơn Pancake đã gửi qua hãng của Pancake được đánh dấu đã gửi (gắn
+              mã vận đơn, rời hàng đợi kho, không trừ tồn). Chạy nền, có thể đóng cửa sổ này.
             </DialogDescription>
           </DialogHeader>
+
+          <fieldset className="space-y-2">
+            <legend className="mb-1 text-sm font-medium">Lấy đơn nào</legend>
+            <label className="flex cursor-pointer items-start gap-2 text-sm">
+              <input
+                type="radio"
+                name="pancake-resync-mode"
+                checked={mode === 'waiting'}
+                onChange={() => setMode('waiting')}
+                disabled={running}
+                className="mt-1"
+              />
+              <span>Đơn đang Chờ xử lý kho trên hệ thống</span>
+            </label>
+            <label className="flex cursor-pointer items-start gap-2 text-sm">
+              <input
+                type="radio"
+                name="pancake-resync-mode"
+                checked={mode === 'range'}
+                onChange={() => setMode('range')}
+                disabled={running}
+                className="mt-1"
+              />
+              <span>
+                Mọi đơn Pancake cập nhật trong khoảng ngày — lấy cả đơn hệ thống chưa có (tối đa{' '}
+                {RESYNC_MAX_DAYS} ngày)
+              </span>
+            </label>
+            {mode === 'range' ? (
+              <div className="grid grid-cols-2 gap-3 pl-6">
+                <label className="space-y-1 text-sm">
+                  <span className="text-muted-foreground">Từ ngày</span>
+                  <Input
+                    type="date"
+                    value={fromDate}
+                    max={toDate || undefined}
+                    onChange={(e) => setFromDate(e.target.value)}
+                    disabled={running}
+                    aria-label="Từ ngày"
+                  />
+                </label>
+                <label className="space-y-1 text-sm">
+                  <span className="text-muted-foreground">Đến ngày</span>
+                  <Input
+                    type="date"
+                    value={toDate}
+                    min={fromDate || undefined}
+                    onChange={(e) => setToDate(e.target.value)}
+                    disabled={running}
+                    aria-label="Đến ngày"
+                  />
+                </label>
+                {invalidRange ? (
+                  <p role="alert" className="col-span-2 text-xs text-destructive">
+                    {invalidRange}
+                  </p>
+                ) : null}
+              </div>
+            ) : null}
+          </fieldset>
 
           <fieldset className="space-y-2">
             <legend className="mb-1 text-sm font-medium">POS</legend>
@@ -153,7 +242,13 @@ export function PancakeOrderResyncButton({ defaultShopId = '' }: { defaultShopId
             </Button>
             <Button
               onClick={onStart}
-              disabled={shopId === '' || running || start.isPending || status.isLoading}
+              disabled={
+                shopId === '' ||
+                running ||
+                start.isPending ||
+                status.isLoading ||
+                invalidRange !== null
+              }
             >
               <RefreshCw aria-hidden />
               {running ? 'Đang chạy…' : 'Đồng bộ đơn'}
@@ -234,12 +329,15 @@ function ResyncStatus({ s }: { s: PancakeOrderResyncStatus }) {
               {rows.map((r) => (
                 <tr key={`${r.kind}-${r.orderId}`} className="border-t align-top">
                   <td className="px-2 py-1">
-                    <Link
-                      href={`/crm/orders/${r.orderId}`}
-                      className="font-mono text-primary hover:underline"
-                    >
-                      {r.docNumber}
-                    </Link>
+                    {/* Đơn chưa vào hệ thống (lỗi khi tạo) chưa có số đơn — chỉ còn mã Pancake. */}
+                    {r.orderId ? (
+                      <Link
+                        href={`/crm/orders/${r.orderId}`}
+                        className="font-mono text-primary hover:underline"
+                      >
+                        {r.docNumber}
+                      </Link>
+                    ) : null}
                     <div className="text-muted-foreground">Pancake #{r.externalId}</div>
                   </td>
                   <td className={r.kind === 'Lỗi' ? 'px-2 py-1 text-destructive' : 'px-2 py-1'}>
