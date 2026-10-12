@@ -4853,6 +4853,8 @@ export interface components {
             line1: string;
             hamlet: string | null;
             ward: string | null;
+            /** @description Quận/huyện cũ — gợi ý cho hãng (GHTK cần khi dòng địa chỉ không có tên đường). */
+            district: string | null;
             province: string;
             isDefault: boolean;
         };
@@ -6300,7 +6302,8 @@ export interface components {
             creditLimit?: string;
             paymentTerm?: number;
         };
-        AddressDto: {
+        CustomerAddressInputDto: {
+            district?: string;
             label?: string;
             recipient: string;
             phone: string;
@@ -6318,6 +6321,8 @@ export interface components {
             line1?: string;
             hamlet?: string;
             ward?: string;
+            /** @description Quận/huyện cũ — chuỗi rỗng = xóa. */
+            district?: string;
             province?: string;
             isDefault?: boolean;
         };
@@ -6391,6 +6396,17 @@ export interface components {
             paymentTerm?: number;
             leadTimeDays?: number;
             isActive?: boolean;
+        };
+        AddressDto: {
+            label?: string;
+            recipient: string;
+            phone: string;
+            line1: string;
+            /** @description Thôn/xóm — địa chỉ 2 cấp (thôn/xóm → phường/xã → tỉnh/thành). */
+            hamlet?: string;
+            ward?: string;
+            province: string;
+            isDefault?: boolean;
         };
         BrandDto: {
             id: string;
@@ -7965,6 +7981,8 @@ export interface components {
             line1: string;
             hamlet: string | null;
             ward: string | null;
+            /** @description Quận/huyện cũ — gợi ý cho hãng, không phải cấp địa chỉ. */
+            district: string | null;
             province: string;
             isDefault: boolean;
             /**
@@ -8417,10 +8435,19 @@ export interface components {
             /** @description Lý do khi QUEUED (thông điệp lỗi của hãng) hoặc SAVED có phiếu đã rời kho. */
             reason: string | null;
         };
+        SendToCarrierFailedItemDto: {
+            orderId: string;
+            docNumber: string | null;
+            /** @description Mã lỗi nghiệp vụ (NOT_FOUND, ORDER_NOT_EDITABLE…). */
+            code: string;
+            message: string;
+            /** @description Lời hãng khi `code = CARRIER_REJECTED` (vd GHTK "Đơn hàng thiếu thông tin địa chỉ…"); null nếu không phải. */
+            carrierMessage: string | null;
+        };
         SendOrdersToCarrierResultDto: {
             sent: components["schemas"]["SendOrderToCarrierItemDto"][];
             /** @description Đơn không gửi được (đã post/hủy, ngoài scope, thiếu địa chỉ giao…) — phần còn lại vẫn gửi. */
-            failed: components["schemas"]["BulkUpdateFailedItemDto"][];
+            failed: components["schemas"]["SendToCarrierFailedItemDto"][];
         };
         BulkCancelOrdersDto: {
             orderIds: string[];
@@ -12806,7 +12833,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["AddressDto"];
+                "application/json": components["schemas"]["CustomerAddressInputDto"];
             };
         };
         responses: {

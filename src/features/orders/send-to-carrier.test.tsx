@@ -218,6 +218,69 @@ describe('Gửi sang ĐVVC — SendToCarrierMenu + SendToCarrierDialog', () => {
     );
   });
 
+  it('lô có đơn hãng từ chối: đơn khác vẫn gửi, dialog giữ mở với danh sách đơn lỗi (số đơn, khách, lời hãng); Đóng → tắt', async () => {
+    search = '';
+    toastSuccess.mockClear();
+    const rows = makeOrders(2);
+    const said = 'Đơn hàng thiếu thông tin địa chỉ (Đường hoặc Phường).';
+    server.use(
+      http.post('/api/sales-orders/send-to-carrier', () =>
+        HttpResponse.json(
+          {
+            sent: [
+              {
+                orderId: rows[1]!.id,
+                docNumber: rows[1]!.docNumber,
+                carrierId: 'c-ghtk',
+                carrierCode: 'GHTK',
+                outcome: 'ISSUED',
+                shipmentId: 's-1',
+                shipmentDocNumber: 'DN-1',
+                trackingNo: 'S1.SG',
+                reason: null,
+              },
+            ],
+            failed: [
+              {
+                orderId: rows[0]!.id,
+                docNumber: rows[0]!.docNumber,
+                code: 'CARRIER_REJECTED',
+                message: 'raw server message',
+                carrierMessage: said,
+              },
+            ],
+          },
+          { status: 201 },
+        ),
+      ),
+    );
+    await selectTwoRows();
+    const dialog = await openFor('GHTK');
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Cập nhật 2 đơn' }));
+
+    const list = await within(dialog).findByRole('list', { name: 'Danh sách đơn lỗi' });
+    expect(within(dialog).getByText('1 đơn không gửi được sang GHTK')).toBeInTheDocument();
+    expect(within(dialog).getByText(/1 đơn còn lại đã gửi xong/)).toBeInTheDocument();
+    const item = within(list).getByRole('listitem');
+    expect(within(item).getByRole('link', { name: rows[0]!.docNumber })).toHaveAttribute(
+      'href',
+      `/crm/orders/${rows[0]!.id}/edit`,
+    );
+    expect(item).toHaveTextContent(rows[0]!.customer.name);
+    expect(item).toHaveTextContent(`Hãng báo: “${said}”`);
+    // Luật 6: không render message thô của server.
+    expect(item).not.toHaveTextContent('raw server message');
+
+    // Danh sách vẫn giữ lựa chọn tới lúc đóng; đóng → dialog tắt + bỏ chọn.
+    // (toolbar nằm sau modal → aria-hidden, phải tìm với hidden: true)
+    expect(screen.getByRole('toolbar', { hidden: true })).toBeInTheDocument();
+    // Nút "Đóng" ở chân danh sách đơn lỗi (dialog còn nút × cùng tên ở góc).
+    const panel = within(dialog).getByRole('region', { name: 'Đơn không gửi được' });
+    fireEvent.click(within(panel).getByRole('button', { name: 'Đóng' }));
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+    await waitFor(() => expect(screen.queryByRole('toolbar')).not.toBeInTheDocument());
+  });
+
   it('toShippingOptions: mặc định chỉ gửi cờ, ô trống không gửi; điền đủ → đúng kiểu số/chuỗi', () => {
     expect(toShippingOptions(DEFAULT_SHIPPING_OPTIONS_FORM)).toEqual({
       shopPaysFee: true,
