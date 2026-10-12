@@ -121,6 +121,19 @@ const MESSAGES: Record<string, string> = {
     'Dòng này chưa có vị trí lấy hàng (thiếu tồn). Điều phối phải xử lý trước.',
   PDA_NO_RESERVATION: 'Không tìm thấy giữ chỗ khớp dòng này. Báo điều phối kiểm tra lại đơn nguồn.',
   PDA_WAVE_SKU_NOT_FOUND: 'Sản phẩm này không có trong lượt hoặc đã lấy đủ. Kiểm tra lại kệ.',
+  // Đơn mới + giao người đóng gói (2026-10-12, apps/api/docs/pick-pack-flow.md §7, §10)
+  PDA_NEW_ORDERS_TAKEN:
+    'Có đơn đã được người khác lấy trước hoặc không còn chờ lấy. Danh sách đã tải lại — chọn lại.',
+  PDA_NEW_ORDERS_LIMIT:
+    'Đang giữ quá nhiều đơn chưa lấy xong (tối đa 30). Bỏ bớt đơn đã chọn hoặc lấy xong việc đang giữ.',
+  PDA_HANDOVER_PENDING:
+    'Còn đơn đã lấy xong chưa giao người đóng gói. Chọn người đóng gói trước khi lấy đơn mới.',
+  PDA_HANDOVER_EMPTY: 'Không còn đơn nào chờ giao người đóng gói.',
+  PDA_INVALID_PACKER:
+    'Không giao được cho người này (đã khóa, không có quyền đóng gói, chưa gán kho hoặc khác kho). Chọn người khác.',
+  PDA_HANDOVER_NOT_YOURS: 'Lần giao này không phải của bạn — không đổi người đóng gói được.',
+  WAVE_SELF_MERGE_STALE:
+    'Danh sách đơn vừa thay đổi (có đơn đã bắt đầu lấy hoặc điều phối vừa đổi). Đã tải lại — bấm Gộp lượt lấy lần nữa.',
   CONTAINER_SCAN_REJECTED:
     'Thùng này không lấy được cho dòng đang làm — kiểm tra đúng thùng ghi trên phiếu, đúng vị trí, thùng chưa bị việc khác lấy.',
   CONTAINER_NOT_FOUND: 'Mã thùng không tồn tại. Quét lại tem trên thùng.',

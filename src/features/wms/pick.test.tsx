@@ -199,7 +199,9 @@ describe('Màn pick trên PDA — quét đơn → dòng theo lối đi → quét
     await waitFor(() => expect(screen.getAllByText('B-02-01').length).toBeGreaterThan(0));
     scanQty('BC-Y', '1');
     expect(await screen.findByText('Xong đơn SO2609-00009')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Quét đơn kế tiếp' })).toBeInTheDocument();
+    // Hết việc được giao → bắt buộc giao người đóng gói (2026-10-12); vẫn về màn chờ được.
+    expect(await screen.findByRole('button', { name: 'Chọn người đóng gói' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Về màn chờ' })).toBeInTheDocument();
   });
 
   it('ô số lượng: Enter với giá trị ≤ 0 → báo lỗi, không gọi server; Esc → bỏ mã đang chờ', async () => {
