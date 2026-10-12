@@ -47,12 +47,17 @@ export function formatDateTime(v: DateInput, opts: { seconds?: boolean } = {}): 
   return `${p.day}/${p.month}/${p.year} ${hh}:${p.minute}${opts.seconds ? `:${p.second}` : ''}`;
 }
 
-/** 14:05 */
-export function formatTime(v: DateInput): string {
+/** 14:05 — `seconds` → 14:05:09 */
+export function formatTime(v: DateInput, opts: { seconds?: boolean } = {}): string {
   const d = toDate(v);
   if (!d) return EMPTY;
-  const p = parts(d, { hour: '2-digit', minute: '2-digit', hour12: false });
-  return `${p.hour === '24' ? '00' : p.hour}:${p.minute}`;
+  const p = parts(d, {
+    hour: '2-digit',
+    minute: '2-digit',
+    ...(opts.seconds ? { second: '2-digit' } : {}),
+    hour12: false,
+  });
+  return `${p.hour === '24' ? '00' : p.hour}:${p.minute}${opts.seconds ? `:${p.second}` : ''}`;
 }
 
 /** Ngày theo múi giờ VN dạng yyyy-mm-dd — cho input[type=date] và query theo ngày. */

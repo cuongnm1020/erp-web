@@ -168,6 +168,74 @@ describe('DispatchScreen — GET /tasks (P1-12)', () => {
   });
 });
 
+describe('DispatchScreen — tự tải lại (2026-10-12)', () => {
+  /** Số lần gọi bảng (take ≠ 1) của tab đang mở. */
+  const countListCalls = () => {
+    const calls = { n: 0 };
+    server.use(
+      http.get('/api/tasks', ({ request }) => {
+        const q = new URL(request.url).searchParams;
+        if (q.get('take') !== '1') calls.n += 1;
+        const items = ALL.filter((t) => t.status === q.get('status'));
+        return HttpResponse.json({
+          items: items.slice(0, Number(q.get('take'))),
+          total: items.length,
+        });
+      }),
+    );
+    return calls;
+  };
+
+  it('mỗi 15 giây invalidate ["wms","tasks"] + ["wms","waves"] (luật 9) → bảng tải lại; bỏ tick thì dừng và nhớ lựa chọn', async () => {
+    search = '';
+    window.localStorage.removeItem('erp.dispatch.autoRefresh');
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    try {
+      const calls = countListCalls();
+      const queryClient = makeTestQueryClient();
+      const spy = vi.spyOn(queryClient, 'invalidateQueries');
+      renderApp(<DispatchScreen />, { queryClient });
+      await screen.findByText(PENDING[0]!.docNumber);
+      expect(screen.getByText(/^Cập nhật \d{2}:\d{2}:\d{2}$/)).toBeInTheDocument();
+      const before = calls.n;
+
+      await vi.advanceTimersByTimeAsync(15_000);
+      expect(spy).toHaveBeenCalledWith({ queryKey: ['wms', 'tasks'] });
+      expect(spy).toHaveBeenCalledWith({ queryKey: ['wms', 'waves'] });
+      await waitFor(() => expect(calls.n).toBe(before + 1));
+
+      const toggle = screen.getByRole('checkbox', { name: 'Tự tải lại' });
+      expect(toggle).toBeChecked();
+      fireEvent.click(toggle);
+      expect(toggle).not.toBeChecked();
+      expect(window.localStorage.getItem('erp.dispatch.autoRefresh')).toBe('off');
+      spy.mockClear();
+      await vi.advanceTimersByTimeAsync(45_000);
+      expect(spy).not.toHaveBeenCalled();
+      expect(calls.n).toBe(before + 1);
+    } finally {
+      vi.useRealTimers();
+      window.localStorage.removeItem('erp.dispatch.autoRefresh');
+    }
+  });
+
+  it('đã tắt từ lần trước → mở màn không tự tải; nút "Tải lại" vẫn tải ngay', async () => {
+    search = '';
+    window.localStorage.setItem('erp.dispatch.autoRefresh', 'off');
+    try {
+      const calls = countListCalls();
+      renderApp(<DispatchScreen />);
+      await screen.findByText(PENDING[0]!.docNumber);
+      expect(screen.getByRole('checkbox', { name: 'Tự tải lại' })).not.toBeChecked();
+      const before = calls.n;
+      fireEvent.click(screen.getByRole('button', { name: 'Tải lại bảng điều phối' }));
+      await waitFor(() => expect(calls.n).toBe(before + 1));
+    } finally {
+      window.localStorage.removeItem('erp.dispatch.autoRefresh');
+    }
+  });
+});
+
 describe('DispatchScreen — gán / trả việc (POST /tasks/:id/assign|unassign)', () => {
   it('thẻ PENDING có ô "Gán cho…" → chọn người → POST assign đúng body', async () => {
     search = '';
