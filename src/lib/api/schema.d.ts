@@ -507,6 +507,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/shipments/{id}/label-data": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Dữ liệu nhãn vận đơn ERP tự in khổ 100×75 mm (máy in nhiệt 3 inch) — dùng khi nhãn PDF
+         *     của hãng không vừa khổ hoặc hãng không có API nhãn. Quyền như in nhãn hãng.
+         */
+        get: operations["ShippingController_labelData"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/shipments/{id}/pack": {
         parameters: {
             query?: never;
@@ -5193,6 +5213,33 @@ export interface components {
             labelPrintedAt: string | null;
             labelPrintCount: number;
             packTask: components["schemas"]["ShipmentPackTaskDto"] | null;
+        };
+        ShipmentLabelRecipientDto: {
+            name: string;
+            phone: string;
+            /** @description Một dòng: số nhà/đường, thôn, xã/phường, quận/huyện, tỉnh. */
+            address: string;
+        };
+        ShipmentLabelItemDto: {
+            name: string;
+            /** @description Decimal(18,6) chuỗi — combo tính theo số combo. */
+            qty: string;
+        };
+        ShipmentLabelDataDto: {
+            shipmentId: string;
+            shipmentDocNumber: string;
+            orderDocNumber: string | null;
+            carrierCode: string | null;
+            carrierName: string | null;
+            /** @description null = hãng chưa cấp vận đơn. */
+            trackingNo: string | null;
+            /** @description Decimal(18,4) chuỗi — "0.0000" = không thu hộ. */
+            codAmount: string;
+            /** @description Decimal(12,4) kg chuỗi. */
+            weightKg: string | null;
+            recipient: components["schemas"]["ShipmentLabelRecipientDto"] | null;
+            items: components["schemas"]["ShipmentLabelItemDto"][];
+            note: string | null;
         };
         PackDto: {
             /**
@@ -11446,6 +11493,27 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ShipmentViewDto"];
+                };
+            };
+        };
+    };
+    ShippingController_labelData: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ShipmentLabelDataDto"];
                 };
             };
         };

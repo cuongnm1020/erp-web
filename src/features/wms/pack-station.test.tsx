@@ -18,6 +18,9 @@ vi.stubGlobal(
   },
 );
 window.HTMLElement.prototype.scrollIntoView = vi.fn();
+// Các test ở đây soi nhãn PDF của hãng (iframe A6); nhãn ERP 100×75 có test riêng
+// (label-print-dialog.test.tsx).
+beforeEach(() => localStorage.setItem('erp.pack.labelPageSize', 'A6'));
 const replace = vi.fn();
 vi.mock('next/navigation', () => ({
   usePathname: () => '/wms/pack',
