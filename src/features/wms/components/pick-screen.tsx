@@ -8,6 +8,7 @@ import {
   Layers,
   MapPin,
   PackageX,
+  UserCheck,
   Warehouse,
   WifiOff,
 } from 'lucide-react';
@@ -16,18 +17,24 @@ import { useEffect, useRef, useState } from 'react';
 import { ScanInput, type ScanInputHandle } from '@/components/data/scan-input';
 import { ForbiddenState } from '@/components/data/states';
 import { Button } from '@/components/ui/button';
+import { toast } from '@/components/ui/toaster';
+import { newIdempotencyKey } from '@/lib/api/client';
 import { beep } from '@/lib/beep';
 import { cn } from '@/lib/cn';
 import { messageFor } from '@/lib/error-messages';
 import { formatDateTime, formatQuantity } from '@/lib/format';
 import { useAbility } from '@/lib/permission';
 import {
+  usePdaHandoverState,
   usePdaMyTasks,
   usePdaMyWaves,
   usePdaQueue,
   usePdaStats,
   useResolveCode,
+  useSelfMergeWave,
 } from '../api/use-pda';
+import { HandoverDialog } from './handover-dialog';
+import { NewOrdersColumn } from './new-orders-column';
 import { useScanSession, type ScanFeedback, type Shortage } from '../scan-session';
 import { useScanQty } from '../use-scan-qty';
 import { useWaveSession } from '../wave-session';
@@ -54,6 +61,11 @@ type Mode = 'task' | 'wave';
  * 2026-10-01: màn chờ hiện thêm cột "Việc cất hàng" (hàng đợi PUT_AWAY: của tôi + chưa ai nhận)
  * để người lấy hàng thấy cả việc lấy và việc cất trên một màn. Chạm / quét mã PUT… → chuyển sang
  * /pda/put-away?task=… (màn cất hàng tự nhận việc), không gộp luồng cất vào phiên pick.
+ *
+ * 2026-10-12 (spec `docs/screens/FE-PDA-2-new-orders-handover.md`, luồng
+ * `apps/api/docs/pick-pack-flow.md`): cột "Đơn mới" (chọn đơn → Lấy đơn, ai trước được), nút
+ * "Gộp lượt lấy" (gộp mọi việc đang giữ chưa bắt đầu), lấy xong → BẮT BUỘC chọn người đóng gói
+ * (HandoverDialog). Đơn thiếu hàng không hoàn thành pick, chuyển điều phối.
  */
 export function PickScreen() {
   const ability = useAbility();
@@ -76,17 +88,24 @@ export function PickScreen() {
   const myWaves = usePdaMyWaves(canExecute);
   const doneToday = usePdaStats('PICK', null, canExecute);
   const putQueue = usePdaQueue('PUT_AWAY', canExecute);
+  const handover = usePdaHandoverState(canExecute);
+  const selfMerge = useSelfMergeWave();
+  const [handoverMode, setHandoverMode] = useState<'new' | 'change' | null>(null);
+  const mergeKey = useRef<{ sig: string; key: string } | null>(null);
   const idle = !resolving && task.phase === 'idle' && wave.phase === 'idle';
+  const finished = task.phase === 'done' || wave.phase === 'done';
   useEffect(() => {
-    // Quay về màn chờ (sau "Quét đơn kế tiếp") → làm tươi hai cột ngay, không đợi 30s.
-    if (idle && canExecute) {
+    // Quay về màn chờ (sau "Quét đơn kế tiếp") hoặc vừa xong việc → làm tươi các cột ngay, không
+    // đợi 30s (xong việc cần biết còn việc nào không để mời chọn người đóng gói).
+    if ((idle || finished) && canExecute) {
       void myTasks.refetch();
       void myWaves.refetch();
       void doneToday.refetch();
       void putQueue.refetch();
+      void handover.refetch();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [idle, canExecute]);
+  }, [idle, finished, canExecute]);
 
   if (!canExecute) return <ForbiddenState className="m-4" />;
 
@@ -188,6 +207,36 @@ export function PickScreen() {
     await wave.open(waveId);
   };
 
+  // "Gộp lượt lấy": mọi việc PICK của tôi chưa bắt đầu (ASSIGNED), ngoài lượt — tối đa 30.
+  const mergeIds = (myPicks ?? [])
+    .filter((t) => t.status === 'ASSIGNED')
+    .slice(0, 30)
+    .map((t) => t.taskId);
+  const onMerge = () => {
+    if (mergeIds.length < 2 || selfMerge.isPending) return;
+    const sig = [...mergeIds].sort().join(',');
+    // Luật 4: key sinh lúc bấm, giữ khi bấm lại cùng danh sách.
+    if (mergeKey.current?.sig !== sig) mergeKey.current = { sig, key: newIdempotencyKey() };
+    selfMerge.mutate(
+      { taskIds: mergeIds, idempotencyKey: mergeKey.current.key },
+      {
+        onSuccess: (w) => {
+          mergeKey.current = null;
+          toast.success(`Đã gộp ${mergeIds.length} đơn thành lượt ${w.docNumber}`);
+          void openWave(w.id);
+        },
+        onError: (err) => {
+          mergeKey.current = null;
+          toast.error(messageFor(err));
+        },
+      },
+    );
+  };
+  const pendingHandover = handover.data?.pending.length ?? 0;
+  const latestHandover = handover.data?.latest ?? null;
+  // Xong việc mà không còn việc được giao → bắt buộc giao người đóng gói.
+  const noMoreWork = assignedCount === 0;
+
   return (
     <div className="flex min-h-dvh flex-col bg-background text-base">
       <header className="flex items-center justify-between border-b px-4 py-3">
@@ -264,10 +313,60 @@ export function PickScreen() {
               <p className="text-lg font-medium text-foreground">Quét mã đơn để nhận việc</p>
               <p className="text-sm">
                 Mã trên phiếu đơn hàng, phiếu lấy hàng, phiếu lượt gộp hoặc phiếu cất hàng — hoặc
-                chạm một việc bên dưới.
+                chọn đơn mới / chạm một việc bên dưới.
               </p>
             </div>
+            {pendingHandover > 0 ? (
+              <div
+                role="status"
+                className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-warning/60 bg-warning/10 px-3 py-2"
+              >
+                <span className="flex items-center gap-2 font-medium">
+                  <AlertTriangle className="h-4 w-4 text-warning" aria-hidden />
+                  {pendingHandover} đơn đã lấy xong chưa giao người đóng gói
+                </span>
+                <Button className="h-12" onClick={() => setHandoverMode('new')}>
+                  <UserCheck aria-hidden />
+                  Chọn người đóng gói
+                </Button>
+              </div>
+            ) : null}
+            {latestHandover && latestHandover.changeable > 0 ? (
+              <div className="flex flex-wrap items-center justify-between gap-2 rounded-md border bg-muted px-3 py-2 text-sm">
+                <span>
+                  Đã giao {latestHandover.orders.length} đơn cho{' '}
+                  <b>{latestHandover.packer.fullName}</b>
+                </span>
+                <Button
+                  variant="outline"
+                  className="h-12"
+                  onClick={() => setHandoverMode('change')}
+                >
+                  Đổi người đóng gói
+                </Button>
+              </div>
+            ) : null}
+            {mergeIds.length >= 2 ? (
+              <Button
+                variant="outline"
+                className="h-14 border-primary text-base text-primary"
+                disabled={selfMerge.isPending}
+                onClick={onMerge}
+              >
+                <Layers aria-hidden />
+                {selfMerge.isPending ? 'Đang gộp lượt…' : `Gộp lượt lấy · ${mergeIds.length} đơn`}
+              </Button>
+            ) : null}
             <div className="grid gap-3 md:grid-cols-2">
+              <NewOrdersColumn
+                enabled={canExecute}
+                blocked={pendingHandover > 0}
+                onTaken={() => {
+                  void myTasks.refetch();
+                  void myWaves.refetch();
+                }}
+                onHandoverRequired={() => setHandoverMode('new')}
+              />
               <PdaListColumn
                 title="Việc được giao"
                 hint="chưa lấy xong"
@@ -554,10 +653,11 @@ export function PickScreen() {
               {mode === 'wave' ? `Xong lượt ${heading}` : `Xong đơn ${heading}`}
             </p>
             <p className="text-muted-foreground">
+              {/* 2026-10-12: đơn thiếu hàng không hoàn thành pick, không sang đóng gói. */}
               {shortages.length > 0
-                ? `Có ${shortages.length} ${mode === 'wave' ? 'nhóm' : 'dòng'} thiếu hàng — điều phối đã nhận cảnh báo.`
-                : 'Chuyển hàng sang bàn đóng gói.'}{' '}
-              Quét đơn kế tiếp.
+                ? `Có ${shortages.length} ${mode === 'wave' ? 'nhóm' : 'dòng'} thiếu hàng — đơn thiếu chuyển điều phối xử lý, không sang đóng gói.`
+                : 'Mang hàng về bàn đóng gói.'}{' '}
+              {noMoreWork ? 'Chọn người đóng gói nhận các đơn đã lấy.' : 'Quét đơn kế tiếp.'}
             </p>
           </div>
         ) : null}
@@ -579,9 +679,21 @@ export function PickScreen() {
           disabled={phase === 'opening'}
         />
         {phase === 'done' ? (
-          <Button className="h-[72px] text-lg" onClick={clear}>
-            Quét đơn kế tiếp
-          </Button>
+          noMoreWork ? (
+            <div className="grid gap-2">
+              <Button className="h-[72px] text-lg" onClick={() => setHandoverMode('new')}>
+                <UserCheck aria-hidden />
+                Chọn người đóng gói
+              </Button>
+              <Button variant="outline" className="h-12" onClick={clear}>
+                Về màn chờ
+              </Button>
+            </div>
+          ) : (
+            <Button className="h-[72px] text-lg" onClick={clear}>
+              Quét đơn kế tiếp
+            </Button>
+          )
         ) : phase === 'ready' ? (
           <div className="grid grid-cols-2 gap-2">
             <Button
@@ -604,6 +716,16 @@ export function PickScreen() {
         )}
       </footer>
 
+      <HandoverDialog
+        open={handoverMode !== null}
+        change={handoverMode === 'change'}
+        onOpenChange={(o) => {
+          if (o) return;
+          setHandoverMode(null);
+          // Giao xong từ màn "Xong" → về màn chờ để lấy đơn mới.
+          if (phase === 'done') clear();
+        }}
+      />
       <ShortPickDialog
         open={shortOpen}
         onOpenChange={setShortOpen}

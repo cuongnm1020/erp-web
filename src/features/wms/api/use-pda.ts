@@ -29,6 +29,9 @@ export const pdaKeys = {
   myWaves: () => [...pdaKeys.all, 'my-waves'] as const,
   stats: (type: string, date: string | null) => [...pdaKeys.all, 'stats', type, date] as const,
   packed: (taskId: string) => [...pdaKeys.all, 'packed', taskId] as const,
+  newOrders: () => [...pdaKeys.all, 'new-orders'] as const,
+  handover: () => [...pdaKeys.all, 'handover'] as const,
+  packers: (warehouseId: string) => [...pdaKeys.all, 'packers', warehouseId] as const,
 };
 
 /**
@@ -275,5 +278,102 @@ export function usePdaStats(
       unwrap(api.GET('/pda/stats', { params: { query: { type, ...(date ? { date } : {}) } } })),
     enabled,
     refetchInterval: 60_000,
+  });
+}
+
+// ── Đơn mới + giao người đóng gói (2026-10-12, apps/api/docs/pick-pack-flow.md §7, §10) ──
+
+export type PdaNewOrders = components['schemas']['PdaNewOrdersDto'];
+export type PdaNewOrder = components['schemas']['PdaNewOrderItemDto'];
+export type PdaHandoverState = components['schemas']['PdaHandoverStateDto'];
+export type PdaHandover = components['schemas']['PdaHandoverDto'];
+export type PdaPacker = components['schemas']['PdaPackerDto'];
+
+/**
+ * GET /pda/new-orders — đơn chưa ai giữ đã "Gửi sang ĐVVC", đủ tồn; giá trị cao trước (server
+ * sắp). Làm tươi 30 s như các cột khác của màn chờ.
+ */
+export function usePdaNewOrders(enabled = true) {
+  return useQuery({
+    queryKey: pdaKeys.newOrders(),
+    queryFn: () => unwrap(api.GET('/pda/new-orders', { params: { query: { take: 200 } } })),
+    enabled,
+    refetchInterval: 30_000,
+  });
+}
+
+/**
+ * POST /pda/new-orders/take — "Lấy đơn" cả lô; ai trước được, người sau 409 cả lô. Xong → làm
+ * tươi mọi cột PDA (đơn mới, việc của tôi) + bảng điều phối.
+ */
+export function useTakeNewOrders() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (body: { taskIds: string[]; idempotencyKey: string }) =>
+      unwrap(api.POST('/pda/new-orders/take', { body })),
+    onSettled: () => {
+      void qc.invalidateQueries({ queryKey: pdaKeys.all });
+      void qc.invalidateQueries({ queryKey: taskKeys.all });
+    },
+  });
+}
+
+/** POST /pda/waves/self-merge — "Gộp lượt lấy": gộp mọi việc PICK của tôi chưa bắt đầu thành lượt. */
+export function useSelfMergeWave() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (body: { taskIds: string[]; idempotencyKey: string }) =>
+      unwrap(api.POST('/pda/waves/self-merge', { body })),
+    onSettled: () => {
+      void qc.invalidateQueries({ queryKey: pdaKeys.all });
+      void qc.invalidateQueries({ queryKey: taskKeys.all });
+    },
+  });
+}
+
+/** GET /pda/handover — đơn đã lấy xong chờ giao người đóng gói + lần giao gần nhất hôm nay. */
+export function usePdaHandoverState(enabled = true) {
+  return useQuery({
+    queryKey: pdaKeys.handover(),
+    queryFn: () => unwrap(api.GET('/pda/handover')),
+    enabled,
+    refetchInterval: 30_000,
+  });
+}
+
+/** GET /pda/packers?warehouseId= — người đóng gói cùng kho (đang hoạt động, có quyền đóng gói). */
+export function usePdaPackers(warehouseId: string | null) {
+  return useQuery({
+    queryKey: pdaKeys.packers(warehouseId ?? ''),
+    queryFn: () =>
+      unwrap(api.GET('/pda/packers', { params: { query: { warehouseId: warehouseId ?? '' } } })),
+    enabled: warehouseId !== null && warehouseId !== '',
+  });
+}
+
+/**
+ * Giao người đóng gói: không `handoverId` → POST /pda/handovers (giao MỌI đơn đã lấy xong);
+ * có → POST /pda/handovers/:id/packer (đổi người, chuyển hết đơn chưa bắt đầu đóng).
+ */
+export function useHandoverToPacker() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      handoverId,
+      ...body
+    }: {
+      handoverId: string | null;
+      packerId: string;
+      idempotencyKey: string;
+    }) =>
+      handoverId
+        ? unwrap(
+            api.POST('/pda/handovers/{id}/packer', { params: { path: { id: handoverId } }, body }),
+          )
+        : unwrap(api.POST('/pda/handovers', { body })),
+    onSettled: () => {
+      void qc.invalidateQueries({ queryKey: pdaKeys.all });
+      void qc.invalidateQueries({ queryKey: taskKeys.all });
+    },
   });
 }

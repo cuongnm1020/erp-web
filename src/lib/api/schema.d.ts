@@ -3344,6 +3344,107 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/pda/new-orders": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["PdaController_newOrders"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/pda/new-orders/take": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** "Lấy đơn": nhận cả lô — có đơn đã bị lấy trước → 409 PDA_NEW_ORDERS_TAKEN, không nhận đơn nào. */
+        post: operations["PdaController_takeNewOrders"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/pda/handover": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Đơn đã lấy xong chờ giao người đóng gói + lần giao gần nhất hôm nay. */
+        get: operations["PdaController_handoverState"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/pda/packers": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Người đóng gói chọn được: đang hoạt động, có quyền đóng gói, kho làm việc = kho (mặc định kho máy). */
+        get: operations["PdaController_packers"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/pda/handovers": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Giao MỌI đơn đã lấy xong (chưa giao) cho một người đóng gói — PACK gán đích danh. */
+        post: operations["PdaController_createHandover"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/pda/handovers/{id}/packer": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Đổi người đóng gói của một lần giao — chuyển hết đơn chưa bắt đầu đóng. */
+        post: operations["PdaController_changeHandoverPacker"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/pda/tasks": {
         parameters: {
             query?: never;
@@ -4586,6 +4687,8 @@ export interface components {
             fullName: string;
             departmentId: string | null;
             departmentName: string | null;
+            /** @description Kho làm việc (wms.Warehouse.id); null = chưa gán. */
+            warehouseId: string | null;
             roleCodes: string[];
             isActive: boolean;
             isSuperAdmin: boolean;
@@ -4609,6 +4712,11 @@ export interface components {
             password: string;
             /** Format: uuid */
             departmentId?: string;
+            /**
+             * Format: uuid
+             * @description Kho làm việc (wms.Warehouse.id) — picker PDA giao đơn cho người đóng gói cùng kho.
+             */
+            warehouseId?: string;
             roleCodes?: string[];
         };
         UserDepartmentDto: {
@@ -4634,6 +4742,8 @@ export interface components {
             email: string;
             fullName: string;
             department: components["schemas"]["UserDepartmentDto"] | null;
+            /** @description Kho làm việc (wms.Warehouse.id); null = chưa gán. */
+            warehouseId: string | null;
             roles: components["schemas"]["UserRoleItemDto"][];
             /** @description Membership đang hiệu lực (leftAt IS NULL). */
             teams: components["schemas"]["UserTeamDto"][];
@@ -4657,6 +4767,11 @@ export interface components {
              * @description null = bỏ khỏi phòng ban.
              */
             departmentId?: string | null;
+            /**
+             * Format: uuid
+             * @description Kho làm việc. null = bỏ gán kho.
+             */
+            warehouseId?: string | null;
             isActive?: boolean;
             /** @description Admin đặt lại mật khẩu. */
             password?: string;
@@ -4812,7 +4927,7 @@ export interface components {
              * @description PANCAKE = có hồ sơ / định danh Pancake hoặc mã do sync tạo (PC…-C-…); MANUAL = tạo trên ERP.
              * @enum {string}
              */
-            source: "PANCAKE" | "MANUAL";
+            source: "MANUAL" | "PANCAKE";
         };
         DuplicateGroupDto: {
             /** @description SĐT chuẩn hoá (core.normalize_phone) chung của nhóm. */
@@ -4898,7 +5013,7 @@ export interface components {
             owners: components["schemas"]["NamedRefDto"][];
             teams: components["schemas"]["NamedRefDto"][];
             /** @enum {string} */
-            source: "PANCAKE" | "MANUAL";
+            source: "MANUAL" | "PANCAKE";
             pancake: components["schemas"]["PancakeLinkDto"] | null;
             consents: components["schemas"]["ConsentSummaryDto"][];
             orders: components["schemas"]["CustomerOrderSummaryDto"];
@@ -5659,14 +5774,20 @@ export interface components {
         };
         ResyncOrdersDto: {
             shopId: number;
+            fromDate?: string;
+            toDate?: string;
         };
         PancakeOrderResyncCountsDto: {
             /** @description Đã ghi đè theo bản Pancake mới nhất. */
             updated: number;
+            /** @description Đơn ERP chưa có, vừa tạo từ Pancake (chỉ khi quét theo khoảng ngày). */
+            created: number;
             /** @description Kho đã bắt đầu làm (nhận việc pick / đóng gói) lúc tới lượt — không ghi đè. */
             skipped: number;
             /** @description PICK chờ được sinh lại vì dòng đơn đổi. */
             pickReplanned: number;
+            /** @description Pancake đã gửi qua hãng của Pancake → ERP đánh dấu gửi ngoài ERP (trừ tồn, gắn vận đơn). */
+            shippedExternal: number;
             failed: number;
         };
         PancakeOrderResyncItemDto: {
@@ -8692,6 +8813,88 @@ export interface components {
         StuckShipmentListDto: {
             items: components["schemas"]["StuckShipmentDto"][];
             total: number;
+        };
+        PdaNewOrderItemDto: {
+            /** @description Việc PICK của đơn — gửi lên "Lấy đơn". */
+            taskId: string;
+            orderId: string;
+            /** @description Mã đơn bán (SO…). */
+            docNumber: string;
+            /** @description Số SKU khác nhau cần lấy. */
+            skuCount: number;
+            /**
+             * @description Cân nặng (kg, chuỗi Decimal 4 số lẻ) = Σ số lượng (ĐVT gốc) × `Sku.weightKg`; SKU chưa khai cân
+             *     nặng tính 0. KHÔNG dùng cân nặng gửi hãng đặt tay trên đơn.
+             */
+            weightKg: string;
+        };
+        PdaNewOrdersDto: {
+            /** @description Kho của thiết bị (null = máy không gắn kho → mọi kho). */
+            warehouseId: string | null;
+            items: components["schemas"]["PdaNewOrderItemDto"][];
+            /** @description Tổng số đơn chờ lấy (mọi trang). */
+            total: number;
+            /** @description Số đơn PICK đang giữ chưa lấy xong — "Lấy đơn" không cho vượt `limit`. */
+            holding: number;
+            /** @description Trần đơn giữ cùng lúc (= trần một lượt gộp). */
+            limit: number;
+            /** @description Số đơn đã lấy xong chưa giao người đóng gói — > 0 thì phải giao trước khi lấy thêm. */
+            pendingHandover: number;
+        };
+        TakeNewOrdersDto: {
+            taskIds: string[];
+            idempotencyKey: string;
+        };
+        PdaTakeNewOrdersResultDto: {
+            taskIds: string[];
+            /** @description Mã đơn bán đã nhận, cùng thứ tự `taskIds`. */
+            docNumbers: string[];
+            replayed: boolean;
+        };
+        PdaHandoverOrderDto: {
+            /** @description Việc PICK đã lấy xong. */
+            taskId: string;
+            orderId: string;
+            docNumber: string;
+            /** @description Việc PACK của đơn (null = worker chưa sinh — sinh ra sẽ tự gán người đóng gói). */
+            packTaskId: string | null;
+            /** @enum {string|null} */
+            packStatus: "CANCELLED" | "PENDING" | "ASSIGNED" | "IN_PROGRESS" | "COMPLETED" | "EXCEPTION" | null;
+        };
+        PdaPackerDto: {
+            id: string;
+            code: string;
+            fullName: string;
+        };
+        PdaHandoverDto: {
+            id: string;
+            warehouseId: string;
+            packer: components["schemas"]["PdaPackerDto"];
+            createdAt: string;
+            updatedAt: string;
+            orders: components["schemas"]["PdaHandoverOrderDto"][];
+            /** @description Số đơn còn đổi người đóng gói được (PACK chưa bắt đầu quét). */
+            changeable: number;
+            replayed: boolean;
+        };
+        PdaHandoverStateDto: {
+            /** @description Đơn đã lấy xong chưa giao, theo kho. Rỗng = không có gì chờ giao. */
+            pending: components["schemas"]["PdaHandoverOrderDto"][];
+            /** @description Kho của các đơn chờ giao (null khi `pending` rỗng). */
+            pendingWarehouseId: string | null;
+            /** @description Số việc PICK tôi còn đang giữ chưa xong (ASSIGNED / IN_PROGRESS). */
+            openPicks: number;
+            latest: components["schemas"]["PdaHandoverDto"] | null;
+        };
+        CreateHandoverDto: {
+            /** Format: uuid */
+            packerId: string;
+            idempotencyKey: string;
+        };
+        ChangeHandoverPackerDto: {
+            /** Format: uuid */
+            packerId: string;
+            idempotencyKey: string;
         };
         PdaBarcodeDetailDto: {
             code: string;
@@ -16211,6 +16414,139 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["StuckShipmentListDto"];
+                };
+            };
+        };
+    };
+    PdaController_newOrders: {
+        parameters: {
+            query?: {
+                take?: number;
+                skip?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PdaNewOrdersDto"];
+                };
+            };
+        };
+    };
+    PdaController_takeNewOrders: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TakeNewOrdersDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PdaTakeNewOrdersResultDto"];
+                };
+            };
+        };
+    };
+    PdaController_handoverState: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PdaHandoverStateDto"];
+                };
+            };
+        };
+    };
+    PdaController_packers: {
+        parameters: {
+            query?: {
+                warehouseId?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PdaPackerDto"][];
+                };
+            };
+        };
+    };
+    PdaController_createHandover: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateHandoverDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PdaHandoverDto"];
+                };
+            };
+        };
+    };
+    PdaController_changeHandoverPacker: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ChangeHandoverPackerDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PdaHandoverDto"];
                 };
             };
         };

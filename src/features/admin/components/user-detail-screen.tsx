@@ -15,6 +15,13 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
   Table,
@@ -29,8 +36,16 @@ import { messageFor } from '@/lib/error-messages';
 import { formatDate, formatDateTime } from '@/lib/format';
 import { useAbility } from '@/lib/permission';
 import { useRoles } from '../api/use-roles';
-import { useAssignRoles, useUpdateUser, useUser, type UserDetail } from '../api/use-users';
+import {
+  useAssignRoles,
+  useUpdateUser,
+  useUser,
+  useWarehouseOptions,
+  type UserDetail,
+} from '../api/use-users';
 import { UserPermissionMatrix } from './user-permission-matrix';
+
+const NO_WAREHOUSE = '__none__';
 
 const TEAM_ROLE: Record<'LEADER' | 'MEMBER', { label: string; tone: 'brand' | 'neutral' }> = {
   LEADER: { label: 'Leader', tone: 'brand' },
@@ -117,16 +132,21 @@ function EditDialog({
   onOpenChange: (o: boolean) => void;
 }) {
   const update = useUpdateUser(user.id);
+  const ability = useAbility();
+  const canReadWarehouses = ability.can('read', 'Stock');
+  const warehouses = useWarehouseOptions(open && canReadWarehouses);
   const [fullName, setFullName] = useState(user.fullName);
   const [email, setEmail] = useState(user.email);
   const [password, setPassword] = useState('');
+  const [warehouseId, setWarehouseId] = useState(user.warehouseId ?? '');
   useEffect(() => {
     if (open) {
       setFullName(user.fullName);
       setEmail(user.email);
       setPassword('');
+      setWarehouseId(user.warehouseId ?? '');
     }
-  }, [open, user.fullName, user.email]);
+  }, [open, user.fullName, user.email, user.warehouseId]);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -153,6 +173,30 @@ function EditDialog({
               onChange={(e) => setPassword(e.target.value)}
             />
           </label>
+          {canReadWarehouses ? (
+            <div className="block text-sm">
+              Kho làm việc
+              <Select
+                value={warehouseId || NO_WAREHOUSE}
+                onValueChange={(v) => setWarehouseId(v === NO_WAREHOUSE ? '' : v)}
+              >
+                <SelectTrigger aria-label="Kho làm việc">
+                  <SelectValue placeholder="— Chưa gán kho —" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={NO_WAREHOUSE}>— Chưa gán kho —</SelectItem>
+                  {(warehouses.data ?? []).map((w) => (
+                    <SelectItem key={w.id} value={w.id}>
+                      {w.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <span className="mt-1 block text-xs text-muted-foreground">
+                Người đóng gói chỉ hiện cho nhân viên lấy hàng cùng kho.
+              </span>
+            </div>
+          ) : null}
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)}>
@@ -166,6 +210,9 @@ function EditDialog({
                   fullName: fullName.trim(),
                   email: email.trim(),
                   ...(password ? { password } : {}),
+                  ...(canReadWarehouses && warehouseId !== (user.warehouseId ?? '')
+                    ? { warehouseId: warehouseId || null }
+                    : {}),
                 },
                 {
                   onSuccess: () => {
@@ -194,6 +241,11 @@ export function UserDetailScreen({ id }: { id: string }) {
   const update = useUpdateUser(id);
   const ability = useAbility();
   const [editOpen, setEditOpen] = useState(false);
+  const warehouses = useWarehouseOptions(ability.can('read', 'Stock'));
+  const warehouseName = (id: string | null) =>
+    id === null
+      ? 'Chưa gán'
+      : (warehouses.data?.find((w) => w.id === id)?.name ?? 'Đã gán (kho ngừng dùng?)');
 
   // `user.canManage` (server): chỉ người tạo tài khoản / superadmin được sửa — CASL chỉ cho biết
   // có quyền chung, còn tài khoản cụ thể này có phải "của mình" hay không thì server quyết.
@@ -279,6 +331,7 @@ export function UserDetailScreen({ id }: { id: string }) {
                 <InfoRow label="Họ tên" value={user.fullName} />
                 <InfoRow label="Email" value={user.email} />
                 <InfoRow label="Phòng ban" value={user.department?.name ?? '—'} />
+                <InfoRow label="Kho làm việc" value={warehouseName(user.warehouseId)} />
                 <InfoRow label="Người tạo" value={user.createdBy?.fullName ?? '—'} />
                 <InfoRow label="Tạo lúc" value={formatDateTime(user.createdAt)} />
                 <InfoRow label="Cập nhật" value={formatDateTime(user.updatedAt)} />

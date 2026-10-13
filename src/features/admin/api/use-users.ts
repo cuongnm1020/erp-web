@@ -39,6 +39,22 @@ export const userKeys = {
   permissions: (id: string) => [...userKeys.detail(id), 'permissions'] as const,
 };
 
+export type WarehouseOption = components['schemas']['WarehouseSummaryDto'];
+
+/**
+ * Kho chọn làm "Kho làm việc" của nhân viên (2026-10-12): GET /warehouses, bỏ kho ngừng dùng và
+ * kho ảo TRANSIT. Picker PDA chỉ giao đơn cho người đóng gói cùng kho
+ * (`apps/api/docs/pick-pack-flow.md` §10). Key riêng của admin — features không import chéo.
+ */
+export function useWarehouseOptions(enabled = true) {
+  return useQuery({
+    queryKey: ['admin', 'warehouse-options'] as const,
+    queryFn: () => unwrap(api.GET('/warehouses')),
+    select: (rows: WarehouseOption[]) => rows.filter((w) => w.isActive && w.code !== 'TRANSIT'),
+    enabled,
+  });
+}
+
 export function useUsers(params: UserListParams) {
   return useQuery({
     queryKey: userKeys.list(params),

@@ -34,10 +34,11 @@ import type { ApiError } from '@/lib/api/errors';
 import { useAbility } from '@/lib/permission';
 import { useDepartments } from '../api/use-departments';
 import { useRoles } from '../api/use-roles';
-import { useCreateUser } from '../api/use-users';
+import { useCreateUser, useWarehouseOptions } from '../api/use-users';
 import { createUserSchema, type CreateUserValues } from '../schema';
 
 const NO_DEPT = '__none__';
+const NO_WAREHOUSE = '__none__';
 
 /**
  * I-02 Thêm nhân viên — POST /users. Sau khi tạo, phân quyền chi tiết ở màn chi tiết.
@@ -58,6 +59,9 @@ export function UserCreateDialog({
   const departments = useDepartments(fixedDepartment === undefined);
   const canReadRoles = ability.can('read', 'Role');
   const roles = useRoles(canReadRoles);
+  // GET /warehouses cần stock.read — không có quyền thì ẩn ô Kho làm việc (sửa sau ở chi tiết).
+  const canReadWarehouses = ability.can('read', 'Stock');
+  const warehouses = useWarehouseOptions(open && canReadWarehouses);
 
   const form = useForm<CreateUserValues>({
     resolver: zodResolver(createUserSchema),
@@ -67,6 +71,7 @@ export function UserCreateDialog({
       email: '',
       password: '',
       departmentId: fixedDepartment?.id ?? '',
+      warehouseId: '',
       roleCodes: [],
     },
   });
@@ -79,6 +84,7 @@ export function UserCreateDialog({
         email: v.email,
         password: v.password,
         departmentId: v.departmentId || undefined,
+        warehouseId: v.warehouseId || undefined,
         roleCodes: v.roleCodes.length ? v.roleCodes : undefined,
       },
       {
@@ -89,7 +95,15 @@ export function UserCreateDialog({
         },
         onError: (err) => {
           applyServerErrors(form, err as ApiError, {
-            knownFields: ['code', 'fullName', 'email', 'password', 'departmentId', 'roleCodes'],
+            knownFields: [
+              'code',
+              'fullName',
+              'email',
+              'password',
+              'departmentId',
+              'warehouseId',
+              'roleCodes',
+            ],
           });
         },
       },
@@ -193,6 +207,36 @@ export function UserCreateDialog({
                 )}
               />
             )}
+            {canReadWarehouses ? (
+              <FormField
+                control={form.control}
+                name="warehouseId"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Kho làm việc</FormLabel>
+                    <Select
+                      value={field.value || NO_WAREHOUSE}
+                      onValueChange={(v) => field.onChange(v === NO_WAREHOUSE ? '' : v)}
+                    >
+                      <FormControl>
+                        <SelectTrigger aria-label="Kho làm việc">
+                          <SelectValue placeholder="— Chưa gán kho —" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value={NO_WAREHOUSE}>— Chưa gán kho —</SelectItem>
+                        {(warehouses.data ?? []).map((w) => (
+                          <SelectItem key={w.id} value={w.id}>
+                            {w.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            ) : null}
             {canReadRoles ? (
               <FormField
                 control={form.control}

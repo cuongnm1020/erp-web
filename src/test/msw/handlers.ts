@@ -1000,6 +1000,7 @@ export const USER_DETAIL_FIXTURE = {
   email: 'nv2@erp.local',
   fullName: 'Nhân viên 2',
   department: { id: uuid('0000000c', 0), code: 'SALES', name: 'Kinh doanh' },
+  warehouseId: null as string | null,
   roles: [{ code: 'SALES_MEMBER', name: 'Nhân viên kinh doanh' }],
   teams: [
     {
@@ -1443,7 +1444,14 @@ export const handlers = [
       state: 'idle',
       done: 0,
       total: 0,
-      counts: { updated: 0, skipped: 0, pickReplanned: 0, failed: 0 },
+      counts: {
+        updated: 0,
+        created: 0,
+        skipped: 0,
+        pickReplanned: 0,
+        shippedExternal: 0,
+        failed: 0,
+      },
       failures: [],
       skippedOrders: [],
       error: null,
@@ -1717,6 +1725,20 @@ export const handlers = [
   http.get('/api/pda/tasks', () => HttpResponse.json([])),
   // Lượt gộp đã giao cho tôi (GET /pda/waves) — mặc định rỗng.
   http.get('/api/pda/waves', () => HttpResponse.json({ items: [], total: 0 })),
+  // Cột "Đơn mới" + giao người đóng gói (2026-10-12) — mặc định rỗng; test luồng mới tự ghi đè.
+  http.get('/api/pda/new-orders', () =>
+    HttpResponse.json({
+      warehouseId: null,
+      items: [],
+      total: 0,
+      holding: 0,
+      limit: 30,
+      pendingHandover: 0,
+    }),
+  ),
+  http.get('/api/pda/handover', () =>
+    HttpResponse.json({ pending: [], pendingWarehouseId: null, openPicks: 0, latest: null }),
+  ),
   // Hàng đợi + thống kê bàn đóng gói (role PACKER, 2026-09-15) — mặc định rỗng / 0.
   http.get('/api/pda/queue', ({ request }) => {
     const type = new URL(request.url).searchParams.get('type') ?? 'PACK';
