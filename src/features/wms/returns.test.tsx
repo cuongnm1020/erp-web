@@ -17,6 +17,16 @@ vi.mock('next/navigation', () => ({
   useSearchParams: () => new URLSearchParams(search),
 }));
 
+const toastSuccess = vi.fn();
+const toastError = vi.fn();
+vi.mock('@/components/ui/toaster', () => ({
+  toast: {
+    success: (...a: unknown[]) => toastSuccess(...a),
+    error: (...a: unknown[]) => toastError(...a),
+    info: vi.fn(),
+  },
+}));
+
 /** Đúng shape `ReturnableOrderDto` (GET /return-receipts/returnable). */
 const RETURNABLE: ReturnableOrder = {
   orderId: 'o-1',
@@ -174,6 +184,87 @@ describe('Nhập hàng hoàn', () => {
     fireEvent.change(screen.getByLabelText('Hủy dòng 1'), { target: { value: '2' } });
     expect(screen.getByText('Tối đa 4')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Lưu & post' })).toBeDisabled();
+  });
+
+  it('quét mã từng sản phẩm hoàn về → cộng "Nhập lại kho" của dòng cùng SKU (mã thùng cộng cả thùng); vượt / không thuộc đơn / mã lạ → báo, không cộng', async () => {
+    search = 'orderId=o-1';
+    toastError.mockClear();
+    const sku = (id: string, code: string, name: string) => ({
+      id,
+      code,
+      name,
+      productCode: code,
+      trackingMode: 'NONE',
+    });
+    const base = { id: 'u-pcs', code: 'PCS' };
+    server.use(
+      http.get('/api/return-receipts/returnable', () => HttpResponse.json(RETURNABLE)),
+      http.get('/api/barcodes/:code', ({ params }) => {
+        const code = String(params.code);
+        if (code === 'https://www.thiennongnamviet.com.vn/vbc')
+          return HttpResponse.json({
+            barcode: code,
+            type: 'QR',
+            sku: sku('s-1', 'VBC-40G', 'Vua Bật Chồi 40gr'),
+            uom: { ...base, name: 'Gói' },
+            baseUom: base,
+            factor: '1',
+          });
+        if (code === 'THUNG-VBC')
+          return HttpResponse.json({
+            barcode: code,
+            type: 'CODE128',
+            sku: sku('s-1', 'VBC-40G', 'Vua Bật Chồi 40gr'),
+            uom: { id: 'u-box', code: 'BOX', name: 'Thùng' },
+            baseUom: base,
+            factor: '3',
+          });
+        if (code === 'KHAC')
+          return HttpResponse.json({
+            barcode: code,
+            type: 'CODE128',
+            sku: sku('s-9', 'KHAC-1', 'Sản phẩm khác'),
+            uom: { ...base, name: 'Gói' },
+            baseUom: base,
+            factor: '1',
+          });
+        return HttpResponse.json(
+          { code: 'NOT_FOUND', message: 'x', details: null, traceId: 't' },
+          { status: 404 },
+        );
+      }),
+      http.get('/api/skus/:id/conversions', () =>
+        HttpResponse.json([{ uomId: 'u-box', uomCode: 'BOX', factor: '3', containerTypeId: null }]),
+      ),
+    );
+    renderApp(<ReturnCreateScreen />);
+    const restock = await screen.findByLabelText('Nhập lại kho dòng 1');
+    const scan = (code: string) => {
+      const input = screen.getByLabelText('Quét mã sản phẩm hoàn về');
+      fireEvent.change(input, { target: { value: code } });
+      fireEvent.keyDown(input, { key: 'Enter' });
+    };
+    scan('https://www.thiennongnamviet.com.vn/vbc');
+    await waitFor(() => expect(restock).toHaveValue('1'));
+    scan('https://www.thiennongnamviet.com.vn/vbc');
+    await waitFor(() => expect(restock).toHaveValue('2'));
+    // Thùng 3 → 5 > còn hoàn được 4 → không cộng.
+    scan('THUNG-VBC');
+    await waitFor(() =>
+      expect(toastError).toHaveBeenCalledWith('Vua Bật Chồi 40gr: đã đủ số còn hoàn được của đơn.'),
+    );
+    expect(restock).toHaveValue('2');
+    scan('KHAC');
+    await waitFor(() =>
+      expect(toastError).toHaveBeenCalledWith(
+        'KHAC-1 — Sản phẩm khác không có trong đơn SO2610-00001.',
+      ),
+    );
+    scan('LA');
+    await waitFor(() =>
+      expect(toastError).toHaveBeenCalledWith(expect.stringContaining('Mã LA chưa gán')),
+    );
+    expect(restock).toHaveValue('2');
   });
 
   it('chi tiết nháp: xử lý từng dòng, nút Post phiếu gọi POST :id/post', async () => {

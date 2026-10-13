@@ -42,6 +42,8 @@ export const ScanInput = forwardRef<ScanInputHandle, ScanInputProps>(function Sc
 ) {
   const input = useRef<HTMLInputElement | null>(null);
   const [value, setValue] = useState('');
+  // Máy quét kiểu bàn phím + bộ gõ tiếng Việt (Telex) đang bật → "www" thành "ưưư", mã không khớp.
+  const [imeWarn, setImeWarn] = useState(false);
   const focus = useCallback(() => input.current?.focus(), []);
   useImperativeHandle(ref, () => ({ focus }), [focus]);
 
@@ -68,6 +70,7 @@ export const ScanInput = forwardRef<ScanInputHandle, ScanInputProps>(function Sc
     e.preventDefault();
     const code = value.trim();
     setValue('');
+    setImeWarn(/[^\u0020-\u007E]/.test(code));
     if (code) onScan(code);
   };
 
@@ -96,6 +99,11 @@ export const ScanInput = forwardRef<ScanInputHandle, ScanInputProps>(function Sc
         className={cn('font-mono', size === 'lg' ? 'h-14 pl-11 text-lg' : 'pl-9')}
         data-scan-input
       />
+      {imeWarn ? (
+        <p role="alert" className="mt-1 text-xs text-destructive">
+          Mã vừa quét có dấu tiếng Việt — tắt bộ gõ (Unikey / EVKey, chuyển sang E) rồi quét lại.
+        </p>
+      ) : null}
     </div>
   );
 });
