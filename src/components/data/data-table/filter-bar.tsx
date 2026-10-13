@@ -1,7 +1,8 @@
 'use client';
 
 import { Search, X } from 'lucide-react';
-import { useEffect, useState, type ReactNode } from 'react';
+import { type ReactNode } from 'react';
+import { DraftInput } from '@/components/data/draft-input';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
@@ -50,14 +51,6 @@ export function FilterBar<F extends string = string>({
   searchPlaceholder?: string;
   right?: ReactNode;
 }) {
-  const [draft, setDraft] = useState(q);
-  useEffect(() => setDraft(q), [q]);
-  useEffect(() => {
-    if (draft === q) return;
-    const t = setTimeout(() => onQChange(draft.trim()), 300);
-    return () => clearTimeout(t);
-  }, [draft, q, onQChange]);
-
   const active =
     Object.values(values).filter((v) => v !== undefined && v !== '').length + (q ? 1 : 0);
 
@@ -68,13 +61,10 @@ export function FilterBar<F extends string = string>({
           className="pointer-events-none absolute left-2 top-2.5 h-4 w-4 text-muted-foreground"
           aria-hidden
         />
-        <Input
-          value={draft}
-          onChange={(e) => setDraft(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter') onQChange(draft.trim());
-            if (e.key === 'Escape') setDraft('');
-          }}
+        <DraftInput
+          value={q}
+          onCommit={onQChange}
+          clearOnEscape
           placeholder={searchPlaceholder}
           aria-label="Tìm nhanh"
           className="w-64 pl-8"
@@ -106,12 +96,24 @@ export function FilterBar<F extends string = string>({
           );
         }
         if (f.type === 'custom') return <div key={f.key}>{f.render({ value, onChange: set })}</div>;
+        if (f.type === 'date') {
+          return (
+            <Input
+              key={f.key}
+              type="date"
+              value={value ?? ''}
+              onChange={(e) => set(e.target.value || undefined)}
+              placeholder={f.placeholder ?? f.label}
+              aria-label={f.label}
+              className="h-9 w-44"
+            />
+          );
+        }
         return (
-          <Input
+          <DraftInput
             key={f.key}
-            type={f.type === 'date' ? 'date' : 'text'}
             value={value ?? ''}
-            onChange={(e) => set(e.target.value || undefined)}
+            onCommit={(v) => set(v || undefined)}
             placeholder={f.placeholder ?? f.label}
             aria-label={f.label}
             className="h-9 w-44"
@@ -123,7 +125,6 @@ export function FilterBar<F extends string = string>({
           variant="ghost"
           size="sm"
           onClick={() => {
-            setDraft('');
             onQChange('');
             const clear = {} as Partial<Record<F, string | undefined>>;
             for (const f of filters ?? []) clear[f.key] = undefined;
