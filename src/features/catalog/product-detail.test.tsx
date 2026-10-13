@@ -308,7 +308,9 @@ describe('ProductDetailScreen — C-03 chi tiết sản phẩm (GET /products/:i
     renderApp(<ProductDetailScreen productId={PRODUCT.id} />);
     await screen.findByText(PRODUCT.name);
     fireEvent.click(screen.getByRole('tab', { name: /Barcode/ }));
-    fireEvent.click(screen.getByRole('button', { name: 'In TL08-BLUE khổ A5 ngang' }));
+    const a5 = screen.getByRole('button', { name: 'In TL08-BLUE khổ A5 ngang' });
+    fireEvent.keyDown(a5, { key: 'Enter' });
+    fireEvent.click(await screen.findByRole('menuitem', { name: 'Mã QR' }));
     await waitFor(() => expect(window.print).toHaveBeenCalledTimes(1));
     expect(snap.size).toBe('A5_LANDSCAPE');
     expect(snap.qr).toBe(1);
@@ -317,6 +319,22 @@ describe('ProductDetailScreen — C-03 chi tiết sản phẩm (GET /products/:i
     expect(snap.text).toContain(`SKU ${SKU_BLUE.code} · Sản phẩm · cái`);
     // In xong → tờ in gỡ khỏi DOM.
     await waitFor(() => expect(document.querySelector('[data-print-root]')).toBeNull());
+
+    // Cùng mã QR nhưng chọn "Mã vạch" → in CODE128 cùng chuỗi (2026-10-13).
+    window.print = vi.fn(() => {
+      const root = document.querySelector('[data-print-root]');
+      snap = {
+        size: root?.getAttribute('data-print-size') ?? null,
+        text: root?.querySelector('[data-product-code-sheet]')?.textContent ?? '',
+        qr: root?.querySelectorAll('[data-barcode="code128"] svg').length ?? 0,
+      };
+    });
+    fireEvent.keyDown(a5, { key: 'Enter' });
+    fireEvent.click(await screen.findByRole('menuitem', { name: 'Mã vạch (CODE128)' }));
+    await waitFor(() => expect(window.print).toHaveBeenCalledTimes(1));
+    expect(snap.size).toBe('A5_LANDSCAPE');
+    expect(snap.qr).toBe(1);
+    expect(snap.text).toContain('TL08-BLUE');
   });
 
   it('tab Barcode: quét mã NSX vào ô của cấp thùng → POST /skus/:id/barcodes với ĐVT thùng, mã 13 số = EAN13', async () => {
