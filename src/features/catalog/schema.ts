@@ -1,6 +1,6 @@
 import Decimal from 'decimal.js';
 import { z } from 'zod';
-import { codeSchema, moneySchema, quantitySchema } from '@/lib/shared';
+import { barcodeCodeSchema, codeSchema, moneySchema, quantitySchema } from '@/lib/shared';
 
 /**
  * Khớp CreateProductDto của apps/api (luật 11 — không chặt/lỏng hơn DTO).
@@ -75,10 +75,7 @@ export function parseAliases(raw: string): string[] {
  * - KHÔNG có giá nhập / tồn đầu kỳ (2026-10-01): giá vốn lấy theo từng phiếu nhập kho (lô FIFO),
  *   tồn chỉ vào qua phiếu nhập — báo cáo lợi nhuận tính theo giá nhập từng thời điểm.
  */
-const barcodeValue = z
-  .string()
-  .trim()
-  .regex(/^[A-Za-z0-9-]{4,64}$/, 'Barcode 4–64 ký tự chữ/số/gạch nối');
+const barcodeValue = barcodeCodeSchema;
 
 export const skuRowSchema = z.object({
   skuId: z.string(),

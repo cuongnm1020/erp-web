@@ -176,6 +176,96 @@ describe('StocktakeScreen — /cycle-counts', () => {
     expect(screen.getByRole('button', { name: /Gửi duyệt/ })).toBeDisabled();
   });
 
+  it('quét khi kiểm kê: SKU ở nhiều vị trí → nhắc quét kệ; quét kệ rồi quét sản phẩm → cộng vào ô Đếm thực đúng dòng (mã thùng cộng cả thùng)', async () => {
+    search = 'cc=cc-2';
+    const URL_CODE = 'https://www.thiennongnamviet.com.vn/combi';
+    const draft = {
+      ...DETAIL_DRAFT,
+      lineCount: 3,
+      lines: [
+        ...DETAIL_DRAFT.lines,
+        line('l3', { skuId: 'sku-l2', skuCode: 'TL08-l2', locationCode: 'B-01-01' }),
+      ],
+    };
+    const empty = {
+      sku: null,
+      container: null,
+      order: null,
+      task: null,
+      wave: null,
+      location: null,
+      shipment: null,
+    };
+    const skuHit = (code: string, factor: string) => ({
+      ...empty,
+      kind: 'sku',
+      code,
+      sku: {
+        barcode: code,
+        type: 'QR',
+        sku: {
+          id: 'sku-l2',
+          code: 'TL08-l2',
+          name: 'Bút bi l2',
+          productCode: 'TL08',
+          trackingMode: 'LOT',
+        },
+        uom: { id: 'u', code: 'PCS', name: 'Cái' },
+        baseUom: { id: 'u', code: 'PCS' },
+        factor,
+      },
+    });
+    server.use(
+      http.get('/api/cycle-counts/:id', () => HttpResponse.json(draft)),
+      http.get('/api/pda/resolve/:code', ({ params }) => {
+        const code = String(params.code);
+        if (code === URL_CODE) return HttpResponse.json(skuHit(code, '1'));
+        if (code === 'THUNG-TL08') return HttpResponse.json(skuHit(code, '10'));
+        if (code === 'LOC-B-01-01')
+          return HttpResponse.json({
+            ...empty,
+            kind: 'location',
+            code,
+            location: {
+              id: 'loc-b',
+              code: 'B-01-01',
+              type: 'BIN',
+              warehouseId: 'wh-1',
+              warehouseCode: 'WH01',
+              pickSequence: 10,
+            },
+          });
+        return HttpResponse.json(
+          { code: 'NOT_FOUND', message: 'x', details: null, traceId: 't' },
+          { status: 404 },
+        );
+      }),
+    );
+    renderApp(<StocktakeScreen />);
+    await screen.findByText('CC2608-00010');
+    const scan = (code: string) => {
+      const input = screen.getByLabelText('Quét mã kệ hoặc mã sản phẩm');
+      fireEvent.change(input, { target: { value: code } });
+      fireEvent.keyDown(input, { key: 'Enter' });
+    };
+    const atB = await screen.findByLabelText('Đếm thực TL08-l2 tại B-01-01');
+    const atA = screen.getByLabelText('Đếm thực TL08-l2 tại A-03-02-B');
+
+    // Chưa chọn kệ, SKU nằm 2 vị trí → không cộng vào đâu.
+    scan(URL_CODE);
+    await new Promise((r) => setTimeout(r, 50));
+    expect(atA).toHaveValue('');
+    expect(atB).toHaveValue('');
+
+    scan('LOC-B-01-01');
+    await waitFor(() => expect(screen.getByText('Vị trí đang đếm: B-01-01')).toBeInTheDocument());
+    scan(URL_CODE);
+    await waitFor(() => expect(atB).toHaveValue('1'));
+    scan('THUNG-TL08');
+    await waitFor(() => expect(atB).toHaveValue('11'));
+    expect(atA).toHaveValue('');
+  });
+
   it('phiên chờ duyệt: Duyệt → POST :id/approve; Từ chối → POST :id/reject; lọc chỉ dòng lệch', async () => {
     search = 'cc=cc-1';
     const approved: string[] = [];

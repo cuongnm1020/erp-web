@@ -77,6 +77,7 @@ const MESSAGES: Record<string, string> = {
   CARRIER_API_ERROR: 'Hãng vận chuyển không phản hồi hoặc trả lỗi. Thử lại sau ít phút.',
   CARRIER_REJECTED:
     'Hãng vận chuyển từ chối dữ liệu đơn (thường là địa chỉ giao). Sửa đơn theo lý do hãng báo rồi xin vận đơn lại.',
+  BARCODE_TAKEN: 'Mã này đã gán cho sản phẩm khác — mỗi mã chỉ thuộc một sản phẩm.',
   ORDER_SKU_NOT_IN_WAREHOUSE:
     'Kho xuất của đơn không có sản phẩm cần giao. Đổi kho xuất hoặc chuyển hàng về kho rồi gửi lại.',
   CARRIER_OPERATION_UNSUPPORTED:
@@ -216,6 +217,13 @@ export function messageForCode(code: string, status?: number): string {
 /** Câu hiển thị cho mọi lỗi — ApiError hoặc lỗi JS bất kỳ. Không bao giờ trả message thô. */
 export function messageFor(err: unknown): string {
   if (err instanceof ApiError) {
+    if (err.code === 'BARCODE_TAKEN') {
+      // Mã + SKU đang giữ mã là dữ liệu (details), không phải message thô của server.
+      const d = err.details as { code?: unknown; skuCode?: unknown; skuName?: unknown } | null;
+      if (d && typeof d.skuCode === 'string') {
+        return `Mã ${String(d.code ?? '')} đã gán cho ${d.skuCode}${typeof d.skuName === 'string' ? ` — ${d.skuName}` : ''}. Mỗi mã chỉ thuộc một sản phẩm.`;
+      }
+    }
     const base = messageForCode(err.code, err.status);
     const said = carrierReasonOf(err);
     return said ? `${base} ${carrierSaid(said)}` : base;

@@ -39,6 +39,7 @@ import { messageFor } from '@/lib/error-messages';
 import { formatDate, formatDateTime, formatMoney, formatQuantity } from '@/lib/format';
 import { Can } from '@/lib/permission';
 import { usePrint } from '@/lib/print';
+import { barcodeCodeSchema, barcodeTypeOf } from '@/lib/shared';
 import {
   useAddBarcode,
   useContainerTypes,
@@ -465,13 +466,6 @@ function barcodeLevels(sku: Sku, typeNameById: ReadonlyMap<string, string>): Bar
   ];
 }
 
-/** Mã do nhà sản xuất in sẵn: 13 số → EAN13 (ký hiệu thật kiểm check digit lúc render), còn lại CODE128. */
-function barcodeTypeOf(code: string): 'EAN13' | 'CODE128' {
-  return /^\d{13}$/.test(code) ? 'EAN13' : 'CODE128';
-}
-
-const BARCODE_RE = /^[A-Za-z0-9-]{4,64}$/;
-
 function BarcodesTab({ product, skus }: { product: ProductDetail; skus: Sku[] }) {
   const types = useContainerTypes();
   const typeNameById = new Map((types.data ?? []).map((t) => [t.id, t.name]));
@@ -651,8 +645,9 @@ function AddBarcodeInput({ sku, level }: { sku: Sku; level: BarcodeLevel }) {
   const submit = () => {
     const v = code.trim();
     if (!v || add.isPending) return;
-    if (!BARCODE_RE.test(v)) {
-      setError('Mã 4–64 ký tự, chỉ chữ, số và dấu gạch');
+    const parsed = barcodeCodeSchema.safeParse(v);
+    if (!parsed.success) {
+      setError(parsed.error.issues[0]?.message ?? 'Mã không hợp lệ');
       return;
     }
     setError(null);

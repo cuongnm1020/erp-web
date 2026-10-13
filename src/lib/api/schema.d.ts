@@ -1802,6 +1802,28 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/skus/{id}/barcodes/at-receipt": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Gán barcode cho SKU ngay lúc nhập hàng (2026-10-13): quét mã lạ trên bao bì ở màn nhập kho →
+         *     chọn sản phẩm → gán. Quyền nhập kho (`stock.receive`) thay vì `product.update` — nhân viên kho
+         *     không sửa được danh mục nhưng phải khai được mã của hàng mình đang nhận. Chỉ THÊM mã, không
+         *     xóa/sửa; mã đã thuộc SKU khác → 409 BARCODE_TAKEN.
+         */
+        post: operations["ProductController_addBarcodeAtReceipt"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/skus/{id}/barcodes/{code}": {
         parameters: {
             query?: never;
@@ -13825,6 +13847,29 @@ export interface operations {
         };
     };
     ProductController_addBarcode: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BarcodeDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    ProductController_addBarcodeAtReceipt: {
         parameters: {
             query?: never;
             header?: never;

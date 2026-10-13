@@ -351,7 +351,9 @@ describe('ProductDetailScreen — C-03 chi tiết sản phẩm (GET /products/:i
     const input = screen.getByLabelText(`Thêm barcode Thùng ${SKU_BLUE.code}`);
     fireEvent.change(input, { target: { value: 'ab' } });
     fireEvent.keyDown(input, { key: 'Enter' });
-    expect(await screen.findByText('Mã 4–64 ký tự, chỉ chữ, số và dấu gạch')).toBeInTheDocument();
+    expect(
+      await screen.findByText('Mã 4–128 ký tự, không dấu tiếng Việt, không khoảng trắng'),
+    ).toBeInTheDocument();
     fireEvent.change(input, { target: { value: '18935001234564' } });
     fireEvent.keyDown(input, { key: 'Enter' });
     fireEvent.change(screen.getByLabelText(`Thêm barcode Sản phẩm ${SKU_RED.code}`), {
@@ -366,6 +368,30 @@ describe('ProductDetailScreen — C-03 chi tiết sản phẩm (GET /products/:i
       body: { code: '18935001234564', uom: 'hộp', type: 'CODE128' },
     });
     expect(posts[1]).toEqual({ id: SKU_RED.id, body: { code: '8935001234999', type: 'EAN13' } });
+  });
+
+  it('tab Barcode: QR in trên bao bì chứa đường link → nhận, gửi loại QR (2026-10-13)', async () => {
+    const posts: Array<{ id: string; body: unknown }> = [];
+    server.use(
+      http.post('/api/skus/:id/barcodes', async ({ params, request }) => {
+        posts.push({ id: params.id as string, body: await request.json() });
+        return HttpResponse.json({}, { status: 201 });
+      }),
+    );
+    renderApp(<ProductDetailScreen productId={PRODUCT.id} />);
+    await screen.findByText(PRODUCT.name);
+    fireEvent.click(screen.getByRole('tab', { name: /Barcode/ }));
+    const input = screen.getByLabelText(`Thêm barcode Sản phẩm ${SKU_RED.code}`);
+    fireEvent.change(input, { target: { value: 'https://www.thiennongnamviet.com.vn/combi' } });
+    fireEvent.keyDown(input, { key: 'Enter' });
+    await waitFor(() =>
+      expect(posts).toEqual([
+        {
+          id: SKU_RED.id,
+          body: { code: 'https://www.thiennongnamviet.com.vn/combi', type: 'QR' },
+        },
+      ]),
+    );
   });
 
   it('tab Đơn vị & quy đổi: dòng cơ bản + dòng quy đổi 1 hộp = 24 cái, chip bán mặc định theo salesUomId', async () => {

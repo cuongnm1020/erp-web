@@ -4,6 +4,7 @@ import Decimal from 'decimal.js';
 import { Search } from 'lucide-react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useRef, useState } from 'react';
+import { ScanInput } from '@/components/data/scan-input';
 import { EmptyState, ListSkeleton, QueryState } from '@/components/data/states';
 import { PageHeader } from '@/components/layout/page-header';
 import { Button } from '@/components/ui/button';
@@ -18,6 +19,7 @@ import {
 } from '@/components/ui/table';
 import { toast } from '@/components/ui/toaster';
 import { cn } from '@/lib/cn';
+import { isApiError } from '@/lib/api/errors';
 import { messageFor } from '@/lib/error-messages';
 import { formatMoney, formatQuantity } from '@/lib/format';
 import { useAbility } from '@/lib/permission';
@@ -30,6 +32,7 @@ import {
   type ReturnableLine,
   type ReturnableOrder,
 } from '../api/use-returns';
+import { useBarcodeLookup } from '../api/use-locations';
 
 /**
  * Lập phiếu nhập hàng hoàn (2026-10-02) — tra đơn theo số đơn (hoặc ?orderId= từ màn đơn), mỗi
@@ -89,6 +92,44 @@ function LinesForm({ order }: { order: ReturnableOrder }) {
           ]),
       ),
     );
+  };
+
+  /**
+   * Quét mã trên từng sản phẩm hoàn về (2026-10-13): mỗi lần quét cộng vào "Nhập lại kho" của dòng
+   * cùng SKU còn chỗ (mã thùng → cộng cả thùng theo quy đổi). Sản phẩm không thuộc đơn / đã đủ số
+   * hoàn được → báo, không cộng. Hàng hỏng vẫn nhập tay ở cột "Hủy (hỏng)".
+   */
+  const lookupBarcode = useBarcodeLookup();
+  const onScan = async (code: string) => {
+    let lookup;
+    try {
+      ({ lookup } = await lookupBarcode(code));
+    } catch (err) {
+      toast.error(
+        isApiError(err) && err.status === 404
+          ? `Mã ${code} chưa gán cho sản phẩm nào — gán ở màn nhập hàng hoặc chi tiết sản phẩm.`
+          : messageFor(err),
+      );
+      return;
+    }
+    const step = new Decimal(lookup.factor);
+    const same = order.lines.filter((l) => l.skuId === lookup.sku.id);
+    if (same.length === 0) {
+      toast.error(`${lookup.sku.code} — ${lookup.sku.name} không có trong đơn ${order.docNumber}.`);
+      return;
+    }
+    const used = (l: ReturnableLine) => {
+      const i = inputs[l.orderLineId];
+      return (dec(i?.restock ?? '') ?? new Decimal(0)).add(dec(i?.scrap ?? '') ?? 0);
+    };
+    const target = same.find((l) => used(l).add(step).lte(l.qtyReturnable));
+    if (!target) {
+      toast.error(`${lookup.sku.name}: đã đủ số còn hoàn được của đơn.`);
+      return;
+    }
+    const next = (dec(inputs[target.orderLineId]?.restock ?? '') ?? new Decimal(0)).add(step);
+    setLine(target.orderLineId, { restock: next.toString() });
+    toast.success(`${lookup.sku.name}: nhập lại kho ${formatQuantity(next.toString())}`);
   };
 
   const errors = order.lines.map((l) => lineError(l, inputs[l.orderLineId]));
@@ -174,6 +215,13 @@ function LinesForm({ order }: { order: ReturnableOrder }) {
       <section className="overflow-hidden rounded-md border bg-card">
         <header className="flex items-center justify-between border-b px-3 py-2 text-sm font-semibold">
           <span>Dòng đơn {order.docNumber}</span>
+          <ScanInput
+            className="ml-auto mr-2 w-80"
+            label="Quét mã sản phẩm hoàn về"
+            placeholder="Quét mã trên từng sản phẩm hoàn về…"
+            paused
+            onScan={(code) => void onScan(code)}
+          />
           <Button variant="outline" size="sm" onClick={fillAll}>
             Hoàn hết (nhập lại kho)
           </Button>

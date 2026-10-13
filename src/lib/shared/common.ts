@@ -36,6 +36,26 @@ export const quantitySchema = z
   .trim()
   .regex(/^\d{1,12}(\.\d{1,6})?$/, 'Số lượng không hợp lệ (tối đa 6 số lẻ)');
 
+/**
+ * Mã barcode SP — khớp `BarcodeDto.code` của API (2026-10-13): 4–128 ký tự ASCII in được, không
+ * khoảng trắng. Nhận cả QR chứa đường link in trên bao bì (`https://…/combi`); chặn tiếng Việt có
+ * dấu (máy quét kiểu bàn phím bị bộ gõ Telex đổi chữ → mã lưu sai, quét không khớp).
+ */
+export const barcodeCodeSchema = z
+  .string()
+  .trim()
+  .regex(/^[\x21-\x7E]{4,128}$/, 'Mã 4–128 ký tự, không dấu tiếng Việt, không khoảng trắng');
+
+/**
+ * Loại mã theo nội dung — khớp `inferBarcodeType` của API: 13 số → EAN13; có ký tự ngoài chữ/số/
+ * gạch (link) → QR; còn lại CODE128.
+ */
+export function barcodeTypeOf(code: string): 'EAN13' | 'CODE128' | 'QR' {
+  if (/^\d{13}$/.test(code)) return 'EAN13';
+  if (/[^A-Za-z0-9-]/.test(code)) return 'QR';
+  return 'CODE128';
+}
+
 /** SĐT Việt Nam đã chuẩn hóa: 0 + 9–10 số. */
 export const phoneSchema = z.string().regex(/^0\d{9,10}$/, 'Số điện thoại không hợp lệ');
 

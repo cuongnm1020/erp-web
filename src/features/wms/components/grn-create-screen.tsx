@@ -4,7 +4,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import Decimal from 'decimal.js';
 import { Plus, X } from 'lucide-react';
 import { useRouter } from 'next/navigation';
-import { useRef } from 'react';
+import { useRef, useState } from 'react';
 import { useFieldArray, useForm, useWatch, type UseFormReturn } from 'react-hook-form';
 import { z } from 'zod';
 import {
@@ -43,6 +43,7 @@ import { messageFor } from '@/lib/error-messages';
 import { formatMoney, formatQuantity } from '@/lib/format';
 import { dateKeySchema, moneySchema, quantitySchema } from '@/lib/shared';
 import { useContainerTypes } from '../api/use-containers';
+import { AssignBarcodeDialog } from './assign-barcode-dialog';
 import {
   useBarcodeLookup,
   useSkuConversions,
@@ -271,23 +272,23 @@ function GrnCreateForm({ copyOf }: { copyOf?: ReceiptDetail }) {
   });
   const { fields, append, remove } = useFieldArray({ control: form.control, name: 'lines' });
   const lookupBarcode = useBarcodeLookup();
+  // Mã quét chưa gán cho SKU nào → hộp thoại gán ngay (2026-10-13).
+  const [unknownCode, setUnknownCode] = useState<string | null>(null);
   const typeCodeById = new Map((containerTypes.data ?? []).map((t) => [t.id, t.code]));
 
   /**
    * Quét mã dán sẵn trên sản phẩm / thùng / pallet: cùng SKU + ĐVT đã có dòng → +1; dòng cuối
    * còn trống → điền vào; còn lại thêm dòng. Mã gắn ĐVT không phải cấp đóng gói → quy về đơn
-   * vị bán chính (+factor). Không tìm thấy → báo, không thêm gì.
+   * vị bán chính (+factor). Không tìm thấy → hộp thoại gán mã cho sản phẩm (2026-10-13), gán xong
+   * quét lại tự động.
    */
   const onScan = async (code: string) => {
     let scanned: ScannedBarcode;
     try {
       scanned = await lookupBarcode(code);
     } catch (err) {
-      toast.error(
-        isApiError(err) && err.status === 404
-          ? `Không tìm thấy barcode ${code}. Khai mã ở chi tiết sản phẩm → tab Barcode rồi quét lại.`
-          : messageFor(err),
-      );
+      if (isApiError(err) && err.status === 404) setUnknownCode(code);
+      else toast.error(messageFor(err));
       return;
     }
     const { lookup, containerTypeId } = scanned;
@@ -385,6 +386,14 @@ function GrnCreateForm({ copyOf }: { copyOf?: ReceiptDetail }) {
 
   return (
     <>
+      <AssignBarcodeDialog
+        code={unknownCode}
+        onClose={() => setUnknownCode(null)}
+        onAssigned={(code) => {
+          setUnknownCode(null);
+          void onScan(code);
+        }}
+      />
       <PageHeader
         title="Tạo phiếu nhập kho"
         description={

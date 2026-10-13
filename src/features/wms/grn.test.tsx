@@ -353,12 +353,12 @@ describe('GrnCreateScreen — POST /goods-receipts (+ post)', () => {
     expect(await screen.findByText('= 20 REAM')).toBeInTheDocument();
     scan('8850000000001');
     await waitFor(() => expect(screen.getByLabelText('Số lượng dòng 2')).toHaveValue('1'));
+    // Mã lạ → hộp thoại gán mã (2026-10-13); "Bỏ qua" → không thêm gì.
     scan('KHONG-CO');
-    await waitFor(() =>
-      expect(toastError).toHaveBeenCalledWith(
-        expect.stringContaining('Không tìm thấy barcode KHONG-CO'),
-      ),
-    );
+    const dialog = await screen.findByRole('dialog', { name: 'Mã chưa gán cho sản phẩm nào' });
+    expect(dialog).toHaveTextContent('KHONG-CO');
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Bỏ qua' }));
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
     expect(screen.queryByLabelText('Số lượng dòng 3')).not.toBeInTheDocument();
 
     const costs = screen
@@ -380,6 +380,79 @@ describe('GrnCreateScreen — POST /goods-receipts (+ post)', () => {
       ],
     });
     expect((posts[0]!.body as { lines: object[] }).lines[1]).not.toHaveProperty('uom');
+  });
+
+  it('quét QR chứa link chưa gán → chọn sản phẩm → POST /skus/:id/barcodes/at-receipt → quét lại tự động thêm dòng', async () => {
+    const URL_CODE = 'https://www.thiennongnamviet.com.vn/combi';
+    const assigned: Array<{ id: string; body: unknown }> = [];
+    let known = false;
+    server.use(
+      http.get('/api/barcodes/:code', ({ params }) =>
+        known && params.code === URL_CODE
+          ? HttpResponse.json({
+              barcode: URL_CODE,
+              type: 'QR',
+              sku: {
+                id: 'sku-1',
+                code: 'DA-A4-80',
+                name: 'Giấy A4 Double A 80gsm',
+                productCode: 'DA-A4',
+                trackingMode: 'NONE',
+              },
+              uom: { id: 'u-ream', code: 'REAM', name: 'Ram' },
+              baseUom: { id: 'u-ream', code: 'REAM' },
+              factor: '1',
+            })
+          : HttpResponse.json(
+              { code: 'NOT_FOUND', message: 'x', details: null, traceId: 't' },
+              { status: 404 },
+            ),
+      ),
+      http.post('/api/skus/:id/barcodes/at-receipt', async ({ params, request }) => {
+        assigned.push({ id: String(params.id), body: await request.json() });
+        known = true;
+        return HttpResponse.json(
+          { id: 'b-1', skuId: 'sku-1', uomId: 'u-ream', code: URL_CODE, type: 'QR' },
+          { status: 201 },
+        );
+      }),
+    );
+    renderApp(<GrnCreateScreen />);
+    fireEvent.click(await screen.findByRole('combobox', { name: 'Kho nhận *' }));
+    fireEvent.click(await screen.findByRole('option', { name: 'Kho HN-1' }));
+    const input = screen.getByLabelText('Quét barcode sản phẩm / thùng / pallet');
+    fireEvent.change(input, { target: { value: URL_CODE } });
+    fireEvent.keyDown(input, { key: 'Enter' });
+
+    const dialog = await screen.findByRole('dialog', { name: 'Mã chưa gán cho sản phẩm nào' });
+    expect(dialog).toHaveTextContent(URL_CODE);
+    const submit = within(dialog).getByRole('button', { name: 'Gán mã và thêm vào phiếu' });
+    expect(submit).toBeDisabled();
+    fireEvent.click(within(dialog).getByText('Chọn sản phẩm…'));
+    fireEvent.click(await screen.findByText('Giấy A4 Double A 80gsm'));
+    fireEvent.click(submit);
+
+    await waitFor(() => expect(assigned).toEqual([{ id: 'sku-1', body: { code: URL_CODE } }]));
+    await waitFor(() => expect(screen.getByLabelText('Số lượng dòng 1')).toHaveValue('1'));
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+  });
+
+  it('mã quét bị bộ gõ tiếng Việt làm sai (có dấu) → hộp thoại cảnh báo tắt bộ gõ, không cho gán', async () => {
+    server.use(
+      http.get('/api/barcodes/:code', () =>
+        HttpResponse.json(
+          { code: 'NOT_FOUND', message: 'x', details: null, traceId: 't' },
+          { status: 404 },
+        ),
+      ),
+    );
+    renderApp(<GrnCreateScreen />);
+    const input = await screen.findByLabelText('Quét barcode sản phẩm / thùng / pallet');
+    fireEvent.change(input, { target: { value: 'https://ưưư.thiennongnamviet.com.vn/combi' } });
+    fireEvent.keyDown(input, { key: 'Enter' });
+    const dialog = await screen.findByRole('dialog', { name: 'Mã chưa gán cho sản phẩm nào' });
+    expect(dialog).toHaveTextContent('Tắt bộ gõ (Unikey/EVKey) rồi quét lại');
+    expect(within(dialog).getByRole('button', { name: 'Gán mã và thêm vào phiếu' })).toBeDisabled();
   });
 
   it('lưu nháp: body đúng + Idempotency-Key có mặt → chuyển sang trang chi tiết', async () => {

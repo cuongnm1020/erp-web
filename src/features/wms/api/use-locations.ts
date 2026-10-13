@@ -90,6 +90,25 @@ export function useBarcodeLookup() {
   };
 }
 
+/**
+ * POST /skus/{id}/barcodes/at-receipt — gán mã quét được (kể cả QR chứa link) cho SKU ngay lúc
+ * nhập hàng; quyền `stock.receive`. Loại mã server tự suy (link → QR). Xong thì bỏ cache tra mã
+ * của mã đó để lần quét kế ra SKU ngay.
+ */
+export function useAssignBarcodeAtReceipt() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ skuId, code }: { skuId: string; code: string }) =>
+      unwrap(
+        api.POST('/skus/{id}/barcodes/at-receipt', {
+          params: { path: { id: skuId } },
+          body: { code },
+        }),
+      ),
+    onSuccess: (_r, v) => qc.removeQueries({ queryKey: locationKeys.barcode(v.code) }),
+  });
+}
+
 /** GET /warehouses/{id}/locations/tree — cây ZONE/AISLE/RACK/BIN; cần stock.read. */
 export function useLocationTree(warehouseId: string | null) {
   return useQuery({

@@ -4,6 +4,7 @@ import Decimal from 'decimal.js';
 import { Plus } from 'lucide-react';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useState } from 'react';
+import { ScanInput } from '@/components/data/scan-input';
 import { EmptyState, ListSkeleton, QueryState } from '@/components/data/states';
 import { StatusBadge, type StatusTone } from '@/components/data/status-badge';
 import { PageHeader } from '@/components/layout/page-header';
@@ -35,6 +36,7 @@ import {
 } from '@/components/ui/table';
 import { toast } from '@/components/ui/toaster';
 import { cn } from '@/lib/cn';
+import { isApiError } from '@/lib/api/errors';
 import { messageFor } from '@/lib/error-messages';
 import { formatDateTime, formatQuantity } from '@/lib/format';
 import { useAbility } from '@/lib/permission';
@@ -50,6 +52,7 @@ import {
   type CycleCountLine,
   type CycleCountStatus,
 } from '../api/use-stocktake';
+import { useResolveCode } from '../api/use-pda';
 import { isOperationalWarehouse, useWarehouses } from '../api/use-warehouses';
 
 /**
@@ -120,24 +123,36 @@ function CreateDialog({ open, onClose }: { open: boolean; onClose: (id?: string)
   );
 }
 
-/** Một dòng đếm — input số đếm + lý do, lưu từng dòng (khớp nhịp PDA quét từng ô). */
+/**
+ * Một dòng đếm — input số đếm + lý do, lưu từng dòng (khớp nhịp PDA quét từng ô). Số đếm đang gõ
+ * nằm ở bảng cha (`qty` / `setQty`) để ô quét mã cộng dồn vào đúng dòng.
+ */
 function CountLineRow({
   line,
   countId,
   editable,
+  qty,
+  setQty,
+  flash,
 }: {
   line: CycleCountLine;
   countId: string;
   editable: boolean;
+  qty: string;
+  setQty: (v: string) => void;
+  /** Dòng vừa được quét — tô nền để mắt theo kịp. */
+  flash: boolean;
 }) {
   const record = useRecordCount(countId);
-  const [qty, setQty] = useState(line.qtyCounted ?? '');
   const [note, setNote] = useState(line.note ?? '');
   const dirty = qty !== (line.qtyCounted ?? '') || note !== (line.note ?? '');
   const variance = line.variance === null ? null : new Decimal(line.variance);
 
   return (
-    <TableRow className={variance && !variance.isZero() ? 'bg-warning/5' : undefined}>
+    <TableRow
+      data-count-line={line.id}
+      className={cn(variance && !variance.isZero() && 'bg-warning/5', flash && 'bg-primary/10')}
+    >
       <TableCell className="px-2.5 py-1.5">
         <div className="font-mono text-xs font-semibold">{line.skuCode}</div>
         <div className="text-xs text-muted-foreground">{line.skuName}</div>
@@ -217,6 +232,67 @@ function DetailPanel({ countId }: { countId: string }) {
   const canCount = ability.can('count', 'Stock');
   const canAdjust = ability.can('adjust', 'Stock');
   const [onlyVariance, setOnlyVariance] = useState(false);
+  // Số đếm đang gõ / quét theo dòng; chưa có = số đã lưu của dòng.
+  const [drafts, setDrafts] = useState<Record<string, string>>({});
+  const [location, setLocation] = useState<string | null>(null);
+  const [flashId, setFlashId] = useState<string | null>(null);
+  const resolve = useResolveCode();
+  const draftOf = (l: CycleCountLine) => drafts[l.id] ?? l.qtyCounted ?? '';
+
+  /**
+   * Quét khi kiểm kê (2026-10-13): mã kệ / vị trí → chọn "vị trí đang đếm"; mã sản phẩm → cộng
+   * (theo quy đổi của mã: mã thùng cộng cả thùng) vào ô Đếm thực của dòng SKU đó — SKU nằm nhiều
+   * vị trí thì lấy vị trí đang đếm, chưa chọn thì nhắc quét mã kệ. Cộng vào ô nháp, bấm Lưu như
+   * nhập tay (lý do lệch vẫn bắt buộc khi lệch).
+   */
+  const onScan = (count: CycleCountDetail) => async (code: string) => {
+    let r;
+    try {
+      r = await resolve.mutateAsync(code);
+    } catch (err) {
+      toast.error(
+        isApiError(err) && err.status === 404
+          ? `Mã ${code} chưa gán cho sản phẩm / vị trí nào.`
+          : messageFor(err),
+      );
+      return;
+    }
+    if (r.kind === 'location' && r.location) {
+      const has = count.lines.some((l) => l.locationCode === r.location!.code);
+      setLocation(r.location.code);
+      if (has) toast.success(`Đang đếm vị trí ${r.location.code}`);
+      else toast.error(`Vị trí ${r.location.code} không có dòng nào trong phiên này.`);
+      return;
+    }
+    if (r.kind !== 'sku' || !r.sku) {
+      toast.error(`Mã ${code} không phải mã sản phẩm hay mã kệ.`);
+      return;
+    }
+    const sku = r.sku.sku;
+    const same = count.lines.filter((l) => l.skuId === sku.id);
+    if (same.length === 0) {
+      toast.error(`${sku.code} — ${sku.name} không có trong phiên kiểm kê này.`);
+      return;
+    }
+    const target =
+      same.length === 1 ? same[0]! : (same.find((l) => l.locationCode === location) ?? null);
+    if (!target) {
+      toast.error(
+        `${sku.code} nằm ở ${same.length} vị trí (${same.map((l) => l.locationCode).join(', ')}) — quét mã kệ đang đếm trước.`,
+      );
+      return;
+    }
+    const cur = draftOf(target);
+    const next = (cur && /^\d+(\.\d+)?$/.test(cur) ? new Decimal(cur) : new Decimal(0)).add(
+      r.sku.factor,
+    );
+    setDrafts((d) => ({ ...d, [target.id]: next.toString() }));
+    setFlashId(target.id);
+    document
+      .querySelector(`[data-count-line="${target.id}"]`)
+      ?.scrollIntoView({ block: 'nearest' });
+    toast.success(`${sku.code} tại ${target.locationCode}: ${formatQuantity(next.toString())}`);
+  };
 
   const act =
     (fn: (id: string) => Promise<unknown>, doneMsg: string): (() => void) =>
@@ -288,7 +364,21 @@ function DetailPanel({ countId }: { countId: string }) {
               </div>
             </header>
 
-            <div className="flex items-center gap-2 border-b px-3 py-2 text-sm">
+            <div className="flex flex-wrap items-center gap-2 border-b px-3 py-2 text-sm">
+              {editable ? (
+                <>
+                  <ScanInput
+                    className="w-80"
+                    label="Quét mã kệ hoặc mã sản phẩm"
+                    placeholder="Quét mã kệ, rồi quét từng sản phẩm…"
+                    paused
+                    onScan={(code) => void onScan(count)(code)}
+                  />
+                  <span className="text-xs text-muted-foreground">
+                    Vị trí đang đếm: {location ?? 'chưa chọn'}
+                  </span>
+                </>
+              ) : null}
               <Checkbox
                 id="only-variance"
                 checked={onlyVariance}
@@ -316,7 +406,15 @@ function DetailPanel({ countId }: { countId: string }) {
                 </TableHeader>
                 <TableBody>
                   {lines.map((l) => (
-                    <CountLineRow key={l.id} line={l} countId={countId} editable={editable} />
+                    <CountLineRow
+                      key={l.id}
+                      line={l}
+                      countId={countId}
+                      editable={editable}
+                      qty={draftOf(l)}
+                      setQty={(v) => setDrafts((d) => ({ ...d, [l.id]: v }))}
+                      flash={flashId === l.id}
+                    />
                   ))}
                 </TableBody>
               </Table>
