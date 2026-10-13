@@ -1,9 +1,9 @@
 'use client';
 
 import { Printer, RefreshCw } from 'lucide-react';
-import { useEffect, useRef, useState } from 'react';
-import { Barcode } from '@/components/data/barcode';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { Button } from '@/components/ui/button';
+import { Skeleton } from '@/components/ui/skeleton';
 import {
   Dialog,
   DialogContent,
@@ -21,18 +21,44 @@ import {
 } from '@/components/ui/select';
 import { toast } from '@/components/ui/toaster';
 import { carrierSaid, messageFor, messageForCode } from '@/lib/error-messages';
-import { labelUrl, useRequestWaybill, useShipment, type PdaWaybill } from '../api/use-pda';
+import { usePrint } from '@/lib/print';
+import {
+  labelUrl,
+  useRequestWaybill,
+  useShipment,
+  useShipmentLabelData,
+  type PdaWaybill,
+} from '../api/use-pda';
 import { useCarriers } from '../api/use-shipping';
+import { WaybillLabel, WaybillLabelPrintSheet, type WaybillOrientation } from './waybill-label';
 
-type PageSize = 'A6' | 'A5';
+/** A6 / A5 = PDF của hãng; `ERP_100x75` = nhãn ERP tự vẽ cho máy in nhiệt 3 inch (2026-10-13). */
+type PageSize = 'ERP_100x75' | 'A6' | 'A5';
 const PAGE_SIZE_KEY = 'erp.pack.labelPageSize';
+const ORIENTATION_KEY = 'erp.pack.labelOrientation';
 
 function readPageSize(): PageSize {
   try {
     const v = localStorage.getItem(PAGE_SIZE_KEY);
-    return v === 'A5' ? 'A5' : 'A6';
+    return v === 'A5' || v === 'A6' ? v : 'ERP_100x75';
   } catch {
-    return 'A6';
+    return 'ERP_100x75';
+  }
+}
+
+function readOrientation(): WaybillOrientation {
+  try {
+    return localStorage.getItem(ORIENTATION_KEY) === 'portrait' ? 'portrait' : 'landscape';
+  } catch {
+    return 'landscape';
+  }
+}
+
+function remember(key: string, value: string) {
+  try {
+    localStorage.setItem(key, value);
+  } catch {
+    // private mode — bỏ qua
   }
 }
 
@@ -43,8 +69,9 @@ function readPageSize(): PageSize {
  *  - QUEUED → chờ hãng: poll GET /shipments/:id mỗi 5 s tới khi có vận đơn;
  *  - NO_CARRIER → chọn hãng tại chỗ → POST /shipments/:id/waybill;
  *  - FAILED → lỗi phía mình (thiếu địa chỉ…) — hàng ĐÃ trừ tồn, sửa đơn rồi xin lại;
- *  - hãng không có nhãn (MANUAL → 501) → ghi mã vận đơn nội bộ, hiện mã vạch to để chép/dán.
- * Khổ giấy nhớ trong localStorage (tiện ích cá nhân, không phải dữ liệu).
+ *  - hãng không có nhãn (MANUAL → 501) → chỉ in được nhãn ERP tự vẽ.
+ * Khổ mặc định là nhãn ERP 100×75 mm (ngang/dọc) cho máy in nhiệt 3 inch; A6/A5 là PDF của hãng.
+ * Khổ + hướng giấy nhớ trong localStorage (tiện ích cá nhân, không phải dữ liệu).
  */
 export function LabelPrintDialog({
   open,
@@ -60,15 +87,19 @@ export function LabelPrintDialog({
   /** Nhãn nút đóng — mở lại từ "Đã đóng gói" thì không phải "quét đơn tiếp". */
   closeLabel?: string;
 }) {
-  const [pageSize, setPageSize] = useState<PageSize>('A6');
-  useEffect(() => setPageSize(readPageSize()), []);
+  const [pageSize, setPageSize] = useState<PageSize>('ERP_100x75');
+  const [orientation, setOrientation] = useState<WaybillOrientation>('landscape');
+  useEffect(() => {
+    setPageSize(readPageSize());
+    setOrientation(readOrientation());
+  }, []);
   const changePageSize = (v: PageSize) => {
     setPageSize(v);
-    try {
-      localStorage.setItem(PAGE_SIZE_KEY, v);
-    } catch {
-      // private mode — bỏ qua
-    }
+    remember(PAGE_SIZE_KEY, v);
+  };
+  const changeOrientation = (v: WaybillOrientation) => {
+    setOrientation(v);
+    remember(ORIENTATION_KEY, v);
   };
 
   const [local, setLocal] = useState<PdaWaybill | null>(waybill);
@@ -103,6 +134,8 @@ export function LabelPrintDialog({
             carrierCode={carrierCode}
             pageSize={pageSize}
             onPageSize={changePageSize}
+            orientation={orientation}
+            onOrientation={changeOrientation}
           />
         ) : local.outcome === 'NO_CARRIER' ? (
           <CarrierPicker
@@ -165,22 +198,164 @@ function LabelFrame({
   carrierCode,
   pageSize,
   onPageSize,
+  orientation,
+  onOrientation,
 }: {
   shipmentId: string;
   trackingNo: string;
   carrierCode: string | null;
   pageSize: PageSize;
   onPageSize: (v: PageSize) => void;
+  orientation: WaybillOrientation;
+  onOrientation: (v: WaybillOrientation) => void;
+}) {
+  // Hãng nội bộ (MANUAL) không có nhãn PDF → 501: chỉ còn nhãn ERP tự vẽ.
+  const supported = carrierCode !== 'MANUAL';
+  const erp = pageSize === 'ERP_100x75' || !supported;
+
+  const sizePicker = (
+    <Select value={erp ? 'ERP_100x75' : pageSize} onValueChange={(v) => onPageSize(v as PageSize)}>
+      <SelectTrigger className="h-9 w-52" aria-label="Khổ nhãn">
+        <SelectValue />
+      </SelectTrigger>
+      <SelectContent>
+        <SelectItem value="ERP_100x75">Tem 100×75 mm (máy in nhiệt)</SelectItem>
+        {supported ? <SelectItem value="A6">Khổ A6 dọc (nhãn hãng)</SelectItem> : null}
+        {supported ? <SelectItem value="A5">Khổ A5 dọc (nhãn hãng)</SelectItem> : null}
+      </SelectContent>
+    </Select>
+  );
+
+  if (erp) {
+    return (
+      <ErpLabel
+        shipmentId={shipmentId}
+        sizePicker={sizePicker}
+        orientation={orientation}
+        onOrientation={onOrientation}
+      />
+    );
+  }
+  return (
+    <CarrierPdfLabel
+      shipmentId={shipmentId}
+      trackingNo={trackingNo}
+      pageSize={pageSize === 'A5' ? 'A5' : 'A6'}
+      sizePicker={sizePicker}
+    />
+  );
+}
+
+/**
+ * Nhãn ERP tự vẽ 100×75 mm: xem trước đúng tỉ lệ thật, tự in một lần khi dữ liệu về (như
+ * nhãn PDF của hãng), đổi hướng giấy thì bấm "In lại".
+ */
+function ErpLabel({
+  shipmentId,
+  sizePicker,
+  orientation,
+  onOrientation,
+}: {
+  shipmentId: string;
+  sizePicker: ReactNode;
+  orientation: WaybillOrientation;
+  onOrientation: (v: WaybillOrientation) => void;
+}) {
+  const label = useShipmentLabelData(shipmentId);
+  const printer = usePrint();
+  const [printedAt, setPrintedAt] = useState(() => new Date());
+  const autoPrinted = useRef(false);
+  const print = printer.print;
+
+  useEffect(() => {
+    if (label.data && !autoPrinted.current) {
+      autoPrinted.current = true;
+      setPrintedAt(new Date());
+      print();
+    }
+  }, [label.data, print]);
+
+  return (
+    <div className="flex flex-col gap-2">
+      <div className="flex flex-wrap items-center gap-2">
+        {sizePicker}
+        <Select value={orientation} onValueChange={(v) => onOrientation(v as WaybillOrientation)}>
+          <SelectTrigger className="h-9 w-32" aria-label="Hướng giấy">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="landscape">Ngang</SelectItem>
+            <SelectItem value="portrait">Dọc</SelectItem>
+          </SelectContent>
+        </Select>
+        <Button
+          onClick={() => {
+            setPrintedAt(new Date());
+            print();
+          }}
+          disabled={!label.data}
+        >
+          <Printer aria-hidden />
+          In lại
+        </Button>
+      </div>
+      {label.data ? (
+        <>
+          <div className="flex justify-center rounded-md border bg-muted p-4">
+            <div className="shadow-md">
+              <WaybillLabel data={label.data} orientation={orientation} printedAt={printedAt} />
+            </div>
+          </div>
+          <p className="text-xs text-muted-foreground">
+            Hộp thoại in: chọn máy in tem, khổ giấy 100×75 mm, lề “Không có”, tỉ lệ 100%.
+          </p>
+          <WaybillLabelPrintSheet
+            data={label.data}
+            orientation={orientation}
+            printedAt={printedAt}
+            printer={printer}
+          />
+        </>
+      ) : label.error ? (
+        <div className="flex items-center gap-2 text-sm text-destructive">
+          <span>{messageFor(label.error)}</span>
+          <Button variant="outline" size="sm" onClick={() => void label.refetch()}>
+            Thử lại
+          </Button>
+        </div>
+      ) : (
+        <div className="flex justify-center rounded-md border bg-muted p-4">
+          <Skeleton
+            style={
+              orientation === 'landscape'
+                ? { width: '100mm', height: '75mm' }
+                : { width: '75mm', height: '100mm' }
+            }
+          />
+        </div>
+      )}
+    </div>
+  );
+}
+
+/** Nhãn PDF của hãng (A6/A5) qua proxy API, nhúng iframe và tự in khi tải xong. */
+function CarrierPdfLabel({
+  shipmentId,
+  trackingNo,
+  pageSize,
+  sizePicker,
+}: {
+  shipmentId: string;
+  trackingNo: string;
+  pageSize: 'A6' | 'A5';
+  sizePicker: ReactNode;
 }) {
   const frame = useRef<HTMLIFrameElement | null>(null);
-  const [state, setState] = useState<'loading' | 'ready' | 'unsupported' | 'error'>('loading');
+  const [state, setState] = useState<'loading' | 'ready' | 'error'>('loading');
   // "Tải lại nhãn" dựng lại iframe qua `key`, KHÔNG thêm query chống cache: API validate
   // query chặt (forbidNonWhitelisted) → `&n=` bị 400; nhãn đã trả `Cache-Control: no-store`.
   const [nonce, setNonce] = useState(0);
   const src = labelUrl(shipmentId, pageSize);
-
-  // Hãng nội bộ (MANUAL) không có nhãn → 501: hiện mã vận đơn nội bộ để chép tay, không nhúng iframe.
-  const supported = carrierCode !== 'MANUAL';
 
   const print = () => {
     try {
@@ -190,31 +365,10 @@ function LabelFrame({
     }
   };
 
-  useEffect(() => {
-    if (!supported) setState('unsupported');
-  }, [supported]);
-
-  if (!supported) {
-    return (
-      <div className="flex flex-col items-center gap-2 rounded-md border p-4 text-center">
-        <p className="text-sm">Hãng này không có nhãn in từ API. Ghi mã vận đơn nội bộ lên kiện:</p>
-        <Barcode value={trackingNo} symbology="code128" height={16} scale={3} />
-      </div>
-    );
-  }
-
   return (
     <div className="flex flex-col gap-2">
       <div className="flex flex-wrap items-center gap-2">
-        <Select value={pageSize} onValueChange={(v) => onPageSize(v as PageSize)}>
-          <SelectTrigger className="h-9 w-40" aria-label="Khổ nhãn">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="A6">Khổ A6 dọc</SelectItem>
-            <SelectItem value="A5">Khổ A5 dọc</SelectItem>
-          </SelectContent>
-        </Select>
+        {sizePicker}
         <Button onClick={print} disabled={state !== 'ready'}>
           <Printer aria-hidden />
           In lại

@@ -12,6 +12,7 @@ export type PdaScanResult = components['schemas']['PdaScanResultDto'];
 export type PdaCompleteResult = components['schemas']['PdaCompleteResultDto'];
 export type PdaWaybill = components['schemas']['PdaWaybillDto'];
 export type ShipmentView = components['schemas']['ShipmentViewDto'];
+export type ShipmentLabelData = components['schemas']['ShipmentLabelDataDto'];
 export type PdaShortResult = components['schemas']['PdaShortResultDto'];
 export type PdaWave = components['schemas']['PdaWaveDto'];
 export type PdaWaveScanResult = components['schemas']['PdaWaveScanResultDto'];
@@ -23,6 +24,7 @@ export const pdaKeys = {
   all: ['wms', 'pda'] as const,
   task: (id: string) => [...pdaKeys.all, 'task', id] as const,
   shipment: (id: string) => [...pdaKeys.all, 'shipment', id] as const,
+  labelData: (id: string) => [...pdaKeys.all, 'label-data', id] as const,
   wave: (id: string) => [...pdaKeys.all, 'wave', id] as const,
   queue: (type: string) => [...pdaKeys.all, 'queue', type] as const,
   myTasks: () => [...pdaKeys.all, 'my-tasks'] as const,
@@ -105,6 +107,19 @@ export function useShipment(shipmentId: string | null, opts: { poll?: boolean } 
       unwrap(api.GET('/shipments/{id}', { params: { path: { id: shipmentId ?? '' } } })),
     enabled: shipmentId !== null && shipmentId !== '',
     refetchInterval: (q) => (opts.poll && !q.state.data?.trackingNo ? 5_000 : false),
+  });
+}
+
+/**
+ * GET /shipments/:id/label-data — dữ liệu nhãn vận đơn ERP tự in (100×75 mm): người nhận,
+ * COD, hàng (combo gộp), ghi chú. Chỉ đọc, không đếm lượt in.
+ */
+export function useShipmentLabelData(shipmentId: string | null) {
+  return useQuery({
+    queryKey: pdaKeys.labelData(shipmentId ?? ''),
+    queryFn: () =>
+      unwrap(api.GET('/shipments/{id}/label-data', { params: { path: { id: shipmentId ?? '' } } })),
+    enabled: shipmentId !== null && shipmentId !== '',
   });
 }
 
