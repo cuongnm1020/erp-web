@@ -8603,6 +8603,10 @@ export interface components {
             /** @description Lý do khi QUEUED (thông điệp lỗi của hãng) hoặc SAVED có phiếu đã rời kho. */
             reason: string | null;
         };
+        SendToCarrierMissingSkuDto: {
+            code: string;
+            name: string;
+        };
         SendToCarrierFailedItemDto: {
             orderId: string;
             docNumber: string | null;
@@ -8611,6 +8615,10 @@ export interface components {
             message: string;
             /** @description Lời hãng khi `code = CARRIER_REJECTED` (vd GHTK "Đơn hàng thiếu thông tin địa chỉ…"); null nếu không phải. */
             carrierMessage: string | null;
+            /** @description `code = ORDER_SKU_NOT_IN_WAREHOUSE`: tên kho xuất; null nếu không phải. */
+            warehouseName: string | null;
+            /** @description `code = ORDER_SKU_NOT_IN_WAREHOUSE`: sản phẩm kho xuất không có; null nếu không phải. */
+            missingSkus: components["schemas"]["SendToCarrierMissingSkuDto"][] | null;
         };
         SendOrdersToCarrierResultDto: {
             sent: components["schemas"]["SendOrderToCarrierItemDto"][];

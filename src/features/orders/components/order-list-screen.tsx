@@ -4,6 +4,7 @@ import type { RowSelectionState } from '@tanstack/react-table';
 import { MessageSquareText, Plus, X } from 'lucide-react';
 import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
+import { CopyText } from '@/components/data/copy-text';
 import { DataTable, FilterBar, type ColumnDef } from '@/components/data/data-table';
 import { EmptyState, ListSkeleton, QueryState } from '@/components/data/states';
 import { PageHeader } from '@/components/layout/page-header';
@@ -20,6 +21,7 @@ import { cn } from '@/lib/cn';
 import {
   formatMoney,
   formatPhone,
+  normalizePhone,
   formatQuantity,
   formatRelative,
   phoneCarrier,
@@ -80,9 +82,13 @@ const DEFAULTS = {
 
 type OrderFilter = (typeof DEFAULTS.filterKeys)[number];
 
-/** Cột của bảng — `carrierName` tra tên hãng chọn trên đơn khi kho chưa tạo phiếu giao. */
+/**
+ * Cột của bảng — `carrierOf` tra mã + tên hãng chọn trên đơn khi kho chưa tạo phiếu giao,
+ * `warehouseName` tra tên kho xuất của đơn.
+ */
 const buildColumns = (
-  carrierName: (id: string) => string | null,
+  carrierOf: (id: string) => CarrierRef | null,
+  warehouseName: (id: string) => string | null,
 ): ColumnDef<SalesOrderListItem, unknown>[] => [
   {
     id: 'docNumber',
@@ -129,7 +135,16 @@ const buildColumns = (
             {o.recipientName ?? o.customer.name}
           </span>
           <span className="flex items-center gap-1.5 whitespace-nowrap">
-            <span className="font-mono text-xs">{formatPhone(o.phone)}</span>
+            {o.phone ? (
+              // Viết liền (0356523006) để dán thẳng vào Zalo / tổng đài; bấm là sao chép.
+              <CopyText
+                value={normalizePhone(o.phone) ?? o.phone}
+                what="số điện thoại"
+                className="font-mono text-xs"
+              />
+            ) : (
+              <span className="font-mono text-xs">{formatPhone(o.phone)}</span>
+            )}
             {telco ? <TelcoBadge name={telco} /> : null}
           </span>
         </div>
@@ -173,7 +188,23 @@ const buildColumns = (
     id: 'shipping',
     header: 'Vận chuyển',
     meta: { width: 200 },
-    cell: ({ row }) => <ShippingCell order={row.original} carrierName={carrierName} />,
+    cell: ({ row }) => <ShippingCell order={row.original} carrierOf={carrierOf} />,
+  },
+  {
+    id: 'warehouse',
+    header: 'Kho',
+    meta: { width: 120 },
+    cell: ({ row }) => {
+      const id = row.original.warehouseId;
+      const name = id ? warehouseName(id) : null;
+      return name ? (
+        <span className="block max-w-28 truncate text-xs" title={name}>
+          {name}
+        </span>
+      ) : (
+        <span className="text-xs text-warning">Chưa chọn kho</span>
+      );
+    },
   },
   {
     id: 'total',
@@ -242,25 +273,41 @@ const buildColumns = (
   },
 ];
 
-/** Hãng + phí VC + mã vận đơn; chưa có phiếu giao thì hãng chọn trên đơn / "Chưa gán hãng". */
+interface CarrierRef {
+  code: string;
+  name: string;
+}
+
+/**
+ * Hãng (viết tắt = mã hãng: GHTK, VTP…) + phí VC + mã vận đơn; chưa có phiếu giao thì hãng chọn
+ * trên đơn / "Chưa gán hãng". Có mã vận đơn → bấm mã hãng (hoặc mã vận đơn) là sao chép mã vận đơn.
+ */
 function ShippingCell({
   order,
-  carrierName,
+  carrierOf,
 }: {
   order: SalesOrderListItem;
-  carrierName: (id: string) => string | null;
+  carrierOf: (id: string) => CarrierRef | null;
 }) {
   const s = order.shipment;
-  // Phiếu giao thắng; chưa có phiếu thì hãng sale chọn trên đơn (tên tra từ danh mục hãng).
-  const name =
-    s?.carrierName ??
-    s?.carrierCode ??
-    (order.carrierId ? (carrierName(order.carrierId) ?? 'Đã chọn hãng') : null);
+  // Phiếu giao thắng; chưa có phiếu thì hãng sale chọn trên đơn (tra từ danh mục hãng).
+  const picked = order.carrierId ? carrierOf(order.carrierId) : null;
+  const code = s?.carrierCode ?? picked?.code ?? null;
+  const fullName = s?.carrierName ?? picked?.name ?? code;
+  const short = code ?? (order.carrierId ? 'Đã chọn hãng' : null);
   return (
     <div className="space-y-1 text-xs">
-      {name ? (
+      {short ? (
         <span className="block whitespace-nowrap">
-          <span className="font-semibold">{name}</span>
+          {s?.trackingNo ? (
+            <CopyText value={s.trackingNo} what="mã vận đơn" className="font-semibold">
+              <span title={fullName ?? undefined}>{short}</span>
+            </CopyText>
+          ) : (
+            <span className="font-semibold" title={fullName ?? undefined}>
+              {short}
+            </span>
+          )}
           {s?.shipFee ? (
             <span className="text-muted-foreground">
               {' '}
@@ -272,12 +319,11 @@ function ShippingCell({
         <span className="block text-warning">Chưa gán hãng</span>
       )}
       {s?.trackingNo ? (
-        <span
+        <CopyText
+          value={s.trackingNo}
+          what="mã vận đơn"
           className="block max-w-48 truncate font-mono text-muted-foreground"
-          title={s.trackingNo}
-        >
-          {s.trackingNo}
-        </span>
+        />
       ) : (
         <WeightNote order={order} />
       )}
@@ -518,11 +564,15 @@ export function OrderListScreen() {
     [filterParams, flow, skipTake],
   );
   const carriers = useCarriers();
-  const columns = useMemo(() => {
-    const byId = new Map((carriers.data ?? []).map((c) => [c.id, c.name]));
-    return buildColumns((id) => byId.get(id) ?? null);
-  }, [carriers.data]);
   const warehouses = useWarehouses();
+  const columns = useMemo(() => {
+    const carrierById = new Map((carriers.data ?? []).map((c) => [c.id, c]));
+    const whById = new Map((warehouses.data ?? []).map((w) => [w.id, w.name]));
+    return buildColumns(
+      (id) => carrierById.get(id) ?? null,
+      (id) => whById.get(id) ?? null,
+    );
+  }, [carriers.data, warehouses.data]);
   const query = useOrders(params);
   const counts = useOrderFlowCounts(filterParams);
   useInvalidateOn(['order.created', 'order.updated'], [orderKeys.lists()]);

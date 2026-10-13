@@ -80,7 +80,8 @@ describe('OrderListScreen — GET /sales-orders (P1-12)', () => {
     renderApp(<OrderListScreen />);
     await screen.findByText(FIRST.docNumber);
     // i=0 → 0912345678 (Vinaphone), i=1 → 0386… (Viettel), i=2 → 0908… (Mobifone).
-    expect(screen.getAllByText('0912 345 678').length).toBeGreaterThan(0);
+    // Viết liền để dán thẳng (2026-10-13).
+    expect(screen.getAllByText('0912345678').length).toBeGreaterThan(0);
     expect(screen.getAllByText('Vina').length).toBeGreaterThan(0);
     expect(screen.getAllByText('Viettel').length).toBeGreaterThan(0);
     expect(screen.getAllByText('Mobi').length).toBeGreaterThan(0);
@@ -90,7 +91,8 @@ describe('OrderListScreen — GET /sales-orders (P1-12)', () => {
     search = 'flow=DELIVERED';
     renderApp(<OrderListScreen />);
     const row = makeOrders(60).find((o) => o.flow === 'DELIVERED')!;
-    fireEvent.click(await screen.findByText(row.shipment!.trackingNo!));
+    // Mã vận đơn giờ là nút sao chép (không mở xem nhanh) → bấm vào chính dòng.
+    fireEvent.click((await screen.findByText(row.shipment!.trackingNo!)).closest('tr')!);
     const panel = await screen.findByRole('dialog');
     expect(panel).toHaveTextContent(row.docNumber);
     expect(panel).toHaveTextContent('Thành công');
@@ -228,7 +230,7 @@ describe('OrderListScreen — cân nặng gửi hãng + gán hãng hàng loạt'
     await waitFor(() =>
       expect(toastSuccess).toHaveBeenCalledWith('Đã cập nhật 2 đơn', expect.anything()),
     );
-    expect(toastError).not.toHaveBeenCalled();
+    expect(toastError.mock.calls).toEqual([]);
     await waitFor(() => expect(screen.queryByRole('toolbar')).not.toBeInTheDocument());
   });
 
@@ -374,5 +376,79 @@ describe('OrderListScreen — lọc theo hãng + thời gian (2026-09-19)', () =
     const url = String(replace.mock.calls.at(-1)![0]);
     expect(url).toContain('noCarrier=true');
     expect(url).not.toContain('carrierId=');
+  });
+});
+
+describe('OrderListScreen — sao chép SĐT / mã vận đơn, cột kho (2026-10-13)', () => {
+  const writeText = vi.fn(() => Promise.resolve());
+  const setup = () => {
+    Object.defineProperty(navigator, 'clipboard', { value: { writeText }, configurable: true });
+    writeText.mockClear();
+    toastSuccess.mockClear();
+    const rows: Array<
+      Omit<ReturnType<typeof makeOrders>[number], 'warehouseId'> & {
+        warehouseId: string | null;
+      }
+    > = makeOrders(60)
+      .filter((o) => o.flow === 'DELIVERED' && o.phone !== null)
+      .slice(0, 2);
+    rows[0] = { ...rows[0]!, warehouseId: 'wh-tt' };
+    server.use(
+      http.get('/api/sales-orders', () => HttpResponse.json({ items: rows, total: rows.length })),
+      http.get('/api/warehouses', () =>
+        HttpResponse.json([
+          {
+            id: 'wh-tt',
+            code: 'KHO-TT-01',
+            name: 'Kho Thạch Thất',
+            address: null,
+            contactName: null,
+            phone: null,
+            hamlet: null,
+            ward: null,
+            province: null,
+            isActive: true,
+            isDefault: true,
+            layoutImageUrl: null,
+          },
+        ]),
+      ),
+    );
+    search = '';
+    renderApp(<OrderListScreen />);
+    return rows;
+  };
+
+  it('bấm SĐT (viết liền) → sao chép, không mở xem nhanh', async () => {
+    const [row] = setup();
+    const phone = await screen.findByRole('button', {
+      name: `Sao chép số điện thoại ${row!.phone}`,
+    });
+    expect(phone).toHaveTextContent(row!.phone!);
+    fireEvent.click(phone);
+    await waitFor(() => expect(writeText).toHaveBeenCalledWith(row!.phone));
+    expect(toastSuccess).toHaveBeenCalledWith(`Đã sao chép số điện thoại ${row!.phone}`);
+    expect(screen.queryByRole('dialog')).toBeNull();
+  });
+
+  it('hãng hiện viết tắt (GHTK, tên đầy đủ ở tooltip); bấm → sao chép mã vận đơn', async () => {
+    const [row] = setup();
+    const tracking = row!.shipment!.trackingNo!;
+    const buttons = await screen.findAllByRole('button', {
+      name: `Sao chép mã vận đơn ${tracking}`,
+    });
+    // Hai chỗ bấm: mã hãng viết tắt + dòng mã vận đơn.
+    expect(buttons).toHaveLength(2);
+    expect(buttons[0]).toHaveTextContent(/^GHTK$/);
+    expect(screen.getAllByTitle('Giao Hàng Tiết Kiệm').length).toBeGreaterThan(0);
+    fireEvent.click(buttons[0]!);
+    await waitFor(() => expect(writeText).toHaveBeenCalledWith(tracking));
+    expect(screen.queryByRole('dialog')).toBeNull();
+  });
+
+  it('cột Kho: tên kho xuất của đơn; đơn chưa có kho → "Chưa chọn kho"', async () => {
+    setup();
+    expect(await screen.findByText('Kho Thạch Thất')).toBeInTheDocument();
+    expect(screen.getByText('Chưa chọn kho')).toBeInTheDocument();
   });
 });

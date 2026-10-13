@@ -77,6 +77,8 @@ const MESSAGES: Record<string, string> = {
   CARRIER_API_ERROR: 'Hãng vận chuyển không phản hồi hoặc trả lỗi. Thử lại sau ít phút.',
   CARRIER_REJECTED:
     'Hãng vận chuyển từ chối dữ liệu đơn (thường là địa chỉ giao). Sửa đơn theo lý do hãng báo rồi xin vận đơn lại.',
+  ORDER_SKU_NOT_IN_WAREHOUSE:
+    'Kho xuất của đơn không có sản phẩm cần giao. Đổi kho xuất hoặc chuyển hàng về kho rồi gửi lại.',
   CARRIER_OPERATION_UNSUPPORTED:
     'Hãng này không hỗ trợ thao tác vừa gọi (tra cước / in nhãn). Chọn hãng khác hoặc làm tay.',
   CARRIER_NOT_FOUND: 'Hãng vận chuyển không tồn tại hoặc đã tắt. Tải lại danh sách hãng.',
