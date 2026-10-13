@@ -29,7 +29,7 @@ import { orderKeys, usePancakeShops } from '../api/use-orders';
 const COUNT_LABELS: Array<[keyof PancakeOrderResyncStatus['counts'], string]> = [
   ['created', 'Đơn mới tạo'],
   ['updated', 'Đã cập nhật'],
-  ['shippedExternal', 'Đã gửi qua Pancake (không trừ tồn)'],
+  ['shippedExternal', 'Theo trạng thái Pancake (đóng gói / gửi ngoài ERP, không trừ tồn)'],
   ['pickReplanned', 'Sinh lại việc lấy hàng'],
   ['skipped', 'Đơn bỏ qua'],
   ['failed', 'Lỗi'],

@@ -209,7 +209,7 @@ describe('Danh sách đơn — Đồng bộ đơn từ Pancake theo POS', () => 
     await within(dialog).findByText('3/3 đơn');
     expect(within(dialog).getByText('Đơn mới tạo').nextSibling).toHaveTextContent('2');
     expect(
-      within(dialog).getByText('Đã gửi qua Pancake (không trừ tồn)').nextSibling,
+      within(dialog).getByText('Theo trạng thái Pancake (đóng gói / gửi ngoài ERP, không trừ tồn)').nextSibling,
     ).toHaveTextContent('1');
     const row = within(dialog).getByText('Pancake #7044').closest('tr')!;
     expect(within(row).queryByRole('link')).not.toBeInTheDocument();
