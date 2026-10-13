@@ -112,12 +112,17 @@ const buildColumns = (
               </span>
             ) : null}
           </div>
-          <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+          <div className="text-xs text-muted-foreground">
             <span className="rounded-sm bg-muted px-1.5 font-medium">
               {o.pancakeOrderId ? `Pancake #${o.pancakeOrderId}` : 'ERP'}
             </span>
-            {o.ownerName ? <span className="truncate">{o.ownerName}</span> : null}
           </div>
+          {/* Sale một dòng riêng dưới mã Pancake — tên sale dài không còn đẩy / cắt mã đơn nguồn. */}
+          {o.ownerName ? (
+            <div className="max-w-40 truncate text-xs text-muted-foreground" title={o.ownerName}>
+              {o.ownerName}
+            </div>
+          ) : null}
         </div>
       );
     },
