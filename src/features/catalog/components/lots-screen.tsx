@@ -15,6 +15,7 @@ import {
   FormMessage,
 } from '@/components/data/form';
 import { RowActions } from '@/components/data/row-actions';
+import { DraftInput } from '@/components/data/draft-input';
 import { EmptyState, ListSkeleton, QueryState } from '@/components/data/states';
 import { StatusBadge } from '@/components/data/status-badge';
 import { PageHeader } from '@/components/layout/page-header';
@@ -335,11 +336,12 @@ export function LotsScreen() {
       <div className="mb-3 flex flex-wrap items-center gap-2 rounded-md border bg-card px-2 py-1.5">
         <div className="flex h-7 w-64 items-center gap-1.5 rounded-md border border-input bg-background px-2 text-sm">
           <Search className="h-3.5 w-3.5 text-muted-foreground" aria-hidden />
-          <input
+          <DraftInput
             value={state.q}
-            onChange={(e) => set({ q: e.target.value })}
+            onCommit={(q) => set({ q })}
             placeholder="Tìm theo số lô…"
-            className="w-full bg-transparent outline-none placeholder:text-muted-foreground"
+            aria-label="Tìm theo số lô"
+            className="h-auto w-full rounded-none border-0 bg-transparent p-0 outline-none placeholder:text-muted-foreground"
           />
         </div>
         <Select

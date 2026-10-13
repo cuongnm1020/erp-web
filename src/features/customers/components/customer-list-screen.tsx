@@ -2,14 +2,14 @@
 
 import { Plus } from 'lucide-react';
 import Link from 'next/link';
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo } from 'react';
 import { DataTable, FilterBar, type ColumnDef } from '@/components/data/data-table';
 import { RowActions } from '@/components/data/row-actions';
+import { DraftInput } from '@/components/data/draft-input';
 import { EmptyState, ListSkeleton, QueryState } from '@/components/data/states';
 import { StatusBadge } from '@/components/data/status-badge';
 import { PageHeader } from '@/components/layout/page-header';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { toast } from '@/components/ui/toaster';
 import { messageFor } from '@/lib/error-messages';
 import { formatDate, formatMoney, formatPhone } from '@/lib/format';
@@ -83,20 +83,11 @@ function ProvinceInput({
   value: string | undefined;
   onChange: (v: string | undefined) => void;
 }) {
-  const [draft, setDraft] = useState(value ?? '');
-  useEffect(() => setDraft(value ?? ''), [value]);
-  useEffect(() => {
-    if (draft.trim() === (value ?? '')) return;
-    const t = setTimeout(() => onChange(draft.trim() || undefined), 400);
-    return () => clearTimeout(t);
-  }, [draft, value, onChange]);
   return (
-    <Input
-      value={draft}
-      onChange={(e) => setDraft(e.target.value)}
-      onKeyDown={(e) => {
-        if (e.key === 'Enter') onChange(draft.trim() || undefined);
-      }}
+    <DraftInput
+      value={value ?? ''}
+      onCommit={(v) => onChange(v || undefined)}
+      delay={400}
       placeholder="Tỉnh/thành (đúng tên)"
       aria-label="Tỉnh/thành"
       className="h-9 w-44"

@@ -2,7 +2,10 @@
 
 import type { CSSProperties } from 'react';
 import { Barcode } from '@/components/data/barcode';
-import type { ApiBarcodeType } from '@/lib/print';
+import { symbologyFor, type ApiBarcodeType } from '@/lib/print';
+
+/** Kiểu in trên A5: QR vuông, hay mã vạch 1 chiều nằm ngang (CODE128 / EAN13). */
+export type ProductCodeSheetFormat = 'qr' | 'linear';
 
 export interface ProductCodeSheetData {
   /** Mã được mã hoá (barcode / QR của sản phẩm). */
@@ -12,6 +15,11 @@ export interface ProductCodeSheetData {
   skuCode: string;
   /** "Sản phẩm · CHAI", "Thùng · BOX = 30 CHAI"… */
   levelLabel: string;
+  /**
+   * Bỏ trống = theo `type`. In mã vạch cho mã kiểu QR vẫn quét ra đúng chuỗi `code` — tra mã
+   * theo chuỗi, không theo ký hiệu — nên máy quét 1 chiều ở kệ / trạm đóng gói đọc được.
+   */
+  format?: ProductCodeSheetFormat;
 }
 
 // Kích thước VẬT LÝ trên A5 ngang (210×148 mm) khai bằng inline style — đây là khổ giấy, không
@@ -31,15 +39,15 @@ const NAME_STYLE: CSSProperties = { fontSize: '24pt', lineHeight: 1.2 };
 const CODE_STYLE: CSSProperties = { fontSize: '20pt', lineHeight: 1.2 };
 const META_STYLE: CSSProperties = { fontSize: '13pt', lineHeight: 1.3 };
 
-const isQr = (type: ApiBarcodeType) => type === 'QR';
-
 /**
- * Một trang A5 ngang: mã QR sản phẩm cỡ lớn (quét được từ xa ở kệ / thùng) + tên sản phẩm, mã
+ * Một trang A5 ngang: mã QR (hoặc mã vạch, theo `format`) sản phẩm cỡ lớn (quét được từ xa ở kệ / thùng) + tên sản phẩm, mã
  * SKU, cấp đóng gói. Mã 1 chiều thì xếp dọc: chữ trên, vạch ngang hết khổ bên dưới. Dùng cả cho
  * preview trên màn hình lẫn tờ in — cái nhìn thấy là cái in ra.
  */
 export function ProductCodeSheet({ data }: { data: ProductCodeSheetData }) {
-  const qr = isQr(data.type);
+  const qr = (data.format ?? (data.type === 'QR' ? 'qr' : 'linear')) === 'qr';
+  // Mã kiểu QR mà in vạch → CODE128; EAN13 hợp lệ giữ EAN13.
+  const linear = data.type === 'QR' ? 'code128' : symbologyFor(data.type, data.code);
   const text = (
     <div className="flex min-w-0 flex-col gap-2">
       <div className="font-bold" style={NAME_STYLE}>
@@ -69,7 +77,7 @@ export function ProductCodeSheet({ data }: { data: ProductCodeSheetData }) {
           <div style={QR_BOX_STYLE}>
             <Barcode
               value={data.code}
-              apiType={data.type}
+              symbology="qrcode"
               scale={8}
               showText={false}
               className="block h-full w-full [&>svg]:h-full [&>svg]:w-full"
@@ -83,7 +91,7 @@ export function ProductCodeSheet({ data }: { data: ProductCodeSheetData }) {
           <div style={LINEAR_BOX_STYLE}>
             <Barcode
               value={data.code}
-              apiType={data.type}
+              symbology={linear}
               height={20}
               scale={4}
               showText={false}

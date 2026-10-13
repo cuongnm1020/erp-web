@@ -1,7 +1,7 @@
 'use client';
 
 import Decimal from 'decimal.js';
-import { Printer, QrCode, ScanBarcode } from 'lucide-react';
+import { ChevronDown, Printer, QrCode, ScanBarcode } from 'lucide-react';
 import Link from 'next/link';
 import { Fragment, useState } from 'react';
 import { Barcode } from '@/components/data/barcode';
@@ -10,6 +10,12 @@ import { DetailSkeleton, EmptyState, ListSkeleton, QueryState } from '@/componen
 import { PageHeader } from '@/components/layout/page-header';
 import { StatusBadge } from '@/components/data/status-badge';
 import { Button } from '@/components/ui/button';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { Input } from '@/components/ui/input';
 import {
   Select,
@@ -46,7 +52,11 @@ import {
   useSkuStockSummary,
   type StockByLocationRow,
 } from '../api/use-product-stock';
-import { ProductCodeSheet, type ProductCodeSheetData } from './product-code-sheet';
+import {
+  ProductCodeSheet,
+  type ProductCodeSheetData,
+  type ProductCodeSheetFormat,
+} from './product-code-sheet';
 
 /**
  * C-03 Chi tiết sản phẩm — nối API thật (GET /products/{id} + /stock*).
@@ -516,8 +526,13 @@ function SkuBarcodeRows({
   // In một mã cỡ lớn trên A5 ngang — dán kệ / thùng, quét từ xa.
   const printer = usePrint();
   const [sheet, setSheet] = useState<ProductCodeSheetData | null>(null);
-  const printA5 = (b: Sku['barcodes'][number], level: BarcodeLevel) => {
+  const printA5 = (
+    b: Sku['barcodes'][number],
+    level: BarcodeLevel,
+    format: ProductCodeSheetFormat,
+  ) => {
     setSheet({
+      format,
       code: b.code,
       type: b.type,
       productName: product.name,
@@ -570,15 +585,26 @@ function SkuBarcodeRows({
                         <Printer /> In
                       </Link>
                     </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => printA5(b, level)}
-                      aria-label={`In ${b.code} khổ A5 ngang`}
-                      title="In mã cỡ lớn trên giấy A5 quay ngang"
-                    >
-                      <QrCode /> A5 ngang
-                    </Button>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          aria-label={`In ${b.code} khổ A5 ngang`}
+                          title="In mã cỡ lớn trên giấy A5 quay ngang"
+                        >
+                          <QrCode /> A5 ngang <ChevronDown aria-hidden />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuItem onSelect={() => printA5(b, level, 'qr')}>
+                          <QrCode aria-hidden /> Mã QR
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onSelect={() => printA5(b, level, 'linear')}>
+                          <ScanBarcode aria-hidden /> Mã vạch (CODE128)
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
                   </div>
                 </TableCell>
               </TableRow>

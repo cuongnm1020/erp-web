@@ -13,12 +13,12 @@ import {
 } from 'lucide-react';
 import Link from 'next/link';
 import { type ReactNode, useMemo, useState } from 'react';
+import { DraftInput } from '@/components/data/draft-input';
 import { EmptyState, ListSkeleton, QueryState } from '@/components/data/states';
 import { StatusBadge } from '@/components/data/status-badge';
 import { PageHeader } from '@/components/layout/page-header';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/cn';
 import { Can } from '@/lib/permission';
@@ -277,10 +277,10 @@ function OrgTreeBody({
             className="absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground"
             aria-hidden
           />
-          <Input
+          <DraftInput
             aria-label="Tìm nhân viên"
             value={q}
-            onChange={(e) => onQChange(e.target.value)}
+            onCommit={onQChange}
             className="h-8 pl-8"
             placeholder="Tìm theo tên, mã, email, phòng ban, team…"
           />
