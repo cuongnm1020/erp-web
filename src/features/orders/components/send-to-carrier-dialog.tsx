@@ -588,8 +588,15 @@ export function SendToCarrierDialog({
   );
 }
 
-/** Lý do một đơn không gửi được: câu theo mã lỗi (luật 6) + nguyên văn lời hãng nếu hãng từ chối. */
+/**
+ * Lý do một đơn không gửi được: câu theo mã lỗi (luật 6) + nguyên văn lời hãng nếu hãng từ chối;
+ * kho xuất không có hàng → nêu tên kho + từng sản phẩm thiếu.
+ */
 function failedReason(f: SendOrdersToCarrierResult['failed'][number]): string {
+  if (f.code === 'ORDER_SKU_NOT_IN_WAREHOUSE' && f.missingSkus?.length) {
+    const skus = f.missingSkus.map((s) => `${s.code} — ${s.name}`).join('; ');
+    return `${f.warehouseName ?? 'Kho xuất'} không có: ${skus}. Đổi kho xuất hoặc chuyển hàng về kho rồi gửi lại.`;
+  }
   const base = messageForCode(f.code);
   return f.carrierMessage ? `${base} ${carrierSaid(f.carrierMessage)}` : base;
 }
@@ -618,7 +625,7 @@ function FailedOrders({
         </h3>
         <p className="text-sm text-muted-foreground">
           {result.sent.length > 0 ? `${result.sent.length} đơn còn lại đã gửi xong. ` : ''}
-          Sửa từng đơn theo lý do bên dưới (thường là địa chỉ giao) rồi gửi lại.
+          Sửa từng đơn theo lý do bên dưới (địa chỉ giao, kho xuất…) rồi gửi lại.
         </p>
       </div>
       <ul

@@ -247,6 +247,8 @@ describe('Gửi sang ĐVVC — SendToCarrierMenu + SendToCarrierDialog', () => {
                 code: 'CARRIER_REJECTED',
                 message: 'raw server message',
                 carrierMessage: said,
+                warehouseName: null,
+                missingSkus: null,
               },
             ],
           },
@@ -279,6 +281,40 @@ describe('Gửi sang ĐVVC — SendToCarrierMenu + SendToCarrierDialog', () => {
     fireEvent.click(within(panel).getByRole('button', { name: 'Đóng' }));
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
     await waitFor(() => expect(screen.queryByRole('toolbar')).not.toBeInTheDocument());
+  });
+
+  it('kho xuất không có sản phẩm (ORDER_SKU_NOT_IN_WAREHOUSE) → cảnh báo nêu tên kho + từng sản phẩm, không gửi', async () => {
+    search = '';
+    const rows = makeOrders(2);
+    server.use(
+      http.post('/api/sales-orders/send-to-carrier', () =>
+        HttpResponse.json(
+          {
+            sent: [],
+            failed: rows.map((r) => ({
+              orderId: r.id,
+              docNumber: r.docNumber,
+              code: 'ORDER_SKU_NOT_IN_WAREHOUSE',
+              message: 'raw server message',
+              carrierMessage: null,
+              warehouseName: 'Kho Thạch Thất',
+              missingSkus: [{ code: 'CANXI-500', name: 'Canxi Bo Organic 500ml' }],
+            })),
+          },
+          { status: 201 },
+        ),
+      ),
+    );
+    await selectTwoRows();
+    const dialog = await openFor('GHTK');
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Cập nhật 2 đơn' }));
+    const list = await within(dialog).findByRole('list', { name: 'Danh sách đơn lỗi' });
+    expect(within(dialog).getByText('2 đơn không gửi được sang GHTK')).toBeInTheDocument();
+    const [first] = within(list).getAllByRole('listitem');
+    expect(first).toHaveTextContent(
+      'Kho Thạch Thất không có: CANXI-500 — Canxi Bo Organic 500ml. Đổi kho xuất hoặc chuyển hàng về kho rồi gửi lại.',
+    );
+    expect(first).not.toHaveTextContent('raw server message');
   });
 
   it('toShippingOptions: mặc định chỉ gửi cờ, ô trống không gửi; điền đủ → đúng kiểu số/chuỗi', () => {
