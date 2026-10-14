@@ -34,9 +34,9 @@ function Caption({ children }: { children: ReactNode }) {
 
 /**
  * Tem vận đơn ERP tự in cho đơn GHTK, khổ 100×75 ngang — theo tem GHTK, chỉnh 2026-10-14:
- * đầu tem GHTK + ngày in; cột trái = người gửi (kho, SĐT che giữa) / người nhận (SĐT che hết,
- * che số nhà), mã đơn KH (= mã phiếu giao gửi GHTK), sản phẩm / SL | ghi chú (xuống dòng);
- * cột phải = mã vạch đoạn số cuối của mã GHTK, kho lấy / khối lượng / thu hộ, QR mã đầy đủ.
+ * đầu tem GHTK + ngày in; mã vạch đoạn số cuối của mã GHTK | QR mã đầy đủ; người gửi (kho, SĐT
+ * che giữa) / người nhận (SĐT che hết, che số nhà) | kho lấy, khối lượng, thu hộ; rồi các hàng
+ * hết bề ngang: mã đơn KH (= mã phiếu giao gửi GHTK), danh sách sản phẩm / SL, ghi chú.
  * Không in mã phân loại, tuyến, kho giao, biểu tượng hàng (người dùng bỏ / API GHTK không có).
  */
 export function GhtkWaybillLabel({
@@ -71,179 +71,161 @@ export function GhtkWaybillLabel({
         className="flex items-end justify-between"
         style={{ borderBottom: LINE, paddingBottom: '0.6mm', gap: '2mm' }}
       >
-        <span className="font-extrabold leading-none tracking-tight" style={{ fontSize: '13pt' }}>
+        <span className="font-extrabold leading-none tracking-tight" style={{ fontSize: '12pt' }}>
           GHTK
         </span>
-        <span className="leading-none" style={{ fontSize: '7.5pt' }}>
-          Ngày in: <span className="tabular-nums">{printed}</span>
+        {/* Mã đơn KH (= mã phiếu giao gửi GHTK) */}
+        <span
+          className="flex items-baseline whitespace-nowrap leading-none"
+          style={{ gap: '1.2mm' }}
+        >
+          <span style={{ fontSize: '7pt' }}>Mã đơn KH</span>
+          <span className="font-extrabold" style={{ fontSize: '10pt' }}>
+            {data.shipmentDocNumber}
+          </span>
+        </span>
+        <span className="whitespace-nowrap leading-none" style={{ fontSize: '6.5pt' }}>
+          In <span className="tabular-nums">{printed}</span>
         </span>
       </div>
 
-      <div className="flex min-h-0 flex-1">
-        {/* ── Cột trái ── */}
-        <div className="flex min-w-0 flex-col" style={{ flex: '64 1 0', borderRight: LINE }}>
-          {/* Người gửi / người nhận */}
-          <div
-            className="flex flex-col"
-            style={{
-              borderBottom: LINE,
-              padding: '0.6mm 1.5mm 0.6mm 0',
-              gap: '0.3mm',
-              fontSize: '7pt',
-            }}
-          >
-            <div className="min-w-0">
-              <Caption>
-                Người gửi / <b style={{ fontSize: '7.5pt' }}>{ghtk.shopCode}</b>
-              </Caption>
-              {data.sender ? (
-                <div className="font-bold" style={clamp(2)}>
-                  {data.sender.name} / {maskPhone(data.sender.phone)} · Đ/c:{' '}
-                  {maskedAddress(data.sender.street, data.sender.locality)}
-                </div>
-              ) : null}
-            </div>
-            <div className="min-w-0">
-              <Caption>Người nhận</Caption>
-              {data.recipient ? (
-                <>
-                  <div className="truncate font-bold leading-tight">
-                    {data.recipient.name} / {hidePhone(data.recipient.phone)}
-                  </div>
-                  <div className="font-bold" style={clamp(3)}>
-                    Đ/c: {maskedAddress(data.recipient.street, data.recipient.locality)}
-                  </div>
-                </>
-              ) : (
-                <div>Đơn chưa có địa chỉ giao</div>
-              )}
-            </div>
+      {/* Hai cột: mã vạch | QR, người gửi / nhận | kho lấy · khối lượng · thu hộ */}
+      <div className="grid" style={{ gridTemplateColumns: '64fr 36fr' }}>
+        <div
+          className="flex flex-col items-center justify-center"
+          style={{ borderBottom: LINE, borderRight: LINE, padding: '0.8mm 2mm 0.6mm 0' }}
+        >
+          <div className="w-full" style={{ height: '9.5mm' }}>
+            {/* height thấp → SVG bè ngang, vạch trải gần hết cột như tem GHTK */}
+            <Barcode
+              value={ghtk.shortCode}
+              symbology="code128"
+              height={4.5}
+              scale={2}
+              showText={false}
+              className={cn('block h-full w-full', FILL_SVG)}
+              label={`Mã vận đơn ${code}`}
+            />
           </div>
-
-          {/* Mã đơn KH (= mã phiếu giao gửi GHTK) */}
-          <div
-            className="flex items-baseline whitespace-nowrap leading-none"
-            style={{ borderBottom: LINE, padding: '0.8mm 1.5mm 0.8mm 0', gap: '1.5mm' }}
+          <span
+            className="font-mono font-bold leading-none tracking-wide"
+            style={{ fontSize: '10pt', marginTop: '0.5mm' }}
           >
-            <span style={{ fontSize: '7pt' }}>Mã đơn KH</span>
-            <span className="font-extrabold" style={{ fontSize: '11pt' }}>
-              {data.shipmentDocNumber}
-            </span>
-          </div>
-
-          {/* Sản phẩm / SL | ghi chú */}
-          <div className="flex min-h-0 flex-1 overflow-hidden">
-            <div
-              className="flex min-w-0 flex-col overflow-hidden"
-              style={{
-                flex: '1.45 1 0',
-                borderRight: LINE,
-                padding: '0.6mm 1.2mm 0 0',
-                fontSize: '7.5pt',
-                gap: '0.5mm',
-              }}
-            >
-              <div className="flex justify-between font-bold" style={{ fontSize: '7pt' }}>
-                <span>Sản phẩm</span>
-                <span>SL</span>
-              </div>
-              {shown.map((it, i) => (
-                <div key={i} className="flex" style={{ gap: '1.2mm' }}>
-                  <span className="min-w-0 flex-1 font-semibold" style={clamp(3)}>
-                    {it.name}
-                  </span>
-                  <span className="shrink-0 font-bold tabular-nums" style={{ fontSize: '9pt' }}>
-                    {formatQuantity(it.qty)}
-                  </span>
-                </div>
-              ))}
-              {more > 0 ? <div className="italic">+{more} sản phẩm khác</div> : null}
-            </div>
-            <div
-              className="flex min-w-0 flex-col overflow-hidden"
-              style={{ flex: '1 1 0', padding: '0.6mm 1.2mm 0 1.2mm', fontSize: '7pt' }}
-            >
-              <div className="font-bold">Ghi chú</div>
-              {note ? (
-                <div className="whitespace-pre-line break-words" style={{ lineHeight: 1.3 }}>
-                  {note}
-                </div>
-              ) : null}
-            </div>
+            {ghtk.shortCode}
+          </span>
+        </div>
+        <div
+          className="flex items-center justify-center"
+          style={{ borderBottom: LINE, padding: '0.6mm 0 0.6mm 1.5mm' }}
+        >
+          <div style={{ width: '13mm', height: '13mm' }}>
+            <Barcode
+              value={code}
+              symbology="qrcode"
+              scale={2}
+              className={cn('block h-full w-full', FILL_SVG)}
+              label={`QR ${code}`}
+            />
           </div>
         </div>
 
-        {/* ── Cột phải ── */}
-        <div className="flex min-w-0 flex-col" style={{ flex: '36 1 0' }}>
-          {/* Mã vạch đoạn số cuối của mã GHTK */}
-          <div
-            className="flex flex-col items-center"
-            style={{ borderBottom: LINE, padding: '1mm 0 0.8mm 1.5mm' }}
-          >
-            <div className="w-full" style={{ height: '10.5mm' }}>
-              <Barcode
-                value={ghtk.shortCode}
-                symbology="code128"
-                height={10}
-                scale={2}
-                showText={false}
-                className={cn('block h-full w-full', FILL_SVG)}
-                label={`Mã vận đơn ${code}`}
-              />
-            </div>
-            <span
-              className="font-mono font-bold leading-none tracking-wide"
-              style={{ fontSize: '10pt', marginTop: '0.6mm' }}
-            >
-              {ghtk.shortCode}
-            </span>
+        <div
+          className="flex min-w-0 flex-col"
+          style={{
+            borderBottom: LINE,
+            borderRight: LINE,
+            padding: '0.5mm 1.5mm 0.6mm 0',
+            gap: '0.3mm',
+            fontSize: '7pt',
+          }}
+        >
+          <div className="min-w-0" style={clamp(2)}>
+            <span style={{ fontSize: '6.5pt' }}>Người gửi / </span>
+            <b>{ghtk.shopCode}</b>
+            {data.sender ? (
+              <b>
+                {' · '}
+                {data.sender.name} / {maskPhone(data.sender.phone)} · Đ/c:{' '}
+                {maskedAddress(data.sender.street, data.sender.locality)}
+              </b>
+            ) : null}
           </div>
-
-          {/* Kho lấy / khối lượng / thu hộ */}
-          <div
-            className="flex flex-col"
-            style={{ borderBottom: LINE, padding: '0.6mm 0 0.8mm 1.5mm', gap: '0.6mm' }}
-          >
-            <div>
-              <Caption>Kho lấy</Caption>
-              <div className="truncate font-extrabold leading-tight" style={{ fontSize: '8.5pt' }}>
-                {data.sender?.warehouseName ?? '—'}
-              </div>
-            </div>
-            <div>
-              <Caption>Khối lượng</Caption>
-              <div className="font-extrabold leading-tight" style={{ fontSize: '9pt' }}>
-                {data.weightKg ? `${formatQuantity(data.weightKg)} KG` : '—'}
-              </div>
-            </div>
-            <div>
-              <Caption>Thu hộ</Caption>
-              <div
-                className="font-extrabold tabular-nums leading-tight"
-                style={{ fontSize: '11pt' }}
-              >
-                {formatMoney(data.codAmount, { unit: 'đ' })}
-              </div>
-            </div>
+          <div className="min-w-0">
+            {data.recipient ? (
+              <>
+                <div className="truncate leading-tight">
+                  <span style={{ fontSize: '6.5pt' }}>Người nhận: </span>
+                  <b>
+                    {data.recipient.name} / {hidePhone(data.recipient.phone)}
+                  </b>
+                </div>
+                <div className="font-bold" style={clamp(2)}>
+                  Đ/c: {maskedAddress(data.recipient.street, data.recipient.locality)}
+                </div>
+              </>
+            ) : (
+              <div>Người nhận: đơn chưa có địa chỉ giao</div>
+            )}
           </div>
-
-          {/* QR mã vận đơn đầy đủ */}
-          <div
-            className="flex min-h-0 flex-1 items-center justify-center"
-            style={{ padding: '0.8mm 0 0 1.5mm' }}
-          >
-            <div style={{ width: '18mm', height: '18mm' }}>
-              <Barcode
-                value={code}
-                symbology="qrcode"
-                scale={2}
-                className={cn('block h-full w-full', FILL_SVG)}
-                label={`QR ${code}`}
-              />
+        </div>
+        <div
+          className="flex min-w-0 flex-col justify-center"
+          style={{ borderBottom: LINE, padding: '0.5mm 0 0.6mm 1.5mm', gap: '0.6mm' }}
+        >
+          {/* Nhãn và giá trị cùng một dòng — nhường chiều cao cho danh sách sản phẩm */}
+          <div style={clamp(2)}>
+            <span style={{ fontSize: '6.5pt' }}>Kho lấy: </span>
+            <b style={{ fontSize: '8pt' }}>{data.sender?.warehouseName ?? '—'}</b>
+          </div>
+          <div className="truncate leading-tight">
+            <span style={{ fontSize: '6.5pt' }}>Khối lượng: </span>
+            <b style={{ fontSize: '8.5pt' }}>
+              {data.weightKg ? `${formatQuantity(data.weightKg)} KG` : '—'}
+            </b>
+          </div>
+          <div>
+            <Caption>Thu hộ</Caption>
+            <div className="font-extrabold tabular-nums leading-tight" style={{ fontSize: '11pt' }}>
+              {formatMoney(data.codAmount, { unit: 'đ' })}
             </div>
           </div>
         </div>
       </div>
+
+      {/* Sản phẩm / SL — một hàng dài hết bề ngang */}
+      <div
+        className="flex min-h-0 flex-1 flex-col overflow-hidden"
+        style={{ padding: '0.6mm 0 0.4mm', fontSize: '7.5pt', gap: '0.4mm' }}
+      >
+        <div className="flex justify-between font-bold" style={{ fontSize: '7pt' }}>
+          <span>Sản phẩm</span>
+          <span>SL</span>
+        </div>
+        {shown.map((it, i) => (
+          <div key={i} className="flex items-baseline" style={{ gap: '2mm' }}>
+            <span className="min-w-0 flex-1 font-semibold" style={clamp(2)}>
+              {it.name}
+            </span>
+            <span className="shrink-0 font-bold tabular-nums" style={{ fontSize: '9pt' }}>
+              {formatQuantity(it.qty)}
+            </span>
+          </div>
+        ))}
+        {more > 0 ? <div className="italic">+{more} sản phẩm khác</div> : null}
+      </div>
+
+      {/* Ghi chú — hàng riêng dưới danh sách sản phẩm, mỗi ý một dòng */}
+      {note ? (
+        <div
+          className="shrink-0 overflow-hidden"
+          style={{ borderTop: LINE, padding: '0.6mm 0 0', fontSize: '7pt', maxHeight: '12mm' }}
+        >
+          <span className="font-bold">Ghi chú: </span>
+          <span className="whitespace-pre-line break-words" style={{ lineHeight: 1.3 }}>
+            {note}
+          </span>
+        </div>
+      ) : null}
     </div>
   );
 }
