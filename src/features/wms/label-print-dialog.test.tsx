@@ -108,7 +108,10 @@ describe('Popup nhãn — tem ERP 100×75 mm (2026-10-13)', () => {
     expect(label.getByText('VTP')).toBeTruthy();
     expect(label.getByText('1/1')).toBeTruthy();
     expect(label.getByText(/COD: 215\.000/)).toBeTruthy();
-    expect(label.getByRole('columnheader', { name: 'Sản phẩm' })).toBeTruthy();
+    // "+N sản phẩm khác" nằm ở tiêu đề cột để không bị cắt khi tên hàng dài (2026-10-14)
+    expect(
+      label.getByRole('columnheader', { name: /^Sản phẩm · \+3 sản phẩm khác$/ }),
+    ).toBeTruthy();
     expect(label.getByRole('columnheader', { name: 'SL' })).toBeTruthy();
     expect(label.getByText('COMBO 3 CHAI CANXI BO ORGANIC 500ML')).toBeTruthy();
     // Ngang in tối đa 2 dòng hàng, còn lại gom lại để chữ không bị thu nhỏ

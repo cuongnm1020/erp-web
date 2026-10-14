@@ -7,18 +7,8 @@ import { formatDate, formatMoney, formatQuantity, formatTime } from '@/lib/forma
 import { LABEL_SIZES } from '@/lib/print';
 import type { ShipmentLabelData } from '../api/use-pda';
 import { type GhtkTracking, hidePhone, maskedAddress, maskPhone, printNote } from '../ghtk-label';
-
-/**
- * Tem dựng ở kích thước ×S rồi `transform: scale(1/S)` về đúng 100×75 mm. Lý do: Chrome có cài
- * đặt "cỡ chữ tối thiểu" (máy đóng gói thử 2026-10-14 đặt 12px) — chữ 6,5–8pt (≈ 9–11px) bị kéo
- * lên 12px, tem tràn và danh sách hàng bị cắt. Cài đặt đó xét cỡ chữ TRƯỚC transform, nên dựng
- * ×2 (chữ nhỏ nhất 13pt ≈ 17px) thì in ra vẫn đúng cỡ thiết kế. `zoom` không qua được (đã thử).
- */
-const S = 2;
-/** Kích thước thiết kế (mm ở tem thật) → kích thước dựng. */
-const u = (mm: number) => `${+(mm * S).toFixed(3)}mm`;
-/** Cỡ chữ thiết kế (pt ở tem thật) → cỡ chữ dựng. */
-const f = (pt: number) => `${+(pt * S).toFixed(3)}pt`;
+// Dựng ×2 rồi thu về — chống cài đặt "cỡ chữ tối thiểu" của Chrome (xem label-scale.ts).
+import { f, labelInner, labelOuter, u } from '../label-scale';
 
 /** Ô mã vạch: SVG của bwip-js giãn theo ô (giữ tỉ lệ), không theo kích thước gốc. */
 const FILL_SVG = '[&>svg]:!h-full [&>svg]:!w-full [&>svg]:!max-w-none';
@@ -75,18 +65,11 @@ export function GhtkWaybillLabel({
     <div
       data-waybill-label={code}
       className="overflow-hidden bg-card text-foreground"
-      style={{ width: `${W}mm`, height: `${H}mm` }}
+      style={labelOuter(W, H)}
     >
       <div
         className="flex flex-col overflow-hidden"
-        style={{
-          width: u(W),
-          height: u(H),
-          padding: `${u(1.8)} ${u(2.5)} ${u(1.5)}`,
-          fontFamily: 'Arial, Helvetica, sans-serif',
-          transform: `scale(${1 / S})`,
-          transformOrigin: '0 0',
-        }}
+        style={{ ...labelInner(W, H), padding: `${u(1.8)} ${u(2.5)} ${u(1.5)}` }}
       >
         {/* Đầu tem */}
         <div

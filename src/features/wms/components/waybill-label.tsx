@@ -9,6 +9,7 @@ import { formatDate, formatMoney, formatPhone, formatQuantity, formatTime } from
 import { LABEL_SIZES, type PrintController } from '@/lib/print';
 import type { ShipmentLabelData } from '../api/use-pda';
 import { parseGhtkTracking } from '../ghtk-label';
+import { f, labelInner, labelOuter, u } from '../label-scale';
 import { GhtkWaybillLabel } from './ghtk-waybill-label';
 
 export type WaybillOrientation = 'landscape' | 'portrait';
@@ -16,8 +17,17 @@ export type WaybillOrientation = 'landscape' | 'portrait';
 /** Số dòng hàng in ra; còn lại gom thành "+N sản phẩm khác" để chữ không bị thu nhỏ. */
 const MAX_ITEMS = { landscape: 2, portrait: 3 } as const;
 
-const sizeOf = (o: WaybillOrientation) =>
-  LABEL_SIZES[o === 'landscape' ? 'WAYBILL_100x75' : 'WAYBILL_75x100'];
+/** Khổ tem (mm) theo hướng. */
+const SIZE = {
+  landscape: {
+    w: LABEL_SIZES.WAYBILL_100x75.labelWidthMm ?? 100,
+    h: LABEL_SIZES.WAYBILL_100x75.labelHeightMm ?? 75,
+  },
+  portrait: {
+    w: LABEL_SIZES.WAYBILL_75x100.labelWidthMm ?? 75,
+    h: LABEL_SIZES.WAYBILL_75x100.labelHeightMm ?? 100,
+  },
+} as const;
 
 /**
  * Mã dài hơn mức này (GHTK ~35 ký tự) cần CẢ chiều ngang tem để mỗi vạch còn ≥ ~2 chấm in
@@ -29,7 +39,7 @@ const LONG_CODE = 16;
 /** Ô mã vạch: SVG của bwip-js giãn theo ô (giữ tỉ lệ), không theo kích thước gốc. */
 const FILL_SVG = '[&>svg]:!h-full [&>svg]:!w-full [&>svg]:!max-w-none';
 
-const BORDER = '0.3mm solid currentColor';
+const BORDER = `${u(0.3)} solid currentColor`;
 
 /** Cắt N dòng; line-height 1.3 để dấu tiếng Việt (ệ, ỹ…) không bị xén ở dòng cuối. */
 const clamp = (lines: number): CSSProperties => ({
@@ -47,7 +57,7 @@ const ICON = { width: '1em', height: '1em', flexShrink: 0 } as const;
  * nhãn in từ Pancake (2026-10-14): viền đứt; trên = hãng + mã hãng + QR + giờ in | mã vạch + mã
  * vận đơn + số kiện; dưới = ô người nhận (tên, SĐT, địa chỉ chữ lớn, ghi chú in) | ô COD + bảng
  * Sản phẩm / SL. Hãng chưa cấp vận đơn → in mã phiếu giao thay thế để kho vẫn dán được kiện.
- * Kích thước tính bằng mm/pt để bản in khớp tem; xem trước dùng chính component này.
+ * Kích thước thiết kế tính bằng mm/pt qua `u()` / `f()` (dựng ×2 — xem `label-scale.ts`).
  */
 export function WaybillLabel({
   data,
@@ -58,11 +68,11 @@ export function WaybillLabel({
   orientation: WaybillOrientation;
   printedAt: Date;
 }) {
-  const size = sizeOf(orientation);
   const land = orientation === 'landscape';
   // Đơn GHTK đã có mã đúng dạng GHTK, tem ngang → bố cục tem GHTK (2026-10-14).
   const ghtk = land && data.carrierCode === 'GHTK' ? parseGhtkTracking(data.trackingNo) : null;
   if (ghtk) return <GhtkWaybillLabel data={data} ghtk={ghtk} printedAt={printedAt} />;
+  const size = SIZE[orientation];
   const code = data.trackingNo ?? data.shipmentDocNumber;
   const long = code.length > LONG_CODE;
   // Dọc + mã dài: khối mã chiếm thêm chỗ → bớt một dòng hàng.
@@ -72,9 +82,9 @@ export function WaybillLabel({
   const carrier = data.carrierName ?? data.carrierCode ?? 'Vận đơn';
   const printed = `${formatTime(printedAt)} ${formatDate(printedAt)}`;
 
-  const barcode = (height: string, textPt: string) => (
+  const barcode = (heightMm: number, textPt: number) => (
     <div className="flex min-w-0 flex-1 flex-col items-center justify-center">
-      <div className="w-full" style={{ height }}>
+      <div className="w-full" style={{ height: u(heightMm) }}>
         <Barcode
           value={code}
           symbology="code128"
@@ -85,18 +95,18 @@ export function WaybillLabel({
           label={`Mã vận đơn ${code}`}
         />
       </div>
-      <div className="flex w-full items-end" style={{ marginTop: '0.8mm', gap: '1mm' }}>
+      <div className="flex w-full items-end" style={{ marginTop: u(0.8), gap: u(1) }}>
         <span
           className={cn(
             'min-w-0 flex-1 text-center font-mono leading-none',
             long ? 'break-all font-bold' : 'tracking-wide',
           )}
-          style={{ fontSize: textPt }}
+          style={{ fontSize: f(textPt) }}
         >
           {code}
         </span>
         {long ? null : (
-          <span className="shrink-0 font-bold leading-none" style={{ fontSize: '11pt' }}>
+          <span className="shrink-0 font-bold leading-none" style={{ fontSize: f(11) }}>
             1/1
           </span>
         )}
@@ -107,35 +117,32 @@ export function WaybillLabel({
   // Trên: mã ngắn → [hãng / mã hãng / QR / giờ in] | [mã vạch]; mã dài → dòng hãng + giờ, mã
   // vạch hết chiều ngang.
   const top = long ? (
-    <div className="flex flex-col" style={{ gap: '1mm' }}>
-      <div className="flex items-baseline justify-between" style={{ gap: '1mm' }}>
-        <span className="truncate font-bold uppercase" style={{ fontSize: '11pt' }}>
+    <div className="flex flex-col" style={{ gap: u(1) }}>
+      <div className="flex items-baseline justify-between" style={{ gap: u(1) }}>
+        <span className="truncate font-bold uppercase" style={{ fontSize: f(11) }}>
           {carrier}
         </span>
-        <span className="shrink-0 font-bold tabular-nums" style={{ fontSize: '8.5pt' }}>
+        <span className="shrink-0 font-bold tabular-nums" style={{ fontSize: f(8.5) }}>
           {printed}
-          <span style={{ fontSize: '11pt', marginLeft: '2mm' }}>1/1</span>
+          <span style={{ fontSize: f(11), marginLeft: u(2) }}>1/1</span>
         </span>
       </div>
-      {barcode(land ? '12mm' : '14mm', land ? '8.5pt' : '7.5pt')}
+      {barcode(land ? 12 : 14, land ? 8.5 : 7.5)}
     </div>
   ) : (
-    <div className="flex items-stretch" style={{ gap: '3mm' }}>
-      <div
-        className="flex shrink-0 flex-col"
-        style={{ width: land ? '21mm' : '19mm', gap: '0.4mm' }}
-      >
-        <div className="flex items-baseline" style={{ gap: '1mm' }}>
-          <span className="shrink-0 font-bold leading-none" style={{ fontSize: '11pt' }}>
+    <div className="flex items-stretch" style={{ gap: u(3) }}>
+      <div className="flex shrink-0 flex-col" style={{ width: u(land ? 21 : 19), gap: u(0.4) }}>
+        <div className="flex items-baseline" style={{ gap: u(1) }}>
+          <span className="shrink-0 font-bold leading-none" style={{ fontSize: f(11) }}>
             {data.carrierCode ?? carrier}
           </span>
           {data.carrierCode && data.carrierName ? (
-            <span className="truncate leading-none" style={{ fontSize: '6.5pt' }}>
+            <span className="truncate leading-none" style={{ fontSize: f(6.5) }}>
               {data.carrierName}
             </span>
           ) : null}
         </div>
-        <div style={{ width: land ? '16mm' : '15mm', height: land ? '16mm' : '15mm' }}>
+        <div style={{ width: u(land ? 16 : 15), height: u(land ? 16 : 15) }}>
           <Barcode
             value={code}
             symbology="qrcode"
@@ -146,48 +153,48 @@ export function WaybillLabel({
         </div>
         <span
           className="whitespace-nowrap font-bold tabular-nums leading-none"
-          style={{ fontSize: '7pt' }}
+          style={{ fontSize: f(7) }}
         >
           {printed}
         </span>
       </div>
-      {barcode(land ? '15mm' : '13mm', land ? '14pt' : '11pt')}
+      {barcode(land ? 15 : 13, land ? 14 : 11)}
     </div>
   );
 
   const recipient = (
     <div
       className="flex min-h-0 min-w-0 flex-col overflow-hidden"
-      style={{ border: BORDER, padding: '1mm 1.2mm', gap: '0.4mm' }}
+      style={{ border: BORDER, padding: `${u(1)} ${u(1.2)}`, gap: u(0.4) }}
     >
       {data.recipient ? (
         <>
-          <div className="flex items-center" style={{ fontSize: '8.5pt', gap: '0.8mm' }}>
+          <div className="flex items-center" style={{ fontSize: f(8.5), gap: u(0.8) }}>
             <User style={ICON} aria-hidden />
             <span className="truncate">{data.recipient.name}</span>
           </div>
           <div
             className="flex items-center font-bold tabular-nums leading-none"
-            style={{ fontSize: '11pt', gap: '0.8mm' }}
+            style={{ fontSize: f(11), gap: u(0.8) }}
           >
             <Phone style={ICON} aria-hidden />
             <span>{formatPhone(data.recipient.phone)}</span>
           </div>
-          <div className="font-bold leading-tight" style={{ fontSize: '11pt', ...clamp(3) }}>
+          <div className="font-bold leading-tight" style={{ fontSize: f(11), ...clamp(3) }}>
             <MapPin style={{ ...ICON, display: 'inline', verticalAlign: '-0.1em' }} aria-hidden />{' '}
             {data.recipient.address}
           </div>
         </>
       ) : (
-        <div style={{ fontSize: '10pt' }}>Đơn chưa có địa chỉ giao</div>
+        <div style={{ fontSize: f(10) }}>Đơn chưa có địa chỉ giao</div>
       )}
       {data.note ? (
         <div
           className="font-bold leading-tight"
           style={{
-            fontSize: '9.5pt',
+            fontSize: f(9.5),
             borderTop: BORDER,
-            paddingTop: '0.6mm',
+            paddingTop: u(0.6),
             marginTop: 'auto',
             ...clamp(3),
           }}
@@ -202,25 +209,34 @@ export function WaybillLabel({
   const goods = (
     <div
       className="flex min-h-0 min-w-0 flex-col overflow-hidden"
-      style={{ border: BORDER, padding: '1mm 1.2mm', gap: '0.6mm' }}
+      style={{ border: BORDER, padding: `${u(1)} ${u(1.2)}`, gap: u(0.6) }}
     >
-      <div className="font-bold tabular-nums leading-none" style={{ fontSize: '11pt' }}>
+      <div className="font-bold tabular-nums leading-none" style={{ fontSize: f(11) }}>
         COD: {formatMoney(data.codAmount, { unit: 'đ' })}
       </div>
       <table
         className="w-full border-collapse"
-        style={{ fontSize: land ? '9.5pt' : '9pt', tableLayout: 'fixed' }}
+        style={{ fontSize: f(land ? 9.5 : 8.5), tableLayout: 'fixed' }}
       >
         <colgroup>
           <col />
-          <col style={{ width: '8mm' }} />
+          <col style={{ width: u(8) }} />
         </colgroup>
         <thead>
           <tr>
-            <th className="text-center font-bold" style={{ border: BORDER, padding: '0.4mm' }}>
+            <th className="text-center font-bold" style={{ border: BORDER, padding: u(0.4) }}>
               Sản phẩm
+              {/* Ở tiêu đề để luôn thấy — dưới bảng thì bị cắt khi hàng dài */}
+              {more > 0 ? (
+                <>
+                  {' · '}
+                  <span className="italic" style={{ fontSize: f(8) }}>
+                    +{more} sản phẩm khác
+                  </span>
+                </>
+              ) : null}
             </th>
-            <th className="text-center font-bold" style={{ border: BORDER, padding: '0.4mm' }}>
+            <th className="text-center font-bold" style={{ border: BORDER, padding: u(0.4) }}>
               SL
             </th>
           </tr>
@@ -230,13 +246,13 @@ export function WaybillLabel({
             <tr key={i}>
               <td
                 className="font-bold leading-tight"
-                style={{ border: BORDER, padding: '0.4mm 0.6mm' }}
+                style={{ border: BORDER, padding: `${u(0.4)} ${u(0.6)}` }}
               >
-                <span style={clamp(3)}>{it.name}</span>
+                <span style={clamp(land ? 3 : 2)}>{it.name}</span>
               </td>
               <td
                 className="text-center font-bold tabular-nums"
-                style={{ border: BORDER, padding: '0.4mm', fontSize: '11pt' }}
+                style={{ border: BORDER, padding: u(0.4), fontSize: f(11) }}
               >
                 {formatQuantity(it.qty)}
               </td>
@@ -244,39 +260,31 @@ export function WaybillLabel({
           ))}
         </tbody>
       </table>
-      {more > 0 ? (
-        <div className="italic" style={{ fontSize: '8.5pt' }}>
-          +{more} sản phẩm khác
-        </div>
-      ) : null}
     </div>
   );
 
   return (
     <div
       data-waybill-label={code}
-      className="bg-card text-foreground"
-      style={{
-        width: `${size.labelWidthMm}mm`,
-        height: `${size.labelHeightMm}mm`,
-        padding: '1.5mm',
-        fontFamily: 'Arial, Helvetica, sans-serif',
-      }}
+      className="overflow-hidden bg-card text-foreground"
+      style={labelOuter(size.w, size.h)}
     >
-      <div
-        className="flex h-full flex-col overflow-hidden"
-        style={{ border: '0.3mm dashed currentColor', padding: '1.5mm', gap: '1.5mm' }}
-      >
-        {top}
+      <div style={{ ...labelInner(size.w, size.h), padding: u(1.5) }}>
         <div
-          className={cn(
-            'grid min-h-0 flex-1 overflow-hidden',
-            land ? 'grid-cols-2' : 'grid-rows-[auto_1fr]',
-          )}
-          style={{ gap: '1.5mm' }}
+          className="flex h-full flex-col overflow-hidden"
+          style={{ border: `${u(0.3)} dashed currentColor`, padding: u(1.5), gap: u(1.5) }}
         >
-          {recipient}
-          {goods}
+          {top}
+          <div
+            className={cn(
+              'grid min-h-0 flex-1 overflow-hidden',
+              land ? 'grid-cols-2' : 'grid-rows-[auto_1fr]',
+            )}
+            style={{ gap: u(1.5) }}
+          >
+            {recipient}
+            {goods}
+          </div>
         </div>
       </div>
     </div>
