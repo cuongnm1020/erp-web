@@ -1153,6 +1153,41 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/pancake-sync/warehouses/links": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Kho ERP × shop đang bật: đã nối kho POS nào + kho POS chưa nối. Gọi Pancake mỗi lần. */
+        get: operations["PancakeWarehouseController_links"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/pancake-sync/warehouses/{id}/link": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Nối kho ERP với kho có sẵn trên shop rồi đẩy ngay (kho POS nhận tên / địa chỉ ERP). */
+        put: operations["PancakeWarehouseController_link"];
+        post?: never;
+        /** Gỡ liên kết (không đổi gì trên Pancake). Đơn chọn kho POS đó sẽ về kho mặc định ERP. */
+        delete: operations["PancakeWarehouseController_unlink"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/pancake-sync/push/warehouses/{id}": {
         parameters: {
             query?: never;
@@ -1162,7 +1197,8 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        post: operations["PancakePushController_warehouse"];
+        /** Đẩy MỘT kho lên mọi shop đang bật. */
+        post: operations["PancakeWarehouseController_warehouse"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1178,7 +1214,8 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        post: operations["PancakePushController_allWarehouses"];
+        /** Đẩy mọi kho (kho ngừng dùng → tắt lên đơn trên POS), trừ TRANSIT. */
+        post: operations["PancakeWarehouseController_allWarehouses"];
         delete?: never;
         options?: never;
         head?: never;
@@ -5241,6 +5278,24 @@ export interface components {
             phone: string;
             /** @description Một dòng: số nhà/đường, thôn, xã/phường, quận/huyện, tỉnh. */
             address: string;
+            /** @description Số nhà / đường riêng — nhãn kiểu GHTK che phần này. */
+            street: string | null;
+            /** @description Phần còn lại của địa chỉ: thôn, xã/phường, quận/huyện, tỉnh. */
+            locality: string;
+            province: string | null;
+        };
+        ShipmentLabelSenderDto: {
+            name: string;
+            phone: string;
+            /** @description Một dòng: số nhà/đường, thôn, xã/phường, quận/huyện, tỉnh. */
+            address: string;
+            /** @description Số nhà / đường riêng — nhãn kiểu GHTK che phần này. */
+            street: string | null;
+            /** @description Phần còn lại của địa chỉ: thôn, xã/phường, quận/huyện, tỉnh. */
+            locality: string;
+            province: string | null;
+            /** @description Tên kho lấy hàng. */
+            warehouseName: string;
         };
         ShipmentLabelItemDto: {
             name: string;
@@ -5260,8 +5315,13 @@ export interface components {
             /** @description Decimal(12,4) kg chuỗi. */
             weightKg: string | null;
             recipient: components["schemas"]["ShipmentLabelRecipientDto"] | null;
+            /** @description Người gửi = kho lấy hàng của đơn. */
+            sender: components["schemas"]["ShipmentLabelSenderDto"] | null;
             items: components["schemas"]["ShipmentLabelItemDto"][];
             note: string | null;
+            /** @description Tuỳ chọn gửi hãng trên đơn — null = không chọn. */
+            allowInspection: boolean | null;
+            callShopOnFailure: boolean | null;
         };
         PackDto: {
             /**
@@ -5944,6 +6004,41 @@ export interface components {
             /** @description Số thực thể ERP đã duyệt. */
             total: number;
             failed: number;
+        };
+        PancakeWarehouseLinkRowDto: {
+            warehouseId: string;
+            code: string;
+            name: string;
+            isActive: boolean;
+            /** @description Id kho trên Pancake; null = chưa có trên shop (bấm đẩy để tạo / nối tay). */
+            externalId: string | null;
+            /** @description Tên kho đang hiện trên Pancake (null khi chưa liên kết hoặc không đọc được danh sách). */
+            externalName: string | null;
+            /** @description Đã liên kết nhưng kho đó không còn trên Pancake (bị xóa tay trên POS). */
+            externalMissing: boolean;
+        };
+        PancakeUnlinkedWarehouseDto: {
+            externalId: string;
+            name: string;
+            customId: string | null;
+            fullAddress: string | null;
+            /** @description false = kho đang tắt lên đơn trên POS. */
+            allowCreateOrder: boolean;
+        };
+        PancakeShopWarehousesDto: {
+            shopId: string;
+            shopName: string | null;
+            /** @description Lỗi đọc danh sách kho của shop (khoá sai, mạng…); null = đọc được. */
+            error: string | null;
+            warehouses: components["schemas"]["PancakeWarehouseLinkRowDto"][];
+            unlinked: components["schemas"]["PancakeUnlinkedWarehouseDto"][];
+        };
+        PancakeWarehouseLinksDto: {
+            shops: components["schemas"]["PancakeShopWarehousesDto"][];
+        };
+        LinkPancakeWarehouseDto: {
+            shopId: string;
+            externalId: string;
         };
         TaskRowDto: {
             id: string;
@@ -12567,7 +12662,72 @@ export interface operations {
             };
         };
     };
-    PancakePushController_warehouse: {
+    PancakeWarehouseController_links: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PancakeWarehouseLinksDto"];
+                };
+            };
+        };
+    };
+    PancakeWarehouseController_link: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["LinkPancakeWarehouseDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PancakePushResultDto"];
+                };
+            };
+        };
+    };
+    PancakeWarehouseController_unlink: {
+        parameters: {
+            query: {
+                shopId: string;
+            };
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    PancakeWarehouseController_warehouse: {
         parameters: {
             query?: never;
             header?: never;
@@ -12588,7 +12748,7 @@ export interface operations {
             };
         };
     };
-    PancakePushController_allWarehouses: {
+    PancakeWarehouseController_allWarehouses: {
         parameters: {
             query?: never;
             header?: never;

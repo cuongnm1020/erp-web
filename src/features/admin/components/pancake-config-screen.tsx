@@ -44,6 +44,7 @@ import { PancakeConfigDialog } from './pancake-config-dialog';
 import { PancakeDuplicateDialog } from './pancake-duplicate-dialog';
 import { PancakeShopProductsDialog } from './pancake-shop-products-dialog';
 import { PancakeStaffSection } from './pancake-staff-section';
+import { PancakeWarehouseSection } from './pancake-warehouse-section';
 
 /**
  * Kết nối Pancake POS — GET/PUT/DELETE /pancake-sync/config, POST …/verify.
@@ -111,6 +112,7 @@ export function PancakeConfigScreen() {
             )}
             <EnvNotice env={data.env} />
             <ShopTable items={data.items} />
+            <PancakeWarehouseSection />
             <PancakeStaffSection />
           </>
         )}

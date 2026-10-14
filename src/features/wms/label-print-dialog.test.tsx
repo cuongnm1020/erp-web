@@ -43,7 +43,21 @@ const LABEL_DATA = {
     name: 'Nguyễn Công Quân',
     phone: '0901234567',
     address: 'Số nhà 137 ấp Mỹ Phó, Xã Thiện Mỹ, Huyện Trà Ôn, Vĩnh Long',
+    street: 'Số nhà 137 ấp Mỹ Phó',
+    locality: 'Xã Thiện Mỹ, Huyện Trà Ôn, Vĩnh Long',
+    province: 'Vĩnh Long',
   },
+  sender: {
+    name: 'Mạnh',
+    phone: '0339213208',
+    address: 'Số nhà 59 đường cốc trại, Kim Quan 3, Xã Thạch Thất, Hà Nội',
+    street: 'Số nhà 59 đường cốc trại, Kim Quan 3',
+    locality: 'Xã Thạch Thất, Hà Nội',
+    province: 'Hà Nội',
+    warehouseName: 'Kho Thạch Thất',
+  },
+  allowInspection: false,
+  callShopOnFailure: null,
   items: [
     { name: 'COMBO 3 CHAI CANXI BO ORGANIC 500ML', qty: '1.000000' },
     { name: 'Phân bón A', qty: '2.000000' },
@@ -94,7 +108,10 @@ describe('Popup nhãn — tem ERP 100×75 mm (2026-10-13)', () => {
     expect(label.getByText('VTP')).toBeTruthy();
     expect(label.getByText('1/1')).toBeTruthy();
     expect(label.getByText(/COD: 215\.000/)).toBeTruthy();
-    expect(label.getByRole('columnheader', { name: 'Sản phẩm' })).toBeTruthy();
+    // "+N sản phẩm khác" nằm ở tiêu đề cột để không bị cắt khi tên hàng dài (2026-10-14)
+    expect(
+      label.getByRole('columnheader', { name: /^Sản phẩm · \+3 sản phẩm khác$/ }),
+    ).toBeTruthy();
     expect(label.getByRole('columnheader', { name: 'SL' })).toBeTruthy();
     expect(label.getByText('COMBO 3 CHAI CANXI BO ORGANIC 500ML')).toBeTruthy();
     // Ngang in tối đa 2 dòng hàng, còn lại gom lại để chữ không bị thu nhỏ
@@ -123,7 +140,42 @@ describe('Popup nhãn — tem ERP 100×75 mm (2026-10-13)', () => {
     expect(within(root).getByText('+2 sản phẩm khác')).toBeTruthy();
   });
 
-  it('mã GHTK dài (35 ký tự) → mã vạch trải hết chiều ngang, không kèm QR', async () => {
+  it('đơn GHTK, tem ngang → bố cục tem GHTK: mã vạch đoạn số cuối, che SĐT, không mã phân loại / tuyến', async () => {
+    const long = 'S23119447.BO.MN13-12-P52.1763110086';
+    server.use(
+      http.get('/api/shipments/:id/label-data', () =>
+        HttpResponse.json({ ...LABEL_DATA, carrierCode: 'GHTK', trackingNo: long }),
+      ),
+    );
+    renderApp(
+      <LabelPrintDialog
+        open
+        waybill={{ ...WAYBILL('GHTK'), trackingNo: long }}
+        orderId={null}
+        onClose={() => {}}
+      />,
+    );
+    await waitFor(() => expect(print).toHaveBeenCalledTimes(1));
+    const label = within(lastPrinted());
+    expect(label.getByRole('img', { name: `Mã vận đơn ${long}` })).toBeTruthy();
+    expect(label.getByRole('img', { name: `QR ${long}` })).toBeTruthy();
+    expect(label.getByText('1763110086')).toBeTruthy();
+    // Người dùng bỏ mã phân loại / tuyến / mã đơn bán khỏi tem (2026-10-14)
+    expect(label.queryByText(/MN13/)).toBeNull();
+    expect(label.queryByText(/MIỀN/)).toBeNull();
+    expect(label.queryByText(/SO2610-00042/)).toBeNull();
+    expect(label.getByText('S23119447')).toBeTruthy();
+    expect(label.getByText(/Mạnh \/ 033\*\*\*3208/)).toBeTruthy();
+    expect(label.getByText(/Nguyễn Công Quân \/ \*{11}/)).toBeTruthy();
+    expect(label.getByText('Đ/c: ***, Xã Thiện Mỹ, Huyện Trà Ôn, Vĩnh Long')).toBeTruthy();
+    expect(label.getByText('DN2610-00001')).toBeTruthy();
+    expect(label.getByText(/Không cho xem hàng/)).toBeTruthy();
+    // SĐT đầy đủ của người nhận không được in
+    expect(label.queryByText(/0901/)).toBeNull();
+  });
+
+  it('mã GHTK dài, tem dọc → bố cục chung: mã vạch trải hết chiều ngang, không kèm QR', async () => {
+    localStorage.setItem('erp.pack.labelOrientation', 'portrait');
     const long = 'S23119447.BO.MT17-07-H42.1298006883';
     server.use(
       http.get('/api/shipments/:id/label-data', () =>

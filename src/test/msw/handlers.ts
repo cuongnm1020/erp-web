@@ -1818,6 +1818,41 @@ export const handlers = [
       verifiedAt: '2026-09-07T08:00:00.000Z',
     }),
   ),
+  // Kho ERP trên các shop Pancake — đúng shape PancakeWarehouseLinksDto.
+  http.get('/api/pancake-sync/warehouses/links', () =>
+    HttpResponse.json(PANCAKE_WAREHOUSE_LINKS_FIXTURE),
+  ),
+  http.post('/api/pancake-sync/push/warehouses', () =>
+    HttpResponse.json({
+      results: [
+        {
+          shopId: '407957969',
+          entity: 'warehouse',
+          internalId: '00000077-0000-4000-8000-000000000001',
+          action: 'updated',
+          externalId: 'wh-pos-tt',
+          reason: null,
+        },
+      ],
+      total: 2,
+      failed: 0,
+    }),
+  ),
+  http.put('/api/pancake-sync/warehouses/:id/link', async ({ params, request }) => {
+    const body = (await request.json()) as { shopId: string; externalId: string };
+    return HttpResponse.json({
+      shopId: body.shopId,
+      entity: 'warehouse',
+      internalId: String(params.id),
+      action: 'updated',
+      externalId: body.externalId,
+      reason: null,
+    });
+  }),
+  http.delete(
+    '/api/pancake-sync/warehouses/:id/link',
+    () => new HttpResponse(null, { status: 204 }),
+  ),
   // ── Quản trị: Cấu hình hệ thống › Đơn vị vận chuyển ──
   http.get('/api/carriers/settings', () => HttpResponse.json(CARRIER_SETTINGS_FIXTURE)),
   http.put('/api/carriers/:code/settings', async ({ params, request }) => {
@@ -1967,6 +2002,54 @@ export const PANCAKE_CONFIG_FIXTURE = {
     },
   ],
   env: { hasApiKey: false, shopId: null },
+};
+
+export const PANCAKE_WAREHOUSE_LINKS_FIXTURE = {
+  shops: [
+    {
+      shopId: '407957969',
+      shopName: 'Shop chính',
+      error: null,
+      warehouses: [
+        {
+          warehouseId: '00000077-0000-4000-8000-000000000001',
+          code: 'KHO-TT-01',
+          name: 'Kho Thạch Thất',
+          isActive: true,
+          externalId: 'wh-pos-tt',
+          externalName: 'Kho Thạch Thất',
+          externalMissing: false,
+        },
+        {
+          warehouseId: '00000077-0000-4000-8000-000000000002',
+          code: 'KHO-LA-01',
+          name: 'Kho Long An',
+          isActive: true,
+          externalId: null,
+          externalName: null,
+          externalMissing: false,
+        },
+        {
+          warehouseId: '00000077-0000-4000-8000-000000000003',
+          code: 'KHO-CU',
+          name: 'Kho cũ',
+          isActive: true,
+          externalId: 'wh-pos-gone',
+          externalName: null,
+          externalMissing: true,
+        },
+      ],
+      unlinked: [
+        {
+          externalId: 'wh-pos-vtnn',
+          name: 'Vật Tư Nông Nghiệp',
+          customId: null,
+          fullAddress: 'Xã Thạch Thất, Hà Nội',
+          allowCreateOrder: true,
+        },
+      ],
+    },
+  ],
 };
 
 /** Bộ handler trạng thái — story "error" / "empty" / "forbidden" dùng. */
