@@ -174,12 +174,17 @@ describe('Popup nhãn — tem ERP 100×75 mm (2026-10-13)', () => {
     expect(label.queryByText(/0901/)).toBeNull();
   });
 
-  it('mã GHTK dài, tem dọc → bố cục chung: mã vạch trải hết chiều ngang, không kèm QR', async () => {
+  it('đơn GHTK, tem dọc → bố cục tem A6 GHTK: tuyến, mã phân loại, mã vạch số cuối, QR', async () => {
     localStorage.setItem('erp.pack.labelOrientation', 'portrait');
-    const long = 'S23119447.BO.MT17-07-H42.1298006883';
+    const long = 'S23119447.MB7.MB7-05-L1.1890932219';
     server.use(
       http.get('/api/shipments/:id/label-data', () =>
-        HttpResponse.json({ ...LABEL_DATA, carrierCode: 'GHTK', trackingNo: long }),
+        HttpResponse.json({
+          ...LABEL_DATA,
+          carrierCode: 'GHTK',
+          trackingNo: long,
+          recipient: { ...LABEL_DATA.recipient, province: 'Hải Phòng' },
+        }),
       ),
     );
     renderApp(
@@ -191,9 +196,23 @@ describe('Popup nhãn — tem ERP 100×75 mm (2026-10-13)', () => {
       />,
     );
     await waitFor(() => expect(print).toHaveBeenCalledTimes(1));
-    const label = within(lastPrinted());
+    const root = lastPrinted();
+    expect(root.getAttribute('data-print-size')).toBe('WAYBILL_75x100');
+    const label = within(root);
     expect(label.getByRole('img', { name: `Mã vận đơn ${long}` })).toBeTruthy();
-    expect(label.queryByRole('img', { name: `QR ${long}` })).toBeNull();
+    expect(label.getByRole('img', { name: `QR ${long}` })).toBeTruthy();
+    expect(label.getByText('1890932219')).toBeTruthy();
+    expect(label.getByText('NỘI MIỀN')).toBeTruthy();
+    expect(label.getByText('MB7')).toBeTruthy();
+    expect(label.getByText('EXPRESS')).toBeTruthy();
+    expect(label.getByText('DN2610-00001')).toBeTruthy();
+    expect(label.getByText('Kho Thạch Thất')).toBeTruthy();
+    expect(label.getByText(/Nguyễn Công Quân \/ \*{11}/)).toBeTruthy();
+    expect(label.getByText(/Không cho xem hàng/)).toBeTruthy();
+    // Dọc in đủ 5 dòng hàng
+    expect(label.getByText('Phân bón D')).toBeTruthy();
+    expect(label.queryByText(/sản phẩm khác/)).toBeNull();
+    expect(label.queryByText(/0901/)).toBeNull();
   });
 
   it('hãng nội bộ (MANUAL, không có nhãn PDF) vẫn in được tem ERP dù máy đã chọn A6', async () => {

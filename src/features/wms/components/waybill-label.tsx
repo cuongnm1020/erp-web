@@ -11,6 +11,7 @@ import type { ShipmentLabelData } from '../api/use-pda';
 import { parseGhtkTracking } from '../ghtk-label';
 import { f, labelInner, labelOuter, u } from '../label-scale';
 import { GhtkWaybillLabel } from './ghtk-waybill-label';
+import { GhtkWaybillLabelPortrait } from './ghtk-waybill-label-portrait';
 
 export type WaybillOrientation = 'landscape' | 'portrait';
 
@@ -69,9 +70,11 @@ export function WaybillLabel({
   printedAt: Date;
 }) {
   const land = orientation === 'landscape';
-  // Đơn GHTK đã có mã đúng dạng GHTK, tem ngang → bố cục tem GHTK (2026-10-14).
-  const ghtk = land && data.carrierCode === 'GHTK' ? parseGhtkTracking(data.trackingNo) : null;
-  if (ghtk) return <GhtkWaybillLabel data={data} ghtk={ghtk} printedAt={printedAt} />;
+  // Đơn GHTK đã có mã đúng dạng GHTK → bố cục tem GHTK (2026-10-14): dọc theo tem A6 của
+  // GHTK, ngang là bản xếp gọn cho 100×75.
+  const ghtk = data.carrierCode === 'GHTK' ? parseGhtkTracking(data.trackingNo) : null;
+  if (ghtk && land) return <GhtkWaybillLabel data={data} ghtk={ghtk} printedAt={printedAt} />;
+  if (ghtk) return <GhtkWaybillLabelPortrait data={data} ghtk={ghtk} printedAt={printedAt} />;
   const size = SIZE[orientation];
   const code = data.trackingNo ?? data.shipmentDocNumber;
   const long = code.length > LONG_CODE;
