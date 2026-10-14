@@ -473,6 +473,7 @@ export function makeOrders(n: number) {
     teamId: 't-hn',
     // Mỗi đơn thứ 5 (lệch 1) đã gán GHTK — để test lọc theo hãng; đơn đầu (FIRST) vẫn chưa gán.
     carrierId: i % 5 === 1 ? 'c-ghtk' : null,
+    carrierAccountId: null,
     warehouseId: null,
     addressId: null,
     // Cân nặng: đặt tay 1 kg ở mỗi đơn thứ 4; còn lại tính từ dòng 0,3 → 1,5 kg.
@@ -577,6 +578,7 @@ export function makeOrderDetail(id: string) {
       packTaskDocNumber: null,
     },
     carrier: null,
+    carrierAccount: null,
     warehouse: null,
     shipment: null,
     lines,
@@ -657,6 +659,7 @@ export const ORDER_SHIPMENT_FIXTURE = {
   docNumber: 'DN2609-00007',
   status: 'PENDING' as const,
   carrierCode: 'GHTK',
+  carrierAccountName: 'Mặc định' as string | null,
   trackingNo: 'S12345678.SG.A1.B2',
   labelPrintedAt: null,
   labelPrintCount: 0,
@@ -764,8 +767,7 @@ export const PICKUP_WAREHOUSES = [
   },
 ];
 
-/** Đúng shape `CarrierDto` (GET /carriers). */
-export const CARRIERS = [
+const CARRIERS_BASE = [
   {
     id: 'c-manual',
     code: 'MANUAL',
@@ -817,6 +819,24 @@ export const CARRIERS = [
     webhook: true,
   },
 ];
+
+/**
+ * Đúng shape `CarrierDto` (GET /carriers). Hãng có adapter có đúng MỘT tài khoản "Mặc định"
+ * (đủ cấu hình như hãng) — test nhiều tài khoản tự ghi đè handler (FE-CARRIER-ACC-1).
+ */
+export const CARRIERS = CARRIERS_BASE.map((c) => ({
+  ...c,
+  accounts: c.hasAdapter
+    ? [
+        {
+          id: `acc-${c.code.toLowerCase()}-default`,
+          name: 'Mặc định',
+          isDefault: true,
+          configured: c.configured,
+        },
+      ]
+    : [],
+}));
 
 /** Đúng shape `ShippingQuoteResultDto` (GET /sales-orders/:id/shipping-quote). */
 export function makeShippingQuote(orderId: string, carrierId: string) {
@@ -1530,7 +1550,11 @@ export const handlers = [
     );
   }),
   http.post('/api/sales-orders/send-to-carrier', async ({ request }) => {
-    const body = (await request.json()) as { orderIds: string[]; carrierId: string };
+    const body = (await request.json()) as {
+      orderIds: string[];
+      carrierId: string;
+      carrierAccountId?: string;
+    };
     await delay(30);
     const byId = new Map(makeOrders(60).map((o) => [o.id, o]));
     const carrier = CARRIERS.find((c) => c.id === body.carrierId);
@@ -1544,6 +1568,7 @@ export const handlers = [
             docNumber: byId.get(id)!.docNumber,
             carrierId: carrier.id,
             carrierCode: carrier.code,
+            carrierAccountId: body.carrierAccountId ?? null,
             // Đơn đầu giả lập đã pick → cấp vận đơn ngay; còn lại lưu chờ đóng gói.
             outcome: i === 0 ? 'ISSUED' : 'SAVED',
             shipmentId: i === 0 ? uuid('00000009', i) : null,
@@ -1879,9 +1904,89 @@ export const handlers = [
       verifiedAt: '2026-10-04T08:00:00.000Z',
     }),
   ),
+  // Tài khoản của hãng (FE-CARRIER-ACC-1) — trả lại cả hãng như API thật.
+  http.post('/api/carriers/:code/accounts', async ({ params, request }) => {
+    const body = (await request.json()) as { name: string };
+    const base = CARRIER_SETTINGS_FIXTURE.find((c) => c.code === params.code)!;
+    return HttpResponse.json(
+      {
+        ...base,
+        accounts: [
+          ...base.accounts,
+          {
+            ...base.accounts[0]!,
+            id: 'acc-new',
+            name: body.name,
+            isDefault: false,
+            lastVerifiedAt: null,
+            lastVerifyError: null,
+          },
+        ],
+      },
+      { status: 201 },
+    );
+  }),
+  http.patch('/api/carriers/:code/accounts/:accountId', ({ params }) =>
+    HttpResponse.json(CARRIER_SETTINGS_FIXTURE.find((c) => c.code === params.code)!),
+  ),
+  http.post('/api/carriers/:code/accounts/:accountId/default', ({ params }) =>
+    HttpResponse.json(CARRIER_SETTINGS_FIXTURE.find((c) => c.code === params.code)!),
+  ),
+  http.post('/api/carriers/:code/accounts/:accountId/verify', () =>
+    HttpResponse.json({
+      status: 'ok',
+      message: 'Token hợp lệ — 1 địa chỉ lấy hàng',
+      verifiedAt: '2026-10-04T08:00:00.000Z',
+    }),
+  ),
+  http.delete(
+    '/api/carriers/:code/accounts/:accountId',
+    () => new HttpResponse(null, { status: 204 }),
+  ),
 ];
 
-/** Đúng shape `CarrierSettingDto` trong openapi.json — bí mật chỉ có hint, không có giá trị. */
+type FieldSource = 'db' | 'env' | 'apiConfig' | null;
+
+const GHTK_DEFAULT_FIELDS = [
+  {
+    key: 'baseUrl' as const,
+    label: 'Địa chỉ API',
+    secret: false,
+    value: 'https://services.giaohangtietkiem.vn',
+    hint: null,
+    source: 'env' as FieldSource,
+    envName: 'CARRIER_GHTK_BASE_URL' as string | null,
+    help: null,
+  },
+  {
+    key: 'token' as const,
+    label: 'Token API',
+    secret: true,
+    value: null,
+    hint: '…9f2c' as string | null,
+    source: 'env' as FieldSource,
+    envName: 'CARRIER_GHTK_TOKEN' as string | null,
+    help: 'Token API ở khachhang.giaohangtietkiem.vn',
+  },
+];
+
+const JT_FIELDS = [
+  {
+    key: 'token' as const,
+    label: 'Token API',
+    secret: true,
+    value: null,
+    hint: null as string | null,
+    source: null as FieldSource,
+    envName: 'CARRIER_JT_TOKEN' as string | null,
+    help: null,
+  },
+];
+
+/**
+ * Đúng shape `CarrierSettingDto` trong openapi.json — bí mật chỉ có hint, không có giá trị.
+ * Trường cấp hãng = tài khoản mặc định; GHTK có thêm một tài khoản phụ (FE-CARRIER-ACC-1).
+ */
 export const CARRIER_SETTINGS_FIXTURE = [
   {
     code: 'GHTK',
@@ -1893,26 +1998,39 @@ export const CARRIER_SETTINGS_FIXTURE = [
     lastVerifiedAt: null,
     lastVerifyError: 'Hãng GHTK lỗi khi kiểm tra kết nối: Token không hợp lệ',
     updatedAt: null,
-    fields: [
+    fields: GHTK_DEFAULT_FIELDS,
+    accounts: [
       {
-        key: 'baseUrl' as const,
-        label: 'Địa chỉ API',
-        secret: false,
-        value: 'https://services.giaohangtietkiem.vn',
-        hint: null,
-        source: 'env' as 'db' | 'env' | 'apiConfig' | null,
-        envName: 'CARRIER_GHTK_BASE_URL',
-        help: null,
+        id: 'acc-ghtk-default',
+        name: 'Mặc định',
+        isDefault: true,
+        isActive: true,
+        configured: true,
+        fields: GHTK_DEFAULT_FIELDS,
+        secretsUnreadable: false,
+        lastVerifiedAt: null as string | null,
+        lastVerifyError: 'Hãng GHTK lỗi khi kiểm tra kết nối: Token không hợp lệ' as string | null,
+        updatedAt: null as string | null,
       },
       {
-        key: 'token' as const,
-        label: 'Token API',
-        secret: true,
-        value: null,
-        hint: '…9f2c',
-        source: 'env' as 'db' | 'env' | 'apiConfig' | null,
-        envName: 'CARRIER_GHTK_TOKEN',
-        help: 'Token API ở khachhang.giaohangtietkiem.vn',
+        id: 'acc-ghtk-shop2',
+        name: 'GHTK cửa hàng 2',
+        isDefault: false,
+        isActive: true,
+        configured: true,
+        fields: [
+          { ...GHTK_DEFAULT_FIELDS[0]! },
+          {
+            ...GHTK_DEFAULT_FIELDS[1]!,
+            hint: '…ab12',
+            source: 'db' as FieldSource,
+            envName: null,
+          },
+        ],
+        secretsUnreadable: false,
+        lastVerifiedAt: '2026-10-14T01:00:00.000Z' as string | null,
+        lastVerifyError: null as string | null,
+        updatedAt: '2026-10-14T01:00:00.000Z' as string | null,
       },
     ],
   },
@@ -1926,16 +2044,19 @@ export const CARRIER_SETTINGS_FIXTURE = [
     lastVerifiedAt: null,
     lastVerifyError: null,
     updatedAt: null,
-    fields: [
+    fields: JT_FIELDS,
+    accounts: [
       {
-        key: 'token' as const,
-        label: 'Token API',
-        secret: true,
-        value: null,
-        hint: null,
-        source: null as 'db' | 'env' | 'apiConfig' | null,
-        envName: 'CARRIER_JT_TOKEN',
-        help: null,
+        id: 'acc-jt-default',
+        name: 'Mặc định',
+        isDefault: true,
+        isActive: true,
+        configured: false,
+        fields: JT_FIELDS,
+        secretsUnreadable: false,
+        lastVerifiedAt: null as string | null,
+        lastVerifyError: null as string | null,
+        updatedAt: null as string | null,
       },
     ],
   },
@@ -2109,7 +2230,7 @@ export const scenario = {
   pancakeError: http.get('/api/pancake-sync/config', () => errorEnvelope(500, 'DB_ERROR')),
   carrierSettingsEmpty: http.get('/api/carriers/settings', () => HttpResponse.json([])),
   carrierSettingsError: http.get('/api/carriers/settings', () => errorEnvelope(500, 'DB_ERROR')),
-  carrierVerifyFailed: http.post('/api/carriers/:code/settings/verify', () =>
+  carrierVerifyFailed: http.post('/api/carriers/:code/accounts/:accountId/verify', () =>
     HttpResponse.json({
       status: 'failed',
       message: 'Hãng GHTK lỗi khi kiểm tra kết nối: Token không hợp lệ',

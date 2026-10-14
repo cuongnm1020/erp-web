@@ -113,12 +113,13 @@ export const duplicatePancakeConfigSchema = z.object({
 export type DuplicatePancakeConfigValues = z.infer<typeof duplicatePancakeConfigSchema>;
 
 /**
- * Sửa kết nối một hãng vận chuyển — khớp UpdateCarrierSettingDto (luật 11). Ô trống = giữ
- * nguyên; `clear` = các trường bỏ giá trị đã nhập ở màn hình (rơi về env). Trường hiện ra tuỳ
- * hãng (server trả `fields`) nên `values` là record theo khoá trường.
+ * Thêm / sửa một tài khoản hãng vận chuyển — khớp Create/UpdateCarrierAccountDto (luật 11): tên
+ * 1..100 ký tự. Ô trống = giữ nguyên; `clear` = các trường bỏ giá trị đã nhập ở màn hình. Trường
+ * hiện ra tuỳ hãng (server trả `fields`) nên `values` là record theo khoá trường.
  */
 export const carrierSettingFormSchema = z
   .object({
+    name: z.string().trim().min(1, 'Nhập tên tài khoản').max(100, 'Tối đa 100 ký tự'),
     values: z.record(z.string(), z.string().max(2000, 'Tối đa 2000 ký tự')),
     clear: z.array(z.string()),
   })

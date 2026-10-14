@@ -84,6 +84,15 @@ export function SendToCarrierDialog({
   const lookup = useOrderLookup();
   const warehouses = usePickupWarehouses();
   const send = useSendOrdersToCarrier();
+  /**
+   * Tài khoản của hãng (FE-CARRIER-ACC-1): chỉ hỏi khi hãng có từ 2 tài khoản đang bật; chọn sẵn
+   * tài khoản mặc định (chưa đủ cấu hình thì tài khoản đủ cấu hình đầu tiên).
+   */
+  const accounts = carrier.accounts;
+  const initialAccountId =
+    (accounts.find((a) => a.isDefault && a.configured) ?? accounts.find((a) => a.configured))?.id ??
+    null;
+  const [accountId, setAccountId] = useState<string | null>(initialAccountId);
 
   // Mở lại với lô khác → nạp lại danh sách + reset form.
   useEffect(() => {
@@ -92,6 +101,7 @@ export function SendToCarrierDialog({
       setSearch('');
       setLookupState('idle');
       setFailedResult(null);
+      setAccountId(initialAccountId);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps -- chỉ nạp lại lúc mở, không theo rows đổi giữa chừng
   }, [open]);
@@ -149,6 +159,7 @@ export function SendToCarrierDialog({
       const r = await send.mutateAsync({
         orderIds: sendable.map((o) => o.id),
         carrierId: carrier.id,
+        ...(accounts.length > 1 && accountId ? { carrierAccountId: accountId } : {}),
         options: toShippingOptions(v),
         ...(v.customPickup && v.warehouseId ? { warehouseId: v.warehouseId } : {}),
       });
@@ -304,6 +315,41 @@ export function SendToCarrierDialog({
               >
                 <div className="min-h-0 flex-1 space-y-5 overflow-y-auto bg-muted/20 px-5 py-4">
                   <h3 className="text-base font-semibold">Cấu hình</h3>
+
+                  {accounts.length > 1 ? (
+                    <fieldset className="space-y-1">
+                      <legend className="mb-1 text-sm text-muted-foreground">
+                        Tài khoản {carrier.code}
+                      </legend>
+                      <div
+                        className="flex flex-wrap gap-x-5 gap-y-2"
+                        role="radiogroup"
+                        aria-label={`Tài khoản ${carrier.code}`}
+                      >
+                        {accounts.map((a) => (
+                          <label
+                            key={a.id}
+                            className={`flex items-center gap-1.5 text-sm ${a.configured ? '' : 'text-muted-foreground'}`}
+                          >
+                            <input
+                              type="radio"
+                              name="carrierAccount"
+                              value={a.id}
+                              checked={accountId === a.id}
+                              disabled={!a.configured}
+                              onChange={() => setAccountId(a.id)}
+                              className="h-4 w-4 accent-primary"
+                            />
+                            {a.name}
+                            {a.isDefault ? (
+                              <span className="text-xs text-muted-foreground">(mặc định)</span>
+                            ) : null}
+                            {a.configured ? null : <span className="text-xs">(chưa cấu hình)</span>}
+                          </label>
+                        ))}
+                      </div>
+                    </fieldset>
+                  ) : null}
 
                   <fieldset className="space-y-2">
                     <legend className="mb-1 text-sm text-muted-foreground">Tùy chọn</legend>

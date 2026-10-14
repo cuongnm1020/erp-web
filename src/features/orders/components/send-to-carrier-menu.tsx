@@ -42,22 +42,28 @@ export function SendToCarrierMenu({ rows, onDone }: { rows: SalesOrder[]; onDone
           {options.length === 0 ? (
             <DropdownMenuItem disabled>Chưa có hãng vận chuyển nào được bật</DropdownMenuItem>
           ) : (
-            options.map((c) => (
-              <DropdownMenuItem
-                key={c.id}
-                disabled={!c.configured}
-                onSelect={() => setCarrier(c)}
-                aria-label={`Sang ${c.code}`}
-              >
-                Sang
-                <StatusBadge tone="brand" className="ml-1.5">
-                  {c.code}
-                </StatusBadge>
-                {c.configured ? null : (
-                  <span className="ml-auto pl-3 text-xs text-muted-foreground">chưa cấu hình</span>
-                )}
-              </DropdownMenuItem>
-            ))
+            options.map((c) => {
+              // Hãng gửi được khi có ÍT NHẤT một tài khoản đủ cấu hình (FE-CARRIER-ACC-1).
+              const ready = c.configured || c.accounts.some((a) => a.configured);
+              return (
+                <DropdownMenuItem
+                  key={c.id}
+                  disabled={!ready}
+                  onSelect={() => setCarrier(c)}
+                  aria-label={`Sang ${c.code}`}
+                >
+                  Sang
+                  <StatusBadge tone="brand" className="ml-1.5">
+                    {c.code}
+                  </StatusBadge>
+                  {ready ? null : (
+                    <span className="ml-auto pl-3 text-xs text-muted-foreground">
+                      chưa cấu hình
+                    </span>
+                  )}
+                </DropdownMenuItem>
+              );
+            })
           )}
         </DropdownMenuContent>
       </DropdownMenu>
