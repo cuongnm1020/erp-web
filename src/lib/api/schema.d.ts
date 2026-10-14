@@ -5855,7 +5855,10 @@ export interface components {
             skipped: number;
             /** @description PICK chờ được sinh lại vì dòng đơn đổi. */
             pickReplanned: number;
-            /** @description Pancake đã gửi qua hãng của Pancake → ERP đánh dấu gửi ngoài ERP (trừ tồn, gắn vận đơn). */
+            /**
+             * @description Đơn cập nhật trạng thái kho / giao hàng theo Pancake: đóng gói / gửi ngoài ERP (không trừ tồn,
+             *     gắn vận đơn Pancake), Thành công, Sự cố hoàn.
+             */
             shippedExternal: number;
             failed: number;
         };
