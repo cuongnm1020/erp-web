@@ -5241,6 +5241,24 @@ export interface components {
             phone: string;
             /** @description Một dòng: số nhà/đường, thôn, xã/phường, quận/huyện, tỉnh. */
             address: string;
+            /** @description Số nhà / đường riêng — nhãn kiểu GHTK che phần này. */
+            street: string | null;
+            /** @description Phần còn lại của địa chỉ: thôn, xã/phường, quận/huyện, tỉnh. */
+            locality: string;
+            province: string | null;
+        };
+        ShipmentLabelSenderDto: {
+            name: string;
+            phone: string;
+            /** @description Một dòng: số nhà/đường, thôn, xã/phường, quận/huyện, tỉnh. */
+            address: string;
+            /** @description Số nhà / đường riêng — nhãn kiểu GHTK che phần này. */
+            street: string | null;
+            /** @description Phần còn lại của địa chỉ: thôn, xã/phường, quận/huyện, tỉnh. */
+            locality: string;
+            province: string | null;
+            /** @description Tên kho lấy hàng. */
+            warehouseName: string;
         };
         ShipmentLabelItemDto: {
             name: string;
@@ -5260,8 +5278,13 @@ export interface components {
             /** @description Decimal(12,4) kg chuỗi. */
             weightKg: string | null;
             recipient: components["schemas"]["ShipmentLabelRecipientDto"] | null;
+            /** @description Người gửi = kho lấy hàng của đơn. */
+            sender: components["schemas"]["ShipmentLabelSenderDto"] | null;
             items: components["schemas"]["ShipmentLabelItemDto"][];
             note: string | null;
+            /** @description Tuỳ chọn gửi hãng trên đơn — null = không chọn. */
+            allowInspection: boolean | null;
+            callShopOnFailure: boolean | null;
         };
         PackDto: {
             /**

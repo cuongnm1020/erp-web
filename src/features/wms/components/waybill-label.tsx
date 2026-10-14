@@ -8,6 +8,8 @@ import { MapPin, Phone, Store, User } from 'lucide-react';
 import { formatDate, formatMoney, formatPhone, formatQuantity, formatTime } from '@/lib/format';
 import { LABEL_SIZES, type PrintController } from '@/lib/print';
 import type { ShipmentLabelData } from '../api/use-pda';
+import { parseGhtkTracking } from '../ghtk-label';
+import { GhtkWaybillLabel } from './ghtk-waybill-label';
 
 export type WaybillOrientation = 'landscape' | 'portrait';
 
@@ -58,6 +60,9 @@ export function WaybillLabel({
 }) {
   const size = sizeOf(orientation);
   const land = orientation === 'landscape';
+  // Đơn GHTK đã có mã đúng dạng GHTK, tem ngang → bố cục tem GHTK (2026-10-14).
+  const ghtk = land && data.carrierCode === 'GHTK' ? parseGhtkTracking(data.trackingNo) : null;
+  if (ghtk) return <GhtkWaybillLabel data={data} ghtk={ghtk} printedAt={printedAt} />;
   const code = data.trackingNo ?? data.shipmentDocNumber;
   const long = code.length > LONG_CODE;
   // Dọc + mã dài: khối mã chiếm thêm chỗ → bớt một dòng hàng.
