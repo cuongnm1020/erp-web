@@ -90,7 +90,12 @@ describe('Popup nhãn — tem ERP 100×75 mm (2026-10-13)', () => {
     expect(label.getByText('Nguyễn Công Quân')).toBeTruthy();
     expect(label.getByText('0901 234 567', { exact: false })).toBeTruthy();
     expect(label.getByText(/Thiện Mỹ, Huyện Trà Ôn, Vĩnh Long/)).toBeTruthy();
-    expect(label.getByText(/215\.000/)).toBeTruthy();
+    // Bố cục theo nhãn Pancake (2026-10-14): mã hãng + số kiện, COD, bảng Sản phẩm / SL
+    expect(label.getByText('VTP')).toBeTruthy();
+    expect(label.getByText('1/1')).toBeTruthy();
+    expect(label.getByText(/COD: 215\.000/)).toBeTruthy();
+    expect(label.getByRole('columnheader', { name: 'Sản phẩm' })).toBeTruthy();
+    expect(label.getByRole('columnheader', { name: 'SL' })).toBeTruthy();
     expect(label.getByText('COMBO 3 CHAI CANXI BO ORGANIC 500ML')).toBeTruthy();
     // Ngang in tối đa 2 dòng hàng, còn lại gom lại để chữ không bị thu nhỏ
     expect(label.getByText('+3 sản phẩm khác')).toBeTruthy();
@@ -114,7 +119,8 @@ describe('Popup nhãn — tem ERP 100×75 mm (2026-10-13)', () => {
     const root = lastPrinted();
     expect(root.getAttribute('data-print-size')).toBe('WAYBILL_75x100');
     expect(root.querySelector('style')!.textContent).toContain('size: 75mm 100mm');
-    expect(within(root).getByText('+1 sản phẩm khác')).toBeTruthy();
+    // Dọc in tối đa 3 dòng hàng
+    expect(within(root).getByText('+2 sản phẩm khác')).toBeTruthy();
   });
 
   it('mã GHTK dài (35 ký tự) → mã vạch trải hết chiều ngang, không kèm QR', async () => {
