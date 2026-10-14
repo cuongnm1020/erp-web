@@ -474,6 +474,7 @@ export function makeOrders(n: number) {
     // Mỗi đơn thứ 5 (lệch 1) đã gán GHTK — để test lọc theo hãng; đơn đầu (FIRST) vẫn chưa gán.
     carrierId: i % 5 === 1 ? 'c-ghtk' : null,
     carrierAccountId: null,
+    senderPhone: null,
     warehouseId: null,
     addressId: null,
     // Cân nặng: đặt tay 1 kg ở mỗi đơn thứ 4; còn lại tính từ dòng 0,3 → 1,5 kg.
@@ -2079,6 +2080,7 @@ export const PANCAKE_SHOP_FIXTURE = {
   updatedBy: 'u-admin',
   webhookPath: '/pancake-sync/webhook/407957969',
   webhookSecret: 'a1b2c3d4e5f60718293a4b5c6d7e8f90a1b2c3d4e5f60718',
+  senderPhones: ['0911000001', '0911000002'] as string[],
 };
 
 export const PANCAKE_STAFF_FIXTURE = [

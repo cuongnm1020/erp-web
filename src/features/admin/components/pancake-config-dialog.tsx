@@ -23,8 +23,9 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
 import { toast } from '@/components/ui/toaster';
-import type { ApiError } from '@/lib/api/errors';
+import { isApiError, type ApiError } from '@/lib/api/errors';
 import {
   useUpsertPancakeConfig,
   type PancakeShopConfig,
@@ -33,6 +34,7 @@ import {
 import {
   createPancakeConfigSchema,
   pancakeConfigFormSchema,
+  senderPhoneLines,
   type PancakeConfigFormValues,
 } from '../schema';
 
@@ -44,6 +46,7 @@ const FIELDS = [
   'requestsPerSecond',
   'burst',
   'isActive',
+  'senderPhones',
 ] as const;
 
 /**
@@ -74,6 +77,7 @@ export function PancakeConfigDialog({
       requestsPerSecond: config?.requestsPerSecond?.toString() ?? '',
       burst: config?.burst?.toString() ?? '',
       isActive: config?.isActive ?? true,
+      senderPhones: (config?.senderPhones ?? []).join('\n'),
     },
   });
 
@@ -84,6 +88,7 @@ export function PancakeConfigDialog({
       requestsPerSecond: v.requestsPerSecond ? Number(v.requestsPerSecond) : null,
       burst: v.burst ? Number(v.burst) : null,
       isActive: v.isActive,
+      senderPhones: senderPhoneLines(v.senderPhones),
       ...(v.apiKey ? { apiKey: v.apiKey } : {}),
     };
     upsert.mutate(
@@ -96,7 +101,22 @@ export function PancakeConfigDialog({
           form.reset();
           onOpenChange(false);
         },
-        onError: (err) => applyServerErrors(form, err as ApiError, { knownFields: [...FIELDS] }),
+        onError: (err) => {
+          // Server báo đúng dòng sai (`senderPhones.<i>`) — ô là một textarea nên gắn lỗi vào cả ô.
+          const phoneErr = isApiError(err)
+            ? (err.details as Array<{ path?: string; message?: string }> | null)?.find?.((d) =>
+                d.path?.startsWith('senderPhones'),
+              )
+            : undefined;
+          if (phoneErr) {
+            form.setError('senderPhones', {
+              type: 'server',
+              message: `Dòng ${Number(phoneErr.path!.split('.')[1] ?? 0) + 1}: ${phoneErr.message ?? 'không hợp lệ'}`,
+            });
+            return;
+          }
+          applyServerErrors(form, err as ApiError, { knownFields: [...FIELDS] });
+        },
       },
     );
   });
@@ -233,6 +253,28 @@ export function PancakeConfigDialog({
                 )}
               />
             </div>
+            <FormField
+              control={form.control}
+              name="senderPhones"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Số điện thoại người gửi</FormLabel>
+                  <FormControl>
+                    <Textarea
+                      {...field}
+                      rows={3}
+                      placeholder={'Mỗi dòng một số, vd:\n0911000001\n0911000002'}
+                      className="font-mono"
+                    />
+                  </FormControl>
+                  <FormDescription>
+                    Vận đơn gửi hãng mang tên shop + một số ở đây; một lô đơn chia đều theo thứ tự
+                    các số. Để trống = dùng số điện thoại của kho.
+                  </FormDescription>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
             {editing ? (
               <FormField
                 control={form.control}

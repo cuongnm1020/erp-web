@@ -5889,6 +5889,11 @@ export interface components {
              *     query `?secret=`). null = chưa sinh (dòng cũ) và server không đặt PANCAKE_WEBHOOK_SECRET.
              */
             webhookSecret: string | null;
+            /**
+             * @description Số điện thoại người gửi của POS (dạng 0…), theo thứ tự chia đơn khi gửi hãng — vận đơn
+             *     mang tên POS + một số trong danh sách. Rỗng = dùng số của kho (2026-10-14).
+             */
+            senderPhones: string[];
         };
         PancakeEnvStatusDto: {
             /** @description PANCAKE_API_KEY có trong env của server API. */
@@ -5919,6 +5924,11 @@ export interface components {
             burst?: number | null;
             /** @description Tắt = giữ cấu hình nhưng mọi lệnh gọi Pancake cho shop này báo chưa cấu hình. */
             isActive?: boolean;
+            /**
+             * @description Số điện thoại người gửi của POS, theo thứ tự chia đơn (tối đa 20). Bỏ qua = giữ; `[]` = xoá
+             *     hết (vận đơn dùng số của kho). Server chuẩn hoá về dạng 0… và bỏ trùng.
+             */
+            senderPhones?: string[];
         };
         DuplicatePancakeConfigDto: {
             /** @description Mã shop Pancake mới. */
@@ -8301,6 +8311,8 @@ export interface components {
             carrierId: string | null;
             /** @description Tài khoản của hãng chọn khi "Gửi sang ĐVVC" (wms.CarrierAccount.id); null = mặc định. */
             carrierAccountId: string | null;
+            /** @description Số người gửi chia cho đơn lúc gán hãng (POS nhiều số); null = số của kho / số đầu của POS. */
+            senderPhone: string | null;
             /** @description Kho lấy hàng chọn khi sửa đơn (wms.Warehouse.id) — điểm lấy khi tra cước hãng. */
             warehouseId: string | null;
             /** @description Địa chỉ giao GHI TRÊN ĐƠN (core.CustomerAddress.id) — null = chưa chọn; địa chỉ hiệu lực xem `shippingAddress` ở chi tiết. */
@@ -8491,6 +8503,8 @@ export interface components {
             carrierId: string | null;
             /** @description Tài khoản của hãng chọn khi "Gửi sang ĐVVC" (wms.CarrierAccount.id); null = mặc định. */
             carrierAccountId: string | null;
+            /** @description Số người gửi chia cho đơn lúc gán hãng (POS nhiều số); null = số của kho / số đầu của POS. */
+            senderPhone: string | null;
             /** @description Kho lấy hàng chọn khi sửa đơn (wms.Warehouse.id) — điểm lấy khi tra cước hãng. */
             warehouseId: string | null;
             /** @description Địa chỉ giao GHI TRÊN ĐƠN (core.CustomerAddress.id) — null = chưa chọn; địa chỉ hiệu lực xem `shippingAddress` ở chi tiết. */

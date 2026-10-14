@@ -140,6 +140,7 @@ const ORDERS: SalesOrderList = {
       teamId: null,
       carrierId: null,
       carrierAccountId: null,
+      senderPhone: null,
       warehouseId: null,
       addressId: null,
       shippingWeightKg: null,

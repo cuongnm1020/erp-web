@@ -53,6 +53,14 @@ export type DepartmentFormValues = z.infer<typeof departmentFormSchema>;
  * Khớp UpsertPancakeConfigDto (luật 11). Form giữ số dạng chuỗi để ô trống = "dùng mặc định";
  * submit đổi sang number / null. `apiKey` bắt buộc ≥ 8 ký tự khi tạo, để trống khi sửa = giữ khoá cũ.
  */
+/** Ô "Số điện thoại người gửi": mỗi dòng (hoặc dấu phẩy) một số, bỏ dòng trống. */
+export function senderPhoneLines(v: string): string[] {
+  return v
+    .split(/[\n,;]+/)
+    .map((l) => l.trim())
+    .filter(Boolean);
+}
+
 export const pancakeConfigFormSchema = z.object({
   shopId: z.string().trim().regex(/^\d+$/, 'Mã shop là số nguyên dương'),
   shopName: z.string().trim().max(200, 'Tối đa 200 ký tự'),
@@ -84,6 +92,17 @@ export const pancakeConfigFormSchema = z.object({
       'Số nguyên từ 1 đến 1000',
     ),
   isActive: z.boolean(),
+  /**
+   * Số người gửi của POS, mỗi dòng một số, theo thứ tự chia đơn — khớp UpsertPancakeConfigDto
+   * `senderPhones` (≤ 20 số). Server chuẩn hoá về 0… và bỏ trùng; ở đây chỉ chặn ký tự lạ.
+   */
+  senderPhones: z
+    .string()
+    .refine((v) => senderPhoneLines(v).length <= 20, 'Tối đa 20 số điện thoại')
+    .refine(
+      (v) => senderPhoneLines(v).every((l) => /^\+?[\d\s.()-]{9,20}$/.test(l)),
+      'Mỗi dòng một số điện thoại (chỉ gồm số, dấu cách, chấm, gạch)',
+    ),
 });
 
 export const createPancakeConfigSchema = pancakeConfigFormSchema.extend({
