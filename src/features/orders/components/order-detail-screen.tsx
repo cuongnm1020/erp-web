@@ -208,7 +208,12 @@ function ShipmentCard({ order, autoPrint }: { order: SalesOrderDetail; autoPrint
             <Field label="Trạng thái giao">{SHIPMENT_STATUS_LABEL[s.status]}</Field>
             <Field label="Hãng trên phiếu">
               {s.carrierCode ? (
-                <span className="font-mono text-xs">{s.carrierCode}</span>
+                <>
+                  <span className="font-mono text-xs">{s.carrierCode}</span>
+                  {s.carrierAccountName ? (
+                    <span className="text-xs text-muted-foreground"> · {s.carrierAccountName}</span>
+                  ) : null}
+                </>
               ) : (
                 <span className="text-muted-foreground">chưa gán — chọn khi đóng gói xong</span>
               )}
@@ -747,6 +752,9 @@ function Detail({ order }: { order: SalesOrderDetail }) {
                   {order.carrier.name}{' '}
                   <span className="font-mono text-xs text-muted-foreground">
                     ({order.carrier.code})
+                  </span>
+                  <span className="block text-xs text-muted-foreground">
+                    Tài khoản: {order.carrierAccount?.name ?? 'mặc định'}
                   </span>
                 </>
               ) : (

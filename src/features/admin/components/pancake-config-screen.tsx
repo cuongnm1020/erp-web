@@ -195,6 +195,14 @@ function ShopTable({ items }: { items: PancakeShopConfig[] }) {
                   <TableCell>
                     <div className="font-mono text-sm">{shop.shopId}</div>
                     <div className="text-xs text-muted-foreground">{shop.shopName ?? '—'}</div>
+                    <div className="text-xs text-muted-foreground">
+                      SĐT gửi hàng:{' '}
+                      {shop.senderPhones.length ? (
+                        <span className="font-mono">{shop.senderPhones.join(', ')}</span>
+                      ) : (
+                        'số của kho'
+                      )}
+                    </div>
                   </TableCell>
                   <TableCell>
                     <span className="font-mono">{shop.apiKeyHint}</span>{' '}

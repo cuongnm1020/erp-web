@@ -3245,6 +3245,74 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/carriers/{code}/accounts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["CarrierController_createAccount"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/carriers/{code}/accounts/{accountId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Xóa tài khoản chưa từng cấp vận đơn (đã dùng → 409, tắt thay vì xóa). */
+        delete: operations["CarrierController_deleteAccount"];
+        options?: never;
+        head?: never;
+        /** Đổi tên / bật tắt / sửa trường kết nối của một tài khoản (tài khoản mặc định không tắt được). */
+        patch: operations["CarrierController_updateAccount"];
+        trace?: never;
+    };
+    "/carriers/{code}/accounts/{accountId}/default": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Đặt làm tài khoản mặc định — đơn không chọn tài khoản gửi bằng tài khoản này. */
+        post: operations["CarrierController_setDefaultAccount"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/carriers/{code}/accounts/{accountId}/verify": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Gọi thử hãng bằng tài khoản này. Luôn 200 — kết quả ở `status`. */
+        post: operations["CarrierController_verifyAccount"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/carriers": {
         parameters: {
             query?: never;
@@ -5260,6 +5328,9 @@ export interface components {
             orderId: string | null;
             carrierId: string | null;
             carrierCode: string | null;
+            /** @description Tài khoản hãng đã cấp vận đơn (2026-10-14); null = chưa cấp. */
+            carrierAccountId: string | null;
+            carrierAccountName: string | null;
             /** @description Mã vận đơn hãng cấp — null = chưa cấp. */
             trackingNo: string | null;
             /** @description Decimal(12,4) kg chuỗi. */
@@ -5335,6 +5406,12 @@ export interface components {
         AssignCarrierDto: {
             /** @description `wms.Carrier.code` — hãng phải đang active. */
             carrierCode: string;
+            /**
+             * Format: uuid
+             * @description Tài khoản của hãng (`wms.CarrierAccount.id`, đang bật). Bỏ trống = tài khoản đơn đã chọn
+             *     lúc "Gửi sang ĐVVC", không có thì tài khoản mặc định (2026-10-14).
+             */
+            carrierAccountId?: string;
         };
         UpdateShipmentStatusDto: {
             /**
@@ -5812,6 +5889,11 @@ export interface components {
              *     query `?secret=`). null = chưa sinh (dòng cũ) và server không đặt PANCAKE_WEBHOOK_SECRET.
              */
             webhookSecret: string | null;
+            /**
+             * @description Số điện thoại người gửi của POS (dạng 0…), theo thứ tự chia đơn khi gửi hãng — vận đơn
+             *     mang tên POS + một số trong danh sách. Rỗng = dùng số của kho (2026-10-14).
+             */
+            senderPhones: string[];
         };
         PancakeEnvStatusDto: {
             /** @description PANCAKE_API_KEY có trong env của server API. */
@@ -5842,6 +5924,11 @@ export interface components {
             burst?: number | null;
             /** @description Tắt = giữ cấu hình nhưng mọi lệnh gọi Pancake cho shop này báo chưa cấu hình. */
             isActive?: boolean;
+            /**
+             * @description Số điện thoại người gửi của POS, theo thứ tự chia đơn (tối đa 20). Bỏ qua = giữ; `[]` = xoá
+             *     hết (vận đơn dùng số của kho). Server chuẩn hoá về dạng 0… và bỏ trùng.
+             */
+            senderPhones?: string[];
         };
         DuplicatePancakeConfigDto: {
             /** @description Mã shop Pancake mới. */
@@ -8222,6 +8309,10 @@ export interface components {
             teamId: string | null;
             /** @description Hãng vận chuyển chọn khi sửa đơn (wms.Carrier.id) — phiếu giao tạo sau lấy sẵn. */
             carrierId: string | null;
+            /** @description Tài khoản của hãng chọn khi "Gửi sang ĐVVC" (wms.CarrierAccount.id); null = mặc định. */
+            carrierAccountId: string | null;
+            /** @description Số người gửi chia cho đơn lúc gán hãng (POS nhiều số); null = số của kho / số đầu của POS. */
+            senderPhone: string | null;
             /** @description Kho lấy hàng chọn khi sửa đơn (wms.Warehouse.id) — điểm lấy khi tra cước hãng. */
             warehouseId: string | null;
             /** @description Địa chỉ giao GHI TRÊN ĐƠN (core.CustomerAddress.id) — null = chưa chọn; địa chỉ hiệu lực xem `shippingAddress` ở chi tiết. */
@@ -8292,6 +8383,10 @@ export interface components {
             code: string;
             name: string;
         };
+        SalesOrderCarrierAccountDto: {
+            id: string;
+            name: string;
+        };
         SalesOrderWarehouseDto: {
             id: string;
             code: string;
@@ -8304,6 +8399,8 @@ export interface components {
             status: "CANCELLED" | "PENDING" | "IN_TRANSIT" | "OUT_FOR_DELIVERY" | "DELIVERED" | "FAILED" | "RETURNED" | "CARRIER_CANCELLED" | "PICKED_UP";
             /** @description Hãng đã gán trên phiếu (có thể khác hãng chọn trên đơn nếu kho đổi lúc đóng gói). */
             carrierCode: string | null;
+            /** @description Tài khoản hãng đã cấp vận đơn — null = chưa cấp. */
+            carrierAccountName: string | null;
             /** @description Mã vận đơn hãng cấp — null = chưa cấp (chưa đóng gói, hoặc hãng lỗi đang chờ). */
             trackingNo: string | null;
             /** @description ISO — lần in nhãn gần nhất; null = chưa in. */
@@ -8367,6 +8464,8 @@ export interface components {
             fulfilment: components["schemas"]["OrderFulfilmentDto"];
             /** @description Hãng đã chọn (tra theo carrierId) — null = chưa chọn hoặc hãng đã tắt. */
             carrier: components["schemas"]["SalesOrderCarrierDto"] | null;
+            /** @description Tài khoản hãng đã chọn (tra theo carrierAccountId) — null = tài khoản mặc định. */
+            carrierAccount: components["schemas"]["SalesOrderCarrierAccountDto"] | null;
             /** @description Kho lấy hàng đã chọn (tra theo warehouseId) — null = chưa chọn. */
             warehouse: components["schemas"]["SalesOrderWarehouseDto"] | null;
             /** @description Phiếu giao của đơn — null = kho chưa pick xong (chưa có phiếu). */
@@ -8402,6 +8501,10 @@ export interface components {
             teamId: string | null;
             /** @description Hãng vận chuyển chọn khi sửa đơn (wms.Carrier.id) — phiếu giao tạo sau lấy sẵn. */
             carrierId: string | null;
+            /** @description Tài khoản của hãng chọn khi "Gửi sang ĐVVC" (wms.CarrierAccount.id); null = mặc định. */
+            carrierAccountId: string | null;
+            /** @description Số người gửi chia cho đơn lúc gán hãng (POS nhiều số); null = số của kho / số đầu của POS. */
+            senderPhone: string | null;
             /** @description Kho lấy hàng chọn khi sửa đơn (wms.Warehouse.id) — điểm lấy khi tra cước hãng. */
             warehouseId: string | null;
             /** @description Địa chỉ giao GHI TRÊN ĐƠN (core.CustomerAddress.id) — null = chưa chọn; địa chỉ hiệu lực xem `shippingAddress` ở chi tiết. */
@@ -8659,6 +8762,7 @@ export interface components {
             /** @enum {string} */
             status: "DRAFT" | "PENDING_APPROVAL" | "APPROVED" | "POSTED" | "CANCELLED";
             carrierId: string | null;
+            carrierAccountId: string | null;
             warehouseId: string | null;
             /** @description Cân nặng đặt tay (kg, Decimal(12,4) chuỗi); null = dùng cân nặng tính từ dòng. */
             shippingWeightKg: string | null;
@@ -8695,6 +8799,11 @@ export interface components {
              * @description wms.Carrier.id đang hoạt động.
              */
             carrierId: string;
+            /**
+             * Format: uuid
+             * @description Tài khoản của hãng (wms.CarrierAccount.id, đang bật) cho cả lô; bỏ trống = tài khoản mặc định.
+             */
+            carrierAccountId?: string;
             /** @description Tuỳ chọn gửi hãng áp cho TẤT CẢ đơn đã chọn; bỏ trống = xoá tuỳ chọn cũ (về mặc định hãng). */
             options?: components["schemas"]["ShippingOptionsDto"];
             /**
@@ -8710,6 +8819,8 @@ export interface components {
             docNumber: string;
             carrierId: string;
             carrierCode: string;
+            /** @description Tài khoản đã lưu trên đơn; null = tài khoản mặc định. */
+            carrierAccountId: string | null;
             /**
              * @description `SAVED` đã gán hãng + tuỳ chọn, chưa có phiếu giao (kho chưa pick) → vận đơn cấp lúc
              *     đóng gói; `ISSUED` hãng cấp vận đơn ngay; `ALREADY_ISSUED` phiếu đã có vận đơn của
@@ -8805,10 +8916,26 @@ export interface components {
              * @enum {string|null}
              */
             source: "apiConfig" | "db" | "env" | null;
-            /** @description Biến env làm nền khi ô này trống. */
-            envName: string;
+            /** @description Biến env làm nền khi ô này trống; null = tài khoản phụ (không rơi về env). */
+            envName: string | null;
             /** @description Mô tả ngắn cho admin. */
             help: string | null;
+        };
+        CarrierAccountDto: {
+            id: string;
+            name: string;
+            /** @description Tài khoản dùng khi đơn không chọn tài khoản; đúng một mỗi hãng. */
+            isDefault: boolean;
+            /** @description Tắt = không chọn được khi gửi đơn mới; vận đơn đã cấp vẫn tra / in / hủy được. */
+            isActive: boolean;
+            /** @description Đủ thông tin để gọi ra hãng (base URL + token hoặc tài khoản). */
+            configured: boolean;
+            fields: components["schemas"]["CarrierSettingFieldDto"][];
+            /** @description Bí mật đã lưu không giải mã được (APP_SECRET_KEY đổi) — phải nhập lại. */
+            secretsUnreadable: boolean;
+            lastVerifiedAt: string | null;
+            lastVerifyError: string | null;
+            updatedAt: string | null;
         };
         CarrierSettingDto: {
             code: string;
@@ -8819,6 +8946,8 @@ export interface components {
             /** @description Hãng có cài kiểm tra kết nối. */
             canVerify: boolean;
             fields: components["schemas"]["CarrierSettingFieldDto"][];
+            /** @description Mọi tài khoản của hãng, mặc định trước. */
+            accounts: components["schemas"]["CarrierAccountDto"][];
             /** @description Bí mật đã lưu không giải mã được (APP_SECRET_KEY đổi) — phải nhập lại. */
             secretsUnreadable: boolean;
             lastVerifiedAt: string | null;
@@ -8851,6 +8980,56 @@ export interface components {
             message: string;
             verifiedAt: string | null;
         };
+        CreateCarrierAccountDto: {
+            /**
+             * Format: uri
+             * @description Địa chỉ API của hãng (môi trường thật / thử nghiệm).
+             */
+            baseUrl?: string | null;
+            /** @description Token API tĩnh (GHN, GHTK, J&T, VTP token tĩnh). */
+            token?: string | null;
+            /** @description Tài khoản đăng nhập API (VTP, VNPost) — thay cho token tĩnh. */
+            username?: string | null;
+            password?: string | null;
+            /** @description Khoá phụ (VNPost `cApiKey`). */
+            apiKey?: string | null;
+            /** @description GHN ShopId. */
+            shopId?: string | null;
+            /** @description GHTK X-Client-Source, VTP / J&T mã đối tác. */
+            partnerCode?: string | null;
+            /** @description Bí mật xác thực webhook vào. Trống = dùng token. */
+            webhookSecret?: string | null;
+            name: string;
+        };
+        UpdateCarrierAccountDto: {
+            /**
+             * Format: uri
+             * @description Địa chỉ API của hãng (môi trường thật / thử nghiệm).
+             */
+            baseUrl?: string | null;
+            /** @description Token API tĩnh (GHN, GHTK, J&T, VTP token tĩnh). */
+            token?: string | null;
+            /** @description Tài khoản đăng nhập API (VTP, VNPost) — thay cho token tĩnh. */
+            username?: string | null;
+            password?: string | null;
+            /** @description Khoá phụ (VNPost `cApiKey`). */
+            apiKey?: string | null;
+            /** @description GHN ShopId. */
+            shopId?: string | null;
+            /** @description GHTK X-Client-Source, VTP / J&T mã đối tác. */
+            partnerCode?: string | null;
+            /** @description Bí mật xác thực webhook vào. Trống = dùng token. */
+            webhookSecret?: string | null;
+            name?: string;
+            isActive?: boolean;
+        };
+        CarrierAccountOptionDto: {
+            id: string;
+            name: string;
+            isDefault: boolean;
+            /** @description Đủ thông tin để gọi hãng — chưa đủ thì ô chọn hiện mờ. */
+            configured: boolean;
+        };
         CarrierDto: {
             id: string;
             code: string;
@@ -8862,6 +9041,8 @@ export interface components {
             /** @description true = đủ token trong env để gọi ra hãng. */
             configured: boolean;
             webhook: boolean;
+            /** @description Tài khoản ĐANG BẬT của hãng, mặc định trước. Hãng không có adapter → rỗng. */
+            accounts: components["schemas"]["CarrierAccountOptionDto"][];
         };
         /**
          * @description Trạng thái quy đổi; `null` = mã chưa có trong bảng ánh xạ.
@@ -16220,6 +16401,8 @@ export interface operations {
                 warehouseId?: string;
                 /** @description Địa chỉ giao đang chọn trên màn sửa (chưa lưu) — phải của khách trên đơn. Bỏ trống = địa chỉ hiệu lực của đơn. */
                 addressId?: string;
+                /** @description Tài khoản của hãng (wms.CarrierAccount.id). Bỏ trống = tài khoản đơn đã lưu → mặc định. */
+                carrierAccountId?: string;
             };
             header?: never;
             path: {
@@ -16452,6 +16635,121 @@ export interface operations {
             header?: never;
             path: {
                 code: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CarrierVerifyResultDto"];
+                };
+            };
+        };
+    };
+    CarrierController_createAccount: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                code: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateCarrierAccountDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CarrierSettingDto"];
+                };
+            };
+        };
+    };
+    CarrierController_deleteAccount: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                code: string;
+                accountId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    CarrierController_updateAccount: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                code: string;
+                accountId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateCarrierAccountDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CarrierSettingDto"];
+                };
+            };
+        };
+    };
+    CarrierController_setDefaultAccount: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                code: string;
+                accountId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CarrierSettingDto"];
+                };
+            };
+        };
+    };
+    CarrierController_verifyAccount: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                code: string;
+                accountId: string;
             };
             cookie?: never;
         };

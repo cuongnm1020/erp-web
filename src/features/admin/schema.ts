@@ -53,6 +53,14 @@ export type DepartmentFormValues = z.infer<typeof departmentFormSchema>;
  * Khớp UpsertPancakeConfigDto (luật 11). Form giữ số dạng chuỗi để ô trống = "dùng mặc định";
  * submit đổi sang number / null. `apiKey` bắt buộc ≥ 8 ký tự khi tạo, để trống khi sửa = giữ khoá cũ.
  */
+/** Ô "Số điện thoại người gửi": mỗi dòng (hoặc dấu phẩy) một số, bỏ dòng trống. */
+export function senderPhoneLines(v: string): string[] {
+  return v
+    .split(/[\n,;]+/)
+    .map((l) => l.trim())
+    .filter(Boolean);
+}
+
 export const pancakeConfigFormSchema = z.object({
   shopId: z.string().trim().regex(/^\d+$/, 'Mã shop là số nguyên dương'),
   shopName: z.string().trim().max(200, 'Tối đa 200 ký tự'),
@@ -84,6 +92,17 @@ export const pancakeConfigFormSchema = z.object({
       'Số nguyên từ 1 đến 1000',
     ),
   isActive: z.boolean(),
+  /**
+   * Số người gửi của POS, mỗi dòng một số, theo thứ tự chia đơn — khớp UpsertPancakeConfigDto
+   * `senderPhones` (≤ 20 số). Server chuẩn hoá về 0… và bỏ trùng; ở đây chỉ chặn ký tự lạ.
+   */
+  senderPhones: z
+    .string()
+    .refine((v) => senderPhoneLines(v).length <= 20, 'Tối đa 20 số điện thoại')
+    .refine(
+      (v) => senderPhoneLines(v).every((l) => /^\+?[\d\s.()-]{9,20}$/.test(l)),
+      'Mỗi dòng một số điện thoại (chỉ gồm số, dấu cách, chấm, gạch)',
+    ),
 });
 
 export const createPancakeConfigSchema = pancakeConfigFormSchema.extend({
@@ -113,12 +132,13 @@ export const duplicatePancakeConfigSchema = z.object({
 export type DuplicatePancakeConfigValues = z.infer<typeof duplicatePancakeConfigSchema>;
 
 /**
- * Sửa kết nối một hãng vận chuyển — khớp UpdateCarrierSettingDto (luật 11). Ô trống = giữ
- * nguyên; `clear` = các trường bỏ giá trị đã nhập ở màn hình (rơi về env). Trường hiện ra tuỳ
- * hãng (server trả `fields`) nên `values` là record theo khoá trường.
+ * Thêm / sửa một tài khoản hãng vận chuyển — khớp Create/UpdateCarrierAccountDto (luật 11): tên
+ * 1..100 ký tự. Ô trống = giữ nguyên; `clear` = các trường bỏ giá trị đã nhập ở màn hình. Trường
+ * hiện ra tuỳ hãng (server trả `fields`) nên `values` là record theo khoá trường.
  */
 export const carrierSettingFormSchema = z
   .object({
+    name: z.string().trim().min(1, 'Nhập tên tài khoản').max(100, 'Tối đa 100 ký tự'),
     values: z.record(z.string(), z.string().max(2000, 'Tối đa 2000 ký tự')),
     clear: z.array(z.string()),
   })

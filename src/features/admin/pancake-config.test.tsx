@@ -131,8 +131,57 @@ describe('PancakeConfigScreen — /pancake-sync/config', () => {
       requestsPerSecond: null,
       burst: null,
       isActive: true,
+      senderPhones: [],
     });
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+  });
+
+  it('số điện thoại người gửi: bảng hiện các số; sửa mỗi dòng một số → PUT senderPhones đúng thứ tự; dòng sai chặn ở form; server báo dòng sai → lỗi tại ô', async () => {
+    const seen: Record<string, unknown>[] = [];
+    let reject = false;
+    server.use(
+      http.put('/api/pancake-sync/config/:shopId', async ({ request }) => {
+        seen.push((await request.json()) as Record<string, unknown>);
+        if (reject) {
+          return HttpResponse.json(
+            {
+              code: 'VALIDATION',
+              message: 'x',
+              details: [{ path: 'senderPhones.1', message: 'Số điện thoại Việt Nam 10–11 chữ số' }],
+              traceId: 't',
+            },
+            { status: 422 },
+          );
+        }
+        return HttpResponse.json(PANCAKE_SHOP_FIXTURE);
+      }),
+    );
+    renderApp(<PancakeConfigScreen />);
+    await screen.findByText('Shop chính');
+    expect(screen.getAllByText('0911000001, 0911000002').length).toBeGreaterThan(0);
+    fireEvent.click(screen.getAllByRole('button', { name: 'Sửa' })[0]!);
+    const phones = await screen.findByLabelText('Số điện thoại người gửi');
+    expect(phones).toHaveValue('0911000001\n0911000002');
+
+    fireEvent.change(phones, { target: { value: '0911000003\nabc' } });
+    fireEvent.submit(screen.getByRole('button', { name: 'Lưu thay đổi' }).closest('form')!);
+    expect(await screen.findByText(/Mỗi dòng một số điện thoại/)).toBeInTheDocument();
+    expect(seen).toHaveLength(0);
+
+    fireEvent.change(phones, { target: { value: '0911000003\n\n0911 000 004' } });
+    fireEvent.submit(screen.getByRole('button', { name: 'Lưu thay đổi' }).closest('form')!);
+    await waitFor(() => expect(seen).toHaveLength(1));
+    expect(seen[0]!.senderPhones).toEqual(['0911000003', '0911 000 004']);
+
+    reject = true;
+    fireEvent.click(screen.getAllByRole('button', { name: 'Sửa' })[0]!);
+    fireEvent.change(await screen.findByLabelText('Số điện thoại người gửi'), {
+      target: { value: '0911000003\n0000000000' },
+    });
+    fireEvent.submit(screen.getByRole('button', { name: 'Lưu thay đổi' }).closest('form')!);
+    expect(
+      await screen.findByText('Dòng 2: Số điện thoại Việt Nam 10–11 chữ số'),
+    ).toBeInTheDocument();
   });
 
   it('sửa shop: không nhập khoá → body không có apiKey (giữ khoá cũ)', async () => {

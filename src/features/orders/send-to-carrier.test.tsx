@@ -1,7 +1,7 @@
 import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import { http, HttpResponse } from 'msw';
 import { describe, expect, it, vi } from 'vitest';
-import { makeOrders } from '@/test/msw/handlers';
+import { CARRIERS, makeOrders } from '@/test/msw/handlers';
 import { server } from '@/test/msw/server';
 import { renderApp } from '@/test/render';
 import { OrderListScreen } from './components/order-list-screen';
@@ -315,6 +315,81 @@ describe('Gửi sang ĐVVC — SendToCarrierMenu + SendToCarrierDialog', () => {
       'Kho Thạch Thất không có: CANXI-500 — Canxi Bo Organic 500ml. Đổi kho xuất hoặc chuyển hàng về kho rồi gửi lại.',
     );
     expect(first).not.toHaveTextContent('raw server message');
+  });
+
+  it('hãng nhiều tài khoản (FE-CARRIER-ACC-1): chọn sẵn tài khoản mặc định, tài khoản chưa cấu hình mờ; chọn tài khoản phụ → POST kèm carrierAccountId; GHN mặc định thiếu cấu hình nhưng có tài khoản khác đủ → menu bật', async () => {
+    search = '';
+    toastSuccess.mockClear();
+    const bodies: Record<string, unknown>[] = [];
+    server.use(
+      http.get('/api/carriers', () =>
+        HttpResponse.json(
+          CARRIERS.map((c) =>
+            c.code === 'GHTK'
+              ? {
+                  ...c,
+                  accounts: [
+                    { id: 'acc-ghtk-default', name: 'Mặc định', isDefault: true, configured: true },
+                    {
+                      id: 'acc-ghtk-shop2',
+                      name: 'GHTK cửa hàng 2',
+                      isDefault: false,
+                      configured: true,
+                    },
+                    { id: 'acc-ghtk-new', name: 'GHTK mới', isDefault: false, configured: false },
+                  ],
+                }
+              : c.code === 'GHN'
+                ? {
+                    ...c,
+                    accounts: [
+                      ...c.accounts,
+                      { id: 'acc-ghn-2', name: 'GHN kho 2', isDefault: false, configured: true },
+                    ],
+                  }
+                : c,
+          ),
+        ),
+      ),
+      http.post('/api/sales-orders/send-to-carrier', async ({ request }) => {
+        const body = (await request.json()) as Record<string, unknown>;
+        bodies.push(body);
+        return HttpResponse.json(
+          {
+            sent: (body.orderIds as string[]).map((id) => ({
+              orderId: id,
+              docNumber: 'SO-1',
+              carrierId: body.carrierId,
+              carrierCode: 'GHTK',
+              carrierAccountId: body.carrierAccountId ?? null,
+              outcome: 'SAVED',
+              shipmentId: null,
+              shipmentDocNumber: null,
+              trackingNo: null,
+              reason: null,
+            })),
+            failed: [],
+          },
+          { status: 201 },
+        );
+      }),
+    );
+    await selectTwoRows();
+    openMenu();
+    const menu = await screen.findByRole('menu');
+    expect(within(menu).getByRole('menuitem', { name: 'Sang GHN' })).not.toHaveAttribute(
+      'aria-disabled',
+      'true',
+    );
+    fireEvent.click(within(menu).getByRole('menuitem', { name: 'Sang GHTK' }));
+    const dialog = await screen.findByRole('dialog');
+    const group = within(dialog).getByRole('radiogroup', { name: 'Tài khoản GHTK' });
+    expect(within(group).getByRole('radio', { name: /Mặc định/ })).toBeChecked();
+    expect(within(group).getByRole('radio', { name: /GHTK mới/ })).toBeDisabled();
+    fireEvent.click(within(group).getByRole('radio', { name: /GHTK cửa hàng 2/ }));
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Cập nhật 2 đơn' }));
+    await waitFor(() => expect(bodies).toHaveLength(1));
+    expect(bodies[0]).toMatchObject({ carrierId: 'c-ghtk', carrierAccountId: 'acc-ghtk-shop2' });
   });
 
   it('toShippingOptions: mặc định chỉ gửi cờ, ô trống không gửi; điền đủ → đúng kiểu số/chuỗi', () => {

@@ -87,6 +87,16 @@ const MESSAGES: Record<string, string> = {
   CARRIER_OPERATION_UNSUPPORTED:
     'Hãng này không hỗ trợ thao tác vừa gọi (tra cước / in nhãn). Chọn hãng khác hoặc làm tay.',
   CARRIER_NOT_FOUND: 'Hãng vận chuyển không tồn tại hoặc đã tắt. Tải lại danh sách hãng.',
+  // Nhiều tài khoản một hãng (FE-CARRIER-ACC-1)
+  CARRIER_ACCOUNT_NOT_FOUND:
+    'Tài khoản vận chuyển không còn hoặc không thuộc hãng đã chọn. Tải lại rồi chọn lại tài khoản.',
+  CARRIER_ACCOUNT_INACTIVE:
+    'Tài khoản vận chuyển này đang tắt. Chọn tài khoản khác hoặc bật lại ở Cấu hình hệ thống.',
+  CARRIER_ACCOUNT_IN_USE:
+    'Không xoá / tắt được tài khoản này: đang là mặc định hoặc đã cấp vận đơn. Đặt tài khoản khác làm mặc định, hoặc tắt thay vì xoá.',
+  CARRIER_ACCOUNT_NAME_TAKEN: 'Hãng này đã có tài khoản cùng tên. Đặt tên khác.',
+  ORDER_WAYBILL_ACCOUNT_LOCKED:
+    'Đơn đã có vận đơn ở tài khoản khác của hãng này. Hủy vận đơn trên phiếu giao rồi gửi lại.',
   PICKUP_WAREHOUSE_NOT_READY:
     'Kho lấy hàng chưa khai tỉnh/thành, phường/xã hoặc số điện thoại. Khai ở Kho › Kho & vị trí › Sửa kho rồi thử lại.',
   PICKUP_WAREHOUSE_MISSING:
