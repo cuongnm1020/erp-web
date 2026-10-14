@@ -3,7 +3,8 @@
  *
  * Mã vận đơn GHTK có dạng `S23119447.BO.MN13-12-P52.1763110086`:
  *   - `S23119447`     mã shop trên GHTK ("Người gửi / S23119447")
- *   - `BO`            mã cụm của GHTK (không in)
+ *   - `BO`            mã cụm của GHTK (không in) — có mã không có đoạn này:
+ *                     `S23119447.MB7-05-L1.1890932219`
  *   - `MN13-12-P52`   mã phân loại (sort code) — tem dọc in to, đoạn đầu `MN13` nền đen
  *   - `1763110086`    mã số ngắn — mã vạch CODE128 của tem mang đúng đoạn này
  */
@@ -17,19 +18,19 @@ export interface GhtkTracking {
   shortCode: string;
 }
 
-const GHTK_TRACKING = /^(S\d+)\.([A-Z0-9]+)\.([A-Z0-9-]+)\.(\d{6,})$/i;
+const GHTK_TRACKING = /^(S\d+)\.(?:[A-Z0-9]+\.)?([A-Z0-9-]+)\.(\d{6,})$/i;
 
 export function parseGhtkTracking(code: string | null | undefined): GhtkTracking | null {
   const m = code?.trim().match(GHTK_TRACKING);
   if (!m) return null;
-  const sortCode = m[3]!;
+  const sortCode = m[2]!;
   const dash = sortCode.indexOf('-');
   return {
     shopCode: m[1]!,
     sortCode,
     sortHead: dash < 0 ? sortCode : sortCode.slice(0, dash),
     sortTail: dash < 0 ? '' : sortCode.slice(dash),
-    shortCode: m[4]!,
+    shortCode: m[3]!,
   };
 }
 

@@ -17,7 +17,15 @@ describe('tem kiểu GHTK — tiện ích', () => {
       sortTail: '-12-P52',
       shortCode: '1763110086',
     });
-    expect(parseGhtkTracking('S1.A1.1763110086')).toBeNull();
+    // Mã không có đoạn mã cụm (đơn thật 2026-10-14)
+    expect(parseGhtkTracking('S23119447.MB7-05-L1.1890932219')).toEqual({
+      shopCode: 'S23119447',
+      sortCode: 'MB7-05-L1',
+      sortHead: 'MB7',
+      sortTail: '-05-L1',
+      shortCode: '1890932219',
+    });
+    expect(parseGhtkTracking('S1.1763110086')).toBeNull();
     expect(parseGhtkTracking('PKE1544685972')).toBeNull();
     expect(parseGhtkTracking(null)).toBeNull();
   });
