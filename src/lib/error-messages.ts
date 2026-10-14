@@ -67,6 +67,10 @@ const MESSAGES: Record<string, string> = {
     'Webhook bị từ chối vì secret không khớp. Dán lại secret từ màn Kết nối Pancake vào cấu hình của Pancake.',
   PANCAKE_SECRET_KEY_MISSING:
     'Server chưa có APP_SECRET_KEY để mã hoá khoá API. Báo IT đặt biến môi trường rồi khởi động lại API.',
+  PANCAKE_WAREHOUSE_LINK_TAKEN:
+    'Kho trên Pancake này đã nối với một kho ERP khác. Gỡ liên kết của kho đó trước rồi nối lại.',
+  PANCAKE_WAREHOUSE_NOT_FOUND:
+    'Shop không còn kho này trên Pancake (có thể vừa bị xóa). Tải lại danh sách kho rồi chọn lại.',
   // Hãng vận chuyển (tra cước ở màn sửa đơn, vận đơn ở bàn đóng gói)
   CARRIER_WAYBILL_DATA:
     'Đơn chưa có địa chỉ giao đủ tỉnh/thành hoặc chưa có dòng hàng. Chọn địa chỉ giao ở hồ sơ khách rồi thử lại.',
