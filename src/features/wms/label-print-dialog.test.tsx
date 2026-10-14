@@ -137,7 +137,7 @@ describe('Popup nhãn — tem ERP 100×75 mm (2026-10-13)', () => {
     expect(within(root).getByText('+2 sản phẩm khác')).toBeTruthy();
   });
 
-  it('đơn GHTK, tem ngang → bố cục tem GHTK: mã vạch đoạn số cuối, mã phân loại, che SĐT, tuyến', async () => {
+  it('đơn GHTK, tem ngang → bố cục tem GHTK: mã vạch đoạn số cuối, che SĐT, không mã phân loại / tuyến', async () => {
     const long = 'S23119447.BO.MN13-12-P52.1763110086';
     server.use(
       http.get('/api/shipments/:id/label-data', () =>
@@ -157,8 +157,10 @@ describe('Popup nhãn — tem ERP 100×75 mm (2026-10-13)', () => {
     expect(label.getByRole('img', { name: `Mã vận đơn ${long}` })).toBeTruthy();
     expect(label.getByRole('img', { name: `QR ${long}` })).toBeTruthy();
     expect(label.getByText('1763110086')).toBeTruthy();
-    expect(label.getByText('MN13')).toBeTruthy();
-    expect(label.getByText('LIÊN MIỀN')).toBeTruthy();
+    // Người dùng bỏ mã phân loại / tuyến / mã đơn bán khỏi tem (2026-10-14)
+    expect(label.queryByText(/MN13/)).toBeNull();
+    expect(label.queryByText(/MIỀN/)).toBeNull();
+    expect(label.queryByText(/SO2610-00042/)).toBeNull();
     expect(label.getByText('S23119447')).toBeTruthy();
     expect(label.getByText(/Mạnh \/ 033\*\*\*3208/)).toBeTruthy();
     expect(label.getByText(/Nguyễn Công Quân \/ \*{11}/)).toBeTruthy();
