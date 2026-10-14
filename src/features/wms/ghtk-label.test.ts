@@ -1,12 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import {
-  hidePhone,
-  maskedAddress,
-  maskPhone,
-  parseGhtkTracking,
-  printNote,
-  routeLabel,
-} from './ghtk-label';
+import { hidePhone, maskedAddress, parseGhtkTracking, printNote, routeLabel } from './ghtk-label';
 
 describe('tem kiểu GHTK — tiện ích', () => {
   it('tách mã vận đơn GHTK: shop, mã phân loại (đoạn đầu nền đen), mã số ngắn', () => {
@@ -30,9 +23,7 @@ describe('tem kiểu GHTK — tiện ích', () => {
     expect(parseGhtkTracking(null)).toBeNull();
   });
 
-  it('che SĐT người gửi giữ 3 đầu 4 cuối; SĐT người nhận che hết', () => {
-    expect(maskPhone('0339213208')).toBe('033***3208');
-    expect(maskPhone('0339 213 208')).toBe('033***3208');
+  it('SĐT người nhận che hết', () => {
     expect(hidePhone('0383352515')).toBe('***********');
   });
 

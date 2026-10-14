@@ -3,10 +3,10 @@
 import type { CSSProperties, ReactNode } from 'react';
 import { Barcode } from '@/components/data/barcode';
 import { cn } from '@/lib/cn';
-import { formatDate, formatMoney, formatQuantity, formatTime } from '@/lib/format';
+import { formatDate, formatMoney, formatPhone, formatQuantity, formatTime } from '@/lib/format';
 import { LABEL_SIZES } from '@/lib/print';
 import type { ShipmentLabelData } from '../api/use-pda';
-import { type GhtkTracking, hidePhone, maskedAddress, maskPhone, printNote } from '../ghtk-label';
+import { type GhtkTracking, hidePhone, maskedAddress, printNote, routeLabel } from '../ghtk-label';
 // Dựng ×2 rồi thu về — chống cài đặt "cỡ chữ tối thiểu" của Chrome (xem label-scale.ts).
 import { f, labelInner, labelOuter, u } from '../label-scale';
 
@@ -17,9 +17,10 @@ const LINE = `${u(0.35)} solid currentColor`;
 
 /**
  * Số dòng hàng in ra; còn lại báo "+N sản phẩm khác không in" ở tiêu đề. Đo trên bản xem trước
- * 2026-10-14 (người gửi / nhận tối đa, ghi chú 3 dòng): 6 dòng tên 1 dòng vừa khít 100×75.
+ * 2026-10-14 (người gửi 3 dòng kèm SĐT đầy đủ, người nhận + ghi chú 3 dòng tối đa): 4 dòng tên
+ * 1 dòng vừa khít 100×75 — in nhiều hơn thì dòng cuối bị ghi chú che mà "+N" lại đếm sai.
  */
-const MAX_ITEMS = 6;
+const MAX_ITEMS = 4;
 /** Tới chừng này dòng hàng thì tên được in 2 dòng. */
 const FULL_NAME_ITEMS = 2;
 
@@ -37,10 +38,10 @@ function Caption({ children }: { children: ReactNode }) {
 
 /**
  * Tem vận đơn ERP tự in cho đơn GHTK, khổ 100×75 ngang — theo tem GHTK, chỉnh 2026-10-14:
- * đầu tem GHTK + mã đơn KH + giờ in; mã vạch đoạn số cuối của mã GHTK | QR mã đầy đủ; người gửi
- * (kho, SĐT che giữa) / người nhận (SĐT che hết, che số nhà) | kho lấy, khối lượng, thu hộ; rồi
- * hai hàng hết bề ngang: danh sách sản phẩm / SL, ghi chú (mỗi ý một dòng).
- * Không in mã phân loại, tuyến, kho giao, biểu tượng hàng (người dùng bỏ / API GHTK không có).
+ * đầu tem GHTK + mã phân loại (đoạn đầu nền đen) | mã đơn KH | tuyến + giờ in; mã vạch đoạn số
+ * cuối của mã GHTK | QR mã đầy đủ; người gửi (kho, SĐT đầy đủ) / người nhận (SĐT che hết, che số
+ * nhà) | kho lấy, khối lượng, thu hộ; rồi hai hàng hết bề ngang: danh sách sản phẩm / SL, ghi chú
+ * (mỗi ý một dòng). Không in kho giao, biểu tượng hàng (API GHTK không có).
  */
 export function GhtkWaybillLabel({
   data,
@@ -59,6 +60,7 @@ export function GhtkWaybillLabel({
   const more = data.items.length - shown.length;
   // Nhiều hàng → mỗi tên 1 dòng, chữ nhỏ hơn một chút — đủ chỗ cho cả danh sách.
   const many = data.items.length > FULL_NAME_ITEMS;
+  const route = routeLabel(data.sender?.province, data.recipient?.province);
   const printed = `${formatDate(printedAt)} ${formatTime(printedAt).replace(':', 'h')}`;
 
   return (
@@ -71,13 +73,27 @@ export function GhtkWaybillLabel({
         className="flex flex-col overflow-hidden"
         style={{ ...labelInner(W, H), padding: `${u(1.8)} ${u(2.5)} ${u(1.5)}` }}
       >
-        {/* Đầu tem */}
+        {/* Đầu tem: GHTK + mã phân loại | mã đơn KH | tuyến + giờ in */}
         <div
-          className="flex items-end justify-between"
+          className="flex items-center justify-between"
           style={{ borderBottom: LINE, paddingBottom: u(0.6), gap: u(2) }}
         >
-          <span className="font-extrabold leading-none tracking-tight" style={{ fontSize: f(12) }}>
-            GHTK
+          <span className="flex items-center whitespace-nowrap" style={{ gap: u(2) }}>
+            <span
+              className="font-extrabold leading-none tracking-tight"
+              style={{ fontSize: f(12) }}
+            >
+              GHTK
+            </span>
+            <span className="font-extrabold leading-none" style={{ fontSize: f(12) }}>
+              <span
+                className="bg-foreground text-background"
+                style={{ padding: `${u(0.3)} ${u(0.6)}` }}
+              >
+                {ghtk.sortHead}
+              </span>
+              {ghtk.sortTail}
+            </span>
           </span>
           {/* Mã đơn KH (= mã phiếu giao gửi GHTK) */}
           <span
@@ -89,8 +105,15 @@ export function GhtkWaybillLabel({
               {data.shipmentDocNumber}
             </span>
           </span>
-          <span className="whitespace-nowrap leading-none" style={{ fontSize: f(6.5) }}>
-            In <span className="tabular-nums">{printed}</span>
+          <span className="flex flex-col items-end whitespace-nowrap" style={{ gap: u(0.5) }}>
+            {route ? (
+              <span className="font-extrabold leading-none" style={{ fontSize: f(9) }}>
+                {route}
+              </span>
+            ) : null}
+            <span className="leading-none" style={{ fontSize: f(6) }}>
+              In <span className="tabular-nums">{printed}</span>
+            </span>
           </span>
         </div>
 
@@ -148,13 +171,13 @@ export function GhtkWaybillLabel({
               fontSize: f(7),
             }}
           >
-            <div className="min-w-0" style={clamp(2)}>
+            <div className="min-w-0" style={clamp(3)}>
               <Caption>Người gửi / </Caption>
               <b>{ghtk.shopCode}</b>
               {data.sender ? (
                 <b>
                   {' · '}
-                  {data.sender.name} / {maskPhone(data.sender.phone)} · Đ/c:{' '}
+                  {data.sender.name} / {formatPhone(data.sender.phone)} · Đ/c:{' '}
                   {maskedAddress(data.sender.street, data.sender.locality)}
                 </b>
               ) : null}

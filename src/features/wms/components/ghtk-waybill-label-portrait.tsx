@@ -4,17 +4,10 @@ import type { CSSProperties, ReactNode } from 'react';
 import { Truck } from 'lucide-react';
 import { Barcode } from '@/components/data/barcode';
 import { cn } from '@/lib/cn';
-import { formatDate, formatMoney, formatQuantity, formatTime } from '@/lib/format';
+import { formatDate, formatMoney, formatPhone, formatQuantity, formatTime } from '@/lib/format';
 import { LABEL_SIZES } from '@/lib/print';
 import type { ShipmentLabelData } from '../api/use-pda';
-import {
-  type GhtkTracking,
-  hidePhone,
-  maskedAddress,
-  maskPhone,
-  printNote,
-  routeLabel,
-} from '../ghtk-label';
+import { type GhtkTracking, hidePhone, maskedAddress, printNote, routeLabel } from '../ghtk-label';
 // Dựng ×2 rồi thu về — chống cài đặt "cỡ chữ tối thiểu" của Chrome (xem label-scale.ts).
 import { f, labelInner, labelOuter, u } from '../label-scale';
 
@@ -139,7 +132,7 @@ export function GhtkWaybillLabelPortrait({
               {data.sender ? (
                 <>
                   <div style={clamp(2)}>
-                    {data.sender.name}/ {maskPhone(data.sender.phone)}
+                    {data.sender.name} / {formatPhone(data.sender.phone)}
                   </div>
                   <div style={clamp(2)}>
                     Đ/c: {maskedAddress(data.sender.street, data.sender.locality)}

@@ -34,13 +34,6 @@ export function parseGhtkTracking(code: string | null | undefined): GhtkTracking
   };
 }
 
-/** `0339213208` → `033***3208` (như tem GHTK). Số quá ngắn → che hết. */
-export function maskPhone(phone: string | null | undefined): string {
-  const d = (phone ?? '').replace(/\D/g, '');
-  if (d.length < 8) return d ? '*'.repeat(d.length) : '';
-  return `${d.slice(0, 3)}***${d.slice(-4)}`;
-}
-
 /** Che toàn bộ số điện thoại người nhận — tem GHTK in `***********`. */
 export function hidePhone(phone: string | null | undefined): string {
   const d = (phone ?? '').replace(/\D/g, '');
