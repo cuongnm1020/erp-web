@@ -46,12 +46,17 @@ function readPageSize(): PageSize {
   }
 }
 
-function readOrientation(): WaybillOrientation {
+/** Hướng tem đã nhớ — dùng chung với "In lại vận đơn" trên danh sách đơn. */
+export function readOrientation(): WaybillOrientation {
   try {
     return localStorage.getItem(ORIENTATION_KEY) === 'portrait' ? 'portrait' : 'landscape';
   } catch {
     return 'landscape';
   }
+}
+
+export function rememberOrientation(v: WaybillOrientation) {
+  remember(ORIENTATION_KEY, v);
 }
 
 function remember(key: string, value: string) {
@@ -99,7 +104,7 @@ export function LabelPrintDialog({
   };
   const changeOrientation = (v: WaybillOrientation) => {
     setOrientation(v);
-    remember(ORIENTATION_KEY, v);
+    rememberOrientation(v);
   };
 
   const [local, setLocal] = useState<PdaWaybill | null>(waybill);
