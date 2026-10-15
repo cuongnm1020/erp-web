@@ -102,7 +102,7 @@ export function PancakeShopProductsDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-3xl">
+      <DialogContent className="max-w-6xl">
         <DialogHeader>
           <DialogTitle>Sản phẩm bán trên {label}</DialogTitle>
           <DialogDescription>
@@ -155,7 +155,7 @@ export function PancakeShopProductsDialog({
                       />
                     </div>
                   </header>
-                  <div className="h-72 overflow-y-auto">
+                  <div className="h-[55vh] min-h-72 overflow-y-auto">
                     {results.isPending ? (
                       <ListSkeleton rows={6} columns={1} />
                     ) : results.isError ? (
@@ -212,7 +212,7 @@ export function PancakeShopProductsDialog({
                       </button>
                     ) : null}
                   </header>
-                  <div className="h-72 overflow-y-auto">
+                  <div className="h-[55vh] min-h-72 overflow-y-auto">
                     {sortedSelected.length === 0 ? (
                       <p className="px-3 py-6 text-center text-sm text-muted-foreground">
                         Chưa chọn sản phẩm nào — shop sẽ không bán sản phẩm nào. Tìm và tick ở cột
