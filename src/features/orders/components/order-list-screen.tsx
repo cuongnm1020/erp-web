@@ -42,6 +42,7 @@ import {
 } from '../api/use-orders';
 import { fulfilmentLabel, ORDER_FLOW_TABS, parseOrderFlow, parseOrderStatus } from '../labels';
 import { BulkCancelDialog } from './bulk-cancel-dialog';
+import { BulkReprintWaybillDialog } from './bulk-reprint-waybill-dialog';
 import { BulkShippingDialog } from './bulk-shipping-dialog';
 import { FlowBadge, OrderQuickView, TelcoBadge } from './order-quick-view';
 import { PancakeOrderResyncButton } from './pancake-order-resync-button';
@@ -57,7 +58,7 @@ import { SendToCarrierMenu } from './send-to-carrier-menu';
  * Tab = luồng chung của đơn (Chờ duyệt → … → Thành công | Sự cố hoàn | Hãng hủy | Đã hủy, bảng
  * trạng thái ở apps/api/docs/carrier-status-mapping.md) — `?flow=` trên URL cùng mọi bộ lọc,
  * trang (luật 8). Bấm một dòng → xem nhanh bên phải; bấm số đơn → màn chi tiết. Chọn nhiều dòng →
- * "Gửi sang ĐVVC" / "Gán hãng / cân nặng".
+ * "Gửi sang ĐVVC" / "Gán hãng / cân nặng" / "In lại vận đơn" (tem ERP 100×75, đơn đã có mã).
  *
  * Trạng thái không sửa tay trên dòng (khác Pancake): trạng thái do quy trình kho + hãng cập nhật.
  * Chưa làm so với canvas (cần API riêng): Nhập / Xuất Excel, In nhãn hàng loạt, Hủy đơn hàng
@@ -776,6 +777,9 @@ export function OrderListScreen() {
                     rows={data.items.filter((r) => ids.includes(r.id))}
                     onDone={() => setSelected({})}
                   />
+                </Can>
+                <Can I="pack" a="Shipment">
+                  <BulkReprintWaybillDialog rows={data.items.filter((r) => ids.includes(r.id))} />
                 </Can>
                 <Can I="cancel" a="SalesOrder">
                   <BulkCancelDialog

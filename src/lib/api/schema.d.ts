@@ -527,6 +527,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/shipments/label-data": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Dữ liệu tem 100×75 của nhiều phiếu một lượt — nút "In lại vận đơn" trên danh sách đơn. Trả
+         *     theo thứ tự `shipmentIds`; phiếu không tồn tại bị bỏ qua. Chỉ đọc (POST vì danh sách id dài).
+         */
+        post: operations["ShippingController_labelDataMany"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/shipments/{id}/pack": {
         parameters: {
             query?: never;
@@ -5394,6 +5414,9 @@ export interface components {
             allowInspection: boolean | null;
             callShopOnFailure: boolean | null;
         };
+        ShipmentLabelDataBulkDto: {
+            shipmentIds: string[];
+        };
         PackDto: {
             /**
              * @description Cân nặng kiện hàng, `Decimal(12,4)` dạng CHUỖI — cấm `number` cho số đo
@@ -8215,6 +8238,8 @@ export interface components {
             moreCount: number;
         };
         SalesOrderListShipmentDto: {
+            /** @description `wms.Shipment.id` — in lại tem vận đơn từ danh sách (POST /shipments/label-data). */
+            id: string;
             /** @enum {string} */
             status: "CANCELLED" | "PENDING" | "IN_TRANSIT" | "OUT_FOR_DELIVERY" | "DELIVERED" | "FAILED" | "RETURNED" | "CARRIER_CANCELLED" | "PICKED_UP";
             carrierCode: string | null;
@@ -11823,6 +11848,29 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ShipmentLabelDataDto"];
+                };
+            };
+        };
+    };
+    ShippingController_labelDataMany: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ShipmentLabelDataBulkDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ShipmentLabelDataDto"][];
                 };
             };
         };

@@ -318,3 +318,30 @@ export function WaybillLabelPrintSheet({
     </PrintSheet>
   );
 }
+
+/** Tờ in nhiều nhãn vận đơn 100×75 (in lại hàng loạt) — mỗi nhãn một trang. */
+export function WaybillLabelBatchPrintSheet({
+  labels,
+  orientation,
+  printedAt,
+  printer,
+}: {
+  labels: ShipmentLabelData[];
+  orientation: WaybillOrientation;
+  printedAt: Date;
+  printer: PrintController;
+}) {
+  return (
+    <PrintSheet
+      open={printer.open}
+      onDone={printer.done}
+      size={orientation === 'landscape' ? 'WAYBILL_100x75' : 'WAYBILL_75x100'}
+    >
+      {labels.map((data) => (
+        <div key={data.shipmentId} data-print-page>
+          <WaybillLabel data={data} orientation={orientation} printedAt={printedAt} />
+        </div>
+      ))}
+    </PrintSheet>
+  );
+}

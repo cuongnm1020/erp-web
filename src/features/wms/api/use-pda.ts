@@ -124,6 +124,17 @@ export function useShipmentLabelData(shipmentId: string | null) {
 }
 
 /**
+ * POST /shipments/label-data — dữ liệu tem 100×75 của nhiều phiếu (in lại vận đơn hàng loạt từ
+ * danh sách đơn, ≤ 200). Chỉ đọc; gọi lúc bấm in nên là mutation, không cache.
+ */
+export function useShipmentLabelDataMany() {
+  return useMutation({
+    mutationFn: (shipmentIds: string[]) =>
+      unwrap(api.POST('/shipments/label-data', { body: { shipmentIds } })),
+  });
+}
+
+/**
  * GET /pda/packed/:taskId — đơn đã đóng gói: dòng đã đóng + phiếu giao, để xem lại và in lại
  * nhãn vận đơn (chưa kịp in, máy in lỗi, hãng chưa cấp lúc đóng). Quyền shipment.pack.
  */
