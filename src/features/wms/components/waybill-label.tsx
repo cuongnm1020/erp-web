@@ -58,8 +58,8 @@ const ICON = { width: '1em', height: '1em', flexShrink: 0 } as const;
  * nhãn in từ Pancake (2026-10-14): viền đứt; trên = hãng + mã hãng + QR + giờ in | mã vạch + mã
  * vận đơn + số kiện; dưới = ô người nhận (tên, SĐT, địa chỉ chữ lớn, ghi chú in) | ô COD + bảng
  * Sản phẩm / SL. Hãng chưa cấp vận đơn → in mã phiếu giao thay thế để kho vẫn dán được kiện.
- * Dọc (2026-10-15): thêm hàng người gửi trên ô người nhận, SĐT người nhận giữ 4 số cuối, ghi chú
- * xuống hàng cuối tem (đơn không ghi chú → câu mặc định). Ngang giữ nguyên.
+ * 2026-10-15 (ngang + dọc): thêm hàng người gửi trên ô người nhận, SĐT người nhận giữ 4 số cuối,
+ * ghi chú xuống hàng cuối tem (đơn không ghi chú → câu mặc định).
  * Kích thước thiết kế tính bằng mm/pt qua `u()` / `f()` (dựng ×2 — xem `label-scale.ts`).
  */
 export function WaybillLabel({
@@ -148,7 +148,7 @@ export function WaybillLabel({
             </span>
           ) : null}
         </div>
-        <div style={{ width: u(land ? 16 : 15), height: u(land ? 16 : 15) }}>
+        <div style={{ width: u(land ? 12 : 15), height: u(land ? 12 : 15) }}>
           <Barcode
             value={code}
             symbology="qrcode"
@@ -164,7 +164,7 @@ export function WaybillLabel({
           {printed}
         </span>
       </div>
-      {barcode(land ? 15 : 13, land ? 14 : 11)}
+      {barcode(land ? 11 : 13, land ? 12 : 11)}
     </div>
   );
 
@@ -184,9 +184,7 @@ export function WaybillLabel({
             style={{ fontSize: f(11), gap: u(0.8) }}
           >
             <Phone style={ICON} aria-hidden />
-            <span>
-              {land ? formatPhone(data.recipient.phone) : hidePhone(data.recipient.phone, 4)}
-            </span>
+            <span>{hidePhone(data.recipient.phone, 4)}</span>
           </div>
           <div className="font-bold leading-tight" style={{ fontSize: f(11), ...clamp(3) }}>
             <MapPin style={{ ...ICON, display: 'inline', verticalAlign: '-0.1em' }} aria-hidden />{' '}
@@ -196,39 +194,29 @@ export function WaybillLabel({
       ) : (
         <div style={{ fontSize: f(10) }}>Đơn chưa có địa chỉ giao</div>
       )}
-      {land && note ? (
-        <div
-          className="font-bold leading-tight"
-          style={{
-            fontSize: f(9.5),
-            borderTop: BORDER,
-            paddingTop: u(0.6),
-            marginTop: 'auto',
-            ...clamp(3),
-          }}
-        >
-          <Store style={{ ...ICON, display: 'inline', verticalAlign: '-0.1em' }} aria-hidden />{' '}
-          {note}
-        </div>
-      ) : null}
     </div>
   );
 
-  // Dọc: người gửi giống tem GHTK (tên POS / SĐT đầy đủ · địa chỉ che số nhà), chữ nhỏ.
+  // Người gửi giống tem GHTK (tên POS / SĐT đầy đủ · địa chỉ che số nhà), chữ nhỏ, tối đa 2 dòng.
   const sender = data.sender ? (
     <div
-      className="min-w-0"
-      style={{ border: BORDER, padding: `${u(0.8)} ${u(1.2)}`, fontSize: f(7.5), ...clamp(2) }}
+      className="min-w-0 shrink-0"
+      style={{
+        border: BORDER,
+        padding: `${u(0.8)} ${u(1.2)}`,
+        fontSize: f(7.5),
+        ...clamp(2),
+      }}
     >
       Người gửi: <b>{data.sender.name}</b> / {formatPhone(data.sender.phone)} · Đ/c:{' '}
       {maskedAddress(data.sender.street, data.sender.locality)}
     </div>
   ) : null;
 
-  // Dọc: ghi chú ở hàng cuối tem.
+  // Ghi chú ở hàng cuối tem.
   const bottomNote = (
     <div
-      className="font-bold leading-tight"
+      className="shrink-0 font-bold leading-tight"
       style={{ border: BORDER, padding: `${u(0.8)} ${u(1.2)}`, fontSize: f(7.5), ...clamp(2) }}
     >
       <Store style={{ ...ICON, display: 'inline', verticalAlign: '-0.1em' }} aria-hidden />{' '}
@@ -278,7 +266,7 @@ export function WaybillLabel({
                 className="font-bold leading-tight"
                 style={{ border: BORDER, padding: `${u(0.4)} ${u(0.6)}` }}
               >
-                <span style={clamp(land ? 3 : shown.length > 1 ? 1 : 2)}>{it.name}</span>
+                <span style={clamp(shown.length > 1 ? 1 : land ? 3 : 2)}>{it.name}</span>
               </td>
               <td
                 className="text-center font-bold tabular-nums"
@@ -305,6 +293,7 @@ export function WaybillLabel({
           style={{ border: `${u(0.3)} dashed currentColor`, padding: u(1.5), gap: u(1.5) }}
         >
           {top}
+          {sender}
           {land ? (
             <div
               className="grid min-h-0 flex-1 grid-cols-2 overflow-hidden"
@@ -316,17 +305,13 @@ export function WaybillLabel({
           ) : (
             <div
               className="grid min-h-0 flex-1 overflow-hidden"
-              style={{
-                gridTemplateRows: sender ? 'auto auto 1fr auto' : 'auto 1fr auto',
-                gap: u(1.5),
-              }}
+              style={{ gridTemplateRows: 'auto 1fr', gap: u(1.5) }}
             >
-              {sender}
               {recipient}
               {goods}
-              {bottomNote}
             </div>
           )}
+          {bottomNote}
         </div>
       </div>
     </div>

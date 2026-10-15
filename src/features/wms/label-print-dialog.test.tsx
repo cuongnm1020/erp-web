@@ -102,7 +102,10 @@ describe('Popup nhãn — tem ERP 100×75 mm (2026-10-13)', () => {
     expect(label.getByText('Viettel Post')).toBeTruthy();
     expect(label.getByText('PKE1545655255')).toBeTruthy();
     expect(label.getByText('Nguyễn Công Quân')).toBeTruthy();
-    expect(label.getByText('0901 234 567', { exact: false })).toBeTruthy();
+    // 2026-10-15: SĐT người nhận giữ 4 số cuối, thêm hàng người gửi
+    expect(label.getByText('******4567')).toBeTruthy();
+    expect(label.queryByText(/0901/)).toBeNull();
+    expect(label.getByText(/\/ 0339 213 208 · Đ\/c: \*\*\*, Xã Thạch Thất, Hà Nội/)).toBeTruthy();
     expect(label.getByText(/Thiện Mỹ, Huyện Trà Ôn, Vĩnh Long/)).toBeTruthy();
     // Bố cục theo nhãn Pancake (2026-10-14): mã hãng + số kiện, COD, bảng Sản phẩm / SL
     expect(label.getByText('VTP')).toBeTruthy();
