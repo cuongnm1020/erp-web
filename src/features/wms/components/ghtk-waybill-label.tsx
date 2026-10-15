@@ -37,11 +37,11 @@ function Caption({ children }: { children: ReactNode }) {
 }
 
 /**
- * Tem vận đơn ERP tự in cho đơn GHTK, khổ 100×75 ngang — theo tem GHTK, chỉnh 2026-10-14:
- * đầu tem GHTK + mã phân loại (đoạn đầu nền đen) | mã đơn KH | tuyến + giờ in; mã vạch đoạn số
- * cuối của mã GHTK | QR mã đầy đủ; người gửi (kho, SĐT đầy đủ) / người nhận (SĐT che hết, che số
- * nhà) | kho lấy, khối lượng, thu hộ; rồi hai hàng hết bề ngang: danh sách sản phẩm / SL, ghi chú
- * (mỗi ý một dòng). Không in kho giao, biểu tượng hàng (API GHTK không có).
+ * Tem vận đơn ERP tự in cho đơn GHTK, khổ 100×75 ngang — theo tem GHTK, chỉnh 2026-10-15:
+ * đầu tem GHTK | mã đơn KH | tuyến + giờ in; mã vạch đoạn số cuối của mã GHTK | QR mã đầy đủ +
+ * mã phân loại (đoạn đầu nền đen) bên dưới; người gửi (SĐT đầy đủ) / người nhận (SĐT giữ 4 số
+ * cuối, che số nhà) | kho lấy, thu hộ; rồi hai hàng hết bề ngang: danh sách sản phẩm / SL, ghi
+ * chú (mỗi ý một dòng). Không in khối lượng, kho giao, biểu tượng hàng.
  */
 export function GhtkWaybillLabel({
   data,
@@ -73,27 +73,16 @@ export function GhtkWaybillLabel({
         className="flex flex-col overflow-hidden"
         style={{ ...labelInner(W, H), padding: `${u(1.8)} ${u(2.5)} ${u(1.5)}` }}
       >
-        {/* Đầu tem: GHTK + mã phân loại | mã đơn KH | tuyến + giờ in */}
+        {/* Đầu tem: GHTK | mã đơn KH | tuyến + giờ in */}
         <div
           className="flex items-center justify-between"
           style={{ borderBottom: LINE, paddingBottom: u(0.6), gap: u(2) }}
         >
-          <span className="flex items-center whitespace-nowrap" style={{ gap: u(2) }}>
-            <span
-              className="font-extrabold leading-none tracking-tight"
-              style={{ fontSize: f(12) }}
-            >
-              GHTK
-            </span>
-            <span className="font-extrabold leading-none" style={{ fontSize: f(12) }}>
-              <span
-                className="bg-foreground text-background"
-                style={{ padding: `${u(0.3)} ${u(0.6)}` }}
-              >
-                {ghtk.sortHead}
-              </span>
-              {ghtk.sortTail}
-            </span>
+          <span
+            className="whitespace-nowrap font-extrabold leading-none tracking-tight"
+            style={{ fontSize: f(12) }}
+          >
+            GHTK
           </span>
           {/* Mã đơn KH (= mã phiếu giao gửi GHTK) */}
           <span
@@ -146,11 +135,16 @@ export function GhtkWaybillLabel({
               {ghtk.shortCode}
             </span>
           </div>
+          {/* QR, dưới là mã phân loại (đoạn đầu nền đen) */}
           <div
-            className="flex items-center justify-center"
-            style={{ borderBottom: LINE, padding: `${u(0.6)} 0 ${u(0.6)} ${u(1.5)}` }}
+            className="flex flex-col items-center justify-center"
+            style={{
+              borderBottom: LINE,
+              padding: `${u(0.6)} 0 ${u(0.6)} ${u(1.5)}`,
+              gap: u(0.8),
+            }}
           >
-            <div style={{ width: u(13), height: u(13) }}>
+            <div style={{ width: u(12), height: u(12) }}>
               <Barcode
                 value={code}
                 symbology="qrcode"
@@ -159,6 +153,18 @@ export function GhtkWaybillLabel({
                 label={`QR ${code}`}
               />
             </div>
+            <span
+              className="whitespace-nowrap font-extrabold leading-none"
+              style={{ fontSize: f(ghtk.sortCode.length > 9 ? 11 : 12) }}
+            >
+              <span
+                className="bg-foreground text-background"
+                style={{ padding: `${u(0.3)} ${u(0.6)}` }}
+              >
+                {ghtk.sortHead}
+              </span>
+              {ghtk.sortTail}
+            </span>
           </div>
 
           <div
@@ -188,7 +194,7 @@ export function GhtkWaybillLabel({
                   <div className="truncate" style={{ lineHeight: 1.3 }}>
                     <Caption>Người nhận: </Caption>
                     <b>
-                      {data.recipient.name} / {hidePhone(data.recipient.phone)}
+                      {data.recipient.name} / {hidePhone(data.recipient.phone, 4)}
                     </b>
                   </div>
                   <div className="font-bold" style={clamp(2)}>
@@ -208,12 +214,6 @@ export function GhtkWaybillLabel({
             <div style={clamp(2)}>
               <Caption>Kho lấy: </Caption>
               <b style={{ fontSize: f(8) }}>{data.sender?.warehouseName ?? '—'}</b>
-            </div>
-            <div className="truncate" style={{ lineHeight: 1.3 }}>
-              <Caption>Khối lượng: </Caption>
-              <b style={{ fontSize: f(8.5) }}>
-                {data.weightKg ? `${formatQuantity(data.weightKg)} KG` : '—'}
-              </b>
             </div>
             <div className="whitespace-nowrap" style={{ lineHeight: 1.3 }}>
               <Caption>Thu hộ </Caption>

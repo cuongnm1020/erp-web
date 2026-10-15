@@ -166,7 +166,9 @@ describe('Popup nhãn — tem ERP 100×75 mm (2026-10-13)', () => {
     expect(label.queryByText(/SO2610-00042/)).toBeNull();
     expect(label.getByText('S23119447')).toBeTruthy();
     expect(label.getByText(/Mạnh \/ 0339 213 208/)).toBeTruthy();
-    expect(label.getByText(/Nguyễn Công Quân \/ \*{11}/)).toBeTruthy();
+    // 2026-10-15: SĐT người nhận giữ 4 số cuối, bỏ khối lượng
+    expect(label.getByText(/Nguyễn Công Quân \/ \*{6}4567/)).toBeTruthy();
+    expect(label.queryByText(/Khối lượng/)).toBeNull();
     expect(label.getByText('Đ/c: ***, Xã Thiện Mỹ, Huyện Trà Ôn, Vĩnh Long')).toBeTruthy();
     expect(label.getByText('DN2610-00001')).toBeTruthy();
     expect(label.getByText(/Không cho xem hàng/)).toBeTruthy();

@@ -36,7 +36,7 @@ export function parseGhtkTracking(code: string | null | undefined): GhtkTracking
 
 /**
  * Che số điện thoại người nhận. Mặc định che hết — tem GHTK in `***********`; `keep` giữ lại
- * vài số cuối (tem dọc 2026-10-15 in `******4567`). Số quá ngắn thì che hết.
+ * vài số cuối (tem GHTK ngang + dọc 2026-10-15 in `******4567`). Số quá ngắn thì che hết.
  */
 export function hidePhone(phone: string | null | undefined, keep = 0): string {
   const d = (phone ?? '').replace(/\D/g, '');
