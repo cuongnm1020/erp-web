@@ -49,7 +49,7 @@ function Row({ label, children, pt = 8 }: { label: string; children: ReactNode; 
  * đầu tem GHTK · EXPRESS · tuyến (NỘI TỈNH / NỘI MIỀN / LIÊN MIỀN, ERP tự suy từ tỉnh); người
  * gửi hết bề ngang; người nhận hết bề ngang (SĐT giữ 4 số cuối); mã vạch đoạn số cuối; mã đơn
  * KH · kho lấy · thu hộ | QR mã đầy đủ + mã phân loại (đoạn đầu nền đen); sản phẩm / SL; ghi chú
- * ở đáy. Lề trái rộng hơn lề phải vì máy in ăn mất ~2 mm mép trái.
+ * ở đáy. Lề trái 2 mm (user chốt 2026-10-15).
  */
 export function GhtkWaybillLabelPortrait({
   data,
@@ -80,7 +80,7 @@ export function GhtkWaybillLabelPortrait({
     >
       <div
         className="flex flex-col overflow-hidden"
-        style={{ ...labelInner(W, H), padding: `${u(1.5)} ${u(1.8)} ${u(1.5)} ${u(4)}` }}
+        style={{ ...labelInner(W, H), padding: `${u(1.5)} ${u(1.8)} ${u(1.5)} ${u(2)}` }}
       >
         {/* Đầu tem: GHTK | EXPRESS + ngày in | tuyến */}
         <div
