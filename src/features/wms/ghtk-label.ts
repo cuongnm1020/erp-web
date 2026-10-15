@@ -34,9 +34,13 @@ export function parseGhtkTracking(code: string | null | undefined): GhtkTracking
   };
 }
 
-/** Che toàn bộ số điện thoại người nhận — tem GHTK in `***********`. */
-export function hidePhone(phone: string | null | undefined): string {
+/**
+ * Che số điện thoại người nhận. Mặc định che hết — tem GHTK in `***********`; `keep` giữ lại
+ * vài số cuối (tem dọc 2026-10-15 in `******4567`). Số quá ngắn thì che hết.
+ */
+export function hidePhone(phone: string | null | undefined, keep = 0): string {
   const d = (phone ?? '').replace(/\D/g, '');
+  if (keep > 0 && d.length > keep) return '*'.repeat(d.length - keep) + d.slice(-keep);
   return '*'.repeat(Math.max(d.length, 10) + 1);
 }
 
