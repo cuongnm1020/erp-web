@@ -164,6 +164,10 @@ export function routeLabel(
   return a === b ? 'NỘI MIỀN' : 'LIÊN MIỀN';
 }
 
+/** Đơn không có ghi chú nào thì tem dọc (GHTK + tem chung) in câu này (2026-10-15). */
+export const DEFAULT_PRINT_NOTE =
+  'Quý Khách Vui Lòng Quay video khi bóc hàng để được hỗ trợ đơn hàng';
+
 /**
  * Ghi chú in: ghi chú của đơn + tuỳ chọn xem hàng / gọi shop đã gửi hãng — mỗi ý một dòng
  * (tem in với `white-space: pre-line`).

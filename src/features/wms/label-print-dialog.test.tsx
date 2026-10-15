@@ -136,8 +136,35 @@ describe('Popup nhãn — tem ERP 100×75 mm (2026-10-13)', () => {
     const root = lastPrinted();
     expect(root.getAttribute('data-print-size')).toBe('WAYBILL_75x100');
     expect(root.querySelector('style')!.textContent).toContain('size: 75mm 100mm');
-    // Dọc in tối đa 3 dòng hàng
-    expect(within(root).getByText('+2 sản phẩm khác')).toBeTruthy();
+    // Dọc in tối đa 2 dòng hàng (thêm hàng người gửi + ghi chú cuối tem 2026-10-15)
+    expect(within(root).getByText('+3 sản phẩm khác')).toBeTruthy();
+  });
+
+  it('tem chung dọc (VTP): hàng người gửi, SĐT người nhận 4 số cuối, ghi chú cuối tem / mặc định', async () => {
+    localStorage.setItem('erp.pack.labelOrientation', 'portrait');
+    renderApp(<LabelPrintDialog open waybill={WAYBILL('VTP')} orderId={null} onClose={() => {}} />);
+    await waitFor(() => expect(print).toHaveBeenCalledTimes(1));
+    const label = within(lastPrinted());
+    expect(label.getByText('Mạnh')).toBeTruthy();
+    expect(label.getByText(/\/ 0339 213 208 · Đ\/c: \*\*\*, Xã Thạch Thất, Hà Nội/)).toBeTruthy();
+    expect(label.getByText('******4567')).toBeTruthy();
+    expect(label.queryByText(/0901/)).toBeNull();
+    expect(label.getByText('Quý khách vui lòng quay video khi bóc hàng')).toBeTruthy();
+  });
+
+  it('tem chung dọc, đơn không có ghi chú → in ghi chú mặc định', async () => {
+    localStorage.setItem('erp.pack.labelOrientation', 'portrait');
+    server.use(
+      http.get('/api/shipments/:id/label-data', () =>
+        HttpResponse.json({ ...LABEL_DATA, note: null }),
+      ),
+    );
+    renderApp(<LabelPrintDialog open waybill={WAYBILL('VTP')} orderId={null} onClose={() => {}} />);
+    await waitFor(() => expect(print).toHaveBeenCalledTimes(1));
+    const label = within(lastPrinted());
+    expect(
+      label.getByText('Quý Khách Vui Lòng Quay video khi bóc hàng để được hỗ trợ đơn hàng'),
+    ).toBeTruthy();
   });
 
   it('đơn GHTK, tem ngang → bố cục tem GHTK: mã vạch đoạn số cuối, mã phân loại, tuyến, SĐT người gửi đầy đủ', async () => {

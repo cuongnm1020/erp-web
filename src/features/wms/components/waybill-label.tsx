@@ -8,7 +8,7 @@ import { MapPin, Phone, Store, User } from 'lucide-react';
 import { formatDate, formatMoney, formatPhone, formatQuantity, formatTime } from '@/lib/format';
 import { LABEL_SIZES, type PrintController } from '@/lib/print';
 import type { ShipmentLabelData } from '../api/use-pda';
-import { parseGhtkTracking } from '../ghtk-label';
+import { DEFAULT_PRINT_NOTE, hidePhone, maskedAddress, parseGhtkTracking } from '../ghtk-label';
 import { f, labelInner, labelOuter, u } from '../label-scale';
 import { GhtkWaybillLabel } from './ghtk-waybill-label';
 import { GhtkWaybillLabelPortrait } from './ghtk-waybill-label-portrait';
@@ -16,7 +16,7 @@ import { GhtkWaybillLabelPortrait } from './ghtk-waybill-label-portrait';
 export type WaybillOrientation = 'landscape' | 'portrait';
 
 /** Số dòng hàng in ra; còn lại gom thành "+N sản phẩm khác" để chữ không bị thu nhỏ. */
-const MAX_ITEMS = { landscape: 2, portrait: 3 } as const;
+const MAX_ITEMS = { landscape: 2, portrait: 2 } as const;
 
 /** Khổ tem (mm) theo hướng. */
 const SIZE = {
@@ -58,6 +58,8 @@ const ICON = { width: '1em', height: '1em', flexShrink: 0 } as const;
  * nhãn in từ Pancake (2026-10-14): viền đứt; trên = hãng + mã hãng + QR + giờ in | mã vạch + mã
  * vận đơn + số kiện; dưới = ô người nhận (tên, SĐT, địa chỉ chữ lớn, ghi chú in) | ô COD + bảng
  * Sản phẩm / SL. Hãng chưa cấp vận đơn → in mã phiếu giao thay thế để kho vẫn dán được kiện.
+ * Dọc (2026-10-15): thêm hàng người gửi trên ô người nhận, SĐT người nhận giữ 4 số cuối, ghi chú
+ * xuống hàng cuối tem (đơn không ghi chú → câu mặc định). Ngang giữ nguyên.
  * Kích thước thiết kế tính bằng mm/pt qua `u()` / `f()` (dựng ×2 — xem `label-scale.ts`).
  */
 export function WaybillLabel({
@@ -84,6 +86,7 @@ export function WaybillLabel({
   const more = data.items.length - shown.length;
   const carrier = data.carrierName ?? data.carrierCode ?? 'Vận đơn';
   const printed = `${formatTime(printedAt)} ${formatDate(printedAt)}`;
+  const note = data.note?.trim() || null;
 
   const barcode = (heightMm: number, textPt: number) => (
     <div className="flex min-w-0 flex-1 flex-col items-center justify-center">
@@ -181,7 +184,9 @@ export function WaybillLabel({
             style={{ fontSize: f(11), gap: u(0.8) }}
           >
             <Phone style={ICON} aria-hidden />
-            <span>{formatPhone(data.recipient.phone)}</span>
+            <span>
+              {land ? formatPhone(data.recipient.phone) : hidePhone(data.recipient.phone, 4)}
+            </span>
           </div>
           <div className="font-bold leading-tight" style={{ fontSize: f(11), ...clamp(3) }}>
             <MapPin style={{ ...ICON, display: 'inline', verticalAlign: '-0.1em' }} aria-hidden />{' '}
@@ -191,7 +196,7 @@ export function WaybillLabel({
       ) : (
         <div style={{ fontSize: f(10) }}>Đơn chưa có địa chỉ giao</div>
       )}
-      {data.note ? (
+      {land && note ? (
         <div
           className="font-bold leading-tight"
           style={{
@@ -203,9 +208,31 @@ export function WaybillLabel({
           }}
         >
           <Store style={{ ...ICON, display: 'inline', verticalAlign: '-0.1em' }} aria-hidden />{' '}
-          {data.note}
+          {note}
         </div>
       ) : null}
+    </div>
+  );
+
+  // Dọc: người gửi giống tem GHTK (tên POS / SĐT đầy đủ · địa chỉ che số nhà), chữ nhỏ.
+  const sender = data.sender ? (
+    <div
+      className="min-w-0"
+      style={{ border: BORDER, padding: `${u(0.8)} ${u(1.2)}`, fontSize: f(7.5), ...clamp(2) }}
+    >
+      Người gửi: <b>{data.sender.name}</b> / {formatPhone(data.sender.phone)} · Đ/c:{' '}
+      {maskedAddress(data.sender.street, data.sender.locality)}
+    </div>
+  ) : null;
+
+  // Dọc: ghi chú ở hàng cuối tem.
+  const bottomNote = (
+    <div
+      className="font-bold leading-tight"
+      style={{ border: BORDER, padding: `${u(0.8)} ${u(1.2)}`, fontSize: f(7.5), ...clamp(2) }}
+    >
+      <Store style={{ ...ICON, display: 'inline', verticalAlign: '-0.1em' }} aria-hidden />{' '}
+      {note ?? DEFAULT_PRINT_NOTE}
     </div>
   );
 
@@ -251,7 +278,7 @@ export function WaybillLabel({
                 className="font-bold leading-tight"
                 style={{ border: BORDER, padding: `${u(0.4)} ${u(0.6)}` }}
               >
-                <span style={clamp(land ? 3 : 2)}>{it.name}</span>
+                <span style={clamp(land ? 3 : shown.length > 1 ? 1 : 2)}>{it.name}</span>
               </td>
               <td
                 className="text-center font-bold tabular-nums"
@@ -278,16 +305,28 @@ export function WaybillLabel({
           style={{ border: `${u(0.3)} dashed currentColor`, padding: u(1.5), gap: u(1.5) }}
         >
           {top}
-          <div
-            className={cn(
-              'grid min-h-0 flex-1 overflow-hidden',
-              land ? 'grid-cols-2' : 'grid-rows-[auto_1fr]',
-            )}
-            style={{ gap: u(1.5) }}
-          >
-            {recipient}
-            {goods}
-          </div>
+          {land ? (
+            <div
+              className="grid min-h-0 flex-1 grid-cols-2 overflow-hidden"
+              style={{ gap: u(1.5) }}
+            >
+              {recipient}
+              {goods}
+            </div>
+          ) : (
+            <div
+              className="grid min-h-0 flex-1 overflow-hidden"
+              style={{
+                gridTemplateRows: sender ? 'auto auto 1fr auto' : 'auto 1fr auto',
+                gap: u(1.5),
+              }}
+            >
+              {sender}
+              {recipient}
+              {goods}
+              {bottomNote}
+            </div>
+          )}
         </div>
       </div>
     </div>

@@ -7,7 +7,14 @@ import { cn } from '@/lib/cn';
 import { formatDate, formatMoney, formatPhone, formatQuantity, formatTime } from '@/lib/format';
 import { LABEL_SIZES } from '@/lib/print';
 import type { ShipmentLabelData } from '../api/use-pda';
-import { type GhtkTracking, hidePhone, maskedAddress, printNote, routeLabel } from '../ghtk-label';
+import {
+  DEFAULT_PRINT_NOTE,
+  type GhtkTracking,
+  hidePhone,
+  maskedAddress,
+  printNote,
+  routeLabel,
+} from '../ghtk-label';
 // Dựng ×2 rồi thu về — chống cài đặt "cỡ chữ tối thiểu" của Chrome (xem label-scale.ts).
 import { f, labelInner, labelOuter, u } from '../label-scale';
 
@@ -22,10 +29,6 @@ const LINE = `${u(0.3)} solid currentColor`;
  */
 const MAX_ITEMS = 5;
 const FULL_NAME_ITEMS = 2;
-
-/** Đơn không có ghi chú nào thì in câu này (2026-10-15). */
-export const DEFAULT_PRINT_NOTE =
-  'Quý Khách Vui Lòng Quay video khi bóc hàng để được hỗ trợ đơn hàng';
 
 const clamp = (lines: number): CSSProperties => ({
   lineHeight: 1.3,
