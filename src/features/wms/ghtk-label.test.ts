@@ -27,6 +27,12 @@ describe('tem kiểu GHTK — tiện ích', () => {
     expect(hidePhone('0383352515')).toBe('***********');
   });
 
+  it('SĐT người nhận giữ 4 số cuối khi yêu cầu', () => {
+    expect(hidePhone('0383 352 515', 4)).toBe('******2515');
+    expect(hidePhone('123', 4)).toBe('***********');
+    expect(hidePhone(null, 4)).toBe('***********');
+  });
+
   it('địa chỉ che số nhà / đường, giữ thôn → tỉnh', () => {
     expect(maskedAddress('Số nhà 1564', 'Ấp Vĩnh Nghĩa, Xã Vĩnh Hậu, An Giang')).toBe(
       '***, Ấp Vĩnh Nghĩa, Xã Vĩnh Hậu, An Giang',

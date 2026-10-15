@@ -34,9 +34,13 @@ export function parseGhtkTracking(code: string | null | undefined): GhtkTracking
   };
 }
 
-/** Che toàn bộ số điện thoại người nhận — tem GHTK in `***********`. */
-export function hidePhone(phone: string | null | undefined): string {
+/**
+ * Che số điện thoại người nhận. Mặc định che hết — tem GHTK in `***********`; `keep` giữ lại
+ * vài số cuối (tem GHTK ngang + dọc 2026-10-15 in `******4567`). Số quá ngắn thì che hết.
+ */
+export function hidePhone(phone: string | null | undefined, keep = 0): string {
   const d = (phone ?? '').replace(/\D/g, '');
+  if (keep > 0 && d.length > keep) return '*'.repeat(d.length - keep) + d.slice(-keep);
   return '*'.repeat(Math.max(d.length, 10) + 1);
 }
 
@@ -159,6 +163,10 @@ export function routeLabel(
   if (!a || !b) return null;
   return a === b ? 'NỘI MIỀN' : 'LIÊN MIỀN';
 }
+
+/** Đơn không có ghi chú nào thì tem dọc (GHTK + tem chung) in câu này (2026-10-15). */
+export const DEFAULT_PRINT_NOTE =
+  'Quý Khách Vui Lòng Quay video khi bóc hàng để được hỗ trợ đơn hàng';
 
 /**
  * Ghi chú in: ghi chú của đơn + tuỳ chọn xem hàng / gọi shop đã gửi hãng — mỗi ý một dòng
