@@ -248,6 +248,8 @@ describe('Popup nhãn — tem ERP 100×75 mm (2026-10-13)', () => {
     expect(label.getByText('1890932219')).toBeTruthy();
     expect(label.getByText('MB7')).toBeTruthy();
     expect(label.getByText('GHTK')).toBeTruthy();
+    // Tuyến cạnh COD: Hà Nội → Hải Phòng cùng miền Bắc
+    expect(label.getByText('NỘI MIỀN')).toBeTruthy();
     expect(label.getByText('Người gửi:')).toBeTruthy();
     expect(label.getByText('0339213208 / Xã Thạch Thất, Hà Nội')).toBeTruthy();
     expect(label.getByText('******4567')).toBeTruthy();

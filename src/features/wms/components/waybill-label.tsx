@@ -8,7 +8,13 @@ import { MapPin, Phone, Store, User } from 'lucide-react';
 import { formatDate, formatMoney, formatPhone, formatQuantity, formatTime } from '@/lib/format';
 import { LABEL_SIZES, type PrintController } from '@/lib/print';
 import type { ShipmentLabelData } from '../api/use-pda';
-import { DEFAULT_PRINT_NOTE, hidePhone, maskedAddress, parseGhtkTracking } from '../ghtk-label';
+import {
+  DEFAULT_PRINT_NOTE,
+  hidePhone,
+  maskedAddress,
+  parseGhtkTracking,
+  routeLabel,
+} from '../ghtk-label';
 import { f, labelInner, labelOuter, u } from '../label-scale';
 import { GhtkWaybillLabel } from './ghtk-waybill-label';
 
@@ -95,6 +101,8 @@ export function WaybillLabel({
   /** Giá trị mã vạch: GHTK quét đoạn số cuối, hãng khác quét cả mã. */
   const barValue = ghtk?.shortCode ?? code;
   const long = barValue.length > LONG_CODE;
+  // Tuyến GHTK (NỘI TỈNH / NỘI MIỀN / LIÊN MIỀN) in cạnh COD — ERP tự suy từ tỉnh.
+  const route = ghtk ? routeLabel(data.sender?.province, data.recipient?.province) : null;
   // Dọc + mã dài: khối mã chiếm thêm chỗ → bớt một dòng hàng.
   const max = MAX_ITEMS[orientation] - (long && !land ? 1 : 0);
   const shown = data.items.slice(0, max);
@@ -283,8 +291,12 @@ export function WaybillLabel({
       className="flex min-h-0 min-w-0 flex-col overflow-hidden"
       style={{ border: BORDER, padding: `${u(1)} ${u(1.2)}`, gap: u(0.6) }}
     >
-      <div className="font-bold tabular-nums leading-none" style={{ fontSize: f(11) }}>
-        COD: {formatMoney(data.codAmount, { unit: 'đ' })}
+      <div
+        className="flex items-baseline justify-between font-bold leading-none"
+        style={{ fontSize: f(11), gap: u(1) }}
+      >
+        <span className="tabular-nums">COD: {formatMoney(data.codAmount, { unit: 'đ' })}</span>
+        {route ? <span className="shrink-0 font-extrabold">{route}</span> : null}
       </div>
       <table
         className="w-full border-collapse"
