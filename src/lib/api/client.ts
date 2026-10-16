@@ -1,4 +1,5 @@
 import createClient, { type Client, type Middleware } from 'openapi-fetch';
+import { warehouseHeaders } from '../warehouse/current-warehouse';
 import type { paths } from './schema';
 import { ApiError, networkError, toApiError } from './errors';
 
@@ -137,6 +138,8 @@ export const api: ApiClient = createApiClient({
   // Tuyệt đối theo origin hiện tại: browser giống '/api'; jsdom/MSW cần URL đầy đủ.
   baseUrl: typeof window === 'undefined' ? '/api' : `${window.location.origin}/api`,
   refresh: typeof window === 'undefined' ? undefined : defaultBrowserRefresh,
+  // Kho đang làm việc (ô chọn kho ở sidebar) — API lọc / chặn theo kho được phép.
+  headers: warehouseHeaders,
 });
 
 /**

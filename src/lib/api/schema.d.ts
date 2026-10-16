@@ -4789,6 +4789,11 @@ export interface components {
         RefreshDto: {
             refreshToken: string;
         };
+        AuthWarehouseDto: {
+            id: string;
+            code: string;
+            name: string;
+        };
         AuthMeDto: {
             userId: string;
             code: string;
@@ -4800,6 +4805,14 @@ export interface components {
             hasGlobalAccess: boolean;
             /** @description Đang là trưởng phòng ít nhất một phòng ban — web hiện Sơ đồ nhân sự dù không có user.read. */
             managesDepartments: boolean;
+            /** @description Kho được phép (id) — null = mọi kho (superadmin / quyền `warehouse.all`). */
+            warehouseIds: string[] | null;
+            /** @description Kho được phép kèm mã + tên, kho mặc định hệ thống trước rồi theo mã — cho ô chọn kho. */
+            warehouses: components["schemas"]["AuthWarehouseDto"][];
+            /** @description Kho mặc định lúc đăng nhập; null = chưa được cấp kho nào. */
+            defaultWarehouseId: string | null;
+            /** @description Kho đang chọn theo header `X-Warehouse-Id` nếu được phép; null = tất cả kho / kho chọn không còn được phép. */
+            selectedWarehouseId: string | null;
             deviceId?: string;
         };
         PermissionDto: {
@@ -4854,8 +4867,10 @@ export interface components {
             fullName: string;
             departmentId: string | null;
             departmentName: string | null;
-            /** @description Kho làm việc (wms.Warehouse.id); null = chưa gán. */
+            /** @description Kho mặc định (wms.Warehouse.id); null = chưa gán. */
             warehouseId: string | null;
+            /** @description Kho được phép làm việc (PLAN-warehouse-context). */
+            warehouseIds: string[];
             roleCodes: string[];
             isActive: boolean;
             isSuperAdmin: boolean;
@@ -4881,9 +4896,14 @@ export interface components {
             departmentId?: string;
             /**
              * Format: uuid
-             * @description Kho làm việc (wms.Warehouse.id) — picker PDA giao đơn cho người đóng gói cùng kho.
+             * @description Kho mặc định lúc đăng nhập (wms.Warehouse.id) — phải thuộc `warehouseIds`.
              */
             warehouseId?: string;
+            /**
+             * @description Kho được phép làm việc (PLAN-warehouse-context). Bỏ trống = chỉ kho mặc định (nếu có).
+             *     Chỉ cấp được kho mà người tạo cũng có quyền.
+             */
+            warehouseIds?: string[];
             roleCodes?: string[];
         };
         UserDepartmentDto: {
@@ -4909,8 +4929,10 @@ export interface components {
             email: string;
             fullName: string;
             department: components["schemas"]["UserDepartmentDto"] | null;
-            /** @description Kho làm việc (wms.Warehouse.id); null = chưa gán. */
+            /** @description Kho mặc định (wms.Warehouse.id); null = chưa gán. */
             warehouseId: string | null;
+            /** @description Kho được phép làm việc (PLAN-warehouse-context). */
+            warehouseIds: string[];
             roles: components["schemas"]["UserRoleItemDto"][];
             /** @description Membership đang hiệu lực (leftAt IS NULL). */
             teams: components["schemas"]["UserTeamDto"][];
@@ -4936,9 +4958,11 @@ export interface components {
             departmentId?: string | null;
             /**
              * Format: uuid
-             * @description Kho làm việc. null = bỏ gán kho.
+             * @description Kho mặc định. null = bỏ (tự lấy kho được phép đầu tiên). Phải thuộc `warehouseIds`.
              */
             warehouseId?: string | null;
+            /** @description Thay TOÀN BỘ danh sách kho được phép. Chỉ thêm / bớt được kho mà người sửa có quyền. */
+            warehouseIds?: string[];
             isActive?: boolean;
             /** @description Admin đặt lại mật khẩu. */
             password?: string;

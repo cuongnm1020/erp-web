@@ -8,6 +8,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip
 import { cn } from '@/lib/cn';
 import { visibleModules, type NavItem, type NavModule } from '@/lib/navigation';
 import { useAbility } from '@/lib/permission';
+import { WarehouseSwitcher } from './warehouse-switcher';
 
 const COLLAPSE_KEY = 'erp.sidebar.collapsed';
 
@@ -95,6 +96,9 @@ export function Sidebar({ brand = 'ERP' }: { brand?: string }) {
             {brand.slice(0, 1)}
           </span>
         ) : null}
+      </div>
+      <div className={cn('border-b p-2', collapsed && 'flex justify-center')}>
+        <WarehouseSwitcher collapsed={collapsed} />
       </div>
       <nav className="flex-1 overflow-y-auto overflow-x-hidden p-2">
         {collapsed ? (

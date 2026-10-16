@@ -9,6 +9,8 @@ const FORWARD_REQUEST_HEADERS = [
   'idempotency-key',
   'x-request-id',
   'if-none-match',
+  // Kho đang làm việc (PLAN-warehouse-context) — API kiểm quyền kho, không tin header mù quáng.
+  'x-warehouse-id',
 ] as const;
 
 /**

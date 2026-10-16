@@ -2,6 +2,7 @@
 
 import { createContext, useContext, type ReactNode } from 'react';
 import { AbilityProvider, type AuthMe } from '@/lib/permission';
+import { WarehouseProvider } from '@/lib/warehouse';
 import { useMe } from '../api/use-me';
 
 interface SessionValue {
@@ -20,7 +21,9 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   const q = useMe();
   return (
     <SessionContext.Provider value={{ me: q.data, isLoading: q.isPending, error: q.error }}>
-      <AbilityProvider me={q.data ?? null}>{children}</AbilityProvider>
+      <AbilityProvider me={q.data ?? null}>
+        <WarehouseProvider me={q.data}>{children}</WarehouseProvider>
+      </AbilityProvider>
     </SessionContext.Provider>
   );
 }

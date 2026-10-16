@@ -11,6 +11,7 @@ import {
   FormLabel,
   FormMessage,
 } from '@/components/data/form';
+import { WarehouseAccessField } from '@/components/data/warehouse-access-field';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import {
@@ -32,13 +33,13 @@ import {
 import { toast } from '@/components/ui/toaster';
 import type { ApiError } from '@/lib/api/errors';
 import { useAbility } from '@/lib/permission';
+import { useWarehouse } from '@/lib/warehouse';
 import { useDepartments } from '../api/use-departments';
 import { useRoles } from '../api/use-roles';
-import { useCreateUser, useWarehouseOptions } from '../api/use-users';
+import { useCreateUser } from '../api/use-users';
 import { createUserSchema, type CreateUserValues } from '../schema';
 
 const NO_DEPT = '__none__';
-const NO_WAREHOUSE = '__none__';
 
 /**
  * I-02 Thêm nhân viên — POST /users. Sau khi tạo, phân quyền chi tiết ở màn chi tiết.
@@ -59,9 +60,12 @@ export function UserCreateDialog({
   const departments = useDepartments(fixedDepartment === undefined);
   const canReadRoles = ability.can('read', 'Role');
   const roles = useRoles(canReadRoles);
-  // GET /warehouses cần stock.read — không có quyền thì ẩn ô Kho làm việc (sửa sau ở chi tiết).
-  const canReadWarehouses = ability.can('read', 'Stock');
-  const warehouses = useWarehouseOptions(open && canReadWarehouses);
+  // Kho cấp được = kho NGƯỜI TẠO được phép (/auth/me); mặc định cấp kho người tạo đang làm việc.
+  const { options: warehouseOptions, selected: workingWarehouse } = useWarehouse();
+  const startWarehouse =
+    workingWarehouse && warehouseOptions.some((o) => o.id === workingWarehouse)
+      ? workingWarehouse
+      : '';
 
   const form = useForm<CreateUserValues>({
     resolver: zodResolver(createUserSchema),
@@ -71,7 +75,8 @@ export function UserCreateDialog({
       email: '',
       password: '',
       departmentId: fixedDepartment?.id ?? '',
-      warehouseId: '',
+      warehouseId: startWarehouse,
+      warehouseIds: startWarehouse ? [startWarehouse] : [],
       roleCodes: [],
     },
   });
@@ -85,6 +90,7 @@ export function UserCreateDialog({
         password: v.password,
         departmentId: v.departmentId || undefined,
         warehouseId: v.warehouseId || undefined,
+        warehouseIds: v.warehouseIds.length ? v.warehouseIds : undefined,
         roleCodes: v.roleCodes.length ? v.roleCodes : undefined,
       },
       {
@@ -102,6 +108,7 @@ export function UserCreateDialog({
               'password',
               'departmentId',
               'warehouseId',
+              'warehouseIds',
               'roleCodes',
             ],
           });
@@ -207,36 +214,26 @@ export function UserCreateDialog({
                 )}
               />
             )}
-            {canReadWarehouses ? (
-              <FormField
-                control={form.control}
-                name="warehouseId"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Kho làm việc</FormLabel>
-                    <Select
-                      value={field.value || NO_WAREHOUSE}
-                      onValueChange={(v) => field.onChange(v === NO_WAREHOUSE ? '' : v)}
-                    >
-                      <FormControl>
-                        <SelectTrigger aria-label="Kho làm việc">
-                          <SelectValue placeholder="— Chưa gán kho —" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        <SelectItem value={NO_WAREHOUSE}>— Chưa gán kho —</SelectItem>
-                        {(warehouses.data ?? []).map((w) => (
-                          <SelectItem key={w.id} value={w.id}>
-                            {w.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            ) : null}
+            <FormField
+              control={form.control}
+              name="warehouseIds"
+              render={({ field }) => (
+                <FormItem>
+                  <WarehouseAccessField
+                    options={warehouseOptions}
+                    value={{
+                      warehouseIds: field.value,
+                      warehouseId: form.watch('warehouseId') ?? '',
+                    }}
+                    onChange={(next) => {
+                      field.onChange(next.warehouseIds);
+                      form.setValue('warehouseId', next.warehouseId);
+                    }}
+                  />
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
             {canReadRoles ? (
               <FormField
                 control={form.control}

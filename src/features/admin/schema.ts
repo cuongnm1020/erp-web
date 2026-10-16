@@ -8,8 +8,10 @@ export const createUserSchema = z.object({
   email: z.string().trim().min(1, 'Nhập email').email('Email không hợp lệ').max(200),
   password: z.string().min(8, 'Tối thiểu 8 ký tự').max(72, 'Tối đa 72 ký tự'),
   departmentId: z.string().optional(),
-  /** Kho làm việc (wms.Warehouse.id) — '' = chưa gán. Picker PDA giao đơn cho người đóng gói cùng kho. */
+  /** Kho mặc định (wms.Warehouse.id) — '' = chưa gán; phải thuộc `warehouseIds` (server kiểm). */
   warehouseId: z.string().optional(),
+  /** Kho được phép làm việc (PLAN-warehouse-context). */
+  warehouseIds: z.array(z.string()),
   roleCodes: z.array(z.string()),
 });
 
