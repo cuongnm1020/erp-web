@@ -215,6 +215,25 @@ export function useBulkCancelOrders() {
   });
 }
 
+export type MoveOrdersWarehouseBody = components['schemas']['MoveOrdersWarehouseDto'];
+export type MoveOrdersWarehouseResult = components['schemas']['MoveOrdersWarehouseResultDto'];
+
+/**
+ * POST /sales-orders/move-warehouse — chuyển đơn sang kho khác (PLAN-warehouse-context K3). Chỉ
+ * đơn chưa ai bắt đầu lấy hàng; đơn lỗi nằm trong `failed`, lô không rollback.
+ */
+export function useMoveOrdersWarehouse() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (body: MoveOrdersWarehouseBody) =>
+      unwrap(api.POST('/sales-orders/move-warehouse', { body })),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: orderKeys.lists() });
+      void qc.invalidateQueries({ queryKey: orderKeys.details() });
+    },
+  });
+}
+
 /** GET /sales-orders/{id} — 404 khi đơn thuộc khách ngoài scope của người đang xem. */
 export function useOrder(id: string) {
   return useQuery({

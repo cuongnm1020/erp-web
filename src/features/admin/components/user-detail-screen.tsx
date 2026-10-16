@@ -2,6 +2,10 @@
 
 import { useEffect, useState } from 'react';
 import { QueryState } from '@/components/data/states';
+import {
+  WarehouseAccessField,
+  type WarehouseAccessValue,
+} from '@/components/data/warehouse-access-field';
 import { StatusBadge } from '@/components/data/status-badge';
 import { PageHeader } from '@/components/layout/page-header';
 import { Button } from '@/components/ui/button';
@@ -15,13 +19,6 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
   Table,
@@ -35,6 +32,7 @@ import { toast } from '@/components/ui/toaster';
 import { messageFor } from '@/lib/error-messages';
 import { formatDate, formatDateTime } from '@/lib/format';
 import { useAbility } from '@/lib/permission';
+import { useWarehouse } from '@/lib/warehouse';
 import { useRoles } from '../api/use-roles';
 import {
   useAssignRoles,
@@ -44,8 +42,6 @@ import {
   type UserDetail,
 } from '../api/use-users';
 import { UserPermissionMatrix } from './user-permission-matrix';
-
-const NO_WAREHOUSE = '__none__';
 
 const TEAM_ROLE: Record<'LEADER' | 'MEMBER', { label: string; tone: 'brand' | 'neutral' }> = {
   LEADER: { label: 'Leader', tone: 'brand' },
@@ -132,25 +128,33 @@ function EditDialog({
   onOpenChange: (o: boolean) => void;
 }) {
   const update = useUpdateUser(user.id);
-  const ability = useAbility();
-  const canReadWarehouses = ability.can('read', 'Stock');
-  const warehouses = useWarehouseOptions(open && canReadWarehouses);
+  // Kho cấp được = kho NGƯỜI SỬA được phép (/auth/me) — server kiểm lại.
+  const { options: warehouseOptions } = useWarehouse();
+  const serverAccess = (): WarehouseAccessValue => ({
+    warehouseIds: user.warehouseIds,
+    warehouseId: user.warehouseId ?? '',
+  });
   const [fullName, setFullName] = useState(user.fullName);
   const [email, setEmail] = useState(user.email);
   const [password, setPassword] = useState('');
-  const [warehouseId, setWarehouseId] = useState(user.warehouseId ?? '');
+  const [access, setAccess] = useState<WarehouseAccessValue>(serverAccess);
   useEffect(() => {
     if (open) {
       setFullName(user.fullName);
       setEmail(user.email);
       setPassword('');
-      setWarehouseId(user.warehouseId ?? '');
+      setAccess(serverAccess());
     }
-  }, [open, user.fullName, user.email, user.warehouseId]);
+    // serverAccess đọc user.warehouseIds / warehouseId — đã nằm trong deps dạng chuỗi
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, user.fullName, user.email, user.warehouseId, user.warehouseIds.join(',')]);
+  const accessChanged =
+    access.warehouseId !== (user.warehouseId ?? '') ||
+    access.warehouseIds.slice().sort().join(',') !== user.warehouseIds.slice().sort().join(',');
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-sm">
+      <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle>Sửa thông tin</DialogTitle>
           <DialogDescription>{user.code}</DialogDescription>
@@ -173,30 +177,7 @@ function EditDialog({
               onChange={(e) => setPassword(e.target.value)}
             />
           </label>
-          {canReadWarehouses ? (
-            <div className="block text-sm">
-              Kho làm việc
-              <Select
-                value={warehouseId || NO_WAREHOUSE}
-                onValueChange={(v) => setWarehouseId(v === NO_WAREHOUSE ? '' : v)}
-              >
-                <SelectTrigger aria-label="Kho làm việc">
-                  <SelectValue placeholder="— Chưa gán kho —" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value={NO_WAREHOUSE}>— Chưa gán kho —</SelectItem>
-                  {(warehouses.data ?? []).map((w) => (
-                    <SelectItem key={w.id} value={w.id}>
-                      {w.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <span className="mt-1 block text-xs text-muted-foreground">
-                Người đóng gói chỉ hiện cho nhân viên lấy hàng cùng kho.
-              </span>
-            </div>
-          ) : null}
+          <WarehouseAccessField options={warehouseOptions} value={access} onChange={setAccess} />
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)}>
@@ -210,8 +191,11 @@ function EditDialog({
                   fullName: fullName.trim(),
                   email: email.trim(),
                   ...(password ? { password } : {}),
-                  ...(canReadWarehouses && warehouseId !== (user.warehouseId ?? '')
-                    ? { warehouseId: warehouseId || null }
+                  ...(accessChanged
+                    ? {
+                        warehouseIds: access.warehouseIds,
+                        warehouseId: access.warehouseId || null,
+                      }
                     : {}),
                 },
                 {
@@ -242,10 +226,15 @@ export function UserDetailScreen({ id }: { id: string }) {
   const ability = useAbility();
   const [editOpen, setEditOpen] = useState(false);
   const warehouses = useWarehouseOptions(ability.can('read', 'Stock'));
+  const { options: myWarehouses } = useWarehouse();
   const warehouseName = (id: string | null) =>
     id === null
       ? 'Chưa gán'
-      : (warehouses.data?.find((w) => w.id === id)?.name ?? 'Đã gán (kho ngừng dùng?)');
+      : (warehouses.data?.find((w) => w.id === id)?.name ??
+        myWarehouses.find((w) => w.id === id)?.name ??
+        'Kho khác');
+  const warehouseList = (ids: string[]) =>
+    ids.length === 0 ? 'Chưa được cấp kho' : ids.map((id) => warehouseName(id)).join(', ');
 
   // `user.canManage` (server): chỉ người tạo tài khoản / superadmin được sửa — CASL chỉ cho biết
   // có quyền chung, còn tài khoản cụ thể này có phải "của mình" hay không thì server quyết.
@@ -331,7 +320,13 @@ export function UserDetailScreen({ id }: { id: string }) {
                 <InfoRow label="Họ tên" value={user.fullName} />
                 <InfoRow label="Email" value={user.email} />
                 <InfoRow label="Phòng ban" value={user.department?.name ?? '—'} />
-                <InfoRow label="Kho làm việc" value={warehouseName(user.warehouseId)} />
+                <InfoRow label="Kho mặc định" value={warehouseName(user.warehouseId)} />
+                <InfoRow
+                  label="Kho được phép"
+                  value={
+                    user.isSuperAdmin ? 'Mọi kho (superadmin)' : warehouseList(user.warehouseIds)
+                  }
+                />
                 <InfoRow label="Người tạo" value={user.createdBy?.fullName ?? '—'} />
                 <InfoRow label="Tạo lúc" value={formatDateTime(user.createdAt)} />
                 <InfoRow label="Cập nhật" value={formatDateTime(user.updatedAt)} />

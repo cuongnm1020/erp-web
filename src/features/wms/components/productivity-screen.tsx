@@ -8,13 +8,6 @@ import { PageHeader } from '@/components/layout/page-header';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
-import {
   Table,
   TableBody,
   TableCell,
@@ -30,7 +23,6 @@ import {
   type ProductivityRow,
   type ProductivitySection,
 } from '../api/use-productivity';
-import { useWarehouses } from '../api/use-warehouses';
 
 /**
  * Năng suất kho (2026-09-28) — GET /tasks/productivity. Hai bảng theo nhân viên: đơn đã LẤY
@@ -40,9 +32,9 @@ import { useWarehouses } from '../api/use-warehouses';
  * một đơn; việc trong lượt gộp tính cho người giữ lượt. Mọi con số do API tính (luật 10).
  * Khoảng ngày + kho nằm trên URL (luật 8) — dán link cho đồng nghiệp xem đúng khoảng đó.
  */
-const DEFAULTS = { filterKeys: ['from', 'to', 'warehouseId'] as const };
+// Kho: ô chọn kho làm việc ở sidebar (header X-Warehouse-Id) — không còn bộ lọc kho riêng.
+const DEFAULTS = { filterKeys: ['from', 'to'] as const };
 type Filter = (typeof DEFAULTS.filterKeys)[number];
-const ALL = '__all__';
 /** Trần của API (PRODUCTIVITY_MAX_DAYS) — chặn trước ở màn để không bắn 422. */
 const MAX_DAYS = 92;
 
@@ -69,10 +61,8 @@ export function ProductivityScreen() {
   const today = toLocalDateKey(new Date()) ?? '';
   const from = state.filters.from ?? today;
   const to = state.filters.to ?? from;
-  const warehouseId = state.filters.warehouseId ?? '';
-  const params = useMemo(() => ({ from, to, warehouseId }), [from, to, warehouseId]);
+  const params = useMemo(() => ({ from, to }), [from, to]);
   const query = useProductivity(params);
-  const warehouses = useWarehouses();
 
   const setRange = useCallback(
     (f: string, t: string) => set({ filters: { ...state.filters, from: f, to: t } }),
@@ -145,27 +135,6 @@ export function ProductivityScreen() {
             onChange={(e) => onTo(e.target.value)}
             aria-label="Đến ngày"
           />
-        </label>
-        <label className="flex flex-col gap-0.5 text-xs text-muted-foreground">
-          Kho
-          <Select
-            value={warehouseId || ALL}
-            onValueChange={(v) =>
-              set({ filters: { ...state.filters, warehouseId: v === ALL ? undefined : v } })
-            }
-          >
-            <SelectTrigger className="h-8 w-48" aria-label="Kho">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value={ALL}>Mọi kho</SelectItem>
-              {(warehouses.data ?? []).map((w) => (
-                <SelectItem key={w.id} value={w.id}>
-                  {w.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
         </label>
       </div>
 

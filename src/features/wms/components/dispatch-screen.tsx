@@ -60,7 +60,6 @@ import {
   useDispatchAutoRefresh,
   useDispatchAutoRefreshPref,
 } from '../api/use-dispatch-auto-refresh';
-import { useWarehouses } from '../api/use-warehouses';
 import {
   useAssignWave,
   useCreateWave,
@@ -119,7 +118,8 @@ import { WavePrintSheet } from './wave-print-sheet';
 const PAGE_SIZE = 20;
 const DEFAULTS = {
   size: PAGE_SIZE,
-  filterKeys: ['status', 'type', 'warehouseId', 'assignedTo', 'lines', 'merge'] as const,
+  // Kho: ô chọn kho làm việc ở sidebar (header X-Warehouse-Id) — không còn bộ lọc kho riêng.
+  filterKeys: ['status', 'type', 'assignedTo', 'lines', 'merge'] as const,
 };
 const ALL_TYPES = '__all__';
 
@@ -558,20 +558,17 @@ export function DispatchScreen() {
   const tab = TABS.find((t) => t.status === status)!;
   const mergeTab = merge ? MERGE_TABS.find((t) => t.level === merge)! : null;
   const type = parseTaskType(state.filters.type);
-  const warehouseId = state.filters.warehouseId ?? '';
   const assignedTo = state.filters.assignedTo ?? '';
   const lines = LINE_VALUES.has(state.filters.lines ?? '') ? state.filters.lines! : '';
   const ability = useAbility();
   const canAssign = ability.can('assign', 'Task');
   const staffQuery = useWarehouseStaff(canAssign);
   const staff = canAssign ? (staffQuery.data ?? null) : null;
-  const warehouses = useWarehouses();
 
   // Chỉ tab đang mở gọi API — đổi tab mới gọi tab đó (không tải sẵn bốn trạng thái).
   const query = useTasks({
     status,
     type,
-    warehouseId,
     assignedTo,
     ...lineFilter(lines),
     sort: 'newest',
@@ -581,10 +578,10 @@ export function DispatchScreen() {
   // nằm ở "Đã giao" bị tưởng là mất.
   const tabCounts = useTaskCounts(
     TABS.map((t) => t.status),
-    { type, warehouseId, assignedTo, ...lineFilter(lines) },
+    { type, assignedTo, ...lineFilter(lines) },
   );
   // Gợi ý gộp: luôn gọi (không lọc cấp) để hai tab hiện số nhóm; mở tab nào thì lọc đúng cấp đó.
-  const suggestions = useWaveSuggestions({ warehouseId, packLevel: merge ?? undefined });
+  const suggestions = useWaveSuggestions({ packLevel: merge ?? undefined });
 
   // Giữ cả dòng (không chỉ id) để thanh công cụ biết lô đang chọn gộp lượt được hay chỉ gán;
   // lô chọn giữ khi đổi tab / đổi trang.
@@ -704,22 +701,6 @@ export function DispatchScreen() {
             {LINE_OPTIONS.map((o) => (
               <SelectItem key={o.value} value={o.value}>
                 {o.label}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-        <Select
-          value={warehouseId || ALL_TYPES}
-          onValueChange={(v) => setFilter({ warehouseId: v === ALL_TYPES ? undefined : v })}
-        >
-          <SelectTrigger className="h-9 w-52" aria-label="Kho">
-            <SelectValue placeholder="Kho" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value={ALL_TYPES}>Kho: tất cả</SelectItem>
-            {(warehouses.data ?? []).map((w) => (
-              <SelectItem key={w.id} value={w.id}>
-                {w.name}
               </SelectItem>
             ))}
           </SelectContent>
@@ -853,7 +834,7 @@ export function DispatchScreen() {
         />
       )}
 
-      {canAssign ? <WavePanel warehouseId={warehouseId} staff={staff ?? []} /> : null}
+      {canAssign ? <WavePanel staff={staff ?? []} /> : null}
 
       <p className="text-xs text-muted-foreground">
         Bảng này không có cờ &ldquo;quá hạn SLA&rdquo;: bảng việc trong kho chưa có cột hạn chót
@@ -999,8 +980,8 @@ function SelectionToolbar({
 const WAVE_TAKE = 20;
 
 /** Lượt pick gộp đang mở của kho — gán / trả về / in phiếu lượt. */
-function WavePanel({ warehouseId, staff }: { warehouseId: string; staff: WarehouseStaff[] }) {
-  const waves = useWaves({ warehouseId, take: WAVE_TAKE, skip: 0 });
+function WavePanel({ staff }: { staff: WarehouseStaff[] }) {
+  const waves = useWaves({ take: WAVE_TAKE, skip: 0 });
   const [printId, setPrintId] = useState<string | null>(null);
   const printer = usePrint();
   const detail = useWaveDetail(printId);

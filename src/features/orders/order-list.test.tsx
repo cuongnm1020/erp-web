@@ -1,6 +1,7 @@
 import { fireEvent, screen, waitFor } from '@testing-library/react';
 import { http, HttpResponse } from 'msw';
 import { describe, expect, it, vi } from 'vitest';
+import { WarehouseProvider } from '@/lib/warehouse';
 import { ME_SALE, makeOrders, scenario } from '@/test/msw/handlers';
 import { server } from '@/test/msw/server';
 import { renderApp } from '@/test/render';
@@ -395,27 +396,23 @@ describe('OrderListScreen — sao chép SĐT / mã vận đơn, cột kho (2026-
     rows[0] = { ...rows[0]!, warehouseId: 'wh-tt' };
     server.use(
       http.get('/api/sales-orders', () => HttpResponse.json({ items: rows, total: rows.length })),
-      http.get('/api/warehouses', () =>
-        HttpResponse.json([
-          {
-            id: 'wh-tt',
-            code: 'KHO-TT-01',
-            name: 'Kho Thạch Thất',
-            address: null,
-            contactName: null,
-            phone: null,
-            hamlet: null,
-            ward: null,
-            province: null,
-            isActive: true,
-            isDefault: true,
-            layoutImageUrl: null,
-          },
-        ]),
-      ),
     );
     search = '';
-    renderApp(<OrderListScreen />);
+    // Tên kho trên cột lấy từ kho được phép của phiên (/auth/me) — sale không cần stock.read.
+    renderApp(
+      <WarehouseProvider
+        me={{
+          ...ME_SALE,
+          managesDepartments: false,
+          warehouseIds: null,
+          warehouses: [{ id: 'wh-tt', code: 'KHO-TT-01', name: 'Kho Thạch Thất' }],
+          defaultWarehouseId: 'wh-tt',
+          selectedWarehouseId: null,
+        }}
+      >
+        <OrderListScreen />
+      </WarehouseProvider>,
+    );
     return rows;
   };
 

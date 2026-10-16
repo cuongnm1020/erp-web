@@ -1,6 +1,7 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/lib/api/client';
 import { toApiError } from '@/lib/api/errors';
+import { forgetWarehouseSelection } from '@/lib/warehouse';
 import type { LoginInput } from '../schema';
 
 /**
@@ -17,6 +18,10 @@ export function useLogin() {
         throw toApiError(response, body);
       }
     },
-    onSuccess: () => qc.removeQueries({ queryKey: ['auth'] }),
+    onSuccess: () => {
+      // Mỗi lần đăng nhập về kho mặc định của tài khoản (PLAN-warehouse-context).
+      forgetWarehouseSelection();
+      qc.removeQueries({ queryKey: ['auth'] });
+    },
   });
 }

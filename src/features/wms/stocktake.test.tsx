@@ -139,7 +139,9 @@ describe('StocktakeScreen — /cycle-counts', () => {
         );
       }),
     );
-    renderApp(<StocktakeScreen />);
+    renderApp(<StocktakeScreen />, {
+      warehouses: [{ id: 'wh-1', code: 'WH01', name: 'Kho HN-1' }],
+    });
     fireEvent.click(await screen.findByRole('button', { name: /Mở phiên kiểm kê/ }));
     const dialog = await screen.findByRole('dialog');
     fireEvent.click(within(dialog).getByRole('combobox', { name: 'Kho kiểm kê' }));

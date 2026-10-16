@@ -1,7 +1,9 @@
 import { fireEvent, screen, waitFor } from '@testing-library/react';
 import { http, HttpResponse } from 'msw';
 import { describe, expect, it, vi } from 'vitest';
+import { forgetWarehouseSelection, WarehouseProvider } from '@/lib/warehouse';
 import {
+  ME_ADMIN,
   makeCustomerAddresses,
   makeCustomers,
   makeOrderDetail,
@@ -116,6 +118,17 @@ describe('toCreateOrderBody — CK% form → tỉ lệ API', () => {
         toCreateOrderBody({ ...base, manualDiscountType: 'PERCENT', manualDiscountValue: v }),
       ).not.toHaveProperty('manualDiscountType');
     }
+  });
+
+  it('kho xuất: chọn kho → gửi warehouseId; bỏ trống → không gửi (server lấy kho mặc định)', () => {
+    const base = {
+      customerId: 'c1',
+      channel: 'DIRECT' as const,
+      manualDiscountType: 'AMOUNT' as const,
+      lines: [{ skuId: 's1', uomId: 'u1', qty: '1', discountPercent: '' }],
+    };
+    expect(toCreateOrderBody({ ...base, warehouseId: 'wh-la' }).warehouseId).toBe('wh-la');
+    expect(toCreateOrderBody({ ...base, warehouseId: '' })).not.toHaveProperty('warehouseId');
   });
 
   it('previewManualDiscount: % trên tạm tính; nhập sai → null', () => {
@@ -298,6 +311,31 @@ describe('OrderCreateScreen — POST /sales-orders (D-01)', () => {
     expect(
       await screen.findByText('vượt trần 15% — hệ thống sẽ chặn khi chốt'),
     ).toBeInTheDocument();
+  });
+
+  it('ô Kho xuất mặc định là kho đang làm việc (ô chọn kho ở sidebar)', async () => {
+    search = '';
+    renderApp(
+      <WarehouseProvider
+        me={{
+          ...ME_ADMIN,
+          managesDepartments: false,
+          warehouseIds: ['wh-tt', 'wh-la'],
+          warehouses: [
+            { id: 'wh-tt', code: 'KHO-TT-01', name: 'Kho Thạch Thất' },
+            { id: 'wh-la', code: 'KHO-LA-01', name: 'Kho Long An' },
+          ],
+          defaultWarehouseId: 'wh-la',
+          selectedWarehouseId: null,
+        }}
+      >
+        <OrderCreateScreen />
+      </WarehouseProvider>,
+    );
+    expect(await screen.findByRole('combobox', { name: 'Kho xuất' })).toHaveTextContent(
+      'Kho Long An',
+    );
+    forgetWarehouseSelection(); // store kho là module-level — không để rò sang test sau
   });
 
   it('?customerId=<id> chọn sẵn khách và hiện tên (nút Tạo đơn từ hồ sơ khách)', async () => {

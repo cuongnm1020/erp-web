@@ -1022,6 +1022,7 @@ export const USER_DETAIL_FIXTURE = {
   fullName: 'Nhân viên 2',
   department: { id: uuid('0000000c', 0), code: 'SALES', name: 'Kinh doanh' },
   warehouseId: null as string | null,
+  warehouseIds: [] as string[],
   roles: [{ code: 'SALES_MEMBER', name: 'Nhân viên kinh doanh' }],
   teams: [
     {

@@ -175,7 +175,12 @@ describe('TransferScreen — /transfers', () => {
         );
       }),
     );
-    renderApp(<TransferScreen />);
+    renderApp(<TransferScreen />, {
+      warehouses: [
+        { id: 'wh-1', code: 'WH01', name: 'Kho HN-1' },
+        { id: 'wh-2', code: 'WH02', name: 'Kho HCM-2' },
+      ],
+    });
     fireEvent.click(await screen.findByRole('button', { name: /Tạo phiếu chuyển/ }));
     const dialog = await screen.findByRole('dialog');
 

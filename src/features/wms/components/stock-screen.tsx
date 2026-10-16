@@ -45,12 +45,12 @@ import { isNegativeQty, locationTypeLabel } from '../labels';
  * - Tab lô: "Thứ tự FEFO" — API chỉ sắp xếp, không trả thứ hạng; đánh số theo trang hiện
  *   tại sẽ sai ngay từ trang 2.
  * - Băng cảnh báo "N lô sắp hết hạn": cần số đếm toàn cục, API không trả.
- * - Chọn kho: `GET /warehouses` chưa khai kiểu response nên chưa dựng được danh sách chọn;
- *   tham số `warehouseId` vẫn đọc từ URL để dán link theo kho được.
+ * - Kho: theo ô chọn kho làm việc ở sidebar (header X-Warehouse-Id, PLAN-warehouse-context) —
+ *   không còn tham số kho riêng trên URL.
  */
 const DEFAULTS = {
   size: 50,
-  filterKeys: ['tab', 'warehouseId', 'skuId', 'locationId'] as const,
+  filterKeys: ['tab', 'skuId', 'locationId'] as const,
 };
 
 type StockFilter = (typeof DEFAULTS.filterKeys)[number];
@@ -282,14 +282,10 @@ function StockTable<T>({
 export function StockScreen() {
   const { state, set, skipTake } = useListState<StockFilter>(DEFAULTS);
   const tab = parseTab(state.filters.tab);
-  const warehouseId = state.filters.warehouseId ?? '';
   const skuId = state.filters.skuId ?? '';
   const locationId = state.filters.locationId ?? '';
 
-  const listParams = useMemo(
-    () => ({ q: state.q, warehouseId, ...skipTake }),
-    [state.q, warehouseId, skipTake],
-  );
+  const listParams = useMemo(() => ({ q: state.q, ...skipTake }), [state.q, skipTake]);
   const breakdownParams = useMemo(
     () => ({ ...listParams, skuId, locationId }),
     [listParams, skuId, locationId],
@@ -306,7 +302,7 @@ export function StockScreen() {
   const setFilter = (patch: Partial<Record<StockFilter, string | undefined>>) =>
     set({ filters: { ...state.filters, ...patch } });
 
-  const hasFilter = state.q !== '' || warehouseId !== '' || skuId !== '' || locationId !== '';
+  const hasFilter = state.q !== '' || skuId !== '' || locationId !== '';
   const unit = tab === 'sku' ? 'SKU' : tab === 'location' ? 'dòng vị trí' : 'dòng lô';
   const pager: PagerState = { page: state.page, size: state.size, sort: state.sort, set };
 
@@ -380,7 +376,6 @@ export function StockScreen() {
         onQChange={(q) => set({ q })}
         // KHÔNG đưa `tab` vào values: tab là chế độ xem, "Xóa lọc" không được reset nó
         values={{
-          warehouseId: state.filters.warehouseId,
           skuId: state.filters.skuId,
           locationId: state.filters.locationId,
         }}

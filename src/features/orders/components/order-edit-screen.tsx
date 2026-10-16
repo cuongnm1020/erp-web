@@ -20,7 +20,7 @@ import {
 import { toast } from '@/components/ui/toaster';
 import { groupOrderLines } from '../combo-lines';
 import { isApiError } from '@/lib/api/errors';
-import { messageFor } from '@/lib/error-messages';
+import { messageFor, messageForCode } from '@/lib/error-messages';
 import { formatDate, formatDateTime, formatMoney, formatQuantity, toDecimal } from '@/lib/format';
 import { useAbility } from '@/lib/permission';
 import { useCarriers } from '@/features/wms/api/use-shipping';
@@ -30,6 +30,7 @@ import {
   useOrder,
   usePickupWarehouses,
   useShippingQuote,
+  useMoveOrdersWarehouse,
   useUpdateOrder,
   type SalesOrderDetail,
   type SalesOrderStatus,
@@ -134,6 +135,7 @@ function Editor({ order }: { order: SalesOrderDetail }) {
   const ability = useAbility();
   const canUpdate = ability.can('update', 'SalesOrder');
   const update = useUpdateOrder(order.id);
+  const moveWarehouse = useMoveOrdersWarehouse();
   const carriers = useCarriers();
   const warehouses = usePickupWarehouses();
 
@@ -198,8 +200,11 @@ function Editor({ order }: { order: SalesOrderDetail }) {
     (nextWeight === null
       ? order.shippingWeightKg !== null
       : order.shippingWeightKg === null || !toDecimal(order.shippingWeightKg)?.eq(nextWeight));
+  // Đổi kho đi đường chuyển đơn (PLAN-warehouse-context K3: dời giữ chỗ + lập lại PICK) — không
+  // qua PATCH (PATCH chặn ORDER_WAREHOUSE_LOCKED khi hàng đã giữ ở kho cũ).
+  const moveTo = warehouseChanged && nextWarehouse ? nextWarehouse : null;
   const patchDirty =
-    statusChanged || carrierChanged || warehouseChanged || addressChanged || weightChanged;
+    statusChanged || carrierChanged || addressChanged || weightChanged || moveTo !== null;
 
   const detailHref = `/crm/orders/${order.id}`;
   const totalQty = order.lines.reduce(
@@ -234,7 +239,7 @@ function Editor({ order }: { order: SalesOrderDetail }) {
   };
 
   const save = () => {
-    if (update.isPending || fulfil.isPending) return;
+    if (update.isPending || fulfil.isPending || moveWarehouse.isPending) return;
     if (weightInvalid) {
       toast.error('Cân nặng gửi hãng phải là số kg lớn hơn 0, tối đa 4 số lẻ');
       return;
@@ -255,11 +260,39 @@ function Editor({ order }: { order: SalesOrderDetail }) {
       return;
     }
     if (!canUpdate) return;
+    if (moveTo) {
+      moveWarehouse.mutate(
+        { orderIds: [order.id], warehouseId: moveTo },
+        {
+          onSuccess: (r) => {
+            const failed = r.failed[0];
+            if (failed) {
+              toast.error(messageForCode(failed.code, 409));
+              setWarehouseId(order.warehouseId ?? NO_WAREHOUSE);
+              return;
+            }
+            if (statusChanged || carrierChanged || addressChanged || weightChanged) patch();
+            else {
+              toast.success('Đã lưu thay đổi', {
+                description: `${order.docNumber} · kho lấy hàng`,
+              });
+              if (fulfilTarget) runFulfil(fulfilTarget);
+              else router.push(detailHref);
+            }
+          },
+          onError: (err) => toast.error(messageFor(err)),
+        },
+      );
+      return;
+    }
+    patch();
+  };
+
+  const patch = () => {
     update.mutate(
       {
         ...(statusChanged ? { status } : {}),
         ...(carrierChanged ? { carrierId: nextCarrier } : {}),
-        ...(warehouseChanged ? { warehouseId: nextWarehouse } : {}),
         ...(addressChanged ? { addressId: nextAddress } : {}),
         ...(weightChanged ? { shippingWeightKg: nextWeight } : {}),
         ...(statusChanged && status === 'CANCELLED' && reason.trim()
@@ -273,13 +306,11 @@ function Editor({ order }: { order: SalesOrderDetail }) {
               .map((c) =>
                 c === 'status'
                   ? `trạng thái → ${orderStatusLabel(r.status)}`
-                  : c === 'warehouseId'
-                    ? 'kho lấy hàng'
-                    : c === 'addressId'
-                      ? 'địa chỉ giao'
-                      : c === 'shippingWeightKg'
-                        ? 'cân nặng gửi hãng'
-                        : 'hãng vận chuyển',
+                  : c === 'addressId'
+                    ? 'địa chỉ giao'
+                    : c === 'shippingWeightKg'
+                      ? 'cân nặng gửi hãng'
+                      : 'hãng vận chuyển',
               )
               .join(', ')}`,
           });
@@ -658,7 +689,10 @@ function Editor({ order }: { order: SalesOrderDetail }) {
                     <SelectValue placeholder="Chưa chọn" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value={NO_WAREHOUSE}>— Chưa chọn —</SelectItem>
+                    {/* Đơn đã có kho thì chỉ chuyển sang kho khác, không bỏ kho. */}
+                    {order.warehouseId ? null : (
+                      <SelectItem value={NO_WAREHOUSE}>— Chưa chọn —</SelectItem>
+                    )}
                     {(warehouses.data ?? []).map((w) => (
                       <SelectItem key={w.id} value={w.id}>
                         {w.name} ({w.code}){w.pickupReady ? '' : ' — chưa khai địa chỉ'}

@@ -18,7 +18,6 @@ import {
   type ReplenishmentRow,
   type ReplenishmentStatus,
 } from '../api/use-replenishment';
-import { useWarehouses } from '../api/use-warehouses';
 import { isNegativeQty } from '../labels';
 
 /**
@@ -30,7 +29,8 @@ import { isNegativeQty } from '../labels';
  * Kho / phạm vi / tìm nhanh / trang nằm trên URL (luật 8). Mặc định chỉ dòng cần chú ý;
  * `scope=all` để rà cả SKU đang đủ hàng.
  */
-const DEFAULTS = { size: 50, filterKeys: ['warehouseId', 'scope'] as const };
+// Kho: ô chọn kho làm việc ở sidebar (header X-Warehouse-Id) — không còn bộ lọc kho riêng.
+const DEFAULTS = { size: 50, filterKeys: ['scope'] as const };
 type Filter = (typeof DEFAULTS.filterKeys)[number];
 
 const STATUS: Record<ReplenishmentStatus, { label: string; tone: StatusTone }> = {
@@ -163,24 +163,16 @@ const columns: ColumnDef<ReplenishmentRow, unknown>[] = [
 
 export function ReplenishmentAlertScreen() {
   const { state, set, skipTake } = useListState<Filter>(DEFAULTS);
-  const warehouseId = state.filters.warehouseId ?? '';
   const onlyAlert = state.filters.scope !== 'all';
   const params = useMemo(
-    () => ({ q: state.q, warehouseId, onlyAlert, ...skipTake }),
-    [state.q, warehouseId, onlyAlert, skipTake],
+    () => ({ q: state.q, onlyAlert, ...skipTake }),
+    [state.q, onlyAlert, skipTake],
   );
   const query = useReplenishment(params);
-  const warehouses = useWarehouses();
   // Luật 9: realtime chỉ invalidate theo prefix — tồn đổi (pack xong / nhập kho) → tính lại.
   useInvalidateOn(['stock.changed', 'stock.moved'], [replenishmentKeys.all]);
 
   const filters: FilterDef<Filter>[] = [
-    {
-      key: 'warehouseId',
-      label: 'Kho',
-      type: 'select',
-      options: (warehouses.data ?? []).map((w) => ({ value: w.id, label: w.name })),
-    },
     {
       key: 'scope',
       label: 'Phạm vi',
@@ -188,7 +180,7 @@ export function ReplenishmentAlertScreen() {
       options: [{ value: 'all', label: 'Mọi SKU có mức tồn kho' }],
     },
   ];
-  const hasFilter = state.q !== '' || warehouseId !== '';
+  const hasFilter = state.q !== '';
   const data = query.data;
 
   return (
@@ -223,7 +215,7 @@ export function ReplenishmentAlertScreen() {
         q={state.q}
         onQChange={(q) => set({ q })}
         filters={filters}
-        values={{ warehouseId: state.filters.warehouseId, scope: state.filters.scope }}
+        values={{ scope: state.filters.scope }}
         onFilterChange={(patch) => set({ filters: { ...state.filters, ...patch } })}
         searchPlaceholder="Tìm theo mã SKU, tên biến thể hoặc tên thương mại…"
       />

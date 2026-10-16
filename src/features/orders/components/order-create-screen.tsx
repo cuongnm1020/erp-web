@@ -34,6 +34,7 @@ import { isApiError, type ApiError } from '@/lib/api/errors';
 import { messageFor } from '@/lib/error-messages';
 import { formatMoney, formatQuantity } from '@/lib/format';
 import { Can } from '@/lib/permission';
+import { ALL_WAREHOUSES, useWarehouse } from '@/lib/warehouse';
 import {
   useCustomerBrief,
   useCustomerSearch,
@@ -48,6 +49,8 @@ import { orderAddressLine, orderChannelLabel } from '../labels';
 
 /** Giá trị Select cho "không chọn" — Radix Select không nhận value rỗng. */
 const NO_ADDRESS = '__none__';
+/** Giá trị Select cho "kho mặc định" — Radix Select không nhận value rỗng. */
+const DEFAULT_WAREHOUSE = '__default__';
 import { QuickCustomerDialog } from './quick-customer-dialog';
 import {
   createOrderSchema,
@@ -79,6 +82,7 @@ export function OrderCreateScreen() {
   const presetCustomerId = search.get('customerId') ?? '';
   const source = useOrder(fromId);
   const create = useCreateOrder();
+  const { options: warehouseOptions, selected: workingWarehouse } = useWarehouse();
   // Idempotency-Key sinh lúc bấm, GIỮ NGUYÊN khi retry lỗi mạng/5xx; đổi khi người dùng sửa form.
   const idemKey = useRef<string | null>(null);
   const [quickOpen, setQuickOpen] = useState(false);
@@ -101,6 +105,8 @@ export function OrderCreateScreen() {
     defaultValues: {
       customerId: presetCustomerId,
       addressId: '',
+      // Kho đang làm việc (ô chọn kho ở sidebar); "Tất cả kho" → để server lấy kho mặc định.
+      warehouseId: workingWarehouse && workingWarehouse !== ALL_WAREHOUSES ? workingWarehouse : '',
       channel: 'DIRECT',
       shippingFee: '',
       manualDiscountType: 'AMOUNT',
@@ -157,6 +163,7 @@ export function OrderCreateScreen() {
     form.reset({
       customerId: source.data.customer.id,
       addressId: source.data.addressId ?? '',
+      warehouseId: source.data.warehouseId ?? '',
       channel: source.data.channel,
       shippingFee: source.data.shippingFee,
       // Giảm tay cấp đơn của đơn cũ: theo % thì giữ %, không thì giữ số tiền.
@@ -217,7 +224,14 @@ export function OrderCreateScreen() {
             }
           }
           applyServerErrors(form, err as ApiError, {
-            knownFields: ['customerId', 'channel', 'shippingFee', 'manualDiscountValue', 'lines'],
+            knownFields: [
+              'customerId',
+              'warehouseId',
+              'channel',
+              'shippingFee',
+              'manualDiscountValue',
+              'lines',
+            ],
           });
           const root = form.formState.errors.root?.server?.message;
           if (root) toast.error(root);
@@ -327,6 +341,34 @@ export function OrderCreateScreen() {
                         và cấp vận đơn.
                       </p>
                     ) : null}
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="warehouseId"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Kho xuất</FormLabel>
+                    <Select
+                      value={field.value || DEFAULT_WAREHOUSE}
+                      onValueChange={(v) => field.onChange(v === DEFAULT_WAREHOUSE ? '' : v)}
+                    >
+                      <FormControl>
+                        <SelectTrigger aria-label="Kho xuất">
+                          <SelectValue placeholder="Kho mặc định" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value={DEFAULT_WAREHOUSE}>— Kho mặc định của bạn —</SelectItem>
+                        {warehouseOptions.map((w) => (
+                          <SelectItem key={w.id} value={w.id}>
+                            {w.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                     <FormMessage />
                   </FormItem>
                 )}

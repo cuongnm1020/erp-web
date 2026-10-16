@@ -21,7 +21,6 @@ import {
   type ReceiptListRow,
   type ReceiptStatus,
 } from '../api/use-receipts';
-import { useWarehouses } from '../api/use-warehouses';
 
 /**
  * Nhập kho — danh sách phiếu GRN nối GET /goods-receipts (design GrnList).
@@ -35,7 +34,8 @@ import { useWarehouses } from '../api/use-warehouses';
  */
 const DEFAULTS = {
   size: 40,
-  filterKeys: ['status', 'warehouseId', 'from', 'to'] as const,
+  // Kho: ô chọn kho làm việc ở sidebar (header X-Warehouse-Id) — không còn bộ lọc kho riêng.
+  filterKeys: ['status', 'from', 'to'] as const,
 };
 type GrnFilter = (typeof DEFAULTS.filterKeys)[number];
 
@@ -59,14 +59,12 @@ export function GrnListScreen() {
   const ability = useAbility();
   const canReceive = ability.can('receive', 'Stock');
   const cancel = useCancelReceipt();
-  const warehouses = useWarehouses();
 
   const params = useMemo(
     () => ({
       ...toSkipTake(state),
       ...(state.q ? { q: state.q } : {}),
       ...(state.filters.status ? { status: state.filters.status as ReceiptStatus } : {}),
-      ...(state.filters.warehouseId ? { warehouseId: state.filters.warehouseId } : {}),
       ...(state.filters.from ? { from: state.filters.from } : {}),
       ...(state.filters.to ? { to: state.filters.to } : {}),
     }),
@@ -215,12 +213,6 @@ export function GrnListScreen() {
         values={state.filters}
         onFilterChange={(patch) => set({ filters: { ...state.filters, ...patch } })}
         filters={[
-          {
-            key: 'warehouseId',
-            label: 'Kho',
-            type: 'select',
-            options: (warehouses.data ?? []).map((w) => ({ value: w.id, label: w.name })),
-          },
           { key: 'from', label: 'Từ ngày', type: 'date' },
           { key: 'to', label: 'Đến ngày', type: 'date' },
         ]}
