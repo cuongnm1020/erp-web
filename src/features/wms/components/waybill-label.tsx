@@ -52,6 +52,16 @@ const clamp = (lines: number): CSSProperties => ({
 
 const ICON = { width: '1em', height: '1em', flexShrink: 0 } as const;
 
+/**
+ * Địa chỉ người nhận tem dọc (2026-10-16): che số nhà → xã/phường bằng `***`, in từ quận/huyện
+ * trở đi — "Thị trấn Phú Long, Huyện Hàm Thuận Bắc, Bình Thuận" → "***, Huyện Hàm Thuận Bắc,
+ * Bình Thuận".
+ */
+function fromDistrictAddress(r: { address: string; fromDistrict: string }): string {
+  if (!r.fromDistrict) return r.address ? '***' : '';
+  return r.address === r.fromDistrict ? r.fromDistrict : `***, ${r.fromDistrict}`;
+}
+
 /** Cỡ chữ hàng người gửi — tem dọc dùng chung cho địa chỉ người nhận và bảng sản phẩm. */
 const SENDER_PT = 7.5;
 
@@ -210,7 +220,7 @@ export function WaybillLabel({
             style={{ fontSize: f(land ? 11 : SENDER_PT), ...clamp(3) }}
           >
             <MapPin style={{ ...ICON, display: 'inline', verticalAlign: '-0.1em' }} aria-hidden />{' '}
-            {land ? data.recipient.address : data.recipient.fromWard}
+            {land ? data.recipient.address : fromDistrictAddress(data.recipient)}
           </div>
         </>
       ) : (
