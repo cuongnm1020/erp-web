@@ -114,6 +114,8 @@ const MESSAGES: Record<string, string> = {
     'Chưa biết lấy hàng ở kho nào. Chọn kho lấy hàng trên đơn hoặc đặt kho mặc định ở Kho & vị trí.',
   CARRIER_NO_WAYBILL: 'Phiếu giao chưa có mã vận đơn. Gán hãng và xin vận đơn trước.',
   SHIPMENT_NO_WAYBILL: 'Phiếu giao chưa có mã vận đơn. Gán hãng và xin vận đơn trước.',
+  CARRIER_WAYBILL_NOT_FOUND:
+    'Hãng không tìm thấy vận đơn này dưới tài khoản hãng của phiếu — vận đơn có thể được tạo ở tài khoản (shop) khác. In tem ERP thay thế, và báo quản lý kiểm tra tài khoản hãng của phiếu.',
   CARRIER_LABEL_UNAVAILABLE:
     'Hãng chưa đưa nhãn cho vận đơn này. Thử lại sau ít phút hoặc in từ cổng của hãng.',
   // Máy quét PDA / trạm đóng gói (PLAN-barcode-pick-pack)

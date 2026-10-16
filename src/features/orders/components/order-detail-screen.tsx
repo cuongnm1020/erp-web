@@ -57,6 +57,7 @@ import {
 } from '../labels';
 import { groupOrderLines } from '../combo-lines';
 import { OrderPrintSheet } from './order-print-sheet';
+import { ReprintWaybillDialog } from './bulk-reprint-waybill-dialog';
 
 /**
  * D-04 Chi tiết đơn hàng — GET /sales-orders/{id}.
@@ -190,10 +191,18 @@ function ShipmentCard({ order, autoPrint }: { order: SalesOrderDetail; autoPrint
           <span>Vận đơn</span>
           {s?.trackingNo ? (
             <Can I="pack" a="Shipment">
-              <Button variant="outline" size="sm" onClick={openPrint}>
-                <Printer aria-hidden />
-                In nhãn
-              </Button>
+              <span className="flex items-center gap-2">
+                {/* Tem ERP 100×75: ERP tự vẽ, không hỏi hãng — in được cả khi hãng đã lấy hàng. */}
+                <ReprintWaybillDialog shipments={[s]} triggerLabel="In tem ERP" />
+                {/* Nhãn PDF của hãng chỉ khi hãng chưa lấy hàng — sau đó hãng (GHTK) thường không
+                    trả nhãn nữa (lỗi thật SO2610-00002, 2026-10-16). */}
+                {s.status === 'PENDING' ? (
+                  <Button variant="outline" size="sm" onClick={openPrint}>
+                    <Printer aria-hidden />
+                    In nhãn hãng
+                  </Button>
+                ) : null}
+              </span>
             </Can>
           ) : null}
         </span>

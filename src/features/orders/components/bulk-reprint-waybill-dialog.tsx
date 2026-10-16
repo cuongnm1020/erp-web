@@ -33,12 +33,43 @@ import type { SalesOrder } from '../api/use-orders';
 /** Phiếu giao bị hủy (bởi mình hoặc hãng) — mã vận đơn không còn dùng được, không in lại. */
 const DEAD = new Set(['CANCELLED', 'CARRIER_CANCELLED']);
 
-/**
- * In lại tem vận đơn ERP 100×75 cho các đơn đã chọn — POST /shipments/label-data rồi in tất cả
- * trong MỘT lệnh in (mỗi tem một trang). Chỉ đơn đã có mã vận đơn và phiếu giao chưa hủy; đơn
- * khác bỏ qua ngay ở client. Hướng tem nhớ chung với popup nhãn ở bàn đóng gói.
- */
+/** Phiếu giao cần in tem — chỉ các trường dialog dùng. */
+export interface ReprintShipment {
+  id: string;
+  trackingNo: string | null;
+  status: string;
+}
+
+/** In lại tem ERP cho các đơn đã chọn trên danh sách — bọc {@link ReprintWaybillDialog}. */
 export function BulkReprintWaybillDialog({ rows }: { rows: SalesOrder[] }) {
+  return (
+    <ReprintWaybillDialog
+      shipments={rows.flatMap((r) => (r.shipment ? [r.shipment] : []))}
+      total={rows.length}
+      triggerLabel="In lại vận đơn"
+      triggerClassName="h-7 px-2 text-xs"
+    />
+  );
+}
+
+/**
+ * In tem vận đơn ERP 100×75 — POST /shipments/label-data rồi in tất cả trong MỘT lệnh in (mỗi tem
+ * một trang). ERP tự vẽ tem từ dữ liệu phiếu, KHÔNG hỏi hãng — in được cả khi hãng đã lấy hàng /
+ * không còn trả nhãn. Chỉ phiếu đã có mã vận đơn và chưa hủy; phiếu khác bỏ qua ngay ở client.
+ * Hướng tem nhớ chung với popup nhãn ở bàn đóng gói.
+ */
+export function ReprintWaybillDialog({
+  shipments,
+  total = shipments.length,
+  triggerLabel,
+  triggerClassName,
+}: {
+  shipments: ReprintShipment[];
+  /** Số đơn đã chọn (kể cả đơn chưa có phiếu giao) — để báo số bị bỏ qua. */
+  total?: number;
+  triggerLabel: string;
+  triggerClassName?: string;
+}) {
   const [open, setOpen] = useState(false);
   const [orientation, setOrientation] = useState<WaybillOrientation>('landscape');
   useEffect(() => setOrientation(readOrientation()), []);
@@ -47,13 +78,13 @@ export function BulkReprintWaybillDialog({ rows }: { rows: SalesOrder[] }) {
   const printer = usePrint();
   const fetchLabels = useShipmentLabelDataMany();
 
-  const printable = rows.filter((r) => r.shipment?.trackingNo && !DEAD.has(r.shipment.status));
-  const skipped = rows.length - printable.length;
+  const printable = shipments.filter((sh) => sh.trackingNo && !DEAD.has(sh.status));
+  const skipped = total - printable.length;
 
   const submit = async () => {
     if (printable.length === 0 || fetchLabels.isPending) return;
     try {
-      const data = await fetchLabels.mutateAsync(printable.map((r) => r.shipment!.id));
+      const data = await fetchLabels.mutateAsync(printable.map((sh) => sh.id));
       if (data.length === 0) {
         toast.error('Không lấy được dữ liệu tem của đơn nào.');
         return;
@@ -72,11 +103,11 @@ export function BulkReprintWaybillDialog({ rows }: { rows: SalesOrder[] }) {
       <Button
         size="sm"
         variant="outline"
-        className="h-7 px-2 text-xs"
+        className={triggerClassName}
         onClick={() => setOpen(true)}
       >
         <Printer aria-hidden />
-        In lại vận đơn
+        {triggerLabel}
       </Button>
       <Dialog open={open} onOpenChange={(o) => !fetchLabels.isPending && setOpen(o)}>
         <DialogContent className="sm:max-w-md">

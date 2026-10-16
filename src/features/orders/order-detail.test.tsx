@@ -157,14 +157,15 @@ describe('OrderDetailScreen — GET /sales-orders/{id} (P1-12)', () => {
     expect(screen.queryByText('Vận đơn / tracking')).not.toBeInTheDocument();
   });
 
-  it('phiếu giao có vận đơn: thẻ Vận đơn từ order.shipment; In nhãn → PDF /api/shipments/:id/label (khổ A6 mặc định)', async () => {
+  it('phiếu giao có vận đơn: thẻ Vận đơn từ order.shipment; In nhãn hãng → PDF /api/shipments/:id/label (khổ A6 mặc định)', async () => {
     server.use(scenario.orderWithShipment);
     renderApp(<OrderDetailScreen orderId={ORDER.id} />);
     await screen.findByRole('heading', { level: 1 });
     expect(screen.getByText(ORDER_SHIPMENT_FIXTURE.trackingNo)).toBeInTheDocument();
     expect(screen.getByText(ORDER_SHIPMENT_FIXTURE.docNumber)).toBeInTheDocument();
     expect(screen.getByText('chưa in')).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: 'In nhãn' }));
+    expect(screen.getByRole('button', { name: 'In tem ERP' })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'In nhãn hãng' }));
     const frame = await screen.findByTestId('pdf-frame');
     expect(frame).toHaveAttribute(
       'src',
@@ -180,12 +181,28 @@ describe('OrderDetailScreen — GET /sales-orders/{id} (P1-12)', () => {
     );
   });
 
-  it('không có shipment.pack → thấy vận đơn nhưng không thấy nút In nhãn (luật 7)', async () => {
+  it('không có shipment.pack → thấy vận đơn nhưng không thấy nút in (luật 7)', async () => {
     server.use(scenario.orderWithShipment);
     renderApp(<OrderDetailScreen orderId={ORDER.id} />, { me: ME_SALE });
     await screen.findByRole('heading', { level: 1 });
     expect(screen.getByText(ORDER_SHIPMENT_FIXTURE.trackingNo)).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'In nhãn' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'In nhãn hãng' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'In tem ERP' })).not.toBeInTheDocument();
+  });
+
+  it('hãng đã lấy hàng → chỉ còn "In tem ERP" (hãng thường không trả nhãn nữa — SO2610-00002)', async () => {
+    server.use(
+      http.get('/api/sales-orders/:id', ({ params }) =>
+        HttpResponse.json({
+          ...makeOrderDetail(String(params.id))!,
+          shipment: { ...ORDER_SHIPMENT_FIXTURE, status: 'OUT_FOR_DELIVERY' },
+        }),
+      ),
+    );
+    renderApp(<OrderDetailScreen orderId={ORDER.id} />);
+    await screen.findByRole('heading', { level: 1 });
+    expect(screen.getByRole('button', { name: 'In tem ERP' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'In nhãn hãng' })).not.toBeInTheDocument();
   });
 });
 
