@@ -152,6 +152,7 @@ describe('Popup nhãn — tem ERP 100×75 mm (2026-10-13)', () => {
     renderApp(<LabelPrintDialog open waybill={WAYBILL('VTP')} orderId={null} onClose={() => {}} />);
     await waitFor(() => expect(print).toHaveBeenCalledTimes(1));
     const label = within(lastPrinted());
+    expect(label.queryByText(/Mã đơn hàng/)).toBeNull();
     // 2026-10-16: "Người gửi: SĐT / xã → tỉnh", tên POS dòng dưới
     expect(label.getByText('Người gửi:')).toBeTruthy();
     expect(label.getByText('0339213208 / Xã Thạch Thất, Hà Nội')).toBeTruthy();
@@ -202,6 +203,8 @@ describe('Popup nhãn — tem ERP 100×75 mm (2026-10-13)', () => {
     expect(label.queryByText(/Thiện Mỹ/)).toBeNull();
     // Tuyến chỉ in cho GHTK
     expect(label.queryByText(/MIỀN|NỘI TỈNH/)).toBeNull();
+    // Mã đơn hàng đã gửi VNPost (mã phiếu giao)
+    expect(label.getByText('Mã đơn hàng: DN2610-00001')).toBeTruthy();
   });
 
   it('tem chung dọc, đơn không có ghi chú → in ghi chú mặc định', async () => {

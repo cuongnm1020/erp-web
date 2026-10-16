@@ -298,6 +298,12 @@ export function WaybillLabel({
         <span className="tabular-nums">COD: {formatMoney(data.codAmount, { unit: 'đ' })}</span>
         {route ? <span className="shrink-0 font-extrabold">{route}</span> : null}
       </div>
+      {data.carrierCode === 'VNPOST' ? (
+        // Mã đơn hàng đã gửi VNPost (`saleOrderCode` = mã phiếu giao) — bưu cục tra theo mã này.
+        <div className="truncate font-bold leading-none" style={{ fontSize: f(SENDER_PT) }}>
+          Mã đơn hàng: {data.shipmentDocNumber}
+        </div>
+      ) : null}
       <table
         className="w-full border-collapse"
         style={{ fontSize: f(land ? 9.5 : SENDER_PT), tableLayout: 'fixed' }}
