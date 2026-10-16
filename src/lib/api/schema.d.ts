@@ -1173,6 +1173,41 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/pancake-sync/config/{shopId}/catalog-migration/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Mẫu mã đang có trên POS + gợi ý hàng ERP tương ứng. */
+        get: operations["PancakeCatalogMigrationController_preview"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/pancake-sync/config/{shopId}/catalog-migration": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Trạng thái / kết quả lượt chuyển gần nhất của shop. */
+        get: operations["PancakeCatalogMigrationController_status"];
+        put?: never;
+        /** Chạy theo các dòng đã duyệt (job nền). Đang có lượt chạy cho shop → trả trạng thái lượt đó. */
+        post: operations["PancakeCatalogMigrationController_start"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/pancake-sync/warehouses/links": {
         parameters: {
             query?: never;
@@ -1509,6 +1544,38 @@ export interface paths {
         options?: never;
         head?: never;
         patch?: never;
+        trace?: never;
+    };
+    "/combos": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["ComboController_list"];
+        put?: never;
+        post: operations["ComboController_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/combos/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["ComboController_get"];
+        put?: never;
+        post?: never;
+        delete: operations["ComboController_remove"];
+        options?: never;
+        head?: never;
+        patch: operations["ComboController_update"];
         trace?: never;
     };
     "/customers": {
@@ -2176,38 +2243,6 @@ export interface paths {
         options?: never;
         head?: never;
         patch?: never;
-        trace?: never;
-    };
-    "/combos": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get: operations["ComboController_list"];
-        put?: never;
-        post: operations["ComboController_create"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/combos/{id}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get: operations["ComboController_get"];
-        put?: never;
-        post?: never;
-        delete: operations["ComboController_remove"];
-        options?: never;
-        head?: never;
-        patch: operations["ComboController_update"];
         trace?: never;
     };
     "/attributes": {
@@ -6167,6 +6202,116 @@ export interface components {
             total: number;
             failed: number;
         };
+        CatalogMigrationSkuRefDto: {
+            skuId: string;
+            productId: string;
+            code: string;
+            name: string;
+            isCombo: boolean;
+        };
+        CatalogMigrationSuggestionDto: {
+            /**
+             * @description NONE = không tìm được hàng ERP tương ứng — người dùng chọn tay hoặc giữ nguyên.
+             * @enum {string}
+             */
+            action: "NONE" | "MAP" | "NEW_COMBO";
+            /**
+             * @description EXACT = trùng mã / trùng tên; FUZZY = gần trùng tên, cần xem kỹ.
+             * @enum {string}
+             */
+            confidence: "NONE" | "EXACT" | "FUZZY";
+            /** @description MAP: SKU / combo ERP gợi ý. */
+            sku: components["schemas"]["CatalogMigrationSkuRefDto"] | null;
+            /** @description NEW_COMBO: SKU thành phần. */
+            component: components["schemas"]["CatalogMigrationSkuRefDto"] | null;
+            /** @description NEW_COMBO: số lượng thành phần đọc từ tên POS. */
+            qty: number | null;
+            /** @description NEW_COMBO: thành phần đã có giá bán lẻ (bắt buộc để tạo combo). */
+            componentPriced: boolean | null;
+        };
+        CatalogMigrationRowDto: {
+            externalProductId: string;
+            externalVariationId: string;
+            /** @description Mã sản phẩm trên POS (cột "Mã SP"). */
+            posCode: string | null;
+            posName: string;
+            /** @description Giá bán trên POS — Decimal(18,4) chuỗi; null = POS chưa đặt giá. */
+            posPrice: string | null;
+            /**
+             * @description PENDING = sản phẩm gốc chưa chuyển; MIGRATED = đã nối sang hàng ERP (`current`);
+             *     ERP = sản phẩm do ERP đẩy lên — không thuộc diện chuyển.
+             * @enum {string}
+             */
+            state: "PENDING" | "MIGRATED" | "ERP";
+            current: components["schemas"]["CatalogMigrationSkuRefDto"] | null;
+            suggestion: components["schemas"]["CatalogMigrationSuggestionDto"];
+        };
+        CatalogMigrationPreviewDto: {
+            shopId: string;
+            rows: components["schemas"]["CatalogMigrationRowDto"][];
+        };
+        CatalogMigrationRowInputDto: {
+            externalProductId: string;
+            externalVariationId: string;
+            /**
+             * @description MAP = nối SKU / combo ERP có sẵn; NEW_COMBO = tạo combo ERP mới; SKIP = giữ nguyên trên POS.
+             * @enum {string}
+             */
+            action: "MAP" | "NEW_COMBO" | "SKIP";
+            /**
+             * Format: uuid
+             * @description MAP: SKU ERP (thường hoặc combo) nhận mẫu mã POS này.
+             */
+            skuId?: string;
+            /**
+             * Format: uuid
+             * @description NEW_COMBO: SKU thường làm thành phần duy nhất.
+             */
+            componentSkuId?: string;
+            /** @description NEW_COMBO: số lượng thành phần trong một combo. */
+            qty?: number;
+            /** @description NEW_COMBO: tên combo (mặc định tên trên POS). */
+            name?: string;
+            /** @description NEW_COMBO: giá bán một combo — mặc định giá bán trên POS. */
+            salePrice?: string;
+        };
+        StartCatalogMigrationDto: {
+            rows: components["schemas"]["CatalogMigrationRowInputDto"][];
+        };
+        CatalogMigrationCountsDto: {
+            combosCreated: number;
+            combosReused: number;
+            /** @description Mẫu mã POS đã nối sang hàng ERP. */
+            linked: number;
+            /** @description Sản phẩm ERP đã đẩy lên shop thành công. */
+            pushed: number;
+            pushFailed: number;
+            /** @description Sản phẩm gốc của POS đã ẩn. */
+            hidden: number;
+            skipped: number;
+        };
+        CatalogMigrationFailureDto: {
+            /** @description Tên sản phẩm POS hoặc mã sản phẩm ERP của dòng lỗi. */
+            item: string;
+            reason: string;
+        };
+        CatalogMigrationStatusDto: {
+            /** @enum {string} */
+            state: "completed" | "failed" | "active" | "waiting" | "idle";
+            /**
+             * @description Bước đang chạy: combos → links → catalog → push → hide → done.
+             * @enum {string|null}
+             */
+            step: "push" | "links" | "done" | "combos" | "catalog" | "hide" | null;
+            /** @description Bước đẩy: số sản phẩm ERP đã đẩy / tổng. */
+            done: number;
+            total: number;
+            counts: components["schemas"]["CatalogMigrationCountsDto"];
+            failures: components["schemas"]["CatalogMigrationFailureDto"][];
+            error: string | null;
+            startedAt: string | null;
+            finishedAt: string | null;
+        };
         PancakeWarehouseLinkRowDto: {
             warehouseId: string;
             code: string;
@@ -6631,6 +6776,151 @@ export interface components {
         AssignWaveDto: {
             /** Format: uuid */
             userId: string;
+        };
+        ComboListItemDto: {
+            /** @description core.Product.id — khoá của mọi endpoint /combos/:id. */
+            id: string;
+            /** @description core.Sku.id của SKU combo — dùng khi lên đơn (`lines[].skuId`). */
+            skuId: string;
+            code: string;
+            name: string;
+            isActive: boolean;
+            /** @description Mã ĐVT bán của combo. */
+            baseUomCode: string;
+            baseUomId: string;
+            /**
+             * @description Giá bán MỘT combo trong bảng giá mặc định = componentsPrice − discountAmount (nhập giảm giá
+             *     hoặc nhập thẳng giá bán — server quy về chênh lệch). null = còn thành phần chưa có giá lẻ.
+             */
+            salePrice: string | null;
+            /** @description Σ(giá lẻ thành phần × số lượng) trước giảm — null khi còn thành phần chưa có giá. */
+            componentsPrice: string | null;
+            /** @description Chênh lệch giảm cho MỘT combo — Decimal(18,4) chuỗi; ÂM = phụ phí (giá bán > tổng thành phần). */
+            discountAmount: string;
+            /** @description Combo miễn ship — gợi ý cho sale khi lên đơn. */
+            freeShipping: boolean;
+            componentCount: number;
+            /**
+             * @description Số combo còn bán được = min theo thành phần của floor(available / qty) — chuỗi số nguyên,
+             *     `0` khi có thành phần âm/hết. Tính từ tồn mọi kho (bất biến 2: combo không có tồn riêng).
+             */
+            available: string;
+            /** @description Optimistic locking — gửi lại trong PATCH; lệch → 409. */
+            version: number;
+            createdAt: string;
+            updatedAt: string;
+        };
+        ComboListResponseDto: {
+            items: components["schemas"]["ComboListItemDto"][];
+            total: number;
+        };
+        ComboComponentDto: {
+            skuId: string;
+            code: string;
+            name: string;
+            /** @description Mã ĐVT cơ sở của SKU thành phần — `qty` tính theo đơn vị này. */
+            baseUomCode: string;
+            /** @description Số lượng cho MỘT combo — Decimal(18,6) chuỗi. */
+            qty: string;
+            /** @description Giá bán lẻ ĐVT cơ sở của thành phần (bảng giá mặc định) — null = chưa có giá. */
+            unitPrice: string | null;
+            /** @description Tồn khả dụng của thành phần (onHand − reserved, mọi kho) — Decimal(18,6) chuỗi. */
+            available: string;
+            isActive: boolean;
+        };
+        ComboDetailDto: {
+            /** @description core.Product.id — khoá của mọi endpoint /combos/:id. */
+            id: string;
+            /** @description core.Sku.id của SKU combo — dùng khi lên đơn (`lines[].skuId`). */
+            skuId: string;
+            code: string;
+            name: string;
+            isActive: boolean;
+            /** @description Mã ĐVT bán của combo. */
+            baseUomCode: string;
+            baseUomId: string;
+            /**
+             * @description Giá bán MỘT combo trong bảng giá mặc định = componentsPrice − discountAmount (nhập giảm giá
+             *     hoặc nhập thẳng giá bán — server quy về chênh lệch). null = còn thành phần chưa có giá lẻ.
+             */
+            salePrice: string | null;
+            /** @description Σ(giá lẻ thành phần × số lượng) trước giảm — null khi còn thành phần chưa có giá. */
+            componentsPrice: string | null;
+            /** @description Chênh lệch giảm cho MỘT combo — Decimal(18,4) chuỗi; ÂM = phụ phí (giá bán > tổng thành phần). */
+            discountAmount: string;
+            /** @description Combo miễn ship — gợi ý cho sale khi lên đơn. */
+            freeShipping: boolean;
+            componentCount: number;
+            /**
+             * @description Số combo còn bán được = min theo thành phần của floor(available / qty) — chuỗi số nguyên,
+             *     `0` khi có thành phần âm/hết. Tính từ tồn mọi kho (bất biến 2: combo không có tồn riêng).
+             */
+            available: string;
+            /** @description Optimistic locking — gửi lại trong PATCH; lệch → 409. */
+            version: number;
+            createdAt: string;
+            updatedAt: string;
+            categoryId: string | null;
+            brandId: string | null;
+            description: string | null;
+            searchAliases: string[];
+            components: components["schemas"]["ComboComponentDto"][];
+        };
+        ComboComponentInputDto: {
+            /**
+             * Format: uuid
+             * @description core.Sku.id của SKU thường (không phải combo), đang bán.
+             */
+            skuId: string;
+            /** @description Số lượng cho MỘT combo — Decimal(18,6) dạng chuỗi, > 0, theo ĐVT cơ sở của SKU thành phần. */
+            qty: string;
+        };
+        CreateComboDto: {
+            /** @description Bỏ trống → sinh tự động `CB-{seq}`. Mã dùng chung cho Product và SKU combo. */
+            code?: string;
+            name: string;
+            /** Format: uuid */
+            categoryId?: string;
+            /** Format: uuid */
+            brandId?: string;
+            description?: string;
+            /** @description Mã ĐVT của SKU combo (mặc định PCS) — combo bán theo đơn vị này, không quy đổi. */
+            baseUom?: string;
+            /**
+             * @description Số tiền giảm cho MỘT combo — Decimal(18,4) chuỗi, ≥ 0, mặc định 0. Giá bán combo do hệ
+             *     thống tính: Σ(giá bán lẻ thành phần × số lượng) − discountAmount.
+             */
+            discountAmount?: string;
+            /**
+             * @description Giá bán MỘT combo nhập tay — Decimal(18,4) chuỗi, ≥ 0; thay cho `discountAmount` (gửi cả hai
+             *     → 422). Được phép LỚN HƠN tổng giá lẻ thành phần (cộng chi phí phát sinh ngoài). Server quy
+             *     về chênh lệch: discountAmount = Σ(giá lẻ × định mức) − salePrice (âm = phụ phí), nên giá
+             *     combo vẫn chạy theo giá lẻ thành phần khi chúng đổi.
+             */
+            salePrice?: string;
+            /** @description Combo miễn ship — gợi ý cho sale khi lên đơn (sale quyết định phí ship cuối). */
+            freeShipping?: boolean;
+            /** @description Tên dân dã / viết tắt cho ô tìm kiếm. */
+            searchAliases?: string[];
+            components: components["schemas"]["ComboComponentInputDto"][];
+        };
+        UpdateComboDto: {
+            /** @description Optimistic locking — Product.version client đang cầm; lệch → 409. */
+            version: number;
+            name?: string;
+            /** Format: uuid */
+            categoryId?: string | null;
+            /** Format: uuid */
+            brandId?: string | null;
+            description?: string;
+            isActive?: boolean;
+            /** @description Xem CreateComboDto.discountAmount. */
+            discountAmount?: string;
+            /** @description Xem CreateComboDto.salePrice. */
+            salePrice?: string;
+            freeShipping?: boolean;
+            searchAliases?: string[];
+            components?: components["schemas"]["ComboComponentInputDto"][];
         };
         CustomerListItemDto: {
             group: components["schemas"]["CustomerGroupRefDto"] | null;
@@ -7601,151 +7891,6 @@ export interface components {
             sortOrder?: number;
             /** @description false = ngừng dùng: không gắn được vào cấp mới / không tạo container mới; cái đã có giữ nguyên. */
             isActive?: boolean;
-        };
-        ComboListItemDto: {
-            /** @description core.Product.id — khoá của mọi endpoint /combos/:id. */
-            id: string;
-            /** @description core.Sku.id của SKU combo — dùng khi lên đơn (`lines[].skuId`). */
-            skuId: string;
-            code: string;
-            name: string;
-            isActive: boolean;
-            /** @description Mã ĐVT bán của combo. */
-            baseUomCode: string;
-            baseUomId: string;
-            /**
-             * @description Giá bán MỘT combo trong bảng giá mặc định = componentsPrice − discountAmount (nhập giảm giá
-             *     hoặc nhập thẳng giá bán — server quy về chênh lệch). null = còn thành phần chưa có giá lẻ.
-             */
-            salePrice: string | null;
-            /** @description Σ(giá lẻ thành phần × số lượng) trước giảm — null khi còn thành phần chưa có giá. */
-            componentsPrice: string | null;
-            /** @description Chênh lệch giảm cho MỘT combo — Decimal(18,4) chuỗi; ÂM = phụ phí (giá bán > tổng thành phần). */
-            discountAmount: string;
-            /** @description Combo miễn ship — gợi ý cho sale khi lên đơn. */
-            freeShipping: boolean;
-            componentCount: number;
-            /**
-             * @description Số combo còn bán được = min theo thành phần của floor(available / qty) — chuỗi số nguyên,
-             *     `0` khi có thành phần âm/hết. Tính từ tồn mọi kho (bất biến 2: combo không có tồn riêng).
-             */
-            available: string;
-            /** @description Optimistic locking — gửi lại trong PATCH; lệch → 409. */
-            version: number;
-            createdAt: string;
-            updatedAt: string;
-        };
-        ComboListResponseDto: {
-            items: components["schemas"]["ComboListItemDto"][];
-            total: number;
-        };
-        ComboComponentDto: {
-            skuId: string;
-            code: string;
-            name: string;
-            /** @description Mã ĐVT cơ sở của SKU thành phần — `qty` tính theo đơn vị này. */
-            baseUomCode: string;
-            /** @description Số lượng cho MỘT combo — Decimal(18,6) chuỗi. */
-            qty: string;
-            /** @description Giá bán lẻ ĐVT cơ sở của thành phần (bảng giá mặc định) — null = chưa có giá. */
-            unitPrice: string | null;
-            /** @description Tồn khả dụng của thành phần (onHand − reserved, mọi kho) — Decimal(18,6) chuỗi. */
-            available: string;
-            isActive: boolean;
-        };
-        ComboDetailDto: {
-            /** @description core.Product.id — khoá của mọi endpoint /combos/:id. */
-            id: string;
-            /** @description core.Sku.id của SKU combo — dùng khi lên đơn (`lines[].skuId`). */
-            skuId: string;
-            code: string;
-            name: string;
-            isActive: boolean;
-            /** @description Mã ĐVT bán của combo. */
-            baseUomCode: string;
-            baseUomId: string;
-            /**
-             * @description Giá bán MỘT combo trong bảng giá mặc định = componentsPrice − discountAmount (nhập giảm giá
-             *     hoặc nhập thẳng giá bán — server quy về chênh lệch). null = còn thành phần chưa có giá lẻ.
-             */
-            salePrice: string | null;
-            /** @description Σ(giá lẻ thành phần × số lượng) trước giảm — null khi còn thành phần chưa có giá. */
-            componentsPrice: string | null;
-            /** @description Chênh lệch giảm cho MỘT combo — Decimal(18,4) chuỗi; ÂM = phụ phí (giá bán > tổng thành phần). */
-            discountAmount: string;
-            /** @description Combo miễn ship — gợi ý cho sale khi lên đơn. */
-            freeShipping: boolean;
-            componentCount: number;
-            /**
-             * @description Số combo còn bán được = min theo thành phần của floor(available / qty) — chuỗi số nguyên,
-             *     `0` khi có thành phần âm/hết. Tính từ tồn mọi kho (bất biến 2: combo không có tồn riêng).
-             */
-            available: string;
-            /** @description Optimistic locking — gửi lại trong PATCH; lệch → 409. */
-            version: number;
-            createdAt: string;
-            updatedAt: string;
-            categoryId: string | null;
-            brandId: string | null;
-            description: string | null;
-            searchAliases: string[];
-            components: components["schemas"]["ComboComponentDto"][];
-        };
-        ComboComponentInputDto: {
-            /**
-             * Format: uuid
-             * @description core.Sku.id của SKU thường (không phải combo), đang bán.
-             */
-            skuId: string;
-            /** @description Số lượng cho MỘT combo — Decimal(18,6) dạng chuỗi, > 0, theo ĐVT cơ sở của SKU thành phần. */
-            qty: string;
-        };
-        CreateComboDto: {
-            /** @description Bỏ trống → sinh tự động `CB-{seq}`. Mã dùng chung cho Product và SKU combo. */
-            code?: string;
-            name: string;
-            /** Format: uuid */
-            categoryId?: string;
-            /** Format: uuid */
-            brandId?: string;
-            description?: string;
-            /** @description Mã ĐVT của SKU combo (mặc định PCS) — combo bán theo đơn vị này, không quy đổi. */
-            baseUom?: string;
-            /**
-             * @description Số tiền giảm cho MỘT combo — Decimal(18,4) chuỗi, ≥ 0, mặc định 0. Giá bán combo do hệ
-             *     thống tính: Σ(giá bán lẻ thành phần × số lượng) − discountAmount.
-             */
-            discountAmount?: string;
-            /**
-             * @description Giá bán MỘT combo nhập tay — Decimal(18,4) chuỗi, ≥ 0; thay cho `discountAmount` (gửi cả hai
-             *     → 422). Được phép LỚN HƠN tổng giá lẻ thành phần (cộng chi phí phát sinh ngoài). Server quy
-             *     về chênh lệch: discountAmount = Σ(giá lẻ × định mức) − salePrice (âm = phụ phí), nên giá
-             *     combo vẫn chạy theo giá lẻ thành phần khi chúng đổi.
-             */
-            salePrice?: string;
-            /** @description Combo miễn ship — gợi ý cho sale khi lên đơn (sale quyết định phí ship cuối). */
-            freeShipping?: boolean;
-            /** @description Tên dân dã / viết tắt cho ô tìm kiếm. */
-            searchAliases?: string[];
-            components: components["schemas"]["ComboComponentInputDto"][];
-        };
-        UpdateComboDto: {
-            /** @description Optimistic locking — Product.version client đang cầm; lệch → 409. */
-            version: number;
-            name?: string;
-            /** Format: uuid */
-            categoryId?: string | null;
-            /** Format: uuid */
-            brandId?: string | null;
-            description?: string;
-            isActive?: boolean;
-            /** @description Xem CreateComboDto.discountAmount. */
-            discountAmount?: string;
-            /** @description Xem CreateComboDto.salePrice. */
-            salePrice?: string;
-            freeShipping?: boolean;
-            searchAliases?: string[];
-            components?: components["schemas"]["ComboComponentInputDto"][];
         };
         AttributeValueDto: {
             code: string;
@@ -12980,6 +13125,73 @@ export interface operations {
             };
         };
     };
+    PancakeCatalogMigrationController_preview: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                shopId: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CatalogMigrationPreviewDto"];
+                };
+            };
+        };
+    };
+    PancakeCatalogMigrationController_status: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                shopId: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CatalogMigrationStatusDto"];
+                };
+            };
+        };
+    };
+    PancakeCatalogMigrationController_start: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                shopId: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["StartCatalogMigrationDto"];
+            };
+        };
+        responses: {
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CatalogMigrationStatusDto"];
+                };
+            };
+        };
+    };
     PancakeWarehouseController_links: {
         parameters: {
             query?: never;
@@ -13465,6 +13677,121 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["WaveDetailDto"];
+                };
+            };
+        };
+    };
+    ComboController_list: {
+        parameters: {
+            query: {
+                /** @description Tìm theo mã / tên combo, mã / tên SKU thành phần. */
+                q?: string;
+                isActive?: boolean;
+                sortBy?: "code" | "name" | "createdAt";
+                sortDir?: "asc" | "desc";
+                take: number;
+                skip: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ComboListResponseDto"];
+                };
+            };
+        };
+    };
+    ComboController_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateComboDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ComboDetailDto"];
+                };
+            };
+        };
+    };
+    ComboController_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ComboDetailDto"];
+                };
+            };
+        };
+    };
+    ComboController_remove: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    ComboController_update: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateComboDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ComboDetailDto"];
                 };
             };
         };
@@ -14946,121 +15273,6 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
-            };
-        };
-    };
-    ComboController_list: {
-        parameters: {
-            query: {
-                /** @description Tìm theo mã / tên combo, mã / tên SKU thành phần. */
-                q?: string;
-                isActive?: boolean;
-                sortBy?: "code" | "name" | "createdAt";
-                sortDir?: "asc" | "desc";
-                take: number;
-                skip: number;
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ComboListResponseDto"];
-                };
-            };
-        };
-    };
-    ComboController_create: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["CreateComboDto"];
-            };
-        };
-        responses: {
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ComboDetailDto"];
-                };
-            };
-        };
-    };
-    ComboController_get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ComboDetailDto"];
-                };
-            };
-        };
-    };
-    ComboController_remove: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            204: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    ComboController_update: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["UpdateComboDto"];
-            };
-        };
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ComboDetailDto"];
-                };
             };
         };
     };
