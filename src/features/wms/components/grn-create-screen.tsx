@@ -42,6 +42,7 @@ import { isApiError, type ApiError } from '@/lib/api/errors';
 import { messageFor } from '@/lib/error-messages';
 import { formatMoney, formatQuantity } from '@/lib/format';
 import { dateKeySchema, moneySchema, quantitySchema } from '@/lib/shared';
+import { ALL_WAREHOUSES, useWarehouse } from '@/lib/warehouse';
 import { useContainerTypes } from '../api/use-containers';
 import { AssignBarcodeDialog } from './assign-barcode-dialog';
 import {
@@ -56,7 +57,6 @@ import {
   useReceipt,
   type ReceiptDetail,
 } from '../api/use-receipts';
-import { isOperationalWarehouse, useWarehouses } from '../api/use-warehouses';
 
 /** Cùng regex với quantitySchema — dùng để guard trước khi new Decimal(). */
 const QTY_RE = /^\d{1,12}(\.\d{1,6})?$/;
@@ -251,7 +251,8 @@ export function GrnCreateScreen({ copyFromId }: { copyFromId?: string }) {
 
 function GrnCreateForm({ copyOf }: { copyOf?: ReceiptDetail }) {
   const router = useRouter();
-  const warehouses = useWarehouses();
+  // Kho nhận: kho được phép (server lọc trong /auth/me); mặc định kho đang làm việc.
+  const { options: myWarehouses, selected: workingWarehouse } = useWarehouse();
   const containerTypes = useContainerTypes();
   const create = useCreateReceipt();
   const post = usePostReceipt();
@@ -264,7 +265,8 @@ function GrnCreateForm({ copyOf }: { copyOf?: ReceiptDetail }) {
     defaultValues: copyOf
       ? receiptToFormValues(copyOf)
       : {
-          warehouseId: '',
+          warehouseId:
+            workingWarehouse && workingWarehouse !== ALL_WAREHOUSES ? workingWarehouse : '',
           receivedAt: todayKey(),
           note: '',
           lines: [EMPTY_LINE],
@@ -447,7 +449,7 @@ function GrnCreateForm({ copyOf }: { copyOf?: ReceiptDetail }) {
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>
-                      {(warehouses.data ?? []).filter(isOperationalWarehouse).map((w) => (
+                      {myWarehouses.map((w) => (
                         <SelectItem key={w.id} value={w.id}>
                           {w.name}
                         </SelectItem>

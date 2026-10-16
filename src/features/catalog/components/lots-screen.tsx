@@ -30,13 +30,6 @@ import {
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
-import {
   Table,
   TableBody,
   TableCell,
@@ -52,7 +45,6 @@ import { useAbility } from '@/lib/permission';
 import { dateKeySchema } from '@/lib/shared';
 import { toSkipTake, useListState } from '@/lib/url-state';
 import { useLotCount, useLots, useUpdateLot, type LotRow } from '../api/use-lots';
-import { useWarehouses } from '../api/use-products';
 
 /**
  * F4 (PLAN-master-data-lot-uom) — màn Lô & hạn dùng nối API thật:
@@ -70,7 +62,8 @@ const PENDING_API: Array<{ title: string; need: string }> = [
   { title: 'Giá vốn tồn theo lô', need: 'CostLayer chưa gắn lotId (quyết định Q3 — giữ FIFO)' },
 ];
 
-const DEFAULTS = { size: 40, filterKeys: ['warehouseId', 'state'] as const };
+// Kho: ô chọn kho làm việc ở sidebar (header X-Warehouse-Id) — tồn lô tính trong kho đó.
+const DEFAULTS = { size: 40, filterKeys: ['state'] as const };
 type LotFilter = (typeof DEFAULTS.filterKeys)[number];
 
 type LotState = 'expired' | 'near' | 'ok' | 'empty' | 'none';
@@ -267,13 +260,11 @@ function FilterChip({
 }
 
 const NUM_CELL = 'px-2.5 py-1.5 text-right tabular-nums';
-const ALL = '__all__';
 
 export function LotsScreen() {
   const { state, set } = useListState<LotFilter>(DEFAULTS);
   const ability = useAbility();
   const canAdjust = ability.can('adjust', 'Stock');
-  const warehouses = useWarehouses();
   const [editing, setEditing] = useState<LotRow | null>(null);
 
   // Chip trạng thái: 'expired' | 'soon' | 'stock' — một chiều, nằm trên URL
@@ -282,7 +273,6 @@ export function LotsScreen() {
     () => ({
       ...toSkipTake(state),
       ...(state.q ? { q: state.q } : {}),
-      ...(state.filters.warehouseId ? { warehouseId: state.filters.warehouseId } : {}),
       ...(chip === 'expired' ? { expiringInDays: 0, hasStock: true } : {}),
       ...(chip === 'soon' ? { expiringInDays: 30 } : {}),
       ...(chip === 'stock' ? { hasStock: true } : {}),
@@ -344,24 +334,6 @@ export function LotsScreen() {
             className="h-auto w-full rounded-none border-0 bg-transparent p-0 outline-none placeholder:text-muted-foreground"
           />
         </div>
-        <Select
-          value={state.filters.warehouseId || ALL}
-          onValueChange={(v) =>
-            set({ filters: { ...state.filters, warehouseId: v === ALL ? undefined : v } })
-          }
-        >
-          <SelectTrigger className="h-7 w-40" aria-label="Kho">
-            <SelectValue placeholder="Kho: Tất cả" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value={ALL}>Kho: Tất cả</SelectItem>
-            {(warehouses.data ?? []).map((w) => (
-              <SelectItem key={w.id} value={w.id}>
-                {w.name}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
         <FilterChip active={chip === 'soon'} onClick={() => toggleChip('soon')}>
           Hết hạn trong 30 ngày
         </FilterChip>

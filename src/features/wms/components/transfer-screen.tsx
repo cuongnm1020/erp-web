@@ -38,6 +38,7 @@ import { cn } from '@/lib/cn';
 import { messageFor } from '@/lib/error-messages';
 import { formatDateTime, formatQuantity } from '@/lib/format';
 import { useAbility } from '@/lib/permission';
+import { useWarehouse } from '@/lib/warehouse';
 import { useLocationTree, useSkuSearch, type LocationNode } from '../api/use-locations';
 import {
   useCancelTransfer,
@@ -111,7 +112,10 @@ function CreateDialog({ onClose }: { onClose: (id?: string) => void }) {
     () => (fromTree.data ? locationOptions(fromTree.data) : []),
     [fromTree.data],
   );
+  // Kho đến: mọi kho đang hoạt động (chuyển tới kho mình không quản lý được — kho đó tự nhận).
+  // Kho đi: chỉ kho được phép (server lọc trong /auth/me — xuất kho cần quyền kho đi).
   const operational = (warehouses.data ?? []).filter(isOperationalWarehouse);
+  const { options: myWarehouses } = useWarehouse();
 
   const patch = (i: number, p: Partial<DraftLine>) =>
     setLines((ls) => ls.map((l, j) => (j === i ? { ...l, ...p } : l)));
@@ -146,7 +150,7 @@ function CreateDialog({ onClose }: { onClose: (id?: string) => void }) {
                 <SelectValue placeholder="Kho đi" />
               </SelectTrigger>
               <SelectContent>
-                {operational.map((w) => (
+                {myWarehouses.map((w) => (
                   <SelectItem key={w.id} value={w.id}>
                     {w.name}
                   </SelectItem>

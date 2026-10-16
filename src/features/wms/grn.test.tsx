@@ -32,6 +32,8 @@ vi.mock('next/navigation', () => ({
 }));
 
 const WAREHOUSES = [{ id: 'wh-1', code: 'WH01', name: 'Kho HN-1', address: null, isActive: true }];
+/** Kho được phép của phiên (/auth/me) — ô Kho nhận lấy từ đây (PLAN-warehouse-context). */
+const MY_WAREHOUSES = [{ id: 'wh-1', code: 'WH01', name: 'Kho HN-1' }];
 
 const LIST = {
   items: [
@@ -239,7 +241,7 @@ describe('GrnCreateScreen — POST /goods-receipts (+ post)', () => {
         );
       }),
     );
-    renderApp(<GrnCreateScreen />);
+    renderApp(<GrnCreateScreen />, { warehouses: MY_WAREHOUSES });
     fireEvent.click(await screen.findByRole('combobox', { name: 'Kho nhận *' }));
     fireEvent.click(await screen.findByRole('option', { name: 'Kho HN-1' }));
     fireEvent.click(screen.getByText('Tìm SKU…'));
@@ -281,7 +283,7 @@ describe('GrnCreateScreen — POST /goods-receipts (+ post)', () => {
         () => (posts.push(1), HttpResponse.json({}, { status: 201 })),
       ),
     );
-    renderApp(<GrnCreateScreen />);
+    renderApp(<GrnCreateScreen />, { warehouses: MY_WAREHOUSES });
     fireEvent.click(await screen.findByRole('combobox', { name: 'Kho nhận *' }));
     fireEvent.click(await screen.findByRole('option', { name: 'Kho HN-1' }));
     fireEvent.click(screen.getByText('Tìm SKU…'));
@@ -337,7 +339,7 @@ describe('GrnCreateScreen — POST /goods-receipts (+ post)', () => {
         );
       }),
     );
-    renderApp(<GrnCreateScreen />);
+    renderApp(<GrnCreateScreen />, { warehouses: MY_WAREHOUSES });
     fireEvent.click(await screen.findByRole('combobox', { name: 'Kho nhận *' }));
     fireEvent.click(await screen.findByRole('option', { name: 'Kho HN-1' }));
     const scan = (code: string) => {
@@ -417,7 +419,7 @@ describe('GrnCreateScreen — POST /goods-receipts (+ post)', () => {
         );
       }),
     );
-    renderApp(<GrnCreateScreen />);
+    renderApp(<GrnCreateScreen />, { warehouses: MY_WAREHOUSES });
     fireEvent.click(await screen.findByRole('combobox', { name: 'Kho nhận *' }));
     fireEvent.click(await screen.findByRole('option', { name: 'Kho HN-1' }));
     const input = screen.getByLabelText('Quét barcode sản phẩm / thùng / pallet');
@@ -446,7 +448,7 @@ describe('GrnCreateScreen — POST /goods-receipts (+ post)', () => {
         ),
       ),
     );
-    renderApp(<GrnCreateScreen />);
+    renderApp(<GrnCreateScreen />, { warehouses: MY_WAREHOUSES });
     const input = await screen.findByLabelText('Quét barcode sản phẩm / thùng / pallet');
     fireEvent.change(input, { target: { value: 'https://ưưư.thiennongnamviet.com.vn/combi' } });
     fireEvent.keyDown(input, { key: 'Enter' });
@@ -469,7 +471,7 @@ describe('GrnCreateScreen — POST /goods-receipts (+ post)', () => {
         );
       }),
     );
-    renderApp(<GrnCreateScreen />);
+    renderApp(<GrnCreateScreen />, { warehouses: MY_WAREHOUSES });
     fireEvent.click(await screen.findByRole('combobox', { name: 'Kho nhận *' }));
     fireEvent.click(await screen.findByRole('option', { name: 'Kho HN-1' }));
 
@@ -503,7 +505,7 @@ describe('GrnCreateScreen — POST /goods-receipts (+ post)', () => {
         return HttpResponse.json({ receiptId: params.id, status: 'POSTED' });
       }),
     );
-    renderApp(<GrnCreateScreen />);
+    renderApp(<GrnCreateScreen />, { warehouses: MY_WAREHOUSES });
     fireEvent.click(await screen.findByRole('combobox', { name: 'Kho nhận *' }));
     fireEvent.click(await screen.findByRole('option', { name: 'Kho HN-1' }));
     fireEvent.click(screen.getByText('Tìm SKU…'));
@@ -645,7 +647,7 @@ describe('Nhân bản phiếu nhập (?from=) — 2026-10-12', () => {
         );
       }),
     );
-    renderApp(<GrnCreateScreen copyFromId="r-1" />);
+    renderApp(<GrnCreateScreen copyFromId="r-1" />, { warehouses: MY_WAREHOUSES });
     expect(await screen.findByText(/Nhân bản từ GRN2608-00087 · 1 dòng/)).toBeInTheDocument();
     expect(screen.getByDisplayValue('Xe 29H-512.44')).toBeInTheDocument();
     expect(screen.getByText('Giấy A4 Double A 80gsm')).toBeInTheDocument();

@@ -17,7 +17,6 @@ import {
   type GoodsIssueListRow,
   type GoodsIssueStatus,
 } from '../api/use-goods-issues';
-import { useWarehouses } from '../api/use-warehouses';
 
 /**
  * Xuất kho — danh sách GDN nối GET /goods-issues (design GdnList).
@@ -36,7 +35,8 @@ import { useWarehouses } from '../api/use-warehouses';
  */
 const DEFAULTS = {
   size: 40,
-  filterKeys: ['status', 'kind', 'warehouseId'] as const,
+  // Kho: ô chọn kho làm việc ở sidebar (header X-Warehouse-Id) — không còn bộ lọc kho riêng.
+  filterKeys: ['status', 'kind'] as const,
 };
 type GdnFilter = (typeof DEFAULTS.filterKeys)[number];
 
@@ -49,7 +49,6 @@ const TABS: Array<{ key: '' | GoodsIssueStatus; label: string }> = [
 
 export function GdnListScreen() {
   const { state, set } = useListState<GdnFilter>(DEFAULTS);
-  const warehouses = useWarehouses();
 
   const params = useMemo(
     () => ({
@@ -57,7 +56,6 @@ export function GdnListScreen() {
       ...(state.q ? { q: state.q } : {}),
       ...(state.filters.status ? { status: state.filters.status as GoodsIssueStatus } : {}),
       ...(state.filters.kind ? { kind: state.filters.kind as GoodsIssueKind } : {}),
-      ...(state.filters.warehouseId ? { warehouseId: state.filters.warehouseId } : {}),
     }),
     [state],
   );
@@ -179,12 +177,6 @@ export function GdnListScreen() {
         values={state.filters}
         onFilterChange={(patch) => set({ filters: { ...state.filters, ...patch } })}
         filters={[
-          {
-            key: 'warehouseId',
-            label: 'Kho',
-            type: 'select',
-            options: (warehouses.data ?? []).map((w) => ({ value: w.id, label: w.name })),
-          },
           {
             key: 'kind',
             label: 'Loại',

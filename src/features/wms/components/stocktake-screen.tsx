@@ -40,6 +40,7 @@ import { isApiError } from '@/lib/api/errors';
 import { messageFor } from '@/lib/error-messages';
 import { formatDateTime, formatQuantity } from '@/lib/format';
 import { useAbility } from '@/lib/permission';
+import { ALL_WAREHOUSES, useWarehouse } from '@/lib/warehouse';
 import {
   useApproveCycleCount,
   useCreateCycleCount,
@@ -53,7 +54,6 @@ import {
   type CycleCountStatus,
 } from '../api/use-stocktake';
 import { useResolveCode } from '../api/use-pda';
-import { isOperationalWarehouse, useWarehouses } from '../api/use-warehouses';
 
 /**
  * Kiểm kê định kỳ (P2-07, design Stocktake) — /cycle-counts.
@@ -74,9 +74,12 @@ const STATUS_LABEL: Record<CycleCountStatus, { label: string; tone: StatusTone }
 };
 
 function CreateDialog({ open, onClose }: { open: boolean; onClose: (id?: string) => void }) {
-  const warehouses = useWarehouses();
+  // Kho kiểm: kho được phép (server lọc trong /auth/me); mặc định kho đang làm việc.
+  const { options: myWarehouses, selected: workingWarehouse } = useWarehouse();
   const create = useCreateCycleCount();
-  const [warehouseId, setWarehouseId] = useState('');
+  const [warehouseId, setWarehouseId] = useState(
+    workingWarehouse && workingWarehouse !== ALL_WAREHOUSES ? workingWarehouse : '',
+  );
   return (
     <Dialog open={open} onOpenChange={(o) => !create.isPending && !o && onClose()}>
       <DialogContent className="sm:max-w-md">
@@ -92,7 +95,7 @@ function CreateDialog({ open, onClose }: { open: boolean; onClose: (id?: string)
             <SelectValue placeholder="Chọn kho" />
           </SelectTrigger>
           <SelectContent>
-            {(warehouses.data ?? []).filter(isOperationalWarehouse).map((w) => (
+            {myWarehouses.map((w) => (
               <SelectItem key={w.id} value={w.id}>
                 {w.name}
               </SelectItem>

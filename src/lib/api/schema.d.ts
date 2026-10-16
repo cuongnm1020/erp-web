@@ -17816,6 +17816,8 @@ export interface operations {
         parameters: {
             query: {
                 orderId?: string;
+                /** @description Kho nhận hàng hoàn (mặc định theo kho đang chọn — header X-Warehouse-Id). */
+                warehouseId?: string;
                 status?: "DRAFT" | "PENDING_APPROVAL" | "APPROVED" | "POSTED" | "CANCELLED";
                 /** @description Số phiếu RTN (contains, không phân biệt hoa thường). */
                 q?: string;

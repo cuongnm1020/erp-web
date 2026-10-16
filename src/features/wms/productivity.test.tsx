@@ -90,7 +90,8 @@ describe('ProductivityScreen — /wms/productivity', () => {
     const pick = await screen.findByRole('region', { name: 'Nhân viên lấy hàng' });
     expect(seen[0]?.get('from')).toBe('2026-09-21');
     expect(seen[0]?.get('to')).toBe('2026-09-27');
-    expect(seen[0]?.get('warehouseId')).toBe('wh-1');
+    // Kho theo ô chọn kho làm việc (header) — ?warehouseId trên URL không còn đi vào query.
+    expect(seen[0]?.has('warehouseId')).toBe(false);
 
     expect(screen.getAllByText('Đơn đã lấy')[0]?.nextSibling?.textContent).toBe('45'); // KPI trước bảng
     expect(screen.getByText('Chờ giao việc').nextSibling?.textContent).toBe('12');
