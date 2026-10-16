@@ -11,7 +11,6 @@ import type { ShipmentLabelData } from '../api/use-pda';
 import { DEFAULT_PRINT_NOTE, hidePhone, maskedAddress, parseGhtkTracking } from '../ghtk-label';
 import { f, labelInner, labelOuter, u } from '../label-scale';
 import { GhtkWaybillLabel } from './ghtk-waybill-label';
-import { GhtkWaybillLabelPortrait } from './ghtk-waybill-label-portrait';
 
 export type WaybillOrientation = 'landscape' | 'portrait';
 
@@ -77,14 +76,15 @@ export function WaybillLabel({
   printedAt: Date;
 }) {
   const land = orientation === 'landscape';
-  // Đơn GHTK đã có mã đúng dạng GHTK → bố cục tem GHTK (2026-10-14): dọc theo tem A6 của
-  // GHTK, ngang là bản xếp gọn cho 100×75.
+  // Đơn GHTK đã có mã đúng dạng GHTK: ngang → tem GHTK xếp gọn 100×75 (2026-10-14); dọc →
+  // cùng khung tem dọc chung (2026-10-16), mã vạch mang đoạn số cuối + in mã phân loại.
   const ghtk = data.carrierCode === 'GHTK' ? parseGhtkTracking(data.trackingNo) : null;
   if (ghtk && land) return <GhtkWaybillLabel data={data} ghtk={ghtk} printedAt={printedAt} />;
-  if (ghtk) return <GhtkWaybillLabelPortrait data={data} ghtk={ghtk} printedAt={printedAt} />;
   const size = SIZE[orientation];
   const code = data.trackingNo ?? data.shipmentDocNumber;
-  const long = code.length > LONG_CODE;
+  /** Giá trị mã vạch: GHTK quét đoạn số cuối, hãng khác quét cả mã. */
+  const barValue = ghtk?.shortCode ?? code;
+  const long = barValue.length > LONG_CODE;
   // Dọc + mã dài: khối mã chiếm thêm chỗ → bớt một dòng hàng.
   const max = MAX_ITEMS[orientation] - (long && !land ? 1 : 0);
   const shown = data.items.slice(0, max);
@@ -97,7 +97,7 @@ export function WaybillLabel({
     <div className="flex min-w-0 flex-1 flex-col items-center justify-center">
       <div className="w-full" style={{ height: u(heightMm) }}>
         <Barcode
-          value={code}
+          value={barValue}
           symbology="code128"
           height={14}
           scale={2}
@@ -112,11 +112,25 @@ export function WaybillLabel({
             'min-w-0 flex-1 text-center font-mono leading-none',
             long ? 'break-all font-bold' : 'tracking-wide',
           )}
-          style={{ fontSize: f(textPt) }}
+          style={{ fontSize: f(ghtk ? 9 : textPt) }}
         >
-          {code}
+          {barValue}
         </span>
-        {long ? null : (
+        {ghtk ? (
+          // Mã phân loại GHTK: đoạn đầu nền đen
+          <span
+            className="shrink-0 whitespace-nowrap font-extrabold leading-none"
+            style={{ fontSize: f(ghtk.sortCode.length > 9 ? 9 : 11) }}
+          >
+            <span
+              className="bg-foreground text-background"
+              style={{ padding: `${u(0.3)} ${u(0.6)}` }}
+            >
+              {ghtk.sortHead}
+            </span>
+            {ghtk.sortTail}
+          </span>
+        ) : long ? null : (
           <span className="shrink-0 font-bold leading-none" style={{ fontSize: f(11) }}>
             1/1
           </span>

@@ -214,7 +214,7 @@ describe('Popup nhãn — tem ERP 100×75 mm (2026-10-13)', () => {
     expect(label.queryByText(/0901/)).toBeNull();
   });
 
-  it('đơn GHTK, tem dọc → bố cục tem A6 GHTK: tuyến, mã phân loại, mã vạch số cuối, QR', async () => {
+  it('đơn GHTK, tem dọc → cùng khung tem dọc chung: mã vạch số cuối, mã phân loại, QR mã đầy đủ', async () => {
     localStorage.setItem('erp.pack.labelOrientation', 'portrait');
     const long = 'S23119447.MB7.MB7-05-L1.1890932219';
     server.use(
@@ -239,27 +239,18 @@ describe('Popup nhãn — tem ERP 100×75 mm (2026-10-13)', () => {
     const root = lastPrinted();
     expect(root.getAttribute('data-print-size')).toBe('WAYBILL_75x100');
     const label = within(root);
+    // 2026-10-16: GHTK dọc dùng khung tem dọc chung (giống Viettel)
     expect(label.getByRole('img', { name: `Mã vận đơn ${long}` })).toBeTruthy();
     expect(label.getByRole('img', { name: `QR ${long}` })).toBeTruthy();
     expect(label.getByText('1890932219')).toBeTruthy();
-    expect(label.getByText('NỘI MIỀN')).toBeTruthy();
     expect(label.getByText('MB7')).toBeTruthy();
-    expect(label.getByText('EXPRESS')).toBeTruthy();
-    expect(label.getByText('DN2610-00001')).toBeTruthy();
-    expect(label.getByText('Kho Thạch Thất')).toBeTruthy();
-    expect(label.getByText(/\/ 0339 213 208/)).toBeTruthy();
-    expect(label.getByText(/Mạnh · Đ\/c: \*\*\*, Xã Thạch Thất, Hà Nội/)).toBeTruthy();
-    // Bố cục 2026-10-15: SĐT người nhận giữ 4 số cuối, bỏ khối lượng + giao tới
-    expect(label.getByText('Nguyễn Công Quân')).toBeTruthy();
-    expect(label.getByText(/\/ \*{6}4567/)).toBeTruthy();
-    expect(label.queryByText(/Khối lượng/)).toBeNull();
-    expect(label.queryByText(/Giao tới/)).toBeNull();
-    expect(
-      label.getByText(/Ghi chú: Quý khách vui lòng quay video khi bóc hàng · Không cho xem hàng/),
-    ).toBeTruthy();
-    // Dọc in đủ 5 dòng hàng
-    expect(label.getByText('Phân bón D')).toBeTruthy();
-    expect(label.queryByText(/sản phẩm khác/)).toBeNull();
+    expect(label.getByText('GHTK')).toBeTruthy();
+    expect(label.getByText('Người gửi:')).toBeTruthy();
+    expect(label.getByText('0339213208 / Xã Thạch Thất, Hà Nội')).toBeTruthy();
+    expect(label.getByText('******4567')).toBeTruthy();
+    expect(label.getByText(/^Xã Thiện Mỹ, Huyện Trà Ôn, Vĩnh Long$/)).toBeTruthy();
+    expect(label.queryByText(/Số nhà/)).toBeNull();
+    expect(label.getByText('Quý khách vui lòng quay video khi bóc hàng')).toBeTruthy();
     expect(label.queryByText(/0901/)).toBeNull();
   });
 
@@ -289,7 +280,7 @@ describe('Popup nhãn — tem ERP 100×75 mm (2026-10-13)', () => {
     await waitFor(() => expect(print).toHaveBeenCalledTimes(1));
     expect(
       within(lastPrinted()).getByText(
-        'Ghi chú: Quý Khách Vui Lòng Quay video khi bóc hàng để được hỗ trợ đơn hàng',
+        'Quý Khách Vui Lòng Quay video khi bóc hàng để được hỗ trợ đơn hàng',
       ),
     ).toBeTruthy();
   });
