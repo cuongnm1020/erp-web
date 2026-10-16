@@ -33,6 +33,8 @@ export const createOrderSchema = z
     customerId: idSchema.or(z.literal('')).refine((v) => v !== '', 'Chọn khách hàng'),
     /** Địa chỉ giao (CustomerAddress của khách đã chọn); '' = để server lấy mặc định của khách. */
     addressId: idSchema.or(z.literal('')).optional(),
+    /** Kho xuất (khớp CreateOrderDto.warehouseId); '' = server lấy kho mặc định của tài khoản. */
+    warehouseId: idSchema.or(z.literal('')).optional(),
     channel: z.enum(ORDER_CHANNELS),
     shippingFee: moneySchema.optional().or(z.literal('')),
     /**
@@ -73,6 +75,7 @@ export function toCreateOrderBody(v: CreateOrderValues) {
   return {
     customerId: v.customerId,
     ...(v.addressId ? { addressId: v.addressId } : {}),
+    ...(v.warehouseId ? { warehouseId: v.warehouseId } : {}),
     channel: v.channel,
     ...(v.shippingFee ? { shippingFee: v.shippingFee } : {}),
     ...manualDiscountBody(v),

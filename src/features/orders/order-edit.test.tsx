@@ -124,11 +124,29 @@ describe('OrderEditScreen — trang sửa đơn (D-05, PATCH /sales-orders/{id})
     expect(asked).toEqual([`${ORDER.id}?c-ghtk`]);
   });
 
-  it('chọn kho lấy hàng → hỏi cước kèm warehouseId, hiện địa chỉ điểm lấy; lưu → PATCH warehouseId', async () => {
+  it('chọn kho lấy hàng → hỏi cước kèm warehouseId, hiện địa chỉ điểm lấy; lưu → chuyển kho (move-warehouse) rồi PATCH phần còn lại', async () => {
     push.mockClear();
     const asked: string[] = [];
     const bodies: Record<string, unknown>[] = [];
+    const moves: unknown[] = [];
     server.use(
+      http.post('/api/sales-orders/move-warehouse', async ({ request }) => {
+        const body = (await request.json()) as { orderIds: string[]; warehouseId: string };
+        moves.push(body);
+        return HttpResponse.json({
+          moved: [
+            {
+              orderId: body.orderIds[0],
+              docNumber: ORDER.docNumber,
+              fromWarehouseId: null,
+              outcome: 'MOVED',
+              pick: 'replanned',
+              awaitingStock: false,
+            },
+          ],
+          failed: [],
+        });
+      }),
       http.get('/api/sales-orders/:id/shipping-quote', ({ params, request }) => {
         const q = new URL(request.url).searchParams;
         asked.push(`${q.get('carrierId')}@${q.get('warehouseId') ?? '-'}`);
@@ -170,7 +188,8 @@ describe('OrderEditScreen — trang sửa đơn (D-05, PATCH /sales-orders/{id})
     await waitFor(() => expect(asked).toEqual(['c-ghtk@wh-hcm']));
 
     fireEvent.click(screen.getByRole('button', { name: /Lưu thay đổi/ }));
-    await waitFor(() => expect(bodies).toEqual([{ carrierId: 'c-ghtk', warehouseId: 'wh-hcm' }]));
+    await waitFor(() => expect(moves).toEqual([{ orderIds: [ORDER.id], warehouseId: 'wh-hcm' }]));
+    await waitFor(() => expect(bodies).toEqual([{ carrierId: 'c-ghtk' }]));
     await waitFor(() => expect(push).toHaveBeenCalledWith(`/crm/orders/${ORDER.id}`));
   });
 

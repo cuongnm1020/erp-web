@@ -3511,6 +3511,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/sales-orders/move-warehouse": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Chuyển đơn sang kho khác (PLAN-warehouse-context K3). Từng đơn một, đơn lỗi vào `failed`
+         *     (không rollback cả lô). Chỉ đơn chưa ai bắt đầu lấy hàng.
+         */
+        post: operations["OrderWarehouseController_move"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/pda/new-orders": {
         parameters: {
             query?: never;
@@ -9226,6 +9246,43 @@ export interface components {
         StuckShipmentListDto: {
             items: components["schemas"]["StuckShipmentDto"][];
             total: number;
+        };
+        MoveOrdersWarehouseDto: {
+            orderIds: string[];
+            /**
+             * Format: uuid
+             * @description Kho chuyển tới (wms.Warehouse.id) — phải là kho người thao tác được phép.
+             */
+            warehouseId: string;
+        };
+        MovedOrderDto: {
+            orderId: string;
+            docNumber: string;
+            /** @description Kho cũ; null = đơn chưa gắn kho. */
+            fromWarehouseId: string | null;
+            /**
+             * @description `MOVED` = đã chuyển; `UNCHANGED` = đơn đã ở kho đó.
+             * @enum {string}
+             */
+            outcome: "MOVED" | "UNCHANGED";
+            /**
+             * @description Việc PICK: `replanned` = đã lập lại ở kho mới; `none` = đơn chưa có việc PICK.
+             * @enum {string}
+             */
+            pick: "none" | "unchanged" | "replanned";
+            /** @description Đơn Pancake: kho mới thiếu hàng → đơn chờ hàng (dòng PICK thiếu tồn). */
+            awaitingStock: boolean;
+        };
+        MoveOrderFailedDto: {
+            orderId: string;
+            docNumber: string | null;
+            /** @description ORDER_WAREHOUSE_MOVE_LOCKED, INSUFFICIENT_STOCK, ORDER_NOT_EDITABLE, NOT_FOUND… */
+            code: string;
+            message: string;
+        };
+        MoveOrdersWarehouseResultDto: {
+            moved: components["schemas"]["MovedOrderDto"][];
+            failed: components["schemas"]["MoveOrderFailedDto"][];
         };
         PdaNewOrderItemDto: {
             /** @description Việc PICK của đơn — gửi lên "Lấy đơn". */
@@ -17076,6 +17133,29 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["StuckShipmentListDto"];
+                };
+            };
+        };
+    };
+    OrderWarehouseController_move: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MoveOrdersWarehouseDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MoveOrdersWarehouseResultDto"];
                 };
             };
         };
