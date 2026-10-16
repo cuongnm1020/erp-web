@@ -5373,6 +5373,10 @@ export interface components {
             street: string | null;
             /** @description Phần còn lại của địa chỉ: thôn, xã/phường, quận/huyện, tỉnh. */
             locality: string;
+            /** @description Từ xã/phường trở đi: xã/phường, quận/huyện, tỉnh — bỏ số nhà/đường và thôn. */
+            fromWard: string;
+            /** @description Từ quận/huyện trở đi: quận/huyện, tỉnh — bỏ cả xã/phường. */
+            fromDistrict: string;
             province: string | null;
         };
         ShipmentLabelSenderDto: {
@@ -5384,6 +5388,10 @@ export interface components {
             street: string | null;
             /** @description Phần còn lại của địa chỉ: thôn, xã/phường, quận/huyện, tỉnh. */
             locality: string;
+            /** @description Từ xã/phường trở đi: xã/phường, quận/huyện, tỉnh — bỏ số nhà/đường và thôn. */
+            fromWard: string;
+            /** @description Từ quận/huyện trở đi: quận/huyện, tỉnh — bỏ cả xã/phường. */
+            fromDistrict: string;
             province: string | null;
             /** @description Tên kho lấy hàng. */
             warehouseName: string;

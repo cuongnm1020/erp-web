@@ -8,10 +8,15 @@ import { MapPin, Phone, Store, User } from 'lucide-react';
 import { formatDate, formatMoney, formatPhone, formatQuantity, formatTime } from '@/lib/format';
 import { LABEL_SIZES, type PrintController } from '@/lib/print';
 import type { ShipmentLabelData } from '../api/use-pda';
-import { DEFAULT_PRINT_NOTE, hidePhone, maskedAddress, parseGhtkTracking } from '../ghtk-label';
+import {
+  DEFAULT_PRINT_NOTE,
+  hidePhone,
+  maskedAddress,
+  parseGhtkTracking,
+  routeLabel,
+} from '../ghtk-label';
 import { f, labelInner, labelOuter, u } from '../label-scale';
 import { GhtkWaybillLabel } from './ghtk-waybill-label';
-import { GhtkWaybillLabelPortrait } from './ghtk-waybill-label-portrait';
 
 export type WaybillOrientation = 'landscape' | 'portrait';
 
@@ -54,12 +59,27 @@ const clamp = (lines: number): CSSProperties => ({
 const ICON = { width: '1em', height: '1em', flexShrink: 0 } as const;
 
 /**
+ * Địa chỉ người nhận tem dọc (2026-10-16): che số nhà → xã/phường bằng `***`, in từ quận/huyện
+ * trở đi — "Thị trấn Phú Long, Huyện Hàm Thuận Bắc, Bình Thuận" → "***, Huyện Hàm Thuận Bắc,
+ * Bình Thuận".
+ */
+function fromDistrictAddress(r: { address: string; fromDistrict: string }): string {
+  if (!r.fromDistrict) return r.address ? '***' : '';
+  return r.address === r.fromDistrict ? r.fromDistrict : `***, ${r.fromDistrict}`;
+}
+
+/** Cỡ chữ hàng người gửi — tem dọc dùng chung cho địa chỉ người nhận và bảng sản phẩm. */
+const SENDER_PT = 7.5;
+
+/**
  * Nhãn vận đơn ERP tự in, khổ 100×75 mm (máy in nhiệt 3 inch) — ngang hoặc dọc. Bố cục theo
  * nhãn in từ Pancake (2026-10-14): viền đứt; trên = hãng + mã hãng + QR + giờ in | mã vạch + mã
  * vận đơn + số kiện; dưới = ô người nhận (tên, SĐT, địa chỉ chữ lớn, ghi chú in) | ô COD + bảng
  * Sản phẩm / SL. Hãng chưa cấp vận đơn → in mã phiếu giao thay thế để kho vẫn dán được kiện.
  * 2026-10-15 (ngang + dọc): thêm hàng người gửi trên ô người nhận, SĐT người nhận giữ 4 số cuối,
  * ghi chú xuống hàng cuối tem (đơn không ghi chú → câu mặc định).
+ * 2026-10-16 (dọc): địa chỉ người nhận chỉ in từ xã/phường trở đi; địa chỉ + bảng sản phẩm cùng
+ * cỡ chữ với hàng người gửi (`SENDER_PT`).
  * Kích thước thiết kế tính bằng mm/pt qua `u()` / `f()` (dựng ×2 — xem `label-scale.ts`).
  */
 export function WaybillLabel({
@@ -72,14 +92,17 @@ export function WaybillLabel({
   printedAt: Date;
 }) {
   const land = orientation === 'landscape';
-  // Đơn GHTK đã có mã đúng dạng GHTK → bố cục tem GHTK (2026-10-14): dọc theo tem A6 của
-  // GHTK, ngang là bản xếp gọn cho 100×75.
+  // Đơn GHTK đã có mã đúng dạng GHTK: ngang → tem GHTK xếp gọn 100×75 (2026-10-14); dọc →
+  // cùng khung tem dọc chung (2026-10-16), mã vạch mang đoạn số cuối + in mã phân loại.
   const ghtk = data.carrierCode === 'GHTK' ? parseGhtkTracking(data.trackingNo) : null;
   if (ghtk && land) return <GhtkWaybillLabel data={data} ghtk={ghtk} printedAt={printedAt} />;
-  if (ghtk) return <GhtkWaybillLabelPortrait data={data} ghtk={ghtk} printedAt={printedAt} />;
   const size = SIZE[orientation];
   const code = data.trackingNo ?? data.shipmentDocNumber;
-  const long = code.length > LONG_CODE;
+  /** Giá trị mã vạch: GHTK quét đoạn số cuối, hãng khác quét cả mã. */
+  const barValue = ghtk?.shortCode ?? code;
+  const long = barValue.length > LONG_CODE;
+  // Tuyến GHTK (NỘI TỈNH / NỘI MIỀN / LIÊN MIỀN) in cạnh COD — ERP tự suy từ tỉnh.
+  const route = ghtk ? routeLabel(data.sender?.province, data.recipient?.province) : null;
   // Dọc + mã dài: khối mã chiếm thêm chỗ → bớt một dòng hàng.
   const max = MAX_ITEMS[orientation] - (long && !land ? 1 : 0);
   const shown = data.items.slice(0, max);
@@ -92,7 +115,7 @@ export function WaybillLabel({
     <div className="flex min-w-0 flex-1 flex-col items-center justify-center">
       <div className="w-full" style={{ height: u(heightMm) }}>
         <Barcode
-          value={code}
+          value={barValue}
           symbology="code128"
           height={14}
           scale={2}
@@ -107,11 +130,25 @@ export function WaybillLabel({
             'min-w-0 flex-1 text-center font-mono leading-none',
             long ? 'break-all font-bold' : 'tracking-wide',
           )}
-          style={{ fontSize: f(textPt) }}
+          style={{ fontSize: f(ghtk ? 9 : textPt) }}
         >
-          {code}
+          {barValue}
         </span>
-        {long ? null : (
+        {ghtk ? (
+          // Mã phân loại GHTK: đoạn đầu nền đen
+          <span
+            className="shrink-0 whitespace-nowrap font-extrabold leading-none"
+            style={{ fontSize: f(ghtk.sortCode.length > 9 ? 9 : 11) }}
+          >
+            <span
+              className="bg-foreground text-background"
+              style={{ padding: `${u(0.3)} ${u(0.6)}` }}
+            >
+              {ghtk.sortHead}
+            </span>
+            {ghtk.sortTail}
+          </span>
+        ) : long ? null : (
           <span className="shrink-0 font-bold leading-none" style={{ fontSize: f(11) }}>
             1/1
           </span>
@@ -186,9 +223,12 @@ export function WaybillLabel({
             <Phone style={ICON} aria-hidden />
             <span>{hidePhone(data.recipient.phone, 4)}</span>
           </div>
-          <div className="font-bold leading-tight" style={{ fontSize: f(11), ...clamp(3) }}>
+          <div
+            className="font-bold leading-tight"
+            style={{ fontSize: f(land ? 11 : SENDER_PT), ...clamp(3) }}
+          >
             <MapPin style={{ ...ICON, display: 'inline', verticalAlign: '-0.1em' }} aria-hidden />{' '}
-            {data.recipient.address}
+            {land ? data.recipient.address : fromDistrictAddress(data.recipient)}
           </div>
         </>
       ) : (
@@ -197,21 +237,43 @@ export function WaybillLabel({
     </div>
   );
 
-  // Người gửi giống tem GHTK (tên POS / SĐT đầy đủ · địa chỉ che số nhà), chữ nhỏ, tối đa 2 dòng.
-  const sender = data.sender ? (
+  // Dọc (2026-10-16): "Người gửi: SĐT / xã → tỉnh", tên POS xuống dòng dưới, thẳng hàng với SĐT.
+  // Ngang giữ kiểu tem GHTK (tên POS / SĐT đầy đủ · địa chỉ che số nhà), tối đa 2 dòng.
+  const sender = !data.sender ? null : !land ? (
+    <div
+      className="flex min-w-0 shrink-0"
+      style={{
+        border: BORDER,
+        padding: `${u(0.8)} ${u(1.2)}`,
+        fontSize: f(SENDER_PT),
+        lineHeight: 1.3,
+        gap: '0.3em',
+      }}
+    >
+      <span className="shrink-0">Người gửi:</span>
+      <div className="min-w-0 flex-1">
+        <div style={clamp(1)}>
+          {data.sender.phone} / {data.sender.fromWard}
+        </div>
+        <div className="font-bold" style={clamp(1)}>
+          {data.sender.name}
+        </div>
+      </div>
+    </div>
+  ) : (
     <div
       className="min-w-0 shrink-0"
       style={{
         border: BORDER,
         padding: `${u(0.8)} ${u(1.2)}`,
-        fontSize: f(7.5),
+        fontSize: f(SENDER_PT),
         ...clamp(2),
       }}
     >
       Người gửi: <b>{data.sender.name}</b> / {formatPhone(data.sender.phone)} · Đ/c:{' '}
       {maskedAddress(data.sender.street, data.sender.locality)}
     </div>
-  ) : null;
+  );
 
   // Ghi chú ở hàng cuối tem.
   const bottomNote = (
@@ -229,12 +291,22 @@ export function WaybillLabel({
       className="flex min-h-0 min-w-0 flex-col overflow-hidden"
       style={{ border: BORDER, padding: `${u(1)} ${u(1.2)}`, gap: u(0.6) }}
     >
-      <div className="font-bold tabular-nums leading-none" style={{ fontSize: f(11) }}>
-        COD: {formatMoney(data.codAmount, { unit: 'đ' })}
+      <div
+        className="flex items-baseline justify-between font-bold leading-none"
+        style={{ fontSize: f(11), gap: u(1) }}
+      >
+        <span className="tabular-nums">COD: {formatMoney(data.codAmount, { unit: 'đ' })}</span>
+        {route ? <span className="shrink-0 font-extrabold">{route}</span> : null}
       </div>
+      {data.carrierCode === 'VNPOST' ? (
+        // Mã đơn hàng đã gửi VNPost (`saleOrderCode` = mã phiếu giao) — bưu cục tra theo mã này.
+        <div className="truncate font-bold leading-none" style={{ fontSize: f(SENDER_PT) }}>
+          Mã đơn hàng: {data.shipmentDocNumber}
+        </div>
+      ) : null}
       <table
         className="w-full border-collapse"
-        style={{ fontSize: f(land ? 9.5 : 8.5), tableLayout: 'fixed' }}
+        style={{ fontSize: f(land ? 9.5 : SENDER_PT), tableLayout: 'fixed' }}
       >
         <colgroup>
           <col />
@@ -248,7 +320,7 @@ export function WaybillLabel({
               {more > 0 ? (
                 <>
                   {' · '}
-                  <span className="italic" style={{ fontSize: f(8) }}>
+                  <span className="italic" style={{ fontSize: f(land ? 8 : SENDER_PT) }}>
                     +{more} sản phẩm khác
                   </span>
                 </>
@@ -270,7 +342,7 @@ export function WaybillLabel({
               </td>
               <td
                 className="text-center font-bold tabular-nums"
-                style={{ border: BORDER, padding: u(0.4), fontSize: f(11) }}
+                style={{ border: BORDER, padding: u(0.4), fontSize: f(land ? 11 : SENDER_PT) }}
               >
                 {formatQuantity(it.qty)}
               </td>
