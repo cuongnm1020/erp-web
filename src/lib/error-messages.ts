@@ -67,6 +67,11 @@ const MESSAGES: Record<string, string> = {
     'Webhook bị từ chối vì secret không khớp. Dán lại secret từ màn Kết nối Pancake vào cấu hình của Pancake.',
   PANCAKE_SECRET_KEY_MISSING:
     'Server chưa có APP_SECRET_KEY để mã hoá khoá API. Báo IT đặt biến môi trường rồi khởi động lại API.',
+  // Quyền theo kho (PLAN-warehouse-context)
+  WAREHOUSE_FORBIDDEN:
+    'Bạn chưa được cấp quyền làm việc ở kho này. Đổi kho làm việc ở góc trái, hoặc nhờ quản lý cấp thêm kho.',
+  DEVICE_WAREHOUSE_MISMATCH:
+    'Việc này thuộc kho khác kho làm việc của tài khoản. Nhờ quản lý kiểm tra kho mặc định của bạn.',
   PANCAKE_WAREHOUSE_LINK_TAKEN:
     'Kho trên Pancake này đã nối với một kho ERP khác. Gỡ liên kết của kho đó trước rồi nối lại.',
   PANCAKE_WAREHOUSE_NOT_FOUND:

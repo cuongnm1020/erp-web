@@ -30,8 +30,8 @@ import {
 import { Can } from '@/lib/permission';
 import { useInvalidateOn } from '@/lib/realtime';
 import { useListState } from '@/lib/url-state';
+import { useWarehouse } from '@/lib/warehouse';
 import { useCarriers } from '@/features/wms/api/use-shipping';
-import { useWarehouses } from '@/features/wms/api/use-warehouses';
 import {
   orderKeys,
   useOrderFlowCounts,
@@ -74,7 +74,7 @@ const DEFAULTS = {
     'weightMax',
     'noCarrier',
     'carrierId',
-    'warehouseId',
+    // Kho: ô chọn kho làm việc ở sidebar (header X-Warehouse-Id) — không còn bộ lọc kho riêng.
     'source',
     'from',
     'to',
@@ -523,7 +523,6 @@ export function OrderListScreen() {
   const weightMax = state.filters.weightMax ?? '';
   const noCarrier = state.filters.noCarrier === 'true';
   const carrierId = state.filters.carrierId ?? '';
-  const warehouseId = state.filters.warehouseId ?? '';
   // Ô "Nguồn" gộp cả POS: `POS:<mã shop>` = đơn Pancake của đúng POS đó (URL giữ một khoá).
   const posShopId = /^POS:(\d+)$/.exec(state.filters.source ?? '')?.[1] ?? '';
   const source: 'PANCAKE' | 'ERP' | undefined =
@@ -544,7 +543,6 @@ export function OrderListScreen() {
       weightMax,
       noCarrier,
       carrierId,
-      warehouseId,
       source,
       pancakeShopId: posShopId || undefined,
       from,
@@ -558,7 +556,6 @@ export function OrderListScreen() {
       weightMax,
       noCarrier,
       carrierId,
-      warehouseId,
       source,
       posShopId,
       from,
@@ -570,15 +567,16 @@ export function OrderListScreen() {
     [filterParams, flow, skipTake],
   );
   const carriers = useCarriers();
-  const warehouses = useWarehouses();
+  // Tên kho: kho được phép từ /auth/me — đơn ngoài kho được phép không bao giờ về tới đây.
+  const { options: warehouses } = useWarehouse();
   const columns = useMemo(() => {
     const carrierById = new Map((carriers.data ?? []).map((c) => [c.id, c]));
-    const whById = new Map((warehouses.data ?? []).map((w) => [w.id, w.name]));
+    const whById = new Map(warehouses.map((w) => [w.id, w.name]));
     return buildColumns(
       (id) => carrierById.get(id) ?? null,
       (id) => whById.get(id) ?? null,
     );
-  }, [carriers.data, warehouses.data]);
+  }, [carriers.data, warehouses]);
   const query = useOrders(params);
   const counts = useOrderFlowCounts(filterParams);
   useInvalidateOn(['order.created', 'order.updated'], [orderKeys.lists()]);
@@ -597,7 +595,6 @@ export function OrderListScreen() {
     weightMax !== '' ||
     noCarrier ||
     carrierId !== '' ||
-    warehouseId !== '' ||
     source !== undefined ||
     from !== '' ||
     to !== '';
@@ -661,12 +658,6 @@ export function OrderListScreen() {
             ),
           },
           {
-            key: 'warehouseId',
-            label: 'Kho',
-            type: 'select',
-            options: (warehouses.data ?? []).map((w) => ({ value: w.id, label: w.name })),
-          },
-          {
             key: 'source',
             label: 'Nguồn',
             type: 'select',
@@ -700,7 +691,6 @@ export function OrderListScreen() {
           weightMax: state.filters.weightMax,
           noCarrier: state.filters.noCarrier,
           carrierId: state.filters.carrierId,
-          warehouseId: state.filters.warehouseId,
           source: state.filters.source,
           from: state.filters.from,
           to: state.filters.to,
