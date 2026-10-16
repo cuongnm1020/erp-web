@@ -166,6 +166,44 @@ describe('Popup nhãn — tem ERP 100×75 mm (2026-10-13)', () => {
     expect(label.queryByText(/Số nhà 137/)).toBeNull();
   });
 
+  it('đơn VNPost, tem dọc → cùng khung tem dọc Viettel: QR + mã vạch cả mã, người gửi, người nhận che tới xã', async () => {
+    localStorage.setItem('erp.pack.labelOrientation', 'portrait');
+    const code = 'EB123456789VN';
+    server.use(
+      http.get('/api/shipments/:id/label-data', () =>
+        HttpResponse.json({
+          ...LABEL_DATA,
+          carrierCode: 'VNPOST',
+          carrierName: 'Vietnam Post',
+          trackingNo: code,
+        }),
+      ),
+    );
+    renderApp(
+      <LabelPrintDialog
+        open
+        waybill={{ ...WAYBILL('VNPOST'), trackingNo: code }}
+        orderId={null}
+        onClose={() => {}}
+      />,
+    );
+    await waitFor(() => expect(print).toHaveBeenCalledTimes(1));
+    const root = lastPrinted();
+    expect(root.getAttribute('data-print-size')).toBe('WAYBILL_75x100');
+    const label = within(root);
+    expect(label.getByRole('img', { name: `Mã vận đơn ${code}` })).toBeTruthy();
+    expect(label.getByRole('img', { name: `QR ${code}` })).toBeTruthy();
+    expect(label.getByText(code)).toBeTruthy();
+    expect(label.getByText('1/1')).toBeTruthy();
+    expect(label.getByText('Người gửi:')).toBeTruthy();
+    expect(label.getByText('0339213208 / Xã Thạch Thất, Hà Nội')).toBeTruthy();
+    expect(label.getByText('******4567')).toBeTruthy();
+    expect(label.getByText('***, Huyện Trà Ôn, Vĩnh Long')).toBeTruthy();
+    expect(label.queryByText(/Thiện Mỹ/)).toBeNull();
+    // Tuyến chỉ in cho GHTK
+    expect(label.queryByText(/MIỀN|NỘI TỈNH/)).toBeNull();
+  });
+
   it('tem chung dọc, đơn không có ghi chú → in ghi chú mặc định', async () => {
     localStorage.setItem('erp.pack.labelOrientation', 'portrait');
     server.use(
