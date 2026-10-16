@@ -71,6 +71,8 @@ const MESSAGES: Record<string, string> = {
   ORDER_WAREHOUSE_MOVE_LOCKED:
     'Kho đã nhận hoặc bắt đầu lấy hàng cho đơn này nên không chuyển kho được. Trả việc về hàng đợi ở Điều phối rồi chuyển lại.',
   MOVE_TARGET_WAREHOUSE_INVALID: 'Kho chuyển tới đã ngừng dùng. Chọn kho khác.',
+  PANCAKE_ORDER_WAREHOUSE_LOCKED:
+    'Pancake không cho đổi kho đơn này (đơn trên Pancake đã qua bước đóng gói, đã có vận đơn, hoặc Pancake từ chối) nên ERP không chuyển. Kiểm tra đơn trên Pancake rồi thử lại.',
   // Quyền theo kho (PLAN-warehouse-context)
   WAREHOUSE_FORBIDDEN:
     'Bạn chưa được cấp quyền làm việc ở kho này. Đổi kho làm việc ở góc trái, hoặc nhờ quản lý cấp thêm kho.',
