@@ -1,6 +1,7 @@
 'use client';
 
 import {
+  ArrowRightLeft,
   Copy,
   CopyPlus,
   Info,
@@ -40,6 +41,7 @@ import {
   type PancakeConfigList,
   type PancakeShopConfig,
 } from '../api/use-pancake-config';
+import { PancakeCatalogMigrationDialog } from './pancake-catalog-migration-dialog';
 import { PancakeConfigDialog } from './pancake-config-dialog';
 import { PancakeDuplicateDialog } from './pancake-duplicate-dialog';
 import { PancakeShopProductsDialog } from './pancake-shop-products-dialog';
@@ -152,6 +154,7 @@ function EnvNotice({ env }: { env: PancakeConfigList['env'] | undefined }) {
 function ShopTable({ items }: { items: PancakeShopConfig[] }) {
   const [editing, setEditing] = useState<PancakeShopConfig | null>(null);
   const [catalogShop, setCatalogShop] = useState<PancakeShopConfig | null>(null);
+  const [migratingShop, setMigratingShop] = useState<PancakeShopConfig | null>(null);
   const [duplicating, setDuplicating] = useState<PancakeShopConfig | null>(null);
   const remove = useDeletePancakeConfig();
   const verify = useVerifyPancakeConfig();
@@ -266,6 +269,17 @@ function ShopTable({ items }: { items: PancakeShopConfig[] }) {
                           variant="ghost"
                           size="icon"
                           className="h-8 w-8"
+                          title="Chuyển danh mục POS sang ERP"
+                          aria-label={`Chuyển danh mục POS sang ERP — shop ${shop.shopId}`}
+                          disabled={!shop.keyReadable || (!fromEnv && !shop.isActive)}
+                          onClick={() => setMigratingShop(shop)}
+                        >
+                          <ArrowRightLeft aria-hidden />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8"
                           title="Nhân bản sang shop mới"
                           aria-label={`Nhân bản kết nối shop ${shop.shopId}`}
                           disabled={!shop.keyReadable}
@@ -308,6 +322,14 @@ function ShopTable({ items }: { items: PancakeShopConfig[] }) {
           source={duplicating}
           open
           onOpenChange={(o) => !o && setDuplicating(null)}
+        />
+      ) : null}
+      {migratingShop ? (
+        <PancakeCatalogMigrationDialog
+          key={migratingShop.shopId}
+          shop={migratingShop}
+          open
+          onOpenChange={(o) => !o && setMigratingShop(null)}
         />
       ) : null}
       {catalogShop ? (
