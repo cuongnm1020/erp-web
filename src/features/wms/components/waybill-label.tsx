@@ -205,8 +205,30 @@ export function WaybillLabel({
     </div>
   );
 
-  // Người gửi giống tem GHTK (tên POS / SĐT đầy đủ · địa chỉ che số nhà), chữ nhỏ, tối đa 2 dòng.
-  const sender = data.sender ? (
+  // Dọc (2026-10-16): "Người gửi: SĐT / xã → tỉnh", tên POS xuống dòng dưới, thẳng hàng với SĐT.
+  // Ngang giữ kiểu tem GHTK (tên POS / SĐT đầy đủ · địa chỉ che số nhà), tối đa 2 dòng.
+  const sender = !data.sender ? null : !land ? (
+    <div
+      className="flex min-w-0 shrink-0"
+      style={{
+        border: BORDER,
+        padding: `${u(0.8)} ${u(1.2)}`,
+        fontSize: f(SENDER_PT),
+        lineHeight: 1.3,
+        gap: '0.3em',
+      }}
+    >
+      <span className="shrink-0">Người gửi:</span>
+      <div className="min-w-0 flex-1">
+        <div style={clamp(1)}>
+          {data.sender.phone} / {data.sender.fromWard}
+        </div>
+        <div className="font-bold" style={clamp(1)}>
+          {data.sender.name}
+        </div>
+      </div>
+    </div>
+  ) : (
     <div
       className="min-w-0 shrink-0"
       style={{
@@ -219,7 +241,7 @@ export function WaybillLabel({
       Người gửi: <b>{data.sender.name}</b> / {formatPhone(data.sender.phone)} · Đ/c:{' '}
       {maskedAddress(data.sender.street, data.sender.locality)}
     </div>
-  ) : null;
+  );
 
   // Ghi chú ở hàng cuối tem.
   const bottomNote = (

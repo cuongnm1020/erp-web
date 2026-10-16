@@ -150,8 +150,11 @@ describe('Popup nhãn — tem ERP 100×75 mm (2026-10-13)', () => {
     renderApp(<LabelPrintDialog open waybill={WAYBILL('VTP')} orderId={null} onClose={() => {}} />);
     await waitFor(() => expect(print).toHaveBeenCalledTimes(1));
     const label = within(lastPrinted());
+    // 2026-10-16: "Người gửi: SĐT / xã → tỉnh", tên POS dòng dưới
+    expect(label.getByText('Người gửi:')).toBeTruthy();
+    expect(label.getByText('0339213208 / Xã Thạch Thất, Hà Nội')).toBeTruthy();
     expect(label.getByText('Mạnh')).toBeTruthy();
-    expect(label.getByText(/\/ 0339 213 208 · Đ\/c: \*\*\*, Xã Thạch Thất, Hà Nội/)).toBeTruthy();
+    expect(label.queryByText(/Số nhà 59/)).toBeNull();
     expect(label.getByText('******4567')).toBeTruthy();
     expect(label.queryByText(/0901/)).toBeNull();
     expect(label.getByText('Quý khách vui lòng quay video khi bóc hàng')).toBeTruthy();
