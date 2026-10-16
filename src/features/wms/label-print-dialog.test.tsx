@@ -45,6 +45,7 @@ const LABEL_DATA = {
     address: 'Số nhà 137 ấp Mỹ Phó, Xã Thiện Mỹ, Huyện Trà Ôn, Vĩnh Long',
     street: 'Số nhà 137 ấp Mỹ Phó',
     locality: 'Xã Thiện Mỹ, Huyện Trà Ôn, Vĩnh Long',
+    fromWard: 'Xã Thiện Mỹ, Huyện Trà Ôn, Vĩnh Long',
     province: 'Vĩnh Long',
   },
   sender: {
@@ -53,6 +54,7 @@ const LABEL_DATA = {
     address: 'Số nhà 59 đường cốc trại, Kim Quan 3, Xã Thạch Thất, Hà Nội',
     street: 'Số nhà 59 đường cốc trại, Kim Quan 3',
     locality: 'Xã Thạch Thất, Hà Nội',
+    fromWard: 'Xã Thạch Thất, Hà Nội',
     province: 'Hà Nội',
     warehouseName: 'Kho Thạch Thất',
   },
@@ -153,6 +155,9 @@ describe('Popup nhãn — tem ERP 100×75 mm (2026-10-13)', () => {
     expect(label.getByText('******4567')).toBeTruthy();
     expect(label.queryByText(/0901/)).toBeNull();
     expect(label.getByText('Quý khách vui lòng quay video khi bóc hàng')).toBeTruthy();
+    // 2026-10-16: địa chỉ người nhận chỉ in từ xã trở đi — không lộ số nhà / ấp
+    expect(label.getByText(/^Xã Thiện Mỹ, Huyện Trà Ôn, Vĩnh Long$/)).toBeTruthy();
+    expect(label.queryByText(/Số nhà 137/)).toBeNull();
   });
 
   it('tem chung dọc, đơn không có ghi chú → in ghi chú mặc định', async () => {

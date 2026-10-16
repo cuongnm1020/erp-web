@@ -53,6 +53,9 @@ const clamp = (lines: number): CSSProperties => ({
 
 const ICON = { width: '1em', height: '1em', flexShrink: 0 } as const;
 
+/** Cỡ chữ hàng người gửi — tem dọc dùng chung cho địa chỉ người nhận và bảng sản phẩm. */
+const SENDER_PT = 7.5;
+
 /**
  * Nhãn vận đơn ERP tự in, khổ 100×75 mm (máy in nhiệt 3 inch) — ngang hoặc dọc. Bố cục theo
  * nhãn in từ Pancake (2026-10-14): viền đứt; trên = hãng + mã hãng + QR + giờ in | mã vạch + mã
@@ -60,6 +63,8 @@ const ICON = { width: '1em', height: '1em', flexShrink: 0 } as const;
  * Sản phẩm / SL. Hãng chưa cấp vận đơn → in mã phiếu giao thay thế để kho vẫn dán được kiện.
  * 2026-10-15 (ngang + dọc): thêm hàng người gửi trên ô người nhận, SĐT người nhận giữ 4 số cuối,
  * ghi chú xuống hàng cuối tem (đơn không ghi chú → câu mặc định).
+ * 2026-10-16 (dọc): địa chỉ người nhận chỉ in từ xã/phường trở đi; địa chỉ + bảng sản phẩm cùng
+ * cỡ chữ với hàng người gửi (`SENDER_PT`).
  * Kích thước thiết kế tính bằng mm/pt qua `u()` / `f()` (dựng ×2 — xem `label-scale.ts`).
  */
 export function WaybillLabel({
@@ -186,9 +191,12 @@ export function WaybillLabel({
             <Phone style={ICON} aria-hidden />
             <span>{hidePhone(data.recipient.phone, 4)}</span>
           </div>
-          <div className="font-bold leading-tight" style={{ fontSize: f(11), ...clamp(3) }}>
+          <div
+            className="font-bold leading-tight"
+            style={{ fontSize: f(land ? 11 : SENDER_PT), ...clamp(3) }}
+          >
             <MapPin style={{ ...ICON, display: 'inline', verticalAlign: '-0.1em' }} aria-hidden />{' '}
-            {data.recipient.address}
+            {land ? data.recipient.address : data.recipient.fromWard}
           </div>
         </>
       ) : (
@@ -204,7 +212,7 @@ export function WaybillLabel({
       style={{
         border: BORDER,
         padding: `${u(0.8)} ${u(1.2)}`,
-        fontSize: f(7.5),
+        fontSize: f(SENDER_PT),
         ...clamp(2),
       }}
     >
@@ -234,7 +242,7 @@ export function WaybillLabel({
       </div>
       <table
         className="w-full border-collapse"
-        style={{ fontSize: f(land ? 9.5 : 8.5), tableLayout: 'fixed' }}
+        style={{ fontSize: f(land ? 9.5 : SENDER_PT), tableLayout: 'fixed' }}
       >
         <colgroup>
           <col />
@@ -248,7 +256,7 @@ export function WaybillLabel({
               {more > 0 ? (
                 <>
                   {' · '}
-                  <span className="italic" style={{ fontSize: f(8) }}>
+                  <span className="italic" style={{ fontSize: f(land ? 8 : SENDER_PT) }}>
                     +{more} sản phẩm khác
                   </span>
                 </>
@@ -270,7 +278,7 @@ export function WaybillLabel({
               </td>
               <td
                 className="text-center font-bold tabular-nums"
-                style={{ border: BORDER, padding: u(0.4), fontSize: f(11) }}
+                style={{ border: BORDER, padding: u(0.4), fontSize: f(land ? 11 : SENDER_PT) }}
               >
                 {formatQuantity(it.qty)}
               </td>
