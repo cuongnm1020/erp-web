@@ -1,849 +1,264 @@
 'use client';
 
-import { zodResolver } from '@hookform/resolvers/zod';
 import Decimal from 'decimal.js';
-import { Boxes, Plus, UserPlus, X } from 'lucide-react';
-import Link from 'next/link';
+import { Plus, X } from 'lucide-react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { useFieldArray, useForm, useWatch, type UseFormReturn } from 'react-hook-form';
-import {
-  applyServerErrors,
-  EntityPicker,
-  Form,
-  FormControl,
-  FormField,
-  FormItem,
-  FormLabel,
-  FormMessage,
-  MoneyInput,
-} from '@/components/data/form';
-import { PageHeader } from '@/components/layout/page-header';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { ErrorState } from '@/components/data/states';
+import { Skeleton } from '@/components/ui/skeleton';
 import { toast } from '@/components/ui/toaster';
-import { newIdempotencyKey } from '@/lib/api/client';
-import { isApiError, type ApiError } from '@/lib/api/errors';
-import { messageFor } from '@/lib/error-messages';
-import { formatMoney, formatQuantity } from '@/lib/format';
-import { Can } from '@/lib/permission';
+import { cn } from '@/lib/cn';
 import { ALL_WAREHOUSES, useWarehouse } from '@/lib/warehouse';
-import {
-  useCustomerBrief,
-  useCustomerSearch,
-  useLinePrice,
-  useSkuAvailability,
-  useSkuDetail,
-  useSkuSearch,
-} from '../api/use-line-entry';
-import { useCreateOrder, useOrder } from '../api/use-orders';
+import { useUploadOrderAttachment } from '../api/use-order-create';
+import { useOrder, type SalesOrderDetail } from '../api/use-orders';
 import { collapseComboLines } from '../combo-lines';
-import { orderAddressLine, orderChannelLabel } from '../labels';
-
-/** Giá trị Select cho "không chọn" — Radix Select không nhận value rỗng. */
-const NO_ADDRESS = '__none__';
-/** Giá trị Select cho "kho mặc định" — Radix Select không nhận value rỗng. */
-const DEFAULT_WAREHOUSE = '__default__';
-import { QuickCustomerDialog } from './quick-customer-dialog';
+import { emptyOrderValues, type CreateOrderValues } from '../schema';
+import { useOrderDrafts } from '../use-order-drafts';
 import {
-  createOrderSchema,
-  EMPTY_LINE,
-  ORDER_CHANNELS,
-  previewManualDiscount,
-  toCreateOrderBody,
-  type CreateOrderValues,
-  type ManualDiscountType,
-} from '../schema';
+  OrderDraftForm,
+  type AfterCreate,
+  type CreateOrderResult,
+  type OrderDraftFormHandle,
+} from './order-create/order-draft-form';
+
+function omitKey<T>(m: Record<string, T>, key: string): Record<string, T> {
+  const next = { ...m };
+  delete next[key];
+  return next;
+}
+
+/** Đơn cũ → giá trị form "Tạo lại đơn" (?from=). Không chép tiền chuyển khoản / giờ tạo. */
+function valuesFromOrder(o: SalesOrderDetail, warehouseId: string): CreateOrderValues {
+  const opts = o.shippingOptions;
+  const cm = (v: number | null | undefined) => (v == null ? '' : String(v));
+  return {
+    ...emptyOrderValues(warehouseId),
+    customerId: o.customer.id,
+    customerName: o.customer.name,
+    addressId: o.addressId ?? '',
+    warehouseId: o.warehouseId ?? warehouseId,
+    channel: o.channel,
+    source: o.source ?? '',
+    shippingFee: o.shippingFee,
+    freeShipping: o.freeShipping,
+    shipFeeOnReturnOnly: o.shipFeeOnReturnOnly,
+    surcharge: new Decimal(o.surcharge).isZero() ? '' : o.surcharge,
+    // Giảm tay cấp đơn của đơn cũ: theo % thì giữ %, không thì giữ số tiền.
+    ...(o.manualDiscountRate
+      ? {
+          manualDiscountType: 'PERCENT' as const,
+          manualDiscountValue: new Decimal(o.manualDiscountRate).mul(100).toString(),
+        }
+      : {
+          manualDiscountType: 'AMOUNT' as const,
+          manualDiscountValue: new Decimal(o.manualDiscount || 0).isZero()
+            ? ''
+            : new Decimal(o.manualDiscount).toString(),
+        }),
+    packerId: o.packerId ?? '',
+    careStaffId: o.careStaffId ?? '',
+    marketerId: o.marketerId ?? '',
+    tagIds: o.tags.map((t) => t.id),
+    internalNote: o.internalNote ?? '',
+    printNote: o.printNote ?? '',
+    carrierId: o.carrierId ?? '',
+    carrierAccountId: o.carrierAccountId ?? '',
+    shippingWeightKg: o.shippingWeightKg ?? '',
+    lengthCm: cm(opts?.lengthCm),
+    widthCm: cm(opts?.widthCm),
+    heightCm: cm(opts?.heightCm),
+    // Dòng quà do KM sinh — engine sẽ tự sinh lại nếu còn KM; dòng thành phần combo gộp về một
+    // dòng combo (server bung lại khi chốt).
+    lines: collapseComboLines(o.lines.filter((l) => !l.isGift)).map((l) => ({
+      skuId: l.skuId,
+      uomId: l.uomId,
+      qty: l.qty,
+      discountPercent: '',
+    })),
+  };
+}
 
 /**
- * D-01 Nhập đơn — nối POST /sales-orders, bám design canvas (luật 15) trong phạm vi API:
- * - Giá niêm yết / thành tiền / tạm tính: XEM TRƯỚC qua GET /prices/resolve (server resolve,
- *   client chỉ nhân-trừ hiển thị bằng decimal.js — luật 10). Giá CUỐI vẫn do POST snapshot;
- *   khuyến mãi và VAT chỉ tính lúc chốt (chưa có endpoint preview / VAT chưa cấu hình).
- * - CK% vượt trần bảng giá: canvas nói "cảnh báo, không chặn" nhưng API chặn 422 — hiện cảnh
- *   báo đỏ ngay khi gõ để không bất ngờ lúc chốt.
- * - KHÔNG có "Lưu nháp" (API không có endpoint nháp); "Ngày đơn"/"Kho xuất"/"Địa chỉ giao"
- *   chưa có trường API tương ứng.
- * - Nút chốt không đoán trước có cần duyệt (rule trong DB) — toast theo status trả về.
- * - ?from=<orderId>: tạo lại từ đơn cũ (sửa = hủy & tạo lại); ?customerId=<id>: vào từ nút
- *   "Tạo đơn" của hồ sơ khách — chọn sẵn khách. "+ Khách mới": tạo nhanh khách ngay tại form.
+ * D-01 Tạo đơn — màn tạo đơn mới (2026-10-17, bố cục Pancake đã duyệt): nhiều tab đơn nháp
+ * (F6), giỏ hàng tìm / quét mã (F9), chốt đơn (F10). Mỗi tab là một `OrderDraftForm`; nháp lưu
+ * trên máy (localStorage), tệp đính kèm giữ trong phiên và tải lên ngay sau khi chốt.
+ * ?from=<orderId>: tạo lại từ đơn cũ (sửa = hủy & tạo lại); ?customerId=<id>: vào từ nút "Tạo
+ * đơn" của hồ sơ khách — chọn sẵn khách.
  */
 export function OrderCreateScreen() {
   const router = useRouter();
   const search = useSearchParams();
   const fromId = search.get('from') ?? '';
   const presetCustomerId = search.get('customerId') ?? '';
+  const { selected: workingWarehouse } = useWarehouse();
+  // Kho đang làm việc (ô chọn kho ở sidebar); "Tất cả kho" → để server lấy kho mặc định.
+  const defaultWh = workingWarehouse && workingWarehouse !== ALL_WAREHOUSES ? workingWarehouse : '';
+  const drafts = useOrderDrafts(defaultWh);
+  const { openDraft, closeDraft, activate, updateValues } = drafts;
   const source = useOrder(fromId);
-  const create = useCreateOrder();
-  const { options: warehouseOptions, selected: workingWarehouse } = useWarehouse();
-  // Idempotency-Key sinh lúc bấm, GIỮ NGUYÊN khi retry lỗi mạng/5xx; đổi khi người dùng sửa form.
-  const idemKey = useRef<string | null>(null);
-  const [quickOpen, setQuickOpen] = useState(false);
-  /** Nhãn hiển thị cho khách vừa tạo nhanh / khách chọn sẵn — EntityPicker chưa tự tra được. */
-  const [pickedCustomer, setPickedCustomer] = useState<{ id: string; name: string } | null>(null);
-  const presetCustomer = useCustomerBrief(presetCustomerId);
+  const upload = useUploadOrderAttachment();
+  const formRef = useRef<OrderDraftFormHandle>(null);
+  const [files, setFiles] = useState<Record<string, File[]>>({});
+
+  // Mở tab từ link (?from / ?customerId) một lần, sau khi đã đọc nháp cũ.
+  const seeded = useRef(false);
   useEffect(() => {
-    if (presetCustomer.data && !pickedCustomer) {
-      setPickedCustomer({ id: presetCustomer.data.id, name: presetCustomer.data.name });
+    if (!drafts.ready || seeded.current) return;
+    if (fromId) {
+      if (!source.data) return;
+      seeded.current = true;
+      openDraft(valuesFromOrder(source.data, defaultWh), `from:${fromId}`);
+    } else if (presetCustomerId) {
+      seeded.current = true;
+      openDraft(
+        { ...emptyOrderValues(defaultWh), customerId: presetCustomerId },
+        `customer:${presetCustomerId}`,
+      );
+    } else {
+      seeded.current = true;
     }
-  }, [presetCustomer.data, pickedCustomer]);
-  /** Thành tiền từng dòng (key = field id) để cộng Tạm tính; null = dòng chưa có giá. */
-  const [lineTotals, setLineTotals] = useState<Record<string, string | null>>({});
-  const onLineTotal = useCallback((fieldId: string, total: string | null) => {
-    setLineTotals((prev) => (prev[fieldId] === total ? prev : { ...prev, [fieldId]: total }));
-  }, []);
-
-  const form = useForm<CreateOrderValues>({
-    resolver: zodResolver(createOrderSchema),
-    defaultValues: {
-      customerId: presetCustomerId,
-      addressId: '',
-      // Kho đang làm việc (ô chọn kho ở sidebar); "Tất cả kho" → để server lấy kho mặc định.
-      warehouseId: workingWarehouse && workingWarehouse !== ALL_WAREHOUSES ? workingWarehouse : '',
-      channel: 'DIRECT',
-      shippingFee: '',
-      manualDiscountType: 'AMOUNT',
-      manualDiscountValue: '',
-      lines: [EMPTY_LINE],
-    },
-  });
-  const lines = useFieldArray({ control: form.control, name: 'lines' });
-  const customerId = useWatch({ control: form.control, name: 'customerId' });
-  const channel = useWatch({ control: form.control, name: 'channel' });
-  const shippingFee = useWatch({ control: form.control, name: 'shippingFee' });
-  const manualType = useWatch({ control: form.control, name: 'manualDiscountType' });
-  const manualValue = useWatch({ control: form.control, name: 'manualDiscountValue' });
-  // Địa chỉ giao của khách đã chọn (GET /customers/{id} có `addresses`): đổi khách → chọn lại
-  // địa chỉ mặc định; không có mặc định mà chỉ một địa chỉ → địa chỉ đó; còn lại để trống
-  // (server cũng tự rơi về mặc định nếu client không gửi).
-  const customerDetail = useCustomerBrief(customerId);
-  const addresses = customerDetail.data?.addresses ?? [];
-  useEffect(() => {
-    if (!customerDetail.data) return;
-    const list = customerDetail.data.addresses;
-    const current = form.getValues('addressId') ?? '';
-    if (current && list.some((a) => a.id === current)) return;
-    const preferred = list.find((a) => a.isDefault) ?? (list.length === 1 ? list[0] : undefined);
-    form.setValue('addressId', preferred?.id ?? '', { shouldDirty: false });
-  }, [customerDetail.data, form]);
-
-  const subtotal = useMemo(() => {
-    const ids = new Set(lines.fields.map((f) => f.id));
-    const totals = Object.entries(lineTotals).filter(([k]) => ids.has(k));
-    const known = totals.filter(([, v]) => v !== null);
-    if (known.length === 0) return { value: null as string | null, missing: totals.length };
-    const sum = known.reduce((acc, [, v]) => acc.plus(v as string), new Decimal(0));
-    return { value: sum.toFixed(4), missing: totals.length - known.length };
-  }, [lineTotals, lines.fields]);
-  const shipValid = /^\d{1,14}(\.\d{1,4})?$/.test(shippingFee ?? '');
-  const manualPreview = previewManualDiscount(manualType, manualValue, subtotal.value);
-  const manualTooBig =
-    manualPreview !== null &&
-    subtotal.value !== null &&
-    new Decimal(manualPreview).greaterThan(subtotal.value);
-  const grandTotal =
-    subtotal.value !== null
-      ? new Decimal(subtotal.value)
-          .minus(manualPreview ?? '0')
-          .plus(shipValid ? (shippingFee as string) : '0')
-          .toFixed(4)
-      : null;
-
-  const prefilled = useRef(false);
-  useEffect(() => {
-    if (prefilled.current || !source.data) return;
-    prefilled.current = true;
-    form.reset({
-      customerId: source.data.customer.id,
-      addressId: source.data.addressId ?? '',
-      warehouseId: source.data.warehouseId ?? '',
-      channel: source.data.channel,
-      shippingFee: source.data.shippingFee,
-      // Giảm tay cấp đơn của đơn cũ: theo % thì giữ %, không thì giữ số tiền.
-      ...(source.data.manualDiscountRate
-        ? {
-            manualDiscountType: 'PERCENT' as const,
-            manualDiscountValue: new Decimal(source.data.manualDiscountRate).mul(100).toString(),
-          }
-        : {
-            manualDiscountType: 'AMOUNT' as const,
-            manualDiscountValue: new Decimal(source.data.manualDiscount || 0).isZero()
-              ? ''
-              : new Decimal(source.data.manualDiscount).toString(),
-          }),
-      // Dòng quà do KM sinh — engine sẽ tự sinh lại nếu còn KM; dòng thành phần combo gộp
-      // về một dòng combo (server bung lại khi chốt).
-      lines: collapseComboLines(source.data.lines.filter((l) => !l.isGift)).map((l) => ({
-        ...l,
-        discountPercent: '',
-      })),
-    });
-  }, [source.data, form]);
+  }, [drafts.ready, fromId, presetCustomerId, source.data, defaultWh, openDraft]);
 
   useEffect(() => {
-    const sub = form.watch(() => {
-      idemKey.current = null; // form đổi = đơn khác → key mới ở lần bấm sau
-    });
-    return () => sub.unsubscribe();
-  }, [form]);
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'F6') {
+        e.preventDefault();
+        openDraft();
+      } else if (e.key === 'F9') {
+        e.preventDefault();
+        formRef.current?.focusSearch();
+      } else if (e.key === 'F10') {
+        e.preventDefault();
+        formRef.current?.submit('open');
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [openDraft]);
 
-  const onSubmit = form.handleSubmit((values) => {
-    idemKey.current ??= newIdempotencyKey();
-    create.mutate(
-      { body: toCreateOrderBody(values), key: idemKey.current },
-      {
-        onSuccess: (r) => {
-          if (r.status === 'PENDING_APPROVAL') {
-            toast.success(`Đã gửi duyệt đơn ${r.docNumber}`, {
-              description: 'Đơn vượt ngưỡng duyệt — chờ quản lý xác nhận.',
-            });
-          } else {
-            toast.success(`Đã chốt đơn ${r.docNumber}`, {
-              description: 'Hàng đã được giữ cho đơn này.',
-            });
-          }
-          router.push(`/crm/orders/${r.orderId}`);
-        },
-        onError: (err) => {
-          // 409 thiếu tồn / 422 vượt trần CK: gắn lỗi vào đúng dòng theo skuId trong details
-          if (isApiError(err)) {
-            const skuId = (err.details as { skuId?: string } | undefined)?.skuId;
-            const idx = skuId ? values.lines.findIndex((l) => l.skuId === skuId) : -1;
-            if (idx >= 0) {
-              const field = err.code === 'DISCOUNT_ABOVE_MAX' ? 'discountPercent' : 'qty';
-              form.setError(`lines.${idx}.${field}`, { message: messageFor(err) });
-              toast.error(messageFor(err));
-              return;
-            }
-          }
-          applyServerErrors(form, err as ApiError, {
-            knownFields: [
-              'customerId',
-              'warehouseId',
-              'channel',
-              'shippingFee',
-              'manualDiscountValue',
-              'lines',
-            ],
-          });
-          const root = form.formState.errors.root?.server?.message;
-          if (root) toast.error(root);
-        },
-      },
+  const activeId = drafts.active.id;
+  const onValuesChange = useCallback(
+    (values: CreateOrderValues) => updateValues(activeId, values),
+    [activeId, updateValues],
+  );
+
+  const onCreated = async (r: CreateOrderResult, mode: AfterCreate) => {
+    const draftId = activeId;
+    if (r.status === 'PENDING_APPROVAL') {
+      toast.success(`Đã gửi duyệt đơn ${r.docNumber}`, {
+        description: 'Đơn vượt ngưỡng duyệt — chờ quản lý xác nhận.',
+      });
+    } else {
+      toast.success(`Đã chốt đơn ${r.docNumber}`, { description: 'Hàng đã được giữ cho đơn này.' });
+    }
+    // Tệp đính kèm: đơn đã chốt rồi mới tải (cần id đơn). Hỏng tệp nào báo tệp đó, đơn vẫn giữ.
+    const pending = files[draftId] ?? [];
+    let failed = 0;
+    for (const file of pending) {
+      try {
+        await upload.mutateAsync({ orderId: r.orderId, file });
+      } catch {
+        failed++;
+      }
+    }
+    if (failed > 0) {
+      toast.error(`${failed} tệp chưa tải lên được`, {
+        description: `Đơn ${r.docNumber} đã chốt — mở đơn để đính kèm lại.`,
+      });
+    }
+    setFiles((m) => omitKey(m, draftId));
+    closeDraft(draftId);
+    if (mode === 'next') openDraft();
+    else router.push(`/crm/orders/${r.orderId}`);
+  };
+
+  if (fromId && source.isError) {
+    return (
+      <ErrorState
+        title="Không tải được đơn cũ để tạo lại"
+        error={source.error}
+        onRetry={() => void source.refetch()}
+      />
     );
-  });
+  }
 
   return (
-    <Form {...form}>
-      <form id="order-create" onSubmit={onSubmit} className="flex flex-col gap-3">
-        <PageHeader
-          title={fromId ? 'Tạo lại đơn' : 'Tạo đơn hàng'}
-          description={
-            fromId && source.data
-              ? `Từ đơn ${source.data.docNumber} — kiểm tra lại rồi chốt`
-              : 'Số chứng từ cấp tự động khi chốt · giá chốt theo bảng giá của khách'
-          }
-          breadcrumb={[
-            { label: 'Bán hàng' },
-            { label: 'Đơn hàng', href: '/crm/orders' },
-            { label: 'Tạo đơn' },
-          ]}
-          actions={
-            <>
-              <Button variant="ghost" size="sm" asChild>
-                <Link href="/crm/orders">Hủy bỏ</Link>
-              </Button>
-              <Button size="sm" type="submit" form="order-create" disabled={create.isPending}>
-                {create.isPending ? 'Đang chốt…' : 'Chốt đơn'}
-              </Button>
-            </>
-          }
-        />
-
-        <div className="grid items-start gap-3 lg:grid-cols-3">
-          <section className="rounded-md border bg-card lg:col-span-2">
-            <header className="border-b px-3 py-2 text-sm font-semibold">Thông tin đơn</header>
-            <div className="grid gap-3 px-3 py-3 sm:grid-cols-3">
-              <FormField
-                control={form.control}
-                name="customerId"
-                render={({ field }) => (
-                  <FormItem className="sm:col-span-2">
-                    <div className="flex items-center justify-between">
-                      <FormLabel>Khách hàng</FormLabel>
-                      <Can I="create" a="Customer">
-                        <button
-                          type="button"
-                          onClick={() => setQuickOpen(true)}
-                          className="inline-flex items-center gap-1 text-xs text-primary hover:underline"
-                        >
-                          <UserPlus className="h-3.5 w-3.5" aria-hidden />
-                          Khách mới
-                        </button>
-                      </Can>
-                    </div>
-                    <FormControl>
-                      <EntityPicker
-                        value={field.value}
-                        onChange={field.onChange}
-                        useSearch={useCustomerSearch}
-                        selectedLabel={
-                          pickedCustomer?.id === field.value
-                            ? pickedCustomer.name
-                            : fromId && source.data?.customer.id === field.value
-                              ? source.data.customer.name
-                              : undefined
-                        }
-                        placeholder="Tìm theo tên, mã, SĐT…"
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name="addressId"
-                render={({ field }) => (
-                  <FormItem className="sm:col-span-3">
-                    <FormLabel>Địa chỉ giao</FormLabel>
-                    <Select
-                      value={field.value || NO_ADDRESS}
-                      onValueChange={(v) => field.onChange(v === NO_ADDRESS ? '' : v)}
-                      disabled={!customerId || customerDetail.isPending}
-                    >
-                      <FormControl>
-                        <SelectTrigger aria-label="Địa chỉ giao">
-                          <SelectValue placeholder="Chọn khách trước" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        <SelectItem value={NO_ADDRESS}>— Mặc định của khách —</SelectItem>
-                        {addresses.map((a) => (
-                          <SelectItem key={a.id} value={a.id}>
-                            {a.label ? `${a.label} · ` : ''}
-                            {a.recipient} · {orderAddressLine(a)}
-                            {a.isDefault ? ' (mặc định)' : ''}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    {customerId && customerDetail.data && addresses.length === 0 ? (
-                      <p className="text-xs text-muted-foreground">
-                        Khách chưa có địa chỉ giao — thêm ở hồ sơ khách (Sửa khách hàng) để tra cước
-                        và cấp vận đơn.
-                      </p>
-                    ) : null}
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name="warehouseId"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Kho xuất</FormLabel>
-                    <Select
-                      value={field.value || DEFAULT_WAREHOUSE}
-                      onValueChange={(v) => field.onChange(v === DEFAULT_WAREHOUSE ? '' : v)}
-                    >
-                      <FormControl>
-                        <SelectTrigger aria-label="Kho xuất">
-                          <SelectValue placeholder="Kho mặc định" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        <SelectItem value={DEFAULT_WAREHOUSE}>— Kho mặc định của bạn —</SelectItem>
-                        {warehouseOptions.map((w) => (
-                          <SelectItem key={w.id} value={w.id}>
-                            {w.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name="channel"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Kênh bán</FormLabel>
-                    <Select value={field.value} onValueChange={field.onChange}>
-                      <FormControl>
-                        <SelectTrigger>
-                          <SelectValue />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        {ORDER_CHANNELS.map((c) => (
-                          <SelectItem key={c} value={c}>
-                            {orderChannelLabel(c)}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            </div>
-          </section>
-
-          <section className="rounded-md border bg-card">
-            <header className="border-b px-3 py-2 text-sm font-semibold">Tổng quan</header>
-            <dl className="flex flex-col gap-2 px-3 py-3 text-sm">
-              <div className="flex items-center justify-between">
-                <dt className="text-muted-foreground">Tạm tính</dt>
-                <dd className="font-semibold tabular-nums">
-                  {subtotal.value !== null ? formatMoney(subtotal.value, { unit: '' }) : '—'}
-                </dd>
-              </div>
-              {subtotal.missing > 0 ? (
-                <p className="text-xs text-warning-foreground text-muted-foreground">
-                  {subtotal.missing} dòng chưa có giá — chọn khách/sản phẩm để xem đủ.
-                </p>
-              ) : null}
-              <div className="flex items-center justify-between">
-                <dt className="text-muted-foreground">Khuyến mãi</dt>
-                <dd className="text-xs text-muted-foreground">tính khi chốt</dd>
-              </div>
-              <div className="flex items-start justify-between gap-3">
-                <dt className="shrink-0 pt-2 text-muted-foreground">Giảm giá</dt>
-                <dd className="flex w-44 flex-col items-end gap-1">
-                  <div className="flex w-full gap-1">
-                    <DiscountTypeToggle
-                      value={manualType}
-                      onChange={(t) => {
-                        form.setValue('manualDiscountType', t);
-                        form.setValue('manualDiscountValue', '');
-                        form.clearErrors('manualDiscountValue');
-                      }}
-                    />
-                    <FormField
-                      control={form.control}
-                      name="manualDiscountValue"
-                      render={({ field }) => (
-                        <FormItem className="min-w-0 flex-1">
-                          <FormLabel className="sr-only">
-                            {manualType === 'PERCENT' ? 'Giảm giá (%)' : 'Giảm giá (số tiền)'}
-                          </FormLabel>
-                          <FormControl>
-                            {manualType === 'PERCENT' ? (
-                              <Input
-                                inputMode="decimal"
-                                placeholder="0"
-                                className="text-right tabular-nums"
-                                value={field.value ?? ''}
-                                onChange={field.onChange}
-                                onBlur={field.onBlur}
-                                name={field.name}
-                                ref={field.ref}
-                              />
-                            ) : (
-                              <MoneyInput value={field.value ?? ''} onChange={field.onChange} />
-                            )}
-                          </FormControl>
-                        </FormItem>
-                      )}
-                    />
-                  </div>
-                  {form.formState.errors.manualDiscountValue ? (
-                    <p className="text-right text-xs text-destructive">
-                      {form.formState.errors.manualDiscountValue.message}
-                    </p>
-                  ) : manualTooBig ? (
-                    <p className="text-right text-xs text-destructive">
-                      Vượt tạm tính — hệ thống sẽ từ chối khi chốt.
-                    </p>
-                  ) : manualPreview !== null && manualType === 'PERCENT' ? (
-                    <p className="text-xs tabular-nums text-muted-foreground">
-                      −{formatMoney(manualPreview, { unit: '' })}
-                    </p>
-                  ) : null}
-                </dd>
-              </div>
-              <div className="flex items-center justify-between">
-                <dt className="text-muted-foreground">Thuế (VAT)</dt>
-                <dd className="text-xs text-muted-foreground">chưa cấu hình</dd>
-              </div>
-              <div className="flex items-center justify-between gap-3">
-                <dt className="shrink-0 text-muted-foreground">Phí vận chuyển</dt>
-                <dd className="w-32">
-                  <FormField
-                    control={form.control}
-                    name="shippingFee"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel className="sr-only">Phí vận chuyển</FormLabel>
-                        <FormControl>
-                          <MoneyInput value={field.value ?? ''} onChange={field.onChange} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                </dd>
-              </div>
-              <div className="flex items-center justify-between border-t pt-2">
-                <dt className="font-semibold">Tổng tạm tính</dt>
-                <dd className="text-base font-semibold tabular-nums">
-                  {grandTotal !== null ? formatMoney(grandTotal, { unit: '' }) : '—'}
-                </dd>
-              </div>
-              <p className="text-xs text-muted-foreground">
-                Giá xem trước theo bảng giá của khách; số CUỐI do hệ thống chốt khi bấm Chốt đơn
-                (gồm khuyến mãi — giảm giá tay tính trên phần còn lại sau khuyến mãi). Đơn vượt
-                ngưỡng sẽ tự chuyển chờ duyệt.
-              </p>
-            </dl>
-          </section>
-        </div>
-
-        {quickOpen ? (
-          // Mount có điều kiện: đừng gọi GET /teams khi người dùng chưa mở dialog
-          <QuickCustomerDialog
-            open={quickOpen}
-            onOpenChange={setQuickOpen}
-            onCreated={(c) => {
-              setPickedCustomer(c);
-              form.setValue('customerId', c.id, { shouldValidate: true });
-            }}
-          />
-        ) : null}
-
-        <section className="rounded-md border bg-card">
-          <header className="flex items-center justify-between border-b px-3 py-2">
-            <span className="text-sm font-semibold">
-              Dòng hàng{' '}
-              <span className="font-normal text-muted-foreground">· {lines.fields.length}</span>
-            </span>
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={() => lines.append(EMPTY_LINE)}
+    <div className="flex flex-col gap-3">
+      <h1 className="sr-only">Tạo đơn hàng</h1>
+      <div className="flex flex-wrap items-center gap-2" role="tablist" aria-label="Đơn đang soạn">
+        {drafts.drafts.map((d) => {
+          const isActive = d.id === activeId;
+          const title = d.values.customerName.trim() || `Đơn mới ${d.no}`;
+          return (
+            <div
+              key={d.id}
+              className={cn(
+                'flex h-9 items-center rounded-lg border text-sm',
+                isActive
+                  ? 'border-border bg-card font-semibold text-primary'
+                  : 'border-transparent text-muted-foreground',
+              )}
             >
-              <Plus aria-hidden />
-              Thêm dòng
-            </Button>
-          </header>
-          <div className="flex flex-col divide-y">
-            {lines.fields.map((f, i) => (
-              <LineRow
-                key={f.id}
-                fieldId={f.id}
-                form={form}
-                index={i}
-                customerId={customerId}
-                channel={channel}
-                onTotal={onLineTotal}
-                onRemove={lines.fields.length > 1 ? () => lines.remove(i) : undefined}
-              />
-            ))}
-          </div>
-          {form.formState.errors.lines?.root?.message || form.formState.errors.lines?.message ? (
-            <p className="border-t px-3 py-2 text-sm text-destructive">
-              {form.formState.errors.lines.root?.message ?? form.formState.errors.lines.message}
-            </p>
-          ) : null}
-        </section>
-      </form>
-    </Form>
-  );
-}
-
-/** Chọn giảm theo số tiền (₫) hay theo %. */
-function DiscountTypeToggle({
-  value,
-  onChange,
-}: {
-  value: ManualDiscountType;
-  onChange: (t: ManualDiscountType) => void;
-}) {
-  const options: { type: ManualDiscountType; label: string; title: string }[] = [
-    { type: 'AMOUNT', label: '₫', title: 'Giảm theo số tiền' },
-    { type: 'PERCENT', label: '%', title: 'Giảm theo phần trăm' },
-  ];
-  return (
-    <div
-      role="radiogroup"
-      aria-label="Kiểu giảm giá"
-      className="flex h-9 shrink-0 rounded-md border"
-    >
-      {options.map((o) => (
+              <button
+                type="button"
+                role="tab"
+                aria-selected={isActive}
+                onClick={() => activate(d.id)}
+                className="max-w-[220px] truncate px-3"
+              >
+                {title}
+                {d.no === 1 && drafts.drafts.length === 1 ? ' (F6)' : ''}
+              </button>
+              {drafts.drafts.length > 1 || d.values.lines.length > 0 ? (
+                <button
+                  type="button"
+                  aria-label={`Đóng ${title}`}
+                  title="Đóng tab (nháp bị bỏ)"
+                  onClick={() => {
+                    setFiles((m) => omitKey(m, d.id));
+                    closeDraft(d.id);
+                  }}
+                  className="mr-1 rounded p-1 hover:bg-muted"
+                >
+                  <X className="h-3.5 w-3.5" aria-hidden />
+                </button>
+              ) : null}
+            </div>
+          );
+        })}
         <button
-          key={o.type}
           type="button"
-          role="radio"
-          aria-checked={value === o.type}
-          title={o.title}
-          onClick={() => onChange(o.type)}
-          className={
-            value === o.type
-              ? 'w-7 rounded-md bg-primary text-xs font-semibold text-primary-foreground'
-              : 'w-7 rounded-md text-xs text-muted-foreground hover:bg-muted'
-          }
+          onClick={() => openDraft()}
+          aria-label="Thêm tab đơn mới (F6)"
+          title="Thêm tab đơn mới (F6)"
+          className="flex h-9 w-9 items-center justify-center rounded-lg border bg-card hover:bg-muted"
         >
-          {o.label}
+          <Plus className="h-4 w-4" aria-hidden />
         </button>
-      ))}
-    </div>
-  );
-}
-
-const QTY_RE = /^\d{1,12}(\.\d{1,6})?$/;
-const PCT_RE = /^\d{1,2}(\.\d{1,2})?$/;
-
-/**
- * Một dòng hàng: # → SKU → ĐVT → SL (quy đổi cơ sở) → Giá niêm yết (xem trước) → CK% (cảnh báo
- * vượt trần) → Thành tiền (decimal.js, chỉ hiển thị) → khả dụng. Báo thành tiền lên form cha
- * để cộng Tạm tính.
- */
-function LineRow({
-  fieldId,
-  form,
-  index,
-  customerId,
-  channel,
-  onTotal,
-  onRemove,
-}: {
-  fieldId: string;
-  form: UseFormReturn<CreateOrderValues>;
-  index: number;
-  customerId: string;
-  channel: CreateOrderValues['channel'];
-  onTotal: (fieldId: string, total: string | null) => void;
-  onRemove?: () => void;
-}) {
-  const skuId = useWatch({ control: form.control, name: `lines.${index}.skuId` });
-  const uomId = useWatch({ control: form.control, name: `lines.${index}.uomId` });
-  const qty = useWatch({ control: form.control, name: `lines.${index}.qty` });
-  const dp = useWatch({ control: form.control, name: `lines.${index}.discountPercent` }) ?? '';
-  const sku = useSkuDetail(skuId);
-  const combo = sku.data?.isCombo ? (sku.data.combo ?? null) : null;
-  // Combo không có tồn riêng — khả dụng lấy từ thành phần (GET /skus/{id}.combo), không hỏi /stock.
-  const stock = useSkuAvailability(combo ? '' : (sku.data?.code ?? ''));
-  const qtyValid = QTY_RE.test(qty ?? '');
-  const price = useLinePrice({
-    skuId,
-    uomId,
-    qty: qtyValid ? qty : '',
-    customerId,
-    channel,
-  });
-
-  // SKU vừa chọn (hoặc đổi): mặc định ĐVT cơ sở; ĐVT cũ không thuộc SKU mới thì thay
-  useEffect(() => {
-    if (!sku.data) return;
-    const valid = [sku.data.baseUomId, ...sku.data.uomConversions.map((c) => c.uomId)];
-    if (!uomId || !valid.includes(uomId)) {
-      form.setValue(`lines.${index}.uomId`, sku.data.baseUomId);
-    }
-  }, [sku.data, uomId, form, index]);
-
-  const factor =
-    sku.data && uomId !== sku.data.baseUomId
-      ? sku.data.uomConversions.find((c) => c.uomId === uomId)?.factor
-      : null;
-  const baseHint =
-    factor && qty && /^\d/.test(qty)
-      ? `= ${formatQuantity(new Decimal(qty).mul(factor).toString())} ${sku.data?.baseUom.code}`
-      : null;
-  const low = combo
-    ? qtyValid && new Decimal(combo.available).lessThan(qty)
-    : stock.data && qty
-      ? new Decimal(stock.data.available).lessThan(
-          factor ? new Decimal(qty).mul(factor) : new Decimal(qty || '0'),
-        )
-      : false;
-
-  // Thành tiền xem trước = niêm yết × (1 − CK%) × SL — đúng phép tính server (làm tròn 4 lẻ)
-  const dpValid = dp === '' || PCT_RE.test(dp);
-  const lineTotal =
-    price.data && qtyValid && dpValid
-      ? new Decimal(price.data.listPrice)
-          .mul(new Decimal(1).minus(dp === '' ? 0 : new Decimal(dp).div(100)))
-          .toDecimalPlaces(4)
-          .mul(qty)
-          .toDecimalPlaces(4)
-          .toFixed(4)
-      : null;
-  useEffect(() => {
-    onTotal(fieldId, lineTotal);
-  }, [fieldId, lineTotal, onTotal]);
-
-  // Trần CK của bảng giá (0..1) — server CHẶN 422 khi vượt, cảnh báo ngay lúc gõ
-  const maxPct =
-    price.data?.maxDiscount != null ? new Decimal(price.data.maxDiscount).mul(100) : null;
-  const overCap =
-    maxPct !== null && dp !== '' && dpValid ? new Decimal(dp).greaterThan(maxPct) : false;
-
-  return (
-    <div className="grid items-start gap-2 px-3 py-2 sm:grid-cols-[20px_minmax(190px,2fr)_120px_100px_100px_84px_110px_minmax(110px,1fr)_32px]">
-      <div className="pt-2 text-xs text-muted-foreground">{index + 1}</div>
-      <FormField
-        control={form.control}
-        name={`lines.${index}.skuId`}
-        render={({ field }) => (
-          <FormItem>
-            <FormLabel className="sr-only">Sản phẩm</FormLabel>
-            <FormControl>
-              <EntityPicker
-                value={field.value}
-                onChange={field.onChange}
-                useSearch={useSkuSearch}
-                selectedLabel={sku.data ? sku.data.name : undefined}
-                placeholder="Tìm mã SKU, tên, barcode…"
-              />
-            </FormControl>
-            {combo ? (
-              <p className="flex flex-wrap items-center gap-1 text-xs text-muted-foreground">
-                <span className="inline-flex items-center gap-0.5 rounded bg-primary/10 px-1 font-semibold text-primary">
-                  <Boxes className="h-3 w-3" aria-hidden />
-                  Combo
-                </span>
-                <span>
-                  gồm{' '}
-                  {combo.components.map((c) => `${formatQuantity(c.qty)} × ${c.code}`).join(', ')}
-                  {' — '}kho giữ và pick từng thành phần
-                </span>
-              </p>
-            ) : null}
-            <FormMessage />
-          </FormItem>
-        )}
-      />
-      <FormField
-        control={form.control}
-        name={`lines.${index}.uomId`}
-        render={({ field }) => (
-          <FormItem>
-            <FormLabel className="sr-only">Đơn vị</FormLabel>
-            <Select value={field.value} onValueChange={field.onChange} disabled={!sku.data}>
-              <FormControl>
-                <SelectTrigger aria-label="Đơn vị tính">
-                  <SelectValue placeholder="ĐVT" />
-                </SelectTrigger>
-              </FormControl>
-              <SelectContent>
-                {sku.data ? (
-                  <>
-                    <SelectItem value={sku.data.baseUomId}>{sku.data.baseUom.code}</SelectItem>
-                    {sku.data.uomConversions.map((c) => (
-                      <SelectItem key={c.uomId} value={c.uomId}>
-                        {c.uom.code} (= {formatQuantity(c.factor)} {sku.data!.baseUom.code})
-                      </SelectItem>
-                    ))}
-                  </>
-                ) : null}
-              </SelectContent>
-            </Select>
-            <FormMessage />
-          </FormItem>
-        )}
-      />
-      <FormField
-        control={form.control}
-        name={`lines.${index}.qty`}
-        render={({ field }) => (
-          <FormItem>
-            <FormLabel className="sr-only">Số lượng</FormLabel>
-            <FormControl>
-              <Input
-                inputMode="decimal"
-                aria-label="Số lượng"
-                className="text-right tabular-nums"
-                {...field}
-              />
-            </FormControl>
-            {baseHint ? <p className="text-xs text-muted-foreground">{baseHint}</p> : null}
-            <FormMessage />
-          </FormItem>
-        )}
-      />
-      <div className="pt-2 text-right text-sm tabular-nums text-muted-foreground">
-        {price.data ? (
-          formatMoney(price.data.listPrice, { unit: '' })
-        ) : skuId && customerId ? (
-          <span className="text-xs">{price.isPending && price.isFetching ? '…' : '—'}</span>
-        ) : (
-          <span className="text-xs">chọn khách</span>
-        )}
       </div>
-      <FormField
-        control={form.control}
-        name={`lines.${index}.discountPercent`}
-        render={({ field }) => (
-          <FormItem>
-            <FormLabel className="sr-only">Chiết khấu %</FormLabel>
-            <FormControl>
-              <Input
-                inputMode="decimal"
-                aria-label="Chiết khấu %"
-                placeholder="CK %"
-                className={
-                  overCap ? 'border-destructive text-right tabular-nums' : 'text-right tabular-nums'
-                }
-                {...field}
-                value={field.value ?? ''}
-              />
-            </FormControl>
-            {overCap && maxPct !== null ? (
-              <p className="text-xs font-medium text-destructive">
-                vượt trần {formatQuantity(maxPct.toString())}% — hệ thống sẽ chặn khi chốt
-              </p>
-            ) : null}
-            <FormMessage />
-          </FormItem>
-        )}
-      />
-      <div className="pt-2 text-right text-sm font-semibold tabular-nums">
-        {lineTotal !== null ? formatMoney(lineTotal, { unit: '' }) : '—'}
-      </div>
-      <div className="pt-2 text-right text-sm tabular-nums">
-        {skuId === '' ? null : combo ? (
-          <span className={low ? 'font-semibold text-destructive' : 'text-muted-foreground'}>
-            Còn bán được {formatQuantity(combo.available)} combo
-            {low ? ' — thiếu thành phần' : ''}
-          </span>
-        ) : stock.isPending ? (
-          <span className="text-muted-foreground">Đang xem tồn…</span>
-        ) : stock.data ? (
-          <span className={low ? 'font-semibold text-destructive' : 'text-muted-foreground'}>
-            Khả dụng {formatQuantity(stock.data.available)} / {formatQuantity(stock.data.onHand)}{' '}
-            {stock.data.baseUomCode}
-            {low ? ' — thiếu hàng' : ''}
-          </span>
-        ) : (
-          <span className="text-muted-foreground">Chưa có tồn</span>
-        )}
-      </div>
-      {onRemove ? (
-        <Button
-          type="button"
-          variant="ghost"
-          size="icon"
-          className="h-8 w-8"
-          aria-label="Xóa dòng"
-          title="Xóa dòng"
-          onClick={onRemove}
-        >
-          <X aria-hidden />
-        </Button>
+
+      {!drafts.ready || (fromId && !seeded.current) ? (
+        <div className="flex flex-wrap gap-4" aria-busy="true" aria-label="Đang tải">
+          <div className="flex min-w-0 flex-[999_1_640px] flex-col gap-4">
+            <Skeleton className="h-64 w-full" />
+            <Skeleton className="h-80 w-full" />
+          </div>
+          <div className="flex min-w-0 flex-[1_1_380px] flex-col gap-4">
+            <Skeleton className="h-56 w-full" />
+            <Skeleton className="h-40 w-full" />
+            <Skeleton className="h-64 w-full" />
+          </div>
+        </div>
       ) : (
-        <span />
+        <OrderDraftForm
+          key={activeId}
+          ref={formRef}
+          initialValues={drafts.active.values}
+          files={files[activeId] ?? []}
+          onFilesChange={(next) => setFiles((m) => ({ ...m, [activeId]: next }))}
+          onValuesChange={onValuesChange}
+          onCreated={(r, mode) => void onCreated(r, mode)}
+        />
       )}
     </div>
   );

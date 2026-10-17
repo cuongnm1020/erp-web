@@ -1,6 +1,6 @@
 import { screen, waitFor, within } from '@testing-library/react';
 import { http, HttpResponse } from 'msw';
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { makeOrderDetailWithCombo, makeOrders } from '@/test/msw/handlers';
 import { server } from '@/test/msw/server';
 import { renderApp } from '@/test/render';
@@ -19,6 +19,7 @@ vi.stubGlobal(
 window.HTMLElement.prototype.scrollIntoView = vi.fn();
 
 let search = '';
+beforeEach(() => window.localStorage.clear());
 vi.mock('next/navigation', () => ({
   usePathname: () => '/crm/orders/x',
   useRouter: () => ({ push: vi.fn(), replace: vi.fn(), refresh: vi.fn() }),
@@ -54,7 +55,9 @@ describe('OrderDetailScreen — đơn có combo', () => {
   it('hiện một dòng tổng combo (giá combo × số combo) + dòng thành phần thụt vào', async () => {
     search = '';
     server.use(
-      http.get('/api/sales-orders/:id', () => HttpResponse.json(DETAIL)),
+      http.get('/api/sales-orders/:id', ({ params }) =>
+        params.id === ORDER.id ? HttpResponse.json(DETAIL) : undefined,
+      ),
       http.get('/api/sales-orders', () => HttpResponse.json({ items: [], total: 0 })),
     );
     renderApp(<OrderDetailScreen orderId={ORDER.id} />);
@@ -75,7 +78,9 @@ describe('OrderCreateScreen — ?from= đơn có combo', () => {
     search = `from=${ORDER.id}`;
     const comboSkuId = DETAIL.lines[0]!.combo!.skuId;
     server.use(
-      http.get('/api/sales-orders/:id', () => HttpResponse.json(DETAIL)),
+      http.get('/api/sales-orders/:id', ({ params }) =>
+        params.id === ORDER.id ? HttpResponse.json(DETAIL) : undefined,
+      ),
       http.get('/api/products', () => HttpResponse.json({ items: [], total: 0 })),
       http.get('/api/stock', () => HttpResponse.json({ items: [], total: 0 })),
       http.get('/api/skus/:id', ({ params }) => {
@@ -138,7 +143,8 @@ describe('OrderCreateScreen — ?from= đơn có combo', () => {
     renderApp(<OrderCreateScreen />);
     await waitFor(() => expect(screen.getAllByLabelText('Số lượng')).toHaveLength(2));
     expect(screen.getAllByLabelText('Số lượng')[0]).toHaveValue('3');
-    expect(await screen.findByText('Combo')).toBeInTheDocument();
+    // "Combo" có cả ở tab của ô tìm sản phẩm — chỉ cần nhãn trên dòng giỏ hàng xuất hiện.
+    await waitFor(() => expect(screen.getAllByText('Combo').length).toBeGreaterThan(1));
     expect(screen.getByText(/gồm 2 × SKU-A, 1 × SKU-B/)).toBeInTheDocument();
     expect(screen.getByText('Còn bán được 12 combo')).toBeInTheDocument();
   });

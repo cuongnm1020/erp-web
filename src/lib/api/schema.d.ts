@@ -3010,6 +3010,76 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/sales-orders/staff-options": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Nhân viên chọn được trên màn tạo đơn (NV xử lý / đóng hàng / chăm sóc / marketer) — khai TRƯỚC `:id`. */
+        get: operations["SalesOrderController_staffOptions"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/sales-orders/shipping-quote-preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Tra cước trên màn tạo đơn (chưa có đơn): địa chỉ gõ tay + cân nặng + tiền thu hộ. CHỈ ĐỌC.
+         *     Hãng không có bảng cước → 501; kho chưa khai địa chỉ → 422; hãng lỗi → 502.
+         */
+        post: operations["SalesOrderController_shippingQuotePreview"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/sales-orders/{id}/attachments": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Tệp đính kèm đơn — multipart field "file" (jpg/png/webp/pdf ≤ 10MB, tối đa 20 tệp/đơn). */
+        post: operations["SalesOrderController_uploadAttachment"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/sales-orders/{id}/attachments/{attachmentId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete: operations["SalesOrderController_removeAttachment"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/sales-orders": {
         parameters: {
             query?: never;
@@ -5229,7 +5299,7 @@ export interface components {
         };
         ConsentSummaryDto: {
             /** @enum {string} */
-            channel: "EMAIL" | "SMS" | "ZALO" | "PHONE_CALL";
+            channel: "ZALO" | "EMAIL" | "SMS" | "PHONE_CALL";
             granted: boolean;
             source: string;
             recordedAt: string;
@@ -5598,7 +5668,7 @@ export interface components {
             id: string;
             docNumber: string;
             /** @enum {string} */
-            kind: "SALES" | "OTHER" | "TRANSFER" | "RETURN_TO_SUPPLIER";
+            kind: "OTHER" | "SALES" | "TRANSFER" | "RETURN_TO_SUPPLIER";
             /** @enum {string} */
             status: "DRAFT" | "PENDING_APPROVAL" | "APPROVED" | "POSTED" | "CANCELLED";
             warehouseId: string;
@@ -5645,7 +5715,7 @@ export interface components {
             id: string;
             docNumber: string;
             /** @enum {string} */
-            kind: "SALES" | "OTHER" | "TRANSFER" | "RETURN_TO_SUPPLIER";
+            kind: "OTHER" | "SALES" | "TRANSFER" | "RETURN_TO_SUPPLIER";
             /** @enum {string} */
             status: "DRAFT" | "PENDING_APPROVAL" | "APPROVED" | "POSTED" | "CANCELLED";
             warehouseId: string;
@@ -7676,6 +7746,8 @@ export interface components {
             productName: string;
             categoryName: string | null;
             brandName: string | null;
+            /** @description ĐVT cơ sở — màn tạo đơn thêm dòng ngay với ĐVT này (không chờ GET /skus/:id). */
+            baseUomId: string;
             baseUomCode: string;
             /**
              * @description Chế độ theo dõi (mức SKU — nguồn sự thật): form nhập kho đòi lô khi LOT.
@@ -8112,7 +8184,7 @@ export interface components {
             /** Format: uuid */
             customerId: string;
             /** @enum {string} */
-            channel: "EMAIL" | "SMS" | "ZALO" | "PHONE_CALL";
+            channel: "ZALO" | "EMAIL" | "SMS" | "PHONE_CALL";
             granted: boolean;
             source: string;
             evidence?: {
@@ -8121,7 +8193,7 @@ export interface components {
         };
         CreateCustomerConsentDto: {
             /** @enum {string} */
-            channel: "EMAIL" | "SMS" | "ZALO" | "PHONE_CALL";
+            channel: "ZALO" | "EMAIL" | "SMS" | "PHONE_CALL";
             /** @description true = đồng ý, false = từ chối / rút lại. */
             granted: boolean;
             /** @enum {string} */
@@ -8144,7 +8216,7 @@ export interface components {
             id: string;
             customerId: string;
             /** @enum {string} */
-            channel: "EMAIL" | "SMS" | "ZALO" | "PHONE_CALL";
+            channel: "ZALO" | "EMAIL" | "SMS" | "PHONE_CALL";
             granted: boolean;
             /** @description FORM | PHONE | ZALO_OA | IMPORT | UNSUBSCRIBE_LINK | ADMIN (bản ghi cũ có thể khác). */
             source: string;
@@ -8156,7 +8228,7 @@ export interface components {
         };
         ConsentCurrentDto: {
             /** @enum {string} */
-            channel: "EMAIL" | "SMS" | "ZALO" | "PHONE_CALL";
+            channel: "ZALO" | "EMAIL" | "SMS" | "PHONE_CALL";
             granted: boolean | null;
             /** @description ISO datetime; null khi chưa từng ghi. */
             recordedAt: string | null;
@@ -8184,7 +8256,7 @@ export interface components {
             id: string;
             customer: components["schemas"]["ConsentCustomerRefDto"];
             /** @enum {string} */
-            channel: "EMAIL" | "SMS" | "ZALO" | "PHONE_CALL";
+            channel: "ZALO" | "EMAIL" | "SMS" | "PHONE_CALL";
             granted: boolean;
             source: string;
             purpose: string;
@@ -8200,7 +8272,7 @@ export interface components {
             /** @description Tên khách đã che, vd "Ng*** V** A". */
             customerName: string;
             /** @enum {string} */
-            channel: "EMAIL" | "SMS" | "ZALO" | "PHONE_CALL";
+            channel: "ZALO" | "EMAIL" | "SMS" | "PHONE_CALL";
             /** @description Trạng thái MARKETING hiện tại của kênh; null = chưa từng ghi (coi như không nhận tin). */
             currentlyGranted: boolean | null;
         };
@@ -8425,6 +8497,56 @@ export interface components {
         };
         CloseContainerDto: {
             idempotencyKey?: string;
+        };
+        OrderStaffOptionDto: {
+            id: string;
+            code: string;
+            fullName: string;
+        };
+        ShippingQuotePreviewDto: {
+            /** Format: uuid */
+            carrierId: string;
+            /** Format: uuid */
+            carrierAccountId?: string;
+            /**
+             * Format: uuid
+             * @description Kho lấy hàng; bỏ trống = kho mặc định hệ thống.
+             */
+            warehouseId?: string;
+            province: string;
+            ward?: string;
+            district?: string;
+            address?: string;
+            /** @description Cân nặng gửi hãng (kg, chuỗi decimal > 0). */
+            weightKg: string;
+            /** @description Tiền thu hộ, Decimal(18,4) chuỗi ≥ 0. */
+            codAmount: string;
+        };
+        ShippingQuotePreviewResultDto: {
+            carrierId: string;
+            carrierCode: string;
+            carrierName: string;
+            /** @description Cước hãng báo, Decimal(18,4) chuỗi. */
+            fee: string;
+            currency: string;
+            serviceCode: string | null;
+            estimatedDeliveryAt: string | null;
+            /** @description kg, Decimal(12,4) chuỗi. */
+            weightKg: string;
+            /** @description Decimal(18,4) chuỗi. */
+            codAmount: string;
+            pickupWarehouseId: string;
+            pickupSummary: string;
+        };
+        SalesOrderAttachmentDto: {
+            id: string;
+            fileName: string;
+            contentType: string;
+            sizeBytes: number;
+            /** @description URL đọc có chữ ký, hết hạn sau 1 giờ. */
+            url: string;
+            uploadedBy: string;
+            createdAt: string;
         };
         SalesOrderListProductDto: {
             name: string;
@@ -8679,6 +8801,12 @@ export interface components {
             /** @description Đã pick xong (reservation FULFILLED) — Decimal(18,6) dạng chuỗi theo ĐVT cơ sở. */
             pickedQty: string;
         };
+        SalesOrderTagDto: {
+            id: string;
+            code: string;
+            name: string;
+            color: string | null;
+        };
         SalesOrderDetailDto: {
             /** @description Địa chỉ giao hiệu lực — null = khách chưa có địa chỉ dùng được (tra cước / cấp vận đơn sẽ 422). */
             shippingAddress: components["schemas"]["SalesOrderAddressDto"] | null;
@@ -8693,6 +8821,26 @@ export interface components {
             /** @description Phiếu giao của đơn — null = kho chưa pick xong (chưa có phiếu). */
             shipment: components["schemas"]["SalesOrderShipmentDto"] | null;
             lines: components["schemas"]["SalesOrderLineDto"][];
+            /**
+             * @description Nguồn đơn (Facebook, Zalo, gọi điện…); null = đơn cũ / Pancake.
+             * @enum {string|null}
+             */
+            source: "OTHER" | "WEBSITE" | "FACEBOOK" | "ZALO" | "TIKTOK" | "PHONE" | "WALK_IN" | "REFERRAL" | null;
+            /** @description Phụ thu, Decimal(18,4) chuỗi — đã nằm trong `total`. */
+            surcharge: string;
+            /** @description Khách chuyển khoản trước, Decimal(18,4) chuỗi. */
+            prepaidAmount: string;
+            freeShipping: boolean;
+            shipFeeOnReturnOnly: boolean;
+            packerId: string | null;
+            careStaffId: string | null;
+            marketerId: string | null;
+            internalNote: string | null;
+            printNote: string | null;
+            /** @description `YYYY-MM-DD`. */
+            expectedDeliveryDate: string | null;
+            tags: components["schemas"]["SalesOrderTagDto"][];
+            attachments: components["schemas"]["SalesOrderAttachmentDto"][];
             id: string;
             docNumber: string;
             customer: components["schemas"]["SalesOrderCustomerDto"];
@@ -8806,6 +8954,62 @@ export interface components {
             /** @description Điểm lấy đã gửi hãng, tóm tắt "tỉnh · xã" để sale đối chiếu. */
             pickupSummary: string;
         };
+        InlineCustomerDto: {
+            name: string;
+            phone: string;
+            /** Format: email */
+            email?: string;
+            /** @description `YYYY-MM-DD`. */
+            birthday?: string;
+            /** @enum {string} */
+            gender?: "MALE" | "FEMALE" | "OTHER";
+        };
+        InlineAddressDto: {
+            recipient: string;
+            phone: string;
+            line1: string;
+            hamlet?: string;
+            ward?: string;
+            /** @description Quận/huyện cũ — gợi ý cho hãng (GHTK cần khi địa chỉ không có đường). */
+            district?: string;
+            province: string;
+        };
+        ShippingOptionsDto: {
+            /** @description Shop trả cước cho hãng (mặc định true — phí ship thu khách đã nằm trong COD). */
+            shopPaysFee?: boolean;
+            /**
+             * @description GHTK: `road` đường bộ | `fly` đường bay.
+             * @enum {string}
+             */
+            transport?: "road" | "fly";
+            /** @description Shop mang hàng ra bưu cục thay vì hãng đến lấy. */
+            dropAtPostOffice?: boolean;
+            /** @description Cho khách xem hàng trước khi nhận. */
+            allowInspection?: boolean;
+            /** @description Shipper gọi shop khi giao không được. */
+            callShopOnFailure?: boolean;
+            /** @description Mã dịch vụ của hãng (VTP `ORDER_SERVICE`, GHTK `deliver_option`…). */
+            serviceCode?: string | null;
+            /** @description Dịch vụ bổ sung của hãng (mã theo hãng). */
+            extraServices?: string[];
+            /**
+             * @description Ca lấy hàng: 1 sáng, 2 chiều, 3 tối; null = hãng tự xếp ca.
+             * @enum {number|null}
+             */
+            pickWorkShift?: 1 | 2 | 3 | null;
+            /** @description Hẹn ngày lấy hàng `YYYY-MM-DD`. */
+            pickDate?: string | null;
+            /** @description Giá trị khai giá, Decimal(18,4) chuỗi; null = theo tiền thu hộ. */
+            insuranceValue?: string | null;
+            /** @description Trần cân nặng gửi hãng (kg, Decimal(12,4) chuỗi). */
+            maxWeightKg?: string | null;
+            /** @description Kích thước kiện (cm, số nguyên 0..10000). */
+            lengthCm?: number | null;
+            widthCm?: number | null;
+            heightCm?: number | null;
+            /** @description Ghi chú in lên vận đơn / cho shipper. */
+            note?: string | null;
+        };
         CreateOrderLineDto: {
             /** Format: uuid */
             skuId: string;
@@ -8817,10 +9021,63 @@ export interface components {
             discountPercent?: string;
         };
         CreateOrderDto: {
-            /** Format: uuid */
-            customerId: string;
+            /**
+             * Format: uuid
+             * @description Khách chọn sẵn. Bỏ trống thì phải gửi `customer` (tìm / tạo theo SĐT).
+             */
+            customerId?: string;
+            customer?: components["schemas"]["InlineCustomerDto"];
             /** Format: uuid */
             addressId?: string;
+            /** @description Địa chỉ gõ tay — chỉ dùng khi không gửi `addressId`. */
+            address?: components["schemas"]["InlineAddressDto"];
+            /**
+             * @description Nguồn đơn — khách tìm đến qua đâu.
+             * @enum {string}
+             */
+            source?: "OTHER" | "WEBSITE" | "FACEBOOK" | "ZALO" | "TIKTOK" | "PHONE" | "WALK_IN" | "REFERRAL";
+            /** @description Phụ thu, Decimal(18,4) chuỗi ≥ 0 — cộng vào tổng. */
+            surcharge?: string;
+            /** @description Khách chuyển khoản trước, Decimal(18,4) chuỗi — ≤ tổng đơn; COD = tổng − khoản này. */
+            prepaidAmount?: string;
+            /** @description Miễn phí giao hàng → phí vận chuyển thu khách = 0. */
+            freeShipping?: boolean;
+            /** @description Chỉ thu phí ship nếu hoàn → phí vận chuyển thu khách lúc nhận = 0. */
+            shipFeeOnReturnOnly?: boolean;
+            /**
+             * Format: uuid
+             * @description NV xử lý (người phụ trách đơn) — mặc định người tạo.
+             */
+            ownerId?: string;
+            /** Format: uuid */
+            packerId?: string;
+            /** Format: uuid */
+            careStaffId?: string;
+            /** Format: uuid */
+            marketerId?: string;
+            /** @description Giờ tạo đơn (ISO) — mặc định bây giờ; không ở tương lai, kỳ kế toán phải đang mở. */
+            orderDate?: string;
+            /** @description Thẻ đơn (core.Tag.id). */
+            tagIds?: string[];
+            internalNote?: string;
+            /** @description Ghi chú in lên vận đơn. */
+            printNote?: string;
+            /** @description Ngày hẹn nhận hàng `YYYY-MM-DD`. */
+            expectedDeliveryDate?: string;
+            /**
+             * Format: uuid
+             * @description Hãng vận chuyển chọn sẵn (wms.Carrier.id đang hoạt động).
+             */
+            carrierId?: string;
+            /**
+             * Format: uuid
+             * @description Tài khoản của hãng (wms.CarrierAccount.id đang bật) — cần `carrierId`.
+             */
+            carrierAccountId?: string;
+            /** @description Cân nặng gửi hãng (kg, chuỗi decimal > 0). */
+            shippingWeightKg?: string;
+            /** @description Tuỳ chọn gửi hãng (kích thước kiện…). */
+            shippingOptions?: components["schemas"]["ShippingOptionsDto"];
             /**
              * Format: uuid
              * @description Kho xuất (wms.Warehouse.id đang dùng, không phải TRANSIT) — đơn xuất từ MỘT kho: mọi dòng
@@ -8909,49 +9166,21 @@ export interface components {
             taxAmount: string;
             /** @description Decimal(18,4) dạng chuỗi. */
             shippingFee: string;
+            /** @description Phụ thu, Decimal(18,4) dạng chuỗi — đã nằm trong `total`. */
+            surcharge: string;
             /** @description Decimal(18,4) dạng chuỗi. */
             total: string;
+            /** @description Khách chuyển khoản trước, Decimal(18,4) dạng chuỗi. */
+            prepaidAmount: string;
+            /** @description Tiền thu hộ = total − prepaidAmount, Decimal(18,4) dạng chuỗi. */
+            codAmount: string;
+            /** @description Khách của đơn — khách tạo mới từ form (gõ tên + SĐT) cũng trả id ở đây. */
+            customerId: string;
             lines: components["schemas"]["OrderLineResultDto"][];
             reservations: components["schemas"]["OrderReservationResultDto"][];
             appliedPromotionIds: string[];
             /** @description Rule duyệt đã khớp — null = không cần duyệt, đơn chốt thẳng. */
             approvalRuleId: string | null;
-        };
-        ShippingOptionsDto: {
-            /** @description Shop trả cước cho hãng (mặc định true — phí ship thu khách đã nằm trong COD). */
-            shopPaysFee?: boolean;
-            /**
-             * @description GHTK: `road` đường bộ | `fly` đường bay.
-             * @enum {string}
-             */
-            transport?: "road" | "fly";
-            /** @description Shop mang hàng ra bưu cục thay vì hãng đến lấy. */
-            dropAtPostOffice?: boolean;
-            /** @description Cho khách xem hàng trước khi nhận. */
-            allowInspection?: boolean;
-            /** @description Shipper gọi shop khi giao không được. */
-            callShopOnFailure?: boolean;
-            /** @description Mã dịch vụ của hãng (VTP `ORDER_SERVICE`, GHTK `deliver_option`…). */
-            serviceCode?: string | null;
-            /** @description Dịch vụ bổ sung của hãng (mã theo hãng). */
-            extraServices?: string[];
-            /**
-             * @description Ca lấy hàng: 1 sáng, 2 chiều, 3 tối; null = hãng tự xếp ca.
-             * @enum {number|null}
-             */
-            pickWorkShift?: 1 | 2 | 3 | null;
-            /** @description Hẹn ngày lấy hàng `YYYY-MM-DD`. */
-            pickDate?: string | null;
-            /** @description Giá trị khai giá, Decimal(18,4) chuỗi; null = theo tiền thu hộ. */
-            insuranceValue?: string | null;
-            /** @description Trần cân nặng gửi hãng (kg, Decimal(12,4) chuỗi). */
-            maxWeightKg?: string | null;
-            /** @description Kích thước kiện (cm, số nguyên 0..10000). */
-            lengthCm?: number | null;
-            widthCm?: number | null;
-            heightCm?: number | null;
-            /** @description Ghi chú in lên vận đơn / cho shipper. */
-            note?: string | null;
         };
         UpdateOrderDto: {
             /** @enum {string} */
@@ -10612,7 +10841,7 @@ export interface components {
             previousFrom: string;
             previousTo: string;
             /** @enum {string} */
-            rankBy: "customers" | "qty" | "revenue" | "orders" | "grossProfit";
+            rankBy: "customers" | "orders" | "qty" | "revenue" | "grossProfit";
             /** @description Tối đa `limit` SKU, hạng 1..n. Bằng nhau thì doanh thu cao hơn đứng trước. */
             items: components["schemas"]["SalesTopProductItemDto"][];
             dataAsOf: string | null;
@@ -12269,7 +12498,7 @@ export interface operations {
         parameters: {
             query: {
                 warehouseId?: string;
-                kind?: "SALES" | "OTHER" | "TRANSFER" | "RETURN_TO_SUPPLIER";
+                kind?: "OTHER" | "SALES" | "TRANSFER" | "RETURN_TO_SUPPLIER";
                 status?: "DRAFT" | "PENDING_APPROVAL" | "APPROVED" | "POSTED" | "CANCELLED";
                 /** @description Tìm theo số phiếu (contains, không phân biệt hoa thường). */
                 q?: string;
@@ -15900,7 +16129,7 @@ export interface operations {
     ConsentController_list: {
         parameters: {
             query: {
-                channel?: "EMAIL" | "SMS" | "ZALO" | "PHONE_CALL";
+                channel?: "ZALO" | "EMAIL" | "SMS" | "PHONE_CALL";
                 /** @description Lọc theo trạng thái hiện tại. */
                 granted?: boolean;
                 /** @description `YYYY-MM-DD` (giờ VN) — bản ghi hiện tại ghi từ ngày này. */
@@ -16522,6 +16751,96 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["ContainerDto"];
                 };
+            };
+        };
+    };
+    SalesOrderController_staffOptions: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OrderStaffOptionDto"][];
+                };
+            };
+        };
+    };
+    SalesOrderController_shippingQuotePreview: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ShippingQuotePreviewDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ShippingQuotePreviewResultDto"];
+                };
+            };
+        };
+    };
+    SalesOrderController_uploadAttachment: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": {
+                    /** Format: binary */
+                    file: string;
+                };
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SalesOrderAttachmentDto"];
+                };
+            };
+        };
+    };
+    SalesOrderController_removeAttachment: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+                attachmentId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };
