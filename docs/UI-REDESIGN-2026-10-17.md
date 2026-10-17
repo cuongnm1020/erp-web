@@ -20,8 +20,8 @@ Chỉ đổi giao diện; không đổi quyền, route, API hay hành vi nghiệ
 
 Nguồn số liệu thật đang dùng:
 - Tổng đơn hôm nay / hôm qua cùng giờ / cả ngày hôm qua: `GET /sales-orders/flow-counts?from&to` → `total` (tab "Tất cả", gồm đơn hủy), số hủy = `CANCELLED`. Lọc theo `orderDate`.
-- Cần xử lý: `flow-counts` (không giới hạn ngày) → `PENDING_APPROVAL`, `WAREHOUSE`; "Chưa gán ĐVVC" = `flow-counts?noCarrier=true` → `WAREHOUSE + PICKING + PACKED`; "SKU cần nhập" = `GET /stock/replenishment` → `alertCount`.
-- Sắp hết hàng: `GET /stock/replenishment?onlyAlert=true&take=5` — theo **mức tồn đã đặt** trên sản phẩm (câu hỏi còn mở trong mockup: theo số ngày đủ bán hay điểm đặt hàng → đang theo API có sẵn).
+- Cần xử lý: `flow-counts` (không giới hạn ngày) → `PENDING_APPROVAL`, `WAREHOUSE`; "Chưa gán ĐVVC" = `flow-counts?noCarrier=true` → `WAREHOUSE + PICKING + PACKED` (đơn còn ở kho chưa chọn hãng — user chốt 2026-10-17); "SKU cần nhập" = `GET /stock/replenishment` → `alertCount`.
+- Sắp hết hàng: `GET /stock/replenishment?onlyAlert=true&take=5` — theo **mức tồn tối thiểu đã đặt** trên sản phẩm (user chốt 2026-10-17, không tính theo số ngày đủ bán như mockup).
 
 ## Chưa có API — đã dựng giao diện, chờ backend
 
