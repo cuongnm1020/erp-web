@@ -1,5 +1,6 @@
 'use client';
 
+import Decimal from 'decimal.js';
 import { Boxes, CornerDownRight, Gift, Info, Printer } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
@@ -51,6 +52,7 @@ import {
   fulfilmentTone,
   orderAddressLine,
   orderChannelLabel,
+  orderSourceLabel,
   orderStatusLabel,
   orderStatusTone,
   manualDiscountNote,
@@ -279,7 +281,6 @@ const MISSING: Array<{ title: string; need: string }> = [
   { title: 'Thanh toán / còn phải thu', need: 'chưa có mặt đọc công nợ theo đơn' },
   { title: 'Dòng thời gian chứng từ', need: 'chưa có endpoint lịch sử trạng thái đơn' },
   { title: 'Người tạo, người phụ trách', need: 'chỉ có ownerId; chưa có danh bạ user' },
-  { title: 'Ghi chú giao', need: 'đơn chưa có trường ghi chú giao hàng' },
 ];
 
 /** Một dòng SKU; `component` = dòng thành phần combo (thụt vào, giá đã phân bổ hiện mờ). */
@@ -736,6 +737,44 @@ function Detail({ order }: { order: SalesOrderDetail }) {
               <span className="font-mono text-xs">{order.docNumber}</span>
             </Field>
             <Field label="Kênh bán">{orderChannelLabel(order.channel)}</Field>
+            {order.source ? (
+              <Field label="Nguồn đơn">{orderSourceLabel(order.source)}</Field>
+            ) : null}
+            {!new Decimal(order.surcharge).isZero() ? (
+              <Field label="Phụ thu">{money(order.surcharge)}</Field>
+            ) : null}
+            {!new Decimal(order.prepaidAmount).isZero() ? (
+              <Field label="Đã chuyển khoản">
+                {money(order.prepaidAmount)}
+                <span className="block text-xs text-muted-foreground">
+                  Thu hộ còn{' '}
+                  {money(
+                    Decimal.max(new Decimal(order.total).minus(order.prepaidAmount), 0).toFixed(4),
+                  )}
+                </span>
+              </Field>
+            ) : null}
+            {order.freeShipping || order.shipFeeOnReturnOnly ? (
+              <Field label="Phí giao hàng">
+                {order.freeShipping ? 'Miễn phí giao hàng' : 'Chỉ thu phí nếu hoàn'}
+              </Field>
+            ) : null}
+            {order.expectedDeliveryDate ? (
+              <Field label="Hẹn nhận hàng">
+                {formatDate(`${order.expectedDeliveryDate}T00:00:00Z`)}
+              </Field>
+            ) : null}
+            {order.tags.length > 0 ? (
+              <Field label="Thẻ">
+                <span className="flex flex-wrap gap-1">
+                  {order.tags.map((t) => (
+                    <span key={t.id} className="rounded bg-warning/15 px-1.5 text-xs font-medium">
+                      {t.name}
+                    </span>
+                  ))}
+                </span>
+              </Field>
+            ) : null}
             <Field label="Ngày đặt">{formatDate(order.orderDate)}</Field>
             <Field label="Tiền tệ">{order.currencyCode}</Field>
             <Field label="Tạo lúc">{formatDateTime(order.createdAt)}</Field>
@@ -799,6 +838,40 @@ function Detail({ order }: { order: SalesOrderDetail }) {
           </p>
         </Card>
       </div>
+
+      {order.internalNote || order.printNote || order.attachments.length > 0 ? (
+        <Card title="Ghi chú & đính kèm">
+          <dl className="grid gap-x-4 gap-y-3 px-3 py-3 sm:grid-cols-2">
+            {order.internalNote ? (
+              <Field label="Ghi chú nội bộ">
+                <span className="whitespace-pre-line">{order.internalNote}</span>
+              </Field>
+            ) : null}
+            {order.printNote ? (
+              <Field label="Ghi chú in lên vận đơn">
+                <span className="whitespace-pre-line">{order.printNote}</span>
+              </Field>
+            ) : null}
+            {order.attachments.length > 0 ? (
+              <Field label={`Tệp đính kèm (${order.attachments.length})`}>
+                <span className="flex flex-wrap gap-2">
+                  {order.attachments.map((a) => (
+                    <a
+                      key={a.id}
+                      href={a.url}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="text-primary hover:underline"
+                    >
+                      {a.fileName}
+                    </a>
+                  ))}
+                </span>
+              </Field>
+            ) : null}
+          </dl>
+        </Card>
+      ) : null}
 
       <div className="grid items-start gap-3 lg:grid-cols-5">
         <ShipmentCard order={order} autoPrint={autoPrint} />

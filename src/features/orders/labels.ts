@@ -36,6 +36,30 @@ const CHANNEL_LABEL: Record<SalesOrderChannel, string> = {
   POS: 'Tại quầy',
 };
 
+type OrderSource = NonNullable<SalesOrderDetail['source']>;
+
+const SOURCE_LABEL: Record<OrderSource, string> = {
+  FACEBOOK: 'Facebook',
+  ZALO: 'Zalo',
+  TIKTOK: 'TikTok',
+  PHONE: 'Gọi điện',
+  WEBSITE: 'Website',
+  WALK_IN: 'Khách đến cửa hàng',
+  REFERRAL: 'Người quen giới thiệu',
+  OTHER: 'Khác',
+};
+
+/** Nguồn đơn — khách tìm đến qua đâu. */
+export function orderSourceLabel(s: OrderSource): string {
+  return SOURCE_LABEL[s];
+}
+
+export const GENDER_LABEL: Record<'MALE' | 'FEMALE' | 'OTHER', string> = {
+  MALE: 'Nam',
+  FEMALE: 'Nữ',
+  OTHER: 'Khác',
+};
+
 export function orderStatusLabel(s: SalesOrderStatus): string {
   return STATUS_LABEL[s];
 }

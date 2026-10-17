@@ -583,6 +583,27 @@ export function makeOrderDetail(id: string) {
     warehouse: null,
     shipment: null,
     lines,
+    source: null,
+    surcharge: '0.0000',
+    prepaidAmount: '0.0000',
+    freeShipping: false,
+    shipFeeOnReturnOnly: false,
+    packerId: null,
+    careStaffId: null,
+    marketerId: null,
+    internalNote: null,
+    printNote: null,
+    expectedDeliveryDate: null,
+    tags: [] as { id: string; code: string; name: string; color: string | null }[],
+    attachments: [] as {
+      id: string;
+      fileName: string;
+      contentType: string;
+      sizeBytes: number;
+      url: string;
+      uploadedBy: string;
+      createdAt: string;
+    }[],
   };
 }
 
@@ -1357,6 +1378,16 @@ export const handlers = [
   ),
   http.get('/api/container-types', () => HttpResponse.json([])),
   http.get('/api/carriers', () => HttpResponse.json(CARRIERS)),
+  http.get('/api/sales-orders/staff-options', () =>
+    HttpResponse.json([
+      {
+        id: '00000000-0000-4000-8000-0000000000a1',
+        code: 'sale.hn.1',
+        fullName: 'Nguyễn Văn Sale',
+      },
+      { id: '00000000-0000-4000-8000-0000000000a2', code: 'packer.01', fullName: 'Trần Thị Đóng' },
+    ]),
+  ),
   http.get('/api/pickup-warehouses', () => HttpResponse.json(PICKUP_WAREHOUSES)),
   http.get('/api/sales-orders/:id/shipping-quote', ({ params, request }) => {
     const carrierId = new URL(request.url).searchParams.get('carrierId') ?? '';
@@ -1376,7 +1407,13 @@ export const handlers = [
     await delay(150);
     let all = makeCustomers(237);
     if (q)
-      all = all.filter((c) => c.name.toLowerCase().includes(q) || c.code.toLowerCase().includes(q));
+      // Như API: q khớp tên, mã hoặc SĐT.
+      all = all.filter(
+        (c) =>
+          c.name.toLowerCase().includes(q) ||
+          c.code.toLowerCase().includes(q) ||
+          (c.phone ?? '').includes(q),
+      );
     const groupId = url.searchParams.get('groupId');
     const tierId = url.searchParams.get('tierId');
     const type = url.searchParams.get('type');

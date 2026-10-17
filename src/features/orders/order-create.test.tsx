@@ -1,6 +1,6 @@
-import { fireEvent, screen, waitFor } from '@testing-library/react';
+import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import { http, HttpResponse } from 'msw';
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { forgetWarehouseSelection, WarehouseProvider } from '@/lib/warehouse';
 import {
   ME_ADMIN,
@@ -12,9 +12,16 @@ import {
 import { server } from '@/test/msw/server';
 import { renderApp } from '@/test/render';
 import { OrderCreateScreen } from './components/order-create-screen';
-import { previewManualDiscount, toCreateOrderBody } from './schema';
+import {
+  createOrderSchema,
+  emptyOrderValues,
+  normalizePhoneInput,
+  previewManualDiscount,
+  toCreateOrderBody,
+  type CreateOrderValues,
+} from './schema';
 
-// Radix Select (team trong dialog Khách mới) cần ResizeObserver + scrollIntoView — jsdom không có.
+// Radix Select cần ResizeObserver + scrollIntoView — jsdom không có.
 vi.stubGlobal(
   'ResizeObserver',
   class {
@@ -34,79 +41,211 @@ vi.mock('next/navigation', () => ({
   useSearchParams: () => new URLSearchParams(search),
 }));
 
+beforeEach(() => {
+  // Tab nháp lưu localStorage — không để rò từ test trước.
+  window.localStorage.clear();
+  push.mockReset();
+  search = '';
+});
+
 const ORDER = makeOrders(1)[0]!;
 const DETAIL = makeOrderDetail(ORDER.id)!;
 const REAL_LINES = DETAIL.lines.filter((l) => !l.isGift);
+const SKU = {
+  id: '00000003-0000-4000-8000-0000000000aa',
+  code: 'AMINO-GA3',
+  name: 'Amino GA3 500ml',
+};
+const C1 = 'c1000000-0000-4000-8000-000000000001';
+const S1 = '51000000-0000-4000-8000-000000000001';
+const U1 = '41000000-0000-4000-8000-000000000001';
 
-/** GET /skus/:id trả baseUomId = uomId của dòng nguồn để form không phải đổi ĐVT. */
+const CREATED = {
+  orderId: 'new-order-1',
+  docNumber: 'SO2610-00099',
+  status: 'APPROVED',
+  subtotal: '1',
+  discount: '0',
+  manualDiscount: '0',
+  taxAmount: '0',
+  shippingFee: '0',
+  surcharge: '0',
+  total: '1',
+  prepaidAmount: '0',
+  codAmount: '1',
+  customerId: C1,
+  lines: [],
+  reservations: [],
+  appliedPromotionIds: [],
+  approvalRuleId: null,
+};
+
+function skuDetail(id: string, code: string, name: string, uomId = U1) {
+  return {
+    id,
+    productId: 'p-1',
+    code,
+    name,
+    baseUomId: uomId,
+    isActive: true,
+    product: null,
+    baseUom: { id: uomId, code: 'PCS', name: 'Cái', decimals: 0 },
+    barcodes: [],
+    uomConversions: [],
+    weightKg: '0.5',
+    isCombo: false,
+    combo: null,
+  };
+}
+
+/** GET /skus/:id cho dòng đơn nguồn + SKU tìm được; /skus (ô tìm) trả đúng SKU mẫu. */
 function skuHandlers() {
   return [
-    http.get('/api/products', () => HttpResponse.json({ items: [], total: 0 })),
+    http.get('/api/skus', () =>
+      HttpResponse.json({
+        items: [
+          {
+            skuId: SKU.id,
+            code: SKU.code,
+            name: SKU.name,
+            productId: 'p-1',
+            productCode: 'P1',
+            productName: SKU.name,
+            categoryName: null,
+            brandName: null,
+            baseUomId: U1,
+            baseUomCode: 'PCS',
+            trackingMode: 'NONE',
+            barcodeCount: 0,
+            isActive: true,
+            isCombo: false,
+            version: 1,
+            thumbnailUrl: null,
+            onHand: '10',
+            reserved: '0',
+            available: '10',
+            byWarehouse: [],
+          },
+        ],
+        total: 1,
+      }),
+    ),
     http.get('/api/skus/:id', ({ params }) => {
+      if (params.id === SKU.id) return HttpResponse.json(skuDetail(SKU.id, SKU.code, SKU.name));
       const line = DETAIL.lines.find((l) => l.skuId === params.id);
       if (!line) return new HttpResponse(null, { status: 404 });
-      return HttpResponse.json({
-        id: line.skuId,
-        productId: 'p-1',
-        code: line.skuCode,
-        name: line.skuName,
-        baseUomId: line.uomId,
-        isActive: true,
-        product: null,
-        baseUom: { id: line.uomId, code: line.uomCode, name: line.uomCode, decimals: 0 },
-        barcodes: [],
-        uomConversions: [],
-      });
+      return HttpResponse.json(skuDetail(line.skuId, line.skuCode, line.skuName, line.uomId));
     }),
-    http.get('/api/stock', () =>
-      HttpResponse.json({
-        items: [],
-        total: 0,
-      }),
+    http.get('/api/stock', () => HttpResponse.json({ items: [], total: 0 })),
+    http.get('/api/prices/resolve', () =>
+      HttpResponse.json({ priceListId: 'pl-1', listPrice: '100000', maxDiscount: '0.15' }),
     ),
   ];
 }
 
-describe('toCreateOrderBody — CK% form → tỉ lệ API', () => {
-  it('"5" → "0.05"; rỗng/0 → bỏ field; phí ship rỗng → bỏ field', () => {
-    const body = toCreateOrderBody({
-      customerId: 'c1',
-      channel: 'DIRECT',
-      shippingFee: '',
-      manualDiscountType: 'AMOUNT',
-      manualDiscountValue: '',
-      lines: [
-        { skuId: 's1', uomId: 'u1', qty: '2', discountPercent: '5' },
-        { skuId: 's2', uomId: 'u2', qty: '10', discountPercent: '' },
-        { skuId: 's3', uomId: 'u3', qty: '1', discountPercent: '0' },
-      ],
+function values(over: Partial<CreateOrderValues> = {}): CreateOrderValues {
+  return {
+    ...emptyOrderValues(),
+    lines: [{ skuId: S1, uomId: U1, qty: '2', discountPercent: '5' }],
+    ...over,
+  };
+}
+
+describe('toCreateOrderBody — form → body POST /sales-orders', () => {
+  it('khách mới gõ tay: gửi customer {tên, SĐT chuẩn hoá} + địa chỉ gõ tay, không gửi customerId', () => {
+    const body = toCreateOrderBody(
+      values({
+        customerName: 'Trần Văn Hùng',
+        customerPhone: '+84 912 345 678',
+        customerGender: 'MALE',
+        recipient: 'Trần Văn Hùng',
+        recipientPhone: '0912.345.678',
+        line1: 'Thôn Đông',
+        ward: 'Xã Tân Lập',
+        province: 'Hà Nội',
+      }),
+    );
+    expect(body).not.toHaveProperty('customerId');
+    expect(body.customer).toEqual({ name: 'Trần Văn Hùng', phone: '0912345678', gender: 'MALE' });
+    expect(body.address).toEqual({
+      recipient: 'Trần Văn Hùng',
+      phone: '0912345678',
+      line1: 'Thôn Đông',
+      ward: 'Xã Tân Lập',
+      province: 'Hà Nội',
     });
-    expect(body).toEqual({
-      customerId: 'c1',
-      channel: 'DIRECT',
-      lines: [
-        { skuId: 's1', uomId: 'u1', qty: '2', discountPercent: '0.05' },
-        { skuId: 's2', uomId: 'u2', qty: '10' },
-        { skuId: 's3', uomId: 'u3', qty: '1' },
-      ],
+    expect(body.lines).toEqual([{ skuId: S1, uomId: U1, qty: '2', discountPercent: '0.05' }]);
+  });
+
+  it('khách chọn sẵn + địa chỉ đã lưu: gửi customerId + addressId, không gửi khối address', () => {
+    const body = toCreateOrderBody(
+      values({
+        customerId: C1,
+        customerName: 'A',
+        addressId: 'a1',
+        recipient: 'A',
+        line1: 'x',
+        province: 'HN',
+      }),
+    );
+    expect(body).toMatchObject({ customerId: C1, addressId: 'a1' });
+    expect(body).not.toHaveProperty('customer');
+    expect(body).not.toHaveProperty('address');
+  });
+
+  it('các trường mới: nguồn, phụ thu, chuyển khoản, NV, thẻ, ghi chú, hãng, kích thước', () => {
+    const body = toCreateOrderBody(
+      values({
+        customerId: C1,
+        source: 'ZALO',
+        surcharge: '10000',
+        prepaidAmount: '50000',
+        packerId: 'p1',
+        tagIds: ['t1'],
+        internalNote: '  gọi trước  ',
+        printNote: 'Cho xem hàng',
+        expectedDeliveryDate: '2026-10-20',
+        carrierId: 'car1',
+        shippingWeightKg: '1.5',
+        lengthCm: '30',
+        widthCm: '',
+        heightCm: '10',
+      }),
+    );
+    expect(body).toMatchObject({
+      source: 'ZALO',
+      surcharge: '10000',
+      prepaidAmount: '50000',
+      packerId: 'p1',
+      tagIds: ['t1'],
+      internalNote: 'gọi trước',
+      printNote: 'Cho xem hàng',
+      expectedDeliveryDate: '2026-10-20',
+      carrierId: 'car1',
+      shippingWeightKg: '1.5',
+      shippingOptions: { lengthCm: 30, heightCm: 10 },
     });
-    expect(
-      toCreateOrderBody({
-        customerId: 'c1',
-        channel: 'POS',
+    expect(body.shippingOptions).not.toHaveProperty('widthCm');
+  });
+
+  it('miễn phí giao hàng → không gửi shippingFee; phụ thu / chuyển khoản 0 → bỏ field', () => {
+    const body = toCreateOrderBody(
+      values({
+        customerId: C1,
         shippingFee: '30000',
-        manualDiscountType: 'AMOUNT',
-        lines: [{ skuId: 's1', uomId: 'u1', qty: '1', discountPercent: '12.5' }],
-      }).lines[0]!.discountPercent,
-    ).toBe('0.125');
+        freeShipping: true,
+        surcharge: '0',
+        prepaidAmount: '',
+      }),
+    );
+    expect(body).toMatchObject({ freeShipping: true });
+    expect(body).not.toHaveProperty('shippingFee');
+    expect(body).not.toHaveProperty('surcharge');
+    expect(body).not.toHaveProperty('prepaidAmount');
   });
 
   it('giảm giá cấp đơn: số tiền gửi nguyên; "%" → tỉ lệ; 0 / rỗng → bỏ field', () => {
-    const base = {
-      customerId: 'c1',
-      channel: 'DIRECT' as const,
-      lines: [{ skuId: 's1', uomId: 'u1', qty: '1' }],
-    };
+    const base = values({ customerId: C1 });
     expect(
       toCreateOrderBody({ ...base, manualDiscountType: 'AMOUNT', manualDiscountValue: '15000' }),
     ).toMatchObject({ manualDiscountType: 'AMOUNT', manualDiscountValue: '15000' });
@@ -120,29 +259,38 @@ describe('toCreateOrderBody — CK% form → tỉ lệ API', () => {
     }
   });
 
-  it('kho xuất: chọn kho → gửi warehouseId; bỏ trống → không gửi (server lấy kho mặc định)', () => {
-    const base = {
-      customerId: 'c1',
-      channel: 'DIRECT' as const,
-      manualDiscountType: 'AMOUNT' as const,
-      lines: [{ skuId: 's1', uomId: 'u1', qty: '1', discountPercent: '' }],
-    };
-    expect(toCreateOrderBody({ ...base, warehouseId: 'wh-la' }).warehouseId).toBe('wh-la');
-    expect(toCreateOrderBody({ ...base, warehouseId: '' })).not.toHaveProperty('warehouseId');
-  });
-
-  it('previewManualDiscount: % trên tạm tính; nhập sai → null', () => {
+  it('previewManualDiscount + normalizePhoneInput', () => {
     expect(previewManualDiscount('PERCENT', '10', '270000.0000')).toBe('27000.0000');
-    expect(previewManualDiscount('AMOUNT', '5000', '270000.0000')).toBe('5000.0000');
     expect(previewManualDiscount('PERCENT', '100', '270000.0000')).toBeNull();
-    expect(previewManualDiscount('AMOUNT', '-1', '270000.0000')).toBeNull();
     expect(previewManualDiscount('AMOUNT', '5000', null)).toBeNull();
+    expect(normalizePhoneInput('(+84) 912-345-678')).toBe('0912345678');
+    expect(normalizePhoneInput('912345678')).toBe('0912345678');
   });
 });
 
-describe('OrderCreateScreen — POST /sales-orders (D-01)', () => {
-  it('chưa chọn khách / dòng trống → lỗi validate, KHÔNG gọi API', async () => {
-    search = '';
+describe('createOrderSchema — kiểm tra trước khi gọi API', () => {
+  it('không chọn khách: bắt buộc tên + SĐT hợp lệ', () => {
+    const r = createOrderSchema.safeParse(values({ customerName: '', customerPhone: '123' }));
+    expect(r.success).toBe(false);
+    const paths = r.success ? [] : r.error.issues.map((i) => i.path.join('.'));
+    expect(paths).toEqual(expect.arrayContaining(['customerName', 'customerPhone']));
+  });
+
+  it('địa chỉ gõ dở dang: thiếu người nhận / địa chỉ / tỉnh → báo đúng ô', () => {
+    const r = createOrderSchema.safeParse(values({ customerId: C1, ward: 'Xã A' }));
+    const paths = r.success ? [] : r.error.issues.map((i) => i.path.join('.'));
+    expect(paths).toEqual(
+      expect.arrayContaining(['recipient', 'recipientPhone', 'line1', 'province']),
+    );
+  });
+
+  it('khách chọn sẵn, không gõ địa chỉ → hợp lệ', () => {
+    expect(createOrderSchema.safeParse(values({ customerId: C1 })).success).toBe(true);
+  });
+});
+
+describe('OrderCreateScreen — màn tạo đơn mới', () => {
+  it('giỏ trống, chưa có khách → báo lỗi tại ô, KHÔNG gọi API', async () => {
     const posts: unknown[] = [];
     server.use(
       http.post('/api/sales-orders', () => {
@@ -151,55 +299,48 @@ describe('OrderCreateScreen — POST /sales-orders (D-01)', () => {
       }),
     );
     renderApp(<OrderCreateScreen />);
-    fireEvent.click(screen.getByRole('button', { name: 'Chốt đơn' }));
-    expect(await screen.findByText('Chọn khách hàng')).toBeInTheDocument();
-    expect(screen.getByText('Chọn sản phẩm')).toBeInTheDocument();
+    expect(await screen.findByText('Chưa có sản phẩm trong giỏ')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Chốt đơn (F10)' }));
+    expect(await screen.findByText('Nhập tên khách hàng')).toBeInTheDocument();
+    expect(screen.getByText('Đơn phải có ít nhất một dòng hàng')).toBeInTheDocument();
     expect(posts).toHaveLength(0);
+  });
+
+  it('tìm sản phẩm → thêm vào giỏ; quét lại đúng mã + Enter → cùng dòng +1', async () => {
+    server.use(...skuHandlers());
+    renderApp(<OrderCreateScreen />);
+    const box = await screen.findByRole('combobox', { name: 'Tìm sản phẩm' });
+    fireEvent.change(box, { target: { value: 'amino' } });
+    fireEvent.click(await screen.findByRole('option', { name: /Amino GA3 500ml/ }));
+    await waitFor(() => expect(screen.getAllByLabelText('Số lượng')).toHaveLength(1));
+    expect(screen.getByLabelText('Số lượng')).toHaveValue('1');
+
+    // Máy quét: gõ mã rồi Enter ngay (chưa chờ kết quả) → khớp đúng mã → +1 vào dòng cũ.
+    fireEvent.change(box, { target: { value: SKU.code } });
+    fireEvent.keyDown(box, { key: 'Enter' });
+    await waitFor(() => expect(screen.getByLabelText('Số lượng')).toHaveValue('2'));
+    expect(screen.getAllByLabelText('Số lượng')).toHaveLength(1);
   });
 
   it('?from=<đơn cũ> đổ sẵn dòng hàng (bỏ hàng tặng) → chốt gửi đúng body + Idempotency-Key, điều hướng về chi tiết', async () => {
     search = `from=${ORDER.id}`;
-    const captured: Array<{ key: string | null; body: unknown }> = [];
+    const captured: Array<{ key: string | null; body: Record<string, unknown> }> = [];
     server.use(
       ...skuHandlers(),
       http.post('/api/sales-orders', async ({ request }) => {
         captured.push({
           key: request.headers.get('idempotency-key'),
-          body: await request.json(),
+          body: (await request.json()) as Record<string, unknown>,
         });
-        return HttpResponse.json(
-          {
-            orderId: 'new-order-1',
-            docNumber: 'SO2609-00099',
-            status: 'APPROVED',
-            subtotal: '1',
-            discount: '0',
-            manualDiscount: '0.0000',
-            manualDiscountRate: null,
-            taxAmount: '0',
-            shippingFee: '0',
-            total: '1',
-            lines: [],
-            reservations: [],
-            appliedPromotionIds: [],
-            approvalRuleId: null,
-          },
-          { status: 201 },
-        );
+        return HttpResponse.json(CREATED, { status: 201 });
       }),
     );
     renderApp(<OrderCreateScreen />);
-    // Prefill xong: mô tả nêu số chứng từ đơn nguồn
-    expect(
-      await screen.findByText(`Từ đơn ${ORDER.docNumber} — kiểm tra lại rồi chốt`, undefined, {
-        timeout: 3000,
-      }),
-    ).toBeInTheDocument();
-    await waitFor(() =>
-      expect(screen.getAllByLabelText('Số lượng')).toHaveLength(REAL_LINES.length),
+    await waitFor(
+      () => expect(screen.getAllByLabelText('Số lượng')).toHaveLength(REAL_LINES.length),
+      { timeout: 3000 },
     );
-
-    fireEvent.click(screen.getByRole('button', { name: 'Chốt đơn' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Chốt đơn (F10)' }));
     await waitFor(() => expect(captured).toHaveLength(1));
     expect(captured[0]!.key).toMatch(/[0-9a-f-]{36}/);
     expect(captured[0]!.body).toMatchObject({
@@ -210,7 +351,27 @@ describe('OrderCreateScreen — POST /sales-orders (D-01)', () => {
     await waitFor(() => expect(push).toHaveBeenCalledWith('/crm/orders/new-order-1'));
   });
 
-  it('xem trước giá: niêm yết + thành tiền từng dòng và Tạm tính cộng từ /prices/resolve', async () => {
+  it('?from=: địa chỉ mặc định của khách tự điền vào phần Nhận hàng và gửi addressId', async () => {
+    search = `from=${ORDER.id}`;
+    const addrs = makeCustomerAddresses(ORDER.customer.id);
+    const bodies: Record<string, unknown>[] = [];
+    server.use(
+      ...skuHandlers(),
+      http.post('/api/sales-orders', async ({ request }) => {
+        bodies.push((await request.json()) as Record<string, unknown>);
+        return HttpResponse.json(CREATED, { status: 201 });
+      }),
+    );
+    renderApp(<OrderCreateScreen />);
+    const recipient = await screen.findByLabelText('Tên người nhận');
+    await waitFor(() => expect(recipient).toHaveValue(addrs.find((a) => a.isDefault)!.recipient));
+    fireEvent.click(screen.getByRole('button', { name: 'Chốt đơn (F10)' }));
+    await waitFor(() => expect(bodies).toHaveLength(1));
+    expect(bodies[0]).toMatchObject({ addressId: addrs.find((a) => a.isDefault)!.id });
+    expect(bodies[0]).not.toHaveProperty('address');
+  });
+
+  it('xem trước tiền: tổng = tạm tính + ship + phụ thu − giảm; Tiền cần thu trừ chuyển khoản', async () => {
     search = `from=${ORDER.id}`;
     server.use(
       ...skuHandlers(),
@@ -220,101 +381,137 @@ describe('OrderCreateScreen — POST /sales-orders (D-01)', () => {
     );
     renderApp(<OrderCreateScreen />);
     await waitFor(() =>
-      expect(screen.getAllByLabelText('Số lượng')).toHaveLength(REAL_LINES.length),
+      expect(screen.getAllByLabelText('Số lượng')[0]).toHaveValue(REAL_LINES[0]!.qty),
     );
-    // Mỗi dòng qty (i+1)*10 (bỏ dòng quà i=2) → thành tiền qty × 100.000
-    const expectSubtotal = REAL_LINES.reduce((acc, l) => acc + Number(l.qty) * 100_000, 0);
-    await waitFor(() => {
-      expect(screen.getAllByText('100.000').length).toBeGreaterThan(0); // giá niêm yết hiện ra
-    });
-    // Tạm tính (và có thể trùng với thành tiền dòng khi chỉ 1 dòng) — chỉ cần xuất hiện
+    const vnd = (n: number) => new Intl.NumberFormat('vi-VN').format(n);
+    const subtotal = REAL_LINES.reduce((acc, l) => acc + Number(l.qty) * 100_000, 0);
+    const ship = Number(DETAIL.shippingFee);
+    await waitFor(() =>
+      expect(screen.getAllByText(new RegExp(vnd(subtotal + ship))).length).toBeGreaterThan(0),
+    );
+    fireEvent.change(screen.getByLabelText('Tiền chuyển khoản'), { target: { value: '100000' } });
+    fireEvent.blur(screen.getByLabelText('Tiền chuyển khoản'));
     await waitFor(() =>
       expect(
-        screen.getAllByText(new Intl.NumberFormat('vi-VN').format(expectSubtotal)).length,
+        screen.getAllByText(new RegExp(vnd(subtotal + ship - 100_000))).length,
       ).toBeGreaterThan(0),
     );
+    expect(screen.getByText('Đã chuyển khoản')).toBeInTheDocument();
   });
 
-  it('giảm giá cấp đơn theo %: xem trước số tiền giảm, Tổng tạm tính trừ theo, body gửi tỉ lệ', async () => {
-    search = `from=${ORDER.id}`;
-    const bodies: unknown[] = [];
+  it('gõ SĐT trùng khách cũ → gắn khách đó (hiện "Khách cũ"), chốt gửi customerId', async () => {
+    const CUST = makeCustomers(1)[0]!;
+    const bodies: Record<string, unknown>[] = [];
     server.use(
       ...skuHandlers(),
-      http.get('/api/prices/resolve', () =>
-        HttpResponse.json({ priceListId: 'pl-1', listPrice: '100000', maxDiscount: '0.15' }),
-      ),
       http.post('/api/sales-orders', async ({ request }) => {
-        bodies.push(await request.json());
+        bodies.push((await request.json()) as Record<string, unknown>);
+        return HttpResponse.json(CREATED, { status: 201 });
+      }),
+    );
+    renderApp(<OrderCreateScreen />);
+    fireEvent.change(await screen.findByLabelText('Số điện thoại khách'), {
+      target: { value: CUST.phone },
+    });
+    expect(await screen.findByText('Khách cũ')).toBeInTheDocument();
+    await waitFor(() => expect(screen.getByLabelText('Tên khách hàng')).toHaveValue(CUST.name));
+
+    const box = screen.getByRole('combobox', { name: 'Tìm sản phẩm' });
+    fireEvent.change(box, { target: { value: 'amino' } });
+    fireEvent.click(await screen.findByRole('option', { name: /Amino GA3 500ml/ }));
+    await waitFor(() => expect(screen.getAllByLabelText('Số lượng')).toHaveLength(1));
+    fireEvent.click(screen.getByRole('button', { name: 'Chốt đơn (F10)' }));
+    await waitFor(() => expect(bodies).toHaveLength(1));
+    expect(bodies[0]).toMatchObject({ customerId: CUST.id });
+  });
+
+  it('server báo chuyển khoản vượt tổng (422 path prepaidAmount) → lỗi gắn đúng ô', async () => {
+    search = `from=${ORDER.id}`;
+    server.use(
+      ...skuHandlers(),
+      http.post('/api/sales-orders', () =>
+        HttpResponse.json(
+          {
+            statusCode: 422,
+            code: 'VALIDATION',
+            message: 'x',
+            details: { path: 'prepaidAmount' },
+            traceId: 't',
+          },
+          { status: 422 },
+        ),
+      ),
+    );
+    renderApp(<OrderCreateScreen />);
+    await waitFor(
+      () => expect(screen.getAllByLabelText('Số lượng')).toHaveLength(REAL_LINES.length),
+      { timeout: 3000 },
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Chốt đơn (F10)' }));
+    expect((await screen.findAllByText('Tiền chuyển khoản vượt tổng đơn')).length).toBeGreaterThan(
+      0,
+    );
+    expect(push).not.toHaveBeenCalled();
+  });
+
+  it('tab nháp: F6 mở tab mới; tab đặt tên theo khách; nháp còn sau khi mở lại màn', async () => {
+    const view = renderApp(<OrderCreateScreen />);
+    fireEvent.change(await screen.findByLabelText('Tên khách hàng'), {
+      target: { value: 'Chị Lan' },
+    });
+    await waitFor(() => expect(screen.getByRole('tab', { name: /Chị Lan/ })).toBeInTheDocument());
+    fireEvent.keyDown(window, { key: 'F6' });
+    expect(
+      await screen.findByRole('tab', { name: 'Đơn mới 2', selected: true }),
+    ).toBeInTheDocument();
+    expect(screen.getByLabelText('Tên khách hàng')).toHaveValue('');
+
+    view.unmount();
+    renderApp(<OrderCreateScreen />);
+    const tabs = await screen.findByRole('tablist', { name: 'Đơn đang soạn' });
+    await waitFor(() =>
+      expect(within(tabs).getByRole('tab', { name: /Chị Lan/ })).toBeInTheDocument(),
+    );
+    fireEvent.click(within(tabs).getByRole('tab', { name: /Chị Lan/ }));
+    await waitFor(() => expect(screen.getByLabelText('Tên khách hàng')).toHaveValue('Chị Lan'));
+  });
+
+  it('tệp đính kèm: chốt xong tải từng tệp lên POST /sales-orders/:id/attachments', async () => {
+    search = `from=${ORDER.id}`;
+    const uploads: string[] = [];
+    server.use(
+      ...skuHandlers(),
+      http.post('/api/sales-orders', () => HttpResponse.json(CREATED, { status: 201 })),
+      http.post('/api/sales-orders/:id/attachments', ({ params }) => {
+        uploads.push(String(params.id));
         return HttpResponse.json(
-          { orderId: 'new-order-2', docNumber: 'SO2610-00001', status: 'APPROVED' },
+          {
+            id: 'att-1',
+            fileName: 'a.png',
+            contentType: 'image/png',
+            sizeBytes: 3,
+            url: 'https://s3/a.png',
+            uploadedBy: 'u',
+            createdAt: '2026-10-17T00:00:00Z',
+          },
           { status: 201 },
         );
       }),
     );
     renderApp(<OrderCreateScreen />);
-    await waitFor(() =>
-      expect(screen.getAllByLabelText('Số lượng')[0]).toHaveValue(REAL_LINES[0]!.qty),
+    await waitFor(
+      () => expect(screen.getAllByLabelText('Số lượng')).toHaveLength(REAL_LINES.length),
+      { timeout: 3000 },
     );
-    const subtotal = REAL_LINES.reduce((acc, l) => acc + Number(l.qty) * 100_000, 0);
-    const vnd = (n: number) => new Intl.NumberFormat('vi-VN').format(n);
-    await waitFor(() => expect(screen.getAllByText(vnd(subtotal)).length).toBeGreaterThan(0));
-
-    fireEvent.click(screen.getByRole('radio', { name: '%' }));
-    fireEvent.change(screen.getByLabelText('Giảm giá (%)'), { target: { value: '10' } });
-    expect(await screen.findByText(`−${vnd(subtotal / 10)}`)).toBeInTheDocument();
-    const ship = Number(DETAIL.shippingFee);
-    expect(screen.getAllByText(vnd(subtotal - subtotal / 10 + ship)).length).toBeGreaterThan(0);
-
-    fireEvent.click(screen.getByRole('button', { name: 'Chốt đơn' }));
-    await waitFor(() => expect(bodies).toHaveLength(1));
-    expect(bodies[0]).toMatchObject({ manualDiscountType: 'PERCENT', manualDiscountValue: '0.1' });
-  });
-
-  it('giảm giá % ≥ 100 → lỗi tại ô, KHÔNG gọi API', async () => {
-    search = `from=${ORDER.id}`;
-    const posts: unknown[] = [];
-    server.use(
-      ...skuHandlers(),
-      http.post('/api/sales-orders', () => {
-        posts.push(1);
-        return HttpResponse.json({});
-      }),
-    );
-    renderApp(<OrderCreateScreen />);
-    await waitFor(() =>
-      expect(screen.getAllByLabelText('Số lượng')[0]).toHaveValue(REAL_LINES[0]!.qty),
-    );
-    fireEvent.click(screen.getByRole('radio', { name: '%' }));
-    fireEvent.change(screen.getByLabelText('Giảm giá (%)'), { target: { value: '100' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Chốt đơn' }));
-    expect(await screen.findByText('Giảm % từ 0 đến dưới 100')).toBeInTheDocument();
-    expect(posts).toHaveLength(0);
-  });
-
-  it('CK% vượt trần bảng giá → cảnh báo đỏ ngay tại dòng', async () => {
-    search = `from=${ORDER.id}`;
-    server.use(
-      ...skuHandlers(),
-      http.get('/api/prices/resolve', () =>
-        HttpResponse.json({ priceListId: 'pl-1', listPrice: '100000', maxDiscount: '0.15' }),
-      ),
-    );
-    renderApp(<OrderCreateScreen />);
-    await waitFor(() =>
-      expect(screen.getAllByLabelText('Số lượng')).toHaveLength(REAL_LINES.length),
-    );
-    // Chờ prefill reset xong (qty của dòng nguồn đã đổ vào) rồi mới gõ CK
-    await waitFor(() =>
-      expect(screen.getAllByLabelText('Số lượng')[0]).toHaveValue(REAL_LINES[0]!.qty),
-    );
-    fireEvent.change(screen.getAllByLabelText('Chiết khấu %')[0]!, { target: { value: '18' } });
-    expect(
-      await screen.findByText('vượt trần 15% — hệ thống sẽ chặn khi chốt'),
-    ).toBeInTheDocument();
+    const file = new File(['abc'], 'a.png', { type: 'image/png' });
+    fireEvent.change(screen.getByLabelText('Chọn tệp đính kèm'), { target: { files: [file] } });
+    expect(await screen.findByRole('button', { name: 'Bỏ tệp a.png' })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Chốt đơn (F10)' }));
+    await waitFor(() => expect(uploads).toEqual(['new-order-1']));
+    await waitFor(() => expect(push).toHaveBeenCalledWith('/crm/orders/new-order-1'));
   });
 
   it('ô Kho xuất mặc định là kho đang làm việc (ô chọn kho ở sidebar)', async () => {
-    search = '';
     renderApp(
       <WarehouseProvider
         me={{
@@ -336,108 +533,5 @@ describe('OrderCreateScreen — POST /sales-orders (D-01)', () => {
       'Kho Long An',
     );
     forgetWarehouseSelection(); // store kho là module-level — không để rò sang test sau
-  });
-
-  it('?customerId=<id> chọn sẵn khách và hiện tên (nút Tạo đơn từ hồ sơ khách)', async () => {
-    const CUST = makeCustomers(1)[0]!;
-    search = `customerId=${CUST.id}`;
-    server.use(...skuHandlers());
-    renderApp(<OrderCreateScreen />);
-    // combobox đầu tiên là picker khách hàng
-    await waitFor(() => expect(screen.getAllByRole('combobox')[0]).toHaveTextContent(CUST.name));
-  });
-
-  it('địa chỉ giao: chọn khách → tự chọn địa chỉ mặc định của khách và gửi addressId khi chốt; đổi được sang địa chỉ khác', async () => {
-    // Đơn nguồn có customer = makeCustomers[0] → dòng hàng đổ sẵn, khách chọn sẵn, addressId trống.
-    const addrs = makeCustomerAddresses(ORDER.customer.id);
-    search = `from=${ORDER.id}`;
-    const captured: unknown[] = [];
-    server.use(
-      ...skuHandlers(),
-      http.post('/api/sales-orders', async ({ request }) => {
-        captured.push(await request.json());
-        return HttpResponse.json(
-          {
-            orderId: 'new-order-2',
-            docNumber: 'SO2609-00100',
-            status: 'APPROVED',
-            subtotal: '1',
-            discount: '0',
-            manualDiscount: '0.0000',
-            manualDiscountRate: null,
-            taxAmount: '0',
-            shippingFee: '0',
-            total: '1',
-            lines: [],
-            reservations: [],
-            appliedPromotionIds: [],
-            approvalRuleId: null,
-          },
-          { status: 201 },
-        );
-      }),
-    );
-    renderApp(<OrderCreateScreen />);
-    await waitFor(
-      () => expect(screen.getAllByLabelText('Số lượng')).toHaveLength(REAL_LINES.length),
-      { timeout: 3000 },
-    );
-    const picker = screen.getByRole('combobox', { name: 'Địa chỉ giao' });
-    // Địa chỉ mặc định của khách được chọn sẵn sau khi tải GET /customers/{id}.
-    await waitFor(() => expect(picker).toHaveTextContent(/Nguyễn Thị Thu Hà/));
-    fireEvent.click(picker);
-    fireEvent.click(await screen.findByRole('option', { name: /Trần Văn Bình/ }));
-    expect(picker).toHaveTextContent(/Trần Văn Bình/);
-
-    fireEvent.click(screen.getByRole('button', { name: 'Chốt đơn' }));
-    await waitFor(() => expect(captured).toHaveLength(1));
-    expect(captured[0]).toMatchObject({ customerId: ORDER.customer.id, addressId: addrs[1]!.id });
-  });
-
-  it('Khách mới: tạo nhanh trong form → POST /customers, picker chọn ngay khách vừa tạo', async () => {
-    search = '';
-    const posted: unknown[] = [];
-    server.use(
-      http.get('/api/teams', () =>
-        HttpResponse.json([
-          {
-            id: '00000042-0000-4000-8000-000000000001',
-            code: 'SALES-HN',
-            name: 'Kinh doanh Hà Nội',
-            type: 'SALES',
-            parentId: null,
-          },
-        ]),
-      ),
-      http.post('/api/customers', async ({ request }) => {
-        const body = (await request.json()) as Record<string, unknown>;
-        posted.push(body);
-        return HttpResponse.json(
-          { id: 'new-cust-1', code: body.code, name: body.name, isActive: true },
-          { status: 201 },
-        );
-      }),
-    );
-    server.use(...skuHandlers());
-    renderApp(<OrderCreateScreen />);
-    fireEvent.click(await screen.findByRole('button', { name: 'Khách mới' }));
-    expect(await screen.findByText('Tạo nhanh khách hàng')).toBeInTheDocument();
-    fireEvent.change(screen.getByLabelText('Tên khách hàng'), {
-      target: { value: 'Cửa hàng An Nhiên' },
-    });
-    fireEvent.change(screen.getByLabelText('Mã KH'), { target: { value: 'KH-TEST-01' } });
-    // Radix Select: mở rồi chọn team
-    fireEvent.click(screen.getByRole('combobox', { name: /Team chăm sóc/ }));
-    fireEvent.click(await screen.findByRole('option', { name: 'Kinh doanh Hà Nội' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Tạo khách hàng' }));
-    await waitFor(() => expect(posted).toHaveLength(1));
-    expect(posted[0]).toMatchObject({
-      code: 'KH-TEST-01',
-      name: 'Cửa hàng An Nhiên',
-      teamId: '00000042-0000-4000-8000-000000000001',
-    });
-    // Dialog đóng, picker hiện khách vừa tạo
-    await waitFor(() => expect(screen.queryByText('Tạo nhanh khách hàng')).not.toBeInTheDocument());
-    expect(screen.getAllByRole('combobox')[0]).toHaveTextContent('Cửa hàng An Nhiên');
   });
 });

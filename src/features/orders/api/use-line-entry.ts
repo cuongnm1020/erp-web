@@ -1,4 +1,4 @@
-import { useMutation, useQuery } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
 import type { EntityOption, EntitySearchResult } from '@/components/data/form';
 import { api, unwrap } from '@/lib/api/client';
 import type { components } from '@/lib/api/schema';
@@ -6,7 +6,6 @@ import type { components } from '@/lib/api/schema';
 export type SkuDetail = components['schemas']['SkuDetailDto'];
 export type StockRow = components['schemas']['StockRowDto'];
 export type ResolvedPrice = components['schemas']['ResolvedPriceDto'];
-export type Team = components['schemas']['TeamDto'];
 
 /** Phễu key riêng cho dữ liệu nhập dòng hàng — không đụng phễu ['crm','orders']. */
 export const lineEntryKeys = {
@@ -16,7 +15,6 @@ export const lineEntryKeys = {
   sku: (id: string) => [...lineEntryKeys.all, 'sku', id] as const,
   stock: (skuCode: string) => [...lineEntryKeys.all, 'stock', skuCode] as const,
   price: (p: LinePriceParams) => [...lineEntryKeys.all, 'price', p] as const,
-  teams: () => [...lineEntryKeys.all, 'teams'] as const,
 };
 
 export interface LinePriceParams {
@@ -43,34 +41,13 @@ export function useLinePrice(p: LinePriceParams) {
   });
 }
 
-/** GET /teams — danh bạ team cho select `teamId` khi tạo nhanh khách hàng. */
-export function useTeams() {
-  return useQuery({
-    queryKey: lineEntryKeys.teams(),
-    queryFn: () => unwrap(api.GET('/teams')),
-    staleTime: 300_000,
-  });
-}
-
-/** GET /customers/{id} — chỉ để hiện tên khách khi vào form bằng ?customerId=. */
+/** GET /customers/{id} — khách gắn vào đơn: tên, SĐT, email, địa chỉ đã lưu. */
 export function useCustomerBrief(id: string) {
   return useQuery({
     queryKey: [...lineEntryKeys.all, 'customer', id] as const,
     queryFn: () => unwrap(api.GET('/customers/{id}', { params: { path: { id } } })),
     enabled: id !== '',
     staleTime: 60_000,
-  });
-}
-
-export type QuickCustomerBody = components['schemas']['CreateCustomerDto'];
-
-/**
- * POST /customers — tạo nhanh khách ngay trong form lên đơn (sale đang chat, khách chưa có
- * trong hệ thống). Member tự thành owner phía server; team phải thuộc scope người tạo.
- */
-export function useQuickCreateCustomer() {
-  return useMutation({
-    mutationFn: (body: QuickCustomerBody) => unwrap(api.POST('/customers', { body })),
   });
 }
 
