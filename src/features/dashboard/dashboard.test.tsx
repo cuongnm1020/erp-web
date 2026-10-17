@@ -7,6 +7,8 @@ import { errorEnvelope } from '@/test/msw/handlers';
 import { server } from '@/test/msw/server';
 import { renderApp } from '@/test/render';
 import type {
+  OrderFlowCounts,
+  Replenishment,
   SalesKpis,
   SalesOrderList,
   SalesSummary,
@@ -24,12 +26,13 @@ vi.mock('next/navigation', () => ({
 }));
 
 const TODAY = toLocalDateKey(new Date())!;
+const YESTERDAY = shiftDay(TODAY, -1);
 const MONTH_START = `${TODAY.slice(0, 8)}01`;
 const CHART_FROM = shiftDay(TODAY, -29);
 
-/** Quản lý: báo cáo doanh thu + đơn + giao hàng. */
+/** Quản lý: báo cáo doanh thu + đơn + giao hàng + tồn kho. */
 const ME_MANAGER = {
-  permissions: ['report.sales', 'sales_order.read', 'shipment.read', 'customer.read'],
+  permissions: ['report.sales', 'sales_order.read', 'shipment.read', 'customer.read', 'stock.read'],
   hasGlobalAccess: false,
 };
 /** Sale thường: không có report.sales. */
@@ -177,18 +180,78 @@ const SHIPPING: ShipmentMonitorSummary = {
   byCarrier: [],
 };
 
+const flow = (over: Partial<OrderFlowCounts> = {}): OrderFlowCounts => ({
+  total: 0,
+  PENDING_APPROVAL: 0,
+  WAREHOUSE: 0,
+  PICKING: 0,
+  PACKED: 0,
+  PICKED_UP: 0,
+  IN_TRANSIT: 0,
+  OUT_FOR_DELIVERY: 0,
+  DELIVERED: 0,
+  RETURNED: 0,
+  CARRIER_CANCELLED: 0,
+  CANCELLED: 0,
+  ...over,
+});
+
+/** flow-counts theo bộ lọc: hôm nay / hôm qua cùng giờ / cả ngày hôm qua / chưa gán hãng / toàn bộ. */
+const flowHandler = http.get('/api/sales-orders/flow-counts', ({ request }) => {
+  const q = new URL(request.url).searchParams;
+  const from = q.get('from');
+  const to = q.get('to');
+  if (from === TODAY && to === TODAY)
+    return HttpResponse.json(flow({ total: 1240, CANCELLED: 18 }));
+  if (from === YESTERDAY && to === YESTERDAY) return HttpResponse.json(flow({ total: 1500 }));
+  if (from === YESTERDAY) return HttpResponse.json(flow({ total: 1000 }));
+  if (q.get('noCarrier') === 'true')
+    return HttpResponse.json(flow({ WAREHOUSE: 5, PICKING: 2, PACKED: 1, DELIVERED: 40 }));
+  return HttpResponse.json(flow({ total: 9000, PENDING_APPROVAL: 7, WAREHOUSE: 48 }));
+});
+
+const LOW_STOCK: Replenishment = {
+  items: [
+    {
+      skuId: 'sku-ga3',
+      skuCode: 'AMN-GA3',
+      skuName: 'Amino GA3 kích ra rễ, chai 500 ml',
+      productId: 'p-ga3',
+      productName: 'Amino GA3',
+      baseUomCode: 'CHAI',
+      reorderLevel: '50.000000',
+      onHand: '0.000000',
+      reserved: '0.000000',
+      available: '0.000000',
+      soldToday: '20.000000',
+      sold1d: '210.000000',
+      sold2d: '214.000000',
+      avgDaily: '212.000000',
+      daysLeft: null,
+      projectedOutDate: null,
+      status: 'OUT',
+    },
+  ],
+  total: 1,
+  alertCount: 14,
+  asOf: TODAY,
+};
+const stockHandler = http.get('/api/stock/replenishment', () => HttpResponse.json(LOW_STOCK));
+
 const summaryCalls: URLSearchParams[] = [];
-const salesHandlers = (opts: { emptyToday?: boolean } = {}) => [
+const salesHandlers = (opts: { empty?: boolean } = {}) => [
   http.get('/api/reports/sales/summary', ({ request }) => {
     const q = new URL(request.url).searchParams;
     summaryCalls.push(q);
     const from = q.get('from')!;
     const to = q.get('to')!;
+    if (opts.empty)
+      return HttpResponse.json(
+        summary(from, to, kpis({ orderCount: 0, revenue: '0' }), kpis({ orderCount: 0 })),
+      );
     if (from === to)
       return HttpResponse.json(
-        opts.emptyToday
-          ? summary(from, to, kpis({ orderCount: 0, revenue: '0' }), kpis({ orderCount: 0 }))
-          : summary(from, to, kpis(), kpis({ revenue: '2400000.0000', orderCount: 10 })),
+        summary(from, to, kpis(), kpis({ revenue: '2400000.0000', orderCount: 10 })),
       );
     return HttpResponse.json(
       summary(from, to, kpis({ revenue: '90000000.0000' }), kpis({ revenue: '100000000.0000' })),
@@ -200,6 +263,8 @@ const salesHandlers = (opts: { emptyToday?: boolean } = {}) => [
 const opsHandlers = [
   http.get('/api/sales-orders', () => HttpResponse.json(ORDERS)),
   http.get('/api/shipment-monitor/summary', () => HttpResponse.json(SHIPPING)),
+  flowHandler,
+  stockHandler,
 ];
 
 const section = (name: string) => screen.getByRole('region', { name });
@@ -210,23 +275,26 @@ beforeEach(() => {
 });
 
 describe('DashboardScreen — số thật theo quyền (RPT-08)', () => {
-  it('report.sales: KPI hôm nay so hôm qua + tháng này, biểu đồ 30 ngày, top 5 — link đúng tab/khoảng', async () => {
+  it('report.sales: bảng doanh số hôm nay | tháng này, biểu đồ 30 ngày, top 5 — link đúng tab/khoảng', async () => {
     server.use(...salesHandlers(), ...opsHandlers);
     renderApp(<DashboardScreen />, { me: ME_MANAGER });
 
-    const today = await screen.findByRole('region', { name: 'Hôm nay' });
-    await within(today).findByText('3.000.000 ₫');
-    expect(within(today).getByText('Hôm qua 2.400.000 ₫')).toBeInTheDocument();
-    expect(within(today).getByLabelText('Tăng 25,00% so kỳ trước')).toBeInTheDocument();
-    expect(within(today).getByRole('link', { name: 'Xem báo cáo' })).toHaveAttribute(
-      'href',
-      `/reports/sales?from=${TODAY}&to=${TODAY}`,
+    const sales = await screen.findByRole('region', { name: 'Doanh số' });
+    const revenueRow = (await within(sales).findByRole('rowheader', { name: /Doanh thu/ }))
+      .parentElement!;
+    // Hôm nay 3tr (▲25% so hôm qua, tô xám vì ngày chưa hết) | tháng 90tr (▼10% so kỳ trước)
+    expect(within(revenueRow).getByText('3.000.000 ₫')).toBeInTheDocument();
+    expect(within(revenueRow).getByLabelText('Tăng 25,00% so kỳ trước')).toHaveClass(
+      'text-muted-foreground',
     );
-
-    const month = section(`Tháng ${TODAY.slice(5, 7)}/${TODAY.slice(0, 4)}`);
-    await within(month).findByText('90.000.000 ₫');
-    expect(within(month).getByLabelText('Giảm 10,00% so kỳ trước')).toBeInTheDocument();
-    expect(within(month).getByRole('link', { name: 'Xem báo cáo' })).toHaveAttribute(
+    expect(within(revenueRow).getByText('90.000.000 ₫')).toBeInTheDocument();
+    expect(within(revenueRow).getByLabelText('Giảm 10,00% so kỳ trước')).toHaveClass(
+      'text-destructive',
+    );
+    // Lãi gộp hôm nay = % trên doanh thu
+    const profitRow = within(sales).getByRole('rowheader', { name: /Lãi gộp/ }).parentElement!;
+    expect(within(profitRow).getByText('30,00% doanh thu')).toBeInTheDocument();
+    expect(within(sales).getAllByRole('link', { name: 'Xem báo cáo' })[0]).toHaveAttribute(
       'href',
       `/reports/sales?from=${MONTH_START}&to=${TODAY}`,
     );
@@ -235,7 +303,7 @@ describe('DashboardScreen — số thật theo quyền (RPT-08)', () => {
     );
 
     const chart = section('Doanh thu 30 ngày');
-    await within(chart).findByText(/Tổng 1\.500\.000 ₫/);
+    await within(chart).findByText('1.500.000 ₫');
     expect(within(chart).getByRole('link', { name: 'Xem báo cáo' })).toHaveAttribute(
       'href',
       `/reports/sales?gran=day&from=${CHART_FROM}&to=${TODAY}`,
@@ -258,7 +326,7 @@ describe('DashboardScreen — số thật theo quyền (RPT-08)', () => {
 
   it('không có report.sales: không gọi API báo cáo, chỉ thấy đơn chờ duyệt', async () => {
     // onUnhandledRequest: 'error' — gọi /reports/* sẽ làm test lỗi.
-    server.use(opsHandlers[0]!);
+    server.use(opsHandlers[0]!, flowHandler);
     renderApp(<DashboardScreen />, { me: ME_SALE_ONLY });
     const pending = await screen.findByRole('region', { name: 'Đơn chờ duyệt' });
     await within(pending).findByText('Cửa hàng VTNN Minh Tâm');
@@ -270,8 +338,11 @@ describe('DashboardScreen — số thật theo quyền (RPT-08)', () => {
       'href',
       '/crm/orders?status=PENDING_APPROVAL',
     );
-    expect(within(pending).getByText('· 3 đơn')).toBeInTheDocument();
-    expect(screen.queryByRole('region', { name: 'Hôm nay' })).not.toBeInTheDocument();
+    expect(within(pending).getByText('3 đơn')).toBeInTheDocument();
+    expect(screen.queryByRole('region', { name: 'Doanh số' })).not.toBeInTheDocument();
+    // Không có stock.read: không có ô sắp hết hàng / SKU cần nhập
+    expect(screen.queryByRole('region', { name: 'Sản phẩm sắp hết hàng' })).not.toBeInTheDocument();
+    expect(screen.queryByText('SKU cần nhập thêm')).not.toBeInTheDocument();
     expect(screen.queryByRole('region', { name: 'Giao hàng hôm nay' })).not.toBeInTheDocument();
   });
 
@@ -284,7 +355,7 @@ describe('DashboardScreen — số thật theo quyền (RPT-08)', () => {
       'href',
       '/wms/shipping?view=OVERDUE',
     );
-    expect(within(ship).getByText('3')).toHaveClass('text-destructive');
+    expect(within(ship).getByText('3')).toHaveClass('text-warning');
   });
 
   it('loading: skeleton trong từng ô trước khi có số', async () => {
@@ -305,7 +376,7 @@ describe('DashboardScreen — số thật theo quyền (RPT-08)', () => {
     renderApp(<DashboardScreen />, {
       me: { permissions: ['report.sales'], hasGlobalAccess: false },
     });
-    expect(within(section('Hôm nay')).getByRole('status')).toBeInTheDocument();
+    expect(within(section('Doanh số')).getAllByRole('status').length).toBeGreaterThan(0);
     expect(within(section('Doanh thu 30 ngày')).getByRole('status')).toBeInTheDocument();
     expect(within(section('Bán chạy tháng này')).getByRole('status')).toBeInTheDocument();
   });
@@ -328,10 +399,17 @@ describe('DashboardScreen — số thật theo quyền (RPT-08)', () => {
           totals: { packed: 0, handedOver: 0, holding: 0, holdingOverdue: 0 },
         }),
       ),
-      ...salesHandlers({ emptyToday: true }),
+      http.get('/api/stock/replenishment', () =>
+        HttpResponse.json({ ...LOW_STOCK, items: [], total: 0, alertCount: 0 }),
+      ),
+      ...salesHandlers({ empty: true }),
+      flowHandler,
     );
     renderApp(<DashboardScreen />, { me: ME_MANAGER });
-    expect(await screen.findByText('Hôm nay và hôm qua chưa có đơn đã chốt')).toBeInTheDocument();
+    expect(
+      await screen.findByText('Tháng này và kỳ trước chưa có đơn đã chốt'),
+    ).toBeInTheDocument();
+    expect(await screen.findByText('Không có sản phẩm nào dưới mức tồn')).toBeInTheDocument();
     expect(
       await screen.findByText('Chưa có đơn đã chốt trong 60 ngày gần đây'),
     ).toBeInTheDocument();
@@ -356,10 +434,50 @@ describe('DashboardScreen — số thật theo quyền (RPT-08)', () => {
     const top = section('Bán chạy tháng này');
     const alert = await within(top).findByRole('alert');
     expect(within(alert).getByText('trace-db_error')).toBeInTheDocument();
-    await within(section('Hôm nay')).findByText('3.000.000 ₫');
+    await within(section('Doanh số')).findByText('3.000.000 ₫');
     fail = false;
     fireEvent.click(within(alert).getByRole('button', { name: 'Thử lại' }));
     await within(top).findByText('Phân bón NPK 1');
+  });
+
+  it('tổng đơn hôm nay (gồm đơn hủy) so hôm qua cùng giờ, dải Cần xử lý, sắp hết hàng', async () => {
+    server.use(...salesHandlers(), ...opsHandlers);
+    renderApp(<DashboardScreen />, { me: ME_MANAGER });
+
+    const today = await screen.findByRole('region', { name: 'Đơn hôm nay' });
+    expect(await within(today).findByRole('link', { name: '1.240' })).toHaveAttribute(
+      'href',
+      `/crm/orders?from=${TODAY}&to=${TODAY}`,
+    );
+    expect(
+      await within(today).findByText(/so với hôm qua cùng giờ \(1\.000\)/),
+    ).toBeInTheDocument();
+    expect(within(today).getByLabelText('Tăng 24,00% so kỳ trước')).toBeInTheDocument();
+    expect(await within(today).findByText('1.500')).toBeInTheDocument();
+    expect(within(today).getByText('gồm 18 đơn đã hủy')).toBeInTheDocument();
+    expect(
+      within(today).getByText('Biểu đồ theo giờ sẽ hiện khi có API đếm đơn theo giờ.'),
+    ).toBeInTheDocument();
+
+    const low = section('Sản phẩm sắp hết hàng');
+    await within(low).findByText('Amino GA3 kích ra rễ, chai 500 ml');
+    expect(within(low).getByText('Hết hàng')).toBeInTheDocument();
+
+    const todo = section('Cần xử lý');
+    const tile = async (label: string) =>
+      (await within(todo).findByText(label)).closest('a') as HTMLAnchorElement | null;
+    expect(await tile('Đơn chờ duyệt')).toHaveAttribute(
+      'href',
+      '/crm/orders?flow=PENDING_APPROVAL',
+    );
+    await within(todo).findByText('48');
+    expect(await tile('Chờ xử lý kho')).toHaveTextContent('48');
+    // Chưa gán hãng = đơn còn ở kho chưa chọn hãng (5 + 2 + 1), không tính đơn đã giao
+    expect(await tile('Chưa gán ĐVVC')).toHaveTextContent('8');
+    expect(await tile('SKU cần nhập thêm')).toHaveAttribute('href', '/wms/reorder-points');
+    expect(within(todo).getByText('14')).toBeInTheDocument();
+    // Sự cố chưa có API: không link, không số giả
+    expect(await tile('Sự cố / hoàn hàng · chờ API')).toBeNull();
   });
 
   it('không có quyền xem chỉ số nào → màn trống hướng dẫn, không gọi API', () => {

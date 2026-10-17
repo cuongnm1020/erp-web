@@ -66,10 +66,17 @@ export interface NavItem {
    * còn gate URL trực tiếp (đừng comment mục ra — mất gate). Module ẩn thì ẩn cả mục con.
    */
   hidden?: boolean;
+  /** Nhãn nhóm con trong module (Kho: Vận hành / Chứng từ / Danh mục kho / Màn PDA). */
+  section?: string;
 }
+
+/** Màu module ở menu trái (token --mod-*) — chỉ cho điều hướng, không mang nghĩa trạng thái. */
+export type NavTone = 'sales' | 'cust' | 'prod' | 'wh' | 'rpt' | 'adm';
 
 export interface NavModule extends NavItem {
   icon: LucideIcon;
+  /** Màu nhóm trên sidebar; module không con (Tổng quan) dùng màu brand. */
+  tone?: NavTone;
   children?: NavItem[];
 }
 
@@ -78,8 +85,8 @@ export interface NavModule extends NavItem {
  * (tồn tại ở /auth/me) phải gắn ability; chỉ mục chưa có quyền backend tương ứng
  * (Giá & KM, RMA…) mới để trống — siết nốt khi backend thêm subject.
  * Module không gắn ability sẽ tự ẩn khi mọi mục con của nó bị ẩn.
- * Sidebar vẽ module có children thành NHÃN NHÓM (không phải link) + các mục con
- * phẳng bên dưới (design/hide-sidebar.png, 404.png).
+ * Sidebar vẽ module có children thành NHÓM MỞ/ĐÓNG ĐƯỢC (nút, không phải link) tô màu theo
+ * `tone`, mục con bên dưới, chia nhóm con theo `section` (redesign 2026-10-17).
  */
 export const NAV_MODULES: NavModule[] = [
   {
@@ -92,6 +99,7 @@ export const NAV_MODULES: NavModule[] = [
     label: 'Bán hàng',
     href: '/crm/orders',
     icon: ShoppingCart,
+    tone: 'sales',
     ability: { action: 'read', subject: 'SalesOrder' },
     shortcut: 'g d',
     children: [
@@ -120,6 +128,7 @@ export const NAV_MODULES: NavModule[] = [
     label: 'Khách hàng',
     href: '/crm/customers',
     icon: Users,
+    tone: 'cust',
     ability: { action: 'read', subject: 'Customer' },
     shortcut: 'g k',
     children: [
@@ -170,6 +179,7 @@ export const NAV_MODULES: NavModule[] = [
     label: 'Sản phẩm',
     href: '/catalog/products',
     icon: Package,
+    tone: 'prod',
     shortcut: 'g s',
     children: [
       {
@@ -215,79 +225,79 @@ export const NAV_MODULES: NavModule[] = [
     // Không trỏ /wms/stock — mục Tồn kho đang ẩn (2026-10-04).
     href: '/wms/warehouses',
     icon: Warehouse,
+    tone: 'wh',
     shortcut: 'g w',
+    // Chia 4 nhóm con theo `section` (redesign 2026-10-17) — thứ tự mảng = thứ tự hiển thị.
     children: [
       {
         label: 'Tồn kho',
         href: '/wms/stock',
         icon: Boxes,
         hidden: true,
-        ability: { action: 'read', subject: 'Stock' },
-      },
-      {
-        label: 'Kho & vị trí',
-        href: '/wms/warehouses',
-        icon: MapPin,
-        ability: { action: 'read', subject: 'Stock' },
-      },
-      {
-        label: 'Phiếu nhập kho',
-        href: '/wms/grn',
-        icon: PackagePlus,
-        ability: { action: 'read', subject: 'Stock' },
-      },
-      {
-        label: 'Nhập hàng hoàn',
-        href: '/wms/returns',
-        icon: Undo2,
-        ability: { action: 'read', subject: 'Stock' },
-      },
-      {
-        label: 'Phiếu bán hàng',
-        href: '/wms/gdn',
-        icon: PackageMinus,
-        ability: { action: 'read', subject: 'Stock' },
-      },
-      {
-        label: 'Thùng / pallet',
-        href: '/wms/containers',
-        icon: Package,
+        section: 'Vận hành',
         ability: { action: 'read', subject: 'Stock' },
       },
       {
         label: 'Điều phối task',
         href: '/wms/dispatch',
         icon: Columns3,
+        section: 'Vận hành',
         ability: { action: 'read_all', subject: 'Task' },
       },
       {
         label: 'Trạm đóng gói',
         href: '/wms/pack',
         icon: PackageCheck,
+        section: 'Vận hành',
         ability: { action: 'execute', subject: 'Task' },
+      },
+      {
+        label: 'Theo dõi giao hàng',
+        href: '/wms/shipping',
+        icon: Truck,
+        section: 'Vận hành',
+        ability: { action: 'read', subject: 'Shipment' },
       },
       {
         label: 'Năng suất kho',
         href: '/wms/productivity',
         icon: Gauge,
+        section: 'Vận hành',
         ability: { action: 'read_all', subject: 'Task' },
       },
       {
-        label: 'Cất hàng (PDA)',
-        href: '/pda/put-away',
+        label: 'Phiếu nhập kho',
+        href: '/wms/grn',
         icon: PackagePlus,
-        ability: { action: 'execute', subject: 'Task' },
+        section: 'Chứng từ',
+        ability: { action: 'read', subject: 'Stock' },
       },
       {
-        label: 'Lấy hàng (PDA)',
-        href: '/pda/pick',
-        icon: ScanBarcode,
-        ability: { action: 'execute', subject: 'Task' },
+        label: 'Phiếu bán hàng',
+        href: '/wms/gdn',
+        icon: PackageMinus,
+        section: 'Chứng từ',
+        ability: { action: 'read', subject: 'Stock' },
+      },
+      {
+        label: 'Nhập hàng hoàn',
+        href: '/wms/returns',
+        icon: Undo2,
+        section: 'Chứng từ',
+        ability: { action: 'read', subject: 'Stock' },
       },
       {
         label: 'Chuyển kho',
         href: '/wms/transfers',
         icon: ArrowLeftRight,
+        section: 'Chứng từ',
+        ability: { action: 'read', subject: 'Stock' },
+      },
+      {
+        label: 'Kiểm kê',
+        href: '/wms/stocktake',
+        icon: Table2,
+        section: 'Chứng từ',
         ability: { action: 'read', subject: 'Stock' },
       },
       // {
@@ -296,12 +306,6 @@ export const NAV_MODULES: NavModule[] = [
       //   icon: ClipboardList,
       //   ability: { action: 'read', subject: 'PurchaseOrder' },
       // },
-      {
-        label: 'Kiểm kê',
-        href: '/wms/stocktake',
-        icon: Table2,
-        ability: { action: 'read', subject: 'Stock' },
-      },
       // {
       //   label: 'Điều chỉnh tồn',
       //   href: '/wms/adjustments',
@@ -315,16 +319,39 @@ export const NAV_MODULES: NavModule[] = [
       //   ability: { action: 'read', subject: 'Stock' },
       // },
       {
-        label: 'Theo dõi giao hàng',
-        href: '/wms/shipping',
-        icon: Truck,
-        ability: { action: 'read', subject: 'Shipment' },
+        label: 'Kho & vị trí',
+        href: '/wms/warehouses',
+        icon: MapPin,
+        section: 'Danh mục kho',
+        ability: { action: 'read', subject: 'Stock' },
+      },
+      {
+        label: 'Thùng / pallet',
+        href: '/wms/containers',
+        icon: Package,
+        section: 'Danh mục kho',
+        ability: { action: 'read', subject: 'Stock' },
       },
       {
         label: 'Cảnh báo nhập hàng',
         href: '/wms/reorder-points',
         icon: Repeat,
+        section: 'Danh mục kho',
         ability: { action: 'read', subject: 'Stock' },
+      },
+      {
+        label: 'Lấy hàng (PDA)',
+        href: '/pda/pick',
+        icon: ScanBarcode,
+        section: 'Màn PDA',
+        ability: { action: 'execute', subject: 'Task' },
+      },
+      {
+        label: 'Cất hàng (PDA)',
+        href: '/pda/put-away',
+        icon: PackagePlus,
+        section: 'Màn PDA',
+        ability: { action: 'execute', subject: 'Task' },
       },
     ],
   },
@@ -332,6 +359,7 @@ export const NAV_MODULES: NavModule[] = [
     label: 'Giá & KM',
     href: '/pricing/price-lists',
     icon: Percent,
+    tone: 'sales',
     shortcut: 'g g',
     // Ẩn cả nhóm (2026-10-04): Bảng giá, Khuyến mãi, Mã giảm giá, Tích điểm, Hoa hồng.
     hidden: true,
@@ -347,6 +375,7 @@ export const NAV_MODULES: NavModule[] = [
     label: 'Tài chính',
     href: '/fin/invoices',
     icon: Landmark,
+    tone: 'rpt',
     ability: { action: 'read', subject: 'Invoice' },
     shortcut: 'g h',
     // Ẩn cả nhóm Tài chính (2026-10-04).
@@ -377,6 +406,7 @@ export const NAV_MODULES: NavModule[] = [
     label: 'Báo cáo',
     href: '/reports/sales',
     icon: ChartLine,
+    tone: 'rpt',
     shortcut: 'g b',
     children: [
       {
@@ -399,6 +429,7 @@ export const NAV_MODULES: NavModule[] = [
     label: 'Quản trị',
     href: '/admin/org-tree',
     icon: Settings,
+    tone: 'adm',
     shortcut: 'g q',
     children: [
       {

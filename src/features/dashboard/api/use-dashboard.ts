@@ -14,6 +14,9 @@ export type SalesTimeseries = components['schemas']['SalesTimeseriesDto'];
 export type SalesTopProducts = components['schemas']['SalesTopProductsDto'];
 export type SalesOrderList = components['schemas']['SalesOrderListResponseDto'];
 export type ShipmentMonitorSummary = components['schemas']['ShipmentMonitorSummaryDto'];
+export type OrderFlowCounts = components['schemas']['SalesOrderFlowCountsDto'];
+export type Replenishment = components['schemas']['ReplenishmentResponseDto'];
+export type ReplenishmentRow = components['schemas']['ReplenishmentRowDto'];
 type TopRankBy = paths['/reports/sales/top-products']['get']['parameters']['query']['rankBy'];
 
 /** Khoảng ngày YYYY-MM-DD giờ VN, gồm cả hai đầu. */
@@ -26,6 +29,17 @@ export interface DayRange {
 const STALE_MS = 60_000;
 /** Ô giao hàng: cùng nhịp tự làm mới với màn theo dõi giao hàng. */
 const SHIPPING_REFRESH_MS = 60_000;
+/** Đếm đơn / việc cần xử lý / sắp hết hàng: đổi theo đơn mới trong ngày → làm mới mỗi phút. */
+const COUNTS_REFRESH_MS = 60_000;
+
+/** Bộ lọc đếm đơn theo luồng (cùng nghĩa với danh sách đơn) — kho lấy từ header X-Warehouse-Id. */
+export interface FlowCountParams {
+  /** `YYYY-MM-DD` (cả ngày giờ VN) hoặc ISO datetime (≤). */
+  from?: string;
+  to?: string;
+  /** Chỉ đơn chưa chọn hãng. */
+  noCarrier?: boolean;
+}
 
 export const dashboardKeys = {
   all: ['dashboard'] as const,
@@ -36,6 +50,8 @@ export const dashboardKeys = {
   pendingOrders: (take: number) => [...dashboardKeys.all, 'orders', 'pending', take] as const,
   shipping: (date: string, holdDays: number) =>
     [...dashboardKeys.all, 'shipping', 'summary', date, holdDays] as const,
+  flowCounts: (p: FlowCountParams) => [...dashboardKeys.all, 'orders', 'flow-counts', p] as const,
+  lowStock: (take: number) => [...dashboardKeys.all, 'stock', 'low', take] as const,
 };
 
 /** GET /reports/sales/summary (report.sales) — KPI khoảng + kỳ trước cùng độ dài, API scope theo D-CR2. */
@@ -110,5 +126,53 @@ export function useDashboardShipping(date: string, holdDays: number, enabled: bo
     queryFn: () =>
       unwrap(api.GET('/shipment-monitor/summary', { params: { query: { date, holdDays } } })),
     refetchInterval: SHIPPING_REFRESH_MS,
+  });
+}
+
+/**
+ * GET /sales-orders/flow-counts (sales_order.read) — số đơn từng tab danh sách đơn theo bộ lọc;
+ * `total` = tab "Tất cả" (gồm cả đơn đã hủy). API scope theo khách được phân + kho đang chọn.
+ */
+export function useDashboardFlowCounts(p: FlowCountParams, enabled: boolean) {
+  return useQuery({
+    enabled,
+    queryKey: dashboardKeys.flowCounts(p),
+    queryFn: () =>
+      unwrap(
+        api.GET('/sales-orders/flow-counts', {
+          params: {
+            // take / skip vô nghĩa với đếm — spec vẫn đòi vì dùng chung DTO lọc với danh sách.
+            query: {
+              from: p.from,
+              to: p.to,
+              noCarrier: p.noCarrier ? 'true' : undefined,
+              take: 1,
+              skip: 0,
+            },
+          },
+        }),
+      ),
+    staleTime: STALE_MS,
+    refetchInterval: COUNTS_REFRESH_MS,
+    placeholderData: keepPreviousData,
+  });
+}
+
+/**
+ * GET /stock/replenishment?onlyAlert=true (stock.read) — SKU hết / dưới mức tồn / sắp hết theo kho
+ * đang chọn; `alertCount` = số SKU cần nhập (không phụ thuộc phân trang).
+ */
+export function useDashboardLowStock(take: number, enabled: boolean) {
+  return useQuery({
+    enabled,
+    queryKey: dashboardKeys.lowStock(take),
+    queryFn: () =>
+      unwrap(
+        api.GET('/stock/replenishment', {
+          params: { query: { onlyAlert: true, take, skip: 0 } },
+        }),
+      ),
+    staleTime: STALE_MS,
+    refetchInterval: COUNTS_REFRESH_MS,
   });
 }

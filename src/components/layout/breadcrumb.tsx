@@ -32,7 +32,7 @@ export function Breadcrumb({ items }: { items?: Crumb[] }) {
   const crumbs = items ?? crumbsFromPath(pathname);
   if (!crumbs.length) return null;
   return (
-    <nav aria-label="Breadcrumb" className="flex items-center gap-1 text-sm text-muted-foreground">
+    <nav aria-label="Breadcrumb" className="flex items-center gap-1 text-xs text-muted-foreground">
       {crumbs.map((c, i) => (
         <Fragment key={`${c.label}-${i}`}>
           {i > 0 ? <ChevronRight className="h-3.5 w-3.5" aria-hidden /> : null}

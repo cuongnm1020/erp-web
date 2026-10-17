@@ -7,19 +7,26 @@ import { useEffect } from 'react';
 import { EmptyState } from '@/components/data/states';
 import { PageHeader } from '@/components/layout/page-header';
 import { Button } from '@/components/ui/button';
-import { formatDate, toLocalDateKey } from '@/lib/format';
+import { formatDate, formatTime, toLocalDateKey } from '@/lib/format';
 import { Can, useAbility } from '@/lib/permission';
 import { PendingOrdersWidget, ShippingWidget } from './ops-widgets';
-import { RevenueChartWidget, SalesKpiWidget, TopProductsWidget } from './sales-widgets';
+import { SalesWidget, TopProductsWidget } from './sales-widgets';
+import { NeedsActionStrip, TodayCard } from './today-widgets';
+
+const WEEKDAYS = ['Chủ nhật', 'Thứ Hai', 'Thứ Ba', 'Thứ Tư', 'Thứ Năm', 'Thứ Sáu', 'Thứ Bảy'];
+/** "Thứ Bảy, 17/10/2026" — thứ tính từ chính ngày YYYY-MM-DD (giờ VN), không theo múi giờ máy. */
+const weekdayDate = (day: string) =>
+  `${WEEKDAYS[new Date(`${day}T00:00:00Z`).getUTCDay()]}, ${formatDate(day)}`;
 
 /**
- * Tổng quan (RPT-08) — chỉ số thật, ghép theo quyền của người xem (không còn nút đổi góc nhìn
- * Sale / Quản lý của bản UI-first):
- * - `report.sales`: KPI hôm nay so hôm qua + tháng này, doanh thu 30 ngày, top 5 bán chạy tháng —
- *   mỗi ô link sang /reports/sales đúng tab + khoảng. Phạm vi số do API scope (D-CR2).
- * - `sales_order.read`: đơn chờ duyệt. `shipment.read`: giao hàng trong ngày.
- * Bỏ hẳn các ô chưa có API (mục tiêu doanh thu, công nợ quá hạn, KH lâu không mua, ngoại lệ, task
- * quá SLA, đơn theo trạng thái) — không hiện số giả. Dashboard cổ đông chưa quyết định, không dựng.
+ * Tổng quan (RPT-08, bố cục redesign 2026-10-17) — chỉ số thật, ghép theo quyền của người xem:
+ * - `sales_order.read` / `stock.read`: tổng đơn hôm nay (gồm đơn hủy, theo kho đang chọn) + sản
+ *   phẩm sắp hết + dải "Cần xử lý" (5 ô dẫn vào danh sách đã lọc).
+ * - `report.sales`: bảng doanh số Hôm nay | Tháng này + doanh thu 30 ngày, top 5 bán chạy tháng —
+ *   link sang /reports/sales đúng tab + khoảng. Phạm vi số do API scope (D-CR2).
+ * - `sales_order.read`: đơn chờ duyệt. `shipment.read`: giao hàng trong ngày theo luồng + theo hãng.
+ * Ô chưa có API (đơn theo giờ, sự cố đang mở) dựng khung + ghi "chờ API", không hiện số giả —
+ * danh sách ở docs/UI-REDESIGN-2026-10-17.md. Dashboard cổ đông chưa quyết định, không dựng.
  */
 export function DashboardScreen() {
   // Nhân viên kho sàn (PICKER / PACKER, 2026-09-15) không có màn nào ở dashboard: đưa thẳng vào
@@ -37,13 +44,13 @@ export function DashboardScreen() {
   const canSales = ability.can('sales', 'Report');
   const canOrders = ability.can('read', 'SalesOrder');
   const canShipping = ability.can('read', 'Shipment');
-  const monthStart = `${today.slice(0, 8)}01`;
+  const canStock = ability.can('read', 'Stock');
 
   return (
-    <div className="flex flex-col gap-4">
+    <div className="flex flex-col gap-3">
       <PageHeader
         title="Tổng quan"
-        description={`Hôm nay ${formatDate(today)}`}
+        description={`${weekdayDate(today)} · mở lúc ${formatTime(new Date())}`}
         breadcrumb={[{ label: 'Tổng quan' }]}
         actions={
           <>
@@ -67,25 +74,18 @@ export function DashboardScreen() {
         }
       />
 
-      {canSales ? (
+      {canOrders || canStock ? (
         <>
-          <SalesKpiWidget
-            title="Hôm nay"
-            range={{ from: today, to: today }}
-            previousLabel="Hôm qua"
-            emptyTitle="Hôm nay và hôm qua chưa có đơn đã chốt"
-          />
-          <SalesKpiWidget
-            title={`Tháng ${today.slice(5, 7)}/${today.slice(0, 4)}`}
-            range={{ from: monthStart, to: today }}
-            previousLabel="Kỳ trước"
-            emptyTitle="Tháng này và kỳ trước chưa có đơn đã chốt"
-          />
-          <div className="grid gap-3 xl:grid-cols-3">
-            <RevenueChartWidget today={today} />
-            <TopProductsWidget today={today} />
-          </div>
+          <TodayCard today={today} canOrders={canOrders} canStock={canStock} />
+          <NeedsActionStrip canOrders={canOrders} canStock={canStock} />
         </>
+      ) : null}
+
+      {canSales ? (
+        <div className="grid gap-3 xl:grid-cols-3">
+          <SalesWidget today={today} className="xl:col-span-2" />
+          <TopProductsWidget today={today} />
+        </div>
       ) : null}
 
       {canOrders || canShipping ? (
@@ -95,7 +95,7 @@ export function DashboardScreen() {
         </div>
       ) : null}
 
-      {!canSales && !canOrders && !canShipping ? (
+      {!canSales && !canOrders && !canShipping && !canStock ? (
         <EmptyState
           icon={LayoutDashboard}
           title="Chưa có chỉ số tổng quan cho vai trò của bạn"

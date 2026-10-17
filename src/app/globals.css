@@ -9,9 +9,10 @@
  */
 @layer base {
   :root {
-    /* Inter self-host qua next/font (--font-inter, app/layout.tsx); thiếu thì về system sans. */
+    /* Be Vietnam Pro self-host qua next/font (--font-be-vietnam, app/layout.tsx) — dấu chồng tiếng
+       Việt không đè dòng trên (redesign 2026-10-17); thiếu thì về system sans. */
     --font-sans: var(
-      --font-inter,
+      --font-be-vietnam,
       ui-sans-serif,
       system-ui,
       -apple-system,
@@ -47,8 +48,8 @@
     /* --success #217A4B */
     --success: 148 57% 30%;
     --success-foreground: 0 0% 100%;
-    /* --warning #B7791F */
-    --warning: 36 71% 42%;
+    /* --warning #93600F — đậm hơn #B7791F cũ để chữ đạt 4,5:1 trên nền vàng nhạt (redesign 2026-10-17) */
+    --warning: 37 82% 32%;
     --warning-foreground: 0 0% 100%;
     /* --info #4A5568 */
     --info: 218 17% 35%;
@@ -57,7 +58,28 @@
     --border: 214 13% 90%;
     --input: 217 14% 81%;
     --ring: 212 69% 39%;
-    --radius: 0.25rem;
+    /* 6px: thẻ (rounded-lg) 6px, nút / ô nhập (rounded-md) 4px — redesign 2026-10-17 */
+    --radius: 0.375rem;
+    /* Màu module ở menu trái (redesign 2026-10-17): chữ/icon đạt ≥4,5:1 trên trắng, -weak = nền ô
+       icon / mục đang chọn, -line = đường dọc dưới nhóm. CHỈ dùng cho điều hướng, không cho trạng thái. */
+    --mod-sales: 17 88% 40%;
+    --mod-sales-weak: 19 89% 94%;
+    --mod-sales-line: 18 77% 83%;
+    --mod-cust: 183 79% 28%;
+    --mod-cust-weak: 180 45% 92%;
+    --mod-cust-line: 182 41% 76%;
+    --mod-prod: 143 45% 33%;
+    --mod-prod-weak: 140 39% 92%;
+    --mod-prod-line: 140 37% 78%;
+    --mod-wh: 255 67% 55%;
+    --mod-wh-weak: 253 82% 95%;
+    --mod-wh-line: 253 71% 85%;
+    --mod-rpt: 335 78% 42%;
+    --mod-rpt-weak: 337 81% 95%;
+    --mod-rpt-line: 336 70% 84%;
+    --mod-adm: 215 19% 35%;
+    --mod-adm-weak: 210 18% 94%;
+    --mod-adm-line: 214 18% 83%;
     /* Sơ đồ nhân sự: mỗi khối một màu (đậm = viền/nhãn, nhạt = nền ô) */
     --branch-1: 140 45% 34%;
     --branch-1-weak: 140 45% 92%;
