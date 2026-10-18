@@ -43,6 +43,7 @@ const row = (over: Record<string, unknown>) => ({
     sku: null,
     component: null,
     qty: null,
+    components: null,
     componentPriced: null,
     targetPriced: null,
   },
@@ -63,6 +64,7 @@ const PREVIEW = {
         sku: ARISYN,
         component: null,
         qty: null,
+        components: null,
         componentPriced: null,
         targetPriced: true,
       },
@@ -79,6 +81,7 @@ const PREVIEW = {
         sku: null,
         component: ARISYN,
         qty: 10,
+        components: [{ sku: ARISYN, qty: 10 }],
         componentPriced: true,
         targetPriced: null,
       },
@@ -199,6 +202,71 @@ describe('PancakeCatalogMigrationDialog', () => {
     );
     expect(await screen.findByText('Nhập giá combo')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Chuyển danh mục' })).toBeDisabled();
+  });
+
+  it('combo mới nhiều thành phần: liệt kê thành phần × SL, gửi components', async () => {
+    const VL = {
+      skuId: '00000091-0000-4000-8000-000000000002',
+      productId: '00000091-0000-4000-8000-0000000000a2',
+      code: 'SP-0291',
+      name: 'VI LƯỢNG ( CHÁY LÁ) 10GR',
+      isCombo: false,
+    };
+    const multi = row({
+      externalProductId: 'nat-30',
+      externalVariationId: 'nv-30',
+      posCode: '030',
+      posName: '20 GÓI ARISYN + 10 VI LƯỢNG',
+      posPrice: '240000',
+      suggestion: {
+        action: 'NEW_COMBO',
+        confidence: 'EXACT',
+        sku: null,
+        component: null,
+        qty: null,
+        components: [
+          { sku: ARISYN, qty: 20 },
+          { sku: VL, qty: 10 },
+        ],
+        componentPriced: true,
+        targetPriced: null,
+      },
+    });
+    let posted: unknown = null;
+    server.use(
+      http.get(`${base}/preview`, () => HttpResponse.json({ ...PREVIEW, rows: [multi] })),
+      http.get(base, () => HttpResponse.json(status())),
+      http.post(base, async ({ request }) => {
+        posted = await request.json();
+        return HttpResponse.json(status({ state: 'active', step: 'combos' }), { status: 202 });
+      }),
+    );
+    renderApp(
+      <PancakeCatalogMigrationDialog shop={PANCAKE_SHOP_FIXTURE} open onOpenChange={() => {}} />,
+    );
+    const list = await screen.findByRole('list', { name: /Thành phần combo cho 20 GÓI ARISYN/ });
+    expect(within(list).getByText(/SP-0291 · VI LƯỢNG/)).toBeInTheDocument();
+    expect(within(list).getAllByRole('listitem')).toHaveLength(2);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Chuyển danh mục' }));
+    const confirm = await screen.findByRole('dialog', { name: /Chuyển 1 sản phẩm/ });
+    fireEvent.click(within(confirm).getByRole('button', { name: 'Chuyển danh mục' }));
+    await waitFor(() => expect(posted).not.toBeNull());
+    expect(posted).toEqual({
+      rows: [
+        {
+          externalProductId: 'nat-30',
+          externalVariationId: 'nv-30',
+          action: 'NEW_COMBO',
+          components: [
+            { skuId: ARISYN.skuId, qty: 20 },
+            { skuId: VL.skuId, qty: 10 },
+          ],
+          name: '20 GÓI ARISYN + 10 VI LƯỢNG',
+          salePrice: '240000',
+        },
+      ],
+    });
   });
 
   it('hàng ERP gợi ý chưa có giá bán lẻ → cảnh báo lên POS giá 0', async () => {

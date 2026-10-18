@@ -6312,6 +6312,10 @@ export interface components {
             name: string;
             isCombo: boolean;
         };
+        CatalogMigrationComponentRefDto: {
+            sku: components["schemas"]["CatalogMigrationSkuRefDto"];
+            qty: number;
+        };
         CatalogMigrationSuggestionDto: {
             /**
              * @description NONE = không tìm được hàng ERP tương ứng — người dùng chọn tay hoặc giữ nguyên.
@@ -6325,11 +6329,13 @@ export interface components {
             confidence: "NONE" | "EXACT" | "FUZZY";
             /** @description MAP: SKU / combo ERP gợi ý. */
             sku: components["schemas"]["CatalogMigrationSkuRefDto"] | null;
-            /** @description NEW_COMBO: SKU thành phần. */
+            /** @description NEW_COMBO một thành phần: SKU thành phần (nhiều thành phần → null, xem `components`). */
             component: components["schemas"]["CatalogMigrationSkuRefDto"] | null;
-            /** @description NEW_COMBO: số lượng thành phần đọc từ tên POS. */
+            /** @description NEW_COMBO một thành phần: số lượng đọc từ tên POS. */
             qty: number | null;
-            /** @description NEW_COMBO: thành phần đã có giá bán lẻ (bắt buộc để tạo combo). */
+            /** @description NEW_COMBO: mọi thành phần × SL (một hay nhiều) — gửi lại ở `components` khi chạy. */
+            components: components["schemas"]["CatalogMigrationComponentRefDto"][] | null;
+            /** @description NEW_COMBO: MỌI thành phần đã có giá bán lẻ (bắt buộc để tạo combo). */
             componentPriced: boolean | null;
             /** @description MAP: SKU đích đã có giá bán lẻ (combo luôn true) — false thì lên POS giá 0, nên tạo giá trước. */
             targetPriced: boolean | null;
@@ -6355,6 +6361,15 @@ export interface components {
             shopId: string;
             rows: components["schemas"]["CatalogMigrationRowDto"][];
         };
+        CatalogMigrationComponentInputDto: {
+            /**
+             * Format: uuid
+             * @description SKU thường (không phải combo) đang bán.
+             */
+            skuId: string;
+            /** @description Số lượng trong một combo. */
+            qty: number;
+        };
         CatalogMigrationRowInputDto: {
             externalProductId: string;
             externalVariationId: string;
@@ -6370,11 +6385,16 @@ export interface components {
             skuId?: string;
             /**
              * Format: uuid
-             * @description NEW_COMBO: SKU thường làm thành phần duy nhất.
+             * @description NEW_COMBO một thành phần: SKU thường làm thành phần duy nhất (hoặc dùng `components`).
              */
             componentSkuId?: string;
-            /** @description NEW_COMBO: số lượng thành phần trong một combo. */
+            /** @description NEW_COMBO một thành phần: số lượng thành phần trong một combo. */
             qty?: number;
+            /**
+             * @description NEW_COMBO nhiều thành phần ("20 GÓI A + 10 B"): có thì thay `componentSkuId` + `qty`. Một
+             *     thành phần thì SL ≥ 2; không trùng SKU.
+             */
+            components?: components["schemas"]["CatalogMigrationComponentInputDto"][];
             /** @description NEW_COMBO: tên combo (mặc định tên trên POS). */
             name?: string;
             /** @description NEW_COMBO: giá bán một combo — mặc định giá bán trên POS. */

@@ -59,6 +59,8 @@ interface Draft {
   componentSkuId: string;
   componentLabel: string;
   qty: string;
+  /** Combo mới nhiều thành phần ("20 GÓI A + 10 B") theo gợi ý — chỉ xem, không sửa từng vế. */
+  parts: { skuId: string; label: string; qty: number }[] | null;
   salePrice: string;
 }
 
@@ -88,6 +90,14 @@ function draftOf(row: CatalogMigrationRow): Draft {
     componentSkuId: s.component?.skuId ?? '',
     componentLabel: s.component ? `${s.component.code} · ${s.component.name}` : '',
     qty: s.qty ? String(s.qty) : '',
+    parts:
+      s.components && s.components.length > 1
+        ? s.components.map((c) => ({
+            skuId: c.sku.skuId,
+            label: `${c.sku.code} · ${c.sku.name}`,
+            qty: c.qty,
+          }))
+        : null,
     salePrice: row.posPrice ?? '',
   };
 }
@@ -95,6 +105,10 @@ function draftOf(row: CatalogMigrationRow): Draft {
 /** Lỗi nhập của một dòng (null = hợp lệ) — server kiểm lại (422). */
 function draftError(d: Draft): string | null {
   if (d.action === 'MAP' && !d.skuId) return 'Chọn hàng ERP';
+  if (d.action === 'NEW_COMBO' && d.parts) {
+    if (!d.salePrice || new Decimal(d.salePrice).lte(0)) return 'Nhập giá combo';
+    return null;
+  }
   if (d.action === 'NEW_COMBO') {
     if (!d.componentSkuId) return 'Chọn thành phần';
     if (!/^\d+$/.test(d.qty) || Number(d.qty) < 2) return 'Số lượng từ 2';
@@ -110,6 +124,13 @@ function toInput(d: Draft): CatalogMigrationRowInput {
     action: d.action,
   };
   if (d.action === 'MAP') return { ...base, skuId: d.skuId };
+  if (d.action === 'NEW_COMBO' && d.parts)
+    return {
+      ...base,
+      components: d.parts.map((p) => ({ skuId: p.skuId, qty: p.qty })),
+      name: d.row.posName,
+      salePrice: d.salePrice,
+    };
   if (d.action === 'NEW_COMBO')
     return {
       ...base,
@@ -300,6 +321,31 @@ function MigrationReview({
                         </div>
                       ) : null}
                     </>
+                  ) : d.action === 'NEW_COMBO' && d.parts ? (
+                    <div className="flex flex-wrap items-start gap-2">
+                      <ul
+                        className="min-w-48 flex-1 space-y-0.5 text-sm"
+                        aria-label={`Thành phần combo cho ${d.row.posName}`}
+                      >
+                        {d.parts.map((p) => (
+                          <li key={p.skuId}>
+                            <span className="font-mono">{p.qty} ×</span> {p.label}
+                          </li>
+                        ))}
+                      </ul>
+                      <MoneyInput
+                        className="w-32"
+                        value={d.salePrice}
+                        aria-label={`Giá combo cho ${d.row.posName}`}
+                        onChange={(v) => patch(i, { salePrice: v })}
+                      />
+                      {d.row.suggestion.componentPriced === false ? (
+                        <span className="w-full text-xs text-destructive">
+                          Có thành phần chưa có giá bán lẻ — đặt giá cho SKU đó trước, combo mới tạo
+                          được.
+                        </span>
+                      ) : null}
+                    </div>
                   ) : d.action === 'NEW_COMBO' ? (
                     <div className="flex flex-wrap items-center gap-2">
                       <Input
