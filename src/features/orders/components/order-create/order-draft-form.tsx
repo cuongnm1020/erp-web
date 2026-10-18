@@ -67,6 +67,15 @@ import { ProductSearch } from './product-search';
 
 const NONE = '__none__';
 const DEFAULT_WAREHOUSE = '__default__';
+/**
+ * Mật độ riêng màn tạo đơn: cả form nằm gọn một màn hình không phải cuộn. Ô nhập / ô chọn / nút mở
+ * lịch cao 32px; dòng báo lỗi dưới ô chỉ chiếm chỗ khi có lỗi (trống thì ẩn).
+ */
+const DENSE = cn(
+  '[&_input:not([type=checkbox]):not([type=radio]):not([type=file])]:h-8',
+  '[&_button[role=combobox]]:h-8 [&_button[aria-haspopup=dialog]]:h-8',
+  '[&_p[id$=-form-item-message]:empty]:hidden',
+);
 export const ATTACHMENT_MAX_BYTES = 10 * 1024 * 1024;
 export const ATTACHMENT_MAX_COUNT = 20;
 const ATTACHMENT_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'application/pdf'];
@@ -290,11 +299,11 @@ export const OrderDraftForm = forwardRef<
           afterCreate.current = 'open';
           void onSubmit(e);
         }}
-        className="flex flex-col gap-4 pb-24"
+        className={cn('flex flex-col gap-3 pb-24', DENSE)}
       >
-        <div className="flex flex-wrap items-start gap-4">
+        <div className="flex flex-wrap items-start gap-3">
           {/* ── Cột trái ── */}
-          <div className="flex min-w-0 flex-[999_1_640px] flex-col gap-4">
+          <div className="flex min-w-0 flex-[999_1_640px] flex-col gap-3">
             <Card
               title="Sản phẩm"
               actions={<HeaderSelects form={form} warehouseOptions={warehouseOptions} />}
@@ -303,8 +312,8 @@ export const OrderDraftForm = forwardRef<
               <div className="overflow-x-auto rounded-md border">
                 <div className="min-w-[680px]">
                   {lines.fields.length === 0 ? (
-                    <div className="flex flex-col items-center gap-2 px-4 py-10 text-center">
-                      <Inbox className="h-10 w-10 text-muted-foreground/60" aria-hidden />
+                    <div className="flex flex-col items-center gap-1.5 px-4 py-4 text-center">
+                      <Inbox className="h-8 w-8 text-muted-foreground/60" aria-hidden />
                       <p className="text-sm text-muted-foreground">Chưa có sản phẩm trong giỏ</p>
                       <Button
                         type="button"
@@ -374,7 +383,7 @@ export const OrderDraftForm = forwardRef<
               ) : null}
             </Card>
 
-            <div className="flex flex-wrap items-start gap-4">
+            <div className="flex flex-wrap items-start gap-3">
               <ValueCard
                 form={form}
                 subtotal={subtotal}
@@ -383,7 +392,7 @@ export const OrderDraftForm = forwardRef<
                 prepaid={prepaid.toFixed(4)}
                 cod={cod}
               />
-              <div className="flex min-w-0 flex-[1_1_320px] flex-col gap-4">
+              <div className="flex min-w-0 flex-[1_1_320px] flex-col gap-3">
                 <Card title="Thanh toán">
                   <FormField
                     control={form.control}
@@ -418,7 +427,7 @@ export const OrderDraftForm = forwardRef<
           </div>
 
           {/* ── Cột phải ── */}
-          <div className="flex min-w-0 max-w-full flex-[1_1_380px] flex-col gap-4 xl:max-w-[520px]">
+          <div className="flex min-w-0 max-w-full flex-[1_1_380px] flex-col gap-3 xl:max-w-[520px]">
             <InfoCard form={form} />
             <CustomerCard form={form} />
             <ReceiverCard form={form} />
@@ -926,7 +935,7 @@ function NotesCard({
             </FormLabel>
             <FormControl>
               <Textarea
-                rows={5}
+                rows={3}
                 placeholder={
                   tab === 'internal'
                     ? 'Ghi chú cho người trong công ty (kho, CSKH…)'
@@ -943,7 +952,7 @@ function NotesCard({
         {files.map((f, i) => (
           <div
             key={`${f.name}-${i}`}
-            className="relative flex h-[88px] w-[88px] flex-col items-center justify-center gap-1 overflow-hidden rounded-md border bg-muted/30 p-1 text-center"
+            className="relative flex h-16 w-16 flex-col items-center justify-center gap-1 overflow-hidden rounded-md border bg-muted/30 p-1 text-center"
             title={`${f.name} · ${fileSize(f.size)}`}
           >
             {previews[i] ? (
@@ -969,7 +978,7 @@ function NotesCard({
           <button
             type="button"
             onClick={() => inputRef.current?.click()}
-            className="flex h-[88px] w-[88px] flex-col items-center justify-center gap-1.5 rounded-md border border-dashed text-xs text-muted-foreground hover:bg-muted"
+            className="flex h-16 w-16 flex-col items-center justify-center gap-1.5 rounded-md border border-dashed text-xs text-muted-foreground hover:bg-muted"
           >
             <Plus className="h-4 w-4" aria-hidden />
             Tải lên
