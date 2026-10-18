@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { isApiError } from '@/lib/api/errors';
+import { IDLE_LOGOUT_REASON } from '@/lib/auth/idle';
 import { safeNext } from '@/lib/auth/route-guard';
 import { messageFor } from '@/lib/error-messages';
 import { useLogin } from '../api/use-login';
@@ -40,8 +41,18 @@ export function LoginForm() {
       : messageFor(err)
     : undefined;
 
+  const idleNotice =
+    !err && params.get('reason') === IDLE_LOGOUT_REASON
+      ? 'Phiên làm việc đã kết thúc vì không thao tác 30 phút. Đăng nhập lại để tiếp tục đúng trang đang làm.'
+      : undefined;
+
   return (
     <form onSubmit={onSubmit} noValidate className="space-y-4" aria-describedby={ids.err}>
+      {idleNotice ? (
+        <p role="status" className="rounded-md bg-muted px-3 py-2 text-sm text-muted-foreground">
+          {idleNotice}
+        </p>
+      ) : null}
       <div className="space-y-1.5">
         <Label htmlFor={ids.u}>Mã nhân viên hoặc email</Label>
         <Input
