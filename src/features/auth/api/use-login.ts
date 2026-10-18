@@ -1,6 +1,7 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/lib/api/client';
 import { toApiError } from '@/lib/api/errors';
+import { writeLastActivity } from '@/lib/auth/idle';
 import { forgetWarehouseSelection } from '@/lib/warehouse';
 import type { LoginInput } from '../schema';
 
@@ -21,6 +22,8 @@ export function useLogin() {
     onSuccess: () => {
       // Mỗi lần đăng nhập về kho mặc định của tài khoản (PLAN-warehouse-context).
       forgetWarehouseSelection();
+      // Mốc thao tác cuối của phiên trước (đã bị đăng xuất vì không hoạt động) không được đá ra ngay.
+      writeLastActivity();
       qc.removeQueries({ queryKey: ['auth'] });
     },
   });

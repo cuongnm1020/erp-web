@@ -84,8 +84,8 @@ describe('visibleModules', () => {
     const wmsReader = reader.find((m) => m.label === 'Kho');
     expect(wmsReader?.children?.map((c) => c.label)).toEqual([
       'Trạm đóng gói',
-      'Cất hàng (PDA)',
       'Lấy hàng (PDA)',
+      'Cất hàng (PDA)',
     ]);
     const all = visibleModules((a, s) => s === 'Task');
     expect(all.find((m) => m.label === 'Kho')?.children?.map((c) => c.label)).toContain(
@@ -96,15 +96,20 @@ describe('visibleModules', () => {
   it('chỉ có stock.read → module Kho hiện đúng các mục gắn Stock', () => {
     const mods = visibleModules((a, s) => a === 'read' && s === 'Stock');
     const wms = mods.find((m) => m.label === 'Kho');
+    // Thứ tự theo nhóm con (redesign 2026-10-17): Chứng từ → Danh mục kho.
     expect(wms?.children?.map((c) => c.label)).toEqual([
-      'Kho & vị trí',
       'Phiếu nhập kho',
-      'Nhập hàng hoàn',
       'Phiếu bán hàng',
-      'Thùng / pallet',
+      'Nhập hàng hoàn',
       'Chuyển kho',
       'Kiểm kê',
+      'Kho & vị trí',
+      'Thùng / pallet',
       'Cảnh báo nhập hàng',
+    ]);
+    expect([...new Set(wms?.children?.map((c) => c.section))]).toEqual([
+      'Chứng từ',
+      'Danh mục kho',
     ]);
   });
 
@@ -165,11 +170,14 @@ describe('<Sidebar>', () => {
     localStorage.clear();
   });
 
-  it('nhóm là nhãn (không phải link), mục con là link; ẩn theo quyền; đánh dấu mục đang mở', () => {
+  it('nhóm là nút mở/đóng (không phải link), mục con là link; ẩn theo quyền; đánh dấu mục đang mở', () => {
     renderSidebar(SALE);
-    // Module có children giờ là nhãn nhóm, không còn là link
+    // Module có children là nút mở/đóng nhóm, không phải link
     expect(screen.queryByRole('link', { name: 'Khách hàng' })).not.toBeInTheDocument();
-    expect(screen.getByText('Khách hàng')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Khách hàng' })).toHaveAttribute(
+      'aria-expanded',
+      'true',
+    );
     expect(screen.getByRole('link', { name: 'Danh sách khách hàng' })).toHaveAttribute(
       'aria-current',
       'page',
@@ -189,15 +197,40 @@ describe('<Sidebar>', () => {
     expect(screen.queryByText('Tài chính')).not.toBeInTheDocument();
   });
 
-  it('thu gọn: chỉ icon (tên vào aria-label), nhớ vào localStorage, phím [ bật lại', () => {
+  it('đóng nhóm → ẩn mục con, nhớ vào localStorage qua F5', () => {
+    const { unmount } = renderSidebar(SALE);
+    fireEvent.click(screen.getByRole('button', { name: 'Khách hàng' }));
+    expect(screen.queryByRole('link', { name: 'Danh sách khách hàng' })).not.toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Đơn hàng' })).toBeInTheDocument();
+    expect(JSON.parse(localStorage.getItem('erp.sidebar.closed-groups')!)).toEqual([
+      '/crm/customers',
+    ]);
+    unmount();
+    renderSidebar(SALE);
+    expect(screen.getByRole('button', { name: 'Khách hàng' })).toHaveAttribute(
+      'aria-expanded',
+      'false',
+    );
+  });
+
+  it('Kho chia nhóm con Vận hành / Chứng từ / Danh mục kho / Màn PDA', () => {
+    renderSidebar(ADMIN);
+    for (const s of ['Vận hành', 'Chứng từ', 'Danh mục kho', 'Màn PDA']) {
+      expect(screen.getByText(s)).toBeInTheDocument();
+    }
+  });
+
+  it('thu gọn: chỉ ô icon module, bấm ô mở mục con, nhớ vào localStorage, phím [ bật lại', async () => {
     renderSidebar(SALE);
     fireEvent.click(screen.getByRole('button', { name: 'Thu gọn thanh điều hướng' }));
-    // Nhãn nhóm biến mất, link vẫn truy cập được qua aria-label
+    // Nhãn mục con biến mất; ô module vẫn bấm được (tên ở aria-label) và mở danh sách mục con
     expect(screen.queryByText('Danh sách khách hàng')).not.toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'Danh sách khách hàng' })).toHaveAttribute(
+    fireEvent.keyDown(screen.getByRole('button', { name: 'Khách hàng' }), { key: 'Enter' });
+    expect(await screen.findByRole('menuitem', { name: 'Danh sách khách hàng' })).toHaveAttribute(
       'aria-current',
       'page',
     );
+    fireEvent.keyDown(document.activeElement!, { key: 'Escape' });
     expect(localStorage.getItem('erp.sidebar.collapsed')).toBe('1');
     // Phím [ mở rộng lại
     fireEvent.keyDown(window, { key: '[' });

@@ -26,16 +26,25 @@ import { useSalesReportState } from './report-state';
 const GROUPS: ReadonlyArray<readonly [StaffGroupBy, string]> = [
   ['owner', 'Nhân viên'],
   ['team', 'Team'],
+  ['owner_shop', 'Nhân viên × POS'],
 ];
+const GROUP_VALUES = new Set<string>(GROUPS.map(([g]) => g));
+
+/** Một người có thể nhiều dòng (mỗi POS một dòng) → id dòng ghép người + POS. */
+const rowKey = (r: SalesByStaffItem) => `${r.key.id ?? 'null'}|${r.key.shopId ?? ''}`;
 
 /**
  * Tab "Nhân viên": doanh thu theo người phụ trách / team (snapshot lúc tạo đơn — D-CR2). Dữ liệu đã
  * được API scope (nhân viên chỉ thấy dòng mình, trưởng nhóm thấy team) — màn không lọc thêm (luật 7).
- * Bấm "Lọc" trên một dòng để xem mọi tab theo riêng người / team đó.
+ * Bấm "Lọc" trên một dòng để xem mọi tab theo riêng người / team đó. "Nhân viên × POS": mỗi sale
+ * tách một dòng cho từng POS Pancake đã bán (đơn tạo trên ERP thành dòng riêng).
  */
 export function SalesStaffTab() {
   const { state, setFilters, filter, range } = useSalesReportState();
-  const groupBy: StaffGroupBy = state.filters.staff === 'team' ? 'team' : 'owner';
+  const staffRaw = state.filters.staff;
+  const groupBy: StaffGroupBy =
+    staffRaw && GROUP_VALUES.has(staffRaw) ? (staffRaw as StaffGroupBy) : 'owner';
+  const byShop = groupBy === 'owner_shop';
   const query = useSalesByStaff(filter, groupBy);
   const head = groupBy === 'team' ? 'Team' : 'Nhân viên phụ trách';
 
@@ -46,6 +55,20 @@ export function SalesStaffTab() {
         header: head,
         cell: ({ row }) => <GroupKeyLabel id={row.original.key.id} name={row.original.key.name} />,
       },
+      ...(byShop
+        ? [
+            {
+              id: 'shop',
+              header: 'POS',
+              meta: { width: 180 },
+              cell: ({ row }) => (
+                <span className={row.original.key.shopId ? undefined : 'text-muted-foreground'}>
+                  {row.original.key.shopName}
+                </span>
+              ),
+            } satisfies ColumnDef<SalesByStaffItem, unknown>,
+          ]
+        : []),
       {
         id: 'revenue',
         header: 'Doanh thu',
@@ -126,19 +149,24 @@ export function SalesStaffTab() {
         header: '',
         meta: { width: 70 },
         cell: ({ row }) => {
-          const { id, name } = row.original.key;
+          const { id, name, shopId, shopName } = row.original.key;
           if (id === null) return null;
+          const scope = byShop && shopId ? `${name} ở ${shopName}` : name;
           return (
             <Button
               variant="ghost"
               size="sm"
-              aria-label={`Chỉ xem số của ${name}`}
-              title={`Chỉ xem số của ${name} ở mọi tab`}
+              aria-label={`Chỉ xem số của ${scope}`}
+              title={`Chỉ xem số của ${scope} ở mọi tab`}
               onClick={() =>
                 setFilters(
                   groupBy === 'team'
                     ? { teamId: id, teamName: name }
-                    : { ownerId: id, ownerName: name },
+                    : {
+                        ownerId: id,
+                        ownerName: name,
+                        ...(byShop && shopId ? { pancakeShopId: shopId } : {}),
+                      },
                 )
               }
             >
@@ -149,14 +177,15 @@ export function SalesStaffTab() {
         },
       },
     ],
-    [head, groupBy, setFilters],
+    [head, groupBy, byShop, setFilters],
   );
 
   const exportCsv = (items: SalesByStaffItem[]) =>
     downloadCsv(
-      `doanh-thu-theo-${groupBy === 'team' ? 'team' : 'nhan-vien'}_${range.from}_${range.to}`,
+      `doanh-thu-theo-${groupBy === 'team' ? 'team' : byShop ? 'nhan-vien-pos' : 'nhan-vien'}_${range.from}_${range.to}`,
       [
         head,
+        ...(byShop ? ['POS'] : []),
         'Doanh thu',
         'Số đơn',
         'TB/đơn',
@@ -171,6 +200,7 @@ export function SalesStaffTab() {
       ],
       items.map((r) => [
         r.key.name,
+        ...(byShop ? [r.key.shopName ?? ''] : []),
         csvMoney(r.revenue),
         r.orderCount,
         csvMoney(r.aov),
@@ -224,14 +254,14 @@ export function SalesStaffTab() {
             </div>
             <section className="rounded-md border bg-card p-3" aria-label="Biểu đồ doanh thu">
               <h2 className="mb-2 text-sm font-semibold">
-                Doanh thu {Math.min(10, d.items.length)} {groupBy === 'team' ? 'team' : 'người'} cao
-                nhất
+                Doanh thu {Math.min(10, d.items.length)}{' '}
+                {groupBy === 'team' ? 'team' : byShop ? 'dòng nhân viên × POS' : 'người'} cao nhất
               </h2>
               <BarList
                 ariaLabel={`Doanh thu theo ${head.toLowerCase()}`}
-                items={d.items.slice(0, 10).map((r, i) => ({
-                  key: r.key.id ?? `null-${i}`,
-                  label: r.key.name,
+                items={d.items.slice(0, 10).map((r) => ({
+                  key: rowKey(r),
+                  label: byShop ? `${r.key.name} · ${r.key.shopName ?? ''}` : r.key.name,
                   value: r.revenue,
                   display: formatMoney(r.revenue),
                   muted: r.key.id === null,
@@ -246,7 +276,7 @@ export function SalesStaffTab() {
             <DataTable
               columns={columns}
               rows={d.items}
-              getRowId={(r) => r.key.id ?? 'null'}
+              getRowId={rowKey}
               total={d.items.length}
               page={1}
               size={Math.max(d.items.length, 1)}

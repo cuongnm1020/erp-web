@@ -1,14 +1,16 @@
 'use client';
 
+import type { LucideIcon } from 'lucide-react';
+import { Banknote, ChartLine, ReceiptText, Scale, TrendingUp } from 'lucide-react';
 import Link from 'next/link';
 import type { ReactNode } from 'react';
 import { BarList, ComparisonLineChart, type ComparisonPoint } from '@/components/data/charts';
 import { shiftDay } from '@/components/data/date-range-picker';
 import { GrowthIndicator, growthPct, ratioPct } from '@/components/data/growth-indicator';
-import { KpiCard } from '@/components/data/kpi-card';
 import { EmptyState, ErrorState } from '@/components/data/states';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
+import { cn } from '@/lib/cn';
 import { formatDate, formatDateTime, formatMoney } from '@/lib/format';
 import {
   useDashboardSalesSummary,
@@ -34,86 +36,135 @@ const rangeText = (from: string, to: string) =>
 
 const isZero = (v: string) => /^-?0(\.0+)?$/.test(v);
 
+/**
+ * Khung thẻ của dashboard (redesign 2026-10-17): nền trắng bo 6px, hàng đầu có tiêu đề + ghi chú +
+ * link "xem thêm" bên phải, kẻ dưới. `aria-label` = tiêu đề để test / trình đọc màn hình tìm được.
+ */
 export function WidgetFrame({
   title,
   note,
   href,
   linkLabel = 'Xem báo cáo',
+  icon,
+  extra,
   children,
   className,
+  bodyClassName,
 }: {
   title: string;
   note?: ReactNode;
   href?: string;
   linkLabel?: string;
+  /** Ô icon trước tiêu đề. */
+  icon?: ReactNode;
+  /** Chip / nút cạnh tiêu đề. */
+  extra?: ReactNode;
   children: ReactNode;
   className?: string;
+  bodyClassName?: string;
 }) {
   return (
-    <section className={className} aria-label={title}>
-      <div className="mb-1.5 flex flex-wrap items-baseline gap-x-2 text-sm">
-        <h2 className="font-semibold">{title}</h2>
+    <section className={cn('min-w-0 rounded-lg border bg-card', className)} aria-label={title}>
+      <div className="flex min-h-11 flex-wrap items-center gap-x-2.5 gap-y-1 border-b px-3.5 py-2">
+        {icon}
+        <h2 className="text-base font-semibold">{title}</h2>
         {note ? <span className="text-xs text-muted-foreground">{note}</span> : null}
+        {extra}
         {href ? (
-          <Link href={href} className="ml-auto text-primary hover:underline">
+          <Link href={href} className="ml-auto text-sm font-semibold text-primary hover:underline">
             {linkLabel}
           </Link>
         ) : null}
       </div>
-      {children}
+      <div className={cn('p-3.5', bodyClassName)}>{children}</div>
     </section>
   );
 }
 
-function KpiSkeleton() {
+/** Ô icon nhỏ cạnh tiêu đề / nhãn dòng — `tone` là cặp class nền nhạt + chữ đậm. */
+export function IconTile({ icon: Icon, tone }: { icon: LucideIcon; tone: string }) {
   return (
-    <div className="grid grid-cols-2 gap-2 xl:grid-cols-4" role="status" aria-label="Đang tải">
-      {Array.from({ length: 4 }, (_, i) => (
-        <Skeleton key={i} className="h-20" />
-      ))}
-    </div>
+    <span
+      aria-hidden
+      className={cn('flex h-8 w-8 shrink-0 items-center justify-center rounded-md', tone)}
+    >
+      <Icon className="h-4 w-4" />
+    </span>
+  );
+}
+
+type MetricKey = 'revenue' | 'orderCount' | 'aov' | 'grossProfit';
+
+/** Bốn dòng của bảng doanh số — màu ô icon theo design (trang trí, không mang nghĩa trạng thái). */
+const METRICS: ReadonlyArray<{ key: MetricKey; label: string; icon: LucideIcon; tone: string }> = [
+  { key: 'revenue', label: 'Doanh thu', icon: Banknote, tone: 'bg-mod-prod-weak text-mod-prod' },
+  {
+    key: 'orderCount',
+    label: 'Số đơn',
+    icon: ReceiptText,
+    tone: 'bg-mod-sales-weak text-mod-sales',
+  },
+  { key: 'aov', label: 'Giá trị TB/đơn', icon: Scale, tone: 'bg-mod-cust-weak text-mod-cust' },
+  { key: 'grossProfit', label: 'Lãi gộp', icon: TrendingUp, tone: 'bg-mod-wh-weak text-mod-wh' },
+];
+
+const metricStr = (k: SalesKpis, key: MetricKey) =>
+  key === 'orderCount' ? String(k.orderCount) : k[key];
+
+function metricValue(k: SalesKpis, key: MetricKey): ReactNode {
+  if (key === 'orderCount') return formatMoney(String(k.orderCount), { unit: '' });
+  const v = k[key];
+  return (
+    <span className={key === 'grossProfit' && v.startsWith('-') ? 'text-destructive' : undefined}>
+      {formatMoney(v)}
+    </span>
   );
 }
 
 /**
- * Một dải 4 KPI (doanh thu, số đơn, TB/đơn, lãi gộp) cho khoảng `range`, so với kỳ trước cùng độ
- * dài mà API trả về (hôm nay → hôm qua; tháng này → số ngày tương đương liền trước).
+ * Doanh số (redesign 2026-10-17, theo ảnh user gửi): bảng 4 chỉ số × Hôm nay | Tháng này (ngày 1 →
+ * hôm nay, so cùng số ngày liền trước — kỳ trước do API trả). Mức tăng giảm của hôm nay tô xám vì
+ * ngày chưa kết thúc (API so với CẢ NGÀY hôm qua — "cùng giờ" chờ API); lãi gộp hôm nay hiện % trên
+ * doanh thu. Dưới bảng là biểu đồ doanh thu 30 ngày.
  */
-export function SalesKpiWidget({
-  title,
-  range,
-  previousLabel,
-  emptyTitle,
-}: {
-  title: string;
-  range: DayRange;
-  /** Tiền tố dòng phụ: "Hôm qua" / "Kỳ trước". */
-  previousLabel: string;
-  emptyTitle: string;
-}) {
-  const q = useDashboardSalesSummary(range, true);
-  const href = reportHref(range);
-  const s = q.data;
+export function SalesWidget({ today, className }: { today: string; className?: string }) {
+  const todayRange: DayRange = { from: today, to: today };
+  const monthRange: DayRange = { from: `${today.slice(0, 8)}01`, to: today };
+  const qd = useDashboardSalesSummary(todayRange, true);
+  const qm = useDashboardSalesSummary(monthRange, true);
+  const d = qd.data;
+  const m = qm.data;
+  const failed = qd.error ?? qm.error;
+  const asOf = d?.dataAsOf ?? m?.dataAsOf;
+
   return (
     <WidgetFrame
-      title={title}
-      note={
-        s
-          ? `so với ${rangeText(s.previousFrom, s.previousTo)}${s.dataAsOf ? ` · số liệu đến ${formatDateTime(s.dataAsOf)}` : ''}`
-          : undefined
-      }
-      href={href}
+      title="Doanh số"
+      icon={<IconTile icon={ChartLine} tone="bg-mod-rpt-weak text-mod-rpt" />}
+      note={`đơn đã chốt, theo ngày đặt${asOf ? ` · số liệu đến ${formatDateTime(asOf)}` : ''}`}
+      href={reportHref(monthRange)}
+      className={className}
+      bodyClassName="p-0"
     >
-      {q.isPending ? (
-        <KpiSkeleton />
-      ) : q.error ? (
-        <ErrorState className="min-h-40" error={q.error} onRetry={() => void q.refetch()} />
-      ) : !s ? (
-        <KpiSkeleton />
-      ) : s.current.orderCount === 0 && s.previous.orderCount === 0 ? (
+      {qd.isPending || qm.isPending ? (
+        <div className="flex flex-col gap-2 p-3.5" role="status" aria-label="Đang tải">
+          {METRICS.map((r) => (
+            <Skeleton key={r.key} className="h-9" />
+          ))}
+        </div>
+      ) : failed ? (
+        <ErrorState
+          className="min-h-40"
+          error={failed}
+          onRetry={() => {
+            if (qd.error) void qd.refetch();
+            if (qm.error) void qm.refetch();
+          }}
+        />
+      ) : !d || !m ? null : m.current.orderCount === 0 && m.previous.orderCount === 0 ? (
         <EmptyState
           className="min-h-24 p-4"
-          title={emptyTitle}
+          title="Tháng này và kỳ trước chưa có đơn đã chốt"
           description="Doanh thu tính trên đơn đã chốt theo ngày đặt hàng."
           action={
             <Button variant="outline" size="sm" asChild>
@@ -122,112 +173,110 @@ export function SalesKpiWidget({
           }
         />
       ) : (
-        <KpiRow current={s.current} previous={s.previous} previousLabel={previousLabel} />
+        <div className="overflow-x-auto">
+          <table className="w-full min-w-[640px] border-collapse text-base">
+            <thead>
+              <tr className="text-right">
+                <th aria-hidden />
+                <th
+                  colSpan={2}
+                  scope="colgroup"
+                  className="px-4 pb-1 pt-2.5 font-semibold text-primary"
+                >
+                  Hôm nay
+                </th>
+                <th
+                  colSpan={2}
+                  scope="colgroup"
+                  className="border-l px-4 pb-1 pt-2.5 font-semibold"
+                >
+                  {`Tháng ${today.slice(5, 7)} (1–${Number(today.slice(8, 10))})`}
+                </th>
+              </tr>
+              <tr className="border-y text-right text-sm text-muted-foreground">
+                <th className="px-4 py-1.5 text-left font-normal">Chỉ số</th>
+                <th className="px-4 py-1.5 font-normal">giá trị</th>
+                <th className="px-4 py-1.5 font-normal">so hôm qua</th>
+                <th className="border-l px-4 py-1.5 font-normal">giá trị</th>
+                <th className="px-4 py-1.5 font-normal">
+                  so {rangeText(m.previousFrom, m.previousTo)}
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              {METRICS.map((r) => {
+                const margin =
+                  r.key === 'grossProfit'
+                    ? ratioPct(d.current.grossProfit, d.current.revenue)
+                    : null;
+                return (
+                  <tr key={r.key} className="border-b text-right last:border-b-0">
+                    <th scope="row" className="px-4 py-2 text-left font-normal">
+                      <span className="flex items-center gap-3">
+                        <IconTile icon={r.icon} tone={r.tone} />
+                        {r.label}
+                      </span>
+                    </th>
+                    <td className="whitespace-nowrap bg-accent/40 px-4 py-2 font-semibold">
+                      {metricValue(d.current, r.key)}
+                    </td>
+                    <td className="whitespace-nowrap px-4 py-2">
+                      {r.key === 'grossProfit' ? (
+                        <span className="text-sm text-muted-foreground">
+                          {margin === null ? '—' : `${margin.replace('.', ',')}% doanh thu`}
+                        </span>
+                      ) : (
+                        <GrowthIndicator
+                          muted
+                          pct={growthPct(metricStr(d.current, r.key), metricStr(d.previous, r.key))}
+                          hasCurrent={!isZero(metricStr(d.current, r.key))}
+                        />
+                      )}
+                    </td>
+                    <td className="whitespace-nowrap border-l bg-muted/60 px-4 py-2 font-semibold">
+                      {metricValue(m.current, r.key)}
+                    </td>
+                    <td className="whitespace-nowrap px-4 py-2">
+                      <GrowthIndicator
+                        pct={growthPct(metricStr(m.current, r.key), metricStr(m.previous, r.key))}
+                        hasCurrent={!isZero(metricStr(m.current, r.key))}
+                      />
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
       )}
+      <RevenueChart today={today} />
     </WidgetFrame>
-  );
-}
-
-function KpiRow({
-  current: c,
-  previous: p,
-  previousLabel,
-}: {
-  current: SalesKpis;
-  previous: SalesKpis;
-  previousLabel: string;
-}) {
-  const count = (n: number) => formatMoney(String(n), { unit: '' });
-  return (
-    <div className="grid grid-cols-2 gap-2 xl:grid-cols-4">
-      <KpiCard
-        label="Doanh thu"
-        value={formatMoney(c.revenue)}
-        detail={
-          <Delta
-            pct={growthPct(c.revenue, p.revenue)}
-            hasCurrent={!isZero(c.revenue)}
-            text={`${previousLabel} ${formatMoney(p.revenue)}`}
-          />
-        }
-      />
-      <KpiCard
-        label="Số đơn"
-        value={count(c.orderCount)}
-        detail={
-          <Delta
-            pct={growthPct(String(c.orderCount), String(p.orderCount))}
-            hasCurrent={c.orderCount > 0}
-            text={`${previousLabel} ${count(p.orderCount)}`}
-          />
-        }
-      />
-      <KpiCard
-        label="Giá trị TB/đơn"
-        value={formatMoney(c.aov)}
-        detail={
-          <Delta
-            pct={growthPct(c.aov, p.aov)}
-            hasCurrent={!isZero(c.aov)}
-            text={`${previousLabel} ${formatMoney(p.aov)}`}
-          />
-        }
-      />
-      <KpiCard
-        label="Lãi gộp"
-        value={
-          <span className={c.grossProfit.startsWith('-') ? 'text-destructive' : undefined}>
-            {formatMoney(c.grossProfit)}
-          </span>
-        }
-        detail={
-          <Delta
-            pct={growthPct(c.grossProfit, p.grossProfit)}
-            hasCurrent={!isZero(c.grossProfit)}
-            text={(() => {
-              const m = ratioPct(c.grossProfit, c.revenue);
-              return m === null
-                ? `${previousLabel} ${formatMoney(p.grossProfit)}`
-                : `${m.replace('.', ',')}% trên doanh thu`;
-            })()}
-          />
-        }
-      />
-    </div>
-  );
-}
-
-function Delta({
-  pct,
-  hasCurrent,
-  text,
-}: {
-  pct: string | null;
-  hasCurrent: boolean;
-  text: string;
-}) {
-  return (
-    <span className="flex flex-wrap items-center gap-1.5">
-      <GrowthIndicator pct={pct} hasCurrent={hasCurrent} />
-      <span>{text}</span>
-    </span>
   );
 }
 
 const dayLabel = (period: string) => `${period.slice(8, 10)}/${period.slice(5, 7)}`;
 
-/** Doanh thu theo ngày 30 ngày gần nhất (gồm hôm nay), đường kỳ trước 30 ngày liền trước. */
-export function RevenueChartWidget({ today }: { today: string }) {
+/**
+ * Doanh thu theo ngày 30 ngày gần nhất (gồm hôm nay), đường kỳ trước 30 ngày liền trước. Nằm trong
+ * thẻ Doanh số (khối con có tiêu đề riêng, kẻ trên).
+ */
+function RevenueChart({ today }: { today: string }) {
   const range: DayRange = { from: shiftDay(today, -(CHART_DAYS - 1)), to: today };
   const q = useDashboardSalesTimeseries(range, true);
   const t = q.data;
+  const title = `Doanh thu ${CHART_DAYS} ngày`;
   return (
-    <WidgetFrame
-      title={`Doanh thu ${CHART_DAYS} ngày`}
-      note="hôm nay chưa hết ngày"
-      href={reportHref(range, { gran: 'day' })}
-      className="rounded-md border bg-card p-3 xl:col-span-2"
-    >
+    <section aria-label={title} className="border-t px-3.5 pb-3.5 pt-3">
+      <div className="mb-1.5 flex flex-wrap items-baseline gap-x-2.5">
+        <h3 className="text-base font-semibold">{title}</h3>
+        <span className="text-xs text-muted-foreground">hôm nay chưa hết ngày</span>
+        <Link
+          href={reportHref(range, { gran: 'day' })}
+          className="ml-auto text-sm font-semibold text-primary hover:underline"
+        >
+          Xem báo cáo
+        </Link>
+      </div>
       {q.isPending ? (
         <div role="status" aria-label="Đang tải biểu đồ">
           <Skeleton className="h-60" />
@@ -266,8 +315,9 @@ export function RevenueChartWidget({ today }: { today: string }) {
             ariaLabel={`Doanh thu theo ngày, ${CHART_DAYS} ngày gần nhất so với ${CHART_DAYS} ngày trước`}
             tooltipExtra={(p) => <GrowthIndicator pct={growthPct(p.current, p.previous)} />}
           />
-          <p className="mt-2 text-xs text-muted-foreground">
-            Tổng {formatMoney(t.totals.revenue)} ·{' '}
+          <p className="mt-2 text-right text-sm text-muted-foreground">
+            Tổng{' '}
+            <span className="font-semibold text-foreground">{formatMoney(t.totals.revenue)}</span> ·{' '}
             {formatMoney(String(t.totals.orderCount), { unit: '' })} đơn · {CHART_DAYS} ngày trước{' '}
             {formatMoney(t.previousTotals.revenue)}{' '}
             <GrowthIndicator
@@ -277,7 +327,7 @@ export function RevenueChartWidget({ today }: { today: string }) {
           </p>
         </>
       )}
-    </WidgetFrame>
+    </section>
   );
 }
 
@@ -291,7 +341,6 @@ export function TopProductsWidget({ today }: { today: string }) {
       title="Bán chạy tháng này"
       note="theo doanh thu"
       href={reportHref(range, { tab: 'top' })}
-      className="rounded-md border bg-card p-3"
     >
       {q.isPending ? (
         <div className="flex flex-col gap-2" role="status" aria-label="Đang tải">

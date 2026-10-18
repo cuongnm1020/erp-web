@@ -18,6 +18,15 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { cn } from '@/lib/cn';
+import { useMyPancakeProfile, useUpdateMyPancakeProfile } from '../api/use-pancake-profile';
+import { PancakeProfileSection } from './pancake-profile-section';
+
+/** Hồ sơ Pancake của chính mình (dữ liệu thật — các khối dưới vẫn là bản mẫu). */
+function MyPancakeProfile() {
+  const query = useMyPancakeProfile();
+  const mutation = useUpdateMyPancakeProfile();
+  return <PancakeProfileSection query={query} mutation={mutation} canEdit self />;
+}
 
 interface PasswordRule {
   label: string;
@@ -78,6 +87,9 @@ export function MeScreen() {
         description="Tài khoản: huy.lq@congty.vn · Đổi lần cuối 14/05/2026"
         breadcrumb={[{ label: 'Tài khoản của tôi' }]}
       />
+      <div className="mb-3 max-w-3xl">
+        <MyPancakeProfile />
+      </div>
       <div className="grid items-start gap-3 xl:grid-cols-[480px_320px_1fr]">
         <section className="rounded-md border bg-card">
           <h2 className="border-b px-3 py-2 text-sm font-semibold">Đổi mật khẩu</h2>

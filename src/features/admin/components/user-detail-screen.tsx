@@ -41,7 +41,16 @@ import {
   useWarehouseOptions,
   type UserDetail,
 } from '../api/use-users';
+import { useUpdateUserPancakeProfile, useUserPancakeProfile } from '../api/use-pancake-profile';
+import { PancakeProfileSection } from './pancake-profile-section';
 import { UserPermissionMatrix } from './user-permission-matrix';
+
+/** Hồ sơ Pancake của nhân viên — sửa được khi `user.canManage` (server kiểm lại). */
+function UserPancakeProfile({ userId, canEdit }: { userId: string; canEdit: boolean }) {
+  const query = useUserPancakeProfile(userId);
+  const mutation = useUpdateUserPancakeProfile(userId);
+  return <PancakeProfileSection query={query} mutation={mutation} canEdit={canEdit} />;
+}
 
 const TEAM_ROLE: Record<'LEADER' | 'MEMBER', { label: string; tone: 'brand' | 'neutral' }> = {
   LEADER: { label: 'Leader', tone: 'brand' },
@@ -369,6 +378,10 @@ export function UserDetailScreen({ id }: { id: string }) {
                 </Table>
               )}
             </section>
+          </div>
+
+          <div className="mb-3">
+            <UserPancakeProfile userId={user.id} canEdit={user.canManage} />
           </div>
 
           <section>

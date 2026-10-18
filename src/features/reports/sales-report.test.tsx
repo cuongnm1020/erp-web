@@ -542,6 +542,98 @@ describe('Tab Nhân viên', () => {
   });
 });
 
+describe('Tab Nhân viên × POS Pancake', () => {
+  /** Xem báo cáo + xem đơn (sales_order.read) → có bộ lọc POS. */
+  const ME_POS = { permissions: ['report.sales', 'sales_order.read'], hasGlobalAccess: false };
+  const shopItem = (
+    id: string | null,
+    name: string,
+    shopId: string | null,
+    shopName: string,
+    revenue: string,
+  ) => ({ ...staffItem(id, name, revenue), key: { id, name, shopId, shopName } });
+  const BY_SHOP: SalesByStaff = {
+    ...BY_STAFF,
+    groupBy: 'owner_shop',
+    items: [
+      shopItem('u-1', 'Trần Thị Sale', '715130909', 'Thiên Nông chính', '1500000.0000'),
+      shopItem('u-1', 'Trần Thị Sale', null, 'Đơn tạo trên ERP', '500000.0000'),
+      shopItem('u-2', 'Lê Văn Bán', '715130909', 'Thiên Nông chính', '400000.0000'),
+    ],
+  };
+
+  it('groupBy=owner_shop vào query; một người nhiều dòng (mỗi POS một dòng) + cột POS; Lọc ghi cả người lẫn POS', async () => {
+    search = `tab=staff&staff=owner_shop&from=${RANGE.from}&to=${RANGE.to}`;
+    const groups: string[] = [];
+    server.use(
+      http.get('/api/reports/sales/by-staff', ({ request }) => {
+        groups.push(new URL(request.url).searchParams.get('groupBy')!);
+        return HttpResponse.json(BY_SHOP);
+      }),
+    );
+    renderApp(<SalesReportScreen />, { me: ME_POS });
+    expect(await screen.findByRole('columnheader', { name: 'POS' })).toBeInTheDocument();
+    expect(groups[0]).toBe('owner_shop');
+    const rows = screen
+      .getAllByRole('cell', { name: 'Trần Thị Sale' })
+      .map((c) => c.closest('tr')!);
+    expect(rows).toHaveLength(2);
+    expect(within(rows[0]!).getByText('Thiên Nông chính')).toBeInTheDocument();
+    expect(within(rows[1]!).getByText('Đơn tạo trên ERP')).toBeInTheDocument();
+
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Chỉ xem số của Trần Thị Sale ở Thiên Nông chính' }),
+    );
+    expect(lastUrl().get('ownerId')).toBe('u-1');
+    expect(lastUrl().get('pancakeShopId')).toBe('715130909');
+
+    // Dòng đơn tạo trên ERP: chỉ lọc theo người, không đặt POS.
+    fireEvent.click(within(rows[1]!).getByRole('button', { name: 'Chỉ xem số của Trần Thị Sale' }));
+    expect(lastUrl().get('ownerId')).toBe('u-1');
+    expect(lastUrl().get('pancakeShopId')).toBeNull();
+  });
+
+  it('pancakeShopId trên URL đi vào query; có ô chọn POS; "Xóa lọc" bỏ POS', async () => {
+    search = `from=${RANGE.from}&to=${RANGE.to}&pancakeShopId=715130909`;
+    const calls: URLSearchParams[] = [];
+    server.use(
+      http.get('/api/reports/sales/summary', ({ request }) => {
+        calls.push(new URL(request.url).searchParams);
+        return HttpResponse.json(SUMMARY);
+      }),
+      http.get('/api/reports/sales/timeseries', () => HttpResponse.json(SERIES)),
+    );
+    renderApp(<SalesReportScreen />, { me: ME_POS });
+    await screen.findByText('Doanh thu theo thời gian');
+    expect(calls[0]!.get('pancakeShopId')).toBe('715130909');
+    expect(await screen.findByRole('combobox', { name: 'POS Pancake' })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /Xóa lọc/ }));
+    expect(lastUrl().get('pancakeShopId')).toBeNull();
+  });
+
+  it('không có quyền xem đơn / API POS lỗi → không có ô chọn POS; pancakeShopId sai định dạng bị bỏ', async () => {
+    search = `from=${RANGE.from}&to=${RANGE.to}&pancakeShopId=abc`;
+    const calls: URLSearchParams[] = [];
+    server.use(
+      http.get('/api/reports/sales/summary', ({ request }) => {
+        calls.push(new URL(request.url).searchParams);
+        return HttpResponse.json(SUMMARY);
+      }),
+      http.get('/api/reports/sales/timeseries', () => HttpResponse.json(SERIES)),
+      http.get('/api/pancake-sync/shops', () => errorEnvelope(403, 'FORBIDDEN')),
+    );
+    const { unmount } = renderApp(<SalesReportScreen />, { me: ME_POS });
+    await screen.findByText('Doanh thu theo thời gian');
+    expect(calls[0]!.get('pancakeShopId')).toBeNull();
+    expect(screen.queryByRole('combobox', { name: 'POS Pancake' })).not.toBeInTheDocument();
+    unmount();
+
+    renderApp(<SalesReportScreen />, { me: ME_LEADER });
+    await screen.findByText('Doanh thu theo thời gian');
+    expect(screen.queryByRole('combobox', { name: 'POS Pancake' })).not.toBeInTheDocument();
+  });
+});
+
 describe('Tab Bán chạy', () => {
   it('hạng + thay đổi hạng (▲ / ▼ / Mới), tiêu chí + top N đi vào query', async () => {
     search = `tab=top&rank=qty&limit=50&from=${RANGE.from}&to=${RANGE.to}`;

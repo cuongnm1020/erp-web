@@ -1,17 +1,19 @@
 import type { Metadata } from 'next';
-import { Inter } from 'next/font/google';
+import { Be_Vietnam_Pro } from 'next/font/google';
 import type { ReactNode } from 'react';
 import './globals.css';
 import { Providers } from './providers';
 
 /**
- * Inter theo DESIGN-BRIEF §3, subset tiếng Việt, self-host qua next/font (không gọi Google lúc chạy).
- * next/font đặt --font-inter trên <html>; globals.css đưa nó vào --font-sans với fallback hệ thống
- * để Storybook / test (không đi qua layout này) vẫn ra sans.
+ * Be Vietnam Pro (redesign 2026-10-17, thay Inter của DESIGN-BRIEF §3) — thiết kế cho dấu tiếng Việt,
+ * chỉ hai độ đậm 400 / 600 như thang chữ. Self-host qua next/font (không gọi Google lúc chạy).
+ * next/font đặt --font-be-vietnam trên <html>; globals.css đưa nó vào --font-sans với fallback hệ
+ * thống để Storybook / test (không đi qua layout này) vẫn ra sans.
  */
-const inter = Inter({
+const beVietnam = Be_Vietnam_Pro({
   subsets: ['latin', 'vietnamese'],
-  variable: '--font-inter',
+  weight: ['400', '600'],
+  variable: '--font-be-vietnam',
   display: 'swap',
 });
 
@@ -22,7 +24,7 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
-    <html lang="vi" className={inter.variable} suppressHydrationWarning>
+    <html lang="vi" className={beVietnam.variable} suppressHydrationWarning>
       {/* suppressHydrationWarning: extension trình duyệt (ColorZilla…) chèn attribute vào
           <body> trước khi React hydrate (vd cz-shortcut-listen) → cảnh báo giả. Chỉ tắt
           cảnh báo cho attribute của CHÍNH thẻ body, mismatch bên trong vẫn báo bình thường. */}

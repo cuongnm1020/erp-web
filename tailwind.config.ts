@@ -84,6 +84,17 @@ const config: Config = {
             'cancelled',
           ].map((k) => [k, `hsl(var(--flow-${k}))`]),
         ),
+        // Màu module menu trái (globals.css --mod-*) — chỉ cho điều hướng, không cho trạng thái.
+        mod: Object.fromEntries(
+          ['sales', 'cust', 'prod', 'wh', 'rpt', 'adm'].map((k) => [
+            k,
+            {
+              DEFAULT: `hsl(var(--mod-${k}))`,
+              weak: `hsl(var(--mod-${k}-weak))`,
+              line: `hsl(var(--mod-${k}-line))`,
+            },
+          ]),
+        ),
         // Nhà mạng cạnh SĐT (globals.css --telco-*).
         telco: Object.fromEntries(
           ['viettel', 'vina', 'mobi', 'vnmb', 'gmobile', 'itel'].map((k) => [
@@ -124,10 +135,11 @@ const config: Config = {
         semibold: '600',
         bold: '600',
       },
-      // Khung trang brief §3: sidebar 200px, thu gọn 56px. Thanh trên 48px = h-12 có sẵn.
+      // Khung trang (redesign 2026-10-17): sidebar 240px để "Theo dõi giao hàng", "Cảnh báo nhập
+      // hàng" không bị cắt, thu gọn 60px. Thanh trên 48px = h-12 có sẵn.
       spacing: {
-        sidebar: '200px',
-        'sidebar-collapsed': '56px',
+        sidebar: '240px',
+        'sidebar-collapsed': '60px',
       },
       keyframes: {
         'accordion-down': {

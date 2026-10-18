@@ -83,7 +83,7 @@ describe('Ô chọn kho', () => {
   it('phiên chưa tải → "Đang tải…", khoá (không báo nhầm "Chưa được cấp kho")', () => {
     renderApp(
       <WarehouseProvider me={undefined}>
-        <WarehouseSwitcher collapsed={false} />
+        <WarehouseSwitcher />
       </WarehouseProvider>,
     );
     expect(screen.getByRole('button', { name: 'Kho đang làm việc: Đang tải…' })).toBeDisabled();
@@ -99,7 +99,7 @@ describe('Ô chọn kho', () => {
     );
     renderApp(
       <WarehouseProvider me={me()}>
-        <WarehouseSwitcher collapsed={false} />
+        <WarehouseSwitcher />
       </WarehouseProvider>,
     );
     const trigger = screen.getByRole('button', { name: 'Kho đang làm việc: Kho Thạch Thất' });
@@ -120,7 +120,7 @@ describe('Ô chọn kho', () => {
   it('có "Tất cả kho" khi được phép nhiều kho; chỉ một kho → ô bị khoá', async () => {
     const { unmount } = renderApp(
       <WarehouseProvider me={me()}>
-        <WarehouseSwitcher collapsed={false} />
+        <WarehouseSwitcher />
       </WarehouseProvider>,
     );
     fireEvent.keyDown(screen.getByRole('button', { name: /Kho đang làm việc/ }), {
@@ -137,7 +137,7 @@ describe('Ô chọn kho', () => {
           warehouses: [{ id: 'wh-tt', code: 'KHO-TT-01', name: 'Kho Thạch Thất' }],
         })}
       >
-        <WarehouseSwitcher collapsed={false} />
+        <WarehouseSwitcher />
       </WarehouseProvider>,
     );
     expect(

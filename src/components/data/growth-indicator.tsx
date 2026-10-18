@@ -30,15 +30,19 @@ function pctLabel(abs: Decimal): string {
  * ▲ / ▼ kèm %. Mũi tên + chữ mang nghĩa, màu chỉ là lớp phụ (không dựa vào màu đơn thuần).
  * `inverse`: chỉ số "tăng là xấu" (hàng hoàn, tỷ lệ hoàn) → tăng tô đỏ.
  * pct null → "Mới" nếu có số hiện tại, ngược lại "—".
+ * `muted`: kỳ chưa kết thúc (hôm nay so cả ngày hôm qua) — vẫn có mũi tên nhưng tô xám, không
+ * gây báo động sớm.
  */
 export function GrowthIndicator({
   pct,
   inverse = false,
   hasCurrent = false,
+  muted = false,
   className,
 }: {
   pct: string | null;
   inverse?: boolean;
+  muted?: boolean;
   /** pct null nhưng kỳ này có số (kỳ trước = 0) → hiện "Mới". */
   hasCurrent?: boolean;
   className?: string;
@@ -62,7 +66,7 @@ export function GrowthIndicator({
     <span
       className={cn(
         'inline-flex items-center gap-0.5 text-xs font-semibold tabular-nums',
-        good ? 'text-success' : 'text-destructive',
+        muted ? 'font-normal text-muted-foreground' : good ? 'text-success' : 'text-destructive',
         className,
       )}
       aria-label={`${up ? 'Tăng' : 'Giảm'} ${pctLabel(d.abs())} so kỳ trước`}
