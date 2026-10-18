@@ -73,6 +73,7 @@ const STEP_LABEL: Record<NonNullable<CatalogMigrationStatus['step']>, string> = 
   links: 'Nối sản phẩm POS',
   catalog: 'Gán sản phẩm cho shop',
   push: 'Đẩy hàng ERP lên POS',
+  // Chỉ còn ở lượt chạy trước 2026-10-18 — nay không ẩn sản phẩm gốc nữa.
   hide: 'Ẩn sản phẩm gốc',
   done: 'Xong',
 };
@@ -126,7 +127,8 @@ function toInput(d: Draft): CatalogMigrationRowInput {
  * Shop mới nối vào ERP đang bán bằng sản phẩm tạo trên POS. Mỗi sản phẩm POS được gợi ý một hàng
  * ERP (SKU lẻ / combo có sẵn / combo mới giá theo POS); người dùng duyệt rồi chạy. Hệ thống tạo
  * combo, nối sản phẩm POS sang hàng ERP (đơn cũ vẫn vào đúng hàng), cho shop chỉ bán hàng ERP đã
- * gán, đẩy hàng ERP lên POS rồi ẩn sản phẩm gốc.
+ * gán và đẩy hàng ERP lên POS (gắn thẻ "ERP"). Sản phẩm gốc giữ nguyên — người dùng lọc thẻ ERP
+ * trên POS, đối chiếu rồi tự ẩn (2026-10-18).
  */
 export function PancakeCatalogMigrationDialog({
   shop,
@@ -156,7 +158,8 @@ export function PancakeCatalogMigrationDialog({
           </DialogTitle>
           <DialogDescription>
             Duyệt hàng ERP tương ứng với từng sản phẩm đang có trên POS. Sau khi chuyển, shop chỉ
-            bán hàng ERP đã gán; sản phẩm gốc đã nối sẽ bị ẩn trên POS, đơn cũ vẫn vào đúng hàng.
+            bán hàng ERP đã gán, hàng ERP lên POS mang thẻ “ERP”. Sản phẩm gốc vẫn hiện — lọc thẻ
+            ERP trên Pancake để đối chiếu rồi tự ẩn sản phẩm gốc. Đơn cũ vẫn vào đúng hàng.
           </DialogDescription>
         </DialogHeader>
         {showResult && status.data ? (
@@ -278,16 +281,25 @@ function MigrationReview({
                 </TableCell>
                 <TableCell>
                   {d.action === 'MAP' ? (
-                    <EntityPicker
-                      value={d.skuId}
-                      selectedLabel={d.skuLabel}
-                      useSearch={useMigrationTargetSearch}
-                      placeholder="Chọn SKU / combo ERP…"
-                      aria-label={`Hàng ERP cho ${d.row.posName}`}
-                      onChange={(id, o) =>
-                        patch(i, { skuId: id, skuLabel: o ? `${o.hint} · ${o.label}` : '' })
-                      }
-                    />
+                    <>
+                      <EntityPicker
+                        value={d.skuId}
+                        selectedLabel={d.skuLabel}
+                        useSearch={useMigrationTargetSearch}
+                        placeholder="Chọn SKU / combo ERP…"
+                        aria-label={`Hàng ERP cho ${d.row.posName}`}
+                        onChange={(id, o) =>
+                          patch(i, { skuId: id, skuLabel: o ? `${o.hint} · ${o.label}` : '' })
+                        }
+                      />
+                      {d.row.suggestion.targetPriced === false &&
+                      d.skuId === d.row.suggestion.sku?.skuId ? (
+                        <div className="mt-1 text-xs text-destructive">
+                          Hàng ERP này chưa có giá bán lẻ — lên POS sẽ giá 0. Đặt giá cho SKU trước
+                          hoặc chọn hàng khác.
+                        </div>
+                      ) : null}
+                    </>
                   ) : d.action === 'NEW_COMBO' ? (
                     <div className="flex flex-wrap items-center gap-2">
                       <Input
@@ -368,7 +380,7 @@ function MigrationReview({
         open={confirming}
         onOpenChange={setConfirming}
         title={`Chuyển ${moving} sản phẩm sang hàng ERP?`}
-        description="Shop sẽ chỉ bán hàng ERP đã gán. Hàng ERP được đẩy lên POS, sản phẩm gốc đã nối bị ẩn (bật lại được trên Pancake). Combo mới lấy giá đã nhập."
+        description='Shop sẽ chỉ bán hàng ERP đã gán. Hàng ERP được đẩy lên POS kèm thẻ "ERP"; sản phẩm gốc vẫn hiện — đối chiếu trên Pancake rồi tự ẩn. Combo mới lấy giá đã nhập.'
         confirmLabel="Chuyển danh mục"
         onConfirm={() => onStart(drafts.map(toInput))}
       />
@@ -416,12 +428,12 @@ function MigrationProgress({
         <li>Combo dùng lại: {c.combosReused}</li>
         <li>Đẩy lên POS: {c.pushed}</li>
         <li>Đẩy lỗi: {c.pushFailed}</li>
-        <li>Đã ẩn trên POS: {c.hidden}</li>
+        {c.hidden ? <li>Đã ẩn trên POS: {c.hidden}</li> : null}
         <li>Giữ nguyên: {c.skipped}</li>
       </ul>
       {status.failures.length ? (
         <div className="max-h-48 overflow-auto rounded-md border p-2 text-sm">
-          <div className="mb-1 font-medium">Chưa xong — sản phẩm gốc tương ứng chưa bị ẩn:</div>
+          <div className="mb-1 font-medium">Chưa xong — hàng ERP tương ứng chưa lên POS:</div>
           <ul className="space-y-1">
             {status.failures.map((f, i) => (
               <li key={i}>

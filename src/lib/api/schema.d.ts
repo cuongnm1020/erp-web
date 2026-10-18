@@ -1044,39 +1044,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/users/{id}/pancake-profile": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get: operations["UserPancakeProfileController_get"];
-        /** Không gắn @RequirePermission — như PATCH /users/:id, quyền sửa kiểm trong service. */
-        put: operations["UserPancakeProfileController_update"];
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/me/pancake-profile": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get: operations["MyPancakeProfileController_get"];
-        put: operations["MyPancakeProfileController_update"];
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/pancake-sync/webhook/{shopId}": {
         parameters: {
             query?: never;
@@ -4913,6 +4880,39 @@ export interface paths {
         patch: operations["CustomerSegmentController_setSegment"];
         trace?: never;
     };
+    "/users/{id}/pancake-profile": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["UserPancakeProfileController_get"];
+        /** Không gắn @RequirePermission — như PATCH /users/:id, quyền sửa kiểm trong service. */
+        put: operations["UserPancakeProfileController_update"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/me/pancake-profile": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["MyPancakeProfileController_get"];
+        put: operations["MyPancakeProfileController_update"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/health": {
         parameters: {
             query?: never;
@@ -6193,55 +6193,6 @@ export interface components {
             /** @description Đang kết nối (bật). false = đã tắt / gỡ kết nối nhưng vẫn còn đơn cũ. */
             isActive: boolean;
         };
-        PancakeProfileShopDto: {
-            shopId: string;
-            shopName: string | null;
-            /** @description POS còn kết nối. */
-            isActive: boolean;
-            /** @description User đang làm việc trên POS này. */
-            selected: boolean;
-        };
-        PancakeProfileDto: {
-            userId: string;
-            fbId: string | null;
-            pancakeName: string | null;
-            /** @description Mọi POS đã kết nối + POS user đang gắn (kể cả đã gỡ kết nối). */
-            shops: components["schemas"]["PancakeProfileShopDto"][];
-            /**
-             * @description fb_id khác cũng đang trỏ vào user (gán tay nhiều người Pancake vào một tài khoản trước khi có
-             *     hồ sơ) — đơn của chúng vẫn về user này; xoá ở màn /admin/pancake.
-             */
-            otherFbIds: string[];
-        };
-        UpdatePancakeProfileDto: {
-            /**
-             * @description Facebook user id của nhân viên trên Pancake (số, vd 154057992263134). null / rỗng = bỏ hồ sơ
-             *     Pancake — khi đó `shopIds` phải rỗng. Đang thuộc tài khoản sync tự tạo (`pc.*`) → chuyển đơn +
-             *     POS sang và khoá tài khoản đó; thuộc tài khoản thật khác → 409.
-             */
-            fbId: string | null;
-            /** @description Tên hiển thị trên Pancake (vd "Thanh Vân Sale - NLPN"). */
-            pancakeName?: string | null;
-            /** @description POS (shop_id Pancake, chuỗi số) user làm việc. Rỗng = không làm việc trên POS nào. */
-            shopIds: string[];
-        };
-        UpdatePancakeProfileResultDto: {
-            userId: string;
-            fbId: string | null;
-            pancakeName: string | null;
-            /** @description Mọi POS đã kết nối + POS user đang gắn (kể cả đã gỡ kết nối). */
-            shops: components["schemas"]["PancakeProfileShopDto"][];
-            /**
-             * @description fb_id khác cũng đang trỏ vào user (gán tay nhiều người Pancake vào một tài khoản trước khi có
-             *     hồ sơ) — đơn của chúng vẫn về user này; xoá ở màn /admin/pancake.
-             */
-            otherFbIds: string[];
-            transferredFrom: {
-                id: string;
-                code: string;
-                fullName: string;
-            }[];
-        };
         PancakeWebhookReceiptDto: {
             receiptId: string;
             /** @description orders | customers | products | variations_warehouses | unknown */
@@ -6380,6 +6331,8 @@ export interface components {
             qty: number | null;
             /** @description NEW_COMBO: thành phần đã có giá bán lẻ (bắt buộc để tạo combo). */
             componentPriced: boolean | null;
+            /** @description MAP: SKU đích đã có giá bán lẻ (combo luôn true) — false thì lên POS giá 0, nên tạo giá trước. */
+            targetPriced: boolean | null;
         };
         CatalogMigrationRowDto: {
             externalProductId: string;
@@ -6394,7 +6347,7 @@ export interface components {
              *     ERP = sản phẩm do ERP đẩy lên — không thuộc diện chuyển.
              * @enum {string}
              */
-            state: "PENDING" | "MIGRATED" | "ERP";
+            state: "PENDING" | "ERP" | "MIGRATED";
             current: components["schemas"]["CatalogMigrationSkuRefDto"] | null;
             suggestion: components["schemas"]["CatalogMigrationSuggestionDto"];
         };
@@ -6438,7 +6391,7 @@ export interface components {
             /** @description Sản phẩm ERP đã đẩy lên shop thành công. */
             pushed: number;
             pushFailed: number;
-            /** @description Sản phẩm gốc của POS đã ẩn. */
+            /** @description Sản phẩm gốc của POS đã ẩn — luôn 0 từ 2026-10-18 (không ẩn nữa), giữ cho kết quả lượt cũ. */
             hidden: number;
             skipped: number;
         };
@@ -6451,7 +6404,7 @@ export interface components {
             /** @enum {string} */
             state: "completed" | "failed" | "active" | "waiting" | "idle";
             /**
-             * @description Bước đang chạy: combos → links → catalog → push → hide → done.
+             * @description Bước đang chạy: combos → links → catalog → push → done (`hide` chỉ còn ở lượt trước 2026-10-18).
              * @enum {string|null}
              */
             step: "push" | "links" | "done" | "combos" | "catalog" | "hide" | null;
@@ -11429,6 +11382,55 @@ export interface components {
              */
             tierId?: string | null;
         };
+        PancakeProfileShopDto: {
+            shopId: string;
+            shopName: string | null;
+            /** @description POS còn kết nối. */
+            isActive: boolean;
+            /** @description User đang làm việc trên POS này. */
+            selected: boolean;
+        };
+        PancakeProfileDto: {
+            userId: string;
+            fbId: string | null;
+            pancakeName: string | null;
+            /** @description Mọi POS đã kết nối + POS user đang gắn (kể cả đã gỡ kết nối). */
+            shops: components["schemas"]["PancakeProfileShopDto"][];
+            /**
+             * @description fb_id khác cũng đang trỏ vào user (gán tay nhiều người Pancake vào một tài khoản trước khi có
+             *     hồ sơ) — đơn của chúng vẫn về user này; xoá ở màn /admin/pancake.
+             */
+            otherFbIds: string[];
+        };
+        UpdatePancakeProfileDto: {
+            /**
+             * @description Facebook user id của nhân viên trên Pancake (số, vd 154057992263134). null / rỗng = bỏ hồ sơ
+             *     Pancake — khi đó `shopIds` phải rỗng. Đang thuộc tài khoản sync tự tạo (`pc.*`) → chuyển đơn +
+             *     POS sang và khoá tài khoản đó; thuộc tài khoản thật khác → 409.
+             */
+            fbId: string | null;
+            /** @description Tên hiển thị trên Pancake (vd "Thanh Vân Sale - NLPN"). */
+            pancakeName?: string | null;
+            /** @description POS (shop_id Pancake, chuỗi số) user làm việc. Rỗng = không làm việc trên POS nào. */
+            shopIds: string[];
+        };
+        UpdatePancakeProfileResultDto: {
+            userId: string;
+            fbId: string | null;
+            pancakeName: string | null;
+            /** @description Mọi POS đã kết nối + POS user đang gắn (kể cả đã gỡ kết nối). */
+            shops: components["schemas"]["PancakeProfileShopDto"][];
+            /**
+             * @description fb_id khác cũng đang trỏ vào user (gán tay nhiều người Pancake vào một tài khoản trước khi có
+             *     hồ sơ) — đơn của chúng vẫn về user này; xoá ở màn /admin/pancake.
+             */
+            otherFbIds: string[];
+            transferredFrom: {
+                id: string;
+                code: string;
+                fullName: string;
+            }[];
+        };
         HealthReportDto: {
             /** @enum {string} */
             status: "ok" | "degraded";
@@ -13226,94 +13228,6 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["PancakeShopOptionDto"][];
-                };
-            };
-        };
-    };
-    UserPancakeProfileController_get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["PancakeProfileDto"];
-                };
-            };
-        };
-    };
-    UserPancakeProfileController_update: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["UpdatePancakeProfileDto"];
-            };
-        };
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["UpdatePancakeProfileResultDto"];
-                };
-            };
-        };
-    };
-    MyPancakeProfileController_get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["PancakeProfileDto"];
-                };
-            };
-        };
-    };
-    MyPancakeProfileController_update: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["UpdatePancakeProfileDto"];
-            };
-        };
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["UpdatePancakeProfileResultDto"];
                 };
             };
         };
@@ -19944,6 +19858,94 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["CustomerDto"];
+                };
+            };
+        };
+    };
+    UserPancakeProfileController_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PancakeProfileDto"];
+                };
+            };
+        };
+    };
+    UserPancakeProfileController_update: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdatePancakeProfileDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UpdatePancakeProfileResultDto"];
+                };
+            };
+        };
+    };
+    MyPancakeProfileController_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PancakeProfileDto"];
+                };
+            };
+        };
+    };
+    MyPancakeProfileController_update: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdatePancakeProfileDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UpdatePancakeProfileResultDto"];
                 };
             };
         };

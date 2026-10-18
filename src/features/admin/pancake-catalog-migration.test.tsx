@@ -44,6 +44,7 @@ const row = (over: Record<string, unknown>) => ({
     component: null,
     qty: null,
     componentPriced: null,
+    targetPriced: null,
   },
   ...over,
 });
@@ -63,6 +64,7 @@ const PREVIEW = {
         component: null,
         qty: null,
         componentPriced: null,
+        targetPriced: true,
       },
     }),
     row({
@@ -78,6 +80,7 @@ const PREVIEW = {
         component: ARISYN,
         qty: 10,
         componentPriced: true,
+        targetPriced: null,
       },
     }),
     row({
@@ -198,6 +201,21 @@ describe('PancakeCatalogMigrationDialog', () => {
     expect(screen.getByRole('button', { name: 'Chuyển danh mục' })).toBeDisabled();
   });
 
+  it('hàng ERP gợi ý chưa có giá bán lẻ → cảnh báo lên POS giá 0', async () => {
+    const unpriced = {
+      ...PREVIEW.rows[0],
+      suggestion: { ...PREVIEW.rows[0]!.suggestion, targetPriced: false },
+    };
+    server.use(
+      http.get(`${base}/preview`, () => HttpResponse.json({ ...PREVIEW, rows: [unpriced] })),
+      http.get(base, () => HttpResponse.json(status())),
+    );
+    renderApp(
+      <PancakeCatalogMigrationDialog shop={PANCAKE_SHOP_FIXTURE} open onOpenChange={() => {}} />,
+    );
+    expect(await screen.findByText(/chưa có giá bán lẻ — lên POS sẽ giá 0/)).toBeInTheDocument();
+  });
+
   it('đang có lượt chạy → mở thẳng tiến độ, không cần xem trước', async () => {
     server.use(
       http.get(base, () =>
@@ -211,7 +229,7 @@ describe('PancakeCatalogMigrationDialog', () => {
     expect(screen.getByRole('button', { name: 'Chạy nền, đóng' })).toBeInTheDocument();
   });
 
-  it('xong có lỗi → liệt kê dòng chưa xong (sản phẩm gốc chưa bị ẩn)', async () => {
+  it('xong có lỗi → liệt kê dòng chưa xong (hàng ERP chưa lên POS)', async () => {
     server.use(
       http.get(`${base}/preview`, () => HttpResponse.json({ ...PREVIEW, rows: [PREVIEW.rows[0]] })),
       http.get(base, () => HttpResponse.json(status())),
