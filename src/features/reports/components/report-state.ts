@@ -24,6 +24,8 @@ export const REPORT_FILTER_KEYS = [
   'teamName',
   'ownerId',
   'ownerName',
+  // POS Pancake của đơn
+  'pancakeShopId',
   // Tổng quan
   'gran',
   'metric',
@@ -76,8 +78,11 @@ export function useSalesReportState() {
         channelRaw && CHANNEL_VALUES.has(channelRaw) ? (channelRaw as SalesChannel) : undefined,
       teamId: state.filters.teamId,
       ownerId: state.filters.ownerId,
+      pancakeShopId: /^[1-9]\d{0,17}$/.test(state.filters.pancakeShopId ?? '')
+        ? state.filters.pancakeShopId
+        : undefined,
     }),
-    [range, channelRaw, state.filters.teamId, state.filters.ownerId],
+    [range, channelRaw, state.filters.teamId, state.filters.ownerId, state.filters.pancakeShopId],
   );
 
   /** Ghi đè một phần filter (giữ phần còn lại), page về 1. */

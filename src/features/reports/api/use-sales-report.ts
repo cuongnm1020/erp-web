@@ -15,6 +15,7 @@ export type SalesTopProducts = components['schemas']['SalesTopProductsDto'];
 export type SalesTopProductItem = components['schemas']['SalesTopProductItemDto'];
 export type SalesBySupplier = components['schemas']['SalesBySupplierDto'];
 export type SalesBySupplierItem = components['schemas']['SalesBySupplierItemDto'];
+export type ReportPancakeShop = components['schemas']['PancakeShopOptionDto'];
 
 type SummaryQuery = paths['/reports/sales/summary']['get']['parameters']['query'];
 type ByProductQuery = paths['/reports/sales/by-product']['get']['parameters']['query'];
@@ -37,6 +38,8 @@ export interface SalesFilter {
   channel?: SalesChannel;
   teamId?: string;
   ownerId?: string;
+  /** POS Pancake của đơn (shop_id, chuỗi số). */
+  pancakeShopId?: string;
 }
 
 export interface ByProductParams {
@@ -73,6 +76,7 @@ export const salesReportKeys = {
     [...salesReportKeys.all, 'top-products', f, rankBy, limit, supplierId ?? null] as const,
   teams: () => [...salesReportKeys.all, 'options', 'teams'] as const,
   owners: () => [...salesReportKeys.all, 'options', 'owners'] as const,
+  shops: () => [...salesReportKeys.all, 'options', 'pancake-shops'] as const,
 };
 
 const filterQuery = (f: SalesFilter) => ({
@@ -81,6 +85,7 @@ const filterQuery = (f: SalesFilter) => ({
   channel: f.channel,
   teamId: f.teamId,
   ownerId: f.ownerId,
+  pancakeShopId: f.pancakeShopId,
 });
 
 /** GET /reports/sales/summary — KPI kỳ đang xem + kỳ trước cùng độ dài. */
@@ -202,7 +207,10 @@ export function useExportSalesBySupplier() {
   });
 }
 
-/** GET /reports/sales/by-staff — theo người phụ trách hoặc team (snapshot trên đơn), không phân trang. */
+/**
+ * GET /reports/sales/by-staff — theo người phụ trách, team hoặc người × POS Pancake (`owner_shop`:
+ * một sale nhiều dòng, mỗi POS một dòng), không phân trang.
+ */
 export function useSalesByStaff(f: SalesFilter, groupBy: StaffGroupBy, enabled = true) {
   return useQuery({
     enabled,
@@ -253,6 +261,20 @@ export function useReportTeams(enabled: boolean) {
     queryKey: salesReportKeys.teams(),
     queryFn: () => unwrap(api.GET('/teams')),
     staleTime: 300_000,
+  });
+}
+
+/**
+ * GET /pancake-sync/shops (sales_order.read) — POS Pancake cho bộ lọc POS. Không có quyền / lỗi thì
+ * màn ẩn bộ lọc. Danh mục nhỏ → staleTime 5 phút.
+ */
+export function useReportPancakeShops(enabled: boolean) {
+  return useQuery({
+    enabled,
+    queryKey: salesReportKeys.shops(),
+    queryFn: () => unwrap(api.GET('/pancake-sync/shops')),
+    staleTime: 300_000,
+    retry: false,
   });
 }
 

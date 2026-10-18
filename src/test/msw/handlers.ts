@@ -1062,6 +1062,18 @@ export const USER_DETAIL_FIXTURE = {
   updatedAt: new Date(Date.UTC(2026, 7, 23)).toISOString(),
 };
 
+/** Đúng shape `PancakeProfileDto` — chưa khai fb_id, hai POS đang kết nối, chưa chọn POS nào. */
+export const PANCAKE_PROFILE_FIXTURE = {
+  userId: USER_DETAIL_FIXTURE.id,
+  fbId: null as string | null,
+  pancakeName: null as string | null,
+  shops: [
+    { shopId: '407957969', shopName: 'POS Hưng Thịnh', isActive: true, selected: false },
+    { shopId: '715130909', shopName: 'POS Real Agri', isActive: true, selected: false },
+  ],
+  otherFbIds: [] as string[],
+};
+
 /** Đúng shape `UserPermissionsDto` — nv.002 mang SALES_MEMBER, chưa override. */
 export const USER_PERMISSIONS_FIXTURE = {
   userId: USER_DETAIL_FIXTURE.id,
@@ -1721,6 +1733,8 @@ export const handlers = [
     const body = (await request.json()) as Record<string, unknown>;
     return HttpResponse.json({ ...USER_DETAIL_FIXTURE, ...body });
   }),
+  http.get('/api/users/:id/pancake-profile', () => HttpResponse.json(PANCAKE_PROFILE_FIXTURE)),
+  http.get('/api/me/pancake-profile', () => HttpResponse.json(PANCAKE_PROFILE_FIXTURE)),
   http.get('/api/users/:id/permissions', () => HttpResponse.json(USER_PERMISSIONS_FIXTURE)),
   http.put('/api/users/:id/permissions', async ({ request }) => {
     const body = (await request.json()) as { allow: string[]; deny: string[] };

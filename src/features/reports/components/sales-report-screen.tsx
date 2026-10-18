@@ -16,7 +16,12 @@ import { toast } from '@/components/ui/toaster';
 import { cn } from '@/lib/cn';
 import { messageFor } from '@/lib/error-messages';
 import { Can, useAbility } from '@/lib/permission';
-import { useReportOwners, useReportTeams, useSalesRollupRebuild } from '../api/use-sales-report';
+import {
+  useReportOwners,
+  useReportPancakeShops,
+  useReportTeams,
+  useSalesRollupRebuild,
+} from '../api/use-sales-report';
 import { rangeLabel } from './report-parts';
 import {
   CHANNELS,
@@ -48,7 +53,7 @@ const ALL = '__all__';
 
 /**
  * Báo cáo doanh thu bán hàng (RPT-07) — /reports/sales. Bộ lọc chung (khoảng ngày + kênh + team +
- * người phụ trách) và tab nằm trên URL (luật 8), áp cho mọi tab. Doanh thu theo D-CR1 (đơn đã chốt,
+ * người phụ trách + POS Pancake) và tab nằm trên URL (luật 8), áp cho mọi tab. Doanh thu theo D-CR1 (đơn đã chốt,
  * ngày đặt hàng giờ VN, net KM − hàng hoàn); phạm vi xem do API scope theo D-CR2.
  */
 export function SalesReportScreen() {
@@ -66,6 +71,8 @@ export function SalesReportScreen() {
   const ownerPicker = canView && canAll && ability.can('read', 'User');
   const teams = useReportTeams(teamPicker);
   const owners = useReportOwners(ownerPicker);
+  // POS Pancake: ai xem được đơn là chọn được; lỗi (vd 403) thì ẩn bộ lọc.
+  const shops = useReportPancakeShops(canView && ability.can('read', 'SalesOrder'));
   const rebuild = useSalesRollupRebuild();
 
   if (!canView) return <ForbiddenState className="m-4" />;
@@ -76,7 +83,9 @@ export function SalesReportScreen() {
   const ownerId = state.filters.ownerId;
   const showTeamChip = !!teamId && !teamOptions.some((t) => t.id === teamId);
   const showOwnerChip = !!ownerId && !ownerOptions.some((u) => u.id === ownerId);
-  const hasFilter = !!(state.filters.channel || teamId || ownerId);
+  const shopOptions = shops.data ?? [];
+  const shopId = state.filters.pancakeShopId;
+  const hasFilter = !!(state.filters.channel || teamId || ownerId || shopId);
 
   const clearKeys = (...keys: ReportFilterKey[]) =>
     setFilters(Object.fromEntries(keys.map((k) => [k, undefined])));
@@ -136,6 +145,17 @@ export function SalesReportScreen() {
             onChange={(v) => setFilters({ ownerId: v, ownerName: undefined })}
           />
         ) : null}
+        {shopOptions.length > 0 ? (
+          <FilterSelect
+            label="POS Pancake"
+            value={shopId}
+            options={shopOptions.map((s) => ({
+              value: s.shopId,
+              label: s.shopName ?? `POS ${s.shopId}`,
+            }))}
+            onChange={(v) => setFilters({ pancakeShopId: v })}
+          />
+        ) : null}
         {showTeamChip ? (
           <FilterChip
             label={`Team: ${state.filters.teamName ?? 'đã chọn'}`}
@@ -152,7 +172,9 @@ export function SalesReportScreen() {
           <Button
             variant="ghost"
             size="sm"
-            onClick={() => clearKeys('channel', 'teamId', 'teamName', 'ownerId', 'ownerName')}
+            onClick={() =>
+              clearKeys('channel', 'teamId', 'teamName', 'ownerId', 'ownerName', 'pancakeShopId')
+            }
           >
             <X aria-hidden /> Xóa lọc
           </Button>

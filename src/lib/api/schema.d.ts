@@ -1044,6 +1044,39 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/users/{id}/pancake-profile": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["UserPancakeProfileController_get"];
+        /** Không gắn @RequirePermission — như PATCH /users/:id, quyền sửa kiểm trong service. */
+        put: operations["UserPancakeProfileController_update"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/me/pancake-profile": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["MyPancakeProfileController_get"];
+        put: operations["MyPancakeProfileController_update"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/pancake-sync/webhook/{shopId}": {
         parameters: {
             query?: never;
@@ -6160,6 +6193,55 @@ export interface components {
             /** @description Đang kết nối (bật). false = đã tắt / gỡ kết nối nhưng vẫn còn đơn cũ. */
             isActive: boolean;
         };
+        PancakeProfileShopDto: {
+            shopId: string;
+            shopName: string | null;
+            /** @description POS còn kết nối. */
+            isActive: boolean;
+            /** @description User đang làm việc trên POS này. */
+            selected: boolean;
+        };
+        PancakeProfileDto: {
+            userId: string;
+            fbId: string | null;
+            pancakeName: string | null;
+            /** @description Mọi POS đã kết nối + POS user đang gắn (kể cả đã gỡ kết nối). */
+            shops: components["schemas"]["PancakeProfileShopDto"][];
+            /**
+             * @description fb_id khác cũng đang trỏ vào user (gán tay nhiều người Pancake vào một tài khoản trước khi có
+             *     hồ sơ) — đơn của chúng vẫn về user này; xoá ở màn /admin/pancake.
+             */
+            otherFbIds: string[];
+        };
+        UpdatePancakeProfileDto: {
+            /**
+             * @description Facebook user id của nhân viên trên Pancake (số, vd 154057992263134). null / rỗng = bỏ hồ sơ
+             *     Pancake — khi đó `shopIds` phải rỗng. Đang thuộc tài khoản sync tự tạo (`pc.*`) → chuyển đơn +
+             *     POS sang và khoá tài khoản đó; thuộc tài khoản thật khác → 409.
+             */
+            fbId: string | null;
+            /** @description Tên hiển thị trên Pancake (vd "Thanh Vân Sale - NLPN"). */
+            pancakeName?: string | null;
+            /** @description POS (shop_id Pancake, chuỗi số) user làm việc. Rỗng = không làm việc trên POS nào. */
+            shopIds: string[];
+        };
+        UpdatePancakeProfileResultDto: {
+            userId: string;
+            fbId: string | null;
+            pancakeName: string | null;
+            /** @description Mọi POS đã kết nối + POS user đang gắn (kể cả đã gỡ kết nối). */
+            shops: components["schemas"]["PancakeProfileShopDto"][];
+            /**
+             * @description fb_id khác cũng đang trỏ vào user (gán tay nhiều người Pancake vào một tài khoản trước khi có
+             *     hồ sơ) — đơn của chúng vẫn về user này; xoá ở màn /admin/pancake.
+             */
+            otherFbIds: string[];
+            transferredFrom: {
+                id: string;
+                code: string;
+                fullName: string;
+            }[];
+        };
         PancakeWebhookReceiptDto: {
             receiptId: string;
             /** @description orders | customers | products | variations_warehouses | unknown */
@@ -10769,6 +10851,8 @@ export interface components {
         SalesStaffKeyDto: {
             id: string | null;
             name: string;
+            shopId?: string | null;
+            shopName?: string | null;
         };
         SalesByStaffItemDto: {
             key: components["schemas"]["SalesStaffKeyDto"];
@@ -10803,7 +10887,7 @@ export interface components {
             previousFrom: string;
             previousTo: string;
             /** @enum {string} */
-            groupBy: "team" | "owner";
+            groupBy: "team" | "owner" | "owner_shop";
             /**
              * @description Sắp doanh thu giảm dần ("Chưa gán" đứng sau khi bằng nhau). Gồm cả người / team chỉ có doanh
              *     số kỳ trước (số kỳ này 0). Nhân viên chỉ thấy dòng của mình; trưởng nhóm thấy team mình.
@@ -13142,6 +13226,94 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["PancakeShopOptionDto"][];
+                };
+            };
+        };
+    };
+    UserPancakeProfileController_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PancakeProfileDto"];
+                };
+            };
+        };
+    };
+    UserPancakeProfileController_update: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdatePancakeProfileDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UpdatePancakeProfileResultDto"];
+                };
+            };
+        };
+    };
+    MyPancakeProfileController_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PancakeProfileDto"];
+                };
+            };
+        };
+    };
+    MyPancakeProfileController_update: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdatePancakeProfileDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UpdatePancakeProfileResultDto"];
                 };
             };
         };
@@ -18548,6 +18720,8 @@ export interface operations {
                 /** @description Kho lấy hàng chọn trên đơn (`SalesOrder.warehouseId`). */
                 warehouseId?: string;
                 customerId?: string;
+                /** @description POS Pancake của đơn (shop_id, chuỗi số) — như `pancakeShopId` của GET /sales-orders. */
+                pancakeShopId?: string;
             };
             header?: never;
             path?: never;
@@ -18581,6 +18755,8 @@ export interface operations {
                 /** @description Kho lấy hàng chọn trên đơn (`SalesOrder.warehouseId`). */
                 warehouseId?: string;
                 customerId?: string;
+                /** @description POS Pancake của đơn (shop_id, chuỗi số) — như `pancakeShopId` của GET /sales-orders. */
+                pancakeShopId?: string;
                 /** @description `day` | `week` (tuần bắt đầu thứ Hai, giờ VN) | `month`. */
                 granularity: "day" | "week" | "month";
             };
@@ -18616,6 +18792,8 @@ export interface operations {
                 /** @description Kho lấy hàng chọn trên đơn (`SalesOrder.warehouseId`). */
                 warehouseId?: string;
                 customerId?: string;
+                /** @description POS Pancake của đơn (shop_id, chuỗi số) — như `pancakeShopId` của GET /sales-orders. */
+                pancakeShopId?: string;
                 groupBy: "sku" | "product" | "category" | "brand";
                 /** @description Tìm theo mã / tên của NHÓM đang xem (SKU, sản phẩm, danh mục hoặc thương hiệu). */
                 q?: string;
@@ -18664,7 +18842,9 @@ export interface operations {
                 /** @description Kho lấy hàng chọn trên đơn (`SalesOrder.warehouseId`). */
                 warehouseId?: string;
                 customerId?: string;
-                groupBy: "owner" | "team";
+                /** @description POS Pancake của đơn (shop_id, chuỗi số) — như `pancakeShopId` của GET /sales-orders. */
+                pancakeShopId?: string;
+                groupBy: "owner" | "team" | "owner_shop";
             };
             header?: never;
             path?: never;
@@ -18698,6 +18878,8 @@ export interface operations {
                 /** @description Kho lấy hàng chọn trên đơn (`SalesOrder.warehouseId`). */
                 warehouseId?: string;
                 customerId?: string;
+                /** @description POS Pancake của đơn (shop_id, chuỗi số) — như `pancakeShopId` của GET /sales-orders. */
+                pancakeShopId?: string;
                 rankBy: "qty" | "revenue" | "grossProfit" | "orders" | "customers";
                 /** @description Mặc định 20, tối đa 100. */
                 limit?: number;
@@ -18738,6 +18920,8 @@ export interface operations {
                 /** @description Kho lấy hàng chọn trên đơn (`SalesOrder.warehouseId`). */
                 warehouseId?: string;
                 customerId?: string;
+                /** @description POS Pancake của đơn (shop_id, chuỗi số) — như `pancakeShopId` của GET /sales-orders. */
+                pancakeShopId?: string;
                 /** @description Tìm theo mã / tên nhà cung cấp (dòng "Chưa gán NCC" không khớp khi có q). */
                 q?: string;
                 /** @description Sắp xếp theo — mặc định `revenue`. */
