@@ -11,6 +11,7 @@ import {
 } from '@/components/data/data-table';
 import { EmptyState, ForbiddenState, ListSkeleton, QueryState } from '@/components/data/states';
 import { StatusBadge } from '@/components/data/status-badge';
+import { UserAvatar } from '@/components/data/user-avatar';
 import { PageHeader } from '@/components/layout/page-header';
 import { Button } from '@/components/ui/button';
 import {
@@ -53,7 +54,7 @@ import {
   type TeamMemberLoad,
 } from '../api/use-assignments';
 import { customerKeys, toCustomerSort, useCustomers, type Customer } from '../api/use-customers';
-import { customerTypeLabel, customerTypeTone, initialsOf } from '../labels';
+import { customerTypeLabel, customerTypeTone } from '../labels';
 
 /**
  * B-04 Phân công khách hàng — nối API P2-04 (`/customer-assignments`).
@@ -481,17 +482,7 @@ function AssignmentWorkspace({
           <ul>
             {members.map((m) => (
               <li key={m.userId} className="flex items-center gap-2.5 border-b px-3 py-2.5">
-                <span
-                  className={cn(
-                    'flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-semibold',
-                    m.holding === 0
-                      ? 'bg-muted text-muted-foreground'
-                      : 'bg-secondary text-primary',
-                  )}
-                  aria-hidden
-                >
-                  {initialsOf(m.fullName)}
-                </span>
+                <UserAvatar size="sm" tone={m.holding === 0 ? 'muted' : 'default'} />
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-1.5 text-sm font-semibold">
                     <span className="truncate">{m.fullName}</span>
