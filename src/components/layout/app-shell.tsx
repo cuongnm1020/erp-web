@@ -20,6 +20,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { UserAvatar } from '@/components/data/user-avatar';
 import { CommandPalette } from './command-palette';
 import { Sidebar } from './sidebar';
 import { WarehouseSwitcher } from './warehouse-switcher';
@@ -40,12 +41,6 @@ const SHELL_SHORTCUTS: ReadonlyArray<[keys: string[], label: string]> = [
 
 const openPalette = () =>
   document.dispatchEvent(new KeyboardEvent('keydown', { key: 'k', ctrlKey: true, bubbles: true }));
-
-function initials(text: string): string {
-  const words = text.trim().split(/\s+/).filter(Boolean);
-  if (words.length >= 2) return `${words[0]!.charAt(0)}${words[words.length - 1]!.charAt(0)}`;
-  return text.slice(0, 2).toUpperCase();
-}
 
 /**
  * Khung trang nội bộ (redesign 2026-10-17). Nhận user/onLogout qua prop (luật 12: components không
@@ -138,12 +133,7 @@ export function AppShell({
                     aria-label="Tài khoản"
                     className="ml-1 flex items-center gap-2 rounded-md py-1 pl-1 pr-1.5 hover:bg-muted"
                   >
-                    <span
-                      aria-hidden
-                      className="flex h-7 w-7 items-center justify-center rounded-full bg-accent text-xs font-semibold text-accent-foreground"
-                    >
-                      {display ? initials(display) : '…'}
-                    </span>
+                    <UserAvatar size="sm" tone="accent" />
                     <span className="hidden min-w-0 text-left lg:block">
                       <span className="block max-w-40 truncate text-sm font-semibold leading-4">
                         {display ?? '…'}

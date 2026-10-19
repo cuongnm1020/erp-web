@@ -6,6 +6,7 @@ import type { ReactNode } from 'react';
 import { KpiCard } from '@/components/data/kpi-card';
 import { DetailSkeleton, EmptyState, QueryState } from '@/components/data/states';
 import { StatusBadge } from '@/components/data/status-badge';
+import { UserAvatar } from '@/components/data/user-avatar';
 import { Breadcrumb } from '@/components/layout/breadcrumb';
 import { Button } from '@/components/ui/button';
 import { isApiError } from '@/lib/api/errors';
@@ -13,7 +14,7 @@ import { formatDate, formatDateTime, formatMoney, formatPhone } from '@/lib/form
 import { Can, useAbility } from '@/lib/permission';
 import { useInvalidateOn } from '@/lib/realtime';
 import { customerKeys, useCustomer, type CustomerDetail } from '../api/use-customers';
-import { customerTypeLabel, customerTypeTone, initialsOf } from '../labels';
+import { customerTypeLabel, customerTypeTone } from '../labels';
 import { formatAddress } from './customer-address-section';
 import { CustomerConsentCard } from './customer-consent-card';
 import { CustomerPurchaseHistory } from './customer-purchase-history';
@@ -108,9 +109,7 @@ function Profile({ c }: { c: CustomerDetail }) {
     <>
       {c.mergedInto ? <MergedBanner target={c.mergedInto} /> : null}
       <section className="flex items-center gap-4 rounded-md border bg-card px-4 py-3">
-        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-secondary text-sm font-semibold text-primary">
-          {initialsOf(c.name)}
-        </span>
+        <UserAvatar size="lg" />
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
             <h1 className="text-xl font-semibold leading-tight">{c.name}</h1>

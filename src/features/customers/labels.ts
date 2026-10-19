@@ -31,15 +31,6 @@ export const CUSTOMER_TYPE_OPTIONS: Array<{ value: CustomerType; label: string }
   Object.keys(TYPE_LABEL) as CustomerType[]
 ).map((v) => ({ value: v, label: TYPE_LABEL[v] }));
 
-/** Chữ cái đầu để dựng avatar chữ — tối đa 2 ký tự. */
-export function initialsOf(name: string): string {
-  const words = name.trim().split(/\s+/).filter(Boolean);
-  if (words.length === 0) return '?';
-  const first = words[0]!;
-  const last = words[words.length - 1]!;
-  return (words.length === 1 ? first.slice(0, 2) : first[0]! + last[0]!).toUpperCase();
-}
-
 /**
  * Trạng thái / kênh đơn trong tab Lịch sử mua hàng (CRM-06). Chép cùng nhãn với
  * features/orders/labels.ts — luật 12 cấm import chéo feature; khoá lấy từ union của
