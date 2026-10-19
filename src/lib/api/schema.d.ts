@@ -100,6 +100,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/roles/assignable": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Vai trò được phép cấp khi tạo nhân sự — chỉ cần đăng nhập (quản lý kho / trưởng phòng không có
+         *     role.read). Khai báo TRƯỚC `roles/:code` để không bị bắt nhầm làm mã vai trò.
+         */
+        get: operations["RbacController_assignableRoles"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/roles/{code}": {
         parameters: {
             query?: never;
@@ -180,6 +200,39 @@ export interface paths {
         /** Cùng cặp quyền với PUT /users/:id/roles (AND). */
         put: operations["UserController_updatePermissions"];
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/me/profile": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["MeController_profile"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch: operations["MeController_updateProfile"];
+        trace?: never;
+    };
+    "/me/password": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Sai mật khẩu hiện tại → 422 CURRENT_PASSWORD_WRONG. */
+        post: operations["MeController_changePassword"];
         delete?: never;
         options?: never;
         head?: never;
@@ -4497,6 +4550,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/cycle-counts/actual-stock": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Nhập tồn thực tế theo kho — ghi thẳng phần lệch vào sổ cái + phiếu kiểm POSTED (2026-10-19).
+         *     Cần stock.adjust (đụng thẳng tồn, không qua duyệt). Idempotent theo `Idempotency-Key`.
+         */
+        post: operations["StocktakeController_setActualStock"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/cycle-counts/{id}/lines/{lineId}": {
         parameters: {
             query?: never;
@@ -5146,6 +5219,25 @@ export interface components {
             allow: string[];
             deny: string[];
         };
+        MyProfileDto: {
+            userId: string;
+            /** @description Tên đăng nhập — không tự đổi được. */
+            code: string;
+            email: string;
+            fullName: string;
+            /** @description Dạng chuẩn chỉ chữ số; null = chưa khai. */
+            phone: string | null;
+        };
+        UpdateMyProfileDto: {
+            fullName?: string;
+            /** @description null / chuỗi rỗng = xoá số. Server chuẩn hoá (bỏ dấu cách, +84 → 0). */
+            phone?: string | null;
+        };
+        ChangeMyPasswordDto: {
+            currentPassword: string;
+            /** @description bcrypt giới hạn 72 byte — cùng luật với CreateUserDto.password. */
+            newPassword: string;
+        };
         ApprovalStepDto: {
             sequence: number;
             /** @enum {string} */
@@ -5783,6 +5875,11 @@ export interface components {
             reserved: string;
             /** @description `onHand - reserved`, Decimal(18,6) dạng chuỗi. Có thể âm nếu tồn bị lệch. */
             available: string;
+            /**
+             * @description SKU đã có lô giá vốn (từng nhập kho / tồn đầu kỳ). `false` → nhập tồn thực tế cao hơn tồn
+             *     sổ phải kèm giá vốn (`POST /cycle-counts/actual-stock`).
+             */
+            hasCost: boolean;
         };
         StockListResponseDto: {
             items: components["schemas"]["StockRowDto"][];
@@ -11194,6 +11291,35 @@ export interface components {
             status: string;
             lineCount: number;
         };
+        ActualStockLineDto: {
+            /** Format: uuid */
+            skuId: string;
+            /** @description Tồn thực tế đếm được trong kho, theo ĐVT cơ sở — Decimal(18,6) dạng chuỗi, không âm. */
+            qtyCounted: string;
+            /**
+             * @description Giá vốn / ĐVT cơ sở cho phần THỪA, Decimal(18,4) chuỗi. Bỏ trống = lô giá vốn gần nhất của
+             *     SKU; SKU chưa có lô giá nào → 0.
+             */
+            unitCost?: string;
+            /** @description Lý do lệch — bỏ trống ghi "Nhập tồn thực tế". */
+            note?: string;
+        };
+        SetActualStockDto: {
+            /** Format: uuid */
+            warehouseId: string;
+            lines: components["schemas"]["ActualStockLineDto"][];
+            /** @description Dự phòng khi client không đặt được header `Idempotency-Key` (header thắng). */
+            idempotencyKey?: string;
+        };
+        SetActualStockResultDto: {
+            /** @description null = mọi dòng khớp tồn sổ, không sinh phiếu. */
+            countId: string | null;
+            docNumber: string | null;
+            /** @description Số SKU có lệch và đã ghi điều chỉnh. */
+            adjustedSkuCount: number;
+            /** @description Số SKU khớp tồn sổ, không ghi gì. */
+            unchangedSkuCount: number;
+        };
         RecordCountDto: {
             /** @description Số đếm thực — Decimal(18,6) dạng chuỗi, không âm. */
             qtyCounted: string;
@@ -11639,6 +11765,25 @@ export interface operations {
             };
         };
     };
+    RbacController_assignableRoles: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RoleDto"][];
+                };
+            };
+        };
+    };
     RbacController_getRole: {
         parameters: {
             query?: never;
@@ -11870,6 +12015,69 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["UserPermissionsDto"];
                 };
+            };
+        };
+    };
+    MeController_profile: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MyProfileDto"];
+                };
+            };
+        };
+    };
+    MeController_updateProfile: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateMyProfileDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MyProfileDto"];
+                };
+            };
+        };
+    };
+    MeController_changePassword: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ChangeMyPasswordDto"];
+            };
+        };
+        responses: {
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };
@@ -12655,6 +12863,11 @@ export interface operations {
                 q?: string;
                 /** @description Chỉ tính tồn trong kho này (lọc qua `Location.warehouseId`). */
                 warehouseId?: string;
+                /**
+                 * @description `true` = chỉ hàng tạo trong ERP (2026-10-19, màn Tồn kho): bỏ SKU do đơn Pancake tự sinh
+                 *     (sản phẩm có liên kết product 'auto'), combo (không giữ tồn) và SKU đã xoá mềm.
+                 */
+                erpOnly?: string;
                 take: number;
                 skip: number;
             };
@@ -12681,6 +12894,11 @@ export interface operations {
                 q?: string;
                 /** @description Chỉ tính tồn trong kho này (lọc qua `Location.warehouseId`). */
                 warehouseId?: string;
+                /**
+                 * @description `true` = chỉ hàng tạo trong ERP (2026-10-19, màn Tồn kho): bỏ SKU do đơn Pancake tự sinh
+                 *     (sản phẩm có liên kết product 'auto'), combo (không giữ tồn) và SKU đã xoá mềm.
+                 */
+                erpOnly?: string;
                 take: number;
                 skip: number;
                 skuId?: string;
@@ -12709,6 +12927,11 @@ export interface operations {
                 q?: string;
                 /** @description Chỉ tính tồn trong kho này (lọc qua `Location.warehouseId`). */
                 warehouseId?: string;
+                /**
+                 * @description `true` = chỉ hàng tạo trong ERP (2026-10-19, màn Tồn kho): bỏ SKU do đơn Pancake tự sinh
+                 *     (sản phẩm có liên kết product 'auto'), combo (không giữ tồn) và SKU đã xoá mềm.
+                 */
+                erpOnly?: string;
                 take: number;
                 skip: number;
                 skuId?: string;
@@ -14755,6 +14978,11 @@ export interface operations {
                  *     bỏ trống = cả hai (ô tìm sản phẩm khi lên đơn vẫn cần thấy combo).
                  */
                 isCombo?: boolean;
+                /**
+                 * @description true = chỉ hàng tạo trong ERP (2026-10-19, màn Sản phẩm): bỏ sản phẩm SyncSkuService tự sinh
+                 *     từ đơn Pancake (liên kết product 'auto' ở bất kỳ shop nào).
+                 */
+                erpOnly?: boolean;
                 /** @description Mặc định false — bản ghi xóa mềm ẩn khỏi mọi list. */
                 includeDeleted?: boolean;
                 /** @description Bỏ trống → `code` (giữ thứ tự cũ cho client hiện tại). */
@@ -14924,6 +15152,11 @@ export interface operations {
                 status?: "active" | "inactive";
                 /** @description false = bỏ SKU combo (màn Sản phẩm), true = chỉ SKU combo; bỏ trống = cả hai. */
                 isCombo?: boolean;
+                /**
+                 * @description true = chỉ hàng tạo trong ERP (2026-10-19, màn Sản phẩm): bỏ sản phẩm SyncSkuService tự sinh
+                 *     từ đơn Pancake (liên kết product 'auto' ở bất kỳ shop nào).
+                 */
+                erpOnly?: boolean;
                 take: number;
                 skip: number;
             };
@@ -19155,6 +19388,31 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["CycleCountDetailDto"];
+                };
+            };
+        };
+    };
+    StocktakeController_setActualStock: {
+        parameters: {
+            query?: never;
+            header: {
+                "idempotency-key": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SetActualStockDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SetActualStockResultDto"];
                 };
             };
         };

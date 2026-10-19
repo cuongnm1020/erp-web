@@ -222,8 +222,7 @@ export const NAV_MODULES: NavModule[] = [
   },
   {
     label: 'Kho',
-    // Không trỏ /wms/stock — mục Tồn kho đang ẩn (2026-10-04).
-    href: '/wms/warehouses',
+    href: '/wms/stock',
     icon: Warehouse,
     tone: 'wh',
     shortcut: 'g w',
@@ -233,7 +232,6 @@ export const NAV_MODULES: NavModule[] = [
         label: 'Tồn kho',
         href: '/wms/stock',
         icon: Boxes,
-        hidden: true,
         section: 'Vận hành',
         ability: { action: 'read', subject: 'Stock' },
       },

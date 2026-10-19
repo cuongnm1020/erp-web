@@ -1,6 +1,7 @@
-import { screen, waitFor } from '@testing-library/react';
+import { fireEvent, screen, waitFor } from '@testing-library/react';
+import { http, HttpResponse } from 'msw';
 import { describe, expect, it, vi, beforeEach } from 'vitest';
-import { ME_SALE, makeUsers, scenario } from '@/test/msw/handlers';
+import { ME_SALE, ROLES_FIXTURE, makeUsers, scenario } from '@/test/msw/handlers';
 import { server } from '@/test/msw/server';
 import { renderApp } from '@/test/render';
 import { UsersScreen } from './components/users-screen';
@@ -37,6 +38,27 @@ describe('UsersScreen — GET /users (I-01)', () => {
     renderApp(<UsersScreen />, { me: { ...ME_SALE, permissions: ['user.read'] } });
     await screen.findByText('Nhân viên 1');
     expect(screen.queryByRole('button', { name: /Thêm nhân viên/ })).not.toBeInTheDocument();
+  });
+
+  it('quản lý kho (không role.read): ô vai trò lấy từ /roles/assignable, không gọi /roles', async () => {
+    let rolesCalled = false;
+    server.use(
+      http.get('/api/roles', () => {
+        rolesCalled = true;
+        return HttpResponse.json([], { status: 403 });
+      }),
+      http.get('/api/roles/assignable', () =>
+        HttpResponse.json(ROLES_FIXTURE.filter((r) => r.code !== 'ADMIN')),
+      ),
+    );
+    renderApp(<UsersScreen />, {
+      me: { ...ME_SALE, permissions: ['user.read', 'user.create', 'user.update'] },
+    });
+    await screen.findByText('Nhân viên 1');
+    fireEvent.click(screen.getByRole('button', { name: /Thêm nhân viên/ }));
+    expect(await screen.findByLabelText('Nhân viên kinh doanh')).toBeInTheDocument();
+    expect(screen.queryByLabelText('Quản trị')).not.toBeInTheDocument();
+    expect(rolesCalled).toBe(false);
   });
 
   it('empty: EmptyState kèm hành động', async () => {

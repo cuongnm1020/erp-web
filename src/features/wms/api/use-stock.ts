@@ -1,5 +1,5 @@
-import { keepPreviousData, useQuery } from '@tanstack/react-query';
-import { api, unwrap } from '@/lib/api/client';
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { api, idempotency, unwrap } from '@/lib/api/client';
 import type { components } from '@/lib/api/schema';
 
 /** Luật 2: shape response chỉ lấy từ schema.d.ts sinh bởi OpenAPI, không khai lại. */
@@ -7,10 +7,13 @@ export type StockRow = components['schemas']['StockRowDto'];
 export type StockByLocationRow = components['schemas']['StockByLocationRowDto'];
 export type StockByLotRow = components['schemas']['StockByLotRowDto'];
 export type LocationType = StockByLocationRow['locationType'];
+export type SetActualStockBody = components['schemas']['SetActualStockDto'];
 
 export interface StockListParams {
   q?: string;
   warehouseId?: string;
+  /** Chỉ hàng tạo trong ERP — bỏ hàng đơn Pancake tự sinh, combo, SKU đã xoá. */
+  erpOnly?: boolean;
   take: number;
   skip: number;
 }
@@ -43,6 +46,7 @@ export function useStockBySku(params: StockListParams, enabled = true) {
             query: {
               q: params.q || undefined,
               warehouseId: params.warehouseId || undefined,
+              erpOnly: params.erpOnly ? 'true' : undefined,
               take: params.take,
               skip: params.skip,
             },
@@ -65,6 +69,7 @@ export function useStockByLocation(params: StockBreakdownParams, enabled = true)
             query: {
               q: params.q || undefined,
               warehouseId: params.warehouseId || undefined,
+              erpOnly: params.erpOnly ? 'true' : undefined,
               skuId: params.skuId || undefined,
               locationId: params.locationId || undefined,
               take: params.take,
@@ -89,6 +94,7 @@ export function useStockByLot(params: StockBreakdownParams, enabled = true) {
             query: {
               q: params.q || undefined,
               warehouseId: params.warehouseId || undefined,
+              erpOnly: params.erpOnly ? 'true' : undefined,
               skuId: params.skuId || undefined,
               locationId: params.locationId || undefined,
               take: params.take,
@@ -99,5 +105,28 @@ export function useStockByLot(params: StockBreakdownParams, enabled = true) {
       ),
     placeholderData: keepPreviousData,
     enabled,
+  });
+}
+
+/**
+ * POST /cycle-counts/actual-stock — nhập tồn thực tế theo kho, server ghi THẲNG phần lệch vào sổ
+ * cái + phiếu kiểm kê POSTED. Idempotency-Key sinh LÚC BẤM (luật 4), giữ nguyên khi retry. Không
+ * optimistic (luật 5): chờ server rồi invalidate tồn + danh sách phiếu kiểm.
+ */
+export function useSetActualStock() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ body, key }: { body: SetActualStockBody; key: string }) =>
+      unwrap(
+        api.POST('/cycle-counts/actual-stock', {
+          params: { header: { 'idempotency-key': key } },
+          headers: idempotency(key),
+          body,
+        }),
+      ),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: stockKeys.all });
+      void qc.invalidateQueries({ queryKey: ['wms', 'cycle-counts'] });
+    },
   });
 }

@@ -235,6 +235,8 @@ describe('ProductListScreen — góc nhìn Sản phẩm (mặc định, GET /pro
     expect(last.get('trackingMode')).toBe('LOT');
     expect(last.get('hasStock')).toBe('true');
     expect(last.get('isActive')).toBe('true');
+    // Chỉ hàng tạo trong ERP (2026-10-19) — sản phẩm đơn Pancake tự sinh bị ẩn.
+    expect(last.get('erpOnly')).toBe('true');
   });
 
   it('RPT-05a: cột NCC chính (tên / "Chưa gán"); ?supplier=<id> → supplierId, ?supplier=none → hasSupplier=false', async () => {

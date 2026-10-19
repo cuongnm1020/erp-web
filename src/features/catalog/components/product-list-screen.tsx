@@ -580,8 +580,20 @@ export function ProductListScreen() {
     set({ filters: { ...state.filters, ...patch } });
 
   // Hai query đếm tí hon (take 1) cho dòng mô tả "X SKU đang bán · Y ngừng bán" — không tính combo.
-  const activeCount = useSkus({ status: 'active', isCombo: false, take: 1, skip: 0 });
-  const inactiveCount = useSkus({ status: 'inactive', isCombo: false, take: 1, skip: 0 });
+  const activeCount = useSkus({
+    status: 'active',
+    isCombo: false,
+    erpOnly: true,
+    take: 1,
+    skip: 0,
+  });
+  const inactiveCount = useSkus({
+    status: 'inactive',
+    isCombo: false,
+    erpOnly: true,
+    take: 1,
+    skip: 0,
+  });
 
   const hasFilter =
     state.q !== '' ||
@@ -730,6 +742,8 @@ function ProductView({
       hasStock: state.filters.stock === 'in' ? true : undefined,
       // Combo quản lý riêng ở /catalog/combos — màn này chỉ sản phẩm thường.
       isCombo: false,
+      // Chỉ hàng tạo trong ERP (2026-10-19) — ẩn sản phẩm đơn Pancake tự sinh.
+      erpOnly: true,
       sortBy: sort ? (sort.id as 'createdAt' | 'name' | 'code') : undefined,
       sortDir: sort ? (sort.desc ? ('desc' as const) : ('asc' as const)) : undefined,
       ...skipTake,
@@ -865,7 +879,7 @@ function SkuView({
 }: ViewProps) {
   const [selected, setSelected] = useState<RowSelectionState>({});
   const params = useMemo(
-    () => ({ q: state.q, status, isCombo: false, ...skipTake }),
+    () => ({ q: state.q, status, isCombo: false, erpOnly: true, ...skipTake }),
     [state.q, status, skipTake],
   );
   const query = useSkus(params);

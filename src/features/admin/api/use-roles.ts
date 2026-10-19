@@ -8,6 +8,7 @@ export type CreateRoleInput = components['schemas']['CreateRoleDto'];
 
 export const roleKeys = {
   all: ['admin', 'roles'] as const,
+  assignable: ['admin', 'roles', 'assignable'] as const,
 };
 
 /** `enabled: false` khi người xem không có role.read (trưởng phòng thêm nhân sự) — tránh 403 vô ích. */
@@ -15,6 +16,19 @@ export function useRoles(enabled = true) {
   return useQuery({
     queryKey: roleKeys.all,
     queryFn: () => unwrap(api.GET('/roles')),
+    enabled,
+  });
+}
+
+/**
+ * GET /roles/assignable — vai trò NGƯỜI ĐANG ĐĂNG NHẬP được cấp khi tạo nhân sự (2026-10-19): quản
+ * lý kho thấy cấp dưới + nhân viên kho, cấp dưới chỉ thấy nhân viên kho. Server lọc theo quyền —
+ * web không tự lọc (luật 7). Không cần role.read.
+ */
+export function useAssignableRoles(enabled = true) {
+  return useQuery({
+    queryKey: roleKeys.assignable,
+    queryFn: () => unwrap(api.GET('/roles/assignable')),
     enabled,
   });
 }

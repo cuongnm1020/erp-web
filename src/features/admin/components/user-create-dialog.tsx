@@ -32,10 +32,9 @@ import {
 } from '@/components/ui/select';
 import { toast } from '@/components/ui/toaster';
 import type { ApiError } from '@/lib/api/errors';
-import { useAbility } from '@/lib/permission';
 import { useWarehouse } from '@/lib/warehouse';
 import { useDepartments } from '../api/use-departments';
-import { useRoles } from '../api/use-roles';
+import { useAssignableRoles } from '../api/use-roles';
 import { useCreateUser } from '../api/use-users';
 import { createUserSchema, type CreateUserValues } from '../schema';
 
@@ -55,11 +54,10 @@ export function UserCreateDialog({
   onOpenChange: (open: boolean) => void;
   fixedDepartment?: { id: string; name: string };
 }) {
-  const ability = useAbility();
   const create = useCreateUser();
   const departments = useDepartments(fixedDepartment === undefined);
-  const canReadRoles = ability.can('read', 'Role');
-  const roles = useRoles(canReadRoles);
+  // Vai trò cấp được do server lọc theo tầng quản lý (GET /roles/assignable) — không cần role.read.
+  const roles = useAssignableRoles(open);
   // Kho cấp được = kho NGƯỜI TẠO được phép (/auth/me); mặc định cấp kho người tạo đang làm việc.
   const { options: warehouseOptions, selected: workingWarehouse } = useWarehouse();
   const startWarehouse =
@@ -234,7 +232,7 @@ export function UserCreateDialog({
                 </FormItem>
               )}
             />
-            {canReadRoles ? (
+            {(roles.data ?? []).length > 0 ? (
               <FormField
                 control={form.control}
                 name="roleCodes"

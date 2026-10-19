@@ -37,6 +37,8 @@ export interface ProductListParams {
   hasStock?: boolean;
   /** false = bỏ combo (màn Sản phẩm — combo ở /catalog/combos); bỏ trống = cả hai. */
   isCombo?: boolean;
+  /** true = chỉ hàng tạo trong ERP — ẩn sản phẩm đơn Pancake tự sinh (màn Sản phẩm). */
+  erpOnly?: boolean;
   sortBy?: 'createdAt' | 'name' | 'code';
   sortDir?: 'asc' | 'desc';
   take: number;
@@ -48,6 +50,8 @@ export interface SkuListParams {
   status?: 'active' | 'inactive';
   /** false = bỏ SKU combo; bỏ trống = cả hai. */
   isCombo?: boolean;
+  /** true = chỉ hàng tạo trong ERP — ẩn sản phẩm đơn Pancake tự sinh (màn Sản phẩm). */
+  erpOnly?: boolean;
   take: number;
   skip: number;
 }
@@ -79,6 +83,7 @@ export function useSkus(params: SkuListParams) {
               q: params.q || undefined,
               status: params.status,
               isCombo: params.isCombo,
+              erpOnly: params.erpOnly,
               take: params.take,
               skip: params.skip,
             },
@@ -319,6 +324,7 @@ export function useProducts(params: ProductListParams, opts: { enabled?: boolean
               trackingMode: params.trackingMode,
               hasStock: params.hasStock,
               isCombo: params.isCombo,
+              erpOnly: params.erpOnly,
               sortBy: params.sortBy,
               sortDir: params.sortDir,
               take: params.take,

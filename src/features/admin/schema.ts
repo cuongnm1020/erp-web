@@ -176,3 +176,28 @@ export const pdaDeviceFormSchema = z.object({
 });
 
 export type PdaDeviceFormValues = z.infer<typeof pdaDeviceFormSchema>;
+
+/** Tài khoản của tôi — khớp UpdateMyProfileDto (số điện thoại server chuẩn hoá + kiểm 10–11 số). */
+export const myProfileSchema = z.object({
+  fullName: createUserSchema.shape.fullName,
+  phone: z.string().trim().max(30, 'Tối đa 30 ký tự'),
+});
+export type MyProfileValues = z.infer<typeof myProfileSchema>;
+
+/** Đổi mật khẩu của chính mình — khớp ChangeMyPasswordDto; ô nhập lại chỉ kiểm ở web. */
+export const changeMyPasswordSchema = z
+  .object({
+    currentPassword: z.string().min(1, 'Nhập mật khẩu hiện tại').max(72),
+    newPassword: createUserSchema.shape.password,
+    confirmPassword: z.string(),
+  })
+  .superRefine((v, ctx) => {
+    if (v.confirmPassword !== v.newPassword) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['confirmPassword'],
+        message: 'Mật khẩu nhập lại không khớp',
+      });
+    }
+  });
+export type ChangeMyPasswordValues = z.infer<typeof changeMyPasswordSchema>;

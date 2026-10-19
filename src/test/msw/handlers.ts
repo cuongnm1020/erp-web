@@ -895,6 +895,7 @@ export function makeStockRows(n: number) {
       onHand: String(onHand),
       reserved: String(reserved),
       available: String(onHand - reserved),
+      hasCost: i % 2 === 0,
     };
   });
 }
@@ -1735,6 +1736,15 @@ export const handlers = [
   }),
   http.get('/api/users/:id/pancake-profile', () => HttpResponse.json(PANCAKE_PROFILE_FIXTURE)),
   http.get('/api/me/pancake-profile', () => HttpResponse.json(PANCAKE_PROFILE_FIXTURE)),
+  http.get('/api/me/profile', () =>
+    HttpResponse.json({
+      userId: 'u-admin',
+      code: 'admin',
+      email: 'admin@example.com',
+      fullName: 'Quản trị',
+      phone: null,
+    }),
+  ),
   http.get('/api/users/:id/permissions', () => HttpResponse.json(USER_PERMISSIONS_FIXTURE)),
   http.put('/api/users/:id/permissions', async ({ request }) => {
     const body = (await request.json()) as { allow: string[]; deny: string[] };
@@ -1759,6 +1769,7 @@ export const handlers = [
     });
   }),
   http.get('/api/roles', () => HttpResponse.json(ROLES_FIXTURE)),
+  http.get('/api/roles/assignable', () => HttpResponse.json(ROLES_FIXTURE)),
   http.put('/api/roles/:code', async ({ params, request }) => {
     const body = (await request.json()) as { permissions?: string[] };
     const role = ROLES_FIXTURE.find((r) => r.code === params.code);
