@@ -52,7 +52,14 @@ describe('OrderListScreen — GET /sales-orders (P1-12)', () => {
     await screen.findByText('1 đơn khớp bộ lọc');
     const link = screen.getByRole('link', { name: pancake.docNumber });
     expect(link).toHaveAttribute('href', `/crm/orders/${pancake.id}`);
-    expect(screen.getByText('Pancake #103')).toBeInTheDocument();
+    // Mã Pancake bấm được → mở đúng đơn trên POS ở tab mới (2026-10-19).
+    const pos = screen.getByRole('link', { name: 'Pancake #103' });
+    expect(pos).toHaveAttribute('href', pancake.pancakeOrderLink);
+    expect(pos).toHaveAttribute('target', '_blank');
+    expect(pos).toHaveAttribute('rel', 'noreferrer');
+    // Bấm link không bật xem nhanh của dòng.
+    fireEvent.click(pos);
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
   });
 
   it('tab theo luồng đơn đọc ?flow= từ URL, lọc phía server; mỗi tab có số đếm từ API (luật 8)', async () => {
