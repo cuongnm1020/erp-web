@@ -186,6 +186,39 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/me/profile": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["MeController_profile"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch: operations["MeController_updateProfile"];
+        trace?: never;
+    };
+    "/me/password": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Sai mật khẩu hiện tại → 422 CURRENT_PASSWORD_WRONG. */
+        post: operations["MeController_changePassword"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/audit/{entity}/{entityId}": {
         parameters: {
             query?: never;
@@ -5165,6 +5198,25 @@ export interface components {
         UpdateUserPermissionsDto: {
             allow: string[];
             deny: string[];
+        };
+        MyProfileDto: {
+            userId: string;
+            /** @description Tên đăng nhập — không tự đổi được. */
+            code: string;
+            email: string;
+            fullName: string;
+            /** @description Dạng chuẩn chỉ chữ số; null = chưa khai. */
+            phone: string | null;
+        };
+        UpdateMyProfileDto: {
+            fullName?: string;
+            /** @description null / chuỗi rỗng = xoá số. Server chuẩn hoá (bỏ dấu cách, +84 → 0). */
+            phone?: string | null;
+        };
+        ChangeMyPasswordDto: {
+            currentPassword: string;
+            /** @description bcrypt giới hạn 72 byte — cùng luật với CreateUserDto.password. */
+            newPassword: string;
         };
         ApprovalStepDto: {
             sequence: number;
@@ -11924,6 +11976,69 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["UserPermissionsDto"];
                 };
+            };
+        };
+    };
+    MeController_profile: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MyProfileDto"];
+                };
+            };
+        };
+    };
+    MeController_updateProfile: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateMyProfileDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MyProfileDto"];
+                };
+            };
+        };
+    };
+    MeController_changePassword: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ChangeMyPasswordDto"];
+            };
+        };
+        responses: {
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };

@@ -1736,6 +1736,15 @@ export const handlers = [
   }),
   http.get('/api/users/:id/pancake-profile', () => HttpResponse.json(PANCAKE_PROFILE_FIXTURE)),
   http.get('/api/me/pancake-profile', () => HttpResponse.json(PANCAKE_PROFILE_FIXTURE)),
+  http.get('/api/me/profile', () =>
+    HttpResponse.json({
+      userId: 'u-admin',
+      code: 'admin',
+      email: 'admin@example.com',
+      fullName: 'Quản trị',
+      phone: null,
+    }),
+  ),
   http.get('/api/users/:id/permissions', () => HttpResponse.json(USER_PERMISSIONS_FIXTURE)),
   http.put('/api/users/:id/permissions', async ({ request }) => {
     const body = (await request.json()) as { allow: string[]; deny: string[] };

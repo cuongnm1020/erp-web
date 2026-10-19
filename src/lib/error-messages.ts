@@ -222,6 +222,7 @@ const MESSAGES: Record<string, string> = {
   RATE_LIMITED: 'Bạn thao tác quá nhanh. Đợi khoảng một phút rồi thử lại.',
   UNSUBSCRIBE_LINK_INVALID:
     'Link hủy nhận tin không hợp lệ hoặc đã bị sửa. Mở lại đúng link trong tin nhắn / email bạn nhận được.',
+  CURRENT_PASSWORD_WRONG: 'Mật khẩu hiện tại không đúng. Nhập lại mật khẩu đang dùng để đăng nhập.',
   ACTUAL_STOCK_BELOW_RESERVED:
     'Tồn thực tế thấp hơn phần đang giữ cho đơn. Xử lý đơn đang giữ hàng (hủy hoặc đổi kho) rồi nhập lại.',
   TIER_JOB_ACTOR_NOT_FOUND:

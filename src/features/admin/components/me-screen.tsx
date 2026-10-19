@@ -1,236 +1,217 @@
 'use client';
 
-// UI-first từ design canvas — dữ liệu mẫu, chưa nối API (nối ở phase FE-x).
-
-import { CheckCircle2, Eye, Info } from 'lucide-react';
-import { StatusBadge } from '@/components/data/status-badge';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { useForm } from 'react-hook-form';
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+  applyServerErrors,
+} from '@/components/data/form';
+import { FormSkeleton, QueryState } from '@/components/data/states';
 import { PageHeader } from '@/components/layout/page-header';
 import { Button } from '@/components/ui/button';
-import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
+import { toast } from '@/components/ui/toaster';
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
-import { cn } from '@/lib/cn';
+  useChangeMyPassword,
+  useMyProfile,
+  useUpdateMyProfile,
+  type MyProfile,
+} from '../api/use-me';
 import { useMyPancakeProfile, useUpdateMyPancakeProfile } from '../api/use-pancake-profile';
+import {
+  changeMyPasswordSchema,
+  myProfileSchema,
+  type ChangeMyPasswordValues,
+  type MyProfileValues,
+} from '../schema';
 import { PancakeProfileSection } from './pancake-profile-section';
 
-/** Hồ sơ Pancake của chính mình (dữ liệu thật — các khối dưới vẫn là bản mẫu). */
+/**
+ * Tài khoản của tôi (2026-10-19): người đăng nhập tự sửa họ tên, số điện thoại (PATCH /me/profile),
+ * đổi mật khẩu (POST /me/password) và fb_id Pancake (PUT /me/pancake-profile). Không cần quyền
+ * user.* — server chỉ cho sửa chính mình. Tên đăng nhập và email do quản trị cấp, chỉ hiển thị.
+ */
+export function MeScreen() {
+  const query = useMyProfile();
+  return (
+    <>
+      <PageHeader
+        title="Tài khoản của tôi"
+        description={query.data ? `Tên đăng nhập: ${query.data.code}` : undefined}
+        breadcrumb={[{ label: 'Tài khoản của tôi' }]}
+      />
+      <div className="grid max-w-5xl items-start gap-3 lg:grid-cols-2">
+        <section className="rounded-md border bg-card">
+          <h2 className="border-b px-3 py-2 text-sm font-semibold">Thông tin cá nhân</h2>
+          <div className="p-3">
+            <QueryState query={query} skeleton={<FormSkeleton fields={4} />}>
+              {(profile) => <ProfileForm key={profile.userId} profile={profile} />}
+            </QueryState>
+          </div>
+        </section>
+        <section className="rounded-md border bg-card">
+          <h2 className="border-b px-3 py-2 text-sm font-semibold">Đổi mật khẩu</h2>
+          <div className="p-3">
+            <PasswordForm />
+          </div>
+        </section>
+      </div>
+      <div className="mt-3 max-w-5xl">
+        <MyPancakeProfile />
+      </div>
+    </>
+  );
+}
+
 function MyPancakeProfile() {
   const query = useMyPancakeProfile();
   const mutation = useUpdateMyPancakeProfile();
   return <PancakeProfileSection query={query} mutation={mutation} canEdit self />;
 }
 
-interface PasswordRule {
-  label: string;
-  met: boolean;
-}
-
-interface ChannelPrefRow {
-  event: string;
-  email: boolean;
-  sms: boolean;
-  zalo: boolean;
-  inApp: boolean;
-}
-
-const PASSWORD_RULES: PasswordRule[] = [
-  { label: 'Ít nhất 10 ký tự', met: true },
-  { label: 'Có chữ hoa và chữ thường', met: true },
-  { label: 'Có ít nhất một chữ số', met: true },
-  { label: 'Không trùng 5 mật khẩu gần nhất', met: false },
-];
-
-const SAMPLE_CHANNEL_PREFS: ChannelPrefRow[] = [
-  { event: 'Đơn chờ tôi duyệt', email: true, sms: true, zalo: false, inApp: true },
-  { event: 'Đơn của tôi được duyệt / từ chối', email: true, sms: false, zalo: true, inApp: true },
-  { event: 'Task kho quá hạn SLA', email: true, sms: false, zalo: false, inApp: true },
-  { event: 'Ngoại lệ kho mới', email: true, sms: false, zalo: false, inApp: true },
-  { event: 'Chứng từ đã post', email: false, sms: false, zalo: false, inApp: true },
-  { event: 'Công nợ vượt hạn mức', email: true, sms: false, zalo: false, inApp: true },
-  { event: 'Công nợ quá hạn 30 ngày', email: true, sms: true, zalo: false, inApp: true },
-  { event: 'Webhook thất bại', email: true, sms: false, zalo: false, inApp: true },
-  { event: 'Khóa kỳ kế toán', email: true, sms: false, zalo: false, inApp: true },
-  { event: 'Khách chuyển team', email: true, sms: false, zalo: false, inApp: true },
-  { event: 'Import hoàn tất', email: true, sms: false, zalo: false, inApp: true },
-  { event: 'PDA offline > 24h', email: false, sms: false, zalo: false, inApp: true },
-];
-
-function Toggle({ on, label }: { on: boolean; label: string }) {
+function ReadOnlyField({ label, value }: { label: string; value: string }) {
   return (
-    <span
-      role="switch"
-      aria-checked={on}
-      aria-label={label}
-      className={cn(
-        'inline-flex h-4 w-7 items-center rounded-full px-0.5 transition-colors',
-        on ? 'justify-end bg-primary' : 'justify-start bg-border',
-      )}
-    >
-      <span className="h-3 w-3 rounded-full bg-background" />
-    </span>
+    <div className="space-y-1">
+      <p className="text-xs text-muted-foreground">{label}</p>
+      <p className="font-mono text-sm">{value}</p>
+    </div>
   );
 }
 
-export function MeScreen() {
+function ProfileForm({ profile }: { profile: MyProfile }) {
+  const mutation = useUpdateMyProfile();
+  const form = useForm<MyProfileValues>({
+    resolver: zodResolver(myProfileSchema),
+    defaultValues: { fullName: profile.fullName, phone: profile.phone ?? '' },
+  });
+
+  const onSubmit = form.handleSubmit((values) =>
+    mutation
+      .mutateAsync({ fullName: values.fullName, phone: values.phone })
+      .then((saved) => {
+        form.reset({ fullName: saved.fullName, phone: saved.phone ?? '' });
+        toast.success('Đã lưu thay đổi');
+      })
+      .catch((err: unknown) => applyServerErrors(form, err)),
+  );
+
   return (
-    <>
-      <PageHeader
-        title="Tài khoản của tôi"
-        description="Tài khoản: huy.lq@congty.vn · Đổi lần cuối 14/05/2026"
-        breadcrumb={[{ label: 'Tài khoản của tôi' }]}
-      />
-      <div className="mb-3 max-w-3xl">
-        <MyPancakeProfile />
-      </div>
-      <div className="grid items-start gap-3 xl:grid-cols-[480px_320px_1fr]">
-        <section className="rounded-md border bg-card">
-          <h2 className="border-b px-3 py-2 text-sm font-semibold">Đổi mật khẩu</h2>
-          <div className="space-y-4 p-3">
-            <div className="space-y-1">
-              <Label htmlFor="current-password" className="text-xs text-muted-foreground">
-                Mật khẩu hiện tại <span className="text-destructive">*</span>
-              </Label>
-              <div className="relative">
-                <Input id="current-password" type="password" className="h-8 pr-8" />
-                <Eye
-                  className="absolute right-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground"
-                  aria-hidden
+    <Form {...form}>
+      <form onSubmit={(e) => void onSubmit(e)} className="space-y-3" noValidate>
+        <div className="grid grid-cols-2 gap-3">
+          <ReadOnlyField label="Tên đăng nhập" value={profile.code} />
+          <ReadOnlyField label="Email" value={profile.email} />
+        </div>
+        <FormField
+          control={form.control}
+          name="fullName"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Họ tên</FormLabel>
+              <FormControl>
+                <Input {...field} className="h-8" autoComplete="name" />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+        <FormField
+          control={form.control}
+          name="phone"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Số điện thoại</FormLabel>
+              <FormControl>
+                <Input
+                  {...field}
+                  className="h-8"
+                  inputMode="tel"
+                  autoComplete="tel"
+                  placeholder="Để trống nếu không khai"
                 />
-              </div>
-            </div>
-            <div className="space-y-1">
-              <Label htmlFor="new-password" className="text-xs text-muted-foreground">
-                Mật khẩu mới <span className="text-destructive">*</span>
-              </Label>
-              <div className="relative">
-                <Input id="new-password" type="password" className="h-8 pr-8" />
-                <Eye
-                  className="absolute right-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground"
-                  aria-hidden
-                />
-              </div>
-            </div>
-            <div className="space-y-1">
-              <Label htmlFor="confirm-password" className="text-xs text-muted-foreground">
-                Nhập lại mật khẩu mới <span className="text-destructive">*</span>
-              </Label>
-              <Input
-                id="confirm-password"
-                type="password"
-                className="h-8"
-                placeholder="Nhập lại để xác nhận"
-              />
-            </div>
-            <label className="flex items-center gap-2 text-sm">
-              <Checkbox checked aria-label="Đăng xuất khỏi các thiết bị khác" />
-              Đăng xuất khỏi các thiết bị khác (2 phiên đang mở)
-            </label>
-            <div className="flex items-center gap-2">
-              <Button>Lưu thay đổi</Button>
-              <Button variant="ghost">Hủy bỏ</Button>
-            </div>
-          </div>
-        </section>
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+        {form.formState.errors.root?.server ? (
+          <p role="alert" className="text-sm text-destructive">
+            {form.formState.errors.root.server.message}
+          </p>
+        ) : null}
+        <Button type="submit" disabled={mutation.isPending || !form.formState.isDirty}>
+          {mutation.isPending ? 'Đang lưu…' : 'Lưu thay đổi'}
+        </Button>
+      </form>
+    </Form>
+  );
+}
 
-        <section className="rounded-md border bg-card">
-          <h2 className="border-b px-3 py-2 text-sm font-semibold">Yêu cầu mật khẩu</h2>
-          <div className="space-y-2 p-3 text-sm">
-            {PASSWORD_RULES.map((r) => (
-              <p
-                key={r.label}
-                className={cn(
-                  'flex items-center gap-1.5',
-                  r.met ? 'text-success' : 'text-muted-foreground',
-                )}
-              >
-                {r.met ? (
-                  <CheckCircle2 className="h-4 w-4 shrink-0" aria-hidden />
-                ) : (
-                  <Info className="h-4 w-4 shrink-0" aria-hidden />
-                )}
-                {r.label}
-              </p>
-            ))}
-            <p className="pt-1 text-xs text-muted-foreground">
-              Sau khi đổi, phiên hiện tại vẫn giữ nguyên; PDA đã liên kết phải đăng nhập lại.
-            </p>
-          </div>
-        </section>
+const EMPTY_PASSWORD: ChangeMyPasswordValues = {
+  currentPassword: '',
+  newPassword: '',
+  confirmPassword: '',
+};
 
-        <section className="rounded-md border bg-card">
-          <div className="flex items-baseline justify-between border-b px-3 py-2">
-            <h2 className="text-sm font-semibold">Cấu hình kênh nhận</h2>
-            <span className="text-xs text-muted-foreground">của tôi</span>
-          </div>
-          <div className="overflow-x-auto">
-            <Table>
-              <TableHeader className="bg-muted">
-                <TableRow>
-                  <TableHead className="px-2.5">Sự kiện</TableHead>
-                  <TableHead className="px-2.5">Email</TableHead>
-                  <TableHead className="px-2.5">SMS</TableHead>
-                  <TableHead className="px-2.5">Zalo</TableHead>
-                  <TableHead className="px-2.5">In-app</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {SAMPLE_CHANNEL_PREFS.map((p) => (
-                  <TableRow key={p.event}>
-                    <TableCell className="px-2.5 py-1.5">{p.event}</TableCell>
-                    <TableCell className="px-2.5 py-1.5">
-                      <Toggle on={p.email} label={`Email · ${p.event}`} />
-                    </TableCell>
-                    <TableCell className="px-2.5 py-1.5">
-                      <Toggle on={p.sms} label={`SMS · ${p.event}`} />
-                    </TableCell>
-                    <TableCell className="px-2.5 py-1.5">
-                      <Toggle on={p.zalo} label={`Zalo · ${p.event}`} />
-                    </TableCell>
-                    <TableCell className="px-2.5 py-1.5">
-                      <Toggle on={p.inApp} label={`In-app · ${p.event}`} />
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </div>
-          <div className="space-y-2 border-t p-3 text-sm">
-            <div className="flex items-center gap-2">
-              <span className="w-24 shrink-0 text-xs text-muted-foreground">Email</span>
-              <span className="font-mono text-xs">binh.tt@congty.vn</span>
-              <StatusBadge tone="ok">Đã xác minh</StatusBadge>
-            </div>
-            <div className="flex items-center gap-2">
-              <span className="w-24 shrink-0 text-xs text-muted-foreground">SMS</span>
-              <span className="font-mono text-xs">0903 118 224</span>
-              <StatusBadge tone="ok">Đã xác minh</StatusBadge>
-            </div>
-            <div className="flex items-center gap-2">
-              <span className="w-24 shrink-0 text-xs text-muted-foreground">Zalo</span>
-              <span className="text-muted-foreground">Chưa liên kết</span>
-              <button type="button" className="text-primary hover:underline">
-                Liên kết Zalo OA
-              </button>
-            </div>
-            <p className="text-xs text-muted-foreground">
-              In-app không tắt được cho sự kiện &quot;Đơn chờ tôi duyệt&quot; và &quot;Task quá
-              hạn&quot; — đó là việc của bạn.
-            </p>
-            <div className="flex items-center justify-end gap-2 pt-1">
-              <Button variant="ghost">Hoàn tác</Button>
-              <Button>Lưu thay đổi</Button>
-            </div>
-          </div>
-        </section>
-      </div>
-    </>
+function PasswordForm() {
+  const mutation = useChangeMyPassword();
+  const form = useForm<ChangeMyPasswordValues>({
+    resolver: zodResolver(changeMyPasswordSchema),
+    defaultValues: EMPTY_PASSWORD,
+  });
+
+  const onSubmit = form.handleSubmit((values) =>
+    mutation
+      .mutateAsync({ currentPassword: values.currentPassword, newPassword: values.newPassword })
+      .then(() => {
+        form.reset(EMPTY_PASSWORD);
+        toast.success('Đã đổi mật khẩu');
+      })
+      .catch((err: unknown) => applyServerErrors(form, err)),
+  );
+
+  const fields: Array<{ name: keyof ChangeMyPasswordValues; label: string; auto: string }> = [
+    { name: 'currentPassword', label: 'Mật khẩu hiện tại', auto: 'current-password' },
+    { name: 'newPassword', label: 'Mật khẩu mới (tối thiểu 8 ký tự)', auto: 'new-password' },
+    { name: 'confirmPassword', label: 'Nhập lại mật khẩu mới', auto: 'new-password' },
+  ];
+
+  return (
+    <Form {...form}>
+      <form onSubmit={(e) => void onSubmit(e)} className="space-y-3" noValidate>
+        {fields.map((f) => (
+          <FormField
+            key={f.name}
+            control={form.control}
+            name={f.name}
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>{f.label}</FormLabel>
+                <FormControl>
+                  <Input {...field} type="password" className="h-8" autoComplete={f.auto} />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+        ))}
+        {form.formState.errors.root?.server ? (
+          <p role="alert" className="text-sm text-destructive">
+            {form.formState.errors.root.server.message}
+          </p>
+        ) : null}
+        <p className="text-xs text-muted-foreground">
+          Phiên đang mở trên máy này và PDA vẫn giữ nguyên; lần đăng nhập sau dùng mật khẩu mới.
+        </p>
+        <Button type="submit" disabled={mutation.isPending}>
+          {mutation.isPending ? 'Đang đổi…' : 'Đổi mật khẩu'}
+        </Button>
+      </form>
+    </Form>
   );
 }
