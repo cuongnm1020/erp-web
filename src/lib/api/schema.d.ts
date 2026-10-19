@@ -843,6 +843,22 @@ export interface paths {
         patch: operations["LotController_update"];
         trace?: never;
     };
+    "/stock/costs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["CostController_setCosts"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/customer-assignments/teams": {
         parameters: {
             query?: never;
@@ -4960,6 +4976,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
+        /**
+         * Không gắn @RequirePermission: user.read HOẶC quản lý được người này (trưởng phòng / trưởng nhóm
+         *     kinh doanh sửa fb_id cho nhân viên phòng mình, 2026-10-19) — kiểm trong service.
+         */
         get: operations["UserPancakeProfileController_get"];
         /** Không gắn @RequirePermission — như PATCH /users/:id, quyền sửa kiểm trong service. */
         put: operations["UserPancakeProfileController_update"];
@@ -5880,6 +5900,12 @@ export interface components {
              *     sổ phải kèm giá vốn (`POST /cycle-counts/actual-stock`).
              */
             hasCost: boolean;
+            /**
+             * @description Giá vốn / ĐVT cơ sở hiện tại = bình quân các lô giá còn hàng, Decimal(18,4) chuỗi. CHỈ trả cho
+             *     người có `stock.cost` (kế toán) — người khác luôn null (không lộ giá vốn cho kho / sale). null
+             *     cũng khi SKU không còn lô giá còn hàng.
+             */
+            unitCost: string | null;
         };
         StockListResponseDto: {
             items: components["schemas"]["StockRowDto"][];
@@ -5995,6 +6021,23 @@ export interface components {
             mfgDate: string | null;
             expiryDate: string | null;
             createdAt: string;
+        };
+        SetSkuCostLineDto: {
+            /** Format: uuid */
+            skuId: string;
+            /** @description Giá vốn / ĐVT cơ sở, Decimal(18,4) dạng chuỗi, không âm. */
+            unitCost: string;
+        };
+        SetSkuCostsDto: {
+            lines: components["schemas"]["SetSkuCostLineDto"][];
+        };
+        SetSkuCostsResultDto: {
+            /** @description SKU đã đổi giá vốn (có ít nhất một lô giá còn hàng). */
+            updatedSkuCount: number;
+            /** @description Số lô giá vốn đã đổi. */
+            layerCount: number;
+            /** @description SKU không còn hàng có lô giá (chưa nhập / đã bán hết) — không đổi gì. */
+            skippedSkuIds: string[];
         };
         TeamAssignmentSummaryDto: {
             teamId: string;
@@ -13036,6 +13079,29 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["LotDto"];
+                };
+            };
+        };
+    };
+    CostController_setCosts: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SetSkuCostsDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SetSkuCostsResultDto"];
                 };
             };
         };

@@ -8,6 +8,7 @@ export type StockByLocationRow = components['schemas']['StockByLocationRowDto'];
 export type StockByLotRow = components['schemas']['StockByLotRowDto'];
 export type LocationType = StockByLocationRow['locationType'];
 export type SetActualStockBody = components['schemas']['SetActualStockDto'];
+export type SetSkuCostsBody = components['schemas']['SetSkuCostsDto'];
 
 export interface StockListParams {
   q?: string;
@@ -128,5 +129,17 @@ export function useSetActualStock() {
       void qc.invalidateQueries({ queryKey: stockKeys.all });
       void qc.invalidateQueries({ queryKey: ['wms', 'cycle-counts'] });
     },
+  });
+}
+
+/**
+ * POST /stock/costs — kế toán đặt giá vốn cho mọi tồn còn lại của SKU (quyền stock.cost). Đặt giá
+ * là thao tác tuyệt đối, gửi lại cho cùng kết quả — không cần Idempotency-Key. Không optimistic.
+ */
+export function useSetSkuCosts() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (body: SetSkuCostsBody) => unwrap(api.POST('/stock/costs', { body })),
+    onSuccess: () => void qc.invalidateQueries({ queryKey: stockKeys.all }),
   });
 }

@@ -147,6 +147,35 @@ describe('Sơ đồ nhân sự (/admin/org-tree, mặc định dạng sơ đồ)
     expect(patches[0]).toEqual({ id: SALES_HN.members[0]!.id, body: { isActive: false } });
   });
 
+  it('sửa nhân sự: khai Facebook ID Pancake ngay trong hộp thoại → PUT pancake-profile', async () => {
+    const puts: Array<{ id: string; body: unknown }> = [];
+    server.use(
+      http.put('/api/users/:id/pancake-profile', async ({ params, request }) => {
+        const body = (await request.json()) as { fbId: string | null };
+        puts.push({ id: String(params.id), body });
+        return HttpResponse.json({
+          userId: String(params.id),
+          fbId: body.fbId,
+          pancakeName: null,
+          shops: [],
+          otherFbIds: [],
+          transferredFrom: [],
+        });
+      }),
+    );
+    search = `dept=${SALES_HN.id}`;
+    renderApp(<OrgTreeScreen />);
+    fireEvent.click(await screen.findByRole('button', { name: 'Sửa Trần Thị Hoa' }));
+    const dialog = await screen.findByRole('dialog');
+    const fb = await within(dialog).findByLabelText('Facebook ID trên Pancake');
+    fireEvent.change(fb, { target: { value: '1000123456789' } });
+    const saves = within(dialog).getAllByRole('button', { name: 'Lưu thay đổi' });
+    fireEvent.click(saves[saves.length - 1]!);
+    await waitFor(() => expect(puts).toHaveLength(1));
+    expect(puts[0]!.id).toBe(SALES_HN.members[0]!.id);
+    expect(puts[0]!.body).toMatchObject({ fbId: '1000123456789' });
+  });
+
   it('xóa phòng ban còn người → 409 DEPARTMENT_NOT_EMPTY hiện câu hướng dẫn', async () => {
     server.use(
       http.delete('/api/departments/:id', () =>

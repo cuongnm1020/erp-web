@@ -896,6 +896,7 @@ export function makeStockRows(n: number) {
       reserved: String(reserved),
       available: String(onHand - reserved),
       hasCost: i % 2 === 0,
+      unitCost: i % 2 === 0 ? '12000' : null,
     };
   });
 }
