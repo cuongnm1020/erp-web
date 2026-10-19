@@ -18,6 +18,7 @@ import { shipmentStatusBadge } from '@/features/wms/labels';
 import { cn } from '@/lib/cn';
 import { useOrder, type OrderFlow, type SalesOrderListItem } from '../api/use-orders';
 import { orderFlowClass, orderFlowLabel, telcoClass } from '../labels';
+import { PancakeOrderLink } from './pancake-order-link';
 
 /**
  * Xem nhanh một đơn từ danh sách (khung bên phải) — người nhận, sản phẩm, tiền, vận chuyển,
@@ -62,8 +63,12 @@ function Body({ row }: { row: SalesOrderListItem }) {
             <FlowBadge flow={row.flow} />
           </div>
           <p className="text-xs text-muted-foreground">
-            {row.pancakeOrderId ? `Pancake #${row.pancakeOrderId}` : 'Tạo trong ERP'} · tạo{' '}
-            {formatDateTime(row.createdAt)}
+            {row.pancakeOrderId ? (
+              <PancakeOrderLink orderId={row.pancakeOrderId} link={row.pancakeOrderLink} />
+            ) : (
+              'Tạo trong ERP'
+            )}{' '}
+            · tạo {formatDateTime(row.createdAt)}
             {row.ownerName ? ` · ${row.ownerName}` : ''}
           </p>
         </div>

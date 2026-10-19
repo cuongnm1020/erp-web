@@ -48,6 +48,7 @@ import { BulkShippingDialog } from './bulk-shipping-dialog';
 import { FlowBadge, OrderQuickView, TelcoBadge } from './order-quick-view';
 import { PancakeOrderResyncButton } from './pancake-order-resync-button';
 import { SendToCarrierMenu } from './send-to-carrier-menu';
+import { PancakeOrderLink } from './pancake-order-link';
 
 /**
  * D-03 Quản lý đơn hàng — GET /sales-orders + GET /sales-orders/flow-counts (thiết kế lại
@@ -116,7 +117,11 @@ const buildColumns = (
           </div>
           <div className="text-xs text-muted-foreground">
             <span className="rounded-sm bg-muted px-1.5 font-medium">
-              {o.pancakeOrderId ? `Pancake #${o.pancakeOrderId}` : 'ERP'}
+              {o.pancakeOrderId ? (
+                <PancakeOrderLink orderId={o.pancakeOrderId} link={o.pancakeOrderLink} />
+              ) : (
+                'ERP'
+              )}
             </span>
           </div>
           {/* Sale một dòng riêng dưới mã Pancake — tên sale dài không còn đẩy / cắt mã đơn nguồn. */}

@@ -60,6 +60,7 @@ import {
 import { groupOrderLines } from '../combo-lines';
 import { OrderPrintSheet } from './order-print-sheet';
 import { ReprintWaybillDialog } from './bulk-reprint-waybill-dialog';
+import { PancakeOrderLink } from './pancake-order-link';
 
 /**
  * D-04 Chi tiết đơn hàng — GET /sales-orders/{id}.
@@ -616,19 +617,7 @@ function Detail({ order }: { order: SalesOrderDetail }) {
             {order.pancakeOrderId ? (
               <>
                 {' '}
-                ·{' '}
-                {order.pancakeOrderLink ? (
-                  <a
-                    href={order.pancakeOrderLink}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="text-primary hover:underline"
-                  >
-                    Pancake #{order.pancakeOrderId}
-                  </a>
-                ) : (
-                  <>Pancake #{order.pancakeOrderId}</>
-                )}
+                · <PancakeOrderLink orderId={order.pancakeOrderId} link={order.pancakeOrderLink} />
               </>
             ) : null}
           </p>
