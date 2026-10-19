@@ -4,6 +4,7 @@ import { NextResponse } from 'next/server';
 import { serverEnv } from '../env';
 import { cookieNames } from './cookie-names';
 import {
+  DEFAULT_REFRESH_TTL_SECONDS,
   buildAuthCookies,
   buildClearCookies,
   type CookieSpec,
@@ -11,11 +12,36 @@ import {
 } from './cookies';
 
 /** Đọc token từ cookie httpOnly — chỉ route handler / RSC. */
-export async function readAuthCookies(): Promise<{ access?: string; refresh?: string }> {
+export async function readAuthCookies(): Promise<{
+  access?: string;
+  refresh?: string;
+  /** Có khi superadmin đang đăng nhập với tư cách người khác. */
+  adminRefresh?: string;
+}> {
   const env = serverEnv();
   const names = cookieNames(env.AUTH_COOKIE_PREFIX);
   const jar = await cookies();
-  return { access: jar.get(names.access)?.value, refresh: jar.get(names.refresh)?.value };
+  return {
+    access: jar.get(names.access)?.value,
+    refresh: jar.get(names.refresh)?.value,
+    adminRefresh: jar.get(names.adminRefresh)?.value,
+  };
+}
+
+/**
+ * Cất (value) / xoá (null) refresh token của superadmin khi bắt đầu / thôi đăng nhập thay. Cùng
+ * thuộc tính cookie auth: httpOnly, SameSite=Lax, Secure ở prod — không bao giờ tới JS.
+ */
+export function withAdminRefreshCookie(res: NextResponse, value: string | null): NextResponse {
+  const env = serverEnv();
+  res.cookies.set(cookieNames(env.AUTH_COOKIE_PREFIX).adminRefresh, value ?? '', {
+    httpOnly: true,
+    secure: env.isProd,
+    sameSite: 'lax',
+    path: '/',
+    maxAge: value ? DEFAULT_REFRESH_TTL_SECONDS : 0,
+  });
+  return res;
 }
 
 function apply(res: NextResponse, specs: CookieSpec[]): NextResponse {

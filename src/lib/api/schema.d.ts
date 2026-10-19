@@ -52,6 +52,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/auth/impersonate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Đăng nhập với tư cách người dùng (2026-10-19) — CHỈ superadmin, kiểm trong service. Trả cặp
+         *     token của người đó (mang claim imp); web giữ refresh của superadmin để quay lại.
+         */
+        post: operations["AuthController_impersonate"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/auth/me": {
         parameters: {
             query?: never;
@@ -5040,10 +5060,19 @@ export interface components {
         RefreshDto: {
             refreshToken: string;
         };
+        ImpersonateDto: {
+            /** Format: uuid */
+            userId: string;
+        };
         AuthWarehouseDto: {
             id: string;
             code: string;
             name: string;
+        };
+        AuthImpersonatorDto: {
+            userId: string;
+            code: string;
+            fullName: string;
         };
         AuthMeDto: {
             userId: string;
@@ -5065,6 +5094,8 @@ export interface components {
             /** @description Kho đang chọn theo header `X-Warehouse-Id` nếu được phép; null = tất cả kho / kho chọn không còn được phép. */
             selectedWarehouseId: string | null;
             deviceId?: string;
+            /** @description Đang được superadmin đăng nhập thay (2026-10-19) — web hiện thanh báo + nút quay lại; null = chính chủ. */
+            impersonator?: components["schemas"]["AuthImpersonatorDto"] | null;
         };
         PermissionDto: {
             id: string;
@@ -11702,6 +11733,29 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+        };
+    };
+    AuthController_impersonate: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ImpersonateDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TokenPairDto"];
+                };
             };
         };
     };

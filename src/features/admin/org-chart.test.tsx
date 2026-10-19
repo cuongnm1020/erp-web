@@ -176,6 +176,33 @@ describe('Sơ đồ nhân sự (/admin/org-tree, mặc định dạng sơ đồ)
     expect(puts[0]!.body).toMatchObject({ fbId: '1000123456789' });
   });
 
+  it('superadmin: "Đăng nhập với tư cách" gọi POST /auth/impersonate rồi tải lại trang chủ', async () => {
+    const posts: unknown[] = [];
+    server.use(
+      http.post('/api/auth/impersonate', async ({ request }) => {
+        posts.push(await request.json());
+        return new HttpResponse(null, { status: 204 });
+      }),
+    );
+    const assign = vi.fn();
+    vi.stubGlobal('location', { ...window.location, assign });
+    search = `dept=${SALES_HN.id}`;
+    renderApp(<OrgTreeScreen />);
+    fireEvent.click(
+      await screen.findByRole('button', { name: 'Đăng nhập với tư cách Trần Thị Hoa' }),
+    );
+    await waitFor(() => expect(assign).toHaveBeenCalledWith('/'));
+    expect(posts).toEqual([{ userId: SALES_HN.members[0]!.id }]);
+    vi.unstubAllGlobals();
+  });
+
+  it('không phải superadmin: không có nút đăng nhập với tư cách', async () => {
+    search = `dept=${SALES_HN.id}`;
+    renderApp(<OrgTreeScreen />, { me: ME_LEADER });
+    await screen.findByText('Trần Thị Hoa');
+    expect(screen.queryByRole('button', { name: /Đăng nhập với tư cách/ })).not.toBeInTheDocument();
+  });
+
   it('xóa phòng ban còn người → 409 DEPARTMENT_NOT_EMPTY hiện câu hướng dẫn', async () => {
     server.use(
       http.delete('/api/departments/:id', () =>
