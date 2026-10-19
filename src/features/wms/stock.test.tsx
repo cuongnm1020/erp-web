@@ -97,63 +97,112 @@ describe('StockScreen — nhập tồn thực tế (POST /cycle-counts/actual-st
     expect(new URL(urls[0]!).searchParams.get('erpOnly')).toBe('true');
   });
 
-  it('gõ số đếm → chênh lệch; SKU chưa giá vốn đếm thừa có ô giá (bỏ trống được); lưu gửi đúng body + Idempotency-Key', async () => {
+  it('admin (cả hai quyền): số lượng → actual-stock (Idempotency-Key), giá vốn → /stock/costs, số trước giá sau', async () => {
     search = '';
-    const posts: Array<{ key: string | null; body: unknown }> = [];
+    const calls: Array<{ url: string; key: string | null; body: unknown }> = [];
     server.use(
       http.post('/api/cycle-counts/actual-stock', async ({ request }) => {
-        posts.push({ key: request.headers.get('idempotency-key'), body: await request.json() });
+        calls.push({
+          url: 'actual',
+          key: request.headers.get('idempotency-key'),
+          body: await request.json(),
+        });
         return HttpResponse.json(
           { countId: 'cc-1', docNumber: 'CC2610-00001', adjustedSkuCount: 2, unchangedSkuCount: 0 },
           { status: 201 },
         );
       }),
+      http.post('/api/stock/costs', async ({ request }) => {
+        calls.push({ url: 'costs', key: null, body: await request.json() });
+        return HttpResponse.json({ updatedSkuCount: 1, layerCount: 1, skippedSkuIds: [] });
+      }),
     );
     renderApp(<StockScreen />, { warehouses: WH });
-    fireEvent.click(await screen.findByRole('button', { name: /Nhập tồn thực tế/ }));
+    fireEvent.click(await screen.findByRole('button', { name: /Nhập tồn & giá vốn/ }));
     expect(await screen.findByText('Kho HN-1')).toBeInTheDocument();
 
-    // SKU-0001: tồn 100, đã có giá vốn → đếm 90 = −10, không hỏi giá
+    // SKU-0001: tồn 100 → đếm 90 = −10; ô giá vốn gợi ý giá hiện tại
     fireEvent.change(await screen.findByLabelText('Tồn thực tế SKU-0001'), {
       target: { value: '90' },
     });
     expect(screen.getByText('−10')).toBeInTheDocument();
-    expect(screen.queryByLabelText('Giá vốn SKU-0001')).not.toBeInTheDocument();
-
-    // SKU-0002: tồn 107, chưa có giá vốn → đếm 120 hiện ô giá, bỏ trống vẫn lưu được
+    expect(screen.getByLabelText('Giá vốn SKU-0001')).toHaveAttribute(
+      'placeholder',
+      expect.stringContaining('12.000'),
+    );
+    // SKU-0002: chỉ đếm; SKU-0003: chỉ nhập giá (dấu chấm nghìn bị bỏ)
     fireEvent.change(screen.getByLabelText('Tồn thực tế SKU-0002'), { target: { value: '120' } });
-    const save = screen.getByRole('button', { name: 'Lưu tồn thực tế' });
-    expect(save).toBeEnabled();
-    fireEvent.change(screen.getByLabelText('Giá vốn SKU-0002'), { target: { value: '45.000' } });
-    expect(save).toBeEnabled();
-    fireEvent.click(save);
+    fireEvent.change(screen.getByLabelText('Giá vốn SKU-0003'), { target: { value: '45.000' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Lưu thay đổi' }));
 
-    await waitFor(() => expect(posts).toHaveLength(1));
-    expect(posts[0]!.key).toBeTruthy();
-    expect(posts[0]!.body).toEqual({
+    await waitFor(() => expect(calls).toHaveLength(2));
+    expect(calls[0]!.url).toBe('actual');
+    expect(calls[0]!.key).toBeTruthy();
+    expect(calls[0]!.body).toEqual({
       warehouseId: 'wh-1',
       lines: [
         { skuId: expect.any(String), qtyCounted: '90' },
-        { skuId: expect.any(String), qtyCounted: '120', unitCost: '45000' },
+        { skuId: expect.any(String), qtyCounted: '120' },
       ],
+    });
+    expect(calls[1]).toEqual({
+      url: 'costs',
+      key: null,
+      body: { lines: [{ skuId: expect.any(String), unitCost: '45000' }] },
     });
     // Lưu xong bản nháp trống
     await waitFor(() => expect(screen.getByLabelText('Tồn thực tế SKU-0001')).toHaveValue(''));
+    expect(screen.getByLabelText('Giá vốn SKU-0003')).toHaveValue('');
+  });
+
+  it('kho (stock.adjust, không stock.cost): không có cột giá vốn', async () => {
+    search = '';
+    renderApp(<StockScreen />, {
+      warehouses: WH,
+      me: { permissions: ['stock.read', 'stock.adjust'], hasGlobalAccess: false },
+    });
+    fireEvent.click(await screen.findByRole('button', { name: 'Nhập tồn thực tế' }));
+    expect(await screen.findByLabelText('Tồn thực tế SKU-0001')).toBeInTheDocument();
+    expect(screen.queryByLabelText('Giá vốn SKU-0001')).not.toBeInTheDocument();
+  });
+
+  it('kế toán (stock.cost, không stock.adjust): chỉ cột giá vốn, không cần chọn kho', async () => {
+    search = '';
+    forgetWarehouseSelection();
+    const costs: unknown[] = [];
+    server.use(
+      http.post('/api/stock/costs', async ({ request }) => {
+        costs.push(await request.json());
+        return HttpResponse.json({ updatedSkuCount: 1, layerCount: 2, skippedSkuIds: [] });
+      }),
+    );
+    renderApp(<StockScreen />, {
+      me: { permissions: ['stock.read', 'stock.cost'], hasGlobalAccess: false },
+    });
+    fireEvent.click(await screen.findByRole('button', { name: 'Nhập giá vốn' }));
+    const cost = await screen.findByLabelText('Giá vốn SKU-0002');
+    expect(cost).toHaveAttribute('placeholder', 'chưa có');
+    expect(screen.queryByLabelText('Tồn thực tế SKU-0002')).not.toBeInTheDocument();
+    fireEvent.change(cost, { target: { value: '30000' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Lưu thay đổi' }));
+    await waitFor(() =>
+      expect(costs).toEqual([{ lines: [{ skuId: expect.any(String), unitCost: '30000' }] }]),
+    );
   });
 
   it('đang xem tất cả kho → nhắc chọn kho, không có ô nhập', async () => {
     search = '';
     forgetWarehouseSelection(); // test trước đã chọn wh-1 — kho đang chọn là trạng thái cấp module
     renderApp(<StockScreen />);
-    fireEvent.click(await screen.findByRole('button', { name: /Nhập tồn thực tế/ }));
+    fireEvent.click(await screen.findByRole('button', { name: /Nhập tồn & giá vốn/ }));
     expect(await screen.findByText(/Chọn một kho ở ô kho làm việc/)).toBeInTheDocument();
     expect(screen.queryByLabelText('Tồn thực tế SKU-0001')).not.toBeInTheDocument();
   });
 
-  it('không có quyền điều chỉnh tồn → không có nút nhập tồn thực tế', async () => {
+  it('không có quyền điều chỉnh tồn / giá vốn → không có nút nhập', async () => {
     search = '';
     renderApp(<StockScreen />, { me: ME_SALE });
     await screen.findByText(/khớp bộ lọc|Bạn không có quyền/);
-    expect(screen.queryByRole('button', { name: /Nhập tồn thực tế/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Nhập tồn|Nhập giá vốn/ })).not.toBeInTheDocument();
   });
 });

@@ -22,7 +22,7 @@ import { Input } from '@/components/ui/input';
 import { toast } from '@/components/ui/toaster';
 import { cn } from '@/lib/cn';
 import { messageFor } from '@/lib/error-messages';
-import { formatDate, formatQuantity, formatRelative } from '@/lib/format';
+import { formatDate, formatMoney, formatQuantity, formatRelative } from '@/lib/format';
 import { useAbility } from '@/lib/permission';
 import { useInvalidateOn } from '@/lib/realtime';
 import { useListState, type SortState } from '@/lib/url-state';
@@ -30,6 +30,7 @@ import { ALL_WAREHOUSES, useWarehouse } from '@/lib/warehouse';
 import {
   stockKeys,
   useSetActualStock,
+  useSetSkuCosts,
   useStockBySku,
   useStockByLocation,
   useStockByLot,
@@ -68,8 +69,12 @@ import { isNegativeQty, locationTypeLabel } from '../labels';
  * đơn Pancake tự sinh, combo, SKU đã xoá) và chế độ "Nhập tồn thực tế" trên tab Theo SKU: người có
  * quyền điều chỉnh tồn gõ số đếm theo ĐVT cơ sở cho kho đang chọn, bản nháp giữ qua các trang,
  * Lưu → POST /cycle-counts/actual-stock ghi thẳng phần lệch (phiếu kiểm kê CC-… đã ghi sổ).
- * SKU chưa có giá vốn mà số đếm cao hơn tồn sổ có thêm ô giá vốn — bỏ trống = 0 (user chốt
- * 2026-10-19). SKU chưa có vị trí trong kho thì server đưa hàng vào vị trí DEFAULT của kho.
+ * Phần tồn tăng thêm của SKU chưa có giá vốn mang giá 0 (user chốt 2026-10-19); SKU chưa có vị trí
+ * trong kho thì server đưa hàng vào vị trí DEFAULT của kho.
+ *
+ * Nhập song song (2026-10-19): cột Tồn thực tế cho người có stock.adjust (kho, theo kho đang chọn),
+ * cột Giá vốn cho người có stock.cost (kế toán — POST /stock/costs đặt giá cho mọi tồn còn lại của
+ * SKU, không theo kho). Ai có quyền nào thấy cột đó; Lưu ghi số lượng trước rồi giá vốn.
  */
 const DEFAULTS = {
   size: 50,
@@ -84,21 +89,15 @@ const ACTUAL_BATCH = 200;
 const QTY_RE = /^\d+(\.\d{1,6})?$/;
 const COST_RE = /^\d+(\.\d{1,4})?$/;
 
+/** Bản nháp một SKU: số đếm (kho) và giá vốn (kế toán) độc lập — '' = không đổi phần đó. */
 interface CountDraft {
-  skuCode: string;
-  /** Tồn sổ của kho lúc gõ — chỉ để hiện chênh lệch; server tự tính lại lúc ghi. */
-  onHand: string;
-  hasCost: boolean;
   qty: string;
   unitCost: string;
 }
 
-/** Bản nháp đã hợp lệ chưa + có hiện ô giá vốn không (số đếm cao hơn tồn sổ, SKU chưa có giá). */
-function draftState(d: CountDraft): { qtyOk: boolean; needsCost: boolean; costOk: boolean } {
-  const qtyOk = QTY_RE.test(d.qty);
-  const needsCost = qtyOk && !d.hasCost && new Decimal(d.qty).greaterThan(d.onHand);
-  const costOk = !needsCost || d.unitCost === '' || COST_RE.test(d.unitCost);
-  return { qtyOk, needsCost, costOk };
+/** Dòng nháp sai định dạng (ô đã gõ mà không phải số hợp lệ). */
+function draftInvalid(d: CountDraft): boolean {
+  return (d.qty !== '' && !QTY_RE.test(d.qty)) || (d.unitCost !== '' && !COST_RE.test(d.unitCost));
 }
 
 interface CountContextValue {
@@ -152,19 +151,18 @@ function CountDiffCell({ row }: { row: StockRow }) {
   );
 }
 
+/** Giá vốn / ĐVT (kế toán): gợi ý = giá vốn hiện tại của tồn còn lại; trống = không đổi. */
 function CountCostCell({ row }: { row: StockRow }) {
   const ctx = useContext(CountContext)!;
   const d = ctx.drafts[row.skuId];
-  if (!d || !draftState(d).needsCost) {
-    return row.hasCost ? null : <span className="text-xs text-muted-foreground">chưa có</span>;
-  }
-  const invalid = d.unitCost !== '' && !COST_RE.test(d.unitCost);
+  const value = d?.unitCost ?? '';
+  const invalid = value !== '' && !COST_RE.test(value);
   return (
     <Input
       inputMode="decimal"
       aria-label={`Giá vốn ${row.skuCode}`}
-      placeholder="0"
-      value={d.unitCost}
+      placeholder={row.unitCost === null ? 'chưa có' : formatMoney(row.unitCost)}
+      value={value}
       onChange={(e) =>
         ctx.setDraft(row, { unitCost: e.target.value.trim().replace(/[.,\s]/g, '') })
       }
@@ -245,9 +243,7 @@ const skuColumns: ColumnDef<StockRow, unknown>[] = [
   },
 ];
 
-/** Tab Theo SKU ở chế độ nhập tồn thực tế: bỏ cột Ghi chú, thêm ô nhập + chênh lệch + giá vốn. */
-const countColumns: ColumnDef<StockRow, unknown>[] = [
-  ...skuColumns.filter((c) => c.id !== 'flags'),
+const qtyEditColumns: ColumnDef<StockRow, unknown>[] = [
   {
     id: 'actualQty',
     header: 'Tồn thực tế',
@@ -260,13 +256,23 @@ const countColumns: ColumnDef<StockRow, unknown>[] = [
     meta: { align: 'right', width: 110 },
     cell: ({ row }) => <CountDiffCell row={row.original} />,
   },
-  {
-    id: 'actualCost',
-    header: 'Giá vốn / ĐVT',
-    meta: { align: 'right', width: 140 },
-    cell: ({ row }) => <CountCostCell row={row.original} />,
-  },
 ];
+const costEditColumn: ColumnDef<StockRow, unknown> = {
+  id: 'actualCost',
+  header: 'Giá vốn / ĐVT',
+  meta: { align: 'right', width: 140 },
+  cell: ({ row }) => <CountCostCell row={row.original} />,
+};
+const baseEditColumns = skuColumns.filter((c) => c.id !== 'flags');
+/**
+ * Tab Theo SKU ở chế độ nhập: bỏ cột Ghi chú, thêm cột theo quyền. Ba biến thể khai sẵn ở cấp
+ * module để danh tính cột không đổi giữa các lần render (ô nhập không mất focus).
+ */
+const editColumns = {
+  qty: [...baseEditColumns, ...qtyEditColumns],
+  cost: [...baseEditColumns, costEditColumn],
+  both: [...baseEditColumns, ...qtyEditColumns, costEditColumn],
+} satisfies Record<string, ColumnDef<StockRow, unknown>[]>;
 
 const locationColumns: ColumnDef<StockByLocationRow, unknown>[] = [
   {
@@ -426,7 +432,9 @@ export function StockScreen() {
   const skuId = state.filters.skuId ?? '';
   const locationId = state.filters.locationId ?? '';
 
-  const canAdjust = useAbility().can('adjust', 'Stock');
+  const ability = useAbility();
+  const canAdjust = ability.can('adjust', 'Stock');
+  const canCost = ability.can('cost', 'Stock');
   const warehouse = useWarehouse();
   const countWarehouseId =
     warehouse.selected && warehouse.selected !== ALL_WAREHOUSES ? warehouse.selected : null;
@@ -436,20 +444,20 @@ export function StockScreen() {
   // Luật 4: key sinh LÚC BẤM, bấm lại sau lỗi dùng lại đúng key; bản nháp đổi → key mới.
   const saveKey = useRef<string | null>(null);
   const setActual = useSetActualStock();
+  const setCosts = useSetSkuCosts();
+  const saving = setActual.isPending || setCosts.isPending;
+  // Cột số lượng cần một kho cụ thể; cột giá vốn không theo kho.
+  const qtyEditable = canAdjust && countWarehouseId !== null;
+  const editMode = qtyEditable && canCost ? 'both' : qtyEditable ? 'qty' : canCost ? 'cost' : null;
+  const editLabel =
+    canAdjust && canCost ? 'Nhập tồn & giá vốn' : canCost ? 'Nhập giá vốn' : 'Nhập tồn thực tế';
 
   const setDraft = useCallback<CountContextValue['setDraft']>((row, patch) => {
     saveKey.current = null;
     setDrafts((prev) => {
-      const cur = prev[row.skuId] ?? {
-        skuCode: row.skuCode,
-        onHand: row.onHand,
-        hasCost: row.hasCost,
-        qty: '',
-        unitCost: '',
-      };
-      const next = { ...cur, ...patch };
-      // Xoá trắng số đếm = bỏ dòng khỏi bản nháp (không đổi tồn SKU đó).
-      if (next.qty === '') {
+      const next = { qty: '', unitCost: '', ...prev[row.skuId], ...patch };
+      // Xoá trắng cả hai ô = bỏ dòng khỏi bản nháp (không đổi gì SKU đó).
+      if (next.qty === '' && next.unitCost === '') {
         return Object.fromEntries(Object.entries(prev).filter(([id]) => id !== row.skuId));
       }
       return { ...prev, [row.skuId]: next };
@@ -458,10 +466,7 @@ export function StockScreen() {
   const countCtx = useMemo<CountContextValue>(() => ({ drafts, setDraft }), [drafts, setDraft]);
 
   const draftList = Object.entries(drafts);
-  const draftInvalid = draftList.filter(([, d]) => {
-    const st = draftState(d);
-    return !st.qtyOk || !st.costOk;
-  }).length;
+  const invalidCount = draftList.filter(([, d]) => draftInvalid(d)).length;
 
   const stopCounting = () => {
     setCounting(false);
@@ -469,39 +474,72 @@ export function StockScreen() {
     saveKey.current = null;
   };
 
+  /** Bỏ phần đã lưu (số lượng hoặc giá) khỏi bản nháp — lô sau lỗi không làm mất lô trước. */
+  const clearSaved = (ids: Set<string>, part: keyof CountDraft) =>
+    setDrafts((prev) =>
+      Object.fromEntries(
+        Object.entries(prev).flatMap(([id, d]) => {
+          if (!ids.has(id)) return [[id, d]];
+          const next = { ...d, [part]: '' };
+          return next.qty === '' && next.unitCost === '' ? [] : [[id, next]];
+        }),
+      ),
+    );
+
   const saveActual = async () => {
-    if (!countWarehouseId || draftList.length === 0 || draftInvalid > 0) return;
-    const key = (saveKey.current ??= crypto.randomUUID());
-    const lines = draftList.map(([id, d]) => ({
-      skuId: id,
-      qtyCounted: d.qty,
-      ...(draftState(d).needsCost && d.unitCost !== '' ? { unitCost: d.unitCost } : {}),
-    }));
-    let adjusted = 0;
-    let unchanged = 0;
-    const docs: string[] = [];
+    if (draftList.length === 0 || invalidCount > 0) return;
+    const qtyLines =
+      qtyEditable && countWarehouseId
+        ? draftList
+            .filter(([, d]) => d.qty !== '')
+            .map(([id, d]) => ({ skuId: id, qtyCounted: d.qty }))
+        : [];
+    const costLines = canCost
+      ? draftList
+          .filter(([, d]) => d.unitCost !== '')
+          .map(([id, d]) => ({ skuId: id, unitCost: d.unitCost }))
+      : [];
+    const done: string[] = [];
     try {
-      for (let i = 0; i < lines.length; i += ACTUAL_BATCH) {
-        const batch = lines.slice(i, i + ACTUAL_BATCH);
-        const r = await setActual.mutateAsync({
-          key: `${key}-${i / ACTUAL_BATCH}`,
-          body: { warehouseId: countWarehouseId, lines: batch },
-        });
-        adjusted += r.adjustedSkuCount;
-        unchanged += r.unchangedSkuCount;
-        if (r.docNumber) docs.push(r.docNumber);
-        // Lô đã ghi thì bỏ khỏi bản nháp — lô sau lỗi không làm mất lô trước.
-        const saved = new Set(batch.map((l) => l.skuId));
-        setDrafts((prev) =>
-          Object.fromEntries(Object.entries(prev).filter(([id]) => !saved.has(id))),
+      if (qtyLines.length && countWarehouseId) {
+        const key = (saveKey.current ??= crypto.randomUUID());
+        let adjusted = 0;
+        let unchanged = 0;
+        const docs: string[] = [];
+        for (let i = 0; i < qtyLines.length; i += ACTUAL_BATCH) {
+          const batch = qtyLines.slice(i, i + ACTUAL_BATCH);
+          const r = await setActual.mutateAsync({
+            key: `${key}-${i / ACTUAL_BATCH}`,
+            body: { warehouseId: countWarehouseId, lines: batch },
+          });
+          adjusted += r.adjustedSkuCount;
+          unchanged += r.unchangedSkuCount;
+          if (r.docNumber) docs.push(r.docNumber);
+          clearSaved(new Set(batch.map((l) => l.skuId)), 'qty');
+        }
+        saveKey.current = null;
+        done.push(
+          adjusted > 0
+            ? `tồn thực tế ${adjusted} SKU lệch${docs.length ? ` (${docs.join(', ')})` : ''}, ${unchanged} SKU khớp`
+            : `tồn thực tế ${unchanged} SKU khớp, không ghi gì`,
         );
       }
-      saveKey.current = null;
-      toast.success(
-        adjusted > 0
-          ? `Đã lưu tồn thực tế: ${adjusted} SKU lệch đã ghi${docs.length ? ` (${docs.join(', ')})` : ''}, ${unchanged} SKU khớp`
-          : `Đã lưu tồn thực tế: ${unchanged} SKU khớp tồn hệ thống, không ghi gì`,
-      );
+      // Giá vốn SAU số lượng: phần tồn vừa tăng thêm cũng nhận giá kế toán nhập.
+      if (costLines.length) {
+        let updated = 0;
+        let skipped = 0;
+        for (let i = 0; i < costLines.length; i += ACTUAL_BATCH) {
+          const batch = costLines.slice(i, i + ACTUAL_BATCH);
+          const r = await setCosts.mutateAsync({ lines: batch });
+          updated += r.updatedSkuCount;
+          skipped += r.skippedSkuIds.length;
+          clearSaved(new Set(batch.map((l) => l.skuId)), 'unitCost');
+        }
+        done.push(
+          `giá vốn ${updated} SKU${skipped ? ` (${skipped} SKU không còn tồn — không đổi)` : ''}`,
+        );
+      }
+      if (done.length) toast.success(`Đã lưu ${done.join('; ')}`);
     } catch (err) {
       saveKey.current = null;
       toast.error(messageFor(err));
@@ -566,7 +604,7 @@ export function StockScreen() {
         }
         breadcrumb={[{ label: 'Kho' }, { label: 'Tồn kho' }]}
         actions={
-          canAdjust && !counting ? (
+          (canAdjust || canCost) && !counting ? (
             <Button
               variant="outline"
               onClick={() => {
@@ -575,7 +613,7 @@ export function StockScreen() {
               }}
             >
               <ClipboardCheck className="h-4 w-4" aria-hidden />
-              Nhập tồn thực tế
+              {editLabel}
             </Button>
           ) : null
         }
@@ -583,26 +621,33 @@ export function StockScreen() {
 
       {counting ? (
         <div className="flex flex-col gap-1 rounded-md border border-primary/40 bg-primary/5 px-3 py-2 text-xs">
-          {countWarehouseId ? (
+          {canAdjust ? (
+            countWarehouseId ? (
+              <span>
+                Đang nhập tồn thực tế cho kho{' '}
+                <b className="font-semibold text-foreground">{countWarehouseName ?? 'đang chọn'}</b>
+                . Gõ số đếm theo <b className="font-semibold">ĐVT cơ sở</b> vào cột Tồn thực tế
+                (Enter sang dòng dưới), để trống là không đổi. Hệ thống ghi phần chênh lệch vào tồn
+                và sinh phiếu kiểm kê đã ghi sổ để tra lại. Sản phẩm chưa có vị trí trong kho được
+                đưa vào vị trí DEFAULT để lên đơn được ngay; tồn tăng thêm chưa có giá vốn tính giá
+                0 tới khi kế toán nhập giá. Tồn thực tế không được thấp hơn phần đang giữ cho đơn.
+              </span>
+            ) : (
+              <span className="text-destructive">
+                Đang xem tất cả kho. Chọn một kho ở ô kho làm việc (thanh bên trái) để nhập tồn thực
+                tế cho kho đó.
+              </span>
+            )
+          ) : null}
+          {canCost ? (
             <span>
-              Đang nhập tồn thực tế cho kho{' '}
-              <b className="font-semibold text-foreground">{countWarehouseName ?? 'đang chọn'}</b>.
-              Gõ số đếm theo <b className="font-semibold">ĐVT cơ sở</b> vào cột Tồn thực tế (Enter
-              sang dòng dưới), để trống là không đổi. Số đã gõ giữ nguyên khi tìm kiếm hay sang
-              trang. Bấm <b className="font-semibold">Lưu tồn thực tế</b> để ghi phần chênh lệch vào
-              tồn — hệ thống sinh phiếu kiểm kê đã ghi sổ để tra lại.
+              Cột <b className="font-semibold">Giá vốn / ĐVT</b>: giá mới áp cho toàn bộ tồn còn lại
+              của sản phẩm ở mọi kho; ô mờ là giá vốn hiện tại, để trống là không đổi. Đơn đã đóng
+              gói giữ giá vốn cũ.
             </span>
-          ) : (
-            <span className="text-destructive">
-              Đang xem tất cả kho. Chọn một kho ở ô kho làm việc (thanh bên trái) để nhập tồn thực
-              tế cho kho đó.
-            </span>
-          )}
+          ) : null}
           <span className="text-muted-foreground">
-            Sản phẩm chưa có giá vốn mà tồn thực tế cao hơn tồn hệ thống có thêm ô giá vốn / ĐVT cơ
-            sở (dùng tính lãi lỗ) — bỏ trống tính là 0. Sản phẩm chưa có vị trí trong kho được đưa
-            vào vị trí DEFAULT để lên đơn được ngay. Tồn thực tế không được thấp hơn phần đang giữ
-            cho đơn.
+            Số đã gõ giữ nguyên khi tìm kiếm hay sang trang.
           </span>
         </div>
       ) : null}
@@ -665,7 +710,7 @@ export function StockScreen() {
         <CountContext.Provider value={countCtx}>
           <StockTable
             query={bySku}
-            columns={counting && countWarehouseId ? countColumns : skuColumns}
+            columns={counting && editMode ? editColumns[editMode] : skuColumns}
             getRowId={(r) => r.skuId}
             skeletonColumns={counting ? 9 : 7}
             empty={empty}
@@ -678,27 +723,22 @@ export function StockScreen() {
         <div className="sticky bottom-0 flex flex-wrap items-center gap-2 border-t bg-background py-2">
           <span className="text-sm">
             <b className="font-semibold">{draftList.length}</b> SKU đã nhập
-            {draftInvalid > 0 ? (
+            {invalidCount > 0 ? (
               <span className="text-destructive">
                 {' '}
-                · {draftInvalid} dòng chưa hợp lệ (số lượng hoặc giá vốn sai định dạng)
+                · {invalidCount} dòng chưa hợp lệ (số lượng hoặc giá vốn sai định dạng)
               </span>
             ) : null}
           </span>
           <div className="ml-auto flex gap-2">
-            <Button variant="outline" onClick={stopCounting} disabled={setActual.isPending}>
+            <Button variant="outline" onClick={stopCounting} disabled={saving}>
               {draftList.length > 0 ? 'Bỏ nhập' : 'Đóng'}
             </Button>
             <Button
               onClick={() => void saveActual()}
-              disabled={
-                !countWarehouseId ||
-                draftList.length === 0 ||
-                draftInvalid > 0 ||
-                setActual.isPending
-              }
+              disabled={editMode === null || draftList.length === 0 || invalidCount > 0 || saving}
             >
-              {setActual.isPending ? 'Đang lưu…' : 'Lưu tồn thực tế'}
+              {saving ? 'Đang lưu…' : 'Lưu thay đổi'}
             </Button>
           </div>
         </div>
