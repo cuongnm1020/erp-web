@@ -97,7 +97,7 @@ describe('StockScreen — nhập tồn thực tế (POST /cycle-counts/actual-st
     expect(new URL(urls[0]!).searchParams.get('erpOnly')).toBe('true');
   });
 
-  it('gõ số đếm → chênh lệch; SKU chưa giá vốn đếm thừa phải nhập giá; lưu gửi đúng body + Idempotency-Key', async () => {
+  it('gõ số đếm → chênh lệch; SKU chưa giá vốn đếm thừa có ô giá (bỏ trống được); lưu gửi đúng body + Idempotency-Key', async () => {
     search = '';
     const posts: Array<{ key: string | null; body: unknown }> = [];
     server.use(
@@ -120,10 +120,10 @@ describe('StockScreen — nhập tồn thực tế (POST /cycle-counts/actual-st
     expect(screen.getByText('−10')).toBeInTheDocument();
     expect(screen.queryByLabelText('Giá vốn SKU-0001')).not.toBeInTheDocument();
 
-    // SKU-0002: tồn 107, chưa có giá vốn → đếm 120 phải nhập giá
+    // SKU-0002: tồn 107, chưa có giá vốn → đếm 120 hiện ô giá, bỏ trống vẫn lưu được
     fireEvent.change(screen.getByLabelText('Tồn thực tế SKU-0002'), { target: { value: '120' } });
     const save = screen.getByRole('button', { name: 'Lưu tồn thực tế' });
-    expect(save).toBeDisabled();
+    expect(save).toBeEnabled();
     fireEvent.change(screen.getByLabelText('Giá vốn SKU-0002'), { target: { value: '45.000' } });
     expect(save).toBeEnabled();
     fireEvent.click(save);

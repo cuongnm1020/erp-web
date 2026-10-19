@@ -11226,7 +11226,7 @@ export interface components {
             qtyCounted: string;
             /**
              * @description Giá vốn / ĐVT cơ sở cho phần THỪA, Decimal(18,4) chuỗi. Bỏ trống = lô giá vốn gần nhất của
-             *     SKU; SKU chưa có lô giá nào mà đếm thừa → 422 ACTUAL_STOCK_COST_REQUIRED.
+             *     SKU; SKU chưa có lô giá nào → 0.
              */
             unitCost?: string;
             /** @description Lý do lệch — bỏ trống ghi "Nhập tồn thực tế". */

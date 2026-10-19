@@ -20,7 +20,6 @@ import { PageHeader } from '@/components/layout/page-header';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { toast } from '@/components/ui/toaster';
-import { ApiError } from '@/lib/api/errors';
 import { cn } from '@/lib/cn';
 import { messageFor } from '@/lib/error-messages';
 import { formatDate, formatQuantity, formatRelative } from '@/lib/format';
@@ -69,7 +68,8 @@ import { isNegativeQty, locationTypeLabel } from '../labels';
  * đơn Pancake tự sinh, combo, SKU đã xoá) và chế độ "Nhập tồn thực tế" trên tab Theo SKU: người có
  * quyền điều chỉnh tồn gõ số đếm theo ĐVT cơ sở cho kho đang chọn, bản nháp giữ qua các trang,
  * Lưu → POST /cycle-counts/actual-stock ghi thẳng phần lệch (phiếu kiểm kê CC-… đã ghi sổ).
- * SKU chưa có giá vốn mà số đếm cao hơn tồn sổ phải nhập giá vốn (user chốt — FIFO cần lô giá).
+ * SKU chưa có giá vốn mà số đếm cao hơn tồn sổ có thêm ô giá vốn — bỏ trống = 0 (user chốt
+ * 2026-10-19). SKU chưa có vị trí trong kho thì server đưa hàng vào vị trí DEFAULT của kho.
  */
 const DEFAULTS = {
   size: 50,
@@ -93,18 +93,16 @@ interface CountDraft {
   unitCost: string;
 }
 
-/** Bản nháp đã hợp lệ chưa + có cần giá vốn không (số đếm cao hơn tồn sổ, SKU chưa có giá). */
+/** Bản nháp đã hợp lệ chưa + có hiện ô giá vốn không (số đếm cao hơn tồn sổ, SKU chưa có giá). */
 function draftState(d: CountDraft): { qtyOk: boolean; needsCost: boolean; costOk: boolean } {
   const qtyOk = QTY_RE.test(d.qty);
   const needsCost = qtyOk && !d.hasCost && new Decimal(d.qty).greaterThan(d.onHand);
-  const costOk = !needsCost || COST_RE.test(d.unitCost);
+  const costOk = !needsCost || d.unitCost === '' || COST_RE.test(d.unitCost);
   return { qtyOk, needsCost, costOk };
 }
 
 interface CountContextValue {
   drafts: Record<string, CountDraft>;
-  /** SKU server báo thiếu giá vốn ở lần lưu trước — tô đỏ ô giá. */
-  costMissing: string | null;
   setDraft: (row: StockRow, patch: Partial<Pick<CountDraft, 'qty' | 'unitCost'>>) => void;
 }
 
@@ -160,20 +158,18 @@ function CountCostCell({ row }: { row: StockRow }) {
   if (!d || !draftState(d).needsCost) {
     return row.hasCost ? null : <span className="text-xs text-muted-foreground">chưa có</span>;
   }
-  const invalid =
-    (d.unitCost !== '' && !COST_RE.test(d.unitCost)) ||
-    (ctx.costMissing === row.skuId && d.unitCost === '');
+  const invalid = d.unitCost !== '' && !COST_RE.test(d.unitCost);
   return (
     <Input
       inputMode="decimal"
       aria-label={`Giá vốn ${row.skuCode}`}
-      placeholder="Bắt buộc"
+      placeholder="0"
       value={d.unitCost}
       onChange={(e) =>
         ctx.setDraft(row, { unitCost: e.target.value.trim().replace(/[.,\s]/g, '') })
       }
       aria-invalid={invalid || undefined}
-      className={cn('h-8 text-right', (invalid || d.unitCost === '') && 'border-destructive')}
+      className={cn('h-8 text-right', invalid && 'border-destructive')}
     />
   );
 }
@@ -437,7 +433,6 @@ export function StockScreen() {
   const countWarehouseName = warehouse.options.find((o) => o.id === countWarehouseId)?.name;
   const [counting, setCounting] = useState(false);
   const [drafts, setDrafts] = useState<Record<string, CountDraft>>({});
-  const [costMissing, setCostMissing] = useState<string | null>(null);
   // Luật 4: key sinh LÚC BẤM, bấm lại sau lỗi dùng lại đúng key; bản nháp đổi → key mới.
   const saveKey = useRef<string | null>(null);
   const setActual = useSetActualStock();
@@ -460,10 +455,7 @@ export function StockScreen() {
       return { ...prev, [row.skuId]: next };
     });
   }, []);
-  const countCtx = useMemo<CountContextValue>(
-    () => ({ drafts, costMissing, setDraft }),
-    [drafts, costMissing, setDraft],
-  );
+  const countCtx = useMemo<CountContextValue>(() => ({ drafts, setDraft }), [drafts, setDraft]);
 
   const draftList = Object.entries(drafts);
   const draftInvalid = draftList.filter(([, d]) => {
@@ -474,7 +466,6 @@ export function StockScreen() {
   const stopCounting = () => {
     setCounting(false);
     setDrafts({});
-    setCostMissing(null);
     saveKey.current = null;
   };
 
@@ -484,7 +475,7 @@ export function StockScreen() {
     const lines = draftList.map(([id, d]) => ({
       skuId: id,
       qtyCounted: d.qty,
-      ...(draftState(d).needsCost ? { unitCost: d.unitCost } : {}),
+      ...(draftState(d).needsCost && d.unitCost !== '' ? { unitCost: d.unitCost } : {}),
     }));
     let adjusted = 0;
     let unchanged = 0;
@@ -506,7 +497,6 @@ export function StockScreen() {
         );
       }
       saveKey.current = null;
-      setCostMissing(null);
       toast.success(
         adjusted > 0
           ? `Đã lưu tồn thực tế: ${adjusted} SKU lệch đã ghi${docs.length ? ` (${docs.join(', ')})` : ''}, ${unchanged} SKU khớp`
@@ -514,10 +504,6 @@ export function StockScreen() {
       );
     } catch (err) {
       saveKey.current = null;
-      if (err instanceof ApiError && err.code === 'ACTUAL_STOCK_COST_REQUIRED') {
-        const d = err.details as { skuId?: unknown } | null;
-        setCostMissing(typeof d?.skuId === 'string' ? d.skuId : null);
-      }
       toast.error(messageFor(err));
     }
   };
@@ -613,8 +599,10 @@ export function StockScreen() {
             </span>
           )}
           <span className="text-muted-foreground">
-            Sản phẩm chưa có giá vốn mà tồn thực tế cao hơn tồn hệ thống cần nhập giá vốn / ĐVT cơ
-            sở (dùng tính lãi lỗ). Tồn thực tế không được thấp hơn phần đang giữ cho đơn.
+            Sản phẩm chưa có giá vốn mà tồn thực tế cao hơn tồn hệ thống có thêm ô giá vốn / ĐVT cơ
+            sở (dùng tính lãi lỗ) — bỏ trống tính là 0. Sản phẩm chưa có vị trí trong kho được đưa
+            vào vị trí DEFAULT để lên đơn được ngay. Tồn thực tế không được thấp hơn phần đang giữ
+            cho đơn.
           </span>
         </div>
       ) : null}
@@ -693,7 +681,7 @@ export function StockScreen() {
             {draftInvalid > 0 ? (
               <span className="text-destructive">
                 {' '}
-                · {draftInvalid} dòng chưa hợp lệ (số lượng sai định dạng hoặc thiếu giá vốn)
+                · {draftInvalid} dòng chưa hợp lệ (số lượng hoặc giá vốn sai định dạng)
               </span>
             ) : null}
           </span>
