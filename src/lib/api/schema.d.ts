@@ -100,6 +100,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/roles/assignable": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Vai trò được phép cấp khi tạo nhân sự — chỉ cần đăng nhập (quản lý kho / trưởng phòng không có
+         *     role.read). Khai báo TRƯỚC `roles/:code` để không bị bắt nhầm làm mã vai trò.
+         */
+        get: operations["RbacController_assignableRoles"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/roles/{code}": {
         parameters: {
             query?: never;
@@ -11741,6 +11761,25 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["RoleDto"];
+                };
+            };
+        };
+    };
+    RbacController_assignableRoles: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RoleDto"][];
                 };
             };
         };

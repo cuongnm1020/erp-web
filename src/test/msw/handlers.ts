@@ -1769,6 +1769,7 @@ export const handlers = [
     });
   }),
   http.get('/api/roles', () => HttpResponse.json(ROLES_FIXTURE)),
+  http.get('/api/roles/assignable', () => HttpResponse.json(ROLES_FIXTURE)),
   http.put('/api/roles/:code', async ({ params, request }) => {
     const body = (await request.json()) as { permissions?: string[] };
     const role = ROLES_FIXTURE.find((r) => r.code === params.code);

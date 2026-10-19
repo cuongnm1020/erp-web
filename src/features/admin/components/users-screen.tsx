@@ -10,7 +10,7 @@ import { StatusBadge } from '@/components/data/status-badge';
 import { PageHeader } from '@/components/layout/page-header';
 import { Button } from '@/components/ui/button';
 import { formatDate } from '@/lib/format';
-import { Can } from '@/lib/permission';
+import { Can, useAbility } from '@/lib/permission';
 import { useListState } from '@/lib/url-state';
 import { toUserSort, useUsers, type UserListItem } from '../api/use-users';
 import { useRoles } from '../api/use-roles';
@@ -120,7 +120,8 @@ const columns: ColumnDef<UserListItem, unknown>[] = [
 export function UsersScreen() {
   const { state, set, skipTake } = useListState<FilterKey>(DEFAULTS);
   const [createOpen, setCreateOpen] = useState(false);
-  const roles = useRoles();
+  // Bộ lọc vai trò cần role.read — quản lý kho (không có) thì bỏ trống ô lọc, không gọi 403.
+  const roles = useRoles(useAbility().can('read', 'Role'));
 
   const params = useMemo(
     () => ({

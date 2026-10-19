@@ -68,7 +68,9 @@ function InfoRow({ label, value }: { label: string; value: React.ReactNode }) {
 
 /** Khối Vai trò: checkbox theo danh sách role thật, lưu qua PUT /users/:id/roles (thay hết). */
 function RolesSection({ user, canEdit }: { user: UserDetail; canEdit: boolean }) {
-  const roles = useRoles();
+  // Không có role.read (quản lý kho): chỉ xem vai trò đang có của người này, không gọi 403.
+  const canReadRoles = useAbility().can('read', 'Role');
+  const roles = useRoles(canReadRoles);
   const assign = useAssignRoles(user.id);
   const serverCodes = user.roles.map((r) => r.code).sort();
   const [selected, setSelected] = useState<string[]>(serverCodes);
@@ -101,6 +103,14 @@ function RolesSection({ user, canEdit }: { user: UserDetail; canEdit: boolean })
         </p>
       ) : (
         <div className="space-y-1.5">
+          {!canReadRoles
+            ? user.roles.map((r) => (
+                <p key={r.code} className="flex items-center gap-2 text-sm">
+                  <span>{r.name}</span>
+                  <span className="font-mono text-xs text-muted-foreground">{r.code}</span>
+                </p>
+              ))
+            : null}
           {(roles.data ?? []).map((r) => (
             <label key={r.code} className="flex items-center gap-2 text-sm">
               <Checkbox
