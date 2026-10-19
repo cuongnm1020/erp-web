@@ -234,55 +234,29 @@
 
 @layer components {
   /*
-   * Sơ đồ nhân sự (features/admin/components/org-chart.tsx): cây dọc, đường nối vẽ bằng
-   * ::before/::after — mỗi <li> vẽ nửa thanh ngang trái/phải + đoạn dọc xuống ô của nó.
+   * Sơ đồ nhân sự (features/admin/components/org-chart.tsx): cây DỌC thụt lề (2026-10-19) — con
+   * xếp dưới cha, lùi vào một nấc. Mỗi <li> cấp con vẽ ::before = khuỷu (đoạn dọc từ trên xuống
+   * ngang tâm ô + đoạn ngang vào ô) và ::after = đoạn dọc nối xuống anh em kế tiếp. Trục dọc nằm
+   * đúng dưới nút thu gọn / mở rộng của ô cha (left-4).
    */
-  .org-chart ul {
-    @apply relative flex justify-center pt-5;
+  .org-chart ul ul {
+    @apply ml-4 pl-5;
   }
   .org-chart li {
-    @apply relative flex flex-col items-center px-1.5 pt-5;
-  }
-  .org-chart li::before,
-  .org-chart li::after {
-    content: '';
-    @apply absolute top-0 h-5 w-1/2 border-t border-input;
-  }
-  .org-chart li::before {
-    @apply right-1/2;
-  }
-  .org-chart li::after {
-    @apply left-1/2 border-l;
-  }
-  .org-chart li:only-child::before,
-  .org-chart li:only-child::after {
-    @apply hidden;
-  }
-  .org-chart li:only-child {
-    @apply pt-0;
-  }
-  .org-chart li:first-child::before,
-  .org-chart li:last-child::after {
-    @apply border-0;
-  }
-  .org-chart li:last-child::before {
-    @apply rounded-tr border-r;
-  }
-  .org-chart li:first-child::after {
-    @apply rounded-tl;
-  }
-  .org-chart ul ul::before {
-    content: '';
-    @apply absolute left-1/2 top-0 h-5 border-l border-input;
-  }
-  .org-chart > ul {
-    @apply pt-0;
+    @apply relative pt-2;
   }
   .org-chart > ul > li {
     @apply pt-0;
   }
-  .org-chart > ul > li::before,
-  .org-chart > ul > li::after {
+  .org-chart ul ul > li::before {
+    content: '';
+    @apply absolute -left-5 top-0 h-6 w-5 rounded-bl border-b border-l border-input;
+  }
+  .org-chart ul ul > li::after {
+    content: '';
+    @apply absolute -left-5 bottom-0 top-6 border-l border-input;
+  }
+  .org-chart ul ul > li:last-child::after {
     @apply hidden;
   }
 }

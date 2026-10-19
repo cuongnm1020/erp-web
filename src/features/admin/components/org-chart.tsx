@@ -6,9 +6,10 @@ import { cn } from '@/lib/cn';
 import type { OrgDepartmentNode } from '../api/use-org-tree';
 
 /**
- * Sơ đồ nhân sự dạng cây dọc (giống sơ đồ giấy của công ty): mỗi ô = một phòng ban, hiện
- * "Tên: số người" (cộng dồn cả phòng ban con) và trưởng phòng. Chỉ vẽ — dữ liệu từ
- * GET /org/tree, đường nối vẽ bằng CSS `.org-chart` (globals.css).
+ * Sơ đồ nhân sự dạng cây dọc thụt lề (2026-10-19 — trước là cây trải ngang, một cấp nhiều phòng
+ * ban tràn ngang màn hình): mỗi ô = một phòng ban, hiện "Tên: số người" (cộng dồn cả phòng ban
+ * con) và trưởng phòng; con xếp dưới cha, lùi vào một nấc. Chỉ vẽ — dữ liệu từ GET /org/tree,
+ * đường nối vẽ bằng CSS `.org-chart` (globals.css).
  *
  * Màu: các ô "thân" (công ty → ban giám đốc, mỗi cấp chỉ một con) dùng màu chính; từ cấp đầu
  * tiên có nhiều nhánh, mỗi nhánh một màu `branch-N` và con cháu kế thừa màu nhánh.
@@ -77,7 +78,7 @@ export function OrgChart({
   const rootTone = (i: number): Tone =>
     roots.length > 1 ? { kind: 'head', branch: i } : { kind: 'trunk' };
   return (
-    <div className="org-chart inline-block min-w-full px-4 pb-6 pt-2">
+    <div className="org-chart p-4">
       <ul>
         {roots.map((n, i) => (
           <ChartNode
@@ -121,12 +122,12 @@ function ChartNode({
   // Mở link `?dept=` (hoặc chọn ô ở mép) → cuộn ô vào giữa khung; jsdom không có scrollIntoView.
   const boxRef = useRef<HTMLButtonElement>(null);
   useEffect(() => {
-    if (selected) boxRef.current?.scrollIntoView?.({ block: 'nearest', inline: 'center' });
+    if (selected) boxRef.current?.scrollIntoView?.({ block: 'nearest', inline: 'nearest' });
   }, [selected]);
 
   return (
     <li>
-      <div className="relative">
+      <div className="relative w-fit">
         <button
           ref={boxRef}
           type="button"
@@ -134,7 +135,7 @@ function ChartNode({
           aria-pressed={selected}
           aria-label={`${node.name}: ${node.memberCount} người${node.managerName ? `, trưởng phòng ${node.managerName}` : ''}`}
           className={cn(
-            'flex min-w-28 max-w-44 flex-col items-center rounded-md border px-3 py-1.5 text-center text-xs leading-tight shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2',
+            'flex min-w-44 max-w-72 flex-col items-start rounded-md border px-3 py-1.5 text-left text-xs leading-tight shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2',
             tone.kind === 'trunk' && 'border-primary bg-primary text-primary-foreground',
             tone.kind === 'head' && cn('border-transparent font-semibold', palette!.head),
             tone.kind === 'box' && cn('text-foreground', palette!.box),
@@ -163,7 +164,7 @@ function ChartNode({
             aria-label={open ? `Thu gọn ${node.name}` : `Mở rộng ${node.name}`}
             aria-expanded={open}
             className={cn(
-              'absolute -bottom-2 left-1/2 z-10 flex h-4 w-4 -translate-x-1/2 items-center justify-center rounded-full border border-input bg-background text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+              'absolute -bottom-2 left-4 z-10 flex h-4 w-4 -translate-x-1/2 items-center justify-center rounded-full border border-input bg-background text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
               palette && palette.text,
             )}
           >
@@ -202,4 +203,29 @@ export function pathTo(roots: OrgDepartmentNode[], id: string): OrgDepartmentNod
     if (sub.length) return [r, ...sub];
   }
   return [];
+}
+
+/**
+ * Mặc định thu gọn (2026-10-19): mở "thân" (chuỗi một con từ gốc, vd công ty → ban giám đốc) tới
+ * cấp đầu tiên tách nhiều nhánh; các nhánh từ đó trở xuống thu gọn. Phòng ban đang chọn (`?dept=`)
+ * luôn hiện — mở mọi tổ tiên của nó.
+ */
+export function defaultCollapsed(
+  roots: OrgDepartmentNode[],
+  selectedId: string | null,
+): Set<string> {
+  const out = new Set<string>();
+  const collapseAll = (nodes: OrgDepartmentNode[]) => {
+    for (const n of nodes) {
+      if (n.children.length > 0) out.add(n.id);
+      collapseAll(n.children);
+    }
+  };
+  // Thân: một gốc → đi xuống khi mỗi cấp chỉ một con; nhiều gốc = tách nhánh ngay cấp 0.
+  let level = roots;
+  while (level.length === 1 && level[0]!.children.length > 0) level = level[0]!.children;
+  if (level === roots && roots.length > 1) collapseAll(roots);
+  else collapseAll(level);
+  if (selectedId) for (const a of pathTo(roots, selectedId).slice(0, -1)) out.delete(a.id);
+  return out;
 }
