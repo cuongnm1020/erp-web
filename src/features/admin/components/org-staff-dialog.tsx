@@ -32,14 +32,18 @@ import {
 import { toast } from '@/components/ui/toaster';
 import type { ApiError } from '@/lib/api/errors';
 import type { OrgEmployee } from '../api/use-org-tree';
+import { useUpdateUserPancakeProfile, useUserPancakeProfile } from '../api/use-pancake-profile';
 import { useUpdateUser } from '../api/use-users';
 import { editStaffSchema, type EditStaffValues } from '../schema';
+import { PancakeProfileSection } from './pancake-profile-section';
 
 const NONE = '__none__';
 
 /**
  * Sửa nhân sự ngay trên Sơ đồ nhân sự — PATCH /users/{id} (họ tên, email, phòng ban, đặt lại
- * mật khẩu). Chỉ mở với nhân sự `canManage` (người tạo / superadmin); server vẫn kiểm.
+ * mật khẩu) + Facebook ID Pancake (PUT /users/{id}/pancake-profile, 2026-10-19: trưởng nhóm kinh
+ * doanh khai fb_id cho nhân viên phòng mình → đơn Pancake về đúng người). Chỉ mở với nhân sự
+ * `canManage` (trưởng phòng / người tạo / superadmin); server vẫn kiểm.
  * `departments`: các phòng ban người xem được chuyển tới (canAddMembers trên cây).
  */
 export function OrgStaffDialog({
@@ -55,6 +59,8 @@ export function OrgStaffDialog({
   onOpenChange: (open: boolean) => void;
 }) {
   const update = useUpdateUser(employee.id);
+  const pancakeProfile = useUserPancakeProfile(employee.id);
+  const updatePancakeProfile = useUpdateUserPancakeProfile(employee.id);
   const form = useForm<EditStaffValues>({
     resolver: zodResolver(editStaffSchema),
     defaultValues: {
@@ -98,7 +104,7 @@ export function OrgStaffDialog({
 
   return (
     <Dialog open onOpenChange={(o) => !update.isPending && onOpenChange(o)}>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-lg">
         <DialogHeader>
           <DialogTitle>Sửa nhân sự {employee.code}</DialogTitle>
           <DialogDescription>
@@ -197,6 +203,7 @@ export function OrgStaffDialog({
             </DialogFooter>
           </form>
         </Form>
+        <PancakeProfileSection query={pancakeProfile} mutation={updatePancakeProfile} canEdit />
       </DialogContent>
     </Dialog>
   );

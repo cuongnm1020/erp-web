@@ -4960,6 +4960,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
+        /**
+         * Không gắn @RequirePermission: user.read HOẶC quản lý được người này (trưởng phòng / trưởng nhóm
+         *     kinh doanh sửa fb_id cho nhân viên phòng mình, 2026-10-19) — kiểm trong service.
+         */
         get: operations["UserPancakeProfileController_get"];
         /** Không gắn @RequirePermission — như PATCH /users/:id, quyền sửa kiểm trong service. */
         put: operations["UserPancakeProfileController_update"];
