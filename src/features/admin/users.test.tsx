@@ -61,6 +61,39 @@ describe('UsersScreen — GET /users (I-01)', () => {
     expect(rolesCalled).toBe(false);
   });
 
+  it('superadmin: nút đăng nhập với tư cách trên dòng (trừ superadmin / tài khoản khóa)', async () => {
+    const posts: unknown[] = [];
+    server.use(
+      http.post('/api/auth/impersonate', async ({ request }) => {
+        posts.push(await request.json());
+        return new HttpResponse(null, { status: 204 });
+      }),
+    );
+    const assign = vi.fn();
+    vi.stubGlobal('location', { ...window.location, assign });
+    renderApp(<UsersScreen />);
+    await screen.findByText('Nhân viên 1');
+    const users = makeUsers(7);
+    expect(
+      screen.queryByRole('button', { name: `Đăng nhập với tư cách ${users[0]!.fullName}` }),
+    ).toBeNull();
+    expect(
+      screen.queryByRole('button', { name: `Đăng nhập với tư cách ${users[6]!.fullName}` }),
+    ).toBeNull();
+    fireEvent.click(
+      screen.getByRole('button', { name: `Đăng nhập với tư cách ${users[1]!.fullName}` }),
+    );
+    await waitFor(() => expect(assign).toHaveBeenCalledWith('/'));
+    expect(posts).toEqual([{ userId: users[1]!.id }]);
+    vi.unstubAllGlobals();
+  });
+
+  it('không phải superadmin: không có nút đăng nhập với tư cách', async () => {
+    renderApp(<UsersScreen />, { me: { ...ME_SALE, permissions: ['user.read', 'user.update'] } });
+    await screen.findByText('Nhân viên 2');
+    expect(screen.queryByRole('button', { name: /Đăng nhập với tư cách/ })).toBeNull();
+  });
+
   it('empty: EmptyState kèm hành động', async () => {
     server.use(scenario.usersEmpty);
     renderApp(<UsersScreen />);

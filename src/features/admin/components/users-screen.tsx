@@ -14,6 +14,7 @@ import { Can, useAbility } from '@/lib/permission';
 import { useListState } from '@/lib/url-state';
 import { toUserSort, useUsers, type UserListItem } from '../api/use-users';
 import { useRoles } from '../api/use-roles';
+import { ImpersonateButton } from './impersonate-button';
 import { UserCreateDialog } from './user-create-dialog';
 
 const FILTER_KEYS = ['status', 'role'] as const;
@@ -108,11 +109,14 @@ const columns: ColumnDef<UserListItem, unknown>[] = [
   {
     id: 'actions',
     header: '',
-    meta: { title: 'Thao tác', width: 60, align: 'right' },
+    meta: { title: 'Thao tác', width: 90, align: 'right' },
     cell: ({ row }) => (
-      <Can I="update" a="User">
-        <RowActions editHref={`/admin/users/${row.original.id}`} />
-      </Can>
+      <div className="flex items-center justify-end gap-1">
+        <ImpersonateButton user={row.original} compact />
+        <Can I="update" a="User">
+          <RowActions editHref={`/admin/users/${row.original.id}`} />
+        </Can>
+      </div>
     ),
   },
 ];
