@@ -13,7 +13,7 @@ import { useDeleteDepartment, useDepartments } from '../api/use-departments';
 import type { OrgDepartmentNode, OrgEmployee, OrgTree } from '../api/use-org-tree';
 import { useUpdateUser, useUsers } from '../api/use-users';
 import { DepartmentDialog } from './department-dialog';
-import { OrgChart, pathTo } from './org-chart';
+import { OrgChart, defaultCollapsed, pathTo } from './org-chart';
 import { OrgStaffDialog } from './org-staff-dialog';
 import { UserCreateDialog } from './user-create-dialog';
 
@@ -36,7 +36,10 @@ export function OrgChartView({
   selectedId: string | null;
   onSelect: (id: string | null) => void;
 }) {
-  const [collapsed, setCollapsed] = useState<ReadonlySet<string>>(new Set());
+  // Mặc định thu gọn các nhánh dưới thân (chỉ tính lúc mở màn — sau đó theo thao tác người dùng).
+  const [collapsed, setCollapsed] = useState<ReadonlySet<string>>(() =>
+    defaultCollapsed(data.departments, selectedId),
+  );
   const toggle = (id: string) =>
     setCollapsed((prev) => {
       const next = new Set(prev);
