@@ -14824,6 +14824,11 @@ export interface operations {
                  *     bỏ trống = cả hai (ô tìm sản phẩm khi lên đơn vẫn cần thấy combo).
                  */
                 isCombo?: boolean;
+                /**
+                 * @description true = chỉ hàng tạo trong ERP (2026-10-19, màn Sản phẩm): bỏ sản phẩm SyncSkuService tự sinh
+                 *     từ đơn Pancake (liên kết product 'auto' ở bất kỳ shop nào).
+                 */
+                erpOnly?: boolean;
                 /** @description Mặc định false — bản ghi xóa mềm ẩn khỏi mọi list. */
                 includeDeleted?: boolean;
                 /** @description Bỏ trống → `code` (giữ thứ tự cũ cho client hiện tại). */
@@ -14993,6 +14998,11 @@ export interface operations {
                 status?: "active" | "inactive";
                 /** @description false = bỏ SKU combo (màn Sản phẩm), true = chỉ SKU combo; bỏ trống = cả hai. */
                 isCombo?: boolean;
+                /**
+                 * @description true = chỉ hàng tạo trong ERP (2026-10-19, màn Sản phẩm): bỏ sản phẩm SyncSkuService tự sinh
+                 *     từ đơn Pancake (liên kết product 'auto' ở bất kỳ shop nào).
+                 */
+                erpOnly?: boolean;
                 take: number;
                 skip: number;
             };
