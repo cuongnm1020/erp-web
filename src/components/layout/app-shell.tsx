@@ -32,6 +32,14 @@ export interface ShellUser {
   name?: string;
 }
 
+/** Superadmin đang "đăng nhập với tư cách" người dùng hiện tại (2026-10-19). */
+export interface ShellImpersonation {
+  /** Họ tên superadmin thật sự đang thao tác. */
+  by: string;
+  stopping: boolean;
+  onStop: () => void;
+}
+
 /** Phím tắt chung của khung — phím riêng từng màn (trạm đóng gói, tạo đơn…) xem trong màn đó. */
 const SHELL_SHORTCUTS: ReadonlyArray<[keys: string[], label: string]> = [
   [['Ctrl', 'K'], 'Tìm nhanh màn hình'],
@@ -51,10 +59,12 @@ const openPalette = () =>
 export function AppShell({
   user,
   onLogout,
+  impersonation,
   children,
 }: {
   user?: ShellUser;
   onLogout?: () => void;
+  impersonation?: ShellImpersonation;
   children: ReactNode;
 }) {
   const [drawer, setDrawer] = useState(false);
@@ -67,6 +77,26 @@ export function AppShell({
       <div className="flex min-h-screen">
         <Sidebar mobileOpen={drawer} onMobileClose={closeDrawer} />
         <div className="flex min-w-0 flex-1 flex-col">
+          {impersonation ? (
+            <div
+              role="status"
+              className="flex flex-wrap items-center gap-2 bg-warning px-4 py-1.5 text-sm text-warning-foreground"
+            >
+              <span className="min-w-0 flex-1">
+                Đang đăng nhập với tư cách <b className="font-semibold">{display ?? '…'}</b> — mọi
+                thao tác được ghi nhật ký kèm tên {impersonation.by}.
+              </span>
+              <Button
+                size="sm"
+                variant="outline"
+                className="h-7 bg-background text-foreground"
+                disabled={impersonation.stopping}
+                onClick={impersonation.onStop}
+              >
+                Quay lại tài khoản của tôi
+              </Button>
+            </div>
+          ) : null}
           <header className="sticky top-0 z-40 flex h-12 shrink-0 items-center gap-2.5 border-b bg-card px-4">
             <Button
               variant="ghost"
