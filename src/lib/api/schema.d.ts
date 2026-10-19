@@ -4497,6 +4497,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/cycle-counts/actual-stock": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Nhập tồn thực tế theo kho — ghi thẳng phần lệch vào sổ cái + phiếu kiểm POSTED (2026-10-19).
+         *     Cần stock.adjust (đụng thẳng tồn, không qua duyệt). Idempotent theo `Idempotency-Key`.
+         */
+        post: operations["StocktakeController_setActualStock"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/cycle-counts/{id}/lines/{lineId}": {
         parameters: {
             query?: never;
@@ -5783,6 +5803,11 @@ export interface components {
             reserved: string;
             /** @description `onHand - reserved`, Decimal(18,6) dạng chuỗi. Có thể âm nếu tồn bị lệch. */
             available: string;
+            /**
+             * @description SKU đã có lô giá vốn (từng nhập kho / tồn đầu kỳ). `false` → nhập tồn thực tế cao hơn tồn
+             *     sổ phải kèm giá vốn (`POST /cycle-counts/actual-stock`).
+             */
+            hasCost: boolean;
         };
         StockListResponseDto: {
             items: components["schemas"]["StockRowDto"][];
@@ -11194,6 +11219,35 @@ export interface components {
             status: string;
             lineCount: number;
         };
+        ActualStockLineDto: {
+            /** Format: uuid */
+            skuId: string;
+            /** @description Tồn thực tế đếm được trong kho, theo ĐVT cơ sở — Decimal(18,6) dạng chuỗi, không âm. */
+            qtyCounted: string;
+            /**
+             * @description Giá vốn / ĐVT cơ sở cho phần THỪA, Decimal(18,4) chuỗi. Bỏ trống = lô giá vốn gần nhất của
+             *     SKU; SKU chưa có lô giá nào mà đếm thừa → 422 ACTUAL_STOCK_COST_REQUIRED.
+             */
+            unitCost?: string;
+            /** @description Lý do lệch — bỏ trống ghi "Nhập tồn thực tế". */
+            note?: string;
+        };
+        SetActualStockDto: {
+            /** Format: uuid */
+            warehouseId: string;
+            lines: components["schemas"]["ActualStockLineDto"][];
+            /** @description Dự phòng khi client không đặt được header `Idempotency-Key` (header thắng). */
+            idempotencyKey?: string;
+        };
+        SetActualStockResultDto: {
+            /** @description null = mọi dòng khớp tồn sổ, không sinh phiếu. */
+            countId: string | null;
+            docNumber: string | null;
+            /** @description Số SKU có lệch và đã ghi điều chỉnh. */
+            adjustedSkuCount: number;
+            /** @description Số SKU khớp tồn sổ, không ghi gì. */
+            unchangedSkuCount: number;
+        };
         RecordCountDto: {
             /** @description Số đếm thực — Decimal(18,6) dạng chuỗi, không âm. */
             qtyCounted: string;
@@ -12655,6 +12709,11 @@ export interface operations {
                 q?: string;
                 /** @description Chỉ tính tồn trong kho này (lọc qua `Location.warehouseId`). */
                 warehouseId?: string;
+                /**
+                 * @description `true` = chỉ hàng tạo trong ERP (2026-10-19, màn Tồn kho): bỏ SKU do đơn Pancake tự sinh
+                 *     (sản phẩm có liên kết product 'auto'), combo (không giữ tồn) và SKU đã xoá mềm.
+                 */
+                erpOnly?: string;
                 take: number;
                 skip: number;
             };
@@ -12681,6 +12740,11 @@ export interface operations {
                 q?: string;
                 /** @description Chỉ tính tồn trong kho này (lọc qua `Location.warehouseId`). */
                 warehouseId?: string;
+                /**
+                 * @description `true` = chỉ hàng tạo trong ERP (2026-10-19, màn Tồn kho): bỏ SKU do đơn Pancake tự sinh
+                 *     (sản phẩm có liên kết product 'auto'), combo (không giữ tồn) và SKU đã xoá mềm.
+                 */
+                erpOnly?: string;
                 take: number;
                 skip: number;
                 skuId?: string;
@@ -12709,6 +12773,11 @@ export interface operations {
                 q?: string;
                 /** @description Chỉ tính tồn trong kho này (lọc qua `Location.warehouseId`). */
                 warehouseId?: string;
+                /**
+                 * @description `true` = chỉ hàng tạo trong ERP (2026-10-19, màn Tồn kho): bỏ SKU do đơn Pancake tự sinh
+                 *     (sản phẩm có liên kết product 'auto'), combo (không giữ tồn) và SKU đã xoá mềm.
+                 */
+                erpOnly?: string;
                 take: number;
                 skip: number;
                 skuId?: string;
@@ -19155,6 +19224,31 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["CycleCountDetailDto"];
+                };
+            };
+        };
+    };
+    StocktakeController_setActualStock: {
+        parameters: {
+            query?: never;
+            header: {
+                "idempotency-key": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SetActualStockDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SetActualStockResultDto"];
                 };
             };
         };

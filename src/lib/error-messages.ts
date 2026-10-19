@@ -222,6 +222,12 @@ const MESSAGES: Record<string, string> = {
   RATE_LIMITED: 'Bạn thao tác quá nhanh. Đợi khoảng một phút rồi thử lại.',
   UNSUBSCRIBE_LINK_INVALID:
     'Link hủy nhận tin không hợp lệ hoặc đã bị sửa. Mở lại đúng link trong tin nhắn / email bạn nhận được.',
+  ACTUAL_STOCK_COST_REQUIRED:
+    'Có sản phẩm chưa có giá vốn mà tồn thực tế cao hơn tồn hệ thống. Nhập giá vốn cho dòng được đánh dấu rồi lưu lại.',
+  ACTUAL_STOCK_BELOW_RESERVED:
+    'Tồn thực tế thấp hơn phần đang giữ cho đơn. Xử lý đơn đang giữ hàng (hủy hoặc đổi kho) rồi nhập lại.',
+  ACTUAL_STOCK_NO_LOCATION:
+    'Kho chưa có vị trí nào đang dùng để ghi tồn. Tạo vị trí ở màn Kho & vị trí rồi nhập lại.',
   TIER_JOB_ACTOR_NOT_FOUND:
     'Không có tài khoản quản trị đang hoạt động để đứng tên lượt nâng hạng. Báo IT kiểm tra tài khoản admin.',
 };
@@ -264,6 +270,15 @@ export function messageFor(err: unknown): string {
         .join(', ');
       if (who) {
         return `Facebook ID này đang gắn với tài khoản ${who}. Gỡ Facebook ID ở tài khoản đó trước nếu nhập đúng người.`;
+      }
+    }
+    if (err.code === 'ACTUAL_STOCK_COST_REQUIRED' || err.code === 'ACTUAL_STOCK_BELOW_RESERVED') {
+      // SKU vướng + số lượng là dữ liệu (details), không phải message thô của server.
+      const d = err.details as { skuCode?: unknown; reserved?: unknown } | null;
+      if (d && typeof d.skuCode === 'string') {
+        return err.code === 'ACTUAL_STOCK_COST_REQUIRED'
+          ? `${d.skuCode} chưa có giá vốn — nhập giá vốn cho phần tồn tăng thêm rồi lưu lại.`
+          : `${d.skuCode}: tồn thực tế thấp hơn phần đang giữ cho đơn (${String(d.reserved ?? '')}). Xử lý đơn đang giữ hàng rồi nhập lại.`;
       }
     }
     const base = messageForCode(err.code, err.status);

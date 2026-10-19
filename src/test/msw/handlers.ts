@@ -895,6 +895,7 @@ export function makeStockRows(n: number) {
       onHand: String(onHand),
       reserved: String(reserved),
       available: String(onHand - reserved),
+      hasCost: i % 2 === 0,
     };
   });
 }

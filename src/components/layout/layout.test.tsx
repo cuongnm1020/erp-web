@@ -50,7 +50,7 @@ describe('visibleModules', () => {
     expect(visibleModules(() => false).map((m) => m.label)).toEqual(['Tổng quan']);
   });
 
-  it('mục ẩn (2026-10-04): Phân công, Tồn kho, cả nhóm Giá & KM và Tài chính — URL vẫn gate', () => {
+  it('mục ẩn (2026-10-04): Phân công, cả nhóm Giá & KM và Tài chính — URL vẫn gate', () => {
     const mods = visibleModules(() => true);
     const labels = mods.map((m) => m.label);
     expect(labels).not.toContain('Giá & KM');
@@ -63,8 +63,9 @@ describe('visibleModules', () => {
       action: 'merge',
       subject: 'Customer',
     });
-    expect(children).not.toContain('Tồn kho');
-    expect(mods.find((m) => m.label === 'Kho')?.href).toBe('/wms/warehouses');
+    // Tồn kho mở lại 2026-10-19 (nhập tồn thực tế khi đưa phần mềm vào kho).
+    expect(children).toContain('Tồn kho');
+    expect(mods.find((m) => m.label === 'Kho')?.href).toBe('/wms/stock');
     expect(requiredAbilityFor('/crm/customers/assign')).toEqual({
       action: 'assign',
       subject: 'Customer',
@@ -96,8 +97,9 @@ describe('visibleModules', () => {
   it('chỉ có stock.read → module Kho hiện đúng các mục gắn Stock', () => {
     const mods = visibleModules((a, s) => a === 'read' && s === 'Stock');
     const wms = mods.find((m) => m.label === 'Kho');
-    // Thứ tự theo nhóm con (redesign 2026-10-17): Chứng từ → Danh mục kho.
+    // Thứ tự theo nhóm con (redesign 2026-10-17): Vận hành → Chứng từ → Danh mục kho.
     expect(wms?.children?.map((c) => c.label)).toEqual([
+      'Tồn kho',
       'Phiếu nhập kho',
       'Phiếu bán hàng',
       'Nhập hàng hoàn',
@@ -108,6 +110,7 @@ describe('visibleModules', () => {
       'Cảnh báo nhập hàng',
     ]);
     expect([...new Set(wms?.children?.map((c) => c.section))]).toEqual([
+      'Vận hành',
       'Chứng từ',
       'Danh mục kho',
     ]);
