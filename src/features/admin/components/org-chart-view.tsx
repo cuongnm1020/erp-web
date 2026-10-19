@@ -1,6 +1,6 @@
 'use client';
 
-import { FolderPlus, LogIn, Pencil, Trash2, UserPlus, UserX } from 'lucide-react';
+import { FolderPlus, Pencil, Trash2, UserPlus, UserX } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { ConfirmDialog } from '@/components/data/confirm-dialog';
 import { EmptyState } from '@/components/data/states';
@@ -10,10 +10,10 @@ import { toast } from '@/components/ui/toaster';
 import { messageFor } from '@/lib/error-messages';
 import { Can, useAbility } from '@/lib/permission';
 import { useDeleteDepartment, useDepartments } from '../api/use-departments';
-import { useImpersonate } from '../api/use-impersonate';
 import type { OrgDepartmentNode, OrgEmployee, OrgTree } from '../api/use-org-tree';
 import { useUpdateUser, useUsers } from '../api/use-users';
 import { DepartmentDialog } from './department-dialog';
+import { ImpersonateButton } from './impersonate-button';
 import { OrgChart, defaultCollapsed, pathTo } from './org-chart';
 import { OrgStaffDialog } from './org-staff-dialog';
 import { UserCreateDialog } from './user-create-dialog';
@@ -275,10 +275,6 @@ function MemberList({
   tree: OrgTree;
 }) {
   const ability = useAbility();
-  // Đăng nhập với tư cách (2026-10-19): chỉ superadmin (manage all); không tự đăng nhập thay mình —
-  // server vẫn chặn superadmin khác / tài khoản khoá.
-  const canImpersonate = ability.can('manage', 'all');
-  const impersonate = useImpersonate();
   const [editing, setEditing] = useState<OrgEmployee | null>(null);
   const [deleting, setDeleting] = useState<OrgEmployee | null>(null);
 
@@ -326,21 +322,7 @@ function MemberList({
                 <span className="font-mono">{m.code}</span> · {m.email}
               </p>
             </div>
-            {canImpersonate && m.isActive ? (
-              <Button
-                size="icon"
-                variant="ghost"
-                className="h-7 w-7"
-                aria-label={`Đăng nhập với tư cách ${m.fullName}`}
-                title="Đăng nhập với tư cách người này"
-                disabled={impersonate.isPending}
-                onClick={() =>
-                  impersonate.mutate(m.id, { onError: (err) => toast.error(messageFor(err)) })
-                }
-              >
-                <LogIn className="h-3.5 w-3.5" aria-hidden />
-              </Button>
-            ) : null}
+            <ImpersonateButton user={m} compact />
             {m.canManage ? (
               <div className="flex shrink-0 gap-0.5">
                 <Button
