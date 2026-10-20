@@ -2303,6 +2303,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/stock/weights": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["SkuWeightController_setWeights"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/attributes": {
         parameters: {
             query?: never;
@@ -5986,6 +6002,8 @@ export interface components {
              *     cũng khi SKU không còn lô giá còn hàng.
              */
             unitCost: string | null;
+            /** @description Cân nặng một ĐVT cơ sở (kg, Decimal(12,4) chuỗi) — null = chưa cân; nhập ở màn Tồn kho (POST /stock/weights). */
+            weightKg: string | null;
         };
         StockListResponseDto: {
             items: components["schemas"]["StockRowDto"][];
@@ -8203,6 +8221,21 @@ export interface components {
             sortOrder?: number;
             /** @description false = ngừng dùng: không gắn được vào cấp mới / không tạo container mới; cái đã có giữ nguyên. */
             isActive?: boolean;
+        };
+        SetSkuWeightLineDto: {
+            /** Format: uuid */
+            skuId: string;
+            /** @description Cân nặng một ĐVT cơ sở, kg, Decimal(12,4) dạng chuỗi, không âm (web nhập gram rồi quy đổi). */
+            weightKg: string;
+        };
+        SetSkuWeightsDto: {
+            lines: components["schemas"]["SetSkuWeightLineDto"][];
+        };
+        SetSkuWeightsResultDto: {
+            /** @description SKU đã đổi cân nặng. */
+            updatedSkuCount: number;
+            /** @description SKU không tồn tại / đã xoá — không đổi gì. */
+            skippedSkuIds: string[];
         };
         AttributeValueDto: {
             code: string;
@@ -16019,6 +16052,29 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+        };
+    };
+    SkuWeightController_setWeights: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SetSkuWeightsDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SetSkuWeightsResultDto"];
+                };
             };
         };
     };

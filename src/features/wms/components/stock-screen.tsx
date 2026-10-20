@@ -22,7 +22,14 @@ import { Input } from '@/components/ui/input';
 import { toast } from '@/components/ui/toaster';
 import { cn } from '@/lib/cn';
 import { messageFor } from '@/lib/error-messages';
-import { formatDate, formatMoney, formatQuantity, formatRelative } from '@/lib/format';
+import {
+  formatDate,
+  formatMoney,
+  formatQuantity,
+  formatRelative,
+  gramsToKg,
+  kgToGrams,
+} from '@/lib/format';
 import { useAbility } from '@/lib/permission';
 import { useInvalidateOn } from '@/lib/realtime';
 import { useListState, type SortState } from '@/lib/url-state';
@@ -31,6 +38,7 @@ import {
   stockKeys,
   useSetActualStock,
   useSetSkuCosts,
+  useSetSkuWeights,
   useStockBySku,
   useStockByLocation,
   useStockByLot,
@@ -75,6 +83,10 @@ import { isNegativeQty, locationTypeLabel } from '../labels';
  * Nhập song song (2026-10-19): cột Tồn thực tế cho người có stock.adjust (kho, theo kho đang chọn),
  * cột Giá vốn cho người có stock.cost (kế toán — POST /stock/costs đặt giá cho mọi tồn còn lại của
  * SKU, không theo kho). Ai có quyền nào thấy cột đó; Lưu ghi số lượng trước rồi giá vốn.
+ *
+ * Cân nặng (2026-10-20): cột "Cân nặng" (gram, đọc từ Sku.weightKg) trên tab Theo SKU; ở chế độ
+ * nhập, người có stock.adjust gõ cân nặng từng SKU theo gram (không cần chọn kho — cân nặng là
+ * thuộc tính sản phẩm) → POST /stock/weights (kg). Dùng cho khối lượng gửi hãng và đẩy Pancake.
  */
 const DEFAULTS = {
   size: 50,
@@ -88,21 +100,36 @@ type StockTabKey = 'sku' | 'location' | 'lot';
 const ACTUAL_BATCH = 200;
 const QTY_RE = /^\d+(\.\d{1,6})?$/;
 const COST_RE = /^\d+(\.\d{1,4})?$/;
+/** Gram, tối đa 1 chữ số lẻ (API giữ kg 4 chữ số lẻ). */
+const WEIGHT_RE = /^\d{1,9}(\.\d)?$/;
 
-/** Bản nháp một SKU: số đếm (kho) và giá vốn (kế toán) độc lập — '' = không đổi phần đó. */
+/** Bản nháp một SKU: số đếm (kho), giá vốn (kế toán), cân nặng gram (kho) độc lập — '' = không đổi. */
 interface CountDraft {
   qty: string;
   unitCost: string;
+  weightG: string;
 }
+
+const EMPTY_DRAFT: CountDraft = { qty: '', unitCost: '', weightG: '' };
+const draftEmpty = (d: CountDraft) => d.qty === '' && d.unitCost === '' && d.weightG === '';
 
 /** Dòng nháp sai định dạng (ô đã gõ mà không phải số hợp lệ). */
 function draftInvalid(d: CountDraft): boolean {
-  return (d.qty !== '' && !QTY_RE.test(d.qty)) || (d.unitCost !== '' && !COST_RE.test(d.unitCost));
+  return (
+    (d.qty !== '' && !QTY_RE.test(d.qty)) ||
+    (d.unitCost !== '' && !COST_RE.test(d.unitCost)) ||
+    (d.weightG !== '' && !WEIGHT_RE.test(d.weightG))
+  );
 }
 
 interface CountContextValue {
   drafts: Record<string, CountDraft>;
-  setDraft: (row: StockRow, patch: Partial<Pick<CountDraft, 'qty' | 'unitCost'>>) => void;
+  setDraft: (row: StockRow, patch: Partial<CountDraft>) => void;
+}
+
+/** Cân nặng kg (API) → "250 g" / "1.500 g"; null = chưa cân. */
+function formatGrams(weightKg: string | null): string {
+  return weightKg === null ? '—' : formatQuantity(kgToGrams(weightKg), { maxDp: 1, unit: 'g' });
 }
 
 /**
@@ -172,6 +199,26 @@ function CountCostCell({ row }: { row: StockRow }) {
   );
 }
 
+/** Cân nặng gram (kho): gợi ý = cân nặng hiện tại; trống = không đổi. Enter sang dòng dưới. */
+function CountWeightCell({ row }: { row: StockRow }) {
+  const ctx = useContext(CountContext)!;
+  const value = ctx.drafts[row.skuId]?.weightG ?? '';
+  const invalid = value !== '' && !WEIGHT_RE.test(value);
+  return (
+    <Input
+      data-count-input
+      inputMode="decimal"
+      aria-label={`Cân nặng ${row.skuCode}`}
+      placeholder={row.weightKg === null ? 'chưa cân' : kgToGrams(row.weightKg)}
+      value={value}
+      onChange={(e) => ctx.setDraft(row, { weightG: e.target.value.trim().replace(',', '.') })}
+      onKeyDown={focusNextCountInput}
+      aria-invalid={invalid || undefined}
+      className={cn('h-8 text-right', invalid && 'border-destructive')}
+    />
+  );
+}
+
 const TABS: Array<{ key: StockTabKey; label: string }> = [
   { key: 'sku', label: 'Theo SKU' },
   { key: 'location', label: 'Theo vị trí' },
@@ -227,6 +274,16 @@ const skuColumns: ColumnDef<StockRow, unknown>[] = [
   },
   { id: 'skuName', accessorKey: 'skuName', header: 'Tên sản phẩm', meta: { width: 300 } },
   { id: 'baseUomCode', accessorKey: 'baseUomCode', header: 'ĐVT cơ sở', meta: { width: 110 } },
+  {
+    id: 'weight',
+    header: 'Cân nặng',
+    meta: { align: 'right', width: 110 },
+    cell: ({ row }) => (
+      <span className={cn(row.original.weightKg === null && 'text-muted-foreground')}>
+        {formatGrams(row.original.weightKg)}
+      </span>
+    ),
+  },
   ...quantityColumns<StockRow>(),
   {
     id: 'flags',
@@ -263,16 +320,41 @@ const costEditColumn: ColumnDef<StockRow, unknown> = {
   meta: { align: 'right', width: 140 },
   cell: ({ row }) => <CountCostCell row={row.original} />,
 };
-const baseEditColumns = skuColumns.filter((c) => c.id !== 'flags');
+const weightEditColumn: ColumnDef<StockRow, unknown> = {
+  id: 'actualWeight',
+  header: 'Cân nặng (g)',
+  meta: { align: 'right', width: 130 },
+  cell: ({ row }) => <CountWeightCell row={row.original} />,
+};
+/** Chế độ nhập: bỏ cột Ghi chú và cột Cân nặng chỉ-đọc (thay bằng ô nhập khi có quyền). */
+const baseEditColumns = skuColumns.filter((c) => c.id !== 'flags' && c.id !== 'weight');
 /**
- * Tab Theo SKU ở chế độ nhập: bỏ cột Ghi chú, thêm cột theo quyền. Ba biến thể khai sẵn ở cấp
- * module để danh tính cột không đổi giữa các lần render (ô nhập không mất focus).
+ * Tab Theo SKU ở chế độ nhập: cột theo quyền — số lượng (stock.adjust + đã chọn kho), cân nặng
+ * (stock.adjust), giá vốn (stock.cost). Mọi biến thể khai sẵn ở cấp module để danh tính cột không
+ * đổi giữa các lần render (ô nhập không mất focus).
  */
-const editColumns = {
-  qty: [...baseEditColumns, ...qtyEditColumns],
-  cost: [...baseEditColumns, costEditColumn],
-  both: [...baseEditColumns, ...qtyEditColumns, costEditColumn],
-} satisfies Record<string, ColumnDef<StockRow, unknown>[]>;
+function buildEditColumns(opts: {
+  qty: boolean;
+  weight: boolean;
+  cost: boolean;
+}): ColumnDef<StockRow, unknown>[] {
+  return [
+    ...baseEditColumns,
+    ...(opts.qty ? qtyEditColumns : []),
+    ...(opts.weight ? [weightEditColumn] : []),
+    ...(opts.cost ? [costEditColumn] : []),
+  ];
+}
+const editColumnsByKey = new Map<string, ColumnDef<StockRow, unknown>[]>();
+function editColumnsFor(opts: { qty: boolean; weight: boolean; cost: boolean }) {
+  const key = `${opts.qty ? 'q' : ''}${opts.weight ? 'w' : ''}${opts.cost ? 'c' : ''}`;
+  let cols = editColumnsByKey.get(key);
+  if (!cols) {
+    cols = buildEditColumns(opts);
+    editColumnsByKey.set(key, cols);
+  }
+  return cols;
+}
 
 const locationColumns: ColumnDef<StockByLocationRow, unknown>[] = [
   {
@@ -445,19 +527,21 @@ export function StockScreen() {
   const saveKey = useRef<string | null>(null);
   const setActual = useSetActualStock();
   const setCosts = useSetSkuCosts();
-  const saving = setActual.isPending || setCosts.isPending;
-  // Cột số lượng cần một kho cụ thể; cột giá vốn không theo kho.
+  const setWeights = useSetSkuWeights();
+  const saving = setActual.isPending || setCosts.isPending || setWeights.isPending;
+  // Cột số lượng cần một kho cụ thể; cột cân nặng (stock.adjust) và giá vốn (stock.cost) không theo kho.
   const qtyEditable = canAdjust && countWarehouseId !== null;
-  const editMode = qtyEditable && canCost ? 'both' : qtyEditable ? 'qty' : canCost ? 'cost' : null;
+  const editMode = canAdjust || canCost;
+  const editColumns = editColumnsFor({ qty: qtyEditable, weight: canAdjust, cost: canCost });
   const editLabel =
     canAdjust && canCost ? 'Nhập tồn & giá vốn' : canCost ? 'Nhập giá vốn' : 'Nhập tồn thực tế';
 
   const setDraft = useCallback<CountContextValue['setDraft']>((row, patch) => {
     saveKey.current = null;
     setDrafts((prev) => {
-      const next = { qty: '', unitCost: '', ...prev[row.skuId], ...patch };
-      // Xoá trắng cả hai ô = bỏ dòng khỏi bản nháp (không đổi gì SKU đó).
-      if (next.qty === '' && next.unitCost === '') {
+      const next = { ...EMPTY_DRAFT, ...prev[row.skuId], ...patch };
+      // Xoá trắng mọi ô = bỏ dòng khỏi bản nháp (không đổi gì SKU đó).
+      if (draftEmpty(next)) {
         return Object.fromEntries(Object.entries(prev).filter(([id]) => id !== row.skuId));
       }
       return { ...prev, [row.skuId]: next };
@@ -474,14 +558,14 @@ export function StockScreen() {
     saveKey.current = null;
   };
 
-  /** Bỏ phần đã lưu (số lượng hoặc giá) khỏi bản nháp — lô sau lỗi không làm mất lô trước. */
+  /** Bỏ phần đã lưu (số lượng / giá / cân nặng) khỏi bản nháp — lô sau lỗi không làm mất lô trước. */
   const clearSaved = (ids: Set<string>, part: keyof CountDraft) =>
     setDrafts((prev) =>
       Object.fromEntries(
         Object.entries(prev).flatMap(([id, d]) => {
           if (!ids.has(id)) return [[id, d]];
           const next = { ...d, [part]: '' };
-          return next.qty === '' && next.unitCost === '' ? [] : [[id, next]];
+          return draftEmpty(next) ? [] : [[id, next]];
         }),
       ),
     );
@@ -498,6 +582,12 @@ export function StockScreen() {
       ? draftList
           .filter(([, d]) => d.unitCost !== '')
           .map(([id, d]) => ({ skuId: id, unitCost: d.unitCost }))
+      : [];
+    // Gram ở ô nhập → kg cho API, đổi đơn vị chỉ ở đây (luật 10).
+    const weightLines = canAdjust
+      ? draftList
+          .filter(([, d]) => d.weightG !== '')
+          .map(([id, d]) => ({ skuId: id, weightKg: gramsToKg(d.weightG) }))
       : [];
     const done: string[] = [];
     try {
@@ -538,6 +628,16 @@ export function StockScreen() {
         done.push(
           `giá vốn ${updated} SKU${skipped ? ` (${skipped} SKU không còn tồn — không đổi)` : ''}`,
         );
+      }
+      if (weightLines.length) {
+        let updated = 0;
+        for (let i = 0; i < weightLines.length; i += ACTUAL_BATCH) {
+          const batch = weightLines.slice(i, i + ACTUAL_BATCH);
+          const r = await setWeights.mutateAsync({ lines: batch });
+          updated += r.updatedSkuCount;
+          clearSaved(new Set(batch.map((l) => l.skuId)), 'weightG');
+        }
+        done.push(`cân nặng ${updated} SKU`);
       }
       if (done.length) toast.success(`Đã lưu ${done.join('; ')}`);
     } catch (err) {
@@ -635,9 +735,17 @@ export function StockScreen() {
             ) : (
               <span className="text-destructive">
                 Đang xem tất cả kho. Chọn một kho ở ô kho làm việc (thanh bên trái) để nhập tồn thực
-                tế cho kho đó.
+                tế cho kho đó. Cân nặng vẫn nhập được.
               </span>
             )
+          ) : null}
+          {canAdjust ? (
+            <span>
+              Cột <b className="font-semibold">Cân nặng (g)</b>: cân nặng một {''}
+              <b className="font-semibold">ĐVT cơ sở</b> theo gram (vd 250 = 250 g, 1500 = 1,5 kg),
+              áp cho sản phẩm ở mọi kho; ô mờ là cân nặng hiện tại, để trống là không đổi. Dùng để
+              tính khối lượng gửi hãng vận chuyển.
+            </span>
           ) : null}
           {canCost ? (
             <span>
@@ -710,9 +818,9 @@ export function StockScreen() {
         <CountContext.Provider value={countCtx}>
           <StockTable
             query={bySku}
-            columns={counting && editMode ? editColumns[editMode] : skuColumns}
+            columns={counting && editMode ? editColumns : skuColumns}
             getRowId={(r) => r.skuId}
-            skeletonColumns={counting ? 9 : 7}
+            skeletonColumns={counting ? 10 : 8}
             empty={empty}
             pager={pager}
           />
@@ -726,7 +834,7 @@ export function StockScreen() {
             {invalidCount > 0 ? (
               <span className="text-destructive">
                 {' '}
-                · {invalidCount} dòng chưa hợp lệ (số lượng hoặc giá vốn sai định dạng)
+                · {invalidCount} dòng chưa hợp lệ (số lượng, giá vốn hoặc cân nặng sai định dạng)
               </span>
             ) : null}
           </span>
@@ -736,7 +844,7 @@ export function StockScreen() {
             </Button>
             <Button
               onClick={() => void saveActual()}
-              disabled={editMode === null || draftList.length === 0 || invalidCount > 0 || saving}
+              disabled={!editMode || draftList.length === 0 || invalidCount > 0 || saving}
             >
               {saving ? 'Đang lưu…' : 'Lưu thay đổi'}
             </Button>

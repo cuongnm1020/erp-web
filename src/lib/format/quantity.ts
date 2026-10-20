@@ -14,6 +14,16 @@ export interface QuantityFormatOptions {
   factor?: string | number;
 }
 
+/** Gram (ô nhập) → kg (API, Decimal(12,4) chuỗi) — đổi đơn vị chỉ ở lớp hiển thị / submit (luật 10). */
+export function gramsToKg(g: string): string {
+  return new Decimal(g).div(1000).toDecimalPlaces(4).toString();
+}
+
+/** Kg (API) → gram (ô nhập / hiển thị). */
+export function kgToGrams(kg: string): string {
+  return new Decimal(kg).mul(1000).toDecimalPlaces(1).toString();
+}
+
 export function formatQuantity(v: MoneyInput, opts: QuantityFormatOptions = {}): string {
   let d = toDecimal(v);
   if (d === null) return EMPTY;
