@@ -12,7 +12,7 @@ import tokens from './design/tokens.json';
  *   pha độ mờ (`bg-warning/10`), xem scripts/check-tokens.mjs.
  * - Chữ: 12 caption · 13 dense (bảng / form / nút) · 14 body · 16 section · 20 page-title · 24 kpi ·
  *   36 display-number. `text-xs…2xl` của Tailwind ghi đè sang thang này để code cũ không phải sửa.
- * - Chỉ hai độ đậm 400 / 600 — `font-medium` / `font-bold` đều về 600.
+ * - Chỉ hai độ đậm 400 / 700 — `font-medium` / `font-bold` đều về 700 (đậm hơn một bậc từ 2026-10-21).
  * - Kích thước khung và component: `h-control` 32, `h-button-sm` 28, `h-chip` 18, `max-w-dialog`
  *   440, `max-w-dialog-wide` 672, `w-sidebar` 240… (bảng `SIZE` dưới).
  */
@@ -144,9 +144,9 @@ const config: Config = {
       },
       fontWeight: {
         normal: '400',
-        medium: '600',
-        semibold: '600',
-        bold: '600',
+        medium: '700',
+        semibold: '700',
+        bold: '700',
       },
       keyframes: {
         'accordion-down': {

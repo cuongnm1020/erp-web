@@ -6,13 +6,13 @@ import { Providers } from './providers';
 
 /**
  * Be Vietnam Pro (redesign 2026-10-17, thay Inter của DESIGN-BRIEF §3) — thiết kế cho dấu tiếng Việt,
- * chỉ hai độ đậm 400 / 600 như thang chữ. Self-host qua next/font (không gọi Google lúc chạy).
+ * chỉ hai độ đậm 400 / 700 như thang chữ (700 từ 2026-10-21, trước là 600). Self-host qua next/font (không gọi Google lúc chạy).
  * next/font đặt --font-be-vietnam trên <html>; globals.css đưa nó vào --font-sans với fallback hệ
  * thống để Storybook / test (không đi qua layout này) vẫn ra sans.
  */
 const beVietnam = Be_Vietnam_Pro({
   subsets: ['latin', 'vietnamese'],
-  weight: ['400', '600'],
+  weight: ['400', '700'],
   variable: '--font-be-vietnam',
   display: 'swap',
 });
