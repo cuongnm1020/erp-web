@@ -1,5 +1,4 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
-import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import { RowActions } from './row-actions';
 
@@ -15,40 +14,12 @@ describe('<RowActions>', () => {
     expect(container).toBeEmptyDOMElement();
   });
 
-  it('Xóa nằm trong menu "⋯", không phải nút icon trên dòng', async () => {
-    const user = userEvent.setup();
-    render(<RowActions onEdit={() => undefined} onDelete={() => undefined} itemName="KH-0001" />);
-    expect(screen.queryByRole('button', { name: 'Xóa' })).not.toBeInTheDocument();
-    await user.click(screen.getByRole('button', { name: 'Thao tác khác cho KH-0001' }));
-    expect(await screen.findByRole('menuitem', { name: 'Xóa' })).toBeInTheDocument();
-  });
-
-  it('mục tắt hiện kèm lý do thay vì ẩn', async () => {
-    const user = userEvent.setup();
-    render(
-      <RowActions
-        items={[{ label: 'Hủy đơn', danger: true, disabledReason: 'Đơn đã đóng gói' }]}
-      />,
-    );
-    await user.click(screen.getByRole('button', { name: 'Thao tác khác' }));
-    const item = await screen.findByRole('menuitem', { name: /Hủy đơn/ });
-    expect(item).toHaveAttribute('data-disabled');
-    expect(item).toHaveTextContent('Đơn đã đóng gói');
-  });
-
   it('Xóa đi qua hộp xác nhận: Hủy không gọi onDelete, xác nhận mới gọi', async () => {
-    const user = userEvent.setup();
     const onDelete = vi.fn();
     render(<RowActions onDelete={onDelete} itemName="khách hàng KH-0001" />);
-    const openDelete = async () => {
-      await user.click(
-        screen.getByRole('button', { name: 'Thao tác khác cho khách hàng KH-0001' }),
-      );
-      await user.click(await screen.findByRole('menuitem', { name: 'Xóa' }));
-    };
 
-    await openDelete();
-    expect(await screen.findByText('Xóa khách hàng KH-0001?')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Xóa' }));
+    expect(screen.getByText('Xóa khách hàng KH-0001?')).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', { name: 'Hủy' }));
     expect(onDelete).not.toHaveBeenCalled();
@@ -56,8 +27,7 @@ describe('<RowActions>', () => {
       expect(screen.queryByText('Xóa khách hàng KH-0001?')).not.toBeInTheDocument(),
     );
 
-    await openDelete();
-    await screen.findByText('Xóa khách hàng KH-0001?');
+    fireEvent.click(screen.getByRole('button', { name: 'Xóa' }));
     // Trong dialog có 2 nút: "Hủy" và nút xác nhận "Xóa" — nút xác nhận là nút cuối
     const confirmButtons = screen.getAllByRole('button', { name: 'Xóa' });
     fireEvent.click(confirmButtons[confirmButtons.length - 1]!);

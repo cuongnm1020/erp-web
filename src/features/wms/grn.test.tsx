@@ -3,7 +3,6 @@ import { http, HttpResponse } from 'msw';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { server } from '@/test/msw/server';
 import { renderApp } from '@/test/render';
-import { clickRowMenuItem } from '@/test/row-menu';
 import { GrnCreateScreen, receiptToFormValues } from './components/grn-create-screen';
 import { GrnDetailScreen } from './components/grn-detail-screen';
 import { GrnListScreen } from './components/grn-list-screen';
@@ -221,14 +220,12 @@ describe('GrnListScreen — GET /goods-receipts', () => {
     );
     renderApp(<GrnListScreen />);
     await screen.findByText('GRN2608-00087');
-    // Chỉ dòng DRAFT có menu "⋯" (mục Hủy nháp nằm trong đó).
-    const triggers = screen.getAllByRole('button', { name: /^Thao tác khác/ });
-    expect(triggers).toHaveLength(1);
-    expect(triggers[0]).toHaveAccessibleName('Thao tác khác cho phiếu nhập GRN2608-00087');
-    await clickRowMenuItem('Hủy nháp');
-    const confirm = await screen.findByRole('dialog');
-    expect(within(confirm).getByText('Hủy nháp phiếu nhập GRN2608-00087?')).toBeInTheDocument();
-    fireEvent.click(within(confirm).getByRole('button', { name: 'Hủy nháp' }));
+    const buttons = screen.getAllByRole('button', { name: 'Hủy nháp' });
+    expect(buttons).toHaveLength(1);
+    fireEvent.click(buttons[0]!);
+    expect(await screen.findByText('Hủy nháp phiếu nhập GRN2608-00087?')).toBeInTheDocument();
+    const confirm = screen.getAllByRole('button', { name: 'Hủy nháp' });
+    fireEvent.click(confirm[confirm.length - 1]!);
     await waitFor(() => expect(deleted).toEqual(['r-1']));
   });
 });
