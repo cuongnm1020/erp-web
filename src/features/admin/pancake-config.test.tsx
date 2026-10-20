@@ -309,11 +309,25 @@ describe('PancakeConfigScreen — /pancake-sync/config', () => {
   it('nhân viên Pancake: chưa gắn / tự tạo hiện rõ; gắn tài khoản → POST staff/relink đúng body', async () => {
     const seen: Record<string, unknown>[] = [];
     server.use(
-      http.post('/api/pancake-sync/mapping/staff/relink', async ({ request }) => {
+      http.post('/api/pancake-sync/staff/relink', async ({ request }) => {
         const body = (await request.json()) as Record<string, unknown>;
         seen.push(body);
         return HttpResponse.json(
-          { fbId: body.fbId, userId: body.userId, userCode: 'nv.002', shops: 1 },
+          {
+            fbId: body.fbId,
+            userId: body.userId,
+            userCode: 'nv.002',
+            shops: 1,
+            absorbed: [
+              {
+                id: 'u-pc',
+                code: 'pc.nguyen.manh.cuong',
+                fullName: 'Nguyen Manh Cuong',
+                orders: 1441,
+                customers: 1427,
+              },
+            ],
+          },
           { status: 201 },
         );
       }),
@@ -324,16 +338,24 @@ describe('PancakeConfigScreen — /pancake-sync/config', () => {
     expect(screen.getByText('pc.nguyen.manh.cuong')).toBeInTheDocument();
     expect(screen.getByText('Tự tạo')).toBeInTheDocument();
     expect(screen.getByText('Tạo đơn, Chốt đơn')).toBeInTheDocument();
+    // Khối quản trị xem TẤT CẢ: có cả người đã gắn tài khoản thật.
+    expect(screen.getByText('Thanh Vân Sale')).toBeInTheDocument();
+    // Đơn / khách đang treo ở tài khoản tự tạo + gợi ý trùng email.
+    expect(screen.getByText('1.441 / 1.427')).toBeInTheDocument();
+    expect(screen.getByText(/Trùng email với/)).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', { name: 'Gắn tài khoản cho Nguyen Manh Cuong' }));
     const dialog = await screen.findByRole('dialog');
     expect(dialog).toHaveTextContent('Gắn tài khoản ERP cho Nguyen Manh Cuong');
-    expect(dialog).toHaveTextContent('Tài khoản tự tạo pc.nguyen.manh.cuong vẫn giữ');
+    expect(dialog).toHaveTextContent(
+      '1.441 đơn và 1.427 khách đang đứng tên tài khoản tự tạo pc.nguyen.manh.cuong chuyển sang ngay; tài khoản tự tạo đó bị xoá.',
+    );
     const submit = screen.getByRole('button', { name: 'Gắn tài khoản' });
     expect(submit).toBeDisabled();
 
     fireEvent.click(screen.getByLabelText('Tài khoản ERP'));
-    fireEvent.click(await screen.findByText('Nhân viên 2'));
+    // "Nhân viên 2" còn xuất hiện ở dòng gợi ý trong bảng → chọn đúng mục trong danh sách tìm.
+    fireEvent.click(await screen.findByRole('option', { name: /Nhân viên 2/ }));
     await waitFor(() => expect(submit).toBeEnabled());
     fireEvent.click(submit);
     await waitFor(() => expect(seen).toHaveLength(1));
@@ -341,14 +363,18 @@ describe('PancakeConfigScreen — /pancake-sync/config', () => {
     await waitFor(() =>
       expect(toastSuccess).toHaveBeenCalledWith(
         'Đã gắn tài khoản',
-        expect.objectContaining({ description: expect.stringMatching(/nv\.002 ở 1 POS/) }),
+        expect.objectContaining({
+          description: expect.stringMatching(
+            /nv\.002 ở 1 POS — pc\.nguyen\.manh\.cuong: 1\.441 đơn, 1\.427 khách đã chuyển/,
+          ),
+        }),
       ),
     );
   });
 
-  it('không có sync.map → không có nút Gắn tài khoản (luật 7)', async () => {
+  it('không có sync.staff_map → không có nút Gắn tài khoản (luật 7)', async () => {
     renderApp(<PancakeConfigScreen />, {
-      me: { ...ME_SALE, permissions: ['sync.read', 'sync.config'] },
+      me: { ...ME_SALE, permissions: ['sync.read', 'sync.config', 'sync.staff_read'] },
     });
     expect(await screen.findByText('Marketer Chờ')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /Gắn tài khoản cho/ })).not.toBeInTheDocument();
