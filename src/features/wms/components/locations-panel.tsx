@@ -1,7 +1,8 @@
 'use client';
 
 import { zodResolver } from '@hookform/resolvers/zod';
-import { ChevronDown, ChevronRight, Plus, X } from 'lucide-react';
+import { ChevronDown, ChevronRight, Plus, Search, X } from 'lucide-react';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useMemo, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
@@ -363,12 +364,14 @@ function flatten(
   nodes: LocationNode[],
   expanded: Record<string, boolean>,
   depth = 0,
+  /** Đang tìm kiếm → mở hết để vị trí khớp hiện ra ngay, không phải bấm từng nhánh. */
+  openAll = false,
 ): Array<{ node: LocationNode; depth: number }> {
   const out: Array<{ node: LocationNode; depth: number }> = [];
   for (const node of nodes) {
     out.push({ node, depth });
-    if (node.children.length > 0 && (expanded[node.id] ?? depth === 0)) {
-      out.push(...flatten(node.children, expanded, depth + 1));
+    if (node.children.length > 0 && (openAll || (expanded[node.id] ?? depth === 0))) {
+      out.push(...flatten(node.children, expanded, depth + 1, openAll));
     }
   }
   return out;
@@ -392,6 +395,34 @@ function pruneInactive(nodes: LocationNode[]): LocationNode[] {
   });
 }
 
+/** Bỏ dấu + thường hoá để tìm "phan bon" ra "Phân bón". */
+function fold(s: string): string {
+  return s
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '')
+    .replace(/đ/g, 'd')
+    .replace(/Đ/g, 'D')
+    .toLowerCase()
+    .trim();
+}
+
+/**
+ * Tìm vị trí theo sản phẩm (2026-10-20): giữ ô kệ có SKU cố định khớp tên / mã sản phẩm (hoặc
+ * khớp mã vị trí), kèm toàn bộ tổ tiên làm khung. Lọc trên cây đã tải — endpoint tree không
+ * phân trang, trả nguyên kho một lần, nên không phải tải hết rồi lọc (luật 8).
+ */
+export function filterTree(nodes: LocationNode[], q: string): LocationNode[] {
+  const needle = fold(q);
+  if (!needle) return nodes;
+  const hit = (n: LocationNode) =>
+    fold(n.code).includes(needle) ||
+    n.fixedSkus.some((s) => fold(s.name).includes(needle) || fold(s.code).includes(needle));
+  return nodes.flatMap((n) => {
+    const children = filterTree(n.children, q);
+    return hit(n) || children.length > 0 ? [{ ...n, children }] : [];
+  });
+}
+
 /**
  * Cây vị trí (zone/aisle/rack/bin) của một kho — GET /warehouses/:id/locations/tree.
  * Thêm/sửa cần stock.adjust; xóa = soft delete (DELETE /warehouses/locations/:id),
@@ -409,6 +440,21 @@ export function LocationsPanel({
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
   const [dialog, setDialog] = useState<DialogState | null>(null);
   const [showInactive, setShowInactive] = useState(false);
+  // Từ khoá tìm vị trí theo sản phẩm nằm trên URL (?q=) — F5 giữ nguyên, dán link được (luật 8).
+  const router = useRouter();
+  const pathname = usePathname();
+  const search = useSearchParams();
+  // Ô nhập giữ state cục bộ để gõ không giật; URL chỉ là bản sao để F5 / dán link.
+  const [q, setQLocal] = useState(() => search.get('q') ?? '');
+  const setQ = (value: string) => {
+    setQLocal(value);
+    const params = new URLSearchParams(search);
+    if (value.trim()) params.set('q', value.trim());
+    else params.delete('q');
+    const qs = params.toString();
+    router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
+  };
+  const searching = q.trim() !== '';
   const active = useMemo(
     () => (query.data ? countNodes(query.data, (n) => n.isActive) : 0),
     [query.data],
@@ -439,16 +485,41 @@ export function LocationsPanel({
             </button>
           ) : null}
         </h2>
-        {canAdjust ? (
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={() => setDialog({ mode: 'create', parent: null })}
-          >
-            <Plus aria-hidden />
-            Thêm vị trí
-          </Button>
-        ) : null}
+        <div className="flex items-center gap-2">
+          <div className="relative">
+            <Search
+              className="pointer-events-none absolute left-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground"
+              aria-hidden
+            />
+            <Input
+              value={q}
+              onChange={(e) => setQ(e.target.value)}
+              placeholder="Tìm vị trí theo sản phẩm…"
+              aria-label="Tìm vị trí theo sản phẩm"
+              className="h-8 w-64 pl-7 pr-7 text-xs"
+            />
+            {searching ? (
+              <button
+                type="button"
+                aria-label="Xóa từ khoá tìm"
+                className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                onClick={() => setQ('')}
+              >
+                <X className="h-3.5 w-3.5" aria-hidden />
+              </button>
+            ) : null}
+          </div>
+          {canAdjust ? (
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => setDialog({ mode: 'create', parent: null })}
+            >
+              <Plus aria-hidden />
+              Thêm vị trí
+            </Button>
+          ) : null}
+        </div>
       </header>
 
       <QueryState
@@ -471,7 +542,21 @@ export function LocationsPanel({
         }
       >
         {(all) => {
-          const tree = showInactive ? all : pruneInactive(all);
+          const visible = showInactive ? all : pruneInactive(all);
+          const tree = searching ? filterTree(visible, q) : visible;
+          if (searching && tree.length === 0) {
+            return (
+              <EmptyState
+                title="Không có vị trí nào gán sản phẩm khớp"
+                description={`Không tìm thấy "${q.trim()}" trong tên / mã sản phẩm cố định hay mã vị trí. Thử từ khoá khác hoặc xóa từ khoá tìm.`}
+                action={
+                  <Button variant="outline" onClick={() => setQ('')}>
+                    Xóa từ khoá tìm
+                  </Button>
+                }
+              />
+            );
+          }
           return tree.length === 0 ? (
             <EmptyState
               title="Kho chưa có vị trí đang dùng"
@@ -492,7 +577,7 @@ export function LocationsPanel({
                   <TableRow className="bg-muted hover:bg-muted">
                     <TableHead className="px-2.5 text-xs">Mã vị trí</TableHead>
                     <TableHead className="w-24 px-2.5 text-xs">Loại</TableHead>
-                    <TableHead className="px-2.5 text-xs">SKU cố định</TableHead>
+                    <TableHead className="px-2.5 text-xs">Sản phẩm cố định</TableHead>
                     <TableHead className="w-36 px-2.5 text-xs">Barcode</TableHead>
                     <TableHead className="w-24 px-2.5 text-xs">Thứ tự pick</TableHead>
                     <TableHead className="w-28 px-2.5 text-xs">Trạng thái</TableHead>
@@ -502,7 +587,7 @@ export function LocationsPanel({
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {flatten(tree, expanded).map(({ node, depth }) => (
+                  {flatten(tree, expanded, 0, searching).map(({ node, depth }) => (
                     <TableRow key={node.id}>
                       <TableCell className="px-2.5 py-1.5">
                         <div
@@ -540,13 +625,14 @@ export function LocationsPanel({
                       <TableCell className="px-2.5 py-1.5 text-muted-foreground">
                         {TYPE_LABEL[node.type]}
                       </TableCell>
-                      <TableCell className="max-w-56 px-2.5 py-1.5">
+                      <TableCell className="max-w-72 px-2.5 py-1.5">
                         {node.fixedSkus.length > 0 ? (
+                          // Tên sản phẩm cho kho đọc được ngay (2026-10-20); mã SKU chỉ còn ở tooltip.
                           <span
-                            className="block truncate font-mono text-xs"
-                            title={node.fixedSkus.map((s) => `${s.code} — ${s.name}`).join('\n')}
+                            className="block truncate text-xs"
+                            title={node.fixedSkus.map((s) => `${s.name} — ${s.code}`).join('\n')}
                           >
-                            {node.fixedSkus.map((s) => s.code).join(', ')}
+                            {node.fixedSkus.map((s) => s.name).join(', ')}
                           </span>
                         ) : (
                           <span className="text-muted-foreground">—</span>
