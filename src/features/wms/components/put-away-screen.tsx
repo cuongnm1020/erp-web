@@ -135,7 +135,7 @@ export function PutAwayScreen() {
               'flex items-center gap-2 rounded-md border px-3 py-3 font-medium',
               feedback.kind === 'error' &&
                 'border-destructive/50 bg-destructive/10 text-destructive',
-              feedback.kind === 'warn' && 'border-warning/60 bg-warning/10 text-warning-foreground',
+              feedback.kind === 'warn' && 'border-warning-line bg-warning-weak text-warning',
               feedback.kind === 'ok' && 'border-success/50 bg-success/10 text-success',
               feedback.kind === 'info' && 'border-info/50 bg-info/10 text-info',
             )}
@@ -300,7 +300,7 @@ export function PutAwayScreen() {
                   <span className="font-mono font-semibold">{l.toLocationCode ?? '—'}</span>{' '}
                   <span>{l.skuName}</span>
                   {l.status === 'EXCEPTION' ? (
-                    <span className="ml-1 text-xs text-warning-foreground">
+                    <span className="ml-1 text-xs text-warning">
                       · chưa có ô kệ — điều phối chỉ định
                     </span>
                   ) : null}

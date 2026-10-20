@@ -467,7 +467,7 @@ function buildColumns(
         row.original.exceptionLineCount > 0 ? (
           <span className="flex items-center gap-2">
             <span
-              className="flex items-center gap-1 rounded-sm bg-warning/15 px-1.5 text-xs font-semibold text-warning-foreground"
+              className="flex items-center gap-1 rounded-sm bg-warning-weak px-1.5 text-xs font-semibold text-warning"
               title="Thiếu tồn khi tạo việc, hoặc nhân viên báo thiếu khi lấy — phần thiếu không sang đóng gói"
             >
               <AlertTriangle className="h-3.5 w-3.5 text-warning" aria-hidden />

@@ -17,7 +17,7 @@ const DropdownMenuContent = React.forwardRef<
       ref={ref}
       sideOffset={sideOffset}
       className={cn(
-        'z-50 min-w-[8rem] overflow-hidden rounded-lg border bg-popover p-1 text-popover-foreground shadow-popover data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0',
+        'z-50 min-w-[8rem] overflow-hidden rounded-lg border bg-popover p-1 text-popover-foreground shadow-popover focus-visible:ring-0 focus-visible:ring-offset-0 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0',
         className,
       )}
       {...props}
@@ -37,28 +37,38 @@ const DropdownMenuItem = React.forwardRef<
     danger?: boolean;
     hint?: React.ReactNode;
   }
->(({ className, inset, danger, hint, children, ...props }, ref) => (
-  <DropdownMenuPrimitive.Item
-    ref={ref}
-    className={cn(
-      'relative flex h-8 cursor-default select-none items-center gap-2 rounded-md px-2 text-sm outline-none transition-colors focus:bg-muted data-[disabled]:pointer-events-none data-[disabled]:opacity-50 [&_svg]:size-4 [&_svg]:shrink-0 [&_svg]:text-muted-foreground',
-      danger && 'text-destructive focus:bg-destructive-weak [&_svg]:text-destructive',
-      inset && 'pl-8',
-      className,
-    )}
-    {...props}
-  >
-    {/* asChild (Slot) cần đúng một con — chỉ bọc thêm khi có hint */}
-    {hint ? (
+>(({ className, inset, danger, hint, asChild, children, ...props }, ref) => {
+  const hintNode = hint ? (
+    <span className="ml-auto pl-4 text-xs font-normal text-subtle-foreground">{hint}</span>
+  ) : null;
+  // asChild (Slot) cần đúng một con: gắn hint vào bên trong phần tử con (vd <Link>)
+  const content =
+    hint && asChild && React.isValidElement<{ children?: React.ReactNode }>(children) ? (
+      React.cloneElement(children, undefined, children.props.children, hintNode)
+    ) : hint ? (
       <>
         {children}
-        <span className="ml-auto pl-4 text-xs font-normal text-subtle-foreground">{hint}</span>
+        {hintNode}
       </>
     ) : (
       children
-    )}
-  </DropdownMenuPrimitive.Item>
-));
+    );
+  return (
+    <DropdownMenuPrimitive.Item
+      ref={ref}
+      asChild={asChild}
+      className={cn(
+        'relative flex h-8 cursor-default select-none items-center gap-2 rounded-md px-2 text-sm outline-none transition-colors focus:bg-muted data-[disabled]:pointer-events-none data-[disabled]:opacity-50 [&_svg]:size-4 [&_svg]:shrink-0 [&_svg]:text-muted-foreground',
+        danger && 'text-destructive focus:bg-destructive-weak [&_svg]:text-destructive',
+        inset && 'pl-8',
+        className,
+      )}
+      {...props}
+    >
+      {content}
+    </DropdownMenuPrimitive.Item>
+  );
+});
 DropdownMenuItem.displayName = DropdownMenuPrimitive.Item.displayName;
 
 const DropdownMenuLabel = React.forwardRef<

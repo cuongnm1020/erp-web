@@ -13,7 +13,7 @@ export function SkuBarcodes({ barcodes }: { barcodes: string[] }) {
     return (
       <p
         role="status"
-        className="mt-2 flex items-center gap-2 rounded border border-warning/60 bg-warning/10 px-2 py-1.5 text-sm text-warning-foreground"
+        className="mt-2 flex items-center gap-2 rounded-md border border-warning-line bg-warning-weak px-2 py-1.5 text-sm text-foreground"
       >
         <AlertTriangle className="h-4 w-4 shrink-0" aria-hidden />
         SKU chưa có mã vạch — không quét được, gắn mã ở Sản phẩm trước.

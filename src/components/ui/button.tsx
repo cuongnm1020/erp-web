@@ -76,7 +76,6 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
     },
     ref,
   ) => {
-    const Comp = asChild ? Slot : 'button';
     const primary = variant === 'default' || variant === undefined || variant === null;
     const extras =
       count !== undefined || shortcut ? (
@@ -105,26 +104,32 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
           ) : null}
         </>
       ) : null;
+    // asChild: Slottable phải là con TRỰC TIẾP của Slot — bọc Fragment thì Slot gắn className vào Fragment
+    if (asChild) {
+      return (
+        <Slot
+          className={cn(buttonVariants({ variant, size, className }))}
+          ref={ref}
+          aria-busy={loading || undefined}
+          {...props}
+        >
+          <Slottable>{children}</Slottable>
+          {extras}
+        </Slot>
+      );
+    }
     return (
-      <Comp
+      <button
         className={cn(buttonVariants({ variant, size, className }))}
         ref={ref}
-        {...(asChild ? {} : { type, disabled: disabled || loading })}
+        type={type}
+        disabled={disabled || loading}
         aria-busy={loading || undefined}
         {...props}
       >
-        {asChild ? (
-          <>
-            <Slottable>{children}</Slottable>
-            {extras}
-          </>
-        ) : (
-          <>
-            {loading && loadingText ? loadingText : children}
-            {extras}
-          </>
-        )}
-      </Comp>
+        {loading && loadingText ? loadingText : children}
+        {extras}
+      </button>
     );
   },
 );
