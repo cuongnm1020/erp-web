@@ -3,6 +3,7 @@ export const MODULE_LABELS: Record<string, string> = {
   customer: 'Khách hàng',
   supplier: 'Nhà cung cấp',
   product: 'Sản phẩm',
+  combo: 'Combo sản phẩm',
   sales_order: 'Đơn bán hàng',
   purchase_order: 'Đơn mua hàng',
   stock: 'Tồn kho',

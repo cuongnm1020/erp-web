@@ -54,10 +54,10 @@ export function FormSkeleton({ fields = 5, className }: { fields?: number; class
       {Array.from({ length: fields }, (_, i) => (
         <div key={i} className="space-y-1.5">
           <Skeleton className="h-3.5 w-32" />
-          <Skeleton className="h-9 w-full" />
+          <Skeleton className="h-8 w-full" />
         </div>
       ))}
-      <Skeleton className="h-9 w-32" />
+      <Skeleton className="h-8 w-32" />
     </div>
   );
 }

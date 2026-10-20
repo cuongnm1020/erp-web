@@ -203,7 +203,7 @@ export function PackStationScreen() {
               'flex items-center gap-2 rounded-md border px-3 py-3 font-medium',
               feedback.kind === 'error' &&
                 'border-destructive/50 bg-destructive/10 text-destructive',
-              feedback.kind === 'warn' && 'border-warning/60 bg-warning/10 text-warning-foreground',
+              feedback.kind === 'warn' && 'border-warning-line bg-warning-weak text-warning',
               feedback.kind === 'ok' && 'border-success/50 bg-success/10 text-success',
               feedback.kind === 'info' && 'border-info/50 bg-info/10 text-info',
             )}

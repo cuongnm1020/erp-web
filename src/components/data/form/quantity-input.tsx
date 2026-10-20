@@ -33,7 +33,7 @@ export const QuantityInput = React.forwardRef<HTMLInputElement, QuantityInputPro
           type="button"
           variant="outline"
           size="icon"
-          className="h-9 w-9 rounded-r-none"
+          className="h-8 w-8 rounded-r-none"
           aria-label="Giảm"
           tabIndex={-1}
           disabled={disabled || (n !== null && n <= min)}
@@ -69,7 +69,7 @@ export const QuantityInput = React.forwardRef<HTMLInputElement, QuantityInputPro
           type="button"
           variant="outline"
           size="icon"
-          className="h-9 w-9 rounded-l-none"
+          className="h-8 w-8 rounded-l-none"
           aria-label="Tăng"
           tabIndex={-1}
           disabled={disabled || (max !== undefined && n !== null && n >= max)}

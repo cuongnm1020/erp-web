@@ -257,7 +257,7 @@ function ComboFormBody({ combo, copyOf }: { combo?: ComboDetail; copyOf?: ComboD
                 <Link href="/catalog/combos">Hủy bỏ</Link>
               </Button>
               {editing ? (
-                <Can I="create" a="Product">
+                <Can I="create" a="Combo">
                   <Button variant="outline" size="sm" asChild>
                     <Link href={`/catalog/combos/new?from=${combo.id}`}>
                       <CopyPlus aria-hidden />
@@ -266,7 +266,7 @@ function ComboFormBody({ combo, copyOf }: { combo?: ComboDetail; copyOf?: ComboD
                   </Button>
                 </Can>
               ) : null}
-              <Can I={editing ? 'update' : 'create'} a="Product">
+              <Can I={editing ? 'update' : 'create'} a="Combo">
                 <Button size="sm" type="submit" form="combo-form" disabled={saving}>
                   {saving ? 'Đang lưu…' : saveLabel}{' '}
                   <kbd className="rounded-sm border border-primary-foreground/50 px-1 font-mono text-xs">
