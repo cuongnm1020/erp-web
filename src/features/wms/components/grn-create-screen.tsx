@@ -41,6 +41,7 @@ import { toast } from '@/components/ui/toaster';
 import { isApiError, type ApiError } from '@/lib/api/errors';
 import { messageFor } from '@/lib/error-messages';
 import { formatMoney, formatQuantity } from '@/lib/format';
+import { useAbility } from '@/lib/permission';
 import { dateKeySchema, moneySchema, quantitySchema } from '@/lib/shared';
 import { ALL_WAREHOUSES, useWarehouse } from '@/lib/warehouse';
 import { useContainerTypes } from '../api/use-containers';
@@ -103,8 +104,11 @@ const lineSchema = z.object({
   factor: z.string(),
   /** ĐVT cơ sở của SKU đã chọn (meta picker) — chỉ hiển thị. */
   baseUomCode: z.string(),
-  /** Đơn giá theo ĐVT của dòng — server chia factor ra giá mỗi đơn vị bán chính. */
-  unitCost: moneySchema,
+  /**
+   * Đơn giá theo ĐVT của dòng — server chia factor ra giá mỗi đơn vị bán chính. '' = chưa có giá
+   * (2026-10-20: kho nhập không cần giá, kế toán nhập sau trên chi tiết phiếu).
+   */
+  unitCost: z.union([moneySchema, z.literal('')]),
   lotNumber: z.string().trim().max(64, 'Tối đa 64 ký tự'),
   expiryDate: z.union([dateKeySchema, z.literal('')]),
   /** PLAN-packaging-hierarchy D — đóng thùng lúc nhận: loại thùng ('' = hàng rời). */
@@ -253,6 +257,9 @@ function GrnCreateForm({ copyOf }: { copyOf?: ReceiptDetail }) {
   const router = useRouter();
   // Kho nhận: kho được phép (server lọc trong /auth/me); mặc định kho đang làm việc.
   const { options: myWarehouses, selected: workingWarehouse } = useWarehouse();
+  // Đơn giá / Thành tiền / Tổng giá trị chỉ cho người có stock.cost (kế toán) — kho nhập không giá
+  // (2026-10-20, docs/screens/FE-GRN-2-grn-stage-cost.md).
+  const canCost = useAbility().can('cost', 'Stock');
   const containerTypes = useContainerTypes();
   const create = useCreateReceipt();
   const post = usePostReceipt();
@@ -341,7 +348,8 @@ function GrnCreateForm({ copyOf }: { copyOf?: ReceiptDetail }) {
           qty: l.qty,
           // Nhập theo thùng / pallet: SL + đơn giá theo ĐVT này, server quy ra đơn vị bán chính.
           ...(l.uom ? { uom: l.uom } : {}),
-          unitCost: l.unitCost,
+          // Bỏ trống (kho không có quyền giá / chưa biết giá) → không gửi; kế toán nhập sau.
+          ...(l.unitCost ? { unitCost: l.unitCost } : {}),
           ...(l.lotNumber ? { lotNumber: l.lotNumber } : {}),
           ...(l.expiryDate ? { expiryDate: l.expiryDate } : {}),
           // D — vỏ thùng tạo ngay khi lưu nháp (in tem trước khi post), tồn vào thùng lúc post.
@@ -518,8 +526,12 @@ function GrnCreateForm({ copyOf }: { copyOf?: ReceiptDetail }) {
                     <TableHead className="w-56 px-2.5 text-xs">Số lượng · ĐVT nhập</TableHead>
                     <TableHead className="w-32 px-2.5 text-xs">Lô</TableHead>
                     <TableHead className="w-36 px-2.5 text-xs">HSD</TableHead>
-                    <TableHead className="w-32 px-2.5 text-xs">Đơn giá / ĐVT nhập</TableHead>
-                    <TableHead className="w-32 px-2.5 text-right text-xs">Thành tiền</TableHead>
+                    {canCost ? (
+                      <>
+                        <TableHead className="w-32 px-2.5 text-xs">Đơn giá / ĐVT nhập</TableHead>
+                        <TableHead className="w-32 px-2.5 text-right text-xs">Thành tiền</TableHead>
+                      </>
+                    ) : null}
                     <TableHead className="w-10 px-2.5 text-xs">
                       <span className="sr-only">Xóa dòng</span>
                     </TableHead>
@@ -534,6 +546,7 @@ function GrnCreateForm({ copyOf }: { copyOf?: ReceiptDetail }) {
                       canRemove={fields.length > 1}
                       remove={() => remove(i)}
                       containerTypes={containerTypes.data ?? []}
+                      canCost={canCost}
                     />
                   ))}
                 </TableBody>
@@ -541,9 +554,15 @@ function GrnCreateForm({ copyOf }: { copyOf?: ReceiptDetail }) {
             </div>
             <footer className="flex items-center justify-between border-t px-3 py-2 text-sm">
               {linesError ? <span className="text-destructive">{linesError}</span> : <span />}
-              <span>
-                Tổng giá trị: <TotalValue form={form} />
-              </span>
+              {canCost ? (
+                <span>
+                  Tổng giá trị: <TotalValue form={form} />
+                </span>
+              ) : (
+                <span className="text-muted-foreground">
+                  Đơn giá do kế toán nhập sau — cất hàng xong là bán được.
+                </span>
+              )}
             </footer>
           </section>
         </form>
@@ -559,12 +578,15 @@ function LineRows({
   canRemove,
   remove,
   containerTypes,
+  canCost,
 }: {
   form: UseFormReturn<ReceiptValues>;
   i: number;
   canRemove: boolean;
   remove: () => void;
   containerTypes: { id: string; code: string; name: string }[];
+  /** Có `stock.cost` → hiện ô Đơn giá + Thành tiền; kho không thấy. */
+  canCost: boolean;
 }) {
   return (
     <>
@@ -639,23 +661,32 @@ function LineRows({
             )}
           />
         </TableCell>
-        <TableCell className="px-2.5 py-1.5">
-          <FormField
-            control={form.control}
-            name={`lines.${i}.unitCost`}
-            render={({ field }) => (
-              <FormItem>
-                <FormControl>
-                  <Input inputMode="decimal" placeholder="0" {...field} />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-        </TableCell>
-        <TableCell className="px-2.5 py-1.5 text-right">
-          <LineValue form={form} index={i} />
-        </TableCell>
+        {canCost ? (
+          <>
+            <TableCell className="px-2.5 py-1.5">
+              <FormField
+                control={form.control}
+                name={`lines.${i}.unitCost`}
+                render={({ field }) => (
+                  <FormItem>
+                    <FormControl>
+                      <Input
+                        inputMode="decimal"
+                        placeholder="0"
+                        aria-label={`Đơn giá dòng ${i + 1}`}
+                        {...field}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </TableCell>
+            <TableCell className="px-2.5 py-1.5 text-right">
+              <LineValue form={form} index={i} />
+            </TableCell>
+          </>
+        ) : null}
         <TableCell className="px-2.5 py-1.5">
           {canRemove ? (
             <Button

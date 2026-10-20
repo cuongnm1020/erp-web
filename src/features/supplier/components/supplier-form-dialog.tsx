@@ -23,24 +23,46 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
 import { toast } from '@/components/ui/toaster';
 import type { ApiError } from '@/lib/api/errors';
-import { codeSchema, phoneSchema } from '@/lib/shared';
+import { phoneSchema } from '@/lib/shared';
 import { useCreateSupplier, useUpdateSupplier, type Supplier } from '../api/use-suppliers';
+
+/**
+ * Mã NCC — khớp SUPPLIER_CODE của CreateSupplierDto: như mã chung nhưng cho phép ngoặc đơn
+ * (danh sách kế toán có mã kiểu "Delta(BMC)").
+ */
+const supplierCodeSchema = z
+  .string()
+  .trim()
+  .min(1, 'Không được để trống')
+  .max(50, 'Tối đa 50 ký tự')
+  .regex(/^[A-Za-z0-9._()-]+$/, 'Chỉ gồm chữ, số, dấu chấm, gạch ngang, gạch dưới, ngoặc đơn');
 
 /** F2 — form tạo/sửa NCC, khớp CreateSupplierDto/UpdateSupplierDto (luật 11). */
 const supplierSchema = z.object({
-  code: codeSchema,
+  code: supplierCodeSchema,
   name: z.string().trim().min(1, 'Nhập tên nhà cung cấp').max(300, 'Tối đa 300 ký tự'),
   taxCode: z.string().trim().max(20, 'Tối đa 20 ký tự'),
   phone: z.union([phoneSchema, z.literal('')]),
   email: z.union([z.string().email('Email không hợp lệ'), z.literal('')]),
+  address: z.string().trim().max(500, 'Tối đa 500 ký tự'),
   paymentTerm: z.string().trim().regex(/^\d*$/, 'Số ngày, ví dụ 30'),
   leadTimeDays: z.string().trim().regex(/^\d*$/, 'Số ngày, ví dụ 7'),
 });
 type SupplierValues = z.infer<typeof supplierSchema>;
 
-const KNOWN_FIELDS = ['code', 'name', 'taxCode', 'phone', 'email', 'paymentTerm', 'leadTimeDays'];
+const KNOWN_FIELDS = [
+  'code',
+  'name',
+  'taxCode',
+  'phone',
+  'email',
+  'address',
+  'paymentTerm',
+  'leadTimeDays',
+];
 
 export function SupplierFormDialog({
   supplier,
@@ -64,6 +86,7 @@ export function SupplierFormDialog({
       taxCode: supplier?.taxCode ?? '',
       phone: supplier?.phone ?? '',
       email: supplier?.email ?? '',
+      address: supplier?.address ?? '',
       paymentTerm: supplier?.paymentTerm == null ? '' : String(supplier.paymentTerm),
       leadTimeDays: supplier?.leadTimeDays == null ? '' : String(supplier.leadTimeDays),
     },
@@ -75,6 +98,8 @@ export function SupplierFormDialog({
       ...(v.taxCode ? { taxCode: v.taxCode } : {}),
       ...(v.phone ? { phone: v.phone } : {}),
       ...(v.email ? { email: v.email } : {}),
+      // Sửa: luôn gửi address (chuỗi rỗng = xóa địa chỉ); tạo: chỉ gửi khi có.
+      ...(editing ? { address: v.address } : v.address ? { address: v.address } : {}),
       ...(v.paymentTerm !== '' ? { paymentTerm: Number(v.paymentTerm) } : {}),
       ...(v.leadTimeDays !== '' ? { leadTimeDays: Number(v.leadTimeDays) } : {}),
     };
@@ -105,7 +130,9 @@ export function SupplierFormDialog({
           <DialogTitle>
             {editing ? `Sửa nhà cung cấp ${supplier.code}` : 'Thêm nhà cung cấp'}
           </DialogTitle>
-          <DialogDescription>Địa chỉ giao nhận thêm ở màn chi tiết sau khi lưu.</DialogDescription>
+          <DialogDescription>
+            Địa chỉ kho / giao nhận có cấu trúc thêm ở màn chi tiết sau khi lưu.
+          </DialogDescription>
         </DialogHeader>
         <Form {...form}>
           <form onSubmit={onSubmit} className="flex flex-col gap-3" noValidate>
@@ -187,6 +214,24 @@ export function SupplierFormDialog({
                 )}
               />
             </div>
+            <FormField
+              control={form.control}
+              name="address"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Địa chỉ</FormLabel>
+                  <FormControl>
+                    <Textarea
+                      rows={2}
+                      placeholder="Lô F12-F13, đường số 5, KCN Đức Hòa III, Xã Đức Lập, Tây Ninh"
+                      {...field}
+                    />
+                  </FormControl>
+                  <FormDescription>Địa chỉ trụ sở theo đăng ký / hóa đơn.</FormDescription>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
             <div className="grid grid-cols-2 gap-3">
               <FormField
                 control={form.control}

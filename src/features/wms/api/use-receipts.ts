@@ -7,7 +7,11 @@ export type ReceiptListResponse = components['schemas']['ReceiptListResponseDto'
 export type ReceiptDetail = components['schemas']['ReceiptDetailDto'];
 export type ReceiptMovement = components['schemas']['ReceiptMovementDto'];
 export type ReceiptStatus = ReceiptDetail['status'];
+/** Tiến độ nghiệp vụ (2026-10-20): NEW · PUTTING_AWAY · AWAITING_COST · COMPLETED · CANCELLED. */
+export type ReceiptStage = ReceiptDetail['stage'];
 export type CreateReceiptBody = components['schemas']['CreateReceiptDto'];
+export type SetReceiptCostsBody = components['schemas']['SetReceiptCostsDto'];
+export type SetReceiptCostsResult = components['schemas']['SetReceiptCostsResultDto'];
 export type ReceiptListParams = NonNullable<
   operations['ReceivingController_list']['parameters']['query']
 >;
@@ -73,6 +77,23 @@ export function usePostReceipt() {
     mutationFn: (id: string) =>
       unwrap(api.POST('/goods-receipts/{id}/post', { params: { path: { id } }, body: {} })),
     onSuccess: (_d, id) => {
+      void qc.invalidateQueries({ queryKey: receiptKeys.lists() });
+      void qc.invalidateQueries({ queryKey: receiptKeys.detail(id) });
+    },
+  });
+}
+
+/**
+ * POST /goods-receipts/:id/costs — kế toán nhập / sửa giá nhập từng dòng (quyền `stock.cost`,
+ * 2026-10-20). Giá theo ĐVT đã khai trên dòng; phiếu cất xong + đủ giá → stage COMPLETED. Thao tác
+ * tuyệt đối (gửi lại cùng kết quả) nên không cần Idempotency-Key. Không optimistic (luật 5 — tiền).
+ */
+export function useSetReceiptCosts(id: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (body: SetReceiptCostsBody) =>
+      unwrap(api.POST('/goods-receipts/{id}/costs', { params: { path: { id } }, body })),
+    onSuccess: () => {
       void qc.invalidateQueries({ queryKey: receiptKeys.lists() });
       void qc.invalidateQueries({ queryKey: receiptKeys.detail(id) });
     },
