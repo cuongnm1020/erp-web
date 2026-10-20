@@ -133,9 +133,15 @@ const config: Config = {
       maxHeight: {
         dialog: 'calc(100vh - 2rem)',
       },
+      // Hộp thoại rộng tối đa 440px (form 2 cột: sm:max-w-lg 512px)
+      maxWidth: {
+        dialog: '440px',
+      },
       boxShadow: {
         popover: '0 4px 12px rgba(20, 30, 45, 0.12)',
         dialog: '0 8px 24px rgba(20, 30, 45, 0.16)',
+        // Nút chính khi nhấn
+        pressed: 'inset 0 1px 2px rgba(0, 0, 0, 0.25)',
       },
       fontFamily: {
         sans: ['var(--font-sans)', 'system-ui', 'sans-serif'],
