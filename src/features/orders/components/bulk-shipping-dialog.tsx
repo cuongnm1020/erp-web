@@ -88,7 +88,7 @@ export function BulkShippingDialog({ rows, onDone }: { rows: SalesOrder[]; onDon
         Gán hãng / cân nặng
       </Button>
       <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent className="sm:max-w-md">
+        <DialogContent>
           <DialogHeader>
             <DialogTitle>Gán hãng / cân nặng cho {rows.length} đơn</DialogTitle>
             <DialogDescription>

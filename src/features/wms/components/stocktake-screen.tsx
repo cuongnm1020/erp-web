@@ -82,7 +82,7 @@ function CreateDialog({ open, onClose }: { open: boolean; onClose: (id?: string)
   );
   return (
     <Dialog open={open} onOpenChange={(o) => !create.isPending && !o && onClose()}>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent>
         <DialogHeader>
           <DialogTitle>Mở phiên kiểm kê</DialogTitle>
           <DialogDescription>
@@ -154,7 +154,7 @@ function CountLineRow({
   return (
     <TableRow
       data-count-line={line.id}
-      className={cn(variance && !variance.isZero() && 'bg-warning/5', flash && 'bg-primary/10')}
+      className={cn(variance && !variance.isZero() && 'bg-warning-weak', flash && 'bg-secondary')}
     >
       <TableCell className="px-2.5 py-1.5">
         <div className="font-mono text-xs font-semibold">{line.skuCode}</div>

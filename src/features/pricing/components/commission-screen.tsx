@@ -238,7 +238,7 @@ export function CommissionScreen() {
         }
       />
 
-      <div className="mb-3 flex items-start gap-2.5 rounded-md border bg-warning/10 px-3 py-2 text-sm text-warning">
+      <div className="mb-3 flex items-start gap-2.5 rounded-md border bg-warning-weak px-3 py-2 text-sm text-warning">
         <AlertTriangle className="mt-0.5 size-4 shrink-0" />
         <p>
           <span className="font-semibold">Chưa chốt chính sách:</span> sale member thấy hoa hồng của

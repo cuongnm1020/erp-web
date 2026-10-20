@@ -166,7 +166,7 @@ function CategoryDialog({
 
   return (
     <Dialog open={open} onOpenChange={(o) => !isPending && onOpenChange(o)}>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent>
         <DialogHeader>
           <DialogTitle>{editing ? `Sửa danh mục ${category.code}` : 'Thêm danh mục'}</DialogTitle>
           <DialogDescription>
@@ -307,7 +307,7 @@ function BrandDialog({
 
   return (
     <Dialog open={open} onOpenChange={(o) => !isPending && onOpenChange(o)}>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent>
         <DialogHeader>
           <DialogTitle>
             {editing ? `Sửa thương hiệu ${brand.code}` : 'Thêm thương hiệu'}

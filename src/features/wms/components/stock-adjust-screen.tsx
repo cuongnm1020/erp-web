@@ -179,7 +179,7 @@ export function StockAdjustScreen() {
         }
       />
 
-      <div className="flex items-start gap-2 rounded-md border border-warning/50 bg-warning/10 px-3 py-2 text-sm">
+      <div className="flex items-start gap-2 rounded-md border border-warning-line bg-warning-weak px-3 py-2 text-sm">
         <BarChart3 className="mt-0.5 h-4 w-4 shrink-0 text-warning" aria-hidden />
         <div>
           <b className="font-semibold">Điều chỉnh ghi thẳng vào sổ cái tồn (append-only).</b> Sau
@@ -248,7 +248,7 @@ export function StockAdjustScreen() {
               {SAMPLE_LINES.map((l) => (
                 <TableRow
                   key={l.no}
-                  className={l.errHint ? 'bg-warning/10 hover:bg-warning/10' : undefined}
+                  className={l.errHint ? 'bg-warning-weak hover:bg-warning-weak' : undefined}
                 >
                   <TableCell className="px-2.5 py-1.5 text-muted-foreground">{l.no}</TableCell>
                   <TableCell className="px-2.5 py-1.5">
@@ -268,7 +268,7 @@ export function StockAdjustScreen() {
                     <div
                       className={cn(
                         'ml-auto flex h-7 w-20 items-center justify-end rounded border bg-background px-1.5 text-sm tabular-nums',
-                        l.errHint ? 'border-destructive bg-destructive/10' : 'border-input',
+                        l.errHint ? 'border-destructive bg-destructive-weak' : 'border-input',
                       )}
                     >
                       {l.delta}

@@ -1,11 +1,12 @@
+@import './tokens.css';
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 /*
- * Giá trị token theo DESIGN-BRIEF.md §3 (bàn giao 23/08/2026).
- * Tên biến khớp tailwind.config.ts; chỉ sửa giá trị ở đây.
- * Nền sáng, không dark mode ở v1 — block .dark giữ nguyên cho tương lai.
+ * Token màu / khoảng / bo / bóng nằm ở tokens.css — SINH từ design/tokens.json (design system
+ * "Thiên Nông ERP"), không sửa tay. File này chỉ giữ phần không phải token: font, base, in ấn,
+ * reduced-motion, lớp tiện ích riêng. Nền sáng, một theme.
  */
 @layer base {
   :root {
@@ -21,162 +22,6 @@
       sans-serif
     );
     --font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-
-    /* --bg-page */
-    --background: 220 23% 97%;
-    --foreground: 214 12% 12%;
-    /* --bg-surface */
-    --card: 0 0% 100%;
-    --card-foreground: 214 12% 12%;
-    --popover: 0 0% 100%;
-    --popover-foreground: 214 12% 12%;
-    /* --brand #1F5FA8 */
-    --primary: 212 69% 39%;
-    --primary-foreground: 0 0% 100%;
-    /* --brand-weak */
-    --secondary: 212 59% 94%;
-    --secondary-foreground: 212 69% 39%;
-    /* --bg-muted */
-    --muted: 210 17% 95%;
-    /* --text-secondary */
-    --muted-foreground: 214 10% 40%;
-    --accent: 212 59% 94%;
-    --accent-foreground: 212 69% 39%;
-    /* --danger #C0392B */
-    --destructive: 6 63% 46%;
-    --destructive-foreground: 0 0% 100%;
-    /* --success #217A4B */
-    --success: 148 57% 30%;
-    --success-foreground: 0 0% 100%;
-    /* --warning #93600F — đậm hơn #B7791F cũ để chữ đạt 4,5:1 trên nền vàng nhạt (redesign 2026-10-17) */
-    --warning: 37 82% 32%;
-    --warning-foreground: 0 0% 100%;
-    /* --info #4A5568 */
-    --info: 218 17% 35%;
-    --info-foreground: 0 0% 100%;
-    /* --border / --border-strong (input) */
-    --border: 214 13% 90%;
-    --input: 217 14% 81%;
-    --ring: 212 69% 39%;
-    /* 6px: thẻ (rounded-lg) 6px, nút / ô nhập (rounded-md) 4px — redesign 2026-10-17 */
-    --radius: 0.375rem;
-    /* Màu module ở menu trái (redesign 2026-10-17): chữ/icon đạt ≥4,5:1 trên trắng, -weak = nền ô
-       icon / mục đang chọn, -line = đường dọc dưới nhóm. CHỈ dùng cho điều hướng, không cho trạng thái. */
-    --mod-sales: 17 88% 40%;
-    --mod-sales-weak: 19 89% 94%;
-    --mod-sales-line: 18 77% 83%;
-    --mod-cust: 183 79% 28%;
-    --mod-cust-weak: 180 45% 92%;
-    --mod-cust-line: 182 41% 76%;
-    --mod-prod: 143 45% 33%;
-    --mod-prod-weak: 140 39% 92%;
-    --mod-prod-line: 140 37% 78%;
-    --mod-wh: 255 67% 55%;
-    --mod-wh-weak: 253 82% 95%;
-    --mod-wh-line: 253 71% 85%;
-    --mod-rpt: 335 78% 42%;
-    --mod-rpt-weak: 337 81% 95%;
-    --mod-rpt-line: 336 70% 84%;
-    --mod-adm: 215 19% 35%;
-    --mod-adm-weak: 210 18% 94%;
-    --mod-adm-line: 214 18% 83%;
-    /* Sơ đồ nhân sự: mỗi khối một màu (đậm = viền/nhãn, nhạt = nền ô) */
-    --branch-1: 140 45% 34%;
-    --branch-1-weak: 140 45% 92%;
-    --branch-2: 38 80% 38%;
-    --branch-2-weak: 42 85% 90%;
-    --branch-3: 230 55% 48%;
-    --branch-3-weak: 230 70% 94%;
-    --branch-4: 0 62% 48%;
-    --branch-4-weak: 0 75% 94%;
-    --branch-5: 90 35% 32%;
-    --branch-5-weak: 90 35% 90%;
-    --branch-6: 200 70% 38%;
-    --branch-6-weak: 200 75% 93%;
-    --branch-7: 175 60% 30%;
-    --branch-7-weak: 175 55% 91%;
-    --branch-8: 300 45% 42%;
-    --branch-8-weak: 300 50% 94%;
-    /* Tab / trạng thái đơn (2026-10-12): mỗi trạng thái một màu chữ, nền = cùng màu 10% */
-    --flow-pending: 36 85% 34%;
-    --flow-warehouse: 215 14% 38%;
-    --flow-picking: 262 52% 46%;
-    --flow-packed: 231 50% 46%;
-    --flow-picked-up: 199 85% 32%;
-    --flow-in-transit: 212 69% 39%;
-    --flow-out-for-delivery: 174 70% 27%;
-    --flow-delivered: 145 60% 28%;
-    --flow-returned: 22 85% 40%;
-    --flow-carrier-cancelled: 352 68% 44%;
-    --flow-cancelled: 220 8% 45%;
-    /* Nhà mạng cạnh SĐT: chữ = màu đậm, nền = cùng màu 15% */
-    --telco-viettel: 0 70% 40%;
-    --telco-vina: 210 80% 38%;
-    --telco-mobi: 160 70% 27%;
-    --telco-vnmb: 28 90% 37%;
-    --telco-gmobile: 45 90% 30%;
-    --telco-itel: 280 50% 45%;
-  }
-
-  .dark {
-    --background: 222 47% 11%;
-    --foreground: 210 40% 98%;
-    --card: 222 47% 11%;
-    --card-foreground: 210 40% 98%;
-    --popover: 222 47% 11%;
-    --popover-foreground: 210 40% 98%;
-    --primary: 210 40% 98%;
-    --primary-foreground: 222 47% 11%;
-    --secondary: 217 33% 17%;
-    --secondary-foreground: 210 40% 98%;
-    --muted: 217 33% 17%;
-    --muted-foreground: 215 20% 65%;
-    --accent: 217 33% 17%;
-    --accent-foreground: 210 40% 98%;
-    --destructive: 0 63% 31%;
-    --destructive-foreground: 210 40% 98%;
-    --success: 142 71% 45%;
-    --success-foreground: 222 47% 11%;
-    --warning: 38 92% 50%;
-    --warning-foreground: 222 47% 11%;
-    --info: 217 91% 60%;
-    --info-foreground: 222 47% 11%;
-    --border: 217 33% 17%;
-    --input: 217 33% 17%;
-    --ring: 213 27% 84%;
-    --branch-1: 140 45% 60%;
-    --branch-1-weak: 140 30% 16%;
-    --branch-2: 40 80% 60%;
-    --branch-2-weak: 40 40% 16%;
-    --branch-3: 230 70% 72%;
-    --branch-3-weak: 230 35% 20%;
-    --branch-4: 0 70% 68%;
-    --branch-4-weak: 0 35% 18%;
-    --branch-5: 90 35% 60%;
-    --branch-5-weak: 90 20% 16%;
-    --branch-6: 200 70% 65%;
-    --branch-6-weak: 200 40% 17%;
-    --branch-7: 175 50% 55%;
-    --branch-7-weak: 175 35% 15%;
-    --branch-8: 300 45% 70%;
-    --branch-8-weak: 300 25% 18%;
-    --flow-pending: 40 85% 62%;
-    --flow-warehouse: 215 15% 68%;
-    --flow-picking: 262 70% 74%;
-    --flow-packed: 231 70% 74%;
-    --flow-picked-up: 199 80% 64%;
-    --flow-in-transit: 212 80% 68%;
-    --flow-out-for-delivery: 174 55% 55%;
-    --flow-delivered: 145 50% 58%;
-    --flow-returned: 24 85% 64%;
-    --flow-carrier-cancelled: 352 75% 70%;
-    --flow-cancelled: 220 10% 62%;
-    --telco-viettel: 0 70% 68%;
-    --telco-vina: 210 80% 70%;
-    --telco-mobi: 160 55% 55%;
-    --telco-vnmb: 28 85% 64%;
-    --telco-gmobile: 45 85% 60%;
-    --telco-itel: 280 55% 74%;
   }
 
   * {
@@ -189,7 +34,7 @@
     font-variant-numeric: tabular-nums;
   }
 
-  /* Chất lượng nền: focus bàn phím nhìn thấy được ở mọi nơi. */
+  /* Chất lượng nền: focus bàn phím nhìn thấy được ở mọi nơi (vòng 2px cách 2px — focus-ring-*). */
   :focus-visible {
     @apply outline-none ring-2 ring-ring ring-offset-2 ring-offset-background;
   }
@@ -201,7 +46,7 @@
    */
   @media print {
     body {
-      background: hsl(var(--card));
+      background: rgb(var(--card));
     }
     body > *:not([data-print-root]) {
       display: none !important;
@@ -237,7 +82,7 @@
    * Sơ đồ nhân sự (features/admin/components/org-chart.tsx): cây DỌC thụt lề (2026-10-19) — con
    * xếp dưới cha, lùi vào một nấc. Mỗi <li> cấp con vẽ ::before = khuỷu (đoạn dọc từ trên xuống
    * ngang tâm ô + đoạn ngang vào ô) và ::after = đoạn dọc nối xuống anh em kế tiếp. Trục dọc nằm
-   * đúng dưới nút thu gọn / mở rộng của ô cha (left-4).
+   * đúng dưới nút thu gọn / mở rộng của ô cha (left-4). Nét vẽ dùng `input-soft` (viền nhạt).
    */
   .org-chart ul ul {
     @apply ml-4 pl-5;
@@ -250,11 +95,11 @@
   }
   .org-chart ul ul > li::before {
     content: '';
-    @apply absolute -left-5 top-0 h-6 w-5 rounded-bl border-b border-l border-input;
+    @apply absolute -left-5 top-0 h-6 w-5 rounded-bl border-b border-l border-input-soft;
   }
   .org-chart ul ul > li::after {
     content: '';
-    @apply absolute -left-5 bottom-0 top-6 border-l border-input;
+    @apply absolute -left-5 bottom-0 top-6 border-l border-input-soft;
   }
   .org-chart ul ul > li:last-child::after {
     @apply hidden;

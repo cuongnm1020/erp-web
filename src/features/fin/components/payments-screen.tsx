@@ -413,7 +413,7 @@ export function PaymentsScreen() {
             </p>
           </section>
 
-          <div className="flex items-start gap-2.5 rounded-md border bg-success/10 px-3 py-2 text-sm text-success">
+          <div className="flex items-start gap-2.5 rounded-md border bg-success-weak px-3 py-2 text-sm text-success">
             <CheckCircle2 className="mt-0.5 size-4 shrink-0" />
             <p>
               <span className="font-semibold">Phân bổ hợp lệ.</span> Tổng cấn trừ = số tiền thu. Sau

@@ -128,7 +128,7 @@ export function UomManagerDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-lg">
+      <DialogContent wide>
         <DialogHeader>
           <DialogTitle>Đơn vị tính</DialogTitle>
           <DialogDescription>

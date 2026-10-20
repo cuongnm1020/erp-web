@@ -244,9 +244,9 @@ interface ActionTile {
 }
 
 const TILE_TONE: Record<ActionTile['tone'], string> = {
-  warn: 'bg-warning/10 text-warning',
-  danger: 'bg-destructive/10 text-destructive',
-  info: 'bg-info/10 text-info',
+  warn: 'bg-warning-weak text-warning',
+  danger: 'bg-destructive-weak text-destructive',
+  info: 'bg-info-weak text-info',
   brand: 'bg-accent text-primary',
 };
 

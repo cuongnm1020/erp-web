@@ -61,14 +61,14 @@ export function BulkCancelDialog({ rows, onDone }: { rows: SalesOrder[]; onDone:
       <Button
         size="sm"
         variant="outline"
-        className="h-7 border-destructive/50 px-2 text-xs text-destructive hover:bg-destructive/10 hover:text-destructive"
+        className="h-7 border-destructive-line px-2 text-xs text-destructive hover:bg-destructive-weak hover:text-destructive"
         onClick={() => setOpen(true)}
       >
         <Ban aria-hidden />
         Hủy đơn
       </Button>
       <Dialog open={open} onOpenChange={(o) => !bulk.isPending && setOpen(o)}>
-        <DialogContent className="sm:max-w-md">
+        <DialogContent>
           <DialogHeader>
             <DialogTitle>Hủy {cancellable.length} đơn đã chọn?</DialogTitle>
             <DialogDescription>

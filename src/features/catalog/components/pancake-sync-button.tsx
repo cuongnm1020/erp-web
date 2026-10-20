@@ -78,7 +78,7 @@ export function PancakeSyncButton() {
         {running && s ? `Đang đồng bộ ${s.done}/${s.total || '…'}` : 'Đồng bộ Pancake'}
       </Button>
       <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent className="max-w-lg">
+        <DialogContent wide>
           <DialogHeader>
             <DialogTitle>Đồng bộ sản phẩm lên Pancake</DialogTitle>
             <DialogDescription>

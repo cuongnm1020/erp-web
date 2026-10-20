@@ -479,9 +479,7 @@ export const OrderDraftForm = forwardRef<
 });
 
 function Kbd({ children }: { children: string }) {
-  return (
-    <kbd className="rounded border bg-card px-1.5 py-0.5 font-mono text-[11px]">{children}</kbd>
-  );
+  return <kbd className="rounded border bg-card px-1.5 py-0.5 font-mono text-xs">{children}</kbd>;
 }
 
 /** Kênh bán · Nguồn đơn · Kho xuất — đầu card Sản phẩm. */
@@ -961,7 +959,7 @@ function NotesCard({
             ) : (
               <>
                 <FileText className="h-6 w-6 text-muted-foreground" aria-hidden />
-                <span className="line-clamp-2 break-all text-[10px] leading-tight">{f.name}</span>
+                <span className="line-clamp-2 break-all text-xs leading-tight">{f.name}</span>
               </>
             )}
             <button

@@ -253,7 +253,7 @@ export function PickScreen() {
       </header>
 
       {offline ? (
-        <p role="status" className="flex items-center gap-2 bg-warning/15 px-4 py-2 text-sm">
+        <p role="status" className="flex items-center gap-2 bg-warning-weak px-4 py-2 text-sm">
           <WifiOff className="h-4 w-4 text-warning" aria-hidden />
           Mất kết nối — quét lại khi có mạng.
         </p>
@@ -264,7 +264,7 @@ export function PickScreen() {
           <aside
             role="status"
             aria-label="Cảnh báo thiếu hàng"
-            className="rounded-md border border-warning/60 bg-warning/10 px-3 py-2 text-sm"
+            className="rounded-md border border-warning-line bg-warning-weak px-3 py-2 text-sm"
           >
             <p className="flex items-center gap-2 font-semibold">
               <AlertTriangle className="h-4 w-4 text-warning" aria-hidden />
@@ -290,10 +290,10 @@ export function PickScreen() {
             className={cn(
               'flex items-center gap-2 rounded-md border px-3 py-3 font-medium',
               feedback.kind === 'error' &&
-                'border-destructive/50 bg-destructive/10 text-destructive',
-              feedback.kind === 'warn' && 'border-warning/60 bg-warning/10 text-warning-foreground',
-              feedback.kind === 'ok' && 'border-success/50 bg-success/10 text-success',
-              feedback.kind === 'info' && 'border-info/50 bg-info/10 text-info',
+                'border-destructive-line bg-destructive-weak text-destructive',
+              feedback.kind === 'warn' && 'border-warning-line bg-warning-weak text-warning',
+              feedback.kind === 'ok' && 'border-success-line bg-success-weak text-success',
+              feedback.kind === 'info' && 'border-info-line bg-info-weak text-info',
             )}
           >
             {feedback.kind === 'error' ? (
@@ -319,7 +319,7 @@ export function PickScreen() {
             {pendingHandover > 0 ? (
               <div
                 role="status"
-                className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-warning/60 bg-warning/10 px-3 py-2"
+                className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-warning-line bg-warning-weak px-3 py-2"
               >
                 <span className="flex items-center gap-2 font-medium">
                   <AlertTriangle className="h-4 w-4 text-warning" aria-hidden />
@@ -395,7 +395,7 @@ export function PickScreen() {
                         className={cn(
                           'rounded-sm px-1.5 py-0.5 text-xs font-medium',
                           w.status === 'IN_PROGRESS'
-                            ? 'bg-primary/10 text-primary'
+                            ? 'bg-secondary text-primary'
                             : 'bg-muted text-muted-foreground',
                         )}
                       >
@@ -424,7 +424,7 @@ export function PickScreen() {
                         className={cn(
                           'rounded-sm px-1.5 py-0.5 text-xs font-medium',
                           t.status === 'IN_PROGRESS'
-                            ? 'bg-primary/10 text-primary'
+                            ? 'bg-secondary text-primary'
                             : 'bg-muted text-muted-foreground',
                         )}
                       >
@@ -466,7 +466,7 @@ export function PickScreen() {
                         className={cn(
                           'rounded-sm px-1.5 py-0.5 text-xs font-medium',
                           q.assignedToMe
-                            ? 'bg-primary/10 text-primary'
+                            ? 'bg-secondary text-primary'
                             : 'bg-muted text-muted-foreground',
                         )}
                       >
@@ -559,8 +559,8 @@ export function PickScreen() {
                     key={sh.taskLineId}
                     className={cn(
                       'rounded border px-1.5 py-0.5 font-mono',
-                      sh.lineStatus === 'COMPLETED' && 'border-success/50 text-success',
-                      sh.lineStatus === 'EXCEPTION' && 'border-warning/60 text-warning-foreground',
+                      sh.lineStatus === 'COMPLETED' && 'border-success-line text-success',
+                      sh.lineStatus === 'EXCEPTION' && 'border-warning-line text-warning',
                     )}
                   >
                     {sh.refDocNumber ?? sh.taskDocNumber} {formatQuantity(sh.qtyDone)}/
@@ -580,8 +580,8 @@ export function PickScreen() {
                 className={cn(
                   'flex items-center justify-between rounded-md border px-3 py-2',
                   l.status === 'COMPLETED' &&
-                    'border-success/40 bg-success/5 text-muted-foreground',
-                  l.status === 'EXCEPTION' && 'border-warning/60 bg-warning/10',
+                    'border-success-line bg-success-weak text-muted-foreground',
+                  l.status === 'EXCEPTION' && 'border-warning-line bg-warning-weak',
                   l.taskLineId === currentTask?.taskLineId && 'border-primary',
                 )}
               >
@@ -592,7 +592,7 @@ export function PickScreen() {
                       <span className="font-mono font-semibold">{l.locationCode ?? '—'}</span>{' '}
                       {l.productName}
                       {l.status === 'EXCEPTION' ? (
-                        <span className="ml-1 text-xs text-warning-foreground">· thiếu</span>
+                        <span className="ml-1 text-xs text-warning">· thiếu</span>
                       ) : null}
                     </span>
                     {l.skuName !== l.productName ? (
@@ -615,7 +615,7 @@ export function PickScreen() {
                 key={g.key}
                 className={cn(
                   'flex items-center justify-between rounded-md border px-3 py-2',
-                  g.complete && 'border-success/40 bg-success/5 text-muted-foreground',
+                  g.complete && 'border-success-line bg-success-weak text-muted-foreground',
                   g.key === currentWave?.key && 'border-primary',
                 )}
               >
@@ -681,7 +681,7 @@ export function PickScreen() {
         {phase === 'done' ? (
           noMoreWork ? (
             <div className="grid gap-2">
-              <Button className="h-[72px] text-lg" onClick={() => setHandoverMode('new')}>
+              <Button className="h-pda-primary text-lg" onClick={() => setHandoverMode('new')}>
                 <UserCheck aria-hidden />
                 Chọn người đóng gói
               </Button>
@@ -690,7 +690,7 @@ export function PickScreen() {
               </Button>
             </div>
           ) : (
-            <Button className="h-[72px] text-lg" onClick={clear}>
+            <Button className="h-pda-primary text-lg" onClick={clear}>
               Quét đơn kế tiếp
             </Button>
           )
@@ -698,7 +698,7 @@ export function PickScreen() {
           <div className="grid grid-cols-2 gap-2">
             <Button
               variant="outline"
-              className="h-14 border-warning/60 text-warning-foreground"
+              className="h-14 border-warning-line text-warning"
               disabled={!(currentTask || currentWave) || s.busy}
               onClick={() => setShortOpen(true)}
             >
@@ -710,7 +710,7 @@ export function PickScreen() {
             </Button>
           </div>
         ) : (
-          <Button className="h-[72px] text-lg" onClick={() => scanRef.current?.focus()}>
+          <Button className="h-pda-primary text-lg" onClick={() => scanRef.current?.focus()}>
             Quét mã vạch
           </Button>
         )}

@@ -125,7 +125,7 @@ export function NewOrdersColumn({
                 aria-label={`${o.docNumber}, ${o.skuCount} SKU, ${kg(o.weightKg)}`}
                 className={cn(
                   'flex min-h-14 w-full items-center gap-3 px-3 py-2 text-left hover:bg-muted',
-                  on && 'bg-primary/10',
+                  on && 'bg-secondary',
                 )}
                 onClick={() => toggle(o.taskId)}
               >

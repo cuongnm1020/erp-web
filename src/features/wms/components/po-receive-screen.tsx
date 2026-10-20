@@ -218,7 +218,7 @@ function CellBox({
     <div
       className={cn(
         'flex h-7 items-center gap-1 rounded border bg-background px-1.5 text-sm',
-        state === 'warn' && 'border-warning bg-warning/10',
+        state === 'warn' && 'border-warning bg-warning-weak',
         state === 'focus' && 'border-primary ring-2 ring-secondary',
         state === undefined && 'border-input',
         num && 'justify-end tabular-nums',
@@ -338,7 +338,7 @@ export function PoReceiveScreen() {
                   <TableRow
                     key={l.no}
                     className={
-                      diff.tone === 'over' ? 'bg-warning/10 hover:bg-warning/10' : undefined
+                      diff.tone === 'over' ? 'bg-warning-weak hover:bg-warning-weak' : undefined
                     }
                   >
                     <TableCell className="px-2.5 py-1.5 text-muted-foreground">{l.no}</TableCell>
@@ -364,7 +364,7 @@ export function PoReceiveScreen() {
                           aria-label={`Số lượng nhận dòng ${l.no}`}
                           className={cn(
                             'h-7 w-20 text-right tabular-nums',
-                            diff.tone === 'over' && 'border-warning bg-warning/10',
+                            diff.tone === 'over' && 'border-warning bg-warning-weak',
                             input.qty !== '' && !QTY_RE.test(input.qty) && 'border-destructive',
                           )}
                         />

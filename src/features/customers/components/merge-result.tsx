@@ -126,7 +126,7 @@ export function MergeResultView({
       {kept.length > 0 ? (
         <p
           role="note"
-          className="mx-3 mb-3 rounded-md border border-warning/40 bg-warning/10 px-3 py-2 text-sm"
+          className="mx-3 mb-3 rounded-md border border-warning-line bg-warning-weak px-3 py-2 text-sm"
         >
           <span className="font-semibold">
             {keptOrders} đơn đã chốt vẫn nằm ở hồ sơ cũ, hồ sơ cũ trỏ sang khách giữ.

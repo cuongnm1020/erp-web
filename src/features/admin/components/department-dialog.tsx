@@ -147,7 +147,7 @@ export function DepartmentDialog({
 
   return (
     <Dialog open={open} onOpenChange={(o) => !pending && onOpenChange(o)}>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent>
         <DialogHeader>
           <DialogTitle>
             {editing ? `Sửa phòng ban ${department.code}` : 'Thêm phòng ban'}

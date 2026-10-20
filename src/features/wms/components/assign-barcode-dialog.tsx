@@ -45,7 +45,7 @@ export function AssignBarcodeDialog({
 
   return (
     <Dialog open={code !== null} onOpenChange={(o) => !o && !assign.isPending && close()}>
-      <DialogContent className="sm:max-w-lg">
+      <DialogContent wide>
         <DialogHeader>
           <DialogTitle>Mã chưa gán cho sản phẩm nào</DialogTitle>
           <DialogDescription>

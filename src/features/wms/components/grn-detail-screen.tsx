@@ -179,7 +179,7 @@ function StageBanner({ receipt }: { receipt: ReceiptDetail }) {
   );
   if (receipt.stage === 'AWAITING_COST') {
     return (
-      <p className="flex items-center gap-2 rounded-md border border-warning/40 bg-warning/10 px-3 py-2 text-sm">
+      <p className="flex items-center gap-2 rounded-md border border-warning-line bg-warning-weak px-3 py-2 text-sm">
         <AlertCircle className="h-3.5 w-3.5" aria-hidden />
         <span>
           <b>
@@ -193,7 +193,7 @@ function StageBanner({ receipt }: { receipt: ReceiptDetail }) {
     );
   }
   return (
-    <p className="flex items-center gap-2 rounded-md border border-success/30 bg-success/10 px-3 py-2 text-sm">
+    <p className="flex items-center gap-2 rounded-md border border-success-line bg-success-weak px-3 py-2 text-sm">
       <Lock className="h-3.5 w-3.5" aria-hidden />
       <span>
         {posted}
@@ -340,7 +340,7 @@ function DetailBody({
                 const err = cost.errors[l.id];
                 const value = lineValue(l);
                 return (
-                  <TableRow key={l.id} className={cn(err && 'bg-destructive/10')}>
+                  <TableRow key={l.id} className={cn(err && 'bg-destructive-weak')}>
                     <TableCell className="px-2.5 py-1.5 text-muted-foreground">
                       {l.lineNo}
                     </TableCell>

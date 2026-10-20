@@ -208,7 +208,7 @@ function GroupDialog({
 
   return (
     <Dialog open={open} onOpenChange={(o) => !pending && onOpenChange(o)}>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent>
         <DialogHeader>
           <DialogTitle>{editing ? `Sửa nhóm ${group.name}` : 'Thêm nhóm khách hàng'}</DialogTitle>
           <DialogDescription>Một khách thuộc đúng một nhóm.</DialogDescription>
@@ -516,7 +516,7 @@ function TierDialog({
 
   return (
     <Dialog open={open} onOpenChange={(o) => !pending && onOpenChange(o)}>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent>
         <DialogHeader>
           <DialogTitle>{editing ? `Sửa cấp độ ${tier.name}` : 'Thêm cấp độ'}</DialogTitle>
           <DialogDescription>
@@ -858,7 +858,7 @@ function TagDialog({
 
   return (
     <Dialog open={open} onOpenChange={(o) => !pending && onOpenChange(o)}>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent>
         <DialogHeader>
           <DialogTitle>{editing ? `Sửa tag ${tag.name}` : 'Thêm tag'}</DialogTitle>
           <DialogDescription>Tag gắn tự do, một khách mang được nhiều tag.</DialogDescription>
@@ -1029,7 +1029,7 @@ function TagsCard() {
                         type="button"
                         variant="outline"
                         size="sm"
-                        className="h-7 border-destructive px-2 text-xs text-destructive hover:bg-destructive/10 hover:text-destructive"
+                        className="h-7 border-destructive px-2 text-xs text-destructive hover:bg-destructive-weak hover:text-destructive"
                         onClick={() => setDeleting(true)}
                       >
                         Xóa tag

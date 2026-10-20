@@ -545,7 +545,7 @@ function CancelOrderDialog({
   };
   return (
     <Dialog open={open} onOpenChange={(o) => !cancel.isPending && onOpenChange(o)}>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent>
         <DialogHeader>
           <DialogTitle>
             {recreate
@@ -757,7 +757,7 @@ function Detail({ order }: { order: SalesOrderDetail }) {
               <Field label="Thẻ">
                 <span className="flex flex-wrap gap-1">
                   {order.tags.map((t) => (
-                    <span key={t.id} className="rounded bg-warning/15 px-1.5 text-xs font-medium">
+                    <span key={t.id} className="rounded bg-warning-weak px-1.5 text-xs font-medium">
                       {t.name}
                     </span>
                   ))}

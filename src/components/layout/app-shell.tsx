@@ -196,7 +196,7 @@ export function AppShell({
       </div>
       <CommandPalette />
       <Dialog open={shortcuts} onOpenChange={setShortcuts}>
-        <DialogContent className="max-w-md">
+        <DialogContent>
           <DialogHeader>
             <DialogTitle>Phím tắt</DialogTitle>
             <DialogDescription>

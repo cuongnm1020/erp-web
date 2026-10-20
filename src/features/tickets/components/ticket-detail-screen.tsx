@@ -54,9 +54,9 @@ const SAMPLE_TIMELINE: TimelineItem[] = [
 ];
 
 const DOT_CLASS: Record<TimelineKind, string> = {
-  call: 'bg-success/10 text-success',
-  note: 'bg-info/10 text-info',
-  reply: 'bg-warning/10 text-warning',
+  call: 'bg-success-weak text-success',
+  note: 'bg-info-weak text-info',
+  reply: 'bg-warning-weak text-warning',
 };
 
 const RELATED_ORDER = {
@@ -102,7 +102,7 @@ export function TicketDetailScreen({ id }: { id: string }) {
         }
       />
 
-      <div className="mb-3 flex items-start gap-2.5 rounded-md border border-warning/40 bg-warning/10 px-3 py-2 text-sm">
+      <div className="mb-3 flex items-start gap-2.5 rounded-md border border-warning-line bg-warning-weak px-3 py-2 text-sm">
         <Clock className="mt-0.5 h-4 w-4 shrink-0 text-warning" />
         <div>
           <span className="font-semibold">SLA xử lý còn 5h 10m</span> — hạn 24/08/2026 15:00 (giờ

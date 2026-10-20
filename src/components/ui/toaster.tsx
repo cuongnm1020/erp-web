@@ -16,8 +16,8 @@ export function Toaster() {
           toast: 'group border bg-background text-foreground shadow-lg',
           description: 'text-muted-foreground',
           actionButton: 'bg-primary text-primary-foreground',
-          error: 'border-destructive/50',
-          success: 'border-success/50',
+          error: 'border-destructive-line',
+          success: 'border-success-line',
         },
       }}
     />

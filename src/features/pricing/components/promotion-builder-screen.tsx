@@ -230,7 +230,7 @@ export function PromotionBuilderScreen() {
                   </div>
                 </Field>
               </div>
-              <div className="flex items-start gap-2.5 rounded-md border bg-warning/10 px-3 py-2 text-sm text-warning">
+              <div className="flex items-start gap-2.5 rounded-md border bg-warning-weak px-3 py-2 text-sm text-warning">
                 <AlertTriangle className="mt-0.5 size-4 shrink-0" />
                 <p>
                   SKU tặng <span className="font-semibold">RTX-500</span> sẽ được reserve như dòng
@@ -290,7 +290,7 @@ export function PromotionBuilderScreen() {
                   {SAMPLE_PREVIEW_LINES.map((l) => (
                     <TableRow
                       key={l.sku}
-                      className={cn(l.gift && 'bg-success/10 hover:bg-success/10')}
+                      className={cn(l.gift && 'bg-success-weak hover:bg-success-weak')}
                     >
                       <TableCell
                         className={cn('px-2.5 py-1.5 font-mono text-xs', l.gift && 'text-success')}

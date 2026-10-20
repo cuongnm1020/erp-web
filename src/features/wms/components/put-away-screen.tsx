@@ -121,7 +121,7 @@ export function PutAwayScreen() {
       </header>
 
       {s.offline ? (
-        <p role="status" className="flex items-center gap-2 bg-warning/15 px-4 py-2 text-sm">
+        <p role="status" className="flex items-center gap-2 bg-warning-weak px-4 py-2 text-sm">
           <WifiOff className="h-4 w-4 text-warning" aria-hidden />
           Mất kết nối — quét lại khi có mạng.
         </p>
@@ -134,10 +134,10 @@ export function PutAwayScreen() {
             className={cn(
               'flex items-center gap-2 rounded-md border px-3 py-3 font-medium',
               feedback.kind === 'error' &&
-                'border-destructive/50 bg-destructive/10 text-destructive',
-              feedback.kind === 'warn' && 'border-warning/60 bg-warning/10 text-warning-foreground',
-              feedback.kind === 'ok' && 'border-success/50 bg-success/10 text-success',
-              feedback.kind === 'info' && 'border-info/50 bg-info/10 text-info',
+                'border-destructive-line bg-destructive-weak text-destructive',
+              feedback.kind === 'warn' && 'border-warning-line bg-warning-weak text-warning',
+              feedback.kind === 'ok' && 'border-success-line bg-success-weak text-success',
+              feedback.kind === 'info' && 'border-info-line bg-info-weak text-info',
             )}
           >
             {feedback.kind === 'error' ? (
@@ -185,7 +185,7 @@ export function PutAwayScreen() {
                         className={cn(
                           'rounded-sm px-1.5 py-0.5 text-xs font-medium',
                           q.assignedToMe
-                            ? 'bg-primary/10 text-primary'
+                            ? 'bg-secondary text-primary'
                             : 'bg-muted text-muted-foreground',
                         )}
                       >
@@ -263,7 +263,7 @@ export function PutAwayScreen() {
             {awaitingBin ? (
               <p
                 role="status"
-                className="mt-3 flex items-center gap-2 rounded-md border border-primary/50 bg-primary/10 px-3 py-2 font-medium"
+                className="mt-3 flex items-center gap-2 rounded-md border border-primary/50 bg-secondary px-3 py-2 font-medium"
               >
                 <CheckCircle2 className="h-5 w-5 shrink-0" aria-hidden />
                 Đã quét đủ {formatQuantity(current.qtyPlanned)} — quét mã ô kệ{' '}
@@ -291,8 +291,8 @@ export function PutAwayScreen() {
                 className={cn(
                   'flex items-center justify-between rounded-md border px-3 py-2',
                   l.status === 'COMPLETED' &&
-                    'border-success/40 bg-success/5 text-muted-foreground',
-                  l.status === 'EXCEPTION' && 'border-warning/60 bg-warning/10',
+                    'border-success-line bg-success-weak text-muted-foreground',
+                  l.status === 'EXCEPTION' && 'border-warning-line bg-warning-weak',
                   l.taskLineId === current?.taskLineId && 'border-primary',
                 )}
               >
@@ -300,7 +300,7 @@ export function PutAwayScreen() {
                   <span className="font-mono font-semibold">{l.toLocationCode ?? '—'}</span>{' '}
                   <span>{l.skuName}</span>
                   {l.status === 'EXCEPTION' ? (
-                    <span className="ml-1 text-xs text-warning-foreground">
+                    <span className="ml-1 text-xs text-warning">
                       · chưa có ô kệ — điều phối chỉ định
                     </span>
                   ) : null}
@@ -381,7 +381,7 @@ export function PutAwayScreen() {
           disabled={phase === 'opening'}
         />
         {phase === 'done' ? (
-          <Button className="h-[72px] text-lg" onClick={clear}>
+          <Button className="h-pda-primary text-lg" onClick={clear}>
             Việc kế tiếp
           </Button>
         ) : phase === 'ready' ? (
@@ -398,7 +398,7 @@ export function PutAwayScreen() {
             </Button>
           </div>
         ) : (
-          <Button className="h-[72px] text-lg" onClick={() => scanRef.current?.focus()}>
+          <Button className="h-pda-primary text-lg" onClick={() => scanRef.current?.focus()}>
             Quét mã vạch
           </Button>
         )}

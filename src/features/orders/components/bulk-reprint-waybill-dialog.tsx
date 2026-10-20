@@ -110,7 +110,7 @@ export function ReprintWaybillDialog({
         {triggerLabel}
       </Button>
       <Dialog open={open} onOpenChange={(o) => !fetchLabels.isPending && setOpen(o)}>
-        <DialogContent className="sm:max-w-md">
+        <DialogContent>
           <DialogHeader>
             <DialogTitle>In lại {printable.length} tem vận đơn?</DialogTitle>
             <DialogDescription>

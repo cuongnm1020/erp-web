@@ -97,7 +97,7 @@ export function SupplierImportDialog({
 
   return (
     <Dialog open={open} onOpenChange={close}>
-      <DialogContent className="sm:max-w-2xl">
+      <DialogContent wide>
         <DialogHeader>
           <DialogTitle>Nhập nhà cung cấp từ Excel</DialogTitle>
           <DialogDescription>

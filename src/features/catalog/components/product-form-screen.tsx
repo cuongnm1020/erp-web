@@ -533,7 +533,7 @@ function ProductFormBody({ product }: { product?: ProductDetail }) {
         {rowErrors.length > 0 ? (
           <div
             role="alert"
-            className="rounded-md border border-destructive/40 bg-destructive/5 px-3 py-2 text-sm"
+            className="rounded-md border border-destructive-line bg-destructive-weak px-3 py-2 text-sm"
           >
             <span className="font-semibold text-destructive">
               {rowErrors.length} dòng chưa hợp lệ — chưa lưu hết.
@@ -557,7 +557,7 @@ function ProductFormBody({ product }: { product?: ProductDetail }) {
              người khác vừa sửa, phải tải lại rồi nhập lại, không retry tự động (luật 6). */
           <div
             role="alert"
-            className="flex items-center gap-3 rounded-md border border-destructive/40 bg-destructive/5 px-3 py-2 text-sm"
+            className="flex items-center gap-3 rounded-md border border-destructive-line bg-destructive-weak px-3 py-2 text-sm"
           >
             <span className="font-semibold text-destructive">
               {form.formState.errors.root.server.message}
@@ -1022,7 +1022,7 @@ function ProductFormBody({ product }: { product?: ProductDetail }) {
                         )}
                       />
                       {i === 0 ? (
-                        <span className="absolute left-1 top-1 rounded bg-primary px-1 text-[10px] font-medium text-primary-foreground">
+                        <span className="absolute left-1 top-1 rounded bg-primary px-1 text-xs font-medium text-primary-foreground">
                           Ảnh chính
                         </span>
                       ) : null}
@@ -1496,7 +1496,7 @@ function SkuRow({
               <FormControl>
                 <MoneyInput value={field.value ?? ''} onChange={field.onChange} />
               </FormControl>
-              <FormDescription className="text-[11px]">Ghi vào bảng giá mặc định</FormDescription>
+              <FormDescription className="text-xs">Ghi vào bảng giá mặc định</FormDescription>
               <FormMessage />
             </FormItem>
           )}
@@ -1516,7 +1516,7 @@ function SkuRow({
                   value={field.value ?? ''}
                 />
               </FormControl>
-              <FormDescription className="text-[11px]">
+              <FormDescription className="text-xs">
                 Tính cước hãng vận chuyển; lưu theo kg trên SKU
               </FormDescription>
               <FormMessage />
@@ -1582,7 +1582,7 @@ function SkuRow({
                     </SelectItem>
                   </SelectContent>
                 </Select>
-                <FormDescription className="text-[11px]">
+                <FormDescription className="text-xs">
                   {existingCartonFactor !== '' ? 'Đã có cấp thùng' : ' '}
                 </FormDescription>
                 <FormMessage />
@@ -1607,7 +1607,7 @@ function SkuRow({
                     value={field.value ?? ''}
                   />
                 </FormControl>
-                <FormDescription className="text-[11px]">1 thùng = ? {baseUom}</FormDescription>
+                <FormDescription className="text-xs">1 thùng = ? {baseUom}</FormDescription>
                 <FormMessage />
               </FormItem>
             )}
@@ -1635,7 +1635,7 @@ function SkuRow({
                     <SelectItem value="yes">Có</SelectItem>
                   </SelectContent>
                 </Select>
-                <FormDescription className="text-[11px]">
+                <FormDescription className="text-xs">
                   {!hasCarton
                     ? 'Có thùng mới có pallet'
                     : !canPallet && !palletUom
@@ -1664,7 +1664,7 @@ function SkuRow({
                     value={field.value ?? ''}
                   />
                 </FormControl>
-                <FormDescription className="text-[11px]">
+                <FormDescription className="text-xs">
                   1 pallet = ? thùng
                   {palletInBase ? ` = ${palletInBase} ${baseUom}` : ''}
                 </FormDescription>

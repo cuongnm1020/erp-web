@@ -8,7 +8,9 @@ const Input = React.forwardRef<HTMLInputElement, InputProps>(
     <input
       type={type}
       className={cn(
-        'flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm transition-colors file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground disabled:cursor-not-allowed disabled:opacity-50 aria-[invalid=true]:border-destructive',
+        // Ô nhập theo design system Input: cao control-height, viền control-border (3:1), nền card,
+        // placeholder subtle-foreground, lỗi → viền destructive (câu lỗi do FormMessage).
+        'flex h-control w-full rounded-md border border-control-border bg-card px-2.5 py-1 text-sm file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-subtle-foreground focus-visible:border-control-border-focus disabled:cursor-not-allowed disabled:bg-control-bg-disabled disabled:opacity-60 aria-[invalid=true]:border-destructive',
         className,
       )}
       ref={ref}

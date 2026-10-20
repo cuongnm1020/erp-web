@@ -92,7 +92,7 @@ export function HandoverDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent>
         <DialogHeader>
           <DialogTitle>{change ? 'Đổi người đóng gói' : 'Giao người đóng gói'}</DialogTitle>
           <DialogDescription>
@@ -103,7 +103,7 @@ export function HandoverDialog({
         </DialogHeader>
         {docLine ? <p className="font-mono text-sm text-muted-foreground">{docLine}</p> : null}
         {!change && (state.data?.openPicks ?? 0) > 0 ? (
-          <p className="text-sm text-warning-foreground">
+          <p className="text-sm text-warning">
             Bạn còn {state.data?.openPicks} đơn đang lấy dở — đơn đó giao ở lần sau.
           </p>
         ) : null}
@@ -145,7 +145,7 @@ export function HandoverDialog({
                     aria-checked={on}
                     className={cn(
                       'flex min-h-14 w-full items-center gap-3 rounded-md border px-3 py-2 text-left hover:bg-muted',
-                      on && 'border-primary bg-primary/10',
+                      on && 'border-primary bg-secondary',
                     )}
                     onClick={() => setPicked(p.id)}
                   >

@@ -214,8 +214,8 @@ function DiffPanel({ title, lines }: { title: string; lines: DiffLine[] }) {
             key={l.text}
             className={cn(
               'whitespace-pre',
-              l.changed === 'del' && 'bg-destructive/10 text-destructive',
-              l.changed === 'add' && 'bg-success/10 text-success',
+              l.changed === 'del' && 'bg-destructive-weak text-destructive',
+              l.changed === 'add' && 'bg-success-weak text-success',
             )}
           >
             {l.text}
@@ -287,7 +287,7 @@ export function AuditLogScreen() {
           <TableBody>
             {SAMPLE_ROWS.map((r) => (
               <Fragment key={r.traceId}>
-                <TableRow className={cn(r.expanded && 'bg-secondary/50')}>
+                <TableRow className={cn(r.expanded && 'bg-secondary')}>
                   <TableCell className="px-2.5 py-1.5 text-muted-foreground">
                     {r.expanded ? (
                       <ChevronDown className="h-3.5 w-3.5" aria-hidden />

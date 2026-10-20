@@ -9,12 +9,54 @@ nhập liệu nhiều, dữ liệu lớn (17k+ khách hàng, ~10k đơn/ngày). 
 
 ---
 
+## Design system — đọc TRƯỚC mọi việc đụng tới giao diện
+
+Nguồn sự thật về giao diện là design system **"Thiên Nông ERP"**:
+**https://claude.ai/artifact/RwsgPEwCz5QX9hWDjdyW9p**
+
+Bắt buộc mở design system trước khi: dựng màn mới, redesign màn cũ, sửa bất kỳ issue giao diện nào
+(lệch màu, sai cỡ nút/ô, sai vị trí nút, thiếu trạng thái, bảng, hộp thoại…), thêm hay sửa
+primitive trong `components/ui/`, `components/data/`, `components/layout/`.
+
+Đọc bằng Artifact tool, action `read` với `path` (không WebFetch):
+
+| File | Đọc khi |
+|---|---|
+| `project/README.md` | luôn luôn — nguyên tắc, màu, chữ, khoảng cách, khung trang, trạng thái bắt buộc |
+| `project/actions.md` | đặt nút / hành động ở đâu, bao nhiêu nút, nút nguy hiểm |
+| `project/patterns.md` | 5 mẫu màn (Danh sách, Chi tiết, Form chứng từ, Ma trận chọn, Tổng quan) — xếp màn vào một mẫu trước khi dựng |
+| `project/components/<Tên>/README.md` | trước khi dùng / sửa component đó (Button, Input, Checkbox, StatusBadge, DataTable, PageHeader, Dialog, States, ActionMenu, RowActions, BulkActionBar, CopyButton, MatrixSelect, Sidebar, PdaButton) |
+| `project/tokens.json` | giá trị token gốc (hex, px) |
+| `project/code-alignment.md` | chỗ code còn lệch hệ thống |
+
+Luật:
+- **Design system thắng.** Mâu thuẫn với `DESIGN-BRIEF.md`, mockup cũ hay code hiện tại thì làm theo
+  design system. Design system không nói tới thì hỏi, không tự bịa giao diện.
+- **Sửa primitive, không vá từng màn.** Lệch hệ thống ở nút / ô / chip / hộp thoại / bảng → sửa
+  component dùng chung ở `components/`, không thêm `className` đè ở màn.
+- **Token ↔ code:** `design/tokens.json` là bản chép của `project/tokens.json` trong design system;
+  `pnpm gen:tokens` sinh `src/app/tokens.css` (không sửa tay), `tailwind.config.ts` đọc tokens.json
+  để đặt tên lớp cùng tên token (`bg-flow-wait-weak`, `h-control`, `max-w-dialog-wide`…). Đổi token
+  = cập nhật design system → chép tokens.json → sinh lại. Cấm hex tự do, cấm giá trị `[...]`, cấm
+  pha độ mờ màu trạng thái (`bg-warning/10` → `bg-warning-weak`); `pnpm lint` chạy
+  `scripts/check-tokens.mjs` bắt các lỗi này.
+- **Biến thể Button giữ tên cũ** để không sửa ~400 chỗ gọi: `default` = primary, `outline` /
+  `secondary` = nút phụ (nền card, viền input), `destructive` = danger (chỉ trong hộp xác nhận),
+  `danger-ghost`, `ghost`, `link`. Cỡ `default` 32px, `sm` 28px, `icon` / `icon-sm`.
+- **Dùng thành phần có sẵn:** `RowActions` (≤1 icon + "⋯", Xóa cuối menu), `BulkActionBar`,
+  `CopyButton` / `Copyable` (mã chứng từ, SĐT, mã vận đơn), `StatusBadge` theo `tone`,
+  `PageHeader` (nút chính cuối, kèm `shortcut`), `Button loading` thay cho tự ghép spinner.
+- Đổi thiết kế (thêm component, đổi thông số) thì cập nhật design system trước — có mockup và
+  được duyệt — rồi mới code.
+
+---
+
 ## Stack chốt — không thay thế, không bổ sung lib mới nếu chưa hỏi
 
 | Vai trò | Lựa chọn |
 |---|---|
 | Framework | Next.js App Router, TypeScript `strict` |
-| Styling | Tailwind + design tokens từ `DESIGN-BRIEF.md` |
+| Styling | Tailwind + design tokens từ design system "Thiên Nông ERP" (xem trên) |
 | Primitives | shadcn/ui (copy vào `components/ui/`) |
 | Server state | TanStack Query v5 |
 | Bảng | TanStack Table (+ virtualizer khi > 200 dòng) |
@@ -158,6 +200,7 @@ Màn hình trống là lời mời hành động, không phải lời than.
 - Không gộp lệnh bằng `&&`; chạy từng lệnh riêng.
 - Làm việc trên nhánh `develop` — checkout trước khi code. Một màn hình một phiên, một task = một commit trên `develop`; KHÔNG tự merge vào `main` (chỉ merge `develop` → `main` khi được yêu cầu).
 - Trước khi viết code màn hình: đọc `SCREEN-SPEC` của màn đó. Không có spec thì hỏi, không tự bịa.
+- Trước khi code hoặc sửa issue giao diện: đọc design system (mục "Design system" ở đầu file).
 - Sau khi xong: `pnpm typecheck && pnpm lint && pnpm test` phải sạch. Không commit khi còn `any`,
   còn `@ts-expect-error` không kèm lý do, hoặc còn `console.log`.
 

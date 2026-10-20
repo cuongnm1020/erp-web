@@ -328,23 +328,23 @@ function StockSummaryCard({ sku }: { sku: Sku }) {
 function InfoTab({ product }: { product: ProductDetail }) {
   return (
     <div className="grid gap-x-8 gap-y-3 p-4 sm:grid-cols-2">
-      <div className="grid grid-cols-[140px_1fr] gap-2 text-sm">
+      <div className="grid grid-cols-detail gap-2 text-sm">
         <span className="text-muted-foreground">Mã sản phẩm</span>
         <span className="font-mono">{product.code}</span>
       </div>
-      <div className="grid grid-cols-[140px_1fr] gap-2 text-sm">
+      <div className="grid grid-cols-detail gap-2 text-sm">
         <span className="text-muted-foreground">Trạng thái</span>
         <span>{product.isActive ? 'Đang bán' : 'Ngừng bán'}</span>
       </div>
-      <div className="grid grid-cols-[140px_1fr] gap-2 text-sm">
+      <div className="grid grid-cols-detail gap-2 text-sm">
         <span className="text-muted-foreground">Ngày tạo</span>
         <span>{formatDateTime(product.createdAt)}</span>
       </div>
-      <div className="grid grid-cols-[140px_1fr] gap-2 text-sm">
+      <div className="grid grid-cols-detail gap-2 text-sm">
         <span className="text-muted-foreground">Sửa lần cuối</span>
         <span>{formatDateTime(product.updatedAt)}</span>
       </div>
-      <div className="col-span-full grid grid-cols-[140px_1fr] gap-2 text-sm">
+      <div className="col-span-full grid grid-cols-detail gap-2 text-sm">
         <span className="text-muted-foreground">Tên lên đơn Pancake</span>
         {product.searchAliases.length > 0 ? (
           <span className="flex flex-wrap gap-1">
@@ -362,7 +362,7 @@ function InfoTab({ product }: { product: ProductDetail }) {
       <TextRow label="Thành phần" value={product.ingredients} />
       <TextRow label="Cách dùng" value={product.usageInstructions} />
       <TextRow label="Lưu ý khi lên đơn" value={product.orderNote} />
-      <div className="col-span-full grid grid-cols-[140px_1fr] gap-2 text-sm">
+      <div className="col-span-full grid grid-cols-detail gap-2 text-sm">
         <span className="text-muted-foreground">Ghi chú nội bộ</span>
         <span
           className={cn('whitespace-pre-wrap', !product.internalNote && 'text-muted-foreground')}
@@ -377,7 +377,7 @@ function InfoTab({ product }: { product: ProductDetail }) {
 /** Một dòng văn bản nhiều dòng trong tab Thông tin — trống hiện "—". */
 function TextRow({ label, value }: { label: string; value: string | null }) {
   return (
-    <div className="col-span-full grid grid-cols-[140px_1fr] gap-2 text-sm">
+    <div className="col-span-full grid grid-cols-detail gap-2 text-sm">
       <span className="text-muted-foreground">{label}</span>
       <span className={cn('whitespace-pre-wrap', !value && 'text-muted-foreground')}>
         {value || '—'}

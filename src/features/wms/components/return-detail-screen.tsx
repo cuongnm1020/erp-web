@@ -46,7 +46,7 @@ function DetailBody({ receipt }: { receipt: ReturnReceiptDetail }) {
   return (
     <div className="flex flex-col gap-3">
       {posted ? (
-        <p className="flex items-center gap-2 rounded-md border border-success/30 bg-success/10 px-3 py-2 text-sm">
+        <p className="flex items-center gap-2 rounded-md border border-success-line bg-success-weak px-3 py-2 text-sm">
           <Lock className="h-3.5 w-3.5" aria-hidden />
           <span>
             <b>Đã post{receipt.postedAt ? ` lúc ${formatDateTime(receipt.postedAt)}` : ''}.</b> Hàng

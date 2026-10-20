@@ -172,7 +172,7 @@ function TagPicker({ form }: { form: Form }) {
       {selected.map((id) => (
         <span
           key={id}
-          className="inline-flex h-7 items-center gap-1 rounded bg-warning/15 px-2 text-xs font-medium"
+          className="inline-flex h-7 items-center gap-1 rounded bg-warning-weak px-2 text-xs font-medium"
         >
           {byId.get(id)?.name ?? '…'}
           <button
@@ -497,7 +497,7 @@ export function CustomerCard({ form }: { form: Form }) {
       </div>
 
       {customerId && brief.data ? (
-        <div className="flex flex-wrap items-center justify-between gap-2 rounded-md bg-primary/10 px-3 py-2 text-sm">
+        <div className="flex flex-wrap items-center justify-between gap-2 rounded-md bg-secondary px-3 py-2 text-sm">
           <span>
             <b className="font-semibold">Khách cũ</b> · {brief.data.code}
             {brief.data.addresses.length > 0

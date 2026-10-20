@@ -1,9 +1,10 @@
-import { fireEvent, screen, waitFor } from '@testing-library/react';
+import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import { http, HttpResponse } from 'msw';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ME_SALE } from '@/test/msw/handlers';
 import { server } from '@/test/msw/server';
 import { renderApp } from '@/test/render';
+import { clickRowMenuItem, rowMenuIndex } from '@/test/row-menu';
 import { WarehousesScreen } from './components/warehouses-screen';
 
 vi.mock('next/navigation', () => ({
@@ -92,13 +93,13 @@ describe('WarehousesScreen — GET/POST/PATCH/DELETE /warehouses', () => {
     );
     renderApp(<WarehousesScreen />);
     await screen.findByText('Kho Hà Nội 1');
-    fireEvent.click(screen.getAllByRole('button', { name: 'Xóa' })[0]!);
-    expect(await screen.findByText('Xóa kho WH01?')).toBeInTheDocument();
+    await clickRowMenuItem('Xóa', { index: rowMenuIndex('kho WH01') });
+    const confirm = await screen.findByRole('dialog');
+    expect(within(confirm).getByText('Xóa kho WH01?')).toBeInTheDocument();
     expect(
-      screen.getByText('Kho chuyển Ngừng dùng — tồn kho, vị trí và chứng từ giữ nguyên.'),
+      within(confirm).getByText('Kho chuyển Ngừng dùng — tồn kho, vị trí và chứng từ giữ nguyên.'),
     ).toBeInTheDocument();
-    const buttons = screen.getAllByRole('button', { name: 'Xóa' });
-    fireEvent.click(buttons[buttons.length - 1]!);
+    fireEvent.click(within(confirm).getByRole('button', { name: 'Xóa' }));
     await waitFor(() => expect(deleted).toEqual(['wh-1']));
   });
 
@@ -113,8 +114,14 @@ describe('WarehousesScreen — GET/POST/PATCH/DELETE /warehouses', () => {
     renderApp(<WarehousesScreen />);
     await screen.findByText('Kho Đà Nẵng');
     expect(screen.getByText('Mặc định')).toBeInTheDocument();
-    // WH02 ngừng dùng bị ẩn; còn 2 kho, chỉ kho không mặc định có nút Xóa (WH01)
-    expect(screen.getAllByRole('button', { name: 'Xóa' })).toHaveLength(1);
+    // WH02 ngừng dùng bị ẩn; còn 2 kho, chỉ kho không mặc định có Xóa (WH01) — Xóa là mục duy
+    // nhất trong menu "⋯", nên kho mặc định (chỉ còn Sửa) không có menu.
+    const whMenus = screen.getAllByRole('button', { name: /^Thao tác khác cho kho / });
+    expect(whMenus).toHaveLength(1);
+    expect(whMenus[0]).toHaveAccessibleName('Thao tác khác cho kho WH01');
+    expect(
+      screen.queryByRole('button', { name: 'Thao tác khác cho kho WH03' }),
+    ).not.toBeInTheDocument();
     // Chỉ kho ĐANG HOẠT ĐỘNG và chưa mặc định có "Đặt mặc định" → WH01 (WH02 ngừng dùng)
     const setDefault = screen.getAllByRole('button', { name: /Đặt mặc định/ });
     expect(setDefault).toHaveLength(1);
@@ -155,6 +162,7 @@ describe('WarehousesScreen — GET/POST/PATCH/DELETE /warehouses', () => {
     expect(screen.queryByRole('button', { name: /Thêm kho/ })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Sửa' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Xóa' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /^Thao tác khác/ })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /Đặt mặc định/ })).not.toBeInTheDocument();
   });
 });

@@ -222,7 +222,7 @@ function CompareBody({
       {!samePhone ? (
         <p
           role="note"
-          className="flex items-center gap-2 border-b bg-warning/10 px-3 py-2 text-sm text-warning"
+          className="flex items-center gap-2 border-b bg-warning-weak px-3 py-2 text-sm text-warning"
         >
           <AlertTriangle className="h-4 w-4 shrink-0" aria-hidden />
           Hai hồ sơ khác số điện thoại chuẩn hoá — gộp sẽ cần xác nhận thêm một lần.
@@ -515,7 +515,7 @@ function MergeConfirmDialog({
 
   return (
     <Dialog open={open} onOpenChange={changeOpen}>
-      <DialogContent className="sm:max-w-lg">
+      <DialogContent wide>
         {phoneMismatch ? (
           <>
             <DialogHeader>
@@ -580,7 +580,7 @@ function MergeConfirmDialog({
               </section>
               <section
                 role="note"
-                className="rounded-md border border-warning/40 bg-warning/10 px-3 py-2"
+                className="rounded-md border border-warning-line bg-warning-weak px-3 py-2"
               >
                 <h3 className="font-medium text-warning">Ở lại hồ sơ cũ {merged.code}</h3>
                 <p>

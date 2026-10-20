@@ -106,7 +106,7 @@ export function ApprovalRulesScreen() {
                   type="button"
                   className={cn(
                     'flex w-full items-center gap-3 border-b px-3 py-2.5 text-left last:border-b-0 hover:bg-muted',
-                    r.active && 'bg-secondary/50',
+                    r.active && 'bg-secondary',
                   )}
                 >
                   <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-muted text-xs font-semibold tabular-nums">
@@ -208,7 +208,7 @@ export function ApprovalRulesScreen() {
               <Button variant="outline" size="sm">
                 + Bước duyệt
               </Button>
-              <div className="flex items-start gap-2 rounded-md border bg-warning/10 px-3 py-2 text-sm text-warning">
+              <div className="flex items-start gap-2 rounded-md border bg-warning-weak px-3 py-2 text-sm text-warning">
                 <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden />
                 <p>
                   <span className="font-semibold">Sale Hà Nội hiện có 1 leader.</span> Nếu leader

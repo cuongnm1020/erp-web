@@ -55,7 +55,7 @@ function DetailBody({ issue }: { issue: GoodsIssueDetail }) {
   return (
     <div className="flex flex-col gap-3">
       {issue.status === 'POSTED' ? (
-        <p className="flex items-center gap-2 rounded-md border border-success/30 bg-success/10 px-3 py-2 text-sm">
+        <p className="flex items-center gap-2 rounded-md border border-success-line bg-success-weak px-3 py-2 text-sm">
           <Lock className="h-3.5 w-3.5" aria-hidden />
           <span>
             <b>
@@ -68,7 +68,7 @@ function DetailBody({ issue }: { issue: GoodsIssueDetail }) {
       ) : null}
 
       {exceptions.length > 0 ? (
-        <p className="flex items-center gap-2 rounded-md border border-warning/40 bg-warning/10 px-3 py-2 text-sm">
+        <p className="flex items-center gap-2 rounded-md border border-warning-line bg-warning-weak px-3 py-2 text-sm">
           <AlertTriangle className="h-3.5 w-3.5 text-warning" aria-hidden />
           <span>
             {exceptions.length} dòng ngoại lệ (thiếu tồn khi điều phối) — phần thiếu không được
@@ -127,7 +127,7 @@ function DetailBody({ issue }: { issue: GoodsIssueDetail }) {
             </TableHeader>
             <TableBody>
               {issue.lines.map((l) => (
-                <TableRow key={l.id} className={l.exceptionNote ? 'bg-warning/5' : undefined}>
+                <TableRow key={l.id} className={l.exceptionNote ? 'bg-warning-weak' : undefined}>
                   <TableCell className="px-2.5 py-1.5 text-muted-foreground">{l.lineNo}</TableCell>
                   <TableCell className="px-2.5 py-1.5">
                     <div className="font-semibold">{l.skuName}</div>

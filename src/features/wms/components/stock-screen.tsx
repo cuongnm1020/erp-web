@@ -720,7 +720,7 @@ export function StockScreen() {
       />
 
       {counting ? (
-        <div className="flex flex-col gap-1 rounded-md border border-primary/40 bg-primary/5 px-3 py-2 text-xs">
+        <div className="flex flex-col gap-1 rounded-md border border-primary/40 bg-secondary px-3 py-2 text-xs">
           {canAdjust ? (
             countWarehouseId ? (
               <span>

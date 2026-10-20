@@ -1,22 +1,48 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, type ReactNode } from 'react';
 import Link from 'next/link';
-import { Pencil, Trash2 } from 'lucide-react';
+import { MoreHorizontal, Pencil, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { cn } from '@/lib/cn';
 import { ConfirmDialog } from './confirm-dialog';
 
+/** Một mục trong menu "⋯" của dòng. */
+export interface RowActionItem {
+  label: string;
+  icon?: ReactNode;
+  href?: string;
+  onSelect?: () => void;
+  /** Lý do tạm không làm được — mục hiện mờ kèm lý do thay vì ẩn ("Đơn đã đóng gói"). */
+  disabledReason?: string;
+  /** Hủy / Khóa: chữ đỏ, tự xếp xuống cuối menu sau vạch chia. Màn gọi tự mở hộp xác nhận. */
+  danger?: boolean;
+}
+
 export interface RowActionsProps {
-  /** Link tới màn sửa — dùng khi sửa là một route riêng. */
+  /** Link tới màn sửa — dùng khi sửa là một route riêng. Thành nút icon trực tiếp trên dòng. */
   editHref?: string;
   /** Handler sửa — dùng khi sửa mở dialog/drawer tại chỗ. */
   onEdit?: () => void;
   editLabel?: string;
-  /** Có onDelete mới hiện nút xóa; luôn đi qua hộp xác nhận. Trả Promise thì chờ xong mới đóng. */
+  /**
+   * Nút icon trực tiếp thay cho Sửa (Xem nhanh, In…) — chỉ việc an toàn, hay làm.
+   * Có `primary` thì Sửa (nếu có) chuyển vào menu.
+   */
+  primary?: { label: string; icon: ReactNode; href?: string; onClick?: () => void };
+  /** Các mục khác trong menu "⋯". */
+  items?: RowActionItem[];
+  /** Có onDelete mới có mục Xóa (cuối menu); luôn đi qua hộp xác nhận. Trả Promise thì chờ xong mới đóng. */
   onDelete?: () => unknown;
   deleteLabel?: string;
-  /** Tên bản ghi hiện trong hộp xác nhận, ví dụ "khách hàng KH-0001". */
+  /** Tên bản ghi hiện trong tooltip + hộp xác nhận, ví dụ "khách hàng KH-0001". */
   itemName?: string;
   /** Mô tả thêm trong hộp xác nhận (mặc định: không hoàn tác được). */
   deleteDescription?: string;
@@ -24,14 +50,16 @@ export interface RowActionsProps {
 }
 
 /**
- * Cụm nút thao tác trên từng dòng danh sách (cột "Thao tác").
- * Ẩn/hiện theo quyền là việc của màn hình gọi (bọc <Can> hoặc không truyền prop);
- * component này không biết gì về ability.
+ * Cụm thao tác cột cuối dòng (design system RowActions): tối đa MỘT nút icon cho việc hay làm nhất
+ * + "⋯" mở menu phần còn lại; Xóa / Hủy luôn nằm cuối menu, chữ đỏ, qua hộp xác nhận.
+ * Ẩn/hiện theo quyền là việc của màn hình gọi (không truyền prop); component không biết ability.
  */
 export function RowActions({
   editHref,
   onEdit,
   editLabel = 'Sửa',
+  primary,
+  items = [],
   onDelete,
   deleteLabel = 'Xóa',
   itemName,
@@ -40,50 +68,115 @@ export function RowActions({
 }: RowActionsProps) {
   const [confirming, setConfirming] = useState(false);
   const hasEdit = Boolean(editHref || onEdit);
-  if (!hasEdit && !onDelete) return null;
+
+  const direct =
+    primary ??
+    (hasEdit
+      ? { label: editLabel, icon: <Pencil aria-hidden />, href: editHref, onClick: onEdit }
+      : undefined);
+  const menu: RowActionItem[] = [
+    ...(primary && hasEdit
+      ? [{ label: editLabel, icon: <Pencil aria-hidden />, href: editHref, onSelect: onEdit }]
+      : []),
+    ...items.filter((i) => !i.danger),
+  ];
+  const dangerItems: RowActionItem[] = [
+    ...items.filter((i) => i.danger),
+    ...(onDelete
+      ? [
+          {
+            label: deleteLabel,
+            icon: <Trash2 aria-hidden />,
+            danger: true,
+            onSelect: () => setConfirming(true),
+          },
+        ]
+      : []),
+  ];
+  if (!direct && menu.length === 0 && dangerItems.length === 0) return null;
+
+  const tip = (label: string) => (itemName ? `${label} ${itemName}` : label);
+  const renderItem = (it: RowActionItem) => (
+    <DropdownMenuItem
+      key={it.label}
+      danger={it.danger}
+      disabled={Boolean(it.disabledReason)}
+      hint={it.disabledReason}
+      asChild={Boolean(it.href) && !it.disabledReason}
+      onSelect={it.onSelect}
+    >
+      {it.href && !it.disabledReason ? (
+        <Link href={it.href}>
+          {it.icon}
+          {it.label}
+        </Link>
+      ) : (
+        <>
+          {it.icon}
+          {it.label}
+        </>
+      )}
+    </DropdownMenuItem>
+  );
 
   return (
     // stopPropagation: đừng kích hoạt onRowClick của bảng khi bấm nút thao tác
-    <div className={cn('flex justify-end gap-1', className)} onClick={(e) => e.stopPropagation()}>
-      {editHref ? (
-        <Button variant="ghost" size="icon" className="h-8 w-8" asChild title={editLabel}>
-          <Link href={editHref} aria-label={editLabel}>
-            <Pencil aria-hidden />
-          </Link>
-        </Button>
-      ) : onEdit ? (
-        <Button
-          variant="ghost"
-          size="icon"
-          className="h-8 w-8"
-          title={editLabel}
-          aria-label={editLabel}
-          onClick={onEdit}
-        >
-          <Pencil aria-hidden />
-        </Button>
-      ) : null}
-      {onDelete ? (
-        <>
+    <div className={cn('flex justify-end gap-0.5', className)} onClick={(e) => e.stopPropagation()}>
+      {direct ? (
+        direct.href ? (
           <Button
             variant="ghost"
-            size="icon"
-            className="h-8 w-8 text-muted-foreground hover:text-destructive"
-            title={deleteLabel}
-            aria-label={deleteLabel}
-            onClick={() => setConfirming(true)}
+            size="icon-sm"
+            className="text-muted-foreground hover:text-foreground"
+            asChild
+            title={tip(direct.label)}
           >
-            <Trash2 aria-hidden />
+            <Link href={direct.href} aria-label={direct.label}>
+              {direct.icon}
+            </Link>
           </Button>
-          <ConfirmDialog
-            open={confirming}
-            onOpenChange={setConfirming}
-            title={itemName ? `${deleteLabel} ${itemName}?` : `${deleteLabel}?`}
-            description={deleteDescription}
-            confirmLabel={deleteLabel}
-            onConfirm={onDelete}
-          />
-        </>
+        ) : (
+          <Button
+            variant="ghost"
+            size="icon-sm"
+            className="text-muted-foreground hover:text-foreground"
+            title={tip(direct.label)}
+            aria-label={direct.label}
+            onClick={direct.onClick}
+          >
+            {direct.icon}
+          </Button>
+        )
+      ) : null}
+      {menu.length > 0 || dangerItems.length > 0 ? (
+        <DropdownMenu modal={false}>
+          <DropdownMenuTrigger asChild>
+            <Button
+              variant="ghost"
+              size="icon-sm"
+              className="text-muted-foreground hover:text-foreground"
+              title="Thao tác khác"
+              aria-label={itemName ? `Thao tác khác cho ${itemName}` : 'Thao tác khác'}
+            >
+              <MoreHorizontal aria-hidden />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            {menu.map(renderItem)}
+            {menu.length > 0 && dangerItems.length > 0 ? <DropdownMenuSeparator /> : null}
+            {dangerItems.map(renderItem)}
+          </DropdownMenuContent>
+        </DropdownMenu>
+      ) : null}
+      {onDelete ? (
+        <ConfirmDialog
+          open={confirming}
+          onOpenChange={setConfirming}
+          title={itemName ? `${deleteLabel} ${itemName}?` : `${deleteLabel}?`}
+          description={deleteDescription}
+          confirmLabel={deleteLabel}
+          onConfirm={onDelete}
+        />
       ) : null}
     </div>
   );

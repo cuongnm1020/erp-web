@@ -179,7 +179,7 @@ export function InvoiceDetailScreen({ id }: { id?: string }) {
             <Button
               variant="outline"
               size="sm"
-              className="border-destructive text-destructive hover:bg-destructive/10 hover:text-destructive"
+              className="border-destructive text-destructive hover:bg-destructive-weak hover:text-destructive"
             >
               Xóa nháp
             </Button>
@@ -281,7 +281,7 @@ export function InvoiceDetailScreen({ id }: { id?: string }) {
               </Table>
             </div>
             <div className="border-t px-3 py-2">
-              <div className="flex items-start gap-2.5 rounded-md border bg-warning/10 px-3 py-1.5 text-sm text-warning">
+              <div className="flex items-start gap-2.5 rounded-md border bg-warning-weak px-3 py-1.5 text-sm text-warning">
                 <AlertTriangle className="mt-0.5 size-4 shrink-0" />
                 <p>
                   <span className="font-semibold">Khối thuế là placeholder.</span> Cách tính VAT
@@ -326,11 +326,11 @@ export function InvoiceDetailScreen({ id }: { id?: string }) {
                   )}
                 >
                   {c.state === 'ok' ? (
-                    <span className="mt-0.5 inline-flex size-4 shrink-0 items-center justify-center rounded-full bg-success/10 text-xs font-semibold text-success">
+                    <span className="mt-0.5 inline-flex size-4 shrink-0 items-center justify-center rounded-full bg-success-weak text-xs font-semibold text-success">
                       ✓
                     </span>
                   ) : c.state === 'warn' ? (
-                    <span className="mt-0.5 inline-flex size-4 shrink-0 items-center justify-center rounded-full bg-warning/10 text-xs font-semibold text-warning">
+                    <span className="mt-0.5 inline-flex size-4 shrink-0 items-center justify-center rounded-full bg-warning-weak text-xs font-semibold text-warning">
                       !
                     </span>
                   ) : (

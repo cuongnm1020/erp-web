@@ -497,7 +497,7 @@ function GrnCreateForm({ copyOf }: { copyOf?: ReceiptDetail }) {
           </div>
 
           {rootError ? (
-            <p className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+            <p className="rounded-md border border-destructive-line bg-destructive-weak px-3 py-2 text-sm text-destructive">
               {rootError}
             </p>
           ) : null}
