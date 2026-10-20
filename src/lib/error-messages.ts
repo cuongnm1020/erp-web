@@ -10,6 +10,7 @@ const MESSAGES: Record<string, string> = {
   INVALID_CREDENTIALS: 'Sai tên đăng nhập hoặc mật khẩu.',
   INVALID_REFRESH_TOKEN: 'Phiên đăng nhập đã hết. Đăng nhập lại để tiếp tục.',
   FORBIDDEN: 'Bạn không có quyền thực hiện thao tác này.',
+  AUTH_PASSWORD_CHANGE_REQUIRED: 'Bạn cần đổi mật khẩu trước khi tiếp tục. Mở trang Đổi mật khẩu.',
   NOT_FOUND: 'Không tìm thấy dữ liệu. Có thể đã bị xóa hoặc bạn không có quyền xem.',
   CONFLICT: 'Dữ liệu đã thay đổi ở nơi khác. Tải lại rồi thao tác lại.',
   UNIQUE_VIOLATION: 'Dữ liệu bị trùng với bản ghi đã có. Kiểm tra lại mã hoặc số điện thoại.',

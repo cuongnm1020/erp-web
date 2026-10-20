@@ -11,6 +11,7 @@ export const ME_ADMIN = {
   permissions: [],
   leaderTeamIds: [],
   hasGlobalAccess: true,
+  mustChangePassword: false,
 };
 
 export const ME_SALE = {
@@ -20,6 +21,7 @@ export const ME_SALE = {
   permissions: ['customer.read', 'customer.create', 'sales_order.read', 'sales_order.create'],
   leaderTeamIds: [],
   hasGlobalAccess: false,
+  mustChangePassword: false,
 };
 
 const CUSTOMER_TYPES = ['RETAIL', 'WHOLESALE', 'DISTRIBUTOR', 'KEY_ACCOUNT'] as const;

@@ -337,6 +337,9 @@ export function UserDetailScreen({ id }: { id: string }) {
                 ) : (
                   <StatusBadge tone="neutral">Đã khóa</StatusBadge>
                 )}
+                {user.mustChangePassword ? (
+                  <StatusBadge tone="warn">Chưa đổi mật khẩu</StatusBadge>
+                ) : null}
               </h2>
               <dl>
                 <InfoRow label="Mã NV" value={<span className="font-mono">{user.code}</span>} />

@@ -6,6 +6,7 @@ import { IDLE_LOGOUT_REASON } from '@/lib/auth/idle';
 import { useLogout } from '../api/use-logout';
 import { useStopImpersonation } from '../api/use-stop-impersonation';
 import { useIdleLogout } from '../use-idle-logout';
+import { PasswordChangeGate } from './password-change-gate';
 import { RouteAbilityGate } from './route-ability-gate';
 import { SessionProvider, useSession } from './session-provider';
 
@@ -35,12 +36,17 @@ function ShellWithSession({ children }: { children: ReactNode }) {
   );
 }
 
-/** Bọc mọi route trong app/(app): tải /auth/me → ability → shell → gate quyền theo route. */
+/**
+ * Bọc mọi route trong app/(app): tải /auth/me → ability → shell → bắt đổi mật khẩu lần đầu → gate
+ * quyền theo route.
+ */
 export function AuthenticatedShell({ children }: { children: ReactNode }) {
   return (
     <SessionProvider>
       <ShellWithSession>
-        <RouteAbilityGate>{children}</RouteAbilityGate>
+        <PasswordChangeGate>
+          <RouteAbilityGate>{children}</RouteAbilityGate>
+        </PasswordChangeGate>
       </ShellWithSession>
     </SessionProvider>
   );

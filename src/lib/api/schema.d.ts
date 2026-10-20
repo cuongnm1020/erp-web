@@ -251,7 +251,10 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Sai mật khẩu hiện tại → 422 CURRENT_PASSWORD_WRONG. */
+        /**
+         * Sai mật khẩu hiện tại → 422 CURRENT_PASSWORD_WRONG. Đổi xong thì hết bị bắt đổi mật khẩu
+         *     (mustChangePassword = false) — đây là lối ra duy nhất khi đang bị chặn.
+         */
         post: operations["MeController_changePassword"];
         delete?: never;
         options?: never;
@@ -5133,6 +5136,11 @@ export interface components {
             deviceId?: string;
             /** @description Đang được superadmin đăng nhập thay (2026-10-19) — web hiện thanh báo + nút quay lại; null = chính chủ. */
             impersonator?: components["schemas"]["AuthImpersonatorDto"] | null;
+            /**
+             * @description Phải đổi mật khẩu trước khi làm việc (2026-10-20): web chỉ hiện màn đổi mật khẩu; mọi API khác
+             *     trả 403 AUTH_PASSWORD_CHANGE_REQUIRED cho phiên web chính chủ.
+             */
+            mustChangePassword: boolean;
         };
         PermissionDto: {
             id: string;
@@ -5193,6 +5201,8 @@ export interface components {
             roleCodes: string[];
             isActive: boolean;
             isSuperAdmin: boolean;
+            /** @description Chưa đổi mật khẩu do quản trị đặt (2026-10-20). */
+            mustChangePassword: boolean;
             createdBy: components["schemas"]["UserCreatorDto"] | null;
             /** @description Người đang gọi được sửa / khóa / chuyển phòng ban tài khoản này (chỉ để ẩn nút — server vẫn kiểm). */
             canManage: boolean;
@@ -5260,6 +5270,8 @@ export interface components {
             deny: string[];
             isActive: boolean;
             isSuperAdmin: boolean;
+            /** @description Chưa đổi mật khẩu do quản trị đặt (2026-10-20) — phiên web bị chặn tới khi đổi. */
+            mustChangePassword: boolean;
             createdBy: components["schemas"]["UserCreatorDto"] | null;
             /** @description Người đang gọi được sửa / khóa / chuyển phòng ban tài khoản này (chỉ để ẩn nút — server vẫn kiểm). */
             canManage: boolean;

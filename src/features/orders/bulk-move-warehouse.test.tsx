@@ -25,6 +25,7 @@ const ME = {
   ],
   defaultWarehouseId: 'wh-tt',
   selectedWarehouseId: null,
+  mustChangePassword: false,
 };
 
 afterEach(() => forgetWarehouseSelection());

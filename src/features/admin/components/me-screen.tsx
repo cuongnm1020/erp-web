@@ -16,20 +16,11 @@ import { PageHeader } from '@/components/layout/page-header';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { toast } from '@/components/ui/toaster';
-import {
-  useChangeMyPassword,
-  useMyProfile,
-  useUpdateMyProfile,
-  type MyProfile,
-} from '../api/use-me';
+import { useMyProfile, useUpdateMyProfile, type MyProfile } from '../api/use-me';
 import { useMyPancakeProfile, useUpdateMyPancakeProfile } from '../api/use-pancake-profile';
-import {
-  changeMyPasswordSchema,
-  myProfileSchema,
-  type ChangeMyPasswordValues,
-  type MyProfileValues,
-} from '../schema';
+import { myProfileSchema, type MyProfileValues } from '../schema';
 import { PancakeProfileSection } from './pancake-profile-section';
+import { PasswordForm } from './password-form';
 
 /**
  * Tài khoản của tôi (2026-10-19): người đăng nhập tự sửa họ tên, số điện thoại (PATCH /me/profile),
@@ -146,70 +137,6 @@ function ProfileForm({ profile }: { profile: MyProfile }) {
         ) : null}
         <Button type="submit" disabled={mutation.isPending || !form.formState.isDirty}>
           {mutation.isPending ? 'Đang lưu…' : 'Lưu thay đổi'}
-        </Button>
-      </form>
-    </Form>
-  );
-}
-
-const EMPTY_PASSWORD: ChangeMyPasswordValues = {
-  currentPassword: '',
-  newPassword: '',
-  confirmPassword: '',
-};
-
-function PasswordForm() {
-  const mutation = useChangeMyPassword();
-  const form = useForm<ChangeMyPasswordValues>({
-    resolver: zodResolver(changeMyPasswordSchema),
-    defaultValues: EMPTY_PASSWORD,
-  });
-
-  const onSubmit = form.handleSubmit((values) =>
-    mutation
-      .mutateAsync({ currentPassword: values.currentPassword, newPassword: values.newPassword })
-      .then(() => {
-        form.reset(EMPTY_PASSWORD);
-        toast.success('Đã đổi mật khẩu');
-      })
-      .catch((err: unknown) => applyServerErrors(form, err)),
-  );
-
-  const fields: Array<{ name: keyof ChangeMyPasswordValues; label: string; auto: string }> = [
-    { name: 'currentPassword', label: 'Mật khẩu hiện tại', auto: 'current-password' },
-    { name: 'newPassword', label: 'Mật khẩu mới (tối thiểu 8 ký tự)', auto: 'new-password' },
-    { name: 'confirmPassword', label: 'Nhập lại mật khẩu mới', auto: 'new-password' },
-  ];
-
-  return (
-    <Form {...form}>
-      <form onSubmit={(e) => void onSubmit(e)} className="space-y-3" noValidate>
-        {fields.map((f) => (
-          <FormField
-            key={f.name}
-            control={form.control}
-            name={f.name}
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>{f.label}</FormLabel>
-                <FormControl>
-                  <Input {...field} type="password" className="h-8" autoComplete={f.auto} />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-        ))}
-        {form.formState.errors.root?.server ? (
-          <p role="alert" className="text-sm text-destructive">
-            {form.formState.errors.root.server.message}
-          </p>
-        ) : null}
-        <p className="text-xs text-muted-foreground">
-          Phiên đang mở trên máy này và PDA vẫn giữ nguyên; lần đăng nhập sau dùng mật khẩu mới.
-        </p>
-        <Button type="submit" disabled={mutation.isPending}>
-          {mutation.isPending ? 'Đang đổi…' : 'Đổi mật khẩu'}
         </Button>
       </form>
     </Form>
