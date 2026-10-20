@@ -220,14 +220,30 @@ describe('GrnListScreen — GET /goods-receipts', () => {
 });
 
 describe('GrnCreateScreen — POST /goods-receipts (+ post)', () => {
+  const skuUrls: string[] = [];
   beforeEach(() => {
     push.mockClear();
+    skuUrls.length = 0;
     server.use(
       http.get('/api/warehouses', () => HttpResponse.json(WAREHOUSES)),
-      http.get('/api/skus', () => HttpResponse.json(SKU_LIST)),
+      http.get('/api/skus', ({ request }) => {
+        skuUrls.push(request.url);
+        return HttpResponse.json(SKU_LIST);
+      }),
       http.get('/api/container-types', () => HttpResponse.json(CONTAINER_TYPES)),
       http.get('/api/skus/:id/conversions', () => HttpResponse.json(CONVERSIONS)),
     );
+  });
+
+  it('ô tìm SKU chỉ xin hàng nhập được: bỏ combo và sản phẩm sync tự sinh từ Pancake (2026-10-20)', async () => {
+    renderApp(<GrnCreateScreen />, { warehouses: MY_WAREHOUSES });
+    await screen.findByRole('combobox', { name: 'Kho nhận *' });
+    fireEvent.click(screen.getByText('Tìm SKU…'));
+    await waitFor(() => expect(skuUrls.length).toBeGreaterThan(0));
+    const params = new URL(skuUrls[0]!).searchParams;
+    expect(params.get('isCombo')).toBe('false');
+    expect(params.get('erpOnly')).toBe('true');
+    expect(params.get('status')).toBe('active');
   });
 
   it('nhập theo thùng / pallet: ĐVT nhập chỉ có đơn vị bán chính + thùng / pallet đã khai; chọn pallet → SL quy đổi, body gửi uom + packaging suy từ ĐVT', async () => {

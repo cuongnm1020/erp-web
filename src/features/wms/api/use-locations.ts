@@ -44,6 +44,40 @@ export function useSkuSearch(q: string): EntitySearchResult {
 }
 
 /**
+ * Ô tìm SKU trên phiếu nhập kho (2026-10-20): chỉ hàng NHẬP ĐƯỢC — bỏ combo (không có tồn riêng,
+ * nhập theo thành phần) và sản phẩm sync tự sinh từ đơn Pancake (`erpOnly`). Cùng shape option
+ * với {@link useSkuSearch} để form GRN dùng thay thế không đổi gì khác.
+ */
+export function useReceivableSkuSearch(q: string): EntitySearchResult {
+  const query = useQuery({
+    queryKey: [...locationKeys.skuSearch(q), 'receivable'] as const,
+    queryFn: () =>
+      unwrap(
+        api.GET('/skus', {
+          params: {
+            query: {
+              q: q || undefined,
+              status: 'active',
+              isCombo: false,
+              erpOnly: true,
+              take: 20,
+              skip: 0,
+            },
+          },
+        }),
+      ),
+    staleTime: 30_000,
+  });
+  const options: EntityOption[] | undefined = query.data?.items.map((s) => ({
+    id: s.skuId,
+    label: s.name,
+    hint: `${s.code} · ${s.productName}`,
+    meta: { trackingMode: s.trackingMode, baseUomCode: s.baseUomCode },
+  }));
+  return { options, isPending: query.isPending, error: query.error };
+}
+
+/**
  * GET /skus/{id}/conversions — quy đổi ĐVT của một SKU (thùng / pallet = factor × ĐVT cơ sở).
  * Form nhập kho dùng để cho nhập theo thùng / pallet và tự quy ra đơn vị bán chính.
  */

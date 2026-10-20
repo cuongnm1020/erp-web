@@ -48,7 +48,7 @@ import { AssignBarcodeDialog } from './assign-barcode-dialog';
 import {
   useBarcodeLookup,
   useSkuConversions,
-  useSkuSearch,
+  useReceivableSkuSearch,
   type ScannedBarcode,
 } from '../api/use-locations';
 import {
@@ -596,7 +596,7 @@ function LineRows({
                       form.setValue(`lines.${i}.packType`, '');
                       form.setValue(`lines.${i}.packQtyPer`, '');
                     }}
-                    useSearch={useSkuSearch}
+                    useSearch={useReceivableSkuSearch}
                     selectedLabel={form.getValues(`lines.${i}.skuLabel`) || undefined}
                     placeholder="Tìm SKU…"
                     searchPlaceholder="Mã / tên SKU / barcode…"
