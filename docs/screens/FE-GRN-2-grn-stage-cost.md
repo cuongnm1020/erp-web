@@ -8,6 +8,10 @@ Thay đổi nghiệp vụ (user chốt 2026-10-20):
 
 - **Kho nhập hàng không cần giá.** Ô "Đơn giá / ĐVT nhập" (và Thành tiền, Tổng giá trị) **chỉ hiện
   cho người có `stock.cost`** (kế toán). Tài khoản kho (`stock.receive`) không thấy tiền trên phiếu.
+  - 2026-10-21: không chỉ ẩn ở web — API che luôn: `GET :id` trả `unitCost` / `lineValue` /
+    `totalValue` = null cho người không có `stock.cost`; `POST :id/post` che `totalCost`; `POST`
+    tạo phiếu kèm `unitCost` mà không có quyền → 403 `RECEIPT_COST_FORBIDDEN`. Web: nhân bản phiếu
+    (`?from=`) không chép giá và không gửi `unitCost` khi không có quyền.
 - **Tiến độ phiếu** (`stage`) thay badge DocStatus: **Mới tạo → Đang cất hàng → Chờ nhập giá →
   Hoàn thành** (+ Đã hủy). Task cất hàng đóng xong → hàng bán được ngay; còn dòng thiếu giá thì
   phiếu "Chờ nhập giá"; kế toán nhập và lưu xong → "Hoàn thành".

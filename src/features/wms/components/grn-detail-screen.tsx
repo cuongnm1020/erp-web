@@ -252,7 +252,8 @@ function DetailBody({
           return v ? acc.plus(v) : acc;
         }, new Decimal(0))
         .toFixed(4)
-    : receipt.totalValue;
+    : // null = API che tiền với người không có stock.cost (khối này chỉ hiện khi canCost).
+      (receipt.totalValue ?? '0');
 
   return (
     <div className="flex flex-col gap-3">
