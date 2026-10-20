@@ -6,7 +6,7 @@ import { useMemo } from 'react';
 import { DataTable, FilterBar, type ColumnDef } from '@/components/data/data-table';
 import { RowActions } from '@/components/data/row-actions';
 import { EmptyState, ListSkeleton, QueryState } from '@/components/data/states';
-import { StatusBadge, type StatusTone } from '@/components/data/status-badge';
+import { StatusBadge } from '@/components/data/status-badge';
 import { PageHeader } from '@/components/layout/page-header';
 import { Button } from '@/components/ui/button';
 import { toast } from '@/components/ui/toaster';
@@ -19,39 +19,34 @@ import {
   useCancelReceipt,
   useReceipts,
   type ReceiptListRow,
-  type ReceiptStatus,
+  type ReceiptStage,
 } from '../api/use-receipts';
+import { GRN_STAGE } from './grn-stage';
 
 /**
  * Nhập kho — danh sách phiếu GRN nối GET /goods-receipts (design GrnList).
- * Tab trạng thái đếm từ `statusCounts` (server tính trên cùng bộ lọc, bỏ status).
- * Trạng thái/lọc/trang nằm trên URL (luật 8).
+ * Tab tiến độ đếm từ `stageCounts` (server tính trên cùng bộ lọc, bỏ stage): Mới tạo · Đang cất
+ * hàng · Chờ nhập giá · Hoàn thành · Đã hủy (2026-10-20 — kho nhập không cần giá, kế toán nhập
+ * sau; xem docs/screens/FE-GRN-2-grn-stage-cost.md). Trạng thái/lọc/trang nằm trên URL (luật 8).
  *
- * Khác design (backend chưa mô tả được):
- * - Không có tab "Đang nhận": DocStatus không có trạng thái đó (PDA đang quét
- *   vẫn là DRAFT); sẽ thêm khi backend tách trạng thái nhận dở.
- * - Không có "Xuất CSV" (chưa có endpoint export) và loại "Hoàn từ đơn" (RMA là P2-06).
+ * Khác design (backend chưa mô tả được): không có "Xuất CSV" (chưa có endpoint export) và loại
+ * "Hoàn từ đơn" (RMA là P2-06).
  */
 const DEFAULTS = {
   size: 40,
   // Kho: ô chọn kho làm việc ở sidebar (header X-Warehouse-Id) — không còn bộ lọc kho riêng.
-  filterKeys: ['status', 'from', 'to'] as const,
+  filterKeys: ['stage', 'from', 'to'] as const,
 };
 type GrnFilter = (typeof DEFAULTS.filterKeys)[number];
+type TabKey = '' | ReceiptStage;
 
-const STATUS_LABEL: Record<ReceiptStatus, { label: string; tone: StatusTone }> = {
-  DRAFT: { label: 'Nháp', tone: 'draft' },
-  PENDING_APPROVAL: { label: 'Chờ duyệt', tone: 'warn' },
-  APPROVED: { label: 'Đã duyệt', tone: 'brand' },
-  POSTED: { label: 'Đã post', tone: 'ok' },
-  CANCELLED: { label: 'Hủy', tone: 'err' },
-};
-
-const TABS: Array<{ key: '' | ReceiptStatus; label: string }> = [
+const TABS: Array<{ key: TabKey; label: string }> = [
   { key: '', label: 'Tất cả' },
-  { key: 'DRAFT', label: 'Nháp' },
-  { key: 'POSTED', label: 'Đã post' },
-  { key: 'CANCELLED', label: 'Hủy' },
+  { key: 'NEW', label: GRN_STAGE.NEW.label },
+  { key: 'PUTTING_AWAY', label: GRN_STAGE.PUTTING_AWAY.label },
+  { key: 'AWAITING_COST', label: GRN_STAGE.AWAITING_COST.label },
+  { key: 'COMPLETED', label: GRN_STAGE.COMPLETED.label },
+  { key: 'CANCELLED', label: GRN_STAGE.CANCELLED.label },
 ];
 
 export function GrnListScreen() {
@@ -64,18 +59,18 @@ export function GrnListScreen() {
     () => ({
       ...toSkipTake(state),
       ...(state.q ? { q: state.q } : {}),
-      ...(state.filters.status ? { status: state.filters.status as ReceiptStatus } : {}),
+      ...(state.filters.stage ? { stage: state.filters.stage as ReceiptStage } : {}),
       ...(state.filters.from ? { from: state.filters.from } : {}),
       ...(state.filters.to ? { to: state.filters.to } : {}),
     }),
     [state],
   );
   const query = useReceipts(params);
-  const counts = query.data?.statusCounts;
-  const tabCount = (key: '' | ReceiptStatus): number | undefined => {
+  const counts = query.data?.stageCounts;
+  const tabCount = (key: TabKey): number | undefined => {
     if (!counts) return undefined;
-    if (key === '') return counts.DRAFT + counts.POSTED + counts.CANCELLED;
-    return counts[key as 'DRAFT' | 'POSTED' | 'CANCELLED'] ?? 0;
+    if (key === '') return Object.values(counts).reduce((a, b) => a + b, 0);
+    return counts[key] ?? 0;
   };
 
   const columns = useMemo<ColumnDef<ReceiptListRow, unknown>[]>(
@@ -140,11 +135,11 @@ export function GrnListScreen() {
         cell: ({ row }) => formatQuantity(row.original.totalQty),
       },
       {
-        id: 'status',
+        id: 'stage',
         header: 'Trạng thái',
-        meta: { width: 110 },
+        meta: { width: 120 },
         cell: ({ row }) => {
-          const s = STATUS_LABEL[row.original.status];
+          const s = GRN_STAGE[row.original.stage];
           return <StatusBadge tone={s.tone}>{s.label}</StatusBadge>;
         },
       },
@@ -220,7 +215,7 @@ export function GrnListScreen() {
 
       <div className="mb-3 flex border-b" role="tablist">
         {TABS.map((t) => {
-          const active = (state.filters.status ?? '') === t.key;
+          const active = (state.filters.stage ?? '') === t.key;
           const count = tabCount(t.key);
           return (
             <button
@@ -229,7 +224,7 @@ export function GrnListScreen() {
               role="tab"
               aria-selected={active}
               onClick={() =>
-                set({ filters: { ...state.filters, status: t.key === '' ? undefined : t.key } })
+                set({ filters: { ...state.filters, stage: t.key === '' ? undefined : t.key } })
               }
               className={cn(
                 '-mb-px flex items-center gap-1.5 border-b-2 px-3 pb-2 pt-1 text-sm',

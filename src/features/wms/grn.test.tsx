@@ -47,6 +47,7 @@ const LIST = {
       supplierName: 'Công ty TNHH Giấy Double A VN',
       receivedAt: '2026-08-23T08:00:00.000Z',
       createdByName: 'Trần Văn Bảo',
+      stage: 'NEW',
       lineCount: 3,
       totalQty: '120',
     },
@@ -60,12 +61,14 @@ const LIST = {
       supplierName: null,
       receivedAt: '2026-08-22T17:57:00.000Z',
       createdByName: 'Hoàng Văn Long',
+      stage: 'AWAITING_COST',
       lineCount: 4,
       totalQty: '753',
     },
   ],
   total: 2,
   statusCounts: { DRAFT: 1, POSTED: 1, CANCELLED: 0 },
+  stageCounts: { NEW: 1, PUTTING_AWAY: 0, AWAITING_COST: 1, COMPLETED: 0, CANCELLED: 0 },
 };
 
 const DETAIL_DRAFT = {
@@ -82,6 +85,11 @@ const DETAIL_DRAFT = {
   postedByName: null,
   createdByName: 'Trần Văn Bảo',
   note: 'Xe 29H-512.44',
+  stage: 'NEW',
+  putAwayDoneAt: null,
+  costedAt: null,
+  costedByName: null,
+  uncostedLineCount: 0,
   lineCount: 1,
   totalQty: '50',
   totalValue: '17000000',
@@ -186,17 +194,20 @@ describe('GrnListScreen — GET /goods-receipts', () => {
     );
   });
 
-  it('render danh sách thật: số phiếu, NCC, loại, trạng thái, tổng SL, tab đếm từ statusCounts', async () => {
+  it('render danh sách thật: số phiếu, NCC, loại, tiến độ, tổng SL, tab đếm từ stageCounts', async () => {
     renderApp(<GrnListScreen />);
     expect(await screen.findByText('GRN2608-00087')).toBeInTheDocument();
     expect(screen.getByText('Công ty TNHH Giấy Double A VN')).toBeInTheDocument();
     expect(screen.getByText('Từ PO')).toBeInTheDocument();
     expect(screen.getByText('Nhập khác')).toBeInTheDocument();
-    // 'Nháp'/'Đã post' xuất hiện ở cả tab lẫn badge trạng thái dòng
-    expect(screen.getAllByText('Nháp').length).toBeGreaterThan(1);
-    expect(screen.getAllByText('Đã post').length).toBeGreaterThan(1);
-    // Tab "Tất cả" đếm tổng ba trạng thái
-    expect(within(screen.getByRole('tablist')).getByText('2')).toBeInTheDocument();
+    // Nhãn tiến độ (2026-10-20) xuất hiện ở cả tab lẫn badge dòng
+    expect(screen.getAllByText('Mới tạo').length).toBeGreaterThan(1);
+    expect(screen.getAllByText('Chờ nhập giá').length).toBeGreaterThan(1);
+    const tabs = screen.getByRole('tablist');
+    expect(within(tabs).getByRole('tab', { name: /Đang cất hàng/ })).toBeInTheDocument();
+    expect(within(tabs).getByRole('tab', { name: /Hoàn thành/ })).toBeInTheDocument();
+    // Tab "Tất cả" đếm tổng mọi tiến độ
+    expect(within(tabs).getByRole('tab', { name: 'Tất cả 2' })).toBeInTheDocument();
   });
 
   it('hủy nháp: chỉ dòng DRAFT có nút, xác nhận → DELETE /goods-receipts/:id', async () => {
@@ -379,11 +390,8 @@ describe('GrnCreateScreen — POST /goods-receipts (+ post)', () => {
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
     expect(screen.queryByLabelText('Số lượng dòng 3')).not.toBeInTheDocument();
 
-    const costs = screen
-      .getAllByPlaceholderText('0')
-      .filter((el) => el.getAttribute('inputmode') === 'decimal' && !el.getAttribute('aria-label'));
-    fireEvent.change(costs[0]!, { target: { value: '3400000' } });
-    fireEvent.change(costs[1]!, { target: { value: '340000' } });
+    fireEvent.change(screen.getByLabelText('Đơn giá dòng 1'), { target: { value: '3400000' } });
+    fireEvent.change(screen.getByLabelText('Đơn giá dòng 2'), { target: { value: '340000' } });
     fireEvent.click(screen.getByRole('button', { name: 'Lưu nháp' }));
     await waitFor(() => expect(posts).toHaveLength(1));
     expect(posts[0]!.body).toMatchObject({
@@ -564,6 +572,7 @@ describe('GrnDetailScreen — GET /goods-receipts/:id', () => {
         HttpResponse.json({
           ...DETAIL_DRAFT,
           status: 'POSTED',
+          stage: 'PUTTING_AWAY',
           postedAt: '2026-08-23T10:12:00.000Z',
           postedByName: 'Trần Văn Bảo',
         }),
@@ -616,6 +625,176 @@ describe('GrnDetailScreen — GET /goods-receipts/:id', () => {
     expect(screen.getByText('LPN2608-00002')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Post phiếu' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Hủy phiếu' })).not.toBeInTheDocument();
+  });
+});
+
+/**
+ * 2026-10-20 — kho nhập không cần giá: cột Đơn giá / Thành tiền / Tổng giá trị chỉ cho người có
+ * stock.cost (kế toán); phiếu "Chờ nhập giá" mở sẵn ô nhập giá cho kế toán → POST :id/costs.
+ */
+describe('Giá nhập theo quyền stock.cost + tiến độ Chờ nhập giá — 2026-10-20', () => {
+  const WAREHOUSE_ME = { permissions: ['stock.read', 'stock.receive'], hasGlobalAccess: false };
+  const ACCOUNTANT_ME = { permissions: ['stock.read', 'stock.cost'], hasGlobalAccess: false };
+  /** Phiếu đã cất xong, dòng theo thùng (BOX = 10 REAM) chưa có giá. */
+  const DETAIL_AWAITING = {
+    ...DETAIL_DRAFT,
+    status: 'POSTED',
+    stage: 'AWAITING_COST',
+    postedAt: '2026-08-23T10:12:00.000Z',
+    postedByName: 'Trần Văn Bảo',
+    putAwayDoneAt: '2026-08-23T11:00:00.000Z',
+    uncostedLineCount: 1,
+    totalValue: '0',
+    lines: [
+      {
+        ...DETAIL_DRAFT.lines[0],
+        unitCost: null,
+        lineValue: null,
+        uomId: 'u-box',
+        uomCode: 'BOX',
+        factor: '10',
+      },
+    ],
+  };
+
+  beforeEach(() => {
+    push.mockClear();
+    server.use(
+      http.get('/api/warehouses', () => HttpResponse.json(WAREHOUSES)),
+      http.get('/api/skus', () => HttpResponse.json(SKU_LIST)),
+      http.get('/api/container-types', () => HttpResponse.json(CONTAINER_TYPES)),
+      http.get('/api/skus/:id/conversions', () => HttpResponse.json(CONVERSIONS)),
+      http.get('/api/goods-receipts/:id/movements', () => HttpResponse.json([])),
+    );
+  });
+
+  it('tạo phiếu — tài khoản kho: không có ô Đơn giá / Thành tiền / Tổng giá trị; body không gửi unitCost', async () => {
+    const posts: unknown[] = [];
+    server.use(
+      http.post('/api/goods-receipts', async ({ request }) => {
+        posts.push(await request.json());
+        return HttpResponse.json(
+          { receiptId: 'r-9', docNumber: 'GRN2608-00099', status: 'DRAFT', warehouseId: 'wh-1' },
+          { status: 201 },
+        );
+      }),
+    );
+    renderApp(<GrnCreateScreen />, { warehouses: MY_WAREHOUSES, me: WAREHOUSE_ME });
+    fireEvent.click(await screen.findByRole('combobox', { name: 'Kho nhận *' }));
+    fireEvent.click(await screen.findByRole('option', { name: 'Kho HN-1' }));
+    expect(screen.queryByRole('columnheader', { name: 'Đơn giá / ĐVT nhập' })).toBeNull();
+    expect(screen.queryByRole('columnheader', { name: 'Thành tiền' })).toBeNull();
+    expect(screen.queryByText('Tổng giá trị')).toBeNull();
+    expect(screen.queryByLabelText('Đơn giá dòng 1')).toBeNull();
+    expect(screen.getByText(/Đơn giá do kế toán nhập sau/)).toBeInTheDocument();
+
+    fireEvent.click(screen.getByText('Tìm SKU…'));
+    fireEvent.click(await screen.findByText('Giấy A4 Double A 80gsm'));
+    fireEvent.change(screen.getByLabelText('Số lượng dòng 1'), { target: { value: '50' } });
+    fireEvent.click(screen.getByRole('button', { name: /^Lưu nháp/ }));
+    await waitFor(() => expect(posts).toHaveLength(1));
+    const line = (posts[0] as { lines: Record<string, unknown>[] }).lines[0]!;
+    expect(line).toMatchObject({ skuId: 'sku-1', qty: '50' });
+    expect(line).not.toHaveProperty('unitCost');
+  });
+
+  it('tạo phiếu — kế toán: có ô Đơn giá; bỏ trống vẫn lưu được (không gửi unitCost)', async () => {
+    const posts: unknown[] = [];
+    server.use(
+      http.post('/api/goods-receipts', async ({ request }) => {
+        posts.push(await request.json());
+        return HttpResponse.json(
+          { receiptId: 'r-9', docNumber: 'GRN2608-00099', status: 'DRAFT', warehouseId: 'wh-1' },
+          { status: 201 },
+        );
+      }),
+    );
+    renderApp(<GrnCreateScreen />, { warehouses: MY_WAREHOUSES, me: ACCOUNTANT_ME });
+    fireEvent.click(await screen.findByRole('combobox', { name: 'Kho nhận *' }));
+    fireEvent.click(await screen.findByRole('option', { name: 'Kho HN-1' }));
+    expect(screen.getByRole('columnheader', { name: 'Đơn giá / ĐVT nhập' })).toBeInTheDocument();
+    expect(screen.getByLabelText('Đơn giá dòng 1')).toBeInTheDocument();
+    fireEvent.click(screen.getByText('Tìm SKU…'));
+    fireEvent.click(await screen.findByText('Giấy A4 Double A 80gsm'));
+    fireEvent.change(screen.getByLabelText('Số lượng dòng 1'), { target: { value: '5' } });
+    fireEvent.click(screen.getByRole('button', { name: /^Lưu nháp/ }));
+    await waitFor(() => expect(posts).toHaveLength(1));
+    expect((posts[0] as { lines: Record<string, unknown>[] }).lines[0]).not.toHaveProperty(
+      'unitCost',
+    );
+  });
+
+  it('chi tiết — tài khoản kho: tiến độ "Chờ nhập giá", không thấy cột Đơn giá / Tổng giá trị / nút Nhập giá', async () => {
+    server.use(http.get('/api/goods-receipts/:id', () => HttpResponse.json(DETAIL_AWAITING)));
+    renderApp(<GrnDetailScreen id="r-1" />, { me: WAREHOUSE_ME });
+    expect(await screen.findByText('Giấy A4 Double A 80gsm')).toBeInTheDocument();
+    expect(screen.getByText('Chờ nhập giá')).toBeInTheDocument();
+    expect(screen.getByText(/Hàng đã lên kệ, bán được/)).toBeInTheDocument();
+    expect(screen.queryByRole('columnheader', { name: /Đơn giá/ })).toBeNull();
+    expect(screen.queryByText('Tổng giá trị')).toBeNull();
+    expect(screen.queryByRole('button', { name: /Nhập giá nhập/ })).toBeNull();
+    expect(screen.queryByLabelText('Đơn giá dòng 1')).toBeNull();
+  });
+
+  it('chi tiết — kế toán: phiếu Chờ nhập giá mở sẵn ô giá theo ĐVT nhập (/ BOX); Lưu giá → POST :id/costs', async () => {
+    const posts: Array<{ id: string; body: unknown }> = [];
+    server.use(
+      http.get('/api/goods-receipts/:id', () => HttpResponse.json(DETAIL_AWAITING)),
+      http.post('/api/goods-receipts/:id/costs', async ({ params, request }) => {
+        posts.push({ id: params.id as string, body: await request.json() });
+        return HttpResponse.json({
+          receiptId: params.id,
+          stage: 'COMPLETED',
+          costedLineCount: 1,
+          uncostedLineCount: 0,
+          layerCount: 1,
+          affectedOrderCount: 0,
+        });
+      }),
+    );
+    renderApp(<GrnDetailScreen id="r-1" />, { me: ACCOUNTANT_ME });
+    const input = await screen.findByLabelText('Đơn giá dòng 1');
+    expect(screen.getByText('/ BOX')).toBeInTheDocument();
+    expect(screen.getByText('Tổng giá trị')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Nhân bản' })).toBeNull(); // không có stock.receive
+
+    // Giá sai → báo tại dòng, không gọi API.
+    fireEvent.change(input, { target: { value: 'abc' } });
+    fireEvent.click(screen.getByRole('button', { name: /^Lưu giá/ }));
+    expect(await screen.findByText(/Giá không hợp lệ/)).toBeInTheDocument();
+    expect(posts).toHaveLength(0);
+
+    // 120.000 / BOX (10 REAM) → thành tiền 5 thùng = 600.000 hiện ngay; gửi đúng giá theo ĐVT nhập.
+    fireEvent.change(input, { target: { value: '120000' } });
+    expect(screen.getAllByText(/^600\.000/).length).toBeGreaterThan(0); // dòng + Tổng giá trị
+    fireEvent.click(screen.getByRole('button', { name: /^Lưu giá/ }));
+    await waitFor(() => expect(posts).toHaveLength(1));
+    expect(posts[0]).toEqual({
+      id: 'r-1',
+      body: { lines: [{ lineId: 'l-1', unitCost: '120000' }] },
+    });
+  });
+
+  it('chi tiết — kế toán, phiếu Hoàn thành: giá hiện chỉ đọc + nút "Sửa giá nhập" mở ô nhập', async () => {
+    server.use(
+      http.get('/api/goods-receipts/:id', () =>
+        HttpResponse.json({
+          ...DETAIL_DRAFT,
+          status: 'POSTED',
+          stage: 'COMPLETED',
+          postedAt: '2026-08-23T10:12:00.000Z',
+          putAwayDoneAt: '2026-08-23T11:00:00.000Z',
+          costedAt: '2026-08-24T08:00:00.000Z',
+          costedByName: 'Kế toán A',
+        }),
+      ),
+    );
+    renderApp(<GrnDetailScreen id="r-1" />, { me: ACCOUNTANT_ME });
+    expect(await screen.findByText('Hoàn thành')).toBeInTheDocument();
+    expect(screen.getAllByText(/^340\.000/).length).toBeGreaterThan(0);
+    expect(screen.queryByLabelText('Đơn giá dòng 1')).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: /Sửa giá nhập/ }));
+    expect(screen.getByLabelText('Đơn giá dòng 1')).toHaveValue('340000');
   });
 });
 

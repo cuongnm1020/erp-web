@@ -1729,11 +1729,35 @@ export interface paths {
         get: operations["SupplierController_get"];
         put?: never;
         post?: never;
-        /** Soft delete — ngừng giao dịch, giữ lịch sử PO/công nợ. */
+        /**
+         * Xóa mềm (deletedAt) — ẩn khỏi danh sách / chi tiết, giữ lịch sử PO / phiếu nhập / công nợ.
+         *     Ngừng hợp tác (vẫn hiện) dùng PATCH isActive=false.
+         */
         delete: operations["SupplierController_remove"];
         options?: never;
         head?: never;
         patch: operations["SupplierController_update"];
+        trace?: never;
+    };
+    "/suppliers/import": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Import Excel "Danh sách nhà cung cấp" (multipart field "file", .xlsx/.xls/.csv ≤ 5MB):
+         *     header tự nhận theo tên cột (Mã NCC, Tên NCC, Địa chỉ, MST, Điện thoại, Email); mã đã có →
+         *     ghi đè (kể cả NCC đã xóa mềm → khôi phục), chưa có → tạo. Dòng lỗi liệt kê trong `errors`.
+         */
+        post: operations["SupplierController_importExcel"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
         trace?: never;
     };
     "/suppliers/{id}/addresses": {
@@ -4192,6 +4216,28 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/goods-receipts/{id}/costs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Kế toán nhập / sửa giá nhập cho từng dòng (2026-10-20, quyền `stock.cost` — kho không có).
+         *     Giá theo ĐVT đã khai trên dòng; phiếu đã ghi sổ thì lô giá vốn + phần đã tiêu thụ nhận giá
+         *     mới; cất xong + đủ giá → phiếu COMPLETED. Thao tác tuyệt đối (gửi lại cùng kết quả) —
+         *     không cần Idempotency-Key. Phiếu hủy → 409 RECEIPT_CANCELLED.
+         */
+        post: operations["ReceivingController_setCosts"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/return-receipts": {
         parameters: {
             query?: never;
@@ -6497,7 +6543,7 @@ export interface components {
              *     POS; skipped = không đẩy (lý do ở `reason`); failed = Pancake từ chối (lý do ở `reason`).
              * @enum {string}
              */
-            action: "failed" | "created" | "skipped" | "updated" | "linked" | "hidden";
+            action: "failed" | "created" | "updated" | "skipped" | "linked" | "hidden";
             /** @description Id trên Pancake sau khi đẩy (sync.entity_link); null khi chưa liên kết được. */
             externalId: string | null;
             reason: string | null;
@@ -7401,6 +7447,8 @@ export interface components {
             taxCode: string | null;
             phone: string | null;
             email: string | null;
+            /** @description Địa chỉ trụ sở (chuỗi tự do) — khác `addresses` (địa chỉ kho/giao nhận). */
+            address: string | null;
             isActive: boolean;
             /** @description Hạn thanh toán (ngày). */
             paymentTerm: number | null;
@@ -7434,6 +7482,8 @@ export interface components {
             taxCode: string | null;
             phone: string | null;
             email: string | null;
+            /** @description Địa chỉ trụ sở (chuỗi tự do) — khác `addresses` (địa chỉ kho/giao nhận). */
+            address: string | null;
             isActive: boolean;
             /** @description Hạn thanh toán (ngày). */
             paymentTerm: number | null;
@@ -7452,8 +7502,27 @@ export interface components {
             phone?: string;
             /** Format: email */
             email?: string;
+            /** @description Địa chỉ trụ sở (chuỗi tự do). */
+            address?: string;
             paymentTerm?: number;
             leadTimeDays?: number;
+        };
+        SupplierImportErrorDto: {
+            /** @description Số dòng trong file Excel (1-based, tính cả tiêu đề). */
+            row: number;
+            code: string | null;
+            message: string;
+        };
+        SupplierImportResultDto: {
+            /** @description Số dòng có mã trong file (sau khi bỏ dòng trống). */
+            total: number;
+            created: number;
+            /** @description Mã đã có → chỉ ghi đè (gồm NCC đã xóa mềm được khôi phục). */
+            updated: number;
+            /** @description Trong số `updated`: NCC đang xóa mềm được khôi phục. */
+            restored: number;
+            skipped: number;
+            errors: components["schemas"]["SupplierImportErrorDto"][];
         };
         UpdateSupplierDto: {
             name?: string;
@@ -7461,6 +7530,8 @@ export interface components {
             phone?: string;
             /** Format: email */
             email?: string;
+            /** @description Địa chỉ trụ sở — chuỗi rỗng = xóa. */
+            address?: string;
             paymentTerm?: number;
             leadTimeDays?: number;
             isActive?: boolean;
@@ -10528,6 +10599,11 @@ export interface components {
             supplierName: string | null;
             receivedAt: string;
             createdByName: string | null;
+            /**
+             * @description Tiến độ nghiệp vụ — xem {@link ReceiptStageValue}.
+             * @enum {string}
+             */
+            stage: "CANCELLED" | "COMPLETED" | "NEW" | "PUTTING_AWAY" | "AWAITING_COST";
             lineCount: number;
             totalQty: string;
         };
@@ -10536,10 +10612,18 @@ export interface components {
             POSTED: number;
             CANCELLED: number;
         };
+        ReceiptStageCountsDto: {
+            NEW: number;
+            PUTTING_AWAY: number;
+            AWAITING_COST: number;
+            COMPLETED: number;
+            CANCELLED: number;
+        };
         ReceiptListResponseDto: {
             items: components["schemas"]["ReceiptListRowDto"][];
             total: number;
             statusCounts: components["schemas"]["ReceiptStatusCountsDto"];
+            stageCounts: components["schemas"]["ReceiptStageCountsDto"];
         };
         ReceiptPackagingContainerDto: {
             id: string;
@@ -10566,7 +10650,7 @@ export interface components {
             /** @description Decimal(18,6) dạng chuỗi — ĐVT cơ sở. */
             qtyBase: string;
             qtyRejected: string;
-            /** @description Decimal(18,4) dạng chuỗi. */
+            /** @description Giá nhập mỗi ĐVT CƠ SỞ, Decimal(18,4) dạng chuỗi — null = kế toán chưa nhập giá. */
             unitCost: string | null;
             /** @description qtyBase × unitCost — Decimal(18,4) dạng chuỗi, null khi thiếu giá. */
             lineValue: string | null;
@@ -10594,10 +10678,22 @@ export interface components {
             postedByName: string | null;
             createdByName: string | null;
             note: string | null;
+            /**
+             * @description Tiến độ nghiệp vụ — xem {@link ReceiptStageValue}.
+             * @enum {string}
+             */
+            stage: "CANCELLED" | "COMPLETED" | "NEW" | "PUTTING_AWAY" | "AWAITING_COST";
+            /** @description Task cất hàng đóng xong lúc nào; null = chưa cất xong. */
+            putAwayDoneAt: string | null;
+            /** @description Kế toán nhập giá lần cuối (null = chưa nhập qua màn giá). */
+            costedAt: string | null;
+            costedByName: string | null;
+            /** @description Số dòng còn thiếu giá nhập — > 0 khi phiếu đang / sẽ "Chờ nhập giá". */
+            uncostedLineCount: number;
             lineCount: number;
             /** @description Tổng qtyBase — Decimal(18,6) dạng chuỗi. */
             totalQty: string;
-            /** @description Tổng qtyBase × unitCost — Decimal(18,4) dạng chuỗi. */
+            /** @description Tổng qtyBase × unitCost của các dòng ĐÃ có giá — Decimal(18,4) dạng chuỗi. */
             totalValue: string;
             lines: components["schemas"]["ReceiptLineDto"][];
         };
@@ -10644,11 +10740,11 @@ export interface components {
              */
             uom?: string;
             /**
-             * @description Decimal(18,4) dạng chuỗi — **BẮT BUỘC**, không `@IsOptional()`.
-             *     Nhập kho không có giá làm mọi lần xuất sau của SKU nổ
-             *     `INSUFFICIENT_COST_LAYERS` (P1-02) — xem `UnitCostRequiredError`.
+             * @description Giá nhập theo ĐVT `uom`, Decimal(18,4) dạng chuỗi — TUỲ CHỌN (2026-10-20): kho nhập hàng
+             *     không cần giá, kế toán nhập sau qua POST /goods-receipts/:id/costs. Dòng chưa có giá vẫn
+             *     ghi sổ được: CostLayer tạm giá 0 để xuất bán không nổ `INSUFFICIENT_COST_LAYERS`.
              */
-            unitCost: string;
+            unitCost?: string;
             /** @description Bắt buộc với SKU `trackingMode = LOT`; validate ở service (cần đọc DB). */
             lotNumber?: string;
             expiryDate?: string;
@@ -10690,6 +10786,34 @@ export interface components {
              * @description Vị trí nhận thực tế; bỏ trống thì service tự chọn DOCK/STAGING của kho.
              */
             receiveLocationId?: string;
+        };
+        ReceiptCostLineDto: {
+            /**
+             * Format: uuid
+             * @description `ReceiptLineDto.id` — dòng của chính phiếu này.
+             */
+            lineId: string;
+            /** @description Giá theo ĐVT của dòng, Decimal(18,4) dạng chuỗi, không âm. */
+            unitCost: string;
+        };
+        SetReceiptCostsDto: {
+            lines: components["schemas"]["ReceiptCostLineDto"][];
+        };
+        SetReceiptCostsResultDto: {
+            receiptId: string;
+            /**
+             * @description Tiến độ sau khi nhập giá — COMPLETED khi đã cất xong và mọi dòng có giá.
+             * @enum {string}
+             */
+            stage: "CANCELLED" | "COMPLETED" | "NEW" | "PUTTING_AWAY" | "AWAITING_COST";
+            /** @description Số dòng vừa nhận giá. */
+            costedLineCount: number;
+            /** @description Số dòng của phiếu còn thiếu giá sau lần này. */
+            uncostedLineCount: number;
+            /** @description Lô giá vốn đã đổi giá (0 với phiếu nháp — chưa có lô). */
+            layerCount: number;
+            /** @description Đơn bán đã tiêu thụ hàng của phiếu trước khi có giá → giá vốn được tính lại (worker). */
+            affectedOrderCount: number;
         };
         ReturnReceiptListRowDto: {
             id: string;
@@ -14889,6 +15013,32 @@ export interface operations {
             };
         };
     };
+    SupplierController_importExcel: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": {
+                    /** Format: binary */
+                    file: string;
+                };
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SupplierImportResultDto"];
+                };
+            };
+        };
+    };
     SupplierController_addAddress: {
         parameters: {
             query?: never;
@@ -18783,6 +18933,8 @@ export interface operations {
                 poId?: string;
                 warehouseId?: string;
                 status?: "DRAFT" | "PENDING_APPROVAL" | "APPROVED" | "POSTED" | "CANCELLED";
+                /** @description Lọc theo tiến độ nghiệp vụ (tab màn Phiếu nhập) — xem `GoodsReceipt.stage`. */
+                stage?: "CANCELLED" | "COMPLETED" | "NEW" | "PUTTING_AWAY" | "AWAITING_COST";
                 /** @description Tìm theo số phiếu (contains, không phân biệt hoa thường). */
                 q?: string;
                 /** @description Lọc theo receivedAt — ISO date, from ≤ receivedAt < to+1d. */
@@ -18914,6 +19066,31 @@ export interface operations {
                 };
                 content: {
                     "application/json": Record<string, never>;
+                };
+            };
+        };
+    };
+    ReceivingController_setCosts: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SetReceiptCostsDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SetReceiptCostsResultDto"];
                 };
             };
         };
