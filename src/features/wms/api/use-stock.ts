@@ -9,6 +9,7 @@ export type StockByLotRow = components['schemas']['StockByLotRowDto'];
 export type LocationType = StockByLocationRow['locationType'];
 export type SetActualStockBody = components['schemas']['SetActualStockDto'];
 export type SetSkuCostsBody = components['schemas']['SetSkuCostsDto'];
+export type SetSkuWeightsBody = components['schemas']['SetSkuWeightsDto'];
 
 export interface StockListParams {
   q?: string;
@@ -141,5 +142,21 @@ export function useSetSkuCosts() {
   return useMutation({
     mutationFn: (body: SetSkuCostsBody) => unwrap(api.POST('/stock/costs', { body })),
     onSuccess: () => void qc.invalidateQueries({ queryKey: stockKeys.all }),
+  });
+}
+
+/**
+ * POST /stock/weights — kho nhập cân nặng SKU (kg, Decimal chuỗi) ngay trên màn Tồn kho (quyền
+ * stock.adjust, 2026-10-20). Thao tác tuyệt đối, không cần Idempotency-Key. Làm mới tồn kho + danh
+ * mục sản phẩm (form SKU đọc cùng trường).
+ */
+export function useSetSkuWeights() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (body: SetSkuWeightsBody) => unwrap(api.POST('/stock/weights', { body })),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: stockKeys.all });
+      void qc.invalidateQueries({ queryKey: ['catalog'] });
+    },
   });
 }

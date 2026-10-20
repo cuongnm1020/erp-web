@@ -899,6 +899,8 @@ export function makeStockRows(n: number) {
       available: String(onHand - reserved),
       hasCost: i % 2 === 0,
       unitCost: i % 2 === 0 ? '12000' : null,
+      // SKU lẻ chưa cân; SKU chẵn 250 g, 500 g… (kg Decimal chuỗi).
+      weightKg: i % 2 === 0 ? String(0.25 * (i / 2 + 1)) : null,
     };
   });
 }

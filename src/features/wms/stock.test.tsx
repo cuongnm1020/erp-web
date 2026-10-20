@@ -155,6 +155,49 @@ describe('StockScreen — nhập tồn thực tế (POST /cycle-counts/actual-st
     expect(screen.getByLabelText('Giá vốn SKU-0003')).toHaveValue('');
   });
 
+  it('cân nặng: cột gram chỉ đọc; kho gõ gram → POST /stock/weights nhận kg, không cần chọn kho', async () => {
+    search = '';
+    forgetWarehouseSelection();
+    const weights: unknown[] = [];
+    server.use(
+      http.post('/api/stock/weights', async ({ request }) => {
+        weights.push(await request.json());
+        return HttpResponse.json({ updatedSkuCount: 2, skippedSkuIds: [] });
+      }),
+    );
+    renderApp(<StockScreen />, {
+      me: { permissions: ['stock.read', 'stock.adjust'], hasGlobalAccess: false },
+    });
+    // Chế độ xem: SKU-0001 250 g, SKU-0002 chưa cân.
+    expect(await screen.findByText('250 g')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Nhập tồn thực tế' }));
+    // Chưa chọn kho: không có ô tồn thực tế nhưng vẫn nhập cân nặng được.
+    expect(await screen.findByText(/Cân nặng vẫn nhập được/)).toBeInTheDocument();
+    expect(screen.queryByLabelText('Tồn thực tế SKU-0001')).not.toBeInTheDocument();
+    const w1 = screen.getByLabelText('Cân nặng SKU-0001');
+    expect(w1).toHaveAttribute('placeholder', '250');
+    expect(screen.getByLabelText('Cân nặng SKU-0002')).toHaveAttribute('placeholder', 'chưa cân');
+    fireEvent.change(w1, { target: { value: '1500' } });
+    fireEvent.change(screen.getByLabelText('Cân nặng SKU-0002'), { target: { value: '0,5' } });
+    // Sai định dạng → chưa lưu được.
+    fireEvent.change(screen.getByLabelText('Cân nặng SKU-0003'), { target: { value: 'abc' } });
+    expect(screen.getByText(/1 dòng chưa hợp lệ/)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Lưu thay đổi' })).toBeDisabled();
+    fireEvent.change(screen.getByLabelText('Cân nặng SKU-0003'), { target: { value: '' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Lưu thay đổi' }));
+    await waitFor(() =>
+      expect(weights).toEqual([
+        {
+          lines: [
+            { skuId: expect.any(String), weightKg: '1.5' },
+            { skuId: expect.any(String), weightKg: '0.0005' },
+          ],
+        },
+      ]),
+    );
+    await waitFor(() => expect(w1).toHaveValue(''));
+  });
+
   it('kho (stock.adjust, không stock.cost): không có cột giá vốn', async () => {
     search = '';
     renderApp(<StockScreen />, {
