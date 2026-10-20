@@ -597,7 +597,7 @@ function Editor({ order }: { order: SalesOrderDetail }) {
                 )}
               </Field>
               {fulfilTarget ? (
-                <p className="px-3 pb-1 text-xs text-warning">
+                <p className="px-3 pb-1 text-xs text-warning-foreground">
                   {fulfilTarget === 'PACKED'
                     ? 'Đóng gói KHÔNG quét: trừ tồn ngay, xin vận đơn của hãng đã chọn (ĐVVC) và mở nhãn in. Không hoàn tác được.'
                     : 'Đóng việc pick KHÔNG quét: phiếu giao sinh ngay, chưa trừ tồn — trừ khi đóng gói.'}

@@ -4,7 +4,6 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ME_SALE } from '@/test/msw/handlers';
 import { server } from '@/test/msw/server';
 import { renderApp } from '@/test/render';
-import { clickRowMenuItem, rowMenuIndex } from '@/test/row-menu';
 import { toast } from '@/components/ui/toaster';
 import { WarehousesScreen } from './components/warehouses-screen';
 
@@ -347,11 +346,12 @@ describe('LocationsPanel — cây vị trí kho + CRUD', () => {
     await screen.findByText('Vị trí kho WH01');
     await screen.findByText('A01');
     fireEvent.click(screen.getByRole('button', { name: 'Mở rộng A01' }));
-    // Dòng A01-01 (ô kệ lá, đang dùng) — mục Xóa nằm trong menu "⋯" của dòng đó
-    await clickRowMenuItem('Xóa', { index: rowMenuIndex('vị trí A01-01') });
-    const confirm = await screen.findByRole('dialog');
-    expect(within(confirm).getByText('Xóa vị trí A01-01?')).toBeInTheDocument();
-    fireEvent.click(within(confirm).getByRole('button', { name: 'Xóa' }));
+    // Dòng A01-01 (ô kệ lá, đang dùng) — nút Xóa cuối trong panel (A, A01, A01-01)
+    const deleteButtons = screen.getAllByRole('button', { name: 'Xóa' });
+    fireEvent.click(deleteButtons[deleteButtons.length - 1]!);
+    expect(await screen.findByText('Xóa vị trí A01-01?')).toBeInTheDocument();
+    const confirmButtons = screen.getAllByRole('button', { name: 'Xóa' });
+    fireEvent.click(confirmButtons[confirmButtons.length - 1]!);
     await waitFor(() => expect(deleted).toEqual(['b-01']));
   });
 
@@ -365,7 +365,6 @@ describe('LocationsPanel — cây vị trí kho + CRUD', () => {
     expect(screen.queryByRole('button', { name: /Thêm vị trí con/ })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Sửa' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Xóa' })).not.toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: /^Thao tác khác/ })).not.toBeInTheDocument();
   });
 
   it('409 LOCATION_HAS_STOCK khi ngừng dùng vị trí còn hàng → toast nêu số sản phẩm', async () => {
@@ -386,10 +385,11 @@ describe('LocationsPanel — cây vị trí kho + CRUD', () => {
     renderApp(<WarehousesScreen />);
     await screen.findByText('A01');
     fireEvent.click(screen.getByRole('button', { name: 'Mở rộng A01' }));
-    await clickRowMenuItem('Xóa', { index: rowMenuIndex('vị trí A01-01') });
-    const confirm = await screen.findByRole('dialog');
-    await within(confirm).findByText('Xóa vị trí A01-01?');
-    fireEvent.click(within(confirm).getByRole('button', { name: 'Xóa' }));
+    const deleteButtons = screen.getAllByRole('button', { name: 'Xóa' });
+    fireEvent.click(deleteButtons[deleteButtons.length - 1]!);
+    await screen.findByText('Xóa vị trí A01-01?');
+    const confirmButtons = screen.getAllByRole('button', { name: 'Xóa' });
+    fireEvent.click(confirmButtons[confirmButtons.length - 1]!);
     await waitFor(() =>
       expect(error).toHaveBeenCalledWith(
         'Vị trí A01-01 còn 1.000 sản phẩm (1 SKU) — chuyển hàng đi trước khi ngừng dùng.',

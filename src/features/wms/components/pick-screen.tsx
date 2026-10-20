@@ -291,7 +291,7 @@ export function PickScreen() {
               'flex items-center gap-2 rounded-md border px-3 py-3 font-medium',
               feedback.kind === 'error' &&
                 'border-destructive/50 bg-destructive/10 text-destructive',
-              feedback.kind === 'warn' && 'border-warning-line bg-warning-weak text-warning',
+              feedback.kind === 'warn' && 'border-warning/60 bg-warning/10 text-warning-foreground',
               feedback.kind === 'ok' && 'border-success/50 bg-success/10 text-success',
               feedback.kind === 'info' && 'border-info/50 bg-info/10 text-info',
             )}
@@ -560,7 +560,7 @@ export function PickScreen() {
                     className={cn(
                       'rounded border px-1.5 py-0.5 font-mono',
                       sh.lineStatus === 'COMPLETED' && 'border-success/50 text-success',
-                      sh.lineStatus === 'EXCEPTION' && 'border-warning-line text-warning',
+                      sh.lineStatus === 'EXCEPTION' && 'border-warning/60 text-warning-foreground',
                     )}
                   >
                     {sh.refDocNumber ?? sh.taskDocNumber} {formatQuantity(sh.qtyDone)}/
@@ -592,7 +592,7 @@ export function PickScreen() {
                       <span className="font-mono font-semibold">{l.locationCode ?? '—'}</span>{' '}
                       {l.productName}
                       {l.status === 'EXCEPTION' ? (
-                        <span className="ml-1 text-xs text-warning">· thiếu</span>
+                        <span className="ml-1 text-xs text-warning-foreground">· thiếu</span>
                       ) : null}
                     </span>
                     {l.skuName !== l.productName ? (
@@ -698,7 +698,7 @@ export function PickScreen() {
           <div className="grid grid-cols-2 gap-2">
             <Button
               variant="outline"
-              className="h-14 border-warning-line text-warning"
+              className="h-14 border-warning/60 text-warning-foreground"
               disabled={!(currentTask || currentWave) || s.busy}
               onClick={() => setShortOpen(true)}
             >

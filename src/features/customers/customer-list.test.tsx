@@ -11,7 +11,6 @@ import {
 } from '@/test/msw/handlers';
 import { server } from '@/test/msw/server';
 import { renderApp } from '@/test/render';
-import { clickRowMenuItem } from '@/test/row-menu';
 import { CustomerListScreen, toCustomerFilterParams } from './components/customer-list-screen';
 
 const replace = vi.fn();
@@ -99,9 +98,7 @@ describe('CustomerListScreen — GET /customers (P1-12)', () => {
   it('không có customer.delete → không có nút Xóa trên dòng (luật 7)', async () => {
     renderApp(<CustomerListScreen />, { me: ME_SALE }); // read + create, không update/delete
     await screen.findByText('Khách hàng 1');
-    // Xóa nằm trong menu "⋯" — không có update/delete thì dòng không có cả menu lẫn mục Xóa.
-    expect(screen.queryByRole('button', { name: /^Thao tác khác/ })).not.toBeInTheDocument();
-    expect(screen.queryByRole('menuitem', { name: 'Xóa' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Xóa' })).not.toBeInTheDocument();
   });
 
   it('Xóa: qua hộp xác nhận → DELETE /customers/:id → toast + refetch danh sách', async () => {
@@ -116,10 +113,11 @@ describe('CustomerListScreen — GET /customers (P1-12)', () => {
       me: { ...ME_SALE, permissions: ['customer.read', 'customer.update', 'customer.delete'] },
     });
     await screen.findByText('Khách hàng 1');
-    await clickRowMenuItem('Xóa');
+    fireEvent.click(screen.getAllByRole('button', { name: 'Xóa' })[0]!);
     expect(await screen.findByText(`Xóa khách hàng ${FIRST.code}?`)).toBeInTheDocument();
-    // Nút xác nhận trong dialog cũng tên "Xóa"
-    fireEvent.click(screen.getByRole('button', { name: 'Xóa' }));
+    // Nút xác nhận trong dialog cũng tên "Xóa" — là nút cuối cùng
+    const buttons = screen.getAllByRole('button', { name: 'Xóa' });
+    fireEvent.click(buttons[buttons.length - 1]!);
     await waitFor(() => expect(deleted).toEqual([FIRST.id]));
     // Mutation xong → hộp xác nhận đóng (toast không render trong test harness)
     await waitFor(() =>
