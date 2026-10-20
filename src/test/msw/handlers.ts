@@ -11,6 +11,7 @@ export const ME_ADMIN = {
   permissions: [],
   leaderTeamIds: [],
   hasGlobalAccess: true,
+  mustChangePassword: false,
 };
 
 export const ME_SALE = {
@@ -20,6 +21,7 @@ export const ME_SALE = {
   permissions: ['customer.read', 'customer.create', 'sales_order.read', 'sales_order.create'],
   leaderTeamIds: [],
   hasGlobalAccess: false,
+  mustChangePassword: false,
 };
 
 const CUSTOMER_TYPES = ['RETAIL', 'WHOLESALE', 'DISTRIBUTOR', 'KEY_ACCOUNT'] as const;
@@ -1854,8 +1856,40 @@ export const handlers = [
 
   // ── Quản trị: kết nối Pancake ──
   http.get('/api/pancake-sync/config', () => HttpResponse.json(PANCAKE_CONFIG_FIXTURE)),
-  // Nhân viên Pancake ↔ tài khoản ERP — đúng shape PancakeStaffDto.
-  http.get('/api/pancake-sync/mapping/staff', () => HttpResponse.json(PANCAKE_STAFF_FIXTURE)),
+  // Nhân viên Pancake ↔ tài khoản ERP — đúng shape PancakeStaffDto; ?pending=true chỉ dòng chờ.
+  http.get('/api/pancake-sync/staff', ({ request }) =>
+    HttpResponse.json(
+      new URL(request.url).searchParams.get('pending') === 'true'
+        ? PANCAKE_STAFF_FIXTURE.filter((s) => s.pending)
+        : PANCAKE_STAFF_FIXTURE,
+    ),
+  ),
+  // Tài khoản thật được gắn vào — đúng shape StaffCandidateDto (3 người, không pc.*).
+  http.get('/api/pancake-sync/staff/candidates', ({ request }) => {
+    const q = (new URL(request.url).searchParams.get('q') ?? '').toLowerCase();
+    return HttpResponse.json(
+      PANCAKE_STAFF_CANDIDATES_FIXTURE.filter(
+        (u) => !q || u.fullName.toLowerCase().includes(q) || u.code.includes(q),
+      ),
+    );
+  }),
+  http.post('/api/pancake-sync/staff/relink', async ({ request }) => {
+    const body = (await request.json()) as { fbId: string; userId: string };
+    const target = PANCAKE_STAFF_CANDIDATES_FIXTURE.find((u) => u.id === body.userId);
+    return HttpResponse.json(
+      {
+        fbId: body.fbId,
+        userId: body.userId,
+        userCode: target?.code ?? 'nv.002',
+        shops: 1,
+        absorbed: [],
+      },
+      { status: 201 },
+    );
+  }),
+  http.post('/api/pancake-sync/staff/cleanup', () =>
+    HttpResponse.json({ items: [] }, { status: 201 }),
+  ),
   http.put('/api/pancake-sync/config/:shopId', async ({ params, request }) => {
     const body = (await request.json()) as Record<string, unknown>;
     const apiKey = typeof body.apiKey === 'string' ? body.apiKey : null;
@@ -2147,22 +2181,38 @@ export const PANCAKE_SHOP_FIXTURE = {
   senderPhones: ['0911000001', '0911000002'] as string[],
 };
 
+/** Đúng shape `StaffCandidateDto` — 3 tài khoản thật (như makeUsers(3), không pc.*). */
+export const PANCAKE_STAFF_CANDIDATES_FIXTURE = makeUsers(3).map((u) => ({
+  id: u.id,
+  code: u.code,
+  fullName: u.fullName,
+  email: u.email,
+  departmentName: u.departmentName,
+}));
+
+/** Đúng shape `PancakeStaffDto` (2026-10-20: kèm email, đơn / khách treo, gợi ý, pending). */
 export const PANCAKE_STAFF_FIXTURE = [
   {
     fbId: '888000111222',
     externalUserId: null,
     observedName: 'Marketer Chờ',
     observedPhone: '0900000000',
+    observedEmail: 'mk@gmail.com',
     seenRoles: ['marketer'],
     shopIds: ['407957969'],
     user: null,
     autoCreated: false,
+    orderCount: 0,
+    customerCount: 0,
+    suggestedUser: null,
+    pending: true,
   },
   {
     fbId: '1660224970965826',
     externalUserId: '4fc6cdb6-5b09-4d1b-8a78-34bf0adbc751',
     observedName: 'Nguyen Manh Cuong',
     observedPhone: '84977191246',
+    observedEmail: 'nv2@erp.local',
     seenRoles: ['creator', 'seller'],
     shopIds: ['407957969'],
     user: {
@@ -2172,6 +2222,35 @@ export const PANCAKE_STAFF_FIXTURE = [
       isActive: true,
     },
     autoCreated: true,
+    orderCount: 1441,
+    customerCount: 1427,
+    suggestedUser: {
+      id: PANCAKE_STAFF_CANDIDATES_FIXTURE[1]!.id,
+      code: 'nv.002',
+      fullName: 'Nhân viên 2',
+      email: 'nv2@erp.local',
+    },
+    pending: true,
+  },
+  {
+    fbId: '154057992263134',
+    externalUserId: null,
+    observedName: 'Thanh Vân Sale',
+    observedPhone: null,
+    observedEmail: null,
+    seenRoles: ['seller'],
+    shopIds: ['407957969'],
+    user: {
+      id: PANCAKE_STAFF_CANDIDATES_FIXTURE[2]!.id,
+      code: 'nv.003',
+      fullName: 'Nhân viên 3',
+      isActive: true,
+    },
+    autoCreated: false,
+    orderCount: 0,
+    customerCount: 0,
+    suggestedUser: null,
+    pending: false,
   },
 ];
 

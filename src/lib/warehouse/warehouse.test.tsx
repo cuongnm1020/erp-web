@@ -35,6 +35,7 @@ const me = (over: Partial<AuthMe> = {}): AuthMe => ({
   ],
   defaultWarehouseId: 'wh-tt',
   selectedWarehouseId: null,
+  mustChangePassword: false,
   ...over,
 });
 

@@ -41,6 +41,7 @@ const ME_EDITOR = {
   ],
   defaultWarehouseId: 'wh-tt',
   selectedWarehouseId: null,
+  mustChangePassword: false,
 } satisfies AuthMe;
 
 const renderDetail = () =>

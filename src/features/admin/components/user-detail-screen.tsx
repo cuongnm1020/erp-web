@@ -41,6 +41,7 @@ import {
   useWarehouseOptions,
   type UserDetail,
 } from '../api/use-users';
+import { ImpersonateButton } from './impersonate-button';
 import { useUpdateUserPancakeProfile, useUserPancakeProfile } from '../api/use-pancake-profile';
 import { PancakeProfileSection } from './pancake-profile-section';
 import { UserPermissionMatrix } from './user-permission-matrix';
@@ -277,44 +278,47 @@ export function UserDetailScreen({ id }: { id: string }) {
               { label: user.code },
             ]}
             actions={
-              user.canManage ? (
-                <>
-                  {user.isActive ? (
-                    <Button
-                      variant="outline"
-                      disabled={update.isPending}
-                      onClick={() =>
-                        update.mutate(
-                          { isActive: false },
-                          {
-                            onSuccess: () => toast.success('Đã khóa tài khoản'),
-                            onError: (err) => toast.error(messageFor(err)),
-                          },
-                        )
-                      }
-                    >
-                      Khóa tài khoản
-                    </Button>
-                  ) : (
-                    <Button
-                      variant="outline"
-                      disabled={update.isPending}
-                      onClick={() =>
-                        update.mutate(
-                          { isActive: true },
-                          {
-                            onSuccess: () => toast.success('Đã mở khóa tài khoản'),
-                            onError: (err) => toast.error(messageFor(err)),
-                          },
-                        )
-                      }
-                    >
-                      Mở khóa
-                    </Button>
-                  )}
-                  <Button onClick={() => setEditOpen(true)}>Sửa thông tin</Button>
-                </>
-              ) : null
+              <>
+                <ImpersonateButton user={user} />
+                {user.canManage ? (
+                  <>
+                    {user.isActive ? (
+                      <Button
+                        variant="outline"
+                        disabled={update.isPending}
+                        onClick={() =>
+                          update.mutate(
+                            { isActive: false },
+                            {
+                              onSuccess: () => toast.success('Đã khóa tài khoản'),
+                              onError: (err) => toast.error(messageFor(err)),
+                            },
+                          )
+                        }
+                      >
+                        Khóa tài khoản
+                      </Button>
+                    ) : (
+                      <Button
+                        variant="outline"
+                        disabled={update.isPending}
+                        onClick={() =>
+                          update.mutate(
+                            { isActive: true },
+                            {
+                              onSuccess: () => toast.success('Đã mở khóa tài khoản'),
+                              onError: (err) => toast.error(messageFor(err)),
+                            },
+                          )
+                        }
+                      >
+                        Mở khóa
+                      </Button>
+                    )}
+                    <Button onClick={() => setEditOpen(true)}>Sửa thông tin</Button>
+                  </>
+                ) : null}
+              </>
             }
           />
           {user.canManage ? null : (
@@ -333,6 +337,9 @@ export function UserDetailScreen({ id }: { id: string }) {
                 ) : (
                   <StatusBadge tone="neutral">Đã khóa</StatusBadge>
                 )}
+                {user.mustChangePassword ? (
+                  <StatusBadge tone="warn">Chưa đổi mật khẩu</StatusBadge>
+                ) : null}
               </h2>
               <dl>
                 <InfoRow label="Mã NV" value={<span className="font-mono">{user.code}</span>} />

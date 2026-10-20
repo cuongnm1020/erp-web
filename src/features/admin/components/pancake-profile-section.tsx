@@ -118,7 +118,12 @@ function ProfileForm({
           />
           {fbInvalid ? (
             <p className="text-xs text-destructive">Facebook ID chỉ gồm chữ số (hoặc chữ, -, _).</p>
-          ) : null}
+          ) : (
+            <p className="text-xs text-muted-foreground">
+              Để trống cũng được nếu email tài khoản này trùng email trên Pancake — đơn về sẽ tự gán
+              và điền Facebook ID.
+            </p>
+          )}
         </div>
         <div className="space-y-1">
           <Label htmlFor="pancake-name" className="text-xs text-muted-foreground">

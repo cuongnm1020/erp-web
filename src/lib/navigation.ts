@@ -167,6 +167,14 @@ export const NAV_MODULES: NavModule[] = [
         // CRM-13: GET /consents cần customer.read — dữ liệu đã scope theo khách người xem phụ trách.
         ability: { action: 'read', subject: 'Customer' },
       },
+      {
+        label: 'Nhân viên Pancake',
+        href: '/crm/pancake-staff',
+        icon: UserCog,
+        // 2026-10-20: trưởng nhóm kinh doanh (sync.staff_read) thấy người chốt đơn Pancake chưa có
+        // tài khoản thật và gắn họ vào nhân sự phòng mình.
+        ability: { action: 'staff_read', subject: 'Sync' },
+      },
       // {
       //   label: 'Ticket CSKH',
       //   href: '/crm/tickets',

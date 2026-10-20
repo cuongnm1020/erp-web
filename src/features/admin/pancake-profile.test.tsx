@@ -36,6 +36,7 @@ const ME_ADMIN = {
   warehouses: [],
   defaultWarehouseId: null,
   selectedWarehouseId: null,
+  mustChangePassword: false,
 };
 
 const renderDetail = (canManage: boolean) => {

@@ -251,7 +251,10 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Sai mật khẩu hiện tại → 422 CURRENT_PASSWORD_WRONG. */
+        /**
+         * Sai mật khẩu hiện tại → 422 CURRENT_PASSWORD_WRONG. Đổi xong thì hết bị bắt đổi mật khẩu
+         *     (mustChangePassword = false) — đây là lối ra duy nhất khi đang bị chặn.
+         */
         post: operations["MeController_changePassword"];
         delete?: never;
         options?: never;
@@ -970,40 +973,6 @@ export interface paths {
         get: operations["PancakeMappingController_actors"];
         put?: never;
         post: operations["PancakeMappingController_mapActor"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/pancake-sync/mapping/staff": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Nhân viên Pancake mọi POS + tài khoản ERP đang gắn (tự tạo / gán tay / còn chờ). */
-        get: operations["PancakeMappingController_staff"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/pancake-sync/mapping/staff/relink": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** Chuyển nhân viên Pancake sang tài khoản ERP khác (mọi POS); đơn liên quan chiếu lại. */
-        post: operations["PancakeMappingController_relinkStaff"];
         delete?: never;
         options?: never;
         head?: never;
@@ -5026,6 +4995,77 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/pancake-sync/staff": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Nhân viên Pancake mọi POS + tài khoản ERP đang gắn; `pending=true` = chưa có tài khoản thật. */
+        get: operations["PancakeStaffController_list"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/pancake-sync/staff/candidates": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Tài khoản thật người gọi được gắn nhân viên Pancake vào (ô chọn trong hộp "Gắn tài khoản"). */
+        get: operations["PancakeStaffController_candidates"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/pancake-sync/staff/relink": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Gắn nhân viên Pancake vào tài khoản thật (mọi POS): identity đổi, đơn chiếu lại; tài khoản
+         *     pc.* đang giữ → gộp (đơn + khách chuyển ngay, xoá mềm).
+         */
+        post: operations["PancakeStaffController_relink"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/pancake-sync/staff/cleanup": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Dọn pc.* đã khoá trước 2026-10-20 (POS đã chuyển, đơn / khách chưa) — quản trị. */
+        post: operations["PancakeStaffController_cleanup"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/health": {
         parameters: {
             query?: never;
@@ -5096,6 +5136,11 @@ export interface components {
             deviceId?: string;
             /** @description Đang được superadmin đăng nhập thay (2026-10-19) — web hiện thanh báo + nút quay lại; null = chính chủ. */
             impersonator?: components["schemas"]["AuthImpersonatorDto"] | null;
+            /**
+             * @description Phải đổi mật khẩu trước khi làm việc (2026-10-20): web chỉ hiện màn đổi mật khẩu; mọi API khác
+             *     trả 403 AUTH_PASSWORD_CHANGE_REQUIRED cho phiên web chính chủ.
+             */
+            mustChangePassword: boolean;
         };
         PermissionDto: {
             id: string;
@@ -5156,6 +5201,8 @@ export interface components {
             roleCodes: string[];
             isActive: boolean;
             isSuperAdmin: boolean;
+            /** @description Chưa đổi mật khẩu do quản trị đặt (2026-10-20). */
+            mustChangePassword: boolean;
             createdBy: components["schemas"]["UserCreatorDto"] | null;
             /** @description Người đang gọi được sửa / khóa / chuyển phòng ban tài khoản này (chỉ để ẩn nút — server vẫn kiểm). */
             canManage: boolean;
@@ -5223,6 +5270,8 @@ export interface components {
             deny: string[];
             isActive: boolean;
             isSuperAdmin: boolean;
+            /** @description Chưa đổi mật khẩu do quản trị đặt (2026-10-20) — phiên web bị chặn tới khi đổi. */
+            mustChangePassword: boolean;
             createdBy: components["schemas"]["UserCreatorDto"] | null;
             /** @description Người đang gọi được sửa / khóa / chuyển phòng ban tài khoản này (chỉ để ẩn nút — server vẫn kiểm). */
             canManage: boolean;
@@ -6207,41 +6256,6 @@ export interface components {
             fbId: string;
             userId: string;
             userCode: string;
-        };
-        PancakeStaffUserDto: {
-            id: string;
-            code: string;
-            fullName: string;
-            isActive: boolean;
-        };
-        PancakeStaffDto: {
-            /** @description Khoá nhân viên: fb_id (hoặc id Pancake khi không có fb_id). */
-            fbId: string;
-            externalUserId: string | null;
-            /** @description Tên / SĐT Pancake gửi về gần nhất (từ hàng chờ). */
-            observedName: string | null;
-            observedPhone: string | null;
-            /** @description Vai trò đã thấy trên đơn: seller / creator / care / marketer. */
-            seenRoles: string[];
-            /** @description POS đã thấy nhân viên này (mã shop). */
-            shopIds: string[];
-            /** @description null = chưa gắn tài khoản (người tạo / chăm sóc / marketer chưa khai). */
-            user: components["schemas"]["PancakeStaffUserDto"] | null;
-            /** @description true = tài khoản do đồng bộ tự tạo — kiểm xem có trùng người đã có tài khoản không. */
-            autoCreated: boolean;
-        };
-        RelinkStaffDto: {
-            /** @description fb_id nhân viên (hoặc id Pancake khi không có fb_id) — đúng khoá trong danh sách staff. */
-            fbId: string;
-            /** Format: uuid */
-            userId: string;
-        };
-        RelinkStaffResultDto: {
-            fbId: string;
-            userId: string;
-            userCode: string;
-            /** @description Số POS đã chuyển sang tài khoản mới. */
-            shops: number;
         };
         PancakeShopConfigDto: {
             /** @description bigint → string qua API. */
@@ -11649,7 +11663,93 @@ export interface components {
                 id: string;
                 code: string;
                 fullName: string;
+                orders: number;
+                customers: number;
             }[];
+        };
+        PancakeStaffUserDto: {
+            id: string;
+            code: string;
+            fullName: string;
+            isActive: boolean;
+        };
+        PancakeStaffSuggestionDto: {
+            id: string;
+            code: string;
+            fullName: string;
+            email: string;
+        };
+        PancakeStaffDto: {
+            /** @description Khoá nhân viên: fb_id (hoặc id Pancake khi không có fb_id). */
+            fbId: string;
+            externalUserId: string | null;
+            /** @description Tên / SĐT Pancake gửi về gần nhất (từ hàng chờ). */
+            observedName: string | null;
+            observedPhone: string | null;
+            /** @description Vai trò đã thấy trên đơn: seller / creator / care / marketer. */
+            seenRoles: string[];
+            /** @description POS đã thấy nhân viên này (mã shop). */
+            shopIds: string[];
+            /** @description null = chưa gắn tài khoản (người tạo / chăm sóc / marketer chưa khai). */
+            user: components["schemas"]["PancakeStaffUserDto"] | null;
+            /** @description true = tài khoản do đồng bộ tự tạo — kiểm xem có trùng người đã có tài khoản không. */
+            autoCreated: boolean;
+            /** @description Email Pancake gửi về gần nhất (từ hàng chờ) — null khi Pancake không gửi. */
+            observedEmail: string | null;
+            /**
+             * @description Đơn / khách đang đứng tên tài khoản tự tạo (2026-10-20) — thứ sẽ chuyển sang người thật khi
+             *     gắn. 0 cho dòng chưa gắn hoặc tài khoản thật.
+             */
+            orderCount: number;
+            customerCount: number;
+            /** @description Tài khoản thật có email trùng email Pancake — chỉ cho dòng chưa gắn / tự tạo. */
+            suggestedUser: components["schemas"]["PancakeStaffSuggestionDto"] | null;
+            /** @description true = chưa có người thật: chưa gắn, hoặc đang ở tài khoản tự tạo còn hoạt động. */
+            pending: boolean;
+        };
+        StaffCandidateDto: {
+            id: string;
+            code: string;
+            fullName: string;
+            email: string;
+            departmentName: string | null;
+        };
+        RelinkStaffDto: {
+            /** @description fb_id nhân viên (hoặc id Pancake khi không có fb_id) — đúng khoá trong danh sách staff. */
+            fbId: string;
+            /** Format: uuid */
+            userId: string;
+        };
+        AbsorbedStaffAccountDto: {
+            id: string;
+            code: string;
+            fullName: string;
+            orders: number;
+            customers: number;
+        };
+        RelinkStaffResultDto: {
+            fbId: string;
+            userId: string;
+            userCode: string;
+            /** @description Số POS đã chuyển sang tài khoản mới. */
+            shops: number;
+            /** @description Tài khoản tự tạo trước đó giữ nhân viên này — đã gộp (2026-10-20). */
+            absorbed: components["schemas"]["AbsorbedStaffAccountDto"][];
+        };
+        StaffCleanupItemDto: {
+            id: string;
+            code: string;
+            fullName: string;
+            /** @description Người thật nhận đơn + khách; null = không tìm được (bỏ qua, xem `skipped`). */
+            targetUserId: string | null;
+            targetUserCode: string | null;
+            orders: number;
+            customers: number;
+            /** @description Lý do bỏ qua (không gộp): không rõ người nhận / nhiều người nhận. */
+            skipped: string | null;
+        };
+        StaffCleanupResultDto: {
+            items: components["schemas"]["StaffCleanupItemDto"][];
         };
         HealthReportDto: {
             /** @enum {string} */
@@ -13354,48 +13454,6 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["MapActorResultDto"];
-                };
-            };
-        };
-    };
-    PancakeMappingController_staff: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["PancakeStaffDto"][];
-                };
-            };
-        };
-    };
-    PancakeMappingController_relinkStaff: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["RelinkStaffDto"];
-            };
-        };
-        responses: {
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["RelinkStaffResultDto"];
                 };
             };
         };
@@ -20344,6 +20402,90 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["UpdatePancakeProfileResultDto"];
+                };
+            };
+        };
+    };
+    PancakeStaffController_list: {
+        parameters: {
+            query?: {
+                pending?: boolean;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PancakeStaffDto"][];
+                };
+            };
+        };
+    };
+    PancakeStaffController_candidates: {
+        parameters: {
+            query?: {
+                q?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StaffCandidateDto"][];
+                };
+            };
+        };
+    };
+    PancakeStaffController_relink: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RelinkStaffDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RelinkStaffResultDto"];
+                };
+            };
+        };
+    };
+    PancakeStaffController_cleanup: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StaffCleanupResultDto"];
                 };
             };
         };
