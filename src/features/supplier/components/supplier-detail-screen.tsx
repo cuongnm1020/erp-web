@@ -1,7 +1,8 @@
 'use client';
 
 import { zodResolver } from '@hookform/resolvers/zod';
-import { Info, Pencil, Plus } from 'lucide-react';
+import { Info, Pencil, Plus, Trash2 } from 'lucide-react';
+import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
@@ -14,6 +15,7 @@ import {
   FormLabel,
   FormMessage,
 } from '@/components/data/form';
+import { ConfirmDialog } from '@/components/data/confirm-dialog';
 import { EmptyState, DetailSkeleton, QueryState } from '@/components/data/states';
 import { StatusBadge } from '@/components/data/status-badge';
 import { PageHeader } from '@/components/layout/page-header';
@@ -43,6 +45,7 @@ import { useAbility } from '@/lib/permission';
 import { phoneSchema } from '@/lib/shared';
 import {
   useAddSupplierAddress,
+  useDeleteSupplier,
   useSupplier,
   useUpdateSupplier,
   type SupplierDetail,
@@ -271,10 +274,14 @@ function AddressDialog({
 
 function DetailBody({ supplier }: { supplier: SupplierDetail }) {
   const ability = useAbility();
+  const router = useRouter();
   const canUpdate = ability.can('update', 'Supplier');
+  const canDelete = ability.can('delete', 'Supplier');
   const update = useUpdateSupplier();
+  const remove = useDeleteSupplier();
   const [editOpen, setEditOpen] = useState(false);
   const [addressOpen, setAddressOpen] = useState(false);
+  const [deleteOpen, setDeleteOpen] = useState(false);
 
   const infoRows: Array<{ label: string; value: React.ReactNode }> = [
     {
@@ -290,6 +297,14 @@ function DetailBody({ supplier }: { supplier: SupplierDetail }) {
     {
       label: 'Email',
       value: supplier.email ? <span className="text-primary">{supplier.email}</span> : '—',
+    },
+    {
+      label: 'Địa chỉ',
+      value: supplier.address ? (
+        <span className="whitespace-pre-line break-words">{supplier.address}</span>
+      ) : (
+        '—'
+      ),
     },
     {
       label: 'Điều khoản',
@@ -312,9 +327,9 @@ function DetailBody({ supplier }: { supplier: SupplierDetail }) {
           { label: supplier.code },
         ]}
         actions={
-          canUpdate ? (
+          canUpdate || canDelete ? (
             <>
-              {!supplier.isActive ? (
+              {canUpdate && !supplier.isActive ? (
                 <Button
                   variant="outline"
                   size="sm"
@@ -328,9 +343,21 @@ function DetailBody({ supplier }: { supplier: SupplierDetail }) {
                   Bật lại hợp tác
                 </Button>
               ) : null}
-              <Button size="sm" variant="outline" onClick={() => setEditOpen(true)}>
-                <Pencil aria-hidden /> Sửa thông tin
-              </Button>
+              {canUpdate ? (
+                <Button size="sm" variant="outline" onClick={() => setEditOpen(true)}>
+                  <Pencil aria-hidden /> Sửa thông tin
+                </Button>
+              ) : null}
+              {canDelete ? (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="text-destructive hover:text-destructive"
+                  onClick={() => setDeleteOpen(true)}
+                >
+                  <Trash2 aria-hidden /> Xóa
+                </Button>
+              ) : null}
             </>
           ) : undefined
         }
@@ -416,6 +443,22 @@ function DetailBody({ supplier }: { supplier: SupplierDetail }) {
       {addressOpen ? (
         <AddressDialog supplierId={supplier.id} open={addressOpen} onOpenChange={setAddressOpen} />
       ) : null}
+      <ConfirmDialog
+        open={deleteOpen}
+        onOpenChange={setDeleteOpen}
+        title={`Xóa nhà cung cấp ${supplier.code}?`}
+        description="Nhà cung cấp bị ẩn khỏi danh sách và không chọn được nữa; lịch sử PO, phiếu nhập, công nợ giữ nguyên. Tạo lại cùng mã hoặc nhập Excel trúng mã sẽ khôi phục."
+        confirmLabel="Xóa"
+        onConfirm={() =>
+          remove
+            .mutateAsync(supplier.id)
+            .then(() => {
+              toast.success(`Đã xóa nhà cung cấp ${supplier.code}`);
+              router.push('/catalog/suppliers');
+            })
+            .catch((err) => toast.error(messageFor(err)))
+        }
+      />
     </>
   );
 }

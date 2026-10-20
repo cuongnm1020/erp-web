@@ -8,6 +8,8 @@ export type SupplierAddress = components['schemas']['SupplierAddressDto'];
 export type CreateSupplierInput = components['schemas']['CreateSupplierDto'];
 export type UpdateSupplierInput = components['schemas']['UpdateSupplierDto'];
 export type AddressInput = components['schemas']['AddressDto'];
+export type SupplierImportResult = components['schemas']['SupplierImportResultDto'];
+export type SupplierImportError = components['schemas']['SupplierImportErrorDto'];
 
 export interface SupplierListParams {
   q?: string;
@@ -77,14 +79,59 @@ export function useUpdateSupplier() {
   });
 }
 
-/** DELETE = ngừng giao dịch (isActive=false) — lịch sử PO/công nợ giữ nguyên. */
+/** Ngừng hợp tác = PATCH isActive=false — vẫn hiện trong danh sách (lọc "Ngừng hợp tác"), bật lại được. */
 export function useDeactivateSupplier() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) =>
+      unwrap(api.PATCH('/suppliers/{id}', { params: { path: { id } }, body: { isActive: false } })),
+    onSuccess: (_d, id) => {
+      void qc.invalidateQueries({ queryKey: supplierKeys.lists() });
+      void qc.invalidateQueries({ queryKey: supplierKeys.detail(id) });
+    },
+  });
+}
+
+/**
+ * DELETE = xóa mềm (2026-10-20): ẩn khỏi danh sách / chi tiết / chọn NCC; lịch sử PO, phiếu nhập,
+ * công nợ giữ nguyên. Tạo lại cùng mã hoặc nhập Excel trúng mã → khôi phục.
+ */
+export function useDeleteSupplier() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (id: string) => unwrap(api.DELETE('/suppliers/{id}', { params: { path: { id } } })),
     onSuccess: (_d, id) => {
       void qc.invalidateQueries({ queryKey: supplierKeys.lists() });
       void qc.invalidateQueries({ queryKey: supplierKeys.detail(id) });
+    },
+  });
+}
+
+/** Serializer giữ nguyên FormData — để browser tự đặt boundary multipart. */
+const asFormData = (body: unknown) => body as FormData;
+
+/**
+ * POST /suppliers/import — file Excel "Danh sách nhà cung cấp" (.xlsx/.xls/.csv ≤ 5MB). Server
+ * khớp theo mã: đã có → chỉ ghi đè, chưa có → tạo; trả số dòng tạo/ghi đè/bỏ qua + lỗi theo dòng.
+ */
+export function useImportSuppliers() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (file: File) => {
+      const fd = new FormData();
+      fd.append('file', file);
+      return unwrap(
+        api.POST('/suppliers/import', {
+          body: fd as never,
+          bodySerializer: asFormData,
+          // Bỏ Content-Type mặc định (json) để browser tự đặt multipart boundary
+          headers: { 'Content-Type': null },
+        }),
+      );
+    },
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: supplierKeys.lists() });
+      void qc.invalidateQueries({ queryKey: supplierKeys.details() });
     },
   });
 }

@@ -1,6 +1,6 @@
 'use client';
 
-import { Info, Plus } from 'lucide-react';
+import { Ban, FileSpreadsheet, Info, Plus, RotateCcw } from 'lucide-react';
 import Link from 'next/link';
 import { useMemo, useState } from 'react';
 import { DataTable, FilterBar, type ColumnDef } from '@/components/data/data-table';
@@ -13,13 +13,22 @@ import { toast } from '@/components/ui/toaster';
 import { messageFor } from '@/lib/error-messages';
 import { useAbility } from '@/lib/permission';
 import { toSkipTake, useListState } from '@/lib/url-state';
-import { useDeactivateSupplier, useSuppliers, type Supplier } from '../api/use-suppliers';
+import {
+  useDeactivateSupplier,
+  useDeleteSupplier,
+  useSuppliers,
+  useUpdateSupplier,
+  type Supplier,
+} from '../api/use-suppliers';
 import { SupplierFormDialog } from './supplier-form-dialog';
+import { SupplierImportDialog } from './supplier-import-dialog';
 
 /**
  * F2 (PLAN-master-data-lot-uom) — Nhà cung cấp nối API thật: GET /suppliers
  * (q + lọc trạng thái + sort + phân trang server, luật 8), tạo/sửa qua dialog,
- * DELETE = ngừng giao dịch (giữ lịch sử PO/công nợ). Không data scope (bất biến 8).
+ * Ngừng hợp tác = PATCH isActive=false (vẫn hiện, bật lại được), Xóa = DELETE xóa mềm (ẩn khỏi
+ * danh sách, giữ lịch sử PO/công nợ), Nhập Excel = POST /suppliers/import (ghi đè theo mã).
+ * Không data scope (bất biến 8).
  *
  * Khác design canvas (backend chưa có số liệu): cột "PO đang mở" / "Phải trả" và
  * "Xuất CSV" chờ endpoint — ghi ở thẻ PENDING_API, không hiển thị số bịa.
@@ -44,7 +53,10 @@ export function SupplierListScreen() {
   const canUpdate = ability.can('update', 'Supplier');
   const canDelete = ability.can('delete', 'Supplier');
   const deactivate = useDeactivateSupplier();
+  const remove = useDeleteSupplier();
+  const update = useUpdateSupplier();
   const [dialog, setDialog] = useState<{ open: boolean; supplier?: Supplier }>({ open: false });
+  const [importOpen, setImportOpen] = useState(false);
 
   const params = useMemo(
     () => ({
@@ -84,6 +96,19 @@ export function SupplierListScreen() {
         cell: ({ row }) => (
           <span className="font-semibold" title={row.original.name}>
             {row.original.name}
+          </span>
+        ),
+      },
+      {
+        id: 'address',
+        header: 'Địa chỉ',
+        meta: { width: 240 },
+        cell: ({ row }) => (
+          <span
+            className="block max-w-60 truncate text-muted-foreground"
+            title={row.original.address ?? undefined}
+          >
+            {row.original.address ?? '—'}
           </span>
         ),
       },
@@ -139,27 +164,71 @@ export function SupplierListScreen() {
       {
         id: 'actions',
         header: '',
-        meta: { width: 70 },
-        cell: ({ row }) => (
-          <RowActions
-            onEdit={canUpdate ? () => setDialog({ open: true, supplier: row.original }) : undefined}
-            onDelete={
-              canDelete && row.original.isActive
-                ? () =>
-                    deactivate
-                      .mutateAsync(row.original.id)
-                      .then(() => toast.success(`Đã ngừng hợp tác với ${row.original.code}`))
-                      .catch((err) => toast.error(messageFor(err)))
-                : undefined
-            }
-            deleteLabel="Ngừng hợp tác"
-            itemName={`nhà cung cấp ${row.original.code}`}
-            deleteDescription="Ngừng giao dịch — lịch sử PO và công nợ giữ nguyên, bật lại trong hộp thoại sửa."
-          />
-        ),
+        meta: { width: 110 },
+        // Sửa · Ngừng hợp tác / Bật lại hợp tác (nút icon) · Xóa (qua hộp xác nhận — xóa mềm,
+        // ẩn khỏi danh sách; lịch sử PO / công nợ giữ nguyên).
+        cell: ({ row }) => {
+          const s = row.original;
+          return (
+            <div className="flex justify-end gap-1" onClick={(e) => e.stopPropagation()}>
+              {canUpdate ? (
+                s.isActive ? (
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-8 w-8"
+                    title="Ngừng hợp tác"
+                    aria-label="Ngừng hợp tác"
+                    disabled={deactivate.isPending}
+                    onClick={() =>
+                      void deactivate
+                        .mutateAsync(s.id)
+                        .then(() => toast.success(`Đã ngừng hợp tác với ${s.code}`))
+                        .catch((err: unknown) => toast.error(messageFor(err)))
+                    }
+                  >
+                    <Ban aria-hidden />
+                  </Button>
+                ) : (
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-8 w-8"
+                    title="Bật lại hợp tác"
+                    aria-label="Bật lại hợp tác"
+                    disabled={update.isPending}
+                    onClick={() =>
+                      void update
+                        .mutateAsync({ id: s.id, body: { isActive: true } })
+                        .then(() => toast.success(`Đã bật lại hợp tác với ${s.code}`))
+                        .catch((err: unknown) => toast.error(messageFor(err)))
+                    }
+                  >
+                    <RotateCcw aria-hidden />
+                  </Button>
+                )
+              ) : null}
+              <RowActions
+                onEdit={canUpdate ? () => setDialog({ open: true, supplier: s }) : undefined}
+                onDelete={
+                  canDelete
+                    ? () =>
+                        remove
+                          .mutateAsync(s.id)
+                          .then(() => toast.success(`Đã xóa nhà cung cấp ${s.code}`))
+                          .catch((err) => toast.error(messageFor(err)))
+                    : undefined
+                }
+                deleteLabel="Xóa"
+                itemName={`nhà cung cấp ${s.code}`}
+                deleteDescription="Nhà cung cấp bị ẩn khỏi danh sách và không chọn được nữa; lịch sử PO, phiếu nhập, công nợ giữ nguyên. Tạo lại cùng mã hoặc nhập Excel trúng mã sẽ khôi phục."
+              />
+            </div>
+          );
+        },
       },
     ],
-    [canUpdate, canDelete, deactivate],
+    [canUpdate, canDelete, deactivate, remove, update],
   );
 
   return (
@@ -170,9 +239,14 @@ export function SupplierListScreen() {
         breadcrumb={[{ label: 'Sản phẩm', href: '/catalog/products' }, { label: 'Nhà cung cấp' }]}
         actions={
           canCreate ? (
-            <Button size="sm" onClick={() => setDialog({ open: true })}>
-              <Plus aria-hidden /> Thêm nhà cung cấp
-            </Button>
+            <>
+              <Button size="sm" variant="outline" onClick={() => setImportOpen(true)}>
+                <FileSpreadsheet aria-hidden /> Nhập Excel
+              </Button>
+              <Button size="sm" onClick={() => setDialog({ open: true })}>
+                <Plus aria-hidden /> Thêm nhà cung cấp
+              </Button>
+            </>
           ) : undefined
         }
       />
@@ -198,7 +272,7 @@ export function SupplierListScreen() {
 
       <QueryState
         query={query}
-        skeleton={<ListSkeleton rows={8} columns={9} />}
+        skeleton={<ListSkeleton rows={8} columns={10} />}
         isEmpty={(d) => d.total === 0}
         empty={
           <EmptyState
@@ -254,6 +328,7 @@ export function SupplierListScreen() {
           onOpenChange={(o) => setDialog((d) => ({ ...d, open: o }))}
         />
       ) : null}
+      {importOpen ? <SupplierImportDialog open={importOpen} onOpenChange={setImportOpen} /> : null}
     </>
   );
 }
