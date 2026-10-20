@@ -577,7 +577,31 @@ describe('GrnDetailScreen — GET /goods-receipts/:id', () => {
             skuCode: 'DA-A4-80',
             lotNumber: 'L2608',
             locationCode: 'B-01-01-A',
+            containerBarcode: null,
             qtyDelta: '50',
+            actorName: 'Trần Văn Bảo',
+          },
+          // Dòng đóng gói: mỗi thùng một movement cùng SL → cột Thùng phân biệt.
+          {
+            id: '8842172',
+            createdAt: '2026-08-23T10:12:04.000Z',
+            movementType: 'RECEIPT',
+            skuCode: 'DA-A4-80',
+            lotNumber: null,
+            locationCode: 'NHAN',
+            containerBarcode: 'LPN2608-00001',
+            qtyDelta: '30',
+            actorName: 'Trần Văn Bảo',
+          },
+          {
+            id: '8842173',
+            createdAt: '2026-08-23T10:12:04.000Z',
+            movementType: 'RECEIPT',
+            skuCode: 'DA-A4-80',
+            lotNumber: null,
+            locationCode: 'NHAN',
+            containerBarcode: 'LPN2608-00002',
+            qtyDelta: '30',
             actorName: 'Trần Văn Bảo',
           },
         ]),
@@ -586,7 +610,10 @@ describe('GrnDetailScreen — GET /goods-receipts/:id', () => {
     renderApp(<GrnDetailScreen id="r-1" />);
     expect(await screen.findByText(/Chứng từ bất biến/)).toBeInTheDocument();
     expect(await screen.findByText('B-01-01-A')).toBeInTheDocument();
-    expect(screen.getByText('+ Nhập')).toBeInTheDocument();
+    expect(screen.getAllByText('+ Nhập')).toHaveLength(3);
+    expect(screen.getByRole('columnheader', { name: 'Thùng' })).toBeInTheDocument();
+    expect(screen.getByText('LPN2608-00001')).toBeInTheDocument();
+    expect(screen.getByText('LPN2608-00002')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Post phiếu' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Hủy phiếu' })).not.toBeInTheDocument();
   });

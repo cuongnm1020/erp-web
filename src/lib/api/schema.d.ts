@@ -10609,6 +10609,8 @@ export interface components {
             skuCode: string;
             lotNumber: string | null;
             locationCode: string;
+            /** @description Mã vạch thùng/pallet (LPN) nếu movement ghi vào lát container — dòng đóng gói mỗi thùng một movement. */
+            containerBarcode: string | null;
             /** @description Âm = xuất, dương = nhập — Decimal(18,6) dạng chuỗi. */
             qtyDelta: string;
             actorName: string | null;

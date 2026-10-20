@@ -83,6 +83,7 @@ function Movements({ id }: { id: string }) {
                   <TableHead className="px-2.5 text-xs">SKU</TableHead>
                   <TableHead className="px-2.5 text-xs">Lô</TableHead>
                   <TableHead className="px-2.5 text-xs">Vị trí</TableHead>
+                  <TableHead className="px-2.5 text-xs">Thùng</TableHead>
                   <TableHead className="px-2.5 text-right text-xs">+/− SL</TableHead>
                   <TableHead className="px-2.5 text-xs">Người thao tác</TableHead>
                 </TableRow>
@@ -104,6 +105,10 @@ function Movements({ id }: { id: string }) {
                     </TableCell>
                     <TableCell className="px-2.5 py-1.5 font-mono text-xs">
                       {m.locationCode}
+                    </TableCell>
+                    {/* Dòng đóng gói: mỗi thùng một movement — mã LPN để phân biệt các dòng cùng SL. */}
+                    <TableCell className="px-2.5 py-1.5 font-mono text-xs">
+                      {m.containerBarcode ?? '—'}
                     </TableCell>
                     <TableCell className="px-2.5 py-1.5 text-right tabular-nums">
                       {m.qtyDelta.startsWith('-') ? '' : '+'}
