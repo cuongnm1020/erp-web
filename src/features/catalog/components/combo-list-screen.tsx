@@ -114,9 +114,9 @@ const columns: ColumnDef<ComboListItem, unknown>[] = [
 function ComboRowActions({ combo }: { combo: ComboListItem }) {
   const ability = useAbility();
   const del = useDeleteCombo();
-  const canUpdate = ability.can('update', 'Product');
-  const canDelete = ability.can('delete', 'Product');
-  const canCreate = ability.can('create', 'Product');
+  const canUpdate = ability.can('update', 'Combo');
+  const canDelete = ability.can('delete', 'Combo');
+  const canCreate = ability.can('create', 'Combo');
   if (!canUpdate && !canDelete && !canCreate) return null;
   return (
     <div className="flex justify-end gap-1" onClick={(e) => e.stopPropagation()}>
@@ -187,7 +187,7 @@ export function ComboListScreen() {
         description="Một mã bán gộp nhiều SKU — tồn và pick / đóng gói vẫn tính trên từng thành phần"
         breadcrumb={[{ label: 'Sản phẩm', href: '/catalog/products' }, { label: 'Combo sản phẩm' }]}
         actions={
-          <Can I="create" a="Product">
+          <Can I="create" a="Combo">
             <Button size="sm" asChild>
               <Link href="/catalog/combos/new">
                 <Plus aria-hidden />
@@ -225,7 +225,7 @@ export function ComboListScreen() {
                   Xóa lọc
                 </Button>
               ) : (
-                <Can I="create" a="Product">
+                <Can I="create" a="Combo">
                   <Button asChild>
                     <Link href="/catalog/combos/new">
                       <Plus aria-hidden />
