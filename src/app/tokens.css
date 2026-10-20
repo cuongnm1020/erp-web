@@ -7,9 +7,9 @@
   --neutral-200: 225 228 232;
   --neutral-300: 201 206 214;
   --neutral-400: 138 148 166;
-  --neutral-500: 102 111 122;
-  --neutral-600: 91 100 112;
-  --neutral-900: 26 29 33;
+  --neutral-500: 91 100 112;
+  --neutral-600: 75 84 96;
+  --neutral-900: 15 18 22;
   --blue-600: 31 95 168;
   --blue-700: 25 79 140;
   --blue-50: 233 242 251;
@@ -33,9 +33,9 @@
   --border: 225 228 232;
   --input: 138 148 166;
   --input-soft: 201 206 214;
-  --foreground: 26 29 33;
-  --muted-foreground: 91 100 112;
-  --subtle-foreground: 102 111 122;
+  --foreground: 15 18 22;
+  --muted-foreground: 75 84 96;
+  --subtle-foreground: 91 100 112;
   --primary: 31 95 168;
   --primary-hover: 25 79 140;
   --primary-foreground: 255 255 255;
@@ -82,7 +82,7 @@
   --flow-done-weak: 235 250 242;
   --flow-issue: 192 57 43;
   --flow-issue-weak: 250 236 234;
-  --flow-off: 91 100 112;
+  --flow-off: 75 84 96;
   --flow-off-weak: 241 243 245;
   --flow-pending: 147 96 15;
   --flow-pending-weak: 253 245 232;
@@ -104,7 +104,7 @@
   --flow-returned-weak: 250 236 234;
   --flow-carrier-cancelled: 192 57 43;
   --flow-carrier-cancelled-weak: 250 236 234;
-  --flow-cancelled: 91 100 112;
+  --flow-cancelled: 75 84 96;
   --flow-cancelled-weak: 241 243 245;
   --telco-viettel: 173 31 31;
   --telco-viettel-weak: 251 233 233;
@@ -139,7 +139,7 @@
   --control-border: 138 148 166;
   --control-border-focus: 31 95 168;
   --control-bg-disabled: 241 243 245;
-  --checkbox-border: 102 111 122;
+  --checkbox-border: 91 100 112;
   --table-header-bg: 241 243 245;
   --table-row-hover: 247 248 250;
   --table-row-selected: 233 242 251;
