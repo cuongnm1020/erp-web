@@ -131,7 +131,10 @@ export function useUpdatePancakeShopProducts(shopId: string) {
   });
 }
 
-/** GET /products?q= — tìm sản phẩm (kể cả combo) để gán cho shop; phân trang phía server. */
+/**
+ * GET /products?q=&erpOnly=true — tìm sản phẩm (kể cả combo) để gán cho shop; phân trang phía
+ * server. Chỉ hàng tạo trong ERP: sản phẩm sync tự sinh từ đơn Pancake bị loại (2026-10-20).
+ */
 export function useProductPickSearch(q: string, enabled: boolean) {
   return useQuery({
     queryKey: ['admin', 'pancake-config', 'product-pick', q] as const,
@@ -139,7 +142,16 @@ export function useProductPickSearch(q: string, enabled: boolean) {
       unwrap(
         api.GET('/products', {
           params: {
-            query: { q: q || undefined, take: 50, skip: 0, sortBy: 'code', sortDir: 'asc' },
+            // Chỉ hàng tạo trong ERP (2026-10-20): sản phẩm sync tự sinh từ đơn Pancake không
+            // phải thứ để đẩy lên shop — chúng đã có sẵn trên POS.
+            query: {
+              q: q || undefined,
+              erpOnly: true,
+              take: 50,
+              skip: 0,
+              sortBy: 'code',
+              sortDir: 'asc',
+            },
           },
         }),
       ),

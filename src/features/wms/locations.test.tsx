@@ -221,15 +221,48 @@ describe('LocationsPanel — cây vị trí kho + CRUD', () => {
     );
   });
 
-  it('cột SKU cố định: bin đã gán hiện mã + tên SKU', async () => {
+  it('cột Sản phẩm cố định: bin đã gán hiện tên sản phẩm, mã SKU ở tooltip', async () => {
     renderApp(<WarehousesScreen />);
     await screen.findByText('Vị trí kho WH01');
     await screen.findByText('A01');
     fireEvent.click(screen.getByRole('button', { name: 'Mở rộng A01' }));
-    const cell = screen.getByText('P001-1');
+    const cell = screen.getByText('Bút bi xanh');
     expect(cell).toBeInTheDocument();
-    // Tên đầy đủ nằm ở title (tooltip) — cột chỉ hiện mã cho gọn
-    expect(cell).toHaveAttribute('title', 'P001-1 — Bút bi xanh');
+    expect(screen.queryByText('P001-1')).not.toBeInTheDocument();
+    expect(cell).toHaveAttribute('title', 'Bút bi xanh — P001-1');
+  });
+
+  it('tìm vị trí theo sản phẩm: lọc cây, không dấu vẫn khớp, nhánh khớp tự mở', async () => {
+    renderApp(<WarehousesScreen />);
+    await screen.findByText('Vị trí kho WH01');
+    await screen.findByText('A01');
+    expect(screen.queryByText('A01-01')).not.toBeInTheDocument();
+    const input = screen.getByRole('textbox', { name: 'Tìm vị trí theo sản phẩm' });
+    fireEvent.change(input, { target: { value: 'but bi' } });
+    // Ô kệ gán "Bút bi xanh" hiện ra ngay cùng tổ tiên A / A01, không cần bấm chevron
+    expect(screen.getByText('A01-01')).toBeInTheDocument();
+    expect(screen.getByText('A01')).toBeInTheDocument();
+    // Tìm theo mã SKU cũng ra
+    fireEvent.change(input, { target: { value: 'P001' } });
+    expect(screen.getByText('A01-01')).toBeInTheDocument();
+    // Xóa từ khoá → cây về trạng thái cũ (node sâu đóng)
+    fireEvent.click(screen.getByRole('button', { name: 'Xóa từ khoá tìm' }));
+    expect(screen.queryByText('A01-01')).not.toBeInTheDocument();
+    expect(screen.getByText('A01')).toBeInTheDocument();
+  });
+
+  it('tìm không khớp → trống kèm nút xóa từ khoá', async () => {
+    renderApp(<WarehousesScreen />);
+    await screen.findByText('Vị trí kho WH01');
+    await screen.findByText('A01');
+    fireEvent.change(screen.getByRole('textbox', { name: 'Tìm vị trí theo sản phẩm' }), {
+      target: { value: 'phân bón' },
+    });
+    expect(screen.getByText('Không có vị trí nào gán sản phẩm khớp')).toBeInTheDocument();
+    expect(screen.queryByText('A01')).not.toBeInTheDocument();
+    // Nút trong màn trống (nút X trên ô nhập cùng nhãn — lấy theo chữ hiển thị)
+    fireEvent.click(screen.getByText('Xóa từ khoá tìm'));
+    expect(screen.getByText('A01')).toBeInTheDocument();
   });
 
   it('gán nhiều SKU cho bin: chip prefill, thêm từ picker, bỏ chip → PATCH gửi fixedSkuIds', async () => {

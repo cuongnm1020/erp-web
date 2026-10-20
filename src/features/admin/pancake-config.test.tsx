@@ -264,16 +264,18 @@ describe('PancakeConfigScreen — /pancake-sync/config', () => {
       isCombo: false,
       isActive: true,
     });
+    const productUrls: string[] = [];
     server.use(
-      http.get('/api/products', () =>
-        HttpResponse.json({
+      http.get('/api/products', ({ request }) => {
+        productUrls.push(request.url);
+        return HttpResponse.json({
           items: [
             product('p-1', 'SP-0001', 'Phân bón lá A'),
             product('p-2', 'SP-0002', 'Thuốc trừ sâu B'),
           ],
           total: 2,
-        }),
-      ),
+        });
+      }),
       http.put('/api/pancake-sync/config/:shopId/products', async ({ request }) => {
         const body = (await request.json()) as { restricted: boolean; productIds: string[] };
         puts.push(body);
@@ -294,6 +296,9 @@ describe('PancakeConfigScreen — /pancake-sync/config', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Chọn sản phẩm bán cho shop 407957969' }));
     fireEvent.click(await screen.findByRole('radio', { name: /Chỉ sản phẩm được chọn/ }));
     fireEvent.click(await screen.findByRole('checkbox', { name: 'Chọn SP-0001' }));
+    // Danh sách để chọn chỉ gồm hàng tạo trong ERP — sản phẩm sync tự sinh từ Pancake bị loại.
+    expect(productUrls.length).toBeGreaterThan(0);
+    expect(new URL(productUrls[0]!).searchParams.get('erpOnly')).toBe('true');
     expect(screen.getByText('Đã chọn · 1')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Lưu sản phẩm bán' }));
 
