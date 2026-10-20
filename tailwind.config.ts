@@ -12,7 +12,6 @@ import animate from 'tailwindcss-animate';
  *   không kéo thêm weight 500/700.
  */
 const config: Config = {
-  darkMode: ['class'],
   content: ['./src/**/*.{ts,tsx}'],
   theme: {
     container: {
@@ -30,7 +29,10 @@ const config: Config = {
         primary: {
           DEFAULT: 'hsl(var(--primary))',
           foreground: 'hsl(var(--primary-foreground))',
+          hover: 'hsl(var(--primary-hover))',
         },
+        // Chữ mờ nhất (placeholder, số thứ tự, viền ô tick chưa chọn) — chỉ dùng trên card.
+        'subtle-foreground': 'hsl(var(--subtle-foreground))',
         secondary: {
           DEFAULT: 'hsl(var(--secondary))',
           foreground: 'hsl(var(--secondary-foreground))',
@@ -38,6 +40,7 @@ const config: Config = {
         destructive: {
           DEFAULT: 'hsl(var(--destructive))',
           foreground: 'hsl(var(--destructive-foreground))',
+          weak: 'hsl(var(--destructive-weak))',
         },
         muted: {
           DEFAULT: 'hsl(var(--muted))',
@@ -59,14 +62,18 @@ const config: Config = {
         success: {
           DEFAULT: 'hsl(var(--success))',
           foreground: 'hsl(var(--success-foreground))',
+          weak: 'hsl(var(--success-weak))',
         },
         warning: {
           DEFAULT: 'hsl(var(--warning))',
           foreground: 'hsl(var(--warning-foreground))',
+          weak: 'hsl(var(--warning-weak))',
+          line: 'hsl(var(--warning-line))',
         },
         info: {
           DEFAULT: 'hsl(var(--info))',
           foreground: 'hsl(var(--info-foreground))',
+          weak: 'hsl(var(--info-weak))',
         },
         // Trạng thái đơn (tab danh sách đơn) — mỗi trạng thái một màu (globals.css --flow-*).
         flow: Object.fromEntries(
@@ -114,6 +121,21 @@ const config: Config = {
         lg: 'var(--radius)',
         md: 'calc(var(--radius) - 2px)',
         sm: 'calc(var(--radius) - 4px)',
+        // Chip trạng thái cao 18px (design system 2026-10-20)
+        chip: '9px',
+        tile: '7px',
+      },
+      // Viền ô tick chưa chọn 1.5px
+      borderWidth: {
+        '1.5': '1.5px',
+      },
+      // Hộp thoại cao tối đa màn − 32px, cuộn bên trong
+      maxHeight: {
+        dialog: 'calc(100vh - 2rem)',
+      },
+      boxShadow: {
+        popover: '0 4px 12px rgba(20, 30, 45, 0.12)',
+        dialog: '0 8px 24px rgba(20, 30, 45, 0.16)',
       },
       fontFamily: {
         sans: ['var(--font-sans)', 'system-ui', 'sans-serif'],
@@ -139,6 +161,10 @@ const config: Config = {
       // hàng" không bị cắt, thu gọn 60px. Thanh trên 48px = h-12 có sẵn.
       spacing: {
         sidebar: '240px',
+        // control-height / row-height 32px = h-8 có sẵn; đầu thẻ 44px
+        'card-header': '44px',
+        // chip trạng thái 18px
+        '4.5': '1.125rem',
         'sidebar-collapsed': '60px',
       },
       keyframes: {

@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ME_SALE } from '@/test/msw/handlers';
 import { server } from '@/test/msw/server';
 import { renderApp } from '@/test/render';
+import { clickRowMenuItem } from '@/test/row-menu';
 import { ProductListScreen } from './components/product-list-screen';
 
 // Radix (checkbox, dialog) đo kích thước qua ResizeObserver — jsdom không có sẵn.
@@ -286,13 +287,12 @@ describe('ProductListScreen — góc nhìn Sản phẩm (mặc định, GET /pro
     );
     renderApp(<ProductListScreen />);
     await screen.findByText(FIRST_PRODUCT.code);
-    // Nút Xóa của DÒNG (trong bảng) — tiêu đề còn nút "Xóa" hàng loạt, đang vô hiệu vì chưa chọn.
-    const table = screen.getByRole('table');
-    fireEvent.click(within(table).getAllByRole('button', { name: 'Xóa' })[0]!);
-    expect(await screen.findByText(`Xóa sản phẩm ${FIRST_PRODUCT.code}?`)).toBeInTheDocument();
-    // Nút xác nhận trong dialog trùng tên nút dòng — là nút cuối cùng.
-    const buttons = screen.getAllByRole('button', { name: 'Xóa' });
-    fireEvent.click(buttons[buttons.length - 1]!);
+    // Mục Xóa của DÒNG nằm trong menu "⋯" (trong bảng) — tiêu đề còn nút "Xóa" hàng loạt, đang vô hiệu.
+    await clickRowMenuItem('Xóa', { container: screen.getByRole('table') });
+    const confirm = await screen.findByRole('dialog');
+    expect(within(confirm).getByText(`Xóa sản phẩm ${FIRST_PRODUCT.code}?`)).toBeInTheDocument();
+    // Nút xác nhận trong dialog trùng tên mục menu.
+    fireEvent.click(within(confirm).getByRole('button', { name: 'Xóa' }));
     await waitFor(() => expect(deleted).toEqual([FIRST_PRODUCT.id]));
   });
 
@@ -310,8 +310,8 @@ describe('ProductListScreen — góc nhìn Sản phẩm (mặc định, GET /pro
     );
     renderApp(<ProductListScreen />);
     await screen.findByText(FIRST_PRODUCT.code);
-    // Chưa chọn gì → nút tiêu đề (đứng trước bảng trong DOM) vô hiệu; các nút "Xóa" sau là của dòng.
-    expect(screen.getAllByRole('button', { name: 'Xóa' })[0]).toBeDisabled();
+    // Chưa chọn gì → nút "Xóa" trên tiêu đề vô hiệu (xóa từng dòng nằm trong menu "⋯").
+    expect(screen.getByRole('button', { name: 'Xóa' })).toBeDisabled();
 
     const boxes = screen.getAllByRole('checkbox', { name: 'Chọn dòng' });
     expect(boxes).toHaveLength(PRODUCTS.length);
@@ -335,7 +335,7 @@ describe('ProductListScreen — góc nhìn Sản phẩm (mặc định, GET /pro
       ),
     );
     // Xong → bỏ chọn, nút quay về "Xóa" vô hiệu.
-    await waitFor(() => expect(screen.getAllByRole('button', { name: 'Xóa' })[0]).toBeDisabled());
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Xóa' })).toBeDisabled());
     expect(screen.queryByRole('button', { name: 'Xóa (2)' })).not.toBeInTheDocument();
   });
 

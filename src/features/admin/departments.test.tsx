@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ME_SALE, makeUsers } from '@/test/msw/handlers';
 import { server } from '@/test/msw/server';
 import { renderApp } from '@/test/render';
+import { clickRowMenuItem, rowMenuIndex } from '@/test/row-menu';
 import { TeamsScreen } from './components/teams-screen';
 
 vi.stubGlobal(
@@ -209,7 +210,9 @@ describe('TeamsScreen — Phòng ban & team (I-05)', () => {
     const { calls } = wire();
     renderApp(<TeamsScreen />);
     await screen.findByText('Nhân viên 1');
-    fireEvent.click(screen.getAllByRole('button', { name: 'Gỡ khỏi phòng ban' })[0]!);
+    await clickRowMenuItem('Gỡ khỏi phòng ban', {
+      index: rowMenuIndex(`nhân viên ${USERS[0]!.fullName}`),
+    });
     const dialog = await screen.findByRole('dialog');
     fireEvent.click(within(dialog).getByRole('button', { name: 'Gỡ khỏi phòng ban' }));
     await waitFor(() => expect(calls).toHaveLength(1));
@@ -227,6 +230,9 @@ describe('TeamsScreen — Phòng ban & team (I-05)', () => {
     expect(screen.queryByRole('button', { name: /Thêm phòng ban/ })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Sửa' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Gỡ khỏi phòng ban' })).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: /^Thao tác khác cho nhân viên/ }),
+    ).not.toBeInTheDocument();
   });
 
   it('empty: chưa có phòng ban → EmptyState với đúng một hành động tạo', async () => {
