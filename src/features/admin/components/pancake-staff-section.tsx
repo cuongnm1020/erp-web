@@ -43,6 +43,7 @@ const ROLE_LABEL: Record<string, string> = {
 
 /**
  * Nhân viên Pancake ↔ tài khoản ERP — GET /pancake-sync/mapping/staff, POST …/staff/relink.
+ * Nhân viên Pancake có fb_id khai trên hồ sơ hoặc email trùng email ERP được gán tự động (2026-10-20).
  * Nhân viên CHỐT ĐƠN chưa có trong ERP được đồng bộ tự tạo tài khoản sale (mã pc.…, mật khẩu
  * ngẫu nhiên — đặt lại ở màn Người dùng trước khi giao). Tài khoản tự tạo trùng người đã có tài
  * khoản thì "Gắn tài khoản" sang tài khoản đúng: mọi POS đổi theo, đơn liên quan được chiếu lại.
@@ -57,7 +58,8 @@ export function PancakeStaffSection() {
         <h2 className="text-base font-semibold">Nhân viên Pancake</h2>
         <p className="text-sm text-muted-foreground">
           Người chốt đơn trên Pancake là người phụ trách đơn trong ERP (dùng để tính hoa hồng).
-          Người chưa có tài khoản được tạo tự động; tài khoản tự tạo trùng người đã có thì gắn lại.
+          Người có email Pancake trùng email tài khoản ERP được gán tự động; người chưa có tài khoản
+          được tạo tự động; tài khoản tự tạo trùng người đã có thì gắn lại.
         </p>
       </div>
       <QueryState
