@@ -48,6 +48,7 @@ const TEAM_TYPE_LABEL: Record<OrgTeamNode['type'], string> = {
   SALES: 'Kinh doanh',
   WAREHOUSE: 'Kho',
   ACCOUNTING: 'Kế toán',
+  CSKH: 'Chăm sóc khách hàng',
   MARKETING: 'Marketing',
   OPERATION: 'Vận hành',
 };
@@ -223,6 +224,7 @@ function OrgTreeBody({
         isActive: true,
         managerId: null,
         managerName: null,
+        kind: 'SALES',
         sortOrder: Number.MAX_SAFE_INTEGER,
         canAddMembers: false,
         members: data.unassigned,

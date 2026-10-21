@@ -10,6 +10,7 @@ export const ME_ADMIN = {
   roles: ['ADMIN'],
   permissions: [],
   leaderTeamIds: [],
+  careTeamIds: [],
   hasGlobalAccess: true,
   mustChangePassword: false,
 };
@@ -20,6 +21,7 @@ export const ME_SALE = {
   roles: ['SALES_MEMBER'],
   permissions: ['customer.read', 'customer.create', 'sales_order.read', 'sales_order.create'],
   leaderTeamIds: [],
+  careTeamIds: [],
   hasGlobalAccess: false,
   mustChangePassword: false,
 };
@@ -518,6 +520,7 @@ function orderListExtras(i: number, status: (typeof ORDER_STATUSES)[number]) {
           ? ('NOT_STARTED' as const)
           : flow,
     statusChangedAt: shipped ? new Date(Date.UTC(2026, 7, 24) - i * 600_000).toISOString() : null,
+    sameDayCount: 0,
     phone: FIXTURE_PHONES[i % FIXTURE_PHONES.length]!,
     recipientName: null,
     addressLine: `Thôn ${(i % 9) + 1}, X. Ea Kar`,
@@ -1396,6 +1399,13 @@ export const handlers = [
   ),
   http.get('/api/container-types', () => HttpResponse.json([])),
   http.get('/api/carriers', () => HttpResponse.json(CARRIERS)),
+  // CSKH (2026-10-21): mặc định không có đơn trùng / không tra được khách — test riêng ghi đè.
+  http.get('/api/sales-orders/same-day', () =>
+    HttpResponse.json({ day: '2026-10-21', total: 0, hiddenCount: 0, orders: [] }),
+  ),
+  http.get('/api/customer-care/lookup', () =>
+    HttpResponse.json({ customer: null, careTeam: null }),
+  ),
   http.get('/api/sales-orders/staff-options', () =>
     HttpResponse.json([
       {

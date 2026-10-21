@@ -32,6 +32,7 @@ const ME_EDITOR = {
   roles: ['ADMIN'],
   permissions: [],
   leaderTeamIds: [],
+  careTeamIds: [],
   hasGlobalAccess: true,
   managesDepartments: false,
   warehouseIds: null,

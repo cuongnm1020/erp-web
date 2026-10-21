@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { forgetWarehouseSelection, WarehouseProvider } from '@/lib/warehouse';
 import {
   ME_ADMIN,
+  ME_SALE,
   makeCustomerAddresses,
   makeCustomers,
   makeOrderDetail,
@@ -423,6 +424,142 @@ describe('OrderCreateScreen — màn tạo đơn mới', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Chốt đơn (F10)' }));
     await waitFor(() => expect(bodies).toHaveLength(1));
     expect(bodies[0]).toMatchObject({ customerId: CUST.id });
+  });
+
+  it('đơn trùng trong ngày: thẻ khách nhắc; Chốt đơn mở hộp cảnh báo — Quay lại sửa không gửi, Vẫn tạo đơn mới gửi', async () => {
+    search = `from=${ORDER.id}`;
+    const posts: Array<string | null> = [];
+    const sameDayPhones: string[] = [];
+    server.use(
+      ...skuHandlers(),
+      http.get('/api/sales-orders/same-day', ({ request }) => {
+        sameDayPhones.push(new URL(request.url).searchParams.get('phone') ?? '');
+        return HttpResponse.json({
+          day: '2026-10-21',
+          total: 3,
+          hiddenCount: 1,
+          orders: [
+            {
+              id: 'so-dup-1',
+              docNumber: 'DH2610-01234',
+              orderDate: '2026-10-21T01:12:00.000Z',
+              status: 'APPROVED',
+              total: '380000',
+              ownerName: 'Lê Thị Mai',
+              source: 'PANCAKE',
+            },
+            {
+              id: 'so-dup-2',
+              docNumber: 'DH2610-01251',
+              orderDate: '2026-10-21T03:47:00.000Z',
+              status: 'PENDING_APPROVAL',
+              total: '520000',
+              ownerName: null,
+              source: 'ERP',
+            },
+          ],
+        });
+      }),
+      http.post('/api/sales-orders', ({ request }) => {
+        posts.push(request.headers.get('idempotency-key'));
+        return HttpResponse.json(CREATED, { status: 201 });
+      }),
+    );
+    renderApp(<OrderCreateScreen />);
+    expect(await screen.findByText('Khách đã có 3 đơn hôm nay')).toBeInTheDocument();
+    expect(sameDayPhones.at(-1)).toMatch(/^0\d{9,10}$/);
+    await waitFor(() =>
+      expect(screen.getAllByLabelText('Số lượng')).toHaveLength(REAL_LINES.length),
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Chốt đơn (F10)' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Khách này đã có 3 đơn hôm nay' });
+    expect(within(dialog).getByText('DH2610-01234')).toBeInTheDocument();
+    expect(within(dialog).getByText('Pancake')).toBeInTheDocument();
+    expect(within(dialog).getByText(/Và 1 đơn của team khác/)).toBeInTheDocument();
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Quay lại sửa' }));
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+    expect(posts).toHaveLength(0);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Chốt đơn (F10)' }));
+    const again = await screen.findByRole('dialog', { name: 'Khách này đã có 3 đơn hôm nay' });
+    fireEvent.click(within(again).getByRole('button', { name: 'Vẫn tạo đơn' }));
+    await waitFor(() => expect(posts).toHaveLength(1));
+    expect(posts[0]).toMatch(/[0-9a-f-]{36}/);
+    await waitFor(() => expect(push).toHaveBeenCalledWith('/crm/orders/new-order-1'));
+  });
+
+  it('CSKH gõ SĐT khách của team khác: hiện "Khách team khác", điền tên + địa chỉ, chốt gửi theo SĐT (không customerId)', async () => {
+    const bodies: Record<string, unknown>[] = [];
+    const lookups: string[] = [];
+    server.use(
+      ...skuHandlers(),
+      http.get('/api/customer-care/lookup', ({ request }) => {
+        lookups.push(new URL(request.url).searchParams.get('phone') ?? '');
+        return HttpResponse.json({
+          customer: {
+            id: 'cust-other',
+            code: 'KH024811',
+            name: 'Trần Văn Hùng',
+            phone: '0909888777',
+            address: {
+              recipient: 'Trần Văn Hùng',
+              phone: '0909888777',
+              line1: 'Thôn Đông',
+              hamlet: null,
+              ward: 'Xã Tân Lập',
+              district: null,
+              province: 'Hà Nội',
+            },
+          },
+          careTeam: 'OTHER',
+        });
+      }),
+      http.post('/api/sales-orders', async ({ request }) => {
+        bodies.push((await request.json()) as Record<string, unknown>);
+        return HttpResponse.json(CREATED, { status: 201 });
+      }),
+    );
+    renderApp(<OrderCreateScreen />, {
+      me: { ...ME_SALE, permissions: [...ME_SALE.permissions, 'customer.care'] },
+    });
+    fireEvent.change(await screen.findByLabelText('Số điện thoại khách'), {
+      target: { value: '0909 888 777' },
+    });
+    expect(await screen.findByText('Khách team khác')).toBeInTheDocument();
+    expect(screen.getByText(/Đơn này tính doanh thu cho team bạn/)).toBeInTheDocument();
+    expect(lookups).toContain('0909888777');
+    await waitFor(() =>
+      expect(screen.getByLabelText('Tên khách hàng')).toHaveValue('Trần Văn Hùng'),
+    );
+    expect(screen.getByLabelText('Tên người nhận')).toHaveValue('Trần Văn Hùng');
+
+    const box = screen.getByRole('combobox', { name: 'Tìm sản phẩm' });
+    fireEvent.change(box, { target: { value: 'amino' } });
+    fireEvent.click(await screen.findByRole('option', { name: /Amino GA3 500ml/ }));
+    await waitFor(() => expect(screen.getAllByLabelText('Số lượng')).toHaveLength(1));
+    fireEvent.click(screen.getByRole('button', { name: 'Chốt đơn (F10)' }));
+    await waitFor(() => expect(bodies).toHaveLength(1));
+    expect(bodies[0]).not.toHaveProperty('customerId');
+    expect(bodies[0]).toMatchObject({
+      customer: { name: 'Trần Văn Hùng', phone: '0909888777' },
+    });
+  });
+
+  it('không có quyền customer.care → không tra SĐT toàn hệ thống', async () => {
+    const lookups: string[] = [];
+    server.use(
+      http.get('/api/customer-care/lookup', () => {
+        lookups.push('x');
+        return HttpResponse.json({ customer: null, careTeam: null });
+      }),
+    );
+    renderApp(<OrderCreateScreen />, { me: ME_SALE });
+    fireEvent.change(await screen.findByLabelText('Số điện thoại khách'), {
+      target: { value: '0909888777' },
+    });
+    expect(await screen.findByText(/Khách mới — sẽ tạo hồ sơ khách/)).toBeInTheDocument();
+    expect(lookups).toHaveLength(0);
   });
 
   it('server báo chuyển khoản vượt tổng (422 path prepaidAmount) → lỗi gắn đúng ô', async () => {

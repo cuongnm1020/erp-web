@@ -48,7 +48,7 @@ import { cn } from '@/lib/cn';
 import { messageFor } from '@/lib/error-messages';
 import { formatMoney } from '@/lib/format';
 import { useWarehouse } from '@/lib/warehouse';
-import type { SkuQuickRow } from '../../api/use-order-create';
+import { useSameDayOrders, type SkuQuickRow } from '../../api/use-order-create';
 import { useCreateOrder } from '../../api/use-orders';
 import { orderChannelLabel, orderSourceLabel } from '../../labels';
 import {
@@ -64,6 +64,7 @@ import {
 import { CART_GRID, CartLine, type LineMetrics } from './cart-line';
 import { Card, CustomerCard, InfoCard, ReceiverCard, ShippingCard } from './order-side-cards';
 import { ProductSearch } from './product-search';
+import { SameDayDialog } from './same-day-dialog';
 
 const NONE = '__none__';
 const DEFAULT_WAREHOUSE = '__default__';
@@ -260,16 +261,39 @@ export const OrderDraftForm = forwardRef<
     if (root) toast.error(root);
   };
 
+  // Đơn trùng trong ngày (CSKH-5): cùng SĐT đã có đơn chưa hủy hôm nay → hỏi lại trước khi chốt.
+  // Cảnh báo, không chặn — "Vẫn tạo đơn" gửi đúng đơn đang chờ. Đã đồng ý cho SĐT nào thì lần bấm
+  // sau (lỗi mạng, sửa giỏ) không hỏi lại.
+  const customerPhone = useWatch({ control: form.control, name: 'customerPhone' });
+  const sameDay = useSameDayOrders(customerPhone);
+  const [pendingDup, setPendingDup] = useState<CreateOrderValues | null>(null);
+  const acceptedDupPhone = useRef<string | null>(null);
+
+  const send = (values: CreateOrderValues) => {
+    idemKey.current ??= newIdempotencyKey();
+    create.mutate(
+      { body: toCreateOrderBody(values), key: idemKey.current },
+      {
+        onSuccess: (r) => {
+          setPendingDup(null);
+          onCreated(r, afterCreate.current);
+        },
+        onError: (err) => {
+          setPendingDup(null);
+          onError(err, values);
+        },
+      },
+    );
+  };
+
   const onSubmit = form.handleSubmit(
     (values) => {
-      idemKey.current ??= newIdempotencyKey();
-      create.mutate(
-        { body: toCreateOrderBody(values), key: idemKey.current },
-        {
-          onSuccess: (r) => onCreated(r, afterCreate.current),
-          onError: (err) => onError(err, values),
-        },
-      );
+      const dup = sameDay.data;
+      if (dup && dup.total > 0 && acceptedDupPhone.current !== values.customerPhone) {
+        setPendingDup(values);
+        return;
+      }
+      send(values);
     },
     (errors) => {
       if (form.getValues('lines').length === 0) {
@@ -293,6 +317,19 @@ export const OrderDraftForm = forwardRef<
 
   return (
     <Form {...form}>
+      {pendingDup && sameDay.data ? (
+        <SameDayDialog
+          data={sameDay.data}
+          phone={pendingDup.customerPhone}
+          customerName={pendingDup.customerName}
+          pending={create.isPending}
+          onCancel={() => setPendingDup(null)}
+          onConfirm={() => {
+            acceptedDupPhone.current = pendingDup.customerPhone;
+            send(pendingDup);
+          }}
+        />
+      ) : null}
       <form
         id="order-create"
         onSubmit={(e) => {

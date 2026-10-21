@@ -7,6 +7,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { CopyText } from '@/components/data/copy-text';
 import { DataTable, FilterBar, type ColumnDef } from '@/components/data/data-table';
 import { EmptyState, ListSkeleton, QueryState } from '@/components/data/states';
+import { StatusBadge } from '@/components/data/status-badge';
 import { PageHeader } from '@/components/layout/page-header';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -80,6 +81,8 @@ const DEFAULTS = {
     'source',
     'from',
     'to',
+    // CSKH-5: chỉ đơn trùng trong ngày (cùng SĐT, cùng ngày VN, chưa hủy).
+    'duplicate',
   ] as const,
 };
 
@@ -264,8 +267,15 @@ const buildColumns = (
     cell: ({ row }) => {
       const o = row.original;
       return (
-        <span title={o.fulfilmentStatus ? fulfilmentLabel(o.fulfilmentStatus) : undefined}>
-          <FlowBadge flow={o.flow} />
+        <span className="flex flex-wrap items-center gap-1">
+          <span title={o.fulfilmentStatus ? fulfilmentLabel(o.fulfilmentStatus) : undefined}>
+            <FlowBadge flow={o.flow} />
+          </span>
+          {o.sameDayCount > 0 ? (
+            <span title={`Cùng SĐT khách còn ${o.sameDayCount} đơn khác hôm đặt đơn này`}>
+              <StatusBadge tone="warn">Trùng · {o.sameDayCount + 1} đơn</StatusBadge>
+            </span>
+          ) : null}
         </span>
       );
     },
@@ -540,9 +550,11 @@ export function OrderListScreen() {
   const pancakeShops = usePancakeShops();
   const from = state.filters.from ?? '';
   const to = state.filters.to ?? '';
+  const duplicate = state.filters.duplicate === 'true';
   const filterParams = useMemo(
     () => ({
       q: state.q,
+      duplicate,
       status,
       customerId,
       weightMin,
@@ -556,6 +568,7 @@ export function OrderListScreen() {
     }),
     [
       state.q,
+      duplicate,
       status,
       customerId,
       weightMin,
@@ -603,7 +616,8 @@ export function OrderListScreen() {
     carrierId !== '' ||
     source !== undefined ||
     from !== '' ||
-    to !== '';
+    to !== '' ||
+    duplicate;
   const customerName = query.data?.items[0]?.customer.name;
 
   return (
@@ -677,6 +691,12 @@ export function OrderListScreen() {
             ],
           },
           {
+            key: 'duplicate',
+            label: 'Trùng trong ngày',
+            type: 'select',
+            options: [{ value: 'true', label: 'Chỉ đơn trùng trong ngày' }],
+          },
+          {
             key: 'weightMin',
             label: 'Cân nặng',
             type: 'custom',
@@ -700,6 +720,7 @@ export function OrderListScreen() {
           source: state.filters.source,
           from: state.filters.from,
           to: state.filters.to,
+          duplicate: state.filters.duplicate,
         }}
         onFilterChange={setFilter}
         searchPlaceholder="Mã đơn, mã Pancake, SĐT, tên khách, mã vận đơn"
