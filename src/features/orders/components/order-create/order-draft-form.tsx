@@ -680,6 +680,12 @@ function SumRow({
   );
 }
 
+/**
+ * Tạm ẩn Giảm giá / Phí vận chuyển / Phụ thu / Mã khuyến mãi trên màn tạo đơn (user yêu cầu
+ * 2026-10-21) — bật lại = đổi thành true. Ô ẩn giữ giá trị trống nên đơn không mang các khoản này.
+ */
+const SHOW_PRICE_ADJUSTMENTS = false;
+
 function ValueCard({
   form,
   subtotal,
@@ -710,24 +716,26 @@ function ValueCard({
       className="min-w-0 flex-[1_1_320px]"
       title="Giá trị đơn hàng"
       actions={
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button
-              type="button"
-              variant="outline"
-              size="icon"
-              className="h-8 w-8"
-              aria-label="Tùy chọn giá trị đơn"
-            >
-              <MoreVertical aria-hidden />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
-            <DropdownMenuItem onSelect={() => setShowCoupon((s) => !s)}>
-              {showCoupon ? 'Ẩn mã khuyến mãi' : 'Nhập mã khuyến mãi'}
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
+        SHOW_PRICE_ADJUSTMENTS ? (
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                type="button"
+                variant="outline"
+                size="icon"
+                className="h-8 w-8"
+                aria-label="Tùy chọn giá trị đơn"
+              >
+                <MoreVertical aria-hidden />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onSelect={() => setShowCoupon((s) => !s)}>
+                {showCoupon ? 'Ẩn mã khuyến mãi' : 'Nhập mã khuyến mãi'}
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        ) : undefined
       }
     >
       <div className="flex flex-wrap gap-x-6 gap-y-2 border-y py-3">
@@ -756,126 +764,136 @@ function ValueCard({
         ))}
       </div>
 
-      <div className="flex flex-wrap items-start justify-between gap-2">
-        <span className="pt-2 text-sm">Giảm giá</span>
-        <div className="flex w-full flex-col items-end gap-1 sm:w-56">
-          <div className="flex w-full gap-1">
-            <DiscountTypeToggle
-              value={manualType}
-              onChange={(t) => {
-                form.setValue('manualDiscountType', t);
-                form.setValue('manualDiscountValue', '');
-                form.clearErrors('manualDiscountValue');
-              }}
-            />
-            <FormField
-              control={form.control}
-              name="manualDiscountValue"
-              render={({ field }) => (
-                <FormItem className="min-w-0 flex-1">
-                  <FormLabel className="sr-only">
-                    {manualType === 'PERCENT' ? 'Giảm giá (%)' : 'Giảm giá (số tiền)'}
-                  </FormLabel>
-                  <FormControl>
-                    {manualType === 'PERCENT' ? (
-                      <Input
-                        inputMode="decimal"
-                        placeholder="0"
-                        className="text-right tabular-nums"
+      {SHOW_PRICE_ADJUSTMENTS ? (
+        <>
+          <div className="flex flex-wrap items-start justify-between gap-2">
+            <span className="pt-2 text-sm">Giảm giá</span>
+            <div className="flex w-full flex-col items-end gap-1 sm:w-56">
+              <div className="flex w-full gap-1">
+                <DiscountTypeToggle
+                  value={manualType}
+                  onChange={(t) => {
+                    form.setValue('manualDiscountType', t);
+                    form.setValue('manualDiscountValue', '');
+                    form.clearErrors('manualDiscountValue');
+                  }}
+                />
+                <FormField
+                  control={form.control}
+                  name="manualDiscountValue"
+                  render={({ field }) => (
+                    <FormItem className="min-w-0 flex-1">
+                      <FormLabel className="sr-only">
+                        {manualType === 'PERCENT' ? 'Giảm giá (%)' : 'Giảm giá (số tiền)'}
+                      </FormLabel>
+                      <FormControl>
+                        {manualType === 'PERCENT' ? (
+                          <Input
+                            inputMode="decimal"
+                            placeholder="0"
+                            className="text-right tabular-nums"
+                            value={field.value ?? ''}
+                            onChange={field.onChange}
+                            onBlur={field.onBlur}
+                            name={field.name}
+                            ref={field.ref}
+                          />
+                        ) : (
+                          <MoneyInput value={field.value ?? ''} onChange={field.onChange} />
+                        )}
+                      </FormControl>
+                    </FormItem>
+                  )}
+                />
+              </div>
+              {form.formState.errors.manualDiscountValue ? (
+                <p className="text-right text-xs text-destructive">
+                  {form.formState.errors.manualDiscountValue.message}
+                </p>
+              ) : manualTooBig ? (
+                <p className="text-right text-xs text-destructive">
+                  Vượt tạm tính — hệ thống sẽ từ chối khi chốt.
+                </p>
+              ) : manual !== null && manualType === 'PERCENT' ? (
+                <p className="text-xs tabular-nums text-muted-foreground">−{formatMoney(manual)}</p>
+              ) : null}
+            </div>
+          </div>
+
+          <FormField
+            control={form.control}
+            name="shippingFee"
+            render={({ field }) => (
+              <FormItem>
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <FormLabel className="font-normal">Phí vận chuyển</FormLabel>
+                  <div className="w-full sm:w-56">
+                    <FormControl>
+                      <MoneyInput
+                        value={noShipFee ? '' : (field.value ?? '')}
+                        onChange={field.onChange}
+                        disabled={noShipFee}
+                        placeholder={noShipFee ? 'Khách không trả khi nhận' : '0'}
+                      />
+                    </FormControl>
+                  </div>
+                </div>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+          <FormField
+            control={form.control}
+            name="surcharge"
+            render={({ field }) => (
+              <FormItem>
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <FormLabel className="font-normal">Phụ thu</FormLabel>
+                  <div className="w-full sm:w-56">
+                    <FormControl>
+                      <MoneyInput
                         value={field.value ?? ''}
                         onChange={field.onChange}
-                        onBlur={field.onBlur}
-                        name={field.name}
-                        ref={field.ref}
+                        placeholder="0"
                       />
-                    ) : (
-                      <MoneyInput value={field.value ?? ''} onChange={field.onChange} />
-                    )}
-                  </FormControl>
+                    </FormControl>
+                  </div>
+                </div>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+          {showCoupon ? (
+            <FormField
+              control={form.control}
+              name="couponCode"
+              render={({ field }) => (
+                <FormItem>
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <FormLabel className="font-normal">Mã khuyến mãi</FormLabel>
+                    <div className="w-full sm:w-56">
+                      <FormControl>
+                        <Input placeholder="Nhập mã" autoComplete="off" {...field} />
+                      </FormControl>
+                    </div>
+                  </div>
+                  <FormMessage />
                 </FormItem>
               )}
             />
-          </div>
-          {form.formState.errors.manualDiscountValue ? (
-            <p className="text-right text-xs text-destructive">
-              {form.formState.errors.manualDiscountValue.message}
-            </p>
-          ) : manualTooBig ? (
-            <p className="text-right text-xs text-destructive">
-              Vượt tạm tính — hệ thống sẽ từ chối khi chốt.
-            </p>
-          ) : manual !== null && manualType === 'PERCENT' ? (
-            <p className="text-xs tabular-nums text-muted-foreground">−{formatMoney(manual)}</p>
           ) : null}
-        </div>
-      </div>
-
-      <FormField
-        control={form.control}
-        name="shippingFee"
-        render={({ field }) => (
-          <FormItem>
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <FormLabel className="font-normal">Phí vận chuyển</FormLabel>
-              <div className="w-full sm:w-56">
-                <FormControl>
-                  <MoneyInput
-                    value={noShipFee ? '' : (field.value ?? '')}
-                    onChange={field.onChange}
-                    disabled={noShipFee}
-                    placeholder={noShipFee ? 'Khách không trả khi nhận' : '0'}
-                  />
-                </FormControl>
-              </div>
-            </div>
-            <FormMessage />
-          </FormItem>
-        )}
-      />
-      <FormField
-        control={form.control}
-        name="surcharge"
-        render={({ field }) => (
-          <FormItem>
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <FormLabel className="font-normal">Phụ thu</FormLabel>
-              <div className="w-full sm:w-56">
-                <FormControl>
-                  <MoneyInput value={field.value ?? ''} onChange={field.onChange} placeholder="0" />
-                </FormControl>
-              </div>
-            </div>
-            <FormMessage />
-          </FormItem>
-        )}
-      />
-      {showCoupon ? (
-        <FormField
-          control={form.control}
-          name="couponCode"
-          render={({ field }) => (
-            <FormItem>
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <FormLabel className="font-normal">Mã khuyến mãi</FormLabel>
-                <div className="w-full sm:w-56">
-                  <FormControl>
-                    <Input placeholder="Nhập mã" autoComplete="off" {...field} />
-                  </FormControl>
-                </div>
-              </div>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
+        </>
       ) : null}
 
       <div className="flex flex-col gap-2 border-t border-dashed pt-3">
         <SumRow label="Tổng số tiền" value={dash(gross)} />
-        <SumRow
-          label="Giảm giá"
-          value={manual !== null ? `−${formatMoney(manual)}` : formatMoney('0')}
-          tone="neg"
-        />
+        {SHOW_PRICE_ADJUSTMENTS ? (
+          <SumRow
+            label="Giảm giá"
+            value={manual !== null ? `−${formatMoney(manual)}` : formatMoney('0')}
+            tone="neg"
+          />
+        ) : null}
         {!new Decimal(prepaid).isZero() ? (
           <SumRow label="Đã chuyển khoản" value={`−${formatMoney(prepaid)}`} tone="neg" />
         ) : null}

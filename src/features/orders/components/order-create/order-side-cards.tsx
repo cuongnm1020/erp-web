@@ -457,20 +457,8 @@ export function CustomerCard({ form }: { form: Form }) {
         </div>
       ) : null}
 
+      {/* SĐT trước tên (2026-10-21): gõ SĐT là tra ngay khách đã có trên hệ thống. */}
       <div className="grid gap-2.5 sm:grid-cols-2">
-        <FormField
-          control={form.control}
-          name="customerName"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel className="sr-only">Tên khách hàng</FormLabel>
-              <FormControl>
-                <Input placeholder="Tên khách hàng" autoComplete="off" {...field} />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
         <FormField
           control={form.control}
           name="customerPhone"
@@ -479,12 +467,25 @@ export function CustomerCard({ form }: { form: Form }) {
               <FormLabel className="sr-only">Số điện thoại khách</FormLabel>
               <FormControl>
                 <Input
-                  placeholder="SĐT"
+                  placeholder="SĐT — tìm khách đã có"
                   inputMode="tel"
                   autoComplete="off"
                   className="tabular-nums"
                   {...field}
                 />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+        <FormField
+          control={form.control}
+          name="customerName"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel className="sr-only">Tên khách hàng</FormLabel>
+              <FormControl>
+                <Input placeholder="Tên khách hàng" autoComplete="off" {...field} />
               </FormControl>
               <FormMessage />
             </FormItem>

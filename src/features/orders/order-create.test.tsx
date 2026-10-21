@@ -400,6 +400,20 @@ describe('OrderCreateScreen — màn tạo đơn mới', () => {
     expect(screen.getByText('Đã chuyển khoản')).toBeInTheDocument();
   });
 
+  it('ô SĐT đứng trước tên khách; Giá trị đơn tạm ẩn Giảm giá / Phí vận chuyển / Phụ thu / Mã khuyến mãi', async () => {
+    server.use(...skuHandlers());
+    renderApp(<OrderCreateScreen />);
+    const phone = await screen.findByLabelText('Số điện thoại khách');
+    const name = screen.getByLabelText('Tên khách hàng');
+    expect(phone.compareDocumentPosition(name) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(screen.getByText('Giá trị đơn hàng')).toBeInTheDocument();
+    for (const label of ['Phí vận chuyển', 'Phụ thu', 'Mã khuyến mãi']) {
+      expect(screen.queryByLabelText(label)).not.toBeInTheDocument();
+    }
+    expect(screen.queryByText('Giảm giá')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Tùy chọn giá trị đơn' })).not.toBeInTheDocument();
+  });
+
   it('gõ SĐT trùng khách cũ → gắn khách đó (hiện "Khách cũ"), chốt gửi customerId', async () => {
     const CUST = makeCustomers(1)[0]!;
     const bodies: Record<string, unknown>[] = [];
