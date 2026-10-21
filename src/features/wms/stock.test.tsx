@@ -72,6 +72,62 @@ describe('StockScreen — GET /stock, /stock/by-location, /stock/by-lot (P1-12)'
     await waitFor(() => expect(screen.getByText('SKU-0001')).toBeInTheDocument());
   });
 
+  it('sort đọc từ URL → sortBy/sortDir gửi lên GET /stock; bấm tiêu đề Cân nặng đổi sort trên URL', async () => {
+    search = 'sort=available:desc';
+    replace.mockClear();
+    const urls: string[] = [];
+    server.use(
+      http.get('/api/stock', ({ request }) => {
+        urls.push(request.url);
+        return HttpResponse.json({ items: [], total: 0 });
+      }),
+    );
+    renderApp(<StockScreen />);
+    await waitFor(() => expect(urls.length).toBeGreaterThan(0));
+    const sp = new URL(urls[0]!).searchParams;
+    expect(sp.get('sortBy')).toBe('available');
+    expect(sp.get('sortDir')).toBe('desc');
+  });
+
+  it('cột sort được ở tab SKU: Cân nặng / Tồn thực / Đang giữ / Khả dụng; sort lạ trên URL không gửi lên', async () => {
+    search = 'sort=skuName';
+    replace.mockClear();
+    const urls: string[] = [];
+    server.use(
+      http.get('/api/stock', ({ request }) => {
+        urls.push(request.url);
+        return HttpResponse.json({
+          items: [
+            {
+              skuId: 's1',
+              skuCode: 'SKU-A',
+              skuName: 'A',
+              baseUomId: 'u',
+              baseUomCode: 'PCS',
+              isActive: true,
+              onHand: '1',
+              reserved: '0',
+              available: '1',
+              hasCost: false,
+              unitCost: null,
+              weightKg: null,
+            },
+          ],
+          total: 1,
+        });
+      }),
+    );
+    renderApp(<StockScreen />);
+    expect(await screen.findByText('SKU-A')).toBeInTheDocument();
+    expect(new URL(urls[0]!).searchParams.get('sortBy')).toBeNull();
+    for (const name of ['Cân nặng', 'Tồn thực', 'Đang giữ', 'Khả dụng']) {
+      expect(screen.getByRole('columnheader', { name })).toHaveAttribute('aria-sort');
+    }
+    expect(screen.getByRole('columnheader', { name: 'SKU' })).not.toHaveAttribute('aria-sort');
+    fireEvent.click(screen.getByRole('button', { name: /Cân nặng/ }));
+    expect(replace).toHaveBeenCalledWith(expect.stringContaining('sort=weight'), expect.anything());
+  });
+
   it('403: màn không có quyền, không đá về đăng nhập (luật 6)', async () => {
     search = '';
     server.use(scenario.stockForbidden);

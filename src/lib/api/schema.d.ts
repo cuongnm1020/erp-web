@@ -769,7 +769,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Tồn gộp theo SKU — ba con số onHand / reserved / available tách riêng. */
+        /** Tồn gộp theo SKU — ba con số onHand / reserved / available tách riêng; sắp theo cân nặng / tồn. */
         get: operations["InventoryController_list"];
         put?: never;
         post?: never;
@@ -13222,6 +13222,8 @@ export interface operations {
     InventoryController_list: {
         parameters: {
             query: {
+                sortBy?: "weight" | "onHand" | "reserved" | "available";
+                sortDir?: "asc" | "desc";
                 /** @description Lọc theo mã / tên SKU (không phân biệt hoa thường). */
                 q?: string;
                 /** @description Chỉ tính tồn trong kho này (lọc qua `Location.warehouseId`). */
@@ -13253,6 +13255,8 @@ export interface operations {
     InventoryController_byLocation: {
         parameters: {
             query: {
+                skuId?: string;
+                locationId?: string;
                 /** @description Lọc theo mã / tên SKU (không phân biệt hoa thường). */
                 q?: string;
                 /** @description Chỉ tính tồn trong kho này (lọc qua `Location.warehouseId`). */
@@ -13264,8 +13268,6 @@ export interface operations {
                 erpOnly?: string;
                 take: number;
                 skip: number;
-                skuId?: string;
-                locationId?: string;
             };
             header?: never;
             path?: never;
@@ -13286,6 +13288,8 @@ export interface operations {
     InventoryController_byLot: {
         parameters: {
             query: {
+                skuId?: string;
+                locationId?: string;
                 /** @description Lọc theo mã / tên SKU (không phân biệt hoa thường). */
                 q?: string;
                 /** @description Chỉ tính tồn trong kho này (lọc qua `Location.warehouseId`). */
@@ -13297,8 +13301,6 @@ export interface operations {
                 erpOnly?: string;
                 take: number;
                 skip: number;
-                skuId?: string;
-                locationId?: string;
             };
             header?: never;
             path?: never;

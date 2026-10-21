@@ -1,6 +1,6 @@
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api, idempotency, unwrap } from '@/lib/api/client';
-import type { components } from '@/lib/api/schema';
+import type { components, operations } from '@/lib/api/schema';
 
 /** Luật 2: shape response chỉ lấy từ schema.d.ts sinh bởi OpenAPI, không khai lại. */
 export type StockRow = components['schemas']['StockRowDto'];
@@ -20,6 +20,16 @@ export interface StockListParams {
   skip: number;
 }
 
+/** Cột sắp được của GET /stock (theo SKU) — id cột trên bảng = sortBy gửi lên API. */
+export type StockSortField = NonNullable<
+  NonNullable<operations['InventoryController_list']['parameters']['query']>['sortBy']
+>;
+
+export interface StockBySkuParams extends StockListParams {
+  sortBy?: StockSortField;
+  sortDir?: 'asc' | 'desc';
+}
+
 export interface StockBreakdownParams extends StockListParams {
   skuId?: string;
   locationId?: string;
@@ -28,17 +38,18 @@ export interface StockBreakdownParams extends StockListParams {
 /** Query key theo phễu (luật 3): ['wms','stock', <mặt>, params]. Invalidate theo prefix. */
 export const stockKeys = {
   all: ['wms', 'stock'] as const,
-  bySku: (p: StockListParams) => [...stockKeys.all, 'by-sku', p] as const,
+  bySku: (p: StockBySkuParams) => [...stockKeys.all, 'by-sku', p] as const,
   byLocation: (p: StockBreakdownParams) => [...stockKeys.all, 'by-location', p] as const,
   byLot: (p: StockBreakdownParams) => [...stockKeys.all, 'by-lot', p] as const,
 };
 
 /**
- * GET /stock — tồn gộp theo SKU, sắp theo mã SKU. Ba con số `onHand` / `reserved` /
+ * GET /stock — tồn gộp theo SKU, mặc định sắp theo mã SKU; sortBy cân nặng / tồn thực / đang giữ /
+ * khả dụng sắp phía server (trên toàn bộ SKU khớp, rồi mới phân trang). Ba con số `onHand` / `reserved` /
  * `available` là ba trường riêng do API tính (bất biến 3) — frontend chỉ hiển thị,
  * không tự cộng trừ.
  */
-export function useStockBySku(params: StockListParams, enabled = true) {
+export function useStockBySku(params: StockBySkuParams, enabled = true) {
   return useQuery({
     queryKey: stockKeys.bySku(params),
     queryFn: () =>
@@ -49,6 +60,8 @@ export function useStockBySku(params: StockListParams, enabled = true) {
               q: params.q || undefined,
               warehouseId: params.warehouseId || undefined,
               erpOnly: params.erpOnly ? 'true' : undefined,
+              sortBy: params.sortBy,
+              sortDir: params.sortDir,
               take: params.take,
               skip: params.skip,
             },
