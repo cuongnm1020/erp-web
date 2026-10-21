@@ -5,7 +5,7 @@ import { MessageSquareText, Plus, X } from 'lucide-react';
 import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
 import { CopyText } from '@/components/data/copy-text';
-import { DataTable, FilterBar, type ColumnDef } from '@/components/data/data-table';
+import { ColumnPicker, DataTable, FilterBar, type ColumnDef } from '@/components/data/data-table';
 import { EmptyState, ListSkeleton, QueryState } from '@/components/data/states';
 import { StatusBadge } from '@/components/data/status-badge';
 import { PageHeader } from '@/components/layout/page-header';
@@ -20,6 +20,7 @@ import {
 } from '@/components/ui/select';
 import { cn } from '@/lib/cn';
 import {
+  formatDateTime,
   formatMoney,
   formatPhone,
   normalizePhone,
@@ -30,15 +31,19 @@ import {
 } from '@/lib/format';
 import { Can } from '@/lib/permission';
 import { useInvalidateOn } from '@/lib/realtime';
-import { useListState } from '@/lib/url-state';
+import { useListState, type SortState } from '@/lib/url-state';
 import { useWarehouse } from '@/lib/warehouse';
 import { useCarriers } from '@/features/wms/api/use-shipping';
 import {
   orderKeys,
   useOrderFlowCounts,
+  useOrderListPrefs,
   useOrders,
   usePancakeShops,
+  useSaveOrderListPrefs,
   type OrderFlow,
+  type OrderItemOrigin,
+  type OrderSortField,
   type SalesOrderListItem,
 } from '../api/use-orders';
 import { fulfilmentLabel, ORDER_FLOW_TABS, parseOrderFlow, parseOrderStatus } from '../labels';
@@ -84,8 +89,33 @@ const DEFAULTS = {
     'to',
     // CSKH-5: chỉ đơn trùng trong ngày (cùng SĐT, cùng ngày VN, chưa hủy).
     'duplicate',
+    // Đơn có sản phẩm không phải hàng ERP (món gõ tay / SKU Pancake tự sinh), 2026-10-22.
+    'itemOrigin',
   ] as const,
 };
+
+const ITEM_ORIGIN_OPTIONS: { value: OrderItemOrigin; label: string }[] = [
+  { value: 'NON_ERP', label: 'Có SP không phải hàng ERP' },
+  { value: 'CUSTOM', label: 'Có món gõ tay trên Pancake' },
+  { value: 'POS_SKU', label: 'Có SP Pancake tự tạo' },
+];
+const parseItemOrigin = (v: string | undefined): OrderItemOrigin | undefined =>
+  ITEM_ORIGIN_OPTIONS.find((o) => o.value === v)?.value;
+
+/**
+ * Cột sắp được → trường `sortBy` của API. Cột không có ở đây không sắp được (sản phẩm, vận
+ * chuyển… là dữ liệu ghép từ nhiều nguồn, server không sắp theo chúng).
+ */
+const SORT_FIELD: Record<string, OrderSortField> = {
+  docNumber: 'docNumber',
+  orderDate: 'orderDate',
+  customer: 'customer',
+  total: 'total',
+  time: 'time',
+};
+
+/** Cột ẩn khi người dùng chưa chọn lần nào. */
+const DEFAULT_HIDDEN = ['orderDate'];
 
 type OrderFilter = (typeof DEFAULTS.filterKeys)[number];
 
@@ -100,7 +130,7 @@ const buildColumns = (
   {
     id: 'docNumber',
     header: 'Mã đơn',
-    meta: { width: 170 },
+    meta: { width: 170, sortable: true },
     cell: ({ row }) => {
       const o = row.original;
       return (
@@ -139,9 +169,17 @@ const buildColumns = (
     },
   },
   {
+    id: 'orderDate',
+    header: 'Ngày đặt',
+    meta: { width: 130, sortable: true },
+    cell: ({ row }) => (
+      <span className="whitespace-nowrap text-xs">{formatDateTime(row.original.orderDate)}</span>
+    ),
+  },
+  {
     id: 'customer',
     header: 'Khách hàng',
-    meta: { width: 200 },
+    meta: { width: 200, sortable: true },
     cell: ({ row }) => {
       const o = row.original;
       const telco = phoneCarrier(o.phone);
@@ -225,7 +263,7 @@ const buildColumns = (
   {
     id: 'total',
     header: 'Tổng tiền',
-    meta: { align: 'right', width: 120 },
+    meta: { align: 'right', width: 120, sortable: true },
     cell: ({ row }) => {
       const o = row.original;
       return (
@@ -240,7 +278,8 @@ const buildColumns = (
   },
   {
     id: 'collected',
-    // Header dạng hàm để giữ tooltip giải thích (meta.title của DataTable là CHỮ tiêu đề).
+    // Header dạng hàm để giữ tooltip giải thích (meta.title của DataTable là CHỮ tiêu đề; ô
+    // chọn cột đọc meta.title).
     header: () => (
       <span
         className="block text-right"
@@ -249,7 +288,7 @@ const buildColumns = (
         Thực thu ĐVVC
       </span>
     ),
-    meta: { align: 'right', width: 120 },
+    meta: { align: 'right', width: 120, title: 'Thực thu ĐVVC' },
     cell: ({ row }) => {
       const v = row.original.shipment?.collectedAmount;
       if (!v) return <span className="text-muted-foreground">—</span>;
@@ -284,7 +323,7 @@ const buildColumns = (
   {
     id: 'time',
     header: 'Thời gian',
-    meta: { width: 130 },
+    meta: { width: 130, sortable: true },
     cell: ({ row }) => (
       <div className="space-y-1 text-xs">
         <span className="block">{formatRelative(row.original.createdAt)}</span>
@@ -552,6 +591,24 @@ export function OrderListScreen() {
   const from = state.filters.from ?? '';
   const to = state.filters.to ?? '';
   const duplicate = state.filters.duplicate === 'true';
+  const itemOrigin = parseItemOrigin(state.filters.itemOrigin);
+  // Cột ẩn + sắp xếp lưu theo người dùng ở server (đăng xuất / đổi máy vẫn giữ). Sắp xếp trên URL
+  // (link dán cho đồng nghiệp) thắng; URL không có thì lấy lần sắp gần nhất của người dùng.
+  const prefs = useOrderListPrefs();
+  const savePrefs = useSaveOrderListPrefs();
+  const hidden = prefs.data?.hidden ?? DEFAULT_HIDDEN;
+  const sort: SortState | null = state.sort ?? prefs.data?.sort ?? null;
+  const sortBy = sort && !hidden.includes(sort.id) ? SORT_FIELD[sort.id] : undefined;
+  const changeSort = (next: SortState | null) => {
+    set({ sort: next });
+    savePrefs.mutate({ hidden, sort: next });
+  };
+  const changeHidden = (next: string[]) => {
+    // Ẩn cột đang sắp → bỏ sắp xếp theo cột đó (chỉ sắp theo cột đang hiện).
+    const dropSort = sort !== null && next.includes(sort.id);
+    if (dropSort) set({ sort: null });
+    savePrefs.mutate({ hidden: next, sort: dropSort ? null : sort });
+  };
   const filterParams = useMemo(
     () => ({
       q: state.q,
@@ -566,6 +623,7 @@ export function OrderListScreen() {
       pancakeShopId: posShopId || undefined,
       from,
       to,
+      itemOrigin,
     }),
     [
       state.q,
@@ -580,11 +638,18 @@ export function OrderListScreen() {
       posShopId,
       from,
       to,
+      itemOrigin,
     ],
   );
   const params = useMemo(
-    () => ({ ...filterParams, flow, ...skipTake }),
-    [filterParams, flow, skipTake],
+    () => ({
+      ...filterParams,
+      flow,
+      sortBy,
+      sortDir: sortBy ? (sort?.desc ? ('desc' as const) : ('asc' as const)) : undefined,
+      ...skipTake,
+    }),
+    [filterParams, flow, sortBy, sort?.desc, skipTake],
   );
   const carriers = useCarriers();
   // Tên kho: kho được phép từ /auth/me — đơn ngoài kho được phép không bao giờ về tới đây.
@@ -597,6 +662,15 @@ export function OrderListScreen() {
       (id) => whById.get(id) ?? null,
     );
   }, [carriers.data, warehouses]);
+  const pickerColumns = useMemo(
+    () =>
+      columns.map((c) => ({
+        id: c.id!,
+        title: c.meta?.title ?? (typeof c.header === 'string' ? c.header : c.id!),
+        required: c.id === 'docNumber',
+      })),
+    [columns],
+  );
   const query = useOrders(params);
   const counts = useOrderFlowCounts(filterParams);
   useInvalidateOn(['order.created', 'order.updated'], [orderKeys.lists()]);
@@ -618,7 +692,8 @@ export function OrderListScreen() {
     source !== undefined ||
     from !== '' ||
     to !== '' ||
-    duplicate;
+    duplicate ||
+    itemOrigin !== undefined;
   const customerName = query.data?.items[0]?.customer.name;
 
   return (
@@ -698,6 +773,12 @@ export function OrderListScreen() {
             options: [{ value: 'true', label: 'Chỉ đơn trùng trong ngày' }],
           },
           {
+            key: 'itemOrigin',
+            label: 'Sản phẩm ngoài ERP',
+            type: 'select',
+            options: ITEM_ORIGIN_OPTIONS,
+          },
+          {
             key: 'weightMin',
             label: 'Cân nặng',
             type: 'custom',
@@ -722,20 +803,24 @@ export function OrderListScreen() {
           from: state.filters.from,
           to: state.filters.to,
           duplicate: state.filters.duplicate,
+          itemOrigin: state.filters.itemOrigin,
         }}
         onFilterChange={setFilter}
         searchPlaceholder="Mã đơn, mã Pancake, SĐT, tên khách, mã vận đơn"
         right={
-          customerId ? (
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setFilter({ customerId: undefined })}
-            >
-              <X aria-hidden />
-              Đang lọc theo khách {customerName ? `“${customerName}”` : 'đã chọn'}
-            </Button>
-          ) : null
+          <>
+            {customerId ? (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setFilter({ customerId: undefined })}
+              >
+                <X aria-hidden />
+                Đang lọc theo khách {customerName ? `“${customerName}”` : 'đã chọn'}
+              </Button>
+            ) : null}
+            <ColumnPicker columns={pickerColumns} hidden={hidden} onChange={changeHidden} />
+          </>
         }
       />
 
@@ -778,10 +863,11 @@ export function OrderListScreen() {
             total={data.total}
             page={state.page}
             size={state.size}
-            sort={state.sort}
+            sort={sortBy ? sort : null}
+            hiddenColumns={hidden}
             onPageChange={(page) => set({ page })}
             onSizeChange={(size) => set({ size })}
-            onSortChange={(sort) => set({ sort })}
+            onSortChange={changeSort}
             onRowClick={setPeek}
             selection={{ selected, onChange: setSelected }}
             bulkActions={(ids) => (

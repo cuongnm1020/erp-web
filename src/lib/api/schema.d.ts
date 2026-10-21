@@ -262,6 +262,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/me/preferences/{key}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Tuỳ chọn giao diện theo người dùng (2026-10-22): cột hiển thị + sắp xếp danh sách đơn… Lưu
+         *     ở server nên đăng xuất / đổi máy vẫn giữ. Key sai mẫu → 422; value quá 8 KB → 422.
+         */
+        get: operations["MeController_preference"];
+        put: operations["MeController_putPreference"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/audit/{entity}/{entityId}": {
         parameters: {
             query?: never;
@@ -5539,6 +5559,18 @@ export interface components {
             currentPassword: string;
             /** @description bcrypt giới hạn 72 byte — cùng luật với CreateUserDto.password. */
             newPassword: string;
+        };
+        MyPreferenceDto: {
+            value: {
+                [key: string]: unknown;
+            } | null;
+            key: string;
+        };
+        PutMyPreferenceDto: {
+            /** @description Object JSON web tự hiểu; tối đa 8 KB khi ghi. */
+            value: {
+                [key: string]: unknown;
+            };
         };
         ApprovalStepDto: {
             sequence: number;
@@ -12805,6 +12837,52 @@ export interface operations {
             };
         };
     };
+    MeController_preference: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                key: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MyPreferenceDto"];
+                };
+            };
+        };
+    };
+    MeController_putPreference: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                key: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PutMyPreferenceDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MyPreferenceDto"];
+                };
+            };
+        };
+    };
     AuditController_history: {
         parameters: {
             query?: {
@@ -17969,6 +18047,14 @@ export interface operations {
                  *     (`flowOf` trong sales-order-flow.ts). Đếm từng tab: GET /sales-orders/flow-counts.
                  */
                 flow?: "PENDING_APPROVAL" | "WAREHOUSE" | "PICKING" | "PACKED" | "PICKED_UP" | "IN_TRANSIT" | "OUT_FOR_DELIVERY" | "DELIVERED" | "RETURNED" | "CARRIER_CANCELLED" | "CANCELLED";
+                /**
+                 * @description Đơn có sản phẩm KHÔNG phải hàng ERP (2026-10-22): `CUSTOM` = có món gõ tay trên Pancake
+                 *     (`sales_order_external.custom_items`), `POS_SKU` = có dòng là SKU do đồng bộ Pancake tự tạo
+                 *     (liên kết sản phẩm `auto`), `NON_ERP` = một trong hai.
+                 */
+                itemOrigin?: "CUSTOM" | "POS_SKU" | "NON_ERP";
+                /** @description Sắp xếp theo cột (2026-10-22); mặc định ngày đặt mới nhất trước. */
+                sortBy?: "orderDate" | "docNumber" | "customer" | "total" | "time" | "statusChangedAt";
                 customerId?: string;
                 status?: "DRAFT" | "PENDING_APPROVAL" | "APPROVED" | "POSTED" | "CANCELLED";
                 /** @description Lọc theo cân nặng gửi hãng HIỆU LỰC (đặt tay, không thì Σ dòng) — kg, chuỗi decimal, cận dưới (≥). */
@@ -18001,6 +18087,7 @@ export interface operations {
                  *     CSKH-5). Theo from/to nếu có, không thì 7 ngày VN gần nhất.
                  */
                 duplicate?: string;
+                sortDir?: "asc" | "desc";
                 /**
                  * @description Tìm theo số chứng từ, mã hoặc tên khách (không phân biệt hoa thường), SĐT khách, mã vận đơn —
                  *     hoặc id đơn Pancake (id theo shop hoặc id hệ thống trong link đơn, khớp tuyệt đối, cho phép
@@ -18085,6 +18172,14 @@ export interface operations {
                  *     (`flowOf` trong sales-order-flow.ts). Đếm từng tab: GET /sales-orders/flow-counts.
                  */
                 flow?: "PENDING_APPROVAL" | "WAREHOUSE" | "PICKING" | "PACKED" | "PICKED_UP" | "IN_TRANSIT" | "OUT_FOR_DELIVERY" | "DELIVERED" | "RETURNED" | "CARRIER_CANCELLED" | "CANCELLED";
+                /**
+                 * @description Đơn có sản phẩm KHÔNG phải hàng ERP (2026-10-22): `CUSTOM` = có món gõ tay trên Pancake
+                 *     (`sales_order_external.custom_items`), `POS_SKU` = có dòng là SKU do đồng bộ Pancake tự tạo
+                 *     (liên kết sản phẩm `auto`), `NON_ERP` = một trong hai.
+                 */
+                itemOrigin?: "CUSTOM" | "POS_SKU" | "NON_ERP";
+                /** @description Sắp xếp theo cột (2026-10-22); mặc định ngày đặt mới nhất trước. */
+                sortBy?: "orderDate" | "docNumber" | "customer" | "total" | "time" | "statusChangedAt";
                 customerId?: string;
                 status?: "DRAFT" | "PENDING_APPROVAL" | "APPROVED" | "POSTED" | "CANCELLED";
                 /** @description Lọc theo cân nặng gửi hãng HIỆU LỰC (đặt tay, không thì Σ dòng) — kg, chuỗi decimal, cận dưới (≥). */
@@ -18117,6 +18212,7 @@ export interface operations {
                  *     CSKH-5). Theo from/to nếu có, không thì 7 ngày VN gần nhất.
                  */
                 duplicate?: string;
+                sortDir?: "asc" | "desc";
                 /**
                  * @description Tìm theo số chứng từ, mã hoặc tên khách (không phân biệt hoa thường), SĐT khách, mã vận đơn —
                  *     hoặc id đơn Pancake (id theo shop hoặc id hệ thống trong link đơn, khớp tuyệt đối, cho phép

@@ -1764,6 +1764,14 @@ export const handlers = [
       phone: null,
     }),
   ),
+  // Tuỳ chọn giao diện theo người dùng (2026-10-22) — mặc định chưa lưu.
+  http.get('/api/me/preferences/:key', ({ params }) =>
+    HttpResponse.json({ key: params.key, value: null }),
+  ),
+  http.put('/api/me/preferences/:key', async ({ params, request }) => {
+    const body = (await request.json()) as { value: Record<string, unknown> };
+    return HttpResponse.json({ key: params.key, value: body.value });
+  }),
   http.get('/api/users/:id/permissions', () => HttpResponse.json(USER_PERMISSIONS_FIXTURE)),
   http.put('/api/users/:id/permissions', async ({ request }) => {
     const body = (await request.json()) as { allow: string[]; deny: string[] };
