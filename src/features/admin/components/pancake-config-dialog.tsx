@@ -96,7 +96,7 @@ export function PancakeConfigDialog({
       {
         onSuccess: (saved) => {
           toast.success(editing ? 'Đã lưu thay đổi' : 'Đã thêm shop', {
-            description: `Shop ${saved.shopId}${saved.shopName ? ` · ${saved.shopName}` : ''} · khoá ${saved.apiKeyHint}`,
+            description: `Shop ${saved.shopId}${saved.shopName ? ` · ${saved.shopName}` : ''} · khoá ${saved.apiKeyHint}${!editing && saved.isActive ? ' · đang đẩy các kho ERP lên shop' : ''}`,
           });
           form.reset();
           onOpenChange(false);
