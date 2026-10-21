@@ -4,7 +4,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { Info, Plus, X } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useFieldArray, useForm, type UseFormReturn } from 'react-hook-form';
 import {
   applyServerErrors,
@@ -186,12 +186,18 @@ function initialValues(p?: ProductDetail): ProductFormValues {
 export function ProductFormScreen({ productId }: { productId?: string }) {
   const editing = productId !== undefined && productId !== '';
   const query = useProduct(productId ?? '');
+  // Sửa xong ở lại màn: tải lại sản phẩm (version mới cho lần lưu sau) rồi dựng lại form từ đó.
+  const [formKey, setFormKey] = useState(0);
+  const reload = useCallback(async () => {
+    await query.refetch();
+    setFormKey((k) => k + 1);
+  }, [query]);
   if (!editing) return <ProductFormBody />;
   return (
     <QueryState query={query} skeleton={<DetailSkeleton fields={8} />}>
       {(p) =>
         p ? (
-          <ProductFormBody product={p} />
+          <ProductFormBody key={formKey} product={p} onSaved={reload} />
         ) : (
           <EmptyState title="Không tìm thấy sản phẩm" description="Sản phẩm có thể đã bị xóa." />
         )
@@ -200,7 +206,14 @@ export function ProductFormScreen({ productId }: { productId?: string }) {
   );
 }
 
-function ProductFormBody({ product }: { product?: ProductDetail }) {
+function ProductFormBody({
+  product,
+  onSaved,
+}: {
+  product?: ProductDetail;
+  /** Chỉ màn sửa: lưu xong gọi để tải lại dữ liệu thay vì về danh sách. */
+  onSaved?: () => Promise<void>;
+}) {
   const editing = product !== undefined;
   const router = useRouter();
   const canEditImages = useAbility().can('update', 'Product');
@@ -473,7 +486,8 @@ function ProductFormBody({ product }: { product?: ProductDetail }) {
       toast.success(editing ? 'Đã lưu thay đổi' : 'Đã lưu sản phẩm', {
         description: `${savedCode} · ${v.hasVariants ? `${v.skus.length} biến thể` : 'sản phẩm đơn'}`,
       });
-      router.push('/catalog/products');
+      if (editing && onSaved) await onSaved();
+      else router.push('/catalog/products');
     } finally {
       setSaving(false);
     }

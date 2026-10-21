@@ -577,15 +577,22 @@ describe('ProductFormScreen — sửa', () => {
     push.mockClear();
     const patches: unknown[] = [];
     const productPatches: unknown[] = [];
+    let saved = false;
+    let detailGets = 0;
     server.use(
       ...baseHandlers(),
-      http.get('/api/products/:id', () => HttpResponse.json(DETAIL)),
+      // Sau khi lưu: server trả version mới — màn tải lại và dùng version đó cho lần lưu sau.
+      http.get('/api/products/:id', () => {
+        detailGets += 1;
+        return HttpResponse.json(saved ? { ...DETAIL, version: 8 } : DETAIL);
+      }),
       http.patch('/api/products/:id', async ({ request }) => {
         productPatches.push(await request.json());
         return HttpResponse.json({});
       }),
       http.patch('/api/skus/:id', async ({ request, params }) => {
         patches.push({ skuId: params.id, body: await request.json() });
+        saved = true;
         return HttpResponse.json({});
       }),
     );
@@ -618,7 +625,14 @@ describe('ProductFormScreen — sửa', () => {
     expect(productPatches[0]).not.toHaveProperty('code');
     // Chỉ gửi field dirty — tên không đổi thì không nằm trong PATCH; version luôn kèm
     expect(patches[0]).toEqual({ skuId: 's-1', body: { version: 5, isActive: false } });
-    await waitFor(() => expect(push).toHaveBeenCalledWith('/catalog/products'));
+    // Lưu xong ở lại màn sửa, tải lại dữ liệu — lần lưu tiếp mang version mới
+    await waitFor(() => expect(detailGets).toBeGreaterThanOrEqual(2));
+    await waitFor(() => expect(screen.getByRole('button', { name: /Lưu thay đổi/ })).toBeEnabled());
+    expect(screen.getByDisplayValue('Bút bi TL-08 xanh')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /Lưu thay đổi/ }));
+    await waitFor(() => expect(productPatches).toHaveLength(2));
+    expect(productPatches[1]).toMatchObject({ version: 8 });
+    expect(push).not.toHaveBeenCalled();
   });
 
   it('409 version lệch (người khác vừa sửa) → banner xung đột + nút tải lại, KHÔNG điều hướng', async () => {
