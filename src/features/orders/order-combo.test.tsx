@@ -45,8 +45,20 @@ describe('groupOrderLines / collapseComboLines', () => {
 
   it('tạo lại đơn: một nhóm combo → một dòng nhập với skuId của combo, qty = số combo', () => {
     expect(collapseComboLines(DETAIL.lines)).toEqual([
-      { skuId: DETAIL.lines[0]!.combo!.skuId, uomId: '', qty: '3' },
-      { skuId: DETAIL.lines[2]!.skuId, uomId: DETAIL.lines[2]!.uomId, qty: '1' },
+      {
+        skuId: DETAIL.lines[0]!.combo!.skuId,
+        uomId: '',
+        qty: '3',
+        listPrice: DETAIL.lines[0]!.combo!.listPrice,
+        unitPrice: DETAIL.lines[0]!.combo!.unitPrice,
+      },
+      {
+        skuId: DETAIL.lines[2]!.skuId,
+        uomId: DETAIL.lines[2]!.uomId,
+        qty: '1',
+        listPrice: DETAIL.lines[2]!.listPrice,
+        unitPrice: DETAIL.lines[2]!.unitPrice,
+      },
     ]);
   });
 });

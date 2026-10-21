@@ -1,3 +1,4 @@
+import type { EntitySearchResult } from '@/components/data/form';
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api, idempotency, unwrap } from '@/lib/api/client';
 import type { components } from '@/lib/api/schema';
@@ -127,6 +128,26 @@ export function usePancakeShops() {
     queryFn: () => unwrap(api.GET('/pancake-sync/shops')),
     staleTime: 5 * 60_000,
   });
+}
+
+/**
+ * Tìm POS đã liên kết (đang bật) cho ô chọn POS trên màn tạo đơn — danh mục nhỏ nên lọc theo tên /
+ * mã ngay trên danh sách GET /pancake-sync/shops đã cache.
+ */
+export function usePosShopSearch(q: string): EntitySearchResult {
+  const shops = usePancakeShops();
+  const term = q.trim().toLowerCase();
+  return {
+    options: shops.data
+      ?.filter((s) => s.isActive)
+      .filter(
+        (s) =>
+          term === '' || s.shopId.includes(term) || (s.shopName ?? '').toLowerCase().includes(term),
+      )
+      .map((s) => ({ id: s.shopId, label: s.shopName ?? `POS ${s.shopId}`, hint: s.shopId })),
+    isPending: shops.isPending,
+    error: shops.error,
+  };
 }
 
 export function useOrderFlowCounts(params: Omit<OrderListParams, 'flow' | 'take' | 'skip'>) {

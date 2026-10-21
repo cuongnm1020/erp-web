@@ -385,7 +385,12 @@ describe('OrderCreateScreen — màn tạo đơn mới', () => {
       expect(screen.getAllByLabelText('Số lượng')[0]).toHaveValue(REAL_LINES[0]!.qty),
     );
     const vnd = (n: number) => new Intl.NumberFormat('vi-VN').format(n);
-    const subtotal = REAL_LINES.reduce((acc, l) => acc + Number(l.qty) * 100_000, 0);
+    // Dòng đã giảm / sửa giá trên đơn cũ mang nguyên đơn giá sang; còn lại theo giá tra (100.000).
+    const subtotal = REAL_LINES.reduce(
+      (acc, l) =>
+        acc + Number(l.qty) * (l.unitPrice !== l.listPrice ? Number(l.unitPrice) : 100_000),
+      0,
+    );
     const ship = Number(DETAIL.shippingFee);
     await waitFor(() =>
       expect(screen.getAllByText(new RegExp(vnd(subtotal + ship))).length).toBeGreaterThan(0),
@@ -412,6 +417,80 @@ describe('OrderCreateScreen — màn tạo đơn mới', () => {
     }
     expect(screen.queryByText('Giảm giá')).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Tùy chọn giá trị đơn' })).not.toBeInTheDocument();
+  });
+
+  it('đơn giá hiện khi chưa chọn khách (giá sản phẩm), không còn ô CK %; sửa đơn giá / gõ thành tiền → gửi unitPrice; dưới trần CK báo cần duyệt', async () => {
+    const bodies: Record<string, unknown>[] = [];
+    const priceQueries: string[] = [];
+    server.use(
+      http.get('/api/prices/resolve', ({ request }) => {
+        priceQueries.push(new URL(request.url).search);
+        return HttpResponse.json({ priceListId: 'pl-1', listPrice: '100000', maxDiscount: '0.1' });
+      }),
+      ...skuHandlers(),
+      http.post('/api/sales-orders', async ({ request }) => {
+        bodies.push((await request.json()) as Record<string, unknown>);
+        return HttpResponse.json(CREATED, { status: 201 });
+      }),
+    );
+    renderApp(<OrderCreateScreen />);
+    const box = await screen.findByRole('combobox', { name: 'Tìm sản phẩm' });
+    fireEvent.change(box, { target: { value: 'amino' } });
+    fireEvent.click(await screen.findByRole('option', { name: /Amino GA3 500ml/ }));
+    const price = await screen.findByLabelText('Đơn giá');
+    await waitFor(() => expect(price).toHaveValue('100.000'));
+    expect(priceQueries.length).toBeGreaterThan(0);
+    expect(priceQueries.every((q) => !q.includes('customerId'))).toBe(true);
+    expect(screen.queryByLabelText('Chiết khấu %')).not.toBeInTheDocument();
+    expect(screen.queryByText('chọn khách')).not.toBeInTheDocument();
+
+    // SL 2, gõ thành tiền 170.000 → đơn giá 85.000 (dưới trần 90.000 → cần duyệt).
+    fireEvent.change(screen.getByLabelText('Số lượng'), { target: { value: '2' } });
+    const total = screen.getByLabelText('Thành tiền');
+    fireEvent.focus(total);
+    fireEvent.change(total, { target: { value: '170000' } });
+    fireEvent.blur(total);
+    await waitFor(() => expect(screen.getByLabelText('Đơn giá')).toHaveValue('85.000'));
+    expect(screen.getByText('Dưới trần chiết khấu — đơn cần duyệt')).toBeInTheDocument();
+    expect(screen.getByText(/Niêm yết 100\.000/)).toBeInTheDocument();
+
+    fireEvent.change(screen.getByLabelText('Số điện thoại khách'), {
+      target: { value: '0912000111' },
+    });
+    fireEvent.change(screen.getByLabelText('Tên khách hàng'), { target: { value: 'Khách lẻ' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Chốt đơn (F10)' }));
+    await waitFor(() => expect(bodies).toHaveLength(1));
+    expect(bodies[0]!.lines).toEqual([
+      expect.objectContaining({ skuId: SKU.id, qty: '2', unitPrice: '85000' }),
+    ]);
+  });
+
+  it('nguồn Facebook → body gửi posShopId, nguồn khác thì không; chưa chọn nguồn không có ô POS; NV đóng hàng / NV chăm sóc / Marketer ẩn', async () => {
+    server.use(...skuHandlers());
+    renderApp(<OrderCreateScreen />);
+    await screen.findByLabelText('Số điện thoại khách');
+    expect(screen.queryByText('NV đóng hàng')).not.toBeInTheDocument();
+    expect(screen.queryByText('NV chăm sóc')).not.toBeInTheDocument();
+    expect(screen.queryByText('Marketer')).not.toBeInTheDocument();
+    expect(screen.queryByText('Chọn POS')).not.toBeInTheDocument();
+    expect(
+      toCreateOrderBody({
+        ...emptyOrderValues(),
+        customerId: '61000000-0000-4000-8000-000000000001',
+        source: 'FACEBOOK',
+        posShopId: '715130909',
+        lines: [{ skuId: S1, uomId: U1, qty: '1' }],
+      }),
+    ).toMatchObject({ source: 'FACEBOOK', posShopId: '715130909' });
+    expect(
+      toCreateOrderBody({
+        ...emptyOrderValues(),
+        customerId: '61000000-0000-4000-8000-000000000001',
+        source: 'ZALO',
+        posShopId: '715130909',
+        lines: [{ skuId: S1, uomId: U1, qty: '1' }],
+      }),
+    ).not.toHaveProperty('posShopId');
   });
 
   it('gõ SĐT trùng khách cũ → gắn khách đó (hiện "Khách cũ"), chốt gửi customerId', async () => {
