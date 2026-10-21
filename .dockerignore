@@ -3,7 +3,9 @@ node_modules
 out
 storybook-static
 coverage
-design
+# tailwind.config.ts import design/tokens.json lúc build — giữ file đó, bỏ phần còn lại.
+design/*
+!design/tokens.json
 docs
 .git
 .github
