@@ -60,6 +60,9 @@ import { GENDERS, normalizePhoneInput, type CreateOrderValues } from '../../sche
 type Form = UseFormReturn<CreateOrderValues>;
 /** Radix Select không nhận value rỗng. */
 const NONE = '__none__';
+
+/** Tạm ẩn NV đóng hàng / NV chăm sóc / Marketer trên màn tạo đơn (2026-10-21) — bật lại = true. */
+const SHOW_EXTRA_STAFF = false;
 const NEW_ADDRESS = '__new__';
 
 /** Khung card chung của màn tạo đơn. */
@@ -281,19 +284,29 @@ export function InfoCard({ form }: { form: Form }) {
             label="NV xử lý"
             placeholder="Tôi (người tạo đơn)"
           />
-          <StaffField
-            form={form}
-            name="packerId"
-            label="NV đóng hàng"
-            placeholder="Chọn NV đóng hàng"
-          />
-          <StaffField
-            form={form}
-            name="careStaffId"
-            label="NV chăm sóc"
-            placeholder="Chọn NV chăm sóc"
-          />
-          <StaffField form={form} name="marketerId" label="Marketer" placeholder="Chọn Marketer" />
+          {/* Tạm ẩn NV đóng hàng / NV chăm sóc / Marketer (user yêu cầu 2026-10-21) — bật lại bằng cờ. */}
+          {SHOW_EXTRA_STAFF ? (
+            <>
+              <StaffField
+                form={form}
+                name="packerId"
+                label="NV đóng hàng"
+                placeholder="Chọn NV đóng hàng"
+              />
+              <StaffField
+                form={form}
+                name="careStaffId"
+                label="NV chăm sóc"
+                placeholder="Chọn NV chăm sóc"
+              />
+              <StaffField
+                form={form}
+                name="marketerId"
+                label="Marketer"
+                placeholder="Chọn Marketer"
+              />
+            </>
+          ) : null}
           <TagPicker form={form} />
         </>
       ) : null}
@@ -457,20 +470,8 @@ export function CustomerCard({ form }: { form: Form }) {
         </div>
       ) : null}
 
+      {/* SĐT trước tên (2026-10-21): gõ SĐT là tra ngay khách đã có trên hệ thống. */}
       <div className="grid gap-2.5 sm:grid-cols-2">
-        <FormField
-          control={form.control}
-          name="customerName"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel className="sr-only">Tên khách hàng</FormLabel>
-              <FormControl>
-                <Input placeholder="Tên khách hàng" autoComplete="off" {...field} />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
         <FormField
           control={form.control}
           name="customerPhone"
@@ -479,12 +480,25 @@ export function CustomerCard({ form }: { form: Form }) {
               <FormLabel className="sr-only">Số điện thoại khách</FormLabel>
               <FormControl>
                 <Input
-                  placeholder="SĐT"
+                  placeholder="SĐT — tìm khách đã có"
                   inputMode="tel"
                   autoComplete="off"
                   className="tabular-nums"
                   {...field}
                 />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+        <FormField
+          control={form.control}
+          name="customerName"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel className="sr-only">Tên khách hàng</FormLabel>
+              <FormControl>
+                <Input placeholder="Tên khách hàng" autoComplete="off" {...field} />
               </FormControl>
               <FormMessage />
             </FormItem>

@@ -3308,6 +3308,27 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/sales-orders/bulk-fulfil": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * "Đóng gói + in vận đơn" trên danh sách đơn: mỗi đơn như POST /:id/fulfil target PACKED (đóng
+         *     pick, trừ tồn, xin vận đơn hãng trên đơn) — kho không pick/pack trên ERP. Đơn lỗi nằm ở
+         *     `failed` (`packed = true`: đã trừ tồn, chỉ vận đơn lỗi). Quyền `sales_order.fulfil_manual`.
+         */
+        post: operations["SalesOrderController_bulkFulfil"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/sales-orders/{id}/shipping-quote": {
         parameters: {
             query?: never;
@@ -9446,6 +9467,35 @@ export interface components {
             alreadyPacked: boolean;
             waybill: components["schemas"]["FulfilWaybillDto"] | null;
         };
+        BulkFulfilOrdersDto: {
+            orderIds: string[];
+        };
+        BulkFulfilDoneItemDto: {
+            orderId: string;
+            docNumber: string;
+            shipmentId: string;
+            /**
+             * @description ISSUED = hãng cấp mã ngay; ALREADY_ISSUED = đã có mã; QUEUED = hãng lỗi, worker thử lại.
+             * @enum {string}
+             */
+            outcome: "QUEUED" | "ISSUED" | "ALREADY_ISSUED";
+            trackingNo: string | null;
+        };
+        BulkFulfilFailedItemDto: {
+            orderId: string;
+            docNumber: string | null;
+            /** @description ORDER_CARRIER_REQUIRED, ORDER_IN_WAVE, ORDER_PICK_SHORTAGE, CARRIER_REJECTED… */
+            code: string;
+            message: string;
+            /** @description Nguyên văn lời hãng khi `code = CARRIER_REJECTED`; null nếu không phải. */
+            carrierMessage: string | null;
+            /** @description true = ĐÃ đóng gói (tồn đã trừ) nhưng xin vận đơn lỗi — cấp lại vận đơn, không đóng gói lại. */
+            packed: boolean;
+        };
+        BulkFulfilOrdersResultDto: {
+            done: components["schemas"]["BulkFulfilDoneItemDto"][];
+            failed: components["schemas"]["BulkFulfilFailedItemDto"][];
+        };
         ShippingQuoteResultDto: {
             orderId: string;
             docNumber: string;
@@ -9531,6 +9581,11 @@ export interface components {
             qty: string;
             /** @description Tỉ lệ chiết khấu tay 0..1 (`"0.10"` = 10%). Trần là maxDiscount của bảng giá. */
             discountPercent?: string;
+            /**
+             * @description Đơn giá sửa tay theo `uomId` — Decimal(18,4) dạng chuỗi ≥ 0. Có thì thắng `discountPercent`;
+             *     dòng vẫn lưu giá niêm yết. Thấp hơn niêm yết × (1 − trần CK) → đơn Chờ duyệt.
+             */
+            unitPrice?: string;
         };
         CreateOrderDto: {
             /**
@@ -9548,6 +9603,11 @@ export interface components {
              * @enum {string}
              */
             source?: "OTHER" | "WEBSITE" | "FACEBOOK" | "ZALO" | "TIKTOK" | "PHONE" | "WALK_IN" | "REFERRAL";
+            /**
+             * @description POS của đơn — mã shop Pancake đã liên kết (GET /pancake-sync/shops), chọn khi nguồn Facebook.
+             *     Dùng làm người gửi trên vận đơn (tên + SĐT POS) và lọc đơn theo POS.
+             */
+            posShopId?: string;
             /** @description Phụ thu, Decimal(18,4) chuỗi ≥ 0 — cộng vào tổng. */
             surcharge?: string;
             /** @description Khách chuyển khoản trước, Decimal(18,4) chuỗi — ≤ tổng đơn; COD = tổng − khoản này. */
@@ -12851,7 +12911,8 @@ export interface operations {
                 uomId: string;
                 /** @description Decimal(18,6) dạng chuỗi, theo `uomId`, > 0. */
                 qty: string;
-                customerId: string;
+                /** @description Bỏ trống = chưa có khách (khách mới gõ tay) → giá bán trên sản phẩm (bậc kênh / mặc định). */
+                customerId?: string;
                 channel?: "DIRECT" | "MARKETPLACE" | "WEBSITE" | "POS";
             };
             header?: never;
@@ -18116,6 +18177,29 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["FulfilOrderResultDto"];
+                };
+            };
+        };
+    };
+    SalesOrderController_bulkFulfil: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BulkFulfilOrdersDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BulkFulfilOrdersResultDto"];
                 };
             };
         };

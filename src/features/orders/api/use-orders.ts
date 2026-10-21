@@ -1,3 +1,4 @@
+import type { EntitySearchResult } from '@/components/data/form';
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api, idempotency, unwrap } from '@/lib/api/client';
 import type { components } from '@/lib/api/schema';
@@ -129,6 +130,26 @@ export function usePancakeShops() {
   });
 }
 
+/**
+ * Tìm POS đã liên kết (đang bật) cho ô chọn POS trên màn tạo đơn — danh mục nhỏ nên lọc theo tên /
+ * mã ngay trên danh sách GET /pancake-sync/shops đã cache.
+ */
+export function usePosShopSearch(q: string): EntitySearchResult {
+  const shops = usePancakeShops();
+  const term = q.trim().toLowerCase();
+  return {
+    options: shops.data
+      ?.filter((s) => s.isActive)
+      .filter(
+        (s) =>
+          term === '' || s.shopId.includes(term) || (s.shopName ?? '').toLowerCase().includes(term),
+      )
+      .map((s) => ({ id: s.shopId, label: s.shopName ?? `POS ${s.shopId}`, hint: s.shopId })),
+    isPending: shops.isPending,
+    error: shops.error,
+  };
+}
+
 export function useOrderFlowCounts(params: Omit<OrderListParams, 'flow' | 'take' | 'skip'>) {
   return useQuery({
     queryKey: orderKeys.flowCounts(params),
@@ -211,6 +232,25 @@ export function useBulkCancelOrders() {
   return useMutation({
     mutationFn: (body: BulkCancelOrdersBody) =>
       unwrap(api.POST('/sales-orders/bulk-cancel', { body })),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: orderKeys.lists() });
+      void qc.invalidateQueries({ queryKey: orderKeys.details() });
+    },
+  });
+}
+
+export type BulkFulfilOrdersResult = components['schemas']['BulkFulfilOrdersResultDto'];
+
+/**
+ * POST /sales-orders/bulk-fulfil — "Đóng gói + in vận đơn" trên danh sách (quyền
+ * `sales_order.fulfil_manual`): mỗi đơn như "Đã đóng gói" trên màn sửa — trừ tồn + xin vận đơn.
+ * Không retry (mỗi lần gọi hãng là vận đơn thật); server tự idempotent.
+ */
+export function useBulkFulfilOrders() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (orderIds: string[]) =>
+      unwrap(api.POST('/sales-orders/bulk-fulfil', { body: { orderIds } })),
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: orderKeys.lists() });
       void qc.invalidateQueries({ queryKey: orderKeys.details() });

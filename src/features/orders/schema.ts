@@ -26,6 +26,19 @@ export const orderLineSchema = z.object({
     .regex(/^\d{1,2}(\.\d{1,2})?$/, 'CK% từ 0 đến dưới 100')
     .optional()
     .or(z.literal('')),
+  /**
+   * Đơn giá sửa tay (2026-10-21) — string decimal ≥ 0; rỗng = theo bảng giá. Gửi API `unitPrice`
+   * (thắng CK%); giá dưới trần chiết khấu thì đơn vào duyệt.
+   */
+  unitPrice: moneySchema
+    .refine((v) => !v.startsWith('-'), 'Không được âm')
+    .optional()
+    .or(z.literal('')),
+  /**
+   * Giá niêm yết đang hiện trên dòng (xem trước) — chỉ để khi CHƯA chọn khách gửi đúng giá sản
+   * phẩm sale đang thấy (server tra giá theo khách mới có thể khác). Không nhập tay.
+   */
+  previewPrice: z.string().optional(),
 });
 
 /** Nguồn đơn — khách tìm đến qua đâu (khớp enum OrderSource của API). */
@@ -90,6 +103,8 @@ export const createOrderSchema = z
     warehouseId: optionalId,
     channel: z.enum(ORDER_CHANNELS),
     source: z.enum(ORDER_SOURCES).or(z.literal('')),
+    /** POS (mã shop Pancake đã liên kết) — chỉ gửi khi nguồn Facebook. */
+    posShopId: z.string().optional(),
     shippingFee: optionalMoney,
     freeShipping: z.boolean(),
     shipFeeOnReturnOnly: z.boolean(),
@@ -188,6 +203,7 @@ export function emptyOrderValues(warehouseId = ''): CreateOrderValues {
     warehouseId,
     channel: 'DIRECT',
     source: '',
+    posShopId: '',
     shippingFee: '',
     freeShipping: false,
     shipFeeOnReturnOnly: false,
@@ -268,6 +284,7 @@ export function toCreateOrderBody(v: CreateOrderValues) {
     ...(v.warehouseId ? { warehouseId: v.warehouseId } : {}),
     channel: v.channel,
     ...(v.source ? { source: v.source } : {}),
+    ...(v.source === 'FACEBOOK' && v.posShopId ? { posShopId: v.posShopId } : {}),
     ...(v.shippingFee && !v.freeShipping && !v.shipFeeOnReturnOnly
       ? { shippingFee: v.shippingFee }
       : {}),
@@ -294,11 +311,21 @@ export function toCreateOrderBody(v: CreateOrderValues) {
       skuId: l.skuId,
       uomId: l.uomId,
       qty: l.qty,
-      ...(l.discountPercent && !new Decimal(l.discountPercent).isZero()
-        ? { discountPercent: new Decimal(l.discountPercent).div(100).toString() }
-        : {}),
+      ...linePriceBody(l, v.customerId),
     })),
   };
+}
+
+/**
+ * Giá của một dòng → body: giá sửa tay thắng; chưa chọn khách thì gửi giá sản phẩm đang hiện
+ * (đúng cái sale thấy); còn lại CK% như cũ (rỗng / 0 = không gửi).
+ */
+function linePriceBody(l: OrderLineValues, customerId: string) {
+  if (l.unitPrice) return { unitPrice: l.unitPrice };
+  if (!customerId && l.previewPrice) return { unitPrice: l.previewPrice };
+  return l.discountPercent && !new Decimal(l.discountPercent).isZero()
+    ? { discountPercent: new Decimal(l.discountPercent).div(100).toString() }
+    : {};
 }
 
 /** Giảm giá cấp đơn → trường body; 0 hoặc rỗng = không gửi. "%" → tỉ lệ qua decimal.js. */

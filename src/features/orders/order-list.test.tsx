@@ -325,6 +325,127 @@ describe('OrderListScreen — cân nặng gửi hãng + gán hãng hàng loạt'
     await waitFor(() => expect(screen.queryByRole('toolbar')).not.toBeInTheDocument());
   });
 
+  it('"Đóng gói + in vận đơn": chỉ gửi đơn đã duyệt + có hãng → POST /sales-orders/bulk-fulfil, in tem đơn có mã, liệt kê đơn lỗi kèm lời hãng; bỏ chọn sau khi in + đóng hộp lỗi', async () => {
+    search = '';
+    toastSuccess.mockClear();
+    window.print = vi.fn();
+    const rows = makeOrders(3).map((o, i) => ({
+      ...o,
+      status: 'APPROVED' as const,
+      carrierId: i < 2 ? 'c-ghtk' : null,
+    }));
+    const fulfilBodies: unknown[] = [];
+    const labelBodies: unknown[] = [];
+    server.use(
+      http.get('/api/sales-orders', () => HttpResponse.json({ items: rows, total: rows.length })),
+      http.post('/api/sales-orders/bulk-fulfil', async ({ request }) => {
+        fulfilBodies.push(await request.json());
+        return HttpResponse.json(
+          {
+            done: [
+              {
+                orderId: rows[0]!.id,
+                docNumber: rows[0]!.docNumber,
+                shipmentId: 'sh-1',
+                outcome: 'ISSUED',
+                trackingNo: 'S1.A1.123',
+              },
+            ],
+            failed: [
+              {
+                orderId: rows[1]!.id,
+                docNumber: rows[1]!.docNumber,
+                code: 'CARRIER_REJECTED',
+                message: 'raw',
+                carrierMessage: 'Địa chỉ không hợp lệ',
+                packed: true,
+              },
+            ],
+          },
+          { status: 201 },
+        );
+      }),
+      http.post('/api/shipments/label-data', async ({ request }) => {
+        labelBodies.push(await request.json());
+        return HttpResponse.json([
+          {
+            shipmentId: 'sh-1',
+            shipmentDocNumber: 'DN2610-00001',
+            orderDocNumber: rows[0]!.docNumber,
+            carrierCode: 'GHTK',
+            carrierName: 'Giao Hàng Tiết Kiệm',
+            trackingNo: 'S1.A1.123',
+            codAmount: '100000.0000',
+            weightKg: '0.5000',
+            recipient: {
+              name: 'Khách A',
+              phone: '0901234567',
+              address: 'Ấp 1, Xã A, Tỉnh B',
+              street: 'Ấp 1',
+              locality: 'Xã A, Tỉnh B',
+              fromWard: 'Xã A, Tỉnh B',
+              fromDistrict: 'Tỉnh B',
+              province: 'Tỉnh B',
+            },
+            sender: {
+              name: 'Shop',
+              phone: '0339213208',
+              address: 'Kho, Xã C, Hà Nội',
+              street: 'Kho',
+              locality: 'Xã C, Hà Nội',
+              fromWard: 'Xã C, Hà Nội',
+              fromDistrict: 'Hà Nội',
+              province: 'Hà Nội',
+              warehouseName: 'Kho Long An',
+            },
+            allowInspection: false,
+            callShopOnFailure: null,
+            items: [{ name: 'Phân bón A', qty: '1.000000' }],
+            note: null,
+          },
+        ]);
+      }),
+    );
+    renderApp(<OrderListScreen />);
+    await screen.findByText(rows[0]!.docNumber);
+    for (const i of [0, 1, 2]) {
+      fireEvent.click(screen.getAllByRole('checkbox', { name: 'Chọn dòng' })[i]!);
+    }
+    fireEvent.click(await screen.findByRole('button', { name: /Đóng gói \+ in vận đơn/ }));
+    const dialog = await screen.findByRole('dialog');
+    expect(dialog).toHaveTextContent('Đóng gói và in vận đơn 2 đơn?');
+    expect(dialog).toHaveTextContent('1 đơn chưa duyệt hoặc chưa gán hãng sẽ bị bỏ qua');
+    fireEvent.click(screen.getByRole('button', { name: 'Đóng gói + in 2 đơn' }));
+
+    await waitFor(() => expect(window.print).toHaveBeenCalledTimes(1));
+    expect(fulfilBodies).toEqual([{ orderIds: [rows[0]!.id, rows[1]!.id] }]);
+    expect(labelBodies).toEqual([{ shipmentIds: ['sh-1'] }]);
+    expect(toastSuccess).toHaveBeenCalledWith('Đã đóng gói 1 đơn, in 1 tem', undefined);
+    const failed = await screen.findByRole('list', { name: 'Danh sách đơn lỗi' });
+    expect(failed).toHaveTextContent(rows[1]!.docNumber);
+    expect(failed).toHaveTextContent('Đã đóng gói (đã trừ tồn) nhưng chưa có mã vận đơn');
+    expect(failed).toHaveTextContent('Địa chỉ không hợp lệ');
+    expect(failed).not.toHaveTextContent('raw');
+    // Còn hộp lỗi → chưa bỏ chọn; đóng hộp → bỏ chọn.
+    // (hộp thoại modal đang mở → phần nền aria-hidden)
+    expect(screen.getByRole('toolbar', { hidden: true })).toBeInTheDocument();
+    fireEvent.click(screen.getAllByRole('button', { name: 'Đóng' })[0]!);
+    await waitFor(() => expect(screen.queryByRole('toolbar')).not.toBeInTheDocument());
+  });
+
+  it('không có quyền sales_order.fulfil_manual → không có nút "Đóng gói + in vận đơn" (luật 7)', async () => {
+    search = '';
+    renderApp(<OrderListScreen />, {
+      me: { ...ME_SALE, permissions: ['sales_order.read', 'sales_order.update', 'shipment.pack'] },
+    });
+    await screen.findByText(FIRST.docNumber);
+    fireEvent.click(screen.getAllByRole('checkbox', { name: 'Chọn dòng' })[0]!);
+    expect(await screen.findByRole('button', { name: /In lại vận đơn/ })).toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: /Đóng gói \+ in vận đơn/ }),
+    ).not.toBeInTheDocument();
+  });
+
   it('không có quyền sales_order.cancel → thanh chọn không có nút "Hủy đơn" (luật 7)', async () => {
     search = '';
     renderApp(<OrderListScreen />, {

@@ -64,19 +64,38 @@ export function groupOrderLines(lines: readonly SalesOrderLine[]): OrderLineGrou
  * với skuId = SKU combo, qty = số combo. `uomId` để trống — form tự chọn ĐVT cơ sở của SKU
  * combo khi tải chi tiết SKU. Dòng thường giữ nguyên.
  */
-export function collapseComboLines(
-  lines: readonly SalesOrderLine[],
-): Array<{ skuId: string; uomId: string; qty: string }> {
-  const out: Array<{ skuId: string; uomId: string; qty: string }> = [];
+/** Dòng đặt hàng sau khi gộp combo — kèm giá niêm yết / giá bán MỘT đơn vị (combo: một combo). */
+export interface CollapsedLine {
+  skuId: string;
+  uomId: string;
+  qty: string;
+  listPrice: string;
+  unitPrice: string;
+}
+
+export function collapseComboLines(lines: readonly SalesOrderLine[]): CollapsedLine[] {
+  const out: CollapsedLine[] = [];
   const seen = new Set<number>();
   for (const l of lines) {
     if (!l.combo) {
-      out.push({ skuId: l.skuId, uomId: l.uomId, qty: l.qty });
+      out.push({
+        skuId: l.skuId,
+        uomId: l.uomId,
+        qty: l.qty,
+        listPrice: l.listPrice,
+        unitPrice: l.unitPrice,
+      });
       continue;
     }
     if (seen.has(l.combo.groupNo)) continue;
     seen.add(l.combo.groupNo);
-    out.push({ skuId: l.combo.skuId, uomId: '', qty: l.combo.qty });
+    out.push({
+      skuId: l.combo.skuId,
+      uomId: '',
+      qty: l.combo.qty,
+      listPrice: l.combo.listPrice,
+      unitPrice: l.combo.unitPrice,
+    });
   }
   return out;
 }

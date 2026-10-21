@@ -31,10 +31,17 @@ export interface LinePriceParams {
  * 422 PRICE_NOT_FOUND = chưa có bảng giá phủ — hiện '—', không chặn nhập.
  */
 export function useLinePrice(p: LinePriceParams) {
-  const enabled = p.skuId !== '' && p.uomId !== '' && p.customerId !== '' && /^\d/.test(p.qty);
+  // Chưa chọn khách → bỏ customerId: server trả giá bán trên sản phẩm (bậc kênh / mặc định).
+  const enabled = p.skuId !== '' && p.uomId !== '' && /^\d/.test(p.qty);
+  const { customerId, ...rest } = p;
   return useQuery({
     queryKey: lineEntryKeys.price(p),
-    queryFn: () => unwrap(api.GET('/prices/resolve', { params: { query: p } })),
+    queryFn: () =>
+      unwrap(
+        api.GET('/prices/resolve', {
+          params: { query: customerId ? { ...rest, customerId } : rest },
+        }),
+      ),
     enabled,
     staleTime: 60_000,
     retry: false,

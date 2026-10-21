@@ -74,6 +74,8 @@ function valuesFromOrder(o: SalesOrderDetail, warehouseId: string): CreateOrderV
       uomId: l.uomId,
       qty: l.qty,
       discountPercent: '',
+      // Giá đã sửa tay / đã giảm trên đơn cũ đi theo đơn tạo lại; giá niêm yết thì để server tra lại.
+      unitPrice: new Decimal(l.unitPrice).eq(l.listPrice) ? '' : new Decimal(l.unitPrice).toFixed(),
     })),
   };
 }
