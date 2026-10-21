@@ -182,7 +182,7 @@ function LocationFormDialog({
 
   return (
     <Dialog open onOpenChange={(o) => !isPending && !o && onClose()}>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent>
         <DialogHeader>
           <DialogTitle>{editing ? `Sửa vị trí ${location?.code}` : 'Thêm vị trí'}</DialogTitle>
           <DialogDescription>

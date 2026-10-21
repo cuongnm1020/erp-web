@@ -125,7 +125,7 @@ export function SupplierFormDialog({
 
   return (
     <Dialog open={open} onOpenChange={(o) => !isPending && onOpenChange(o)}>
-      <DialogContent className="sm:max-w-lg">
+      <DialogContent wide>
         <DialogHeader>
           <DialogTitle>
             {editing ? `Sửa nhà cung cấp ${supplier.code}` : 'Thêm nhà cung cấp'}

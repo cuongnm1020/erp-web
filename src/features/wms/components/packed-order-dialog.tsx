@@ -54,7 +54,7 @@ export function PackedOrderDialog({
   return (
     <>
       <Dialog open={taskId !== null && !printing} onOpenChange={(o) => !o && onClose()}>
-        <DialogContent className="sm:max-w-2xl">
+        <DialogContent wide>
           <DialogHeader>
             <DialogTitle>
               {packed.data

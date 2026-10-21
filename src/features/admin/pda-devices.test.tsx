@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { makeUsers } from '@/test/msw/handlers';
 import { server } from '@/test/msw/server';
 import { renderApp } from '@/test/render';
+import { clickRowMenuItem, rowMenuIndex } from '@/test/row-menu';
 import { PdaDevicesScreen } from './components/pda-devices-screen';
 
 vi.stubGlobal(
@@ -196,7 +197,7 @@ describe('PdaDevicesScreen — Thiết bị PDA', () => {
     const { calls } = wire();
     renderApp(<PdaDevicesScreen />);
     await screen.findByText('PM84-01');
-    fireEvent.click(screen.getAllByRole('button', { name: 'Xóa' })[1]!);
+    await clickRowMenuItem('Xóa', { index: rowMenuIndex('thiết bị PM84-02') });
     const confirm = await screen.findByRole('dialog');
     expect(within(confirm).getByText(/thiết bị PM84-02/)).toBeInTheDocument();
     fireEvent.click(within(confirm).getByRole('button', { name: 'Xóa' }));

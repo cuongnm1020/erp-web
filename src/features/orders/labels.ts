@@ -255,17 +255,17 @@ export const ORDER_FLOW_TABS: ReadonlyArray<{
  * class — Tailwind chỉ sinh class thấy được trong mã nguồn.
  */
 const FLOW_CLASS: Record<OrderFlow, string> = {
-  PENDING_APPROVAL: 'bg-flow-pending/10 text-flow-pending',
-  WAREHOUSE: 'bg-flow-warehouse/10 text-flow-warehouse',
-  PICKING: 'bg-flow-picking/10 text-flow-picking',
-  PACKED: 'bg-flow-packed/10 text-flow-packed',
-  PICKED_UP: 'bg-flow-picked-up/10 text-flow-picked-up',
-  IN_TRANSIT: 'bg-flow-in-transit/10 text-flow-in-transit',
-  OUT_FOR_DELIVERY: 'bg-flow-out-for-delivery/10 text-flow-out-for-delivery',
-  DELIVERED: 'bg-flow-delivered/10 text-flow-delivered',
-  RETURNED: 'bg-flow-returned/10 text-flow-returned',
-  CARRIER_CANCELLED: 'bg-flow-carrier-cancelled/10 text-flow-carrier-cancelled',
-  CANCELLED: 'bg-flow-cancelled/10 text-flow-cancelled',
+  PENDING_APPROVAL: 'bg-flow-pending-weak text-flow-pending',
+  WAREHOUSE: 'bg-flow-warehouse-weak text-flow-warehouse',
+  PICKING: 'bg-flow-picking-weak text-flow-picking',
+  PACKED: 'bg-flow-packed-weak text-flow-packed',
+  PICKED_UP: 'bg-flow-picked-up-weak text-flow-picked-up',
+  IN_TRANSIT: 'bg-flow-in-transit-weak text-flow-in-transit',
+  OUT_FOR_DELIVERY: 'bg-flow-out-for-delivery-weak text-flow-out-for-delivery',
+  DELIVERED: 'bg-flow-delivered-weak text-flow-delivered',
+  RETURNED: 'bg-flow-returned-weak text-flow-returned',
+  CARRIER_CANCELLED: 'bg-flow-carrier-cancelled-weak text-flow-carrier-cancelled',
+  CANCELLED: 'bg-flow-cancelled-weak text-flow-cancelled',
 };
 
 export function orderFlowClass(f: OrderFlow): string {
@@ -274,12 +274,12 @@ export function orderFlowClass(f: OrderFlow): string {
 
 /** Màu chữ của nhà mạng + nền cùng màu 15% (token --telco-*). Không nhận ra → xám. */
 const TELCO_CLASS: Record<string, string> = {
-  Viettel: 'bg-telco-viettel/15 text-telco-viettel',
-  Vina: 'bg-telco-vina/15 text-telco-vina',
-  Mobi: 'bg-telco-mobi/15 text-telco-mobi',
-  Vnmb: 'bg-telco-vnmb/15 text-telco-vnmb',
-  Gmobile: 'bg-telco-gmobile/15 text-telco-gmobile',
-  iTel: 'bg-telco-itel/15 text-telco-itel',
+  Viettel: 'bg-telco-viettel-weak text-telco-viettel',
+  Vina: 'bg-telco-vina-weak text-telco-vina',
+  Mobi: 'bg-telco-mobi-weak text-telco-mobi',
+  Vnmb: 'bg-telco-vnmb-weak text-telco-vnmb',
+  Gmobile: 'bg-telco-gmobile-weak text-telco-gmobile',
+  iTel: 'bg-telco-itel-weak text-telco-itel',
 };
 
 export function telcoClass(name: string): string {

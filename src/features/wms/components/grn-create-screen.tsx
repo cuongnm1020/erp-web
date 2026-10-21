@@ -209,15 +209,20 @@ function TotalValue({ form }: { form: UseFormReturn<ReceiptValues> }) {
  * (thùng / pallet: SL = qtyBase / factor, đơn giá = giá mỗi đơn vị × factor) và quy cách thùng.
  * Số lô / HSD để trống — lô mới cho lần nhận mới; dòng gốc có số lô thì vẫn đòi nhập lô. Ngày
  * nhập = hôm nay; phiếu theo PO được nhân bản thành phiếu NHẬP TỰ DO (form chưa chọn PO).
+ *
+ * `canCost` = người dùng có `stock.cost`. Không có → đơn giá phiếu gốc KHÔNG chép sang (2026-10-21):
+ * trước đây ô giá bị ẩn nhưng giá trị vẫn nằm trong form và được gửi lên, thủ kho nhân bản phiếu cũ
+ * sẽ tạo phiếu có sẵn giá cũ, nhảy thẳng "Hoàn thành" mà kế toán không hay. API giờ cũng trả
+ * `unitCost` null cho người không có quyền và từ chối (403) nếu họ gửi giá.
  */
-export function receiptToFormValues(r: ReceiptDetail): ReceiptValues {
+export function receiptToFormValues(r: ReceiptDetail, canCost: boolean): ReceiptValues {
   return {
     warehouseId: r.warehouseId,
     receivedAt: todayKey(),
     note: r.note ?? '',
     lines: r.lines.map((l) => {
       const factor = l.uomCode && l.factor ? new Decimal(l.factor) : new Decimal(1);
-      const cost = l.unitCost ? new Decimal(l.unitCost).mul(factor) : null;
+      const cost = canCost && l.unitCost ? new Decimal(l.unitCost).mul(factor) : null;
       return {
         ...EMPTY_LINE,
         skuId: l.skuId,
@@ -270,7 +275,7 @@ function GrnCreateForm({ copyOf }: { copyOf?: ReceiptDetail }) {
   const form = useForm<ReceiptValues>({
     resolver: zodResolver(receiptSchema),
     defaultValues: copyOf
-      ? receiptToFormValues(copyOf)
+      ? receiptToFormValues(copyOf, canCost)
       : {
           warehouseId:
             workingWarehouse && workingWarehouse !== ALL_WAREHOUSES ? workingWarehouse : '',
@@ -349,7 +354,8 @@ function GrnCreateForm({ copyOf }: { copyOf?: ReceiptDetail }) {
           // Nhập theo thùng / pallet: SL + đơn giá theo ĐVT này, server quy ra đơn vị bán chính.
           ...(l.uom ? { uom: l.uom } : {}),
           // Bỏ trống (kho không có quyền giá / chưa biết giá) → không gửi; kế toán nhập sau.
-          ...(l.unitCost ? { unitCost: l.unitCost } : {}),
+          // Không có stock.cost thì không bao giờ gửi giá — server trả 403 nếu gửi.
+          ...(canCost && l.unitCost ? { unitCost: l.unitCost } : {}),
           ...(l.lotNumber ? { lotNumber: l.lotNumber } : {}),
           ...(l.expiryDate ? { expiryDate: l.expiryDate } : {}),
           // D — vỏ thùng tạo ngay khi lưu nháp (in tem trước khi post), tồn vào thùng lúc post.
@@ -497,7 +503,7 @@ function GrnCreateForm({ copyOf }: { copyOf?: ReceiptDetail }) {
           </div>
 
           {rootError ? (
-            <p className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+            <p className="rounded-md border border-destructive-line bg-destructive-weak px-3 py-2 text-sm text-destructive">
               {rootError}
             </p>
           ) : null}

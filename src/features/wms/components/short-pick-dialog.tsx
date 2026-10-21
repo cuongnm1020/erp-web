@@ -35,7 +35,7 @@ export function ShortPickDialog({
   const [note, setNote] = useState('');
   return (
     <Dialog open={open} onOpenChange={(o) => !busy && onOpenChange(o)}>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent>
         <DialogHeader>
           <DialogTitle>Báo thiếu hàng</DialogTitle>
           <DialogDescription>

@@ -769,7 +769,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Tồn gộp theo SKU — ba con số onHand / reserved / available tách riêng. */
+        /** Tồn gộp theo SKU — ba con số onHand / reserved / available tách riêng; sắp theo cân nặng / tồn. */
         get: operations["InventoryController_list"];
         put?: never;
         post?: never;
@@ -4168,6 +4168,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
+        /** Tiền trên phiếu (`unitCost`, `lineValue`, `totalValue`) chỉ trả cho người có `stock.cost`. */
         get: operations["ReceivingController_get"];
         put?: never;
         post?: never;
@@ -10650,9 +10651,12 @@ export interface components {
             /** @description Decimal(18,6) dạng chuỗi — ĐVT cơ sở. */
             qtyBase: string;
             qtyRejected: string;
-            /** @description Giá nhập mỗi ĐVT CƠ SỞ, Decimal(18,4) dạng chuỗi — null = kế toán chưa nhập giá. */
+            /**
+             * @description Giá nhập mỗi ĐVT CƠ SỞ, Decimal(18,4) dạng chuỗi — null = kế toán chưa nhập giá, HOẶC người gọi
+             *     không có `stock.cost` (API che tiền với tài khoản kho, 2026-10-21).
+             */
             unitCost: string | null;
-            /** @description qtyBase × unitCost — Decimal(18,4) dạng chuỗi, null khi thiếu giá. */
+            /** @description qtyBase × unitCost — Decimal(18,4) dạng chuỗi, null khi thiếu giá hoặc bị che theo quyền. */
             lineValue: string | null;
             /** @description C3 — ĐVT client đã nhập (null = ĐVT cơ sở). */
             uomId: string | null;
@@ -10693,8 +10697,11 @@ export interface components {
             lineCount: number;
             /** @description Tổng qtyBase — Decimal(18,6) dạng chuỗi. */
             totalQty: string;
-            /** @description Tổng qtyBase × unitCost của các dòng ĐÃ có giá — Decimal(18,4) dạng chuỗi. */
-            totalValue: string;
+            /**
+             * @description Tổng qtyBase × unitCost của các dòng ĐÃ có giá — Decimal(18,4) dạng chuỗi. null = người gọi
+             *     không có `stock.cost` (kho không thấy tiền; `uncostedLineCount` và `stage` vẫn đúng).
+             */
+            totalValue: string | null;
             lines: components["schemas"]["ReceiptLineDto"][];
         };
         ReceiptMovementDto: {
@@ -13215,6 +13222,8 @@ export interface operations {
     InventoryController_list: {
         parameters: {
             query: {
+                sortBy?: "weight" | "onHand" | "reserved" | "available";
+                sortDir?: "asc" | "desc";
                 /** @description Lọc theo mã / tên SKU (không phân biệt hoa thường). */
                 q?: string;
                 /** @description Chỉ tính tồn trong kho này (lọc qua `Location.warehouseId`). */
@@ -13246,6 +13255,8 @@ export interface operations {
     InventoryController_byLocation: {
         parameters: {
             query: {
+                skuId?: string;
+                locationId?: string;
                 /** @description Lọc theo mã / tên SKU (không phân biệt hoa thường). */
                 q?: string;
                 /** @description Chỉ tính tồn trong kho này (lọc qua `Location.warehouseId`). */
@@ -13257,8 +13268,6 @@ export interface operations {
                 erpOnly?: string;
                 take: number;
                 skip: number;
-                skuId?: string;
-                locationId?: string;
             };
             header?: never;
             path?: never;
@@ -13279,6 +13288,8 @@ export interface operations {
     InventoryController_byLot: {
         parameters: {
             query: {
+                skuId?: string;
+                locationId?: string;
                 /** @description Lọc theo mã / tên SKU (không phân biệt hoa thường). */
                 q?: string;
                 /** @description Chỉ tính tồn trong kho này (lọc qua `Location.warehouseId`). */
@@ -13290,8 +13301,6 @@ export interface operations {
                 erpOnly?: string;
                 take: number;
                 skip: number;
-                skuId?: string;
-                locationId?: string;
             };
             header?: never;
             path?: never;

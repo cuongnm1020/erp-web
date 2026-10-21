@@ -65,7 +65,7 @@ export function ImageDropzone({
       aria-disabled={disabled || undefined}
       className={cn(
         'flex cursor-pointer flex-col items-center justify-center gap-1 rounded-md border-2 border-dashed px-4 py-6 text-center text-sm text-muted-foreground transition-colors',
-        over && 'border-primary bg-primary/5 text-primary',
+        over && 'border-primary bg-secondary text-primary',
         disabled && 'pointer-events-none opacity-50',
       )}
       onClick={() => inputRef.current?.click()}
@@ -206,7 +206,7 @@ export function ProductGallery({
                 )}
               />
               {img.isPrimary ? (
-                <span className="absolute left-1 top-1 rounded bg-primary px-1 text-[10px] font-medium text-primary-foreground">
+                <span className="absolute left-1 top-1 rounded bg-primary px-1 text-xs font-medium text-primary-foreground">
                   Ảnh chính
                 </span>
               ) : null}

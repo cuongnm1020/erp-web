@@ -385,7 +385,7 @@ function Editor({ order }: { order: SalesOrderDetail }) {
       {readOnlyReason ? (
         <div
           role="status"
-          className="flex items-center gap-2 rounded-md border border-warning/40 bg-warning/10 px-3 py-2 text-sm"
+          className="flex items-center gap-2 rounded-md border border-warning-line bg-warning-weak px-3 py-2 text-sm"
         >
           <Lock className="h-3.5 w-3.5 text-warning" aria-hidden />
           {readOnlyReason}
@@ -597,7 +597,7 @@ function Editor({ order }: { order: SalesOrderDetail }) {
                 )}
               </Field>
               {fulfilTarget ? (
-                <p className="px-3 pb-1 text-xs text-warning-foreground">
+                <p className="px-3 pb-1 text-xs text-warning">
                   {fulfilTarget === 'PACKED'
                     ? 'Đóng gói KHÔNG quét: trừ tồn ngay, xin vận đơn của hãng đã chọn (ĐVVC) và mở nhãn in. Không hoàn tác được.'
                     : 'Đóng việc pick KHÔNG quét: phiếu giao sinh ngay, chưa trừ tồn — trừ khi đóng gói.'}

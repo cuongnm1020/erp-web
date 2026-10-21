@@ -231,7 +231,7 @@ function RelinkDialog({
 
   return (
     <Dialog open onOpenChange={(o) => !o && !relink.isPending && onClose()}>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent>
         <DialogHeader>
           <DialogTitle>Gắn tài khoản ERP cho {name}</DialogTitle>
           <DialogDescription>

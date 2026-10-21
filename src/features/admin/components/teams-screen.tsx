@@ -571,7 +571,7 @@ function AddMembersPanel({ department, onClose }: { department: Department; onCl
           )}
         </div>
         {moving.length > 0 ? (
-          <p className="rounded-md border bg-warning/10 px-3 py-2 text-xs text-warning">
+          <p className="rounded-md border bg-warning-weak px-3 py-2 text-xs text-warning">
             {moving.length === 1
               ? `${moving[0]!.fullName} đang ở ${moving[0]!.departmentName} — chuyển vào đây là rời phòng ban cũ.`
               : `${moving.length} người đang thuộc phòng ban khác — chuyển vào đây là rời phòng ban cũ.`}

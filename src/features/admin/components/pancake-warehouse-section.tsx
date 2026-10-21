@@ -123,7 +123,7 @@ function ShopWarehouses({ shop }: { shop: PancakeShopWarehouses }) {
       {shop.error ? (
         <p
           role="status"
-          className="flex items-center gap-2 border-b bg-warning/10 px-3 py-2 text-sm"
+          className="flex items-center gap-2 border-b bg-warning-weak px-3 py-2 text-sm"
         >
           <AlertTriangle className="h-4 w-4 shrink-0 text-warning" aria-hidden />
           Không đọc được kho của shop — kiểm tra kết nối ở bảng trên. Liên kết đã lưu vẫn dùng cho
@@ -271,7 +271,7 @@ function LinkDialog({
 
   return (
     <Dialog open onOpenChange={(o) => !o && !link.isPending && onClose()}>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent>
         <DialogHeader>
           <DialogTitle>
             Nối kho {row.code} với kho trên shop {shop.shopName ?? shop.shopId}

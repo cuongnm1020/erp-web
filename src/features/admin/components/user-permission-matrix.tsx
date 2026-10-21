@@ -54,7 +54,7 @@ const CELL_LABEL: Record<ReturnType<typeof cellState>, string> = {
 const CELL_CLASS: Record<ReturnType<typeof cellState>, string> = {
   inherited: 'bg-secondary text-foreground',
   allow: 'bg-primary text-primary-foreground',
-  deny: 'bg-destructive/10 text-destructive line-through',
+  deny: 'bg-destructive-weak text-destructive line-through',
   none: 'border text-muted-foreground',
 };
 
@@ -161,7 +161,7 @@ export function UserPermissionMatrix({ userId, canEdit }: { userId: string; canE
                         const state = cellState(e, override);
                         const dirty = draft[e.code] !== undefined && draft[e.code] !== e.override;
                         return (
-                          <TableRow key={e.code} className={cn(dirty && 'bg-warning/10')}>
+                          <TableRow key={e.code} className={cn(dirty && 'bg-warning-weak')}>
                             <TableCell className="px-2.5 py-1.5">
                               {actionLabel(e.action)}{' '}
                               <span className="font-mono text-xs text-muted-foreground">

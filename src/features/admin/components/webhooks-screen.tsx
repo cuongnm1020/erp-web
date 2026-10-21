@@ -349,7 +349,7 @@ export function WebhooksScreen() {
               {SAMPLE_JOBS.map((j) => {
                 const s = JOB_STATUS[j.status];
                 return (
-                  <TableRow key={j.job} className={cn(j.selected && 'bg-secondary/50')}>
+                  <TableRow key={j.job} className={cn(j.selected && 'bg-secondary')}>
                     <TableCell className="px-2.5 py-1.5 font-mono text-xs text-primary">
                       {j.job}
                     </TableCell>

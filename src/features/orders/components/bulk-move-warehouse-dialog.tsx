@@ -101,7 +101,7 @@ export function BulkMoveWarehouseDialog({
         Chuyển kho
       </Button>
       <Dialog open={open} onOpenChange={(o) => !move.isPending && (o ? setOpen(true) : close())}>
-        <DialogContent className="sm:max-w-md">
+        <DialogContent>
           <DialogHeader>
             <DialogTitle>Chuyển {movable.length} đơn sang kho khác</DialogTitle>
             <DialogDescription>
@@ -111,7 +111,7 @@ export function BulkMoveWarehouseDialog({
             </DialogDescription>
           </DialogHeader>
           {failures.length > 0 ? (
-            <div className="space-y-1 rounded-md border border-destructive/40 p-2 text-sm">
+            <div className="space-y-1 rounded-md border border-destructive-line p-2 text-sm">
               <p className="font-medium text-destructive">
                 {failures.length} đơn không chuyển được:
               </p>

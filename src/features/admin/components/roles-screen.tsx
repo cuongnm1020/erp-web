@@ -56,7 +56,7 @@ function CreateRoleDialog({
   const [name, setName] = useState('');
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-sm">
+      <DialogContent>
         <DialogHeader>
           <DialogTitle>Thêm vai trò</DialogTitle>
           <DialogDescription>Tạo xong, tick quyền cho vai trò ngay trên ma trận.</DialogDescription>
@@ -121,7 +121,7 @@ function EditRoleDialog({
   const [description, setDescription] = useState(role.description ?? '');
   return (
     <Dialog open onOpenChange={(o) => !update.isPending && onOpenChange(o)}>
-      <DialogContent className="sm:max-w-sm">
+      <DialogContent>
         <DialogHeader>
           <DialogTitle>Sửa vai trò {role.code}</DialogTitle>
           <DialogDescription>Mã vai trò không đổi được. Quyền sửa trên ma trận.</DialogDescription>
@@ -369,7 +369,10 @@ export function RolesScreen() {
                           return (
                             <TableCell
                               key={r.code}
-                              className={cn('px-2.5 py-1.5 text-center', dirty && 'bg-warning/10')}
+                              className={cn(
+                                'px-2.5 py-1.5 text-center',
+                                dirty && 'bg-warning-weak',
+                              )}
                             >
                               <Checkbox
                                 checked={checked(r, p)}

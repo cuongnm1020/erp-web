@@ -114,7 +114,7 @@ export function PancakeShopProductsDialog({
         {current.isPending ? (
           <ListSkeleton rows={4} columns={2} />
         ) : current.isError ? (
-          <div className="flex items-center justify-between gap-3 rounded-md border border-destructive/40 px-3 py-2 text-sm">
+          <div className="flex items-center justify-between gap-3 rounded-md border border-destructive-line px-3 py-2 text-sm">
             <span className="text-destructive">{messageFor(current.error)}</span>
             <Button size="sm" variant="outline" onClick={() => void current.refetch()}>
               Thử lại
@@ -275,7 +275,7 @@ function ModeOption({
       onClick={onSelect}
       className={
         checked
-          ? 'flex items-start gap-2 rounded-md border border-primary bg-primary/5 px-3 py-2 text-left'
+          ? 'flex items-start gap-2 rounded-md border border-primary bg-secondary px-3 py-2 text-left'
           : 'flex items-start gap-2 rounded-md border px-3 py-2 text-left hover:bg-muted'
       }
     >

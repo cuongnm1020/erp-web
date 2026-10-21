@@ -146,7 +146,10 @@ function Ready({ token, info }: { token: string; info: PublicUnsubscribe }) {
           : `Bạn chưa đăng ký nhận tin khuyến mãi qua ${phrase}. Bấm “Hủy nhận tin” để ghi nhận bạn không muốn nhận.`}
       </p>
       {confirm.error ? (
-        <p role="alert" className="rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive">
+        <p
+          role="alert"
+          className="rounded-md bg-destructive-weak px-3 py-2 text-sm text-destructive"
+        >
           {messageFor(confirm.error)}
         </p>
       ) : null}

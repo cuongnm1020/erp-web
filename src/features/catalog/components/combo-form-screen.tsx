@@ -281,7 +281,7 @@ function ComboFormBody({ combo, copyOf }: { combo?: ComboDetail; copyOf?: ComboD
         {form.formState.errors.root?.server ? (
           <div
             role="alert"
-            className="flex items-center gap-3 rounded-md border border-destructive/40 bg-destructive/5 px-3 py-2 text-sm"
+            className="flex items-center gap-3 rounded-md border border-destructive-line bg-destructive-weak px-3 py-2 text-sm"
           >
             <span className="font-semibold text-destructive">
               {form.formState.errors.root.server.message}

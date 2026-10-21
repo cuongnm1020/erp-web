@@ -130,7 +130,7 @@ function EnvNotice({ env }: { env: PancakeConfigList['env'] | undefined }) {
   return (
     <div
       role="status"
-      className="mb-3 flex items-start gap-2 rounded-md border border-warning/50 bg-warning/10 px-3 py-2 text-sm"
+      className="mb-3 flex items-start gap-2 rounded-md border border-warning-line bg-warning-weak px-3 py-2 text-sm"
     >
       <Info className="mt-0.5 h-4 w-4 shrink-0 text-warning" aria-hidden />
       <p>

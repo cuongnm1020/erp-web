@@ -123,7 +123,7 @@ export function CartLine({
             {sku.data?.name ?? (sku.isPending ? 'Đang tải…' : 'Không tìm thấy sản phẩm')}
           </p>
           {combo ? (
-            <span className="inline-flex shrink-0 items-center gap-0.5 rounded bg-primary/10 px-1 text-xs font-semibold text-primary">
+            <span className="inline-flex shrink-0 items-center gap-0.5 rounded bg-secondary px-1 text-xs font-semibold text-primary">
               <Boxes className="h-3 w-3" aria-hidden />
               Combo
             </span>

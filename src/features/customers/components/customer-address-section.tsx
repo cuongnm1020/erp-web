@@ -201,7 +201,7 @@ function AddressDialog({
 
   return (
     <Dialog open={open} onOpenChange={(o) => !isPending && onOpenChange(o)}>
-      <DialogContent className="sm:max-w-lg">
+      <DialogContent wide>
         <DialogHeader>
           <DialogTitle>{editing ? 'Sửa địa chỉ' : 'Thêm địa chỉ'}</DialogTitle>
           <DialogDescription>
@@ -393,7 +393,7 @@ function DeleteAddressDialog({
   };
   return (
     <Dialog open onOpenChange={(o) => !del.isPending && onOpenChange(o)}>
-      <DialogContent className="sm:max-w-sm">
+      <DialogContent>
         <DialogHeader>
           <DialogTitle>Xóa địa chỉ này?</DialogTitle>
           <DialogDescription>

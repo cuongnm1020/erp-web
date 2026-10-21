@@ -3,6 +3,7 @@ import { http, HttpResponse } from 'msw';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { server } from '@/test/msw/server';
 import { renderApp } from '@/test/render';
+import { clickRowMenuItem } from '@/test/row-menu';
 import { GrnCreateScreen, receiptToFormValues } from './components/grn-create-screen';
 import { GrnDetailScreen } from './components/grn-detail-screen';
 import { GrnListScreen } from './components/grn-list-screen';
@@ -220,12 +221,14 @@ describe('GrnListScreen — GET /goods-receipts', () => {
     );
     renderApp(<GrnListScreen />);
     await screen.findByText('GRN2608-00087');
-    const buttons = screen.getAllByRole('button', { name: 'Hủy nháp' });
-    expect(buttons).toHaveLength(1);
-    fireEvent.click(buttons[0]!);
-    expect(await screen.findByText('Hủy nháp phiếu nhập GRN2608-00087?')).toBeInTheDocument();
-    const confirm = screen.getAllByRole('button', { name: 'Hủy nháp' });
-    fireEvent.click(confirm[confirm.length - 1]!);
+    // Chỉ dòng DRAFT có menu "⋯" (mục Hủy nháp nằm trong đó).
+    const triggers = screen.getAllByRole('button', { name: /^Thao tác khác/ });
+    expect(triggers).toHaveLength(1);
+    expect(triggers[0]).toHaveAccessibleName('Thao tác khác cho phiếu nhập GRN2608-00087');
+    await clickRowMenuItem('Hủy nháp');
+    const confirm = await screen.findByRole('dialog');
+    expect(within(confirm).getByText('Hủy nháp phiếu nhập GRN2608-00087?')).toBeInTheDocument();
+    fireEvent.click(within(confirm).getByRole('button', { name: 'Hủy nháp' }));
     await waitFor(() => expect(deleted).toEqual(['r-1']));
   });
 });
@@ -810,7 +813,7 @@ describe('Nhân bản phiếu nhập (?from=) — 2026-10-12', () => {
   });
 
   it('receiptToFormValues: dòng theo thùng → SL thùng + đơn giá mỗi thùng + quy cách; lô để trống nhưng vẫn đòi lô', () => {
-    const v = receiptToFormValues({
+    const source = {
       ...DETAIL_DRAFT,
       status: 'POSTED',
       lines: [
@@ -832,7 +835,8 @@ describe('Nhân bản phiếu nhập (?from=) — 2026-10-12', () => {
           packaging: null,
         },
       ],
-    } as Parameters<typeof receiptToFormValues>[0]);
+    } as Parameters<typeof receiptToFormValues>[0];
+    const v = receiptToFormValues(source, true);
     expect(v.warehouseId).toBe('wh-1');
     expect(v.note).toBe('Xe 29H-512.44');
     expect(v.receivedAt).toBe(new Date().toISOString().slice(0, 10));
@@ -854,6 +858,39 @@ describe('Nhân bản phiếu nhập (?from=) — 2026-10-12', () => {
       factor: '1',
       tracking: 'NONE',
       packType: '',
+    });
+    // Không có stock.cost → giá phiếu gốc không chép sang (2026-10-21).
+    const noCost = receiptToFormValues(source, false);
+    expect(noCost.lines.map((l) => l.unitCost)).toEqual(['', '']);
+    expect(noCost.lines[0]).toMatchObject({ qty: '2', uom: 'BOX', packType: 'CARTON' });
+  });
+
+  it('form nhân bản — kho (không stock.cost): phiếu gốc có giá nhưng POST phiếu mới không mang unitCost', async () => {
+    const posts: unknown[] = [];
+    server.use(
+      http.get('/api/goods-receipts/:id', () => HttpResponse.json(DETAIL_DRAFT)),
+      http.post('/api/goods-receipts', async ({ request }) => {
+        posts.push(await request.json());
+        return HttpResponse.json(
+          { receiptId: 'r-11', docNumber: 'GRN2610-00011', status: 'DRAFT', warehouseId: 'wh-1' },
+          { status: 201 },
+        );
+      }),
+    );
+    renderApp(<GrnCreateScreen copyFromId="r-1" />, {
+      warehouses: MY_WAREHOUSES,
+      me: { permissions: ['stock.read', 'stock.receive'], hasGlobalAccess: false },
+    });
+    expect(await screen.findByText(/Nhân bản từ GRN2608-00087 · 1 dòng/)).toBeInTheDocument();
+    expect(screen.queryByLabelText('Đơn giá dòng 1')).toBeNull();
+    fireEvent.change(screen.getByPlaceholderText('L2608'), { target: { value: 'L2610' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Lưu nháp' }));
+    await waitFor(() => expect(posts).toHaveLength(1));
+    expect(posts[0]).toEqual({
+      warehouseId: 'wh-1',
+      receivedAt: new Date().toISOString().slice(0, 10),
+      note: 'Xe 29H-512.44',
+      lines: [{ skuId: 'sku-1', qty: '50', lotNumber: 'L2610' }],
     });
   });
 

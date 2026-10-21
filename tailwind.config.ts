@@ -1,18 +1,102 @@
 import type { Config } from 'tailwindcss';
 import animate from 'tailwindcss-animate';
+import tokens from './design/tokens.json';
 
 /**
- * Design tokens — NGUỒN DUY NHẤT cho màu / spacing / radius trong apps/web.
- * Component chỉ dùng class theo token ở đây; cấm hex tự do, cấm p-[13px].
+ * Tên lớp Tailwind sinh từ design system "Thiên Nông ERP" (`design/tokens.json`, bản chép của
+ * https://claude.ai/artifact/RwsgPEwCz5QX9hWDjdyW9p). Giá trị nằm trong `src/app/tokens.css`
+ * (sinh bằng `pnpm gen:tokens`); file này chỉ đặt TÊN lớp. Đổi giá trị → sửa tokens.json, sinh lại.
  *
- * Giá trị màu nằm trong globals.css (docs/DESIGN-BRIEF.md §3). Thang chữ, độ đậm và
- * kích thước khung (thanh trên, sidebar) chốt ở đây theo brief:
- * - Chữ: 12 chú thích · 13 mặc định bảng/form · 14 nội dung · 16 tiêu đề mục · 20 tiêu đề trang.
- * - Chỉ hai độ đậm 400 / 600 — `font-medium` và `font-bold` đều quy về 600 để component shadcn
- *   không kéo thêm weight 500/700.
+ * - Màu: mọi token màu (trừ lớp primitive) thành lớp cùng tên: `bg-primary`, `text-flow-wait`,
+ *   `bg-mod-wh-weak`, `border-input-soft`… Nền nhạt là `*-weak`, viền nhạt là `*-line` — không
+ *   pha độ mờ (`bg-warning/10`), xem scripts/check-tokens.mjs.
+ * - Chữ: 12 caption · 13 dense (bảng / form / nút) · 14 body · 16 section · 20 page-title · 24 kpi ·
+ *   36 display-number. `text-xs…2xl` của Tailwind ghi đè sang thang này để code cũ không phải sửa.
+ * - Chỉ hai độ đậm 400 / 700 — `font-medium` / `font-bold` đều về 700 (đậm hơn một bậc từ 2026-10-21).
+ * - Kích thước khung và component: `h-control` 32, `h-button-sm` 28, `h-chip` 18, `max-w-dialog`
+ *   440, `max-w-dialog-wide` 672, `w-sidebar` 240… (bảng `SIZE` dưới).
  */
+
+/** Primitive (neutral-*, blue-*…) chỉ dùng qua token semantic — không sinh lớp. */
+const PRIMITIVE = /^(neutral|blue|red|amber|green|slate|violet)-\d+$/;
+
+type ColorToken = { name: string; value: string | Record<string, string> };
+const colorTokens = tokens.color.tokens as ColorToken[];
+const theme = tokens.color.themes[0]!.id;
+const byName = new Map(colorTokens.map((t) => [t.name, t]));
+
+function resolveColor(name: string): string {
+  const t = byName.get(name);
+  if (!t) throw new Error(`tokens.json: alias trỏ tới token không có: ${name}`);
+  const v = typeof t.value === 'string' ? t.value : t.value[theme]!;
+  const m = /^\{([A-Za-z0-9_.-]+)\}$/.exec(v);
+  return m ? resolveColor(m[1]!) : v;
+}
+
+const colors: Record<string, string> = {};
+for (const t of colorTokens) {
+  if (PRIMITIVE.test(t.name)) continue;
+  colors[t.name] = resolveColor(t.name).startsWith('#')
+    ? `rgb(var(--${t.name}) / <alpha-value>)`
+    : `var(--${t.name})`;
+}
+/** Tên shadcn cũ còn dùng trong code → token tương đương. Không thêm tên mới vào đây. */
+const ALIAS: Record<string, string> = {
+  accent: 'secondary',
+  'accent-foreground': 'primary',
+  popover: 'card',
+  'popover-foreground': 'foreground',
+  'card-foreground': 'foreground',
+  'secondary-foreground': 'primary',
+  'destructive-foreground': 'primary-foreground',
+  'success-foreground': 'primary-foreground',
+  'warning-foreground': 'primary-foreground',
+  'info-foreground': 'primary-foreground',
+};
+for (const [alias, target] of Object.entries(ALIAS)) colors[alias] = colors[target]!;
+
+/** Tên lớp kích thước → token (spacing / component). Dùng cho h- w- min-h- max-w- top-… */
+const SIZE: Record<string, string> = {
+  control: 'control-height',
+  row: 'row-height',
+  'card-header': 'card-header-height',
+  topbar: 'topbar-height',
+  sidebar: 'sidebar-width',
+  'sidebar-collapsed': 'sidebar-collapsed',
+  'pda-touch': 'pda-touch-min',
+  'pda-primary': 'pda-primary-height',
+  button: 'button-height',
+  'button-sm': 'button-sm-height',
+  checkbox: 'checkbox-size',
+  'checkbox-hit': 'checkbox-hit-width',
+  chip: 'chip-height',
+  drawer: 'drawer-width',
+  'detail-label': 'detail-label-width',
+  'detail-aside': 'detail-aside-width',
+  search: 'search-width',
+  'menu-item': 'menu-item-height',
+  'menu-min': 'menu-min-width',
+  'nav-item': 'nav-item-height',
+  'sticky-topbar': 'sticky-topbar',
+  'sticky-page-header': 'sticky-page-header',
+};
+const sizes = Object.fromEntries(Object.entries(SIZE).map(([k, v]) => [k, `var(--${v})`]));
+
+/** `radius-md` → lớp `md` = var(--radius-md) (bỏ tiền tố nhóm). */
+const byPrefix = (group: { tokens: { name: string }[] }, prefix: string) =>
+  Object.fromEntries(group.tokens.map((t) => [t.name.slice(prefix.length), `var(--${t.name})`]));
+
+type Style = { name: string; fontSize: string; lineHeight: string; fontWeight: number };
+const textStyles = Object.fromEntries(
+  tokens.type.groups.flatMap((g) =>
+    (g.styles as Style[]).map((s) => [
+      s.name,
+      [s.fontSize, { lineHeight: s.lineHeight, fontWeight: String(s.fontWeight) }],
+    ]),
+  ),
+);
+
 const config: Config = {
-  darkMode: ['class'],
   content: ['./src/**/*.{ts,tsx}'],
   theme: {
     container: {
@@ -21,107 +105,36 @@ const config: Config = {
       screens: { '2xl': '1400px' },
     },
     extend: {
-      colors: {
-        border: 'hsl(var(--border))',
-        input: 'hsl(var(--input))',
-        ring: 'hsl(var(--ring))',
-        background: 'hsl(var(--background))',
-        foreground: 'hsl(var(--foreground))',
-        primary: {
-          DEFAULT: 'hsl(var(--primary))',
-          foreground: 'hsl(var(--primary-foreground))',
-        },
-        secondary: {
-          DEFAULT: 'hsl(var(--secondary))',
-          foreground: 'hsl(var(--secondary-foreground))',
-        },
-        destructive: {
-          DEFAULT: 'hsl(var(--destructive))',
-          foreground: 'hsl(var(--destructive-foreground))',
-        },
-        muted: {
-          DEFAULT: 'hsl(var(--muted))',
-          foreground: 'hsl(var(--muted-foreground))',
-        },
-        accent: {
-          DEFAULT: 'hsl(var(--accent))',
-          foreground: 'hsl(var(--accent-foreground))',
-        },
-        popover: {
-          DEFAULT: 'hsl(var(--popover))',
-          foreground: 'hsl(var(--popover-foreground))',
-        },
-        card: {
-          DEFAULT: 'hsl(var(--card))',
-          foreground: 'hsl(var(--card-foreground))',
-        },
-        // Trạng thái nghiệp vụ (SLA, chứng từ) — dùng qua StatusBadge, không dùng trực tiếp.
-        success: {
-          DEFAULT: 'hsl(var(--success))',
-          foreground: 'hsl(var(--success-foreground))',
-        },
-        warning: {
-          DEFAULT: 'hsl(var(--warning))',
-          foreground: 'hsl(var(--warning-foreground))',
-        },
-        info: {
-          DEFAULT: 'hsl(var(--info))',
-          foreground: 'hsl(var(--info-foreground))',
-        },
-        // Trạng thái đơn (tab danh sách đơn) — mỗi trạng thái một màu (globals.css --flow-*).
-        flow: Object.fromEntries(
-          [
-            'pending',
-            'warehouse',
-            'picking',
-            'packed',
-            'picked-up',
-            'in-transit',
-            'out-for-delivery',
-            'delivered',
-            'returned',
-            'carrier-cancelled',
-            'cancelled',
-          ].map((k) => [k, `hsl(var(--flow-${k}))`]),
-        ),
-        // Màu module menu trái (globals.css --mod-*) — chỉ cho điều hướng, không cho trạng thái.
-        mod: Object.fromEntries(
-          ['sales', 'cust', 'prod', 'wh', 'rpt', 'adm'].map((k) => [
-            k,
-            {
-              DEFAULT: `hsl(var(--mod-${k}))`,
-              weak: `hsl(var(--mod-${k}-weak))`,
-              line: `hsl(var(--mod-${k}-line))`,
-            },
-          ]),
-        ),
-        // Nhà mạng cạnh SĐT (globals.css --telco-*).
-        telco: Object.fromEntries(
-          ['viettel', 'vina', 'mobi', 'vnmb', 'gmobile', 'itel'].map((k) => [
-            k,
-            `hsl(var(--telco-${k}))`,
-          ]),
-        ),
-        // Sơ đồ nhân sự — màu theo khối (globals.css --branch-N / --branch-N-weak)
-        branch: Object.fromEntries(
-          [1, 2, 3, 4, 5, 6, 7, 8].map((n) => [
-            n,
-            { DEFAULT: `hsl(var(--branch-${n}))`, weak: `hsl(var(--branch-${n}-weak))` },
-          ]),
-        ),
-      },
+      colors,
       borderRadius: {
-        lg: 'var(--radius)',
-        md: 'calc(var(--radius) - 2px)',
-        sm: 'calc(var(--radius) - 4px)',
+        ...byPrefix(tokens.radius, 'radius-'),
+        DEFAULT: 'var(--radius-md)',
       },
+      // Viền ô tick chưa chọn 1.5px
+      borderWidth: {
+        '1.5': '1.5px',
+      },
+      boxShadow: byPrefix(tokens.shadow, 'shadow-'),
+      spacing: sizes,
+      maxWidth: {
+        dialog: 'var(--dialog-max-width)',
+        'dialog-wide': 'var(--dialog-wide-max-width)',
+      },
+      maxHeight: {
+        dialog: 'var(--dialog-max-height)',
+      },
+      // Danh sách nhãn–giá trị ở màn Chi tiết: cột nhãn `detail-label-width`
+      gridTemplateColumns: {
+        detail: 'var(--detail-label-width) minmax(0, 1fr)',
+      },
+      transitionDuration: byPrefix(tokens.duration, 'duration-'),
       fontFamily: {
         sans: ['var(--font-sans)', 'system-ui', 'sans-serif'],
         mono: ['var(--font-mono)', 'ui-monospace', 'monospace'],
       },
-      // Thang chữ brief §3 — ghi đè xs/sm/base/lg/xl của Tailwind để 500+ chỗ dùng text-sm
-      // tự về 13px mà không sửa từng file.
       fontSize: {
+        ...textStyles,
+        // Thang Tailwind ghi đè sang thang hệ thống để 500+ chỗ `text-sm` tự về 13px.
         xs: ['12px', { lineHeight: '16px' }],
         sm: ['13px', { lineHeight: '20px' }],
         base: ['14px', { lineHeight: '20px' }],
@@ -131,15 +144,9 @@ const config: Config = {
       },
       fontWeight: {
         normal: '400',
-        medium: '600',
-        semibold: '600',
-        bold: '600',
-      },
-      // Khung trang (redesign 2026-10-17): sidebar 240px để "Theo dõi giao hàng", "Cảnh báo nhập
-      // hàng" không bị cắt, thu gọn 60px. Thanh trên 48px = h-12 có sẵn.
-      spacing: {
-        sidebar: '240px',
-        'sidebar-collapsed': '60px',
+        medium: '700',
+        semibold: '700',
+        bold: '700',
       },
       keyframes: {
         'accordion-down': {

@@ -84,7 +84,7 @@ export function PancakeDuplicateDialog({
 
   return (
     <Dialog open={open} onOpenChange={(o) => !pending && onOpenChange(o)}>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent>
         <DialogHeader>
           <DialogTitle>Nhân bản kết nối shop {source.shopId}</DialogTitle>
           <DialogDescription>

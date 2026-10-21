@@ -293,7 +293,7 @@ function Stepper({ step }: { step: ImportStep }) {
             <span
               className={cn(
                 'flex h-5 w-5 items-center justify-center rounded-full text-xs',
-                it.state === 'done' && 'bg-success/10 text-success',
+                it.state === 'done' && 'bg-success-weak text-success',
                 it.state === 'on' && 'bg-primary text-primary-foreground',
                 it.state === 'todo' && 'bg-muted text-muted-foreground',
               )}
@@ -356,7 +356,7 @@ function PreviewStep({ onRun }: { onRun: () => void }) {
           </TableHeader>
           <TableBody>
             {SAMPLE_PREVIEW.map((r) => (
-              <TableRow key={r.line} className={cn(r.error && 'bg-destructive/10')}>
+              <TableRow key={r.line} className={cn(r.error && 'bg-destructive-weak')}>
                 <TableCell className="px-2.5 py-1.5 text-right tabular-nums text-muted-foreground">
                   {r.line}
                 </TableCell>
@@ -410,7 +410,7 @@ function PreviewStep({ onRun }: { onRun: () => void }) {
         </div>
       </div>
       <div className="mt-3 flex flex-wrap items-center gap-3 rounded-md border bg-card px-3 py-2.5">
-        <div className="flex min-w-64 flex-1 items-start gap-2 rounded-md border bg-warning/10 px-3 py-1.5 text-sm text-warning">
+        <div className="flex min-w-64 flex-1 items-start gap-2 rounded-md border bg-warning-weak px-3 py-1.5 text-sm text-warning">
           <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden />
           <p>
             <span className="font-semibold">2 dòng lỗi sẽ bị bỏ qua</span> khi chạy thật; 118 dòng
@@ -466,7 +466,7 @@ function ResultStep() {
               </TableHeader>
               <TableBody>
                 {SAMPLE_ERRORS.map((r) => (
-                  <TableRow key={r.line} className="bg-destructive/10">
+                  <TableRow key={r.line} className="bg-destructive-weak">
                     <TableCell className="px-2.5 py-1.5 text-right tabular-nums">
                       {r.line}
                     </TableCell>

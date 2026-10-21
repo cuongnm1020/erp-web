@@ -62,7 +62,7 @@ function StatusLogDialog({
   const query = useShipmentStatusLog(shipment?.id ?? '');
   return (
     <Dialog open={shipment !== null} onOpenChange={(o) => !o && onClose()}>
-      <DialogContent className="sm:max-w-lg">
+      <DialogContent wide>
         <DialogHeader>
           <DialogTitle>Hành trình {shipment?.docNumber}</DialogTitle>
           <DialogDescription>
@@ -251,7 +251,7 @@ function ViewCard({
           active && 'border-primary ring-1 ring-primary',
           tone === 'danger' &&
             card.value > 0 &&
-            'border-destructive/60 bg-destructive/5 text-destructive',
+            'border-destructive-line bg-destructive-weak text-destructive',
         )}
       />
     </button>
@@ -426,7 +426,7 @@ export function ShippingMonitorScreen() {
           {t.holdingOverdue > 0 ? (
             <div
               role="alert"
-              className="flex flex-wrap items-center gap-3 rounded-md border border-destructive/60 bg-destructive/10 px-3 py-2 text-sm text-destructive"
+              className="flex flex-wrap items-center gap-3 rounded-md border border-destructive-line bg-destructive-weak px-3 py-2 text-sm text-destructive"
             >
               <AlertTriangle className="h-5 w-5 shrink-0" aria-hidden />
               <span className="flex-1">

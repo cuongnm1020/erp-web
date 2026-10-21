@@ -467,7 +467,7 @@ function buildColumns(
         row.original.exceptionLineCount > 0 ? (
           <span className="flex items-center gap-2">
             <span
-              className="flex items-center gap-1 rounded-sm bg-warning/15 px-1.5 text-xs font-semibold text-warning-foreground"
+              className="flex items-center gap-1 rounded-sm bg-warning-weak px-1.5 text-xs font-semibold text-warning"
               title="Thiếu tồn khi tạo việc, hoặc nhân viên báo thiếu khi lấy — phần thiếu không sang đóng gói"
             >
               <AlertTriangle className="h-3.5 w-3.5 text-warning" aria-hidden />
@@ -755,9 +755,7 @@ export function DispatchScreen() {
               <span
                 className={cn(
                   'rounded-full px-1.5 text-xs font-normal tabular-nums',
-                  count && !active
-                    ? 'bg-primary/10 text-primary'
-                    : 'bg-muted text-muted-foreground',
+                  count && !active ? 'bg-secondary text-primary' : 'bg-muted text-muted-foreground',
                 )}
               >
                 {count ?? (countQuery.error ? '—' : '…')}
@@ -792,7 +790,7 @@ export function DispatchScreen() {
               <span
                 className={cn(
                   'rounded-full px-1.5 text-xs font-normal tabular-nums',
-                  count ? 'bg-primary/10 text-primary' : 'bg-muted text-muted-foreground',
+                  count ? 'bg-secondary text-primary' : 'bg-muted text-muted-foreground',
                 )}
               >
                 {count ?? (suggestions.error ? '—' : '…')}
@@ -893,7 +891,7 @@ function SelectionToolbar({
     <div
       role="region"
       aria-label="Việc đã chọn"
-      className="flex flex-wrap items-center gap-2 rounded-md border border-primary/40 bg-primary/5 px-3 py-2 text-sm"
+      className="flex flex-wrap items-center gap-2 rounded-md border border-primary/40 bg-secondary px-3 py-2 text-sm"
     >
       <Layers className="h-4 w-4 text-primary" aria-hidden />
       <span>
@@ -927,7 +925,7 @@ function SelectionToolbar({
         Bỏ chọn
       </Button>
       <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent className="sm:max-w-md">
+        <DialogContent>
           <DialogHeader>
             <DialogTitle>Gộp {selectedIds.length} việc thành một lượt lấy hàng</DialogTitle>
             <DialogDescription>
@@ -1305,7 +1303,7 @@ function MergeDialog({
         if (!o && !merge.isPending) onClose();
       }}
     >
-      <DialogContent className="sm:max-w-md">
+      <DialogContent>
         <DialogHeader>
           <DialogTitle>
             Gộp {group.taskCount} đơn — {mergeLabel(group.packLevel, group.packCount)} ·{' '}

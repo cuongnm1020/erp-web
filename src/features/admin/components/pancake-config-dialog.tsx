@@ -126,7 +126,7 @@ export function PancakeConfigDialog({
 
   return (
     <Dialog open={open} onOpenChange={(o) => !pending && onOpenChange(o)}>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent>
         <DialogHeader>
           <DialogTitle>
             {editing ? `Sửa kết nối shop ${config.shopId}` : 'Thêm shop Pancake'}

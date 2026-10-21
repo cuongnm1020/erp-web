@@ -115,7 +115,7 @@ export function ConsentRecordDialog({
 
   return (
     <Dialog open={open} onOpenChange={(o) => !record.isPending && onOpenChange(o)}>
-      <DialogContent className="sm:max-w-lg">
+      <DialogContent wide>
         <DialogHeader>
           <DialogTitle>Ghi nhận đồng ý nhận tin</DialogTitle>
           <DialogDescription>
@@ -206,8 +206,8 @@ export function ConsentRecordDialog({
                           'h-9 flex-1 rounded-md border px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
                           field.value === value
                             ? value === 'true'
-                              ? 'border-success bg-success/10 font-semibold text-success'
-                              : 'border-destructive bg-destructive/10 font-semibold text-destructive'
+                              ? 'border-success bg-success-weak font-semibold text-success'
+                              : 'border-destructive bg-destructive-weak font-semibold text-destructive'
                             : 'border-input bg-card',
                         )}
                       >

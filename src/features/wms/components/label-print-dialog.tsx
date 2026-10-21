@@ -117,7 +117,7 @@ export function LabelPrintDialog({
 
   return (
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
-      <DialogContent className="sm:max-w-2xl" hideClose>
+      <DialogContent wide hideClose>
         <DialogHeader>
           <DialogTitle>
             {trackingNo ? `Nhãn vận đơn ${trackingNo}` : 'Vận đơn cho kiện vừa đóng'}
@@ -157,7 +157,7 @@ export function LabelPrintDialog({
             }
           />
         ) : local.outcome === 'FAILED' ? (
-          <div className="rounded-md border border-destructive/40 bg-destructive/5 p-3 text-sm">
+          <div className="rounded-md border border-destructive-line bg-destructive-weak p-3 text-sm">
             <p className="font-medium">Hàng đã trừ tồn nhưng chưa xin được vận đơn.</p>
             <p className="mt-1 text-muted-foreground">
               {local.errorCode ? messageForCode(local.errorCode) : (local.reason ?? '')}
@@ -177,7 +177,7 @@ export function LabelPrintDialog({
         ) : (
           <div
             role="status"
-            className="flex items-center gap-2 rounded-md border border-warning/40 bg-warning/10 p-3 text-sm"
+            className="flex items-center gap-2 rounded-md border border-warning-line bg-warning-weak p-3 text-sm"
           >
             <RefreshCw className="h-4 w-4 animate-spin motion-reduce:animate-none" aria-hidden />
             <span>

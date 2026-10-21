@@ -28,7 +28,7 @@ export function ErrorState({
     <div
       role="alert"
       className={cn(
-        'flex min-h-64 flex-col items-center justify-center gap-3 rounded-lg border border-destructive/40 bg-destructive/5 p-8 text-center',
+        'flex min-h-64 flex-col items-center justify-center gap-3 rounded-lg border border-destructive-line bg-destructive-weak p-8 text-center',
         className,
       )}
     >

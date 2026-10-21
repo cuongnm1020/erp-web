@@ -76,7 +76,7 @@ function MergedBanner({ target }: { target: NonNullable<CustomerDetail['mergedIn
   return (
     <div
       role="status"
-      className="flex flex-wrap items-center gap-2 rounded-md border border-warning/40 bg-warning/10 px-3 py-2 text-sm"
+      className="flex flex-wrap items-center gap-2 rounded-md border border-warning-line bg-warning-weak px-3 py-2 text-sm"
     >
       <GitMerge className="h-4 w-4 shrink-0 text-warning" aria-hidden />
       {target.code ? (

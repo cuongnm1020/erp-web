@@ -45,12 +45,14 @@ import {
   type StockByLocationRow,
   type StockByLotRow,
   type StockRow,
+  type StockSortField,
 } from '../api/use-stock';
 import { isNegativeQty, locationTypeLabel } from '../labels';
 
 /**
  * G-01 Tồn kho — ba mặt đọc, ba endpoint:
- *   Theo SKU     → GET /stock             (gộp toàn kho, sắp theo mã SKU)
+ *   Theo SKU     → GET /stock             (gộp toàn kho, sắp theo mã SKU; bấm tiêu đề Cân nặng /
+ *                                           Tồn thực / Đang giữ / Khả dụng để sắp phía server)
  *   Theo vị trí  → GET /stock/by-location (sắp theo pickSequence = thứ tự đi kho)
  *   Theo lô      → GET /stock/by-lot      (sắp theo hạn dùng tăng dần = FEFO)
  *
@@ -219,6 +221,13 @@ function CountWeightCell({ row }: { row: StockRow }) {
   );
 }
 
+const STOCK_SORTABLE = new Set<string>([
+  'weight',
+  'onHand',
+  'reserved',
+  'available',
+] satisfies StockSortField[]);
+
 const TABS: Array<{ key: StockTabKey; label: string }> = [
   { key: 'sku', label: 'Theo SKU' },
   { key: 'location', label: 'Theo vị trí' },
@@ -229,27 +238,30 @@ function parseTab(v: string | undefined): StockTabKey {
   return v === 'location' || v === 'lot' ? v : 'sku';
 }
 
-/** Ba cột số dùng chung cho cả ba mặt — cùng thứ tự, cùng cách đọc. */
-function quantityColumns<
-  T extends { onHand: string; reserved: string; available: string },
->(): ColumnDef<T, unknown>[] {
+/**
+ * Ba cột số dùng chung cho cả ba mặt — cùng thứ tự, cùng cách đọc. `sortable` chỉ bật ở mặt
+ * Theo SKU (GET /stock nhận sortBy = id cột); hai mặt bóc tách giữ thứ tự cố định của API.
+ */
+function quantityColumns<T extends { onHand: string; reserved: string; available: string }>(
+  sortable = false,
+): ColumnDef<T, unknown>[] {
   return [
     {
       id: 'onHand',
       header: 'Tồn thực',
-      meta: { align: 'right', width: 110 },
+      meta: { align: 'right', width: 110, sortable },
       cell: ({ row }) => formatQuantity(row.original.onHand),
     },
     {
       id: 'reserved',
       header: 'Đang giữ',
-      meta: { align: 'right', width: 110 },
+      meta: { align: 'right', width: 110, sortable },
       cell: ({ row }) => formatQuantity(row.original.reserved),
     },
     {
       id: 'available',
       header: 'Khả dụng',
-      meta: { align: 'right', width: 120 },
+      meta: { align: 'right', width: 120, sortable },
       cell: ({ row }) => (
         <span
           className={cn(
@@ -277,14 +289,14 @@ const skuColumns: ColumnDef<StockRow, unknown>[] = [
   {
     id: 'weight',
     header: 'Cân nặng',
-    meta: { align: 'right', width: 110 },
+    meta: { align: 'right', width: 110, sortable: true },
     cell: ({ row }) => (
       <span className={cn(row.original.weightKg === null && 'text-muted-foreground')}>
         {formatGrams(row.original.weightKg)}
       </span>
     ),
   },
-  ...quantityColumns<StockRow>(),
+  ...quantityColumns<StockRow>(true),
   {
     id: 'flags',
     header: 'Ghi chú',
@@ -650,12 +662,20 @@ export function StockScreen() {
     () => ({ q: state.q, erpOnly: true, ...skipTake }),
     [state.q, skipTake],
   );
+  // Chỉ cột trong whitelist sort của GET /stock mới gửi lên — sort lạ trên URL bị bỏ qua.
+  const sortBy =
+    state.sort && STOCK_SORTABLE.has(state.sort.id) ? (state.sort.id as StockSortField) : undefined;
+  const sortDir = sortBy ? (state.sort?.desc ? ('desc' as const) : ('asc' as const)) : undefined;
+  const skuParams = useMemo(
+    () => ({ ...listParams, sortBy, sortDir }),
+    [listParams, sortBy, sortDir],
+  );
   const breakdownParams = useMemo(
     () => ({ ...listParams, skuId, locationId }),
     [listParams, skuId, locationId],
   );
 
-  const bySku = useStockBySku(listParams, tab === 'sku');
+  const bySku = useStockBySku(skuParams, tab === 'sku');
   const byLocation = useStockByLocation(breakdownParams, tab === 'location');
   const byLot = useStockByLot(breakdownParams, tab === 'lot');
   const total = (tab === 'sku' ? bySku : tab === 'location' ? byLocation : byLot).data?.total;
@@ -720,7 +740,7 @@ export function StockScreen() {
       />
 
       {counting ? (
-        <div className="flex flex-col gap-1 rounded-md border border-primary/40 bg-primary/5 px-3 py-2 text-xs">
+        <div className="flex flex-col gap-1 rounded-md border border-primary/40 bg-secondary px-3 py-2 text-xs">
           {canAdjust ? (
             countWarehouseId ? (
               <span>

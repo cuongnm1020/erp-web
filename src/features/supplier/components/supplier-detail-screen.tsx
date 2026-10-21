@@ -136,7 +136,7 @@ function AddressDialog({
 
   return (
     <Dialog open={open} onOpenChange={(o) => !add.isPending && onOpenChange(o)}>
-      <DialogContent className="sm:max-w-lg">
+      <DialogContent wide>
         <DialogHeader>
           <DialogTitle>Thêm địa chỉ</DialogTitle>
           <DialogDescription>Địa chỉ kho/giao nhận của nhà cung cấp.</DialogDescription>

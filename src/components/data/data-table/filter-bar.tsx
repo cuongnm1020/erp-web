@@ -81,7 +81,7 @@ export function FilterBar<F extends string = string>({
               value={value ?? ALL}
               onValueChange={(v) => set(v === ALL ? undefined : v)}
             >
-              <SelectTrigger className="h-9 w-44" aria-label={f.label}>
+              <SelectTrigger className="h-8 w-44" aria-label={f.label}>
                 <SelectValue placeholder={f.label} />
               </SelectTrigger>
               <SelectContent>
@@ -105,7 +105,7 @@ export function FilterBar<F extends string = string>({
               onChange={(e) => set(e.target.value || undefined)}
               placeholder={f.placeholder ?? f.label}
               aria-label={f.label}
-              className="h-9 w-44"
+              className="h-8 w-44"
             />
           );
         }
@@ -116,7 +116,7 @@ export function FilterBar<F extends string = string>({
             onCommit={(v) => set(v || undefined)}
             placeholder={f.placeholder ?? f.label}
             aria-label={f.label}
-            className="h-9 w-44"
+            className="h-8 w-44"
           />
         );
       })}

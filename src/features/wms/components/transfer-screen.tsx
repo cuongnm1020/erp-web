@@ -128,7 +128,7 @@ function CreateDialog({ onClose }: { onClose: (id?: string) => void }) {
 
   return (
     <Dialog open onOpenChange={(o) => !create.isPending && !o && onClose()}>
-      <DialogContent className="sm:max-w-2xl">
+      <DialogContent wide>
         <DialogHeader>
           <DialogTitle>Tạo phiếu chuyển kho</DialogTitle>
           <DialogDescription>
@@ -485,7 +485,7 @@ function DetailPanel({ transferId, onClosed }: { transferId: string; onClosed: (
                       return (
                         <TableRow
                           key={l.id}
-                          className={draftShort || finalShort ? 'bg-warning/5' : undefined}
+                          className={draftShort || finalShort ? 'bg-warning-weak' : undefined}
                         >
                           <TableCell className="px-2.5 py-1.5 text-muted-foreground">
                             {l.lineNo}

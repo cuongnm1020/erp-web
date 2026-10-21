@@ -267,7 +267,7 @@ export function ApprovalQueueScreen() {
                   {SAMPLE_REVIEW_LINES.map((l) => (
                     <TableRow
                       key={l.name}
-                      className={cn(l.violation && 'bg-warning/10 hover:bg-warning/10')}
+                      className={cn(l.violation && 'bg-warning-weak hover:bg-warning-weak')}
                     >
                       <TableCell className="px-2.5 py-1.5">
                         <div className={cn(l.violation && 'font-semibold')}>{l.name}</div>

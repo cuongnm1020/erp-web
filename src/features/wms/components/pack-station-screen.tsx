@@ -189,7 +189,7 @@ export function PackStationScreen() {
       </header>
 
       {s.offline ? (
-        <p role="status" className="flex items-center gap-2 bg-warning/15 px-4 py-2 text-sm">
+        <p role="status" className="flex items-center gap-2 bg-warning-weak px-4 py-2 text-sm">
           <WifiOff className="h-4 w-4 text-warning" aria-hidden />
           Mất kết nối — lần quét vừa rồi chưa được ghi. Kiểm tra mạng rồi quét lại.
         </p>
@@ -202,10 +202,10 @@ export function PackStationScreen() {
             className={cn(
               'flex items-center gap-2 rounded-md border px-3 py-3 font-medium',
               feedback.kind === 'error' &&
-                'border-destructive/50 bg-destructive/10 text-destructive',
-              feedback.kind === 'warn' && 'border-warning/60 bg-warning/10 text-warning-foreground',
-              feedback.kind === 'ok' && 'border-success/50 bg-success/10 text-success',
-              feedback.kind === 'info' && 'border-info/50 bg-info/10 text-info',
+                'border-destructive-line bg-destructive-weak text-destructive',
+              feedback.kind === 'warn' && 'border-warning-line bg-warning-weak text-warning',
+              feedback.kind === 'ok' && 'border-success-line bg-success-weak text-success',
+              feedback.kind === 'info' && 'border-info-line bg-info-weak text-info',
             )}
           >
             {feedback.kind === 'error' ? (
@@ -256,7 +256,7 @@ export function PackStationScreen() {
                         className={cn(
                           'rounded-sm px-1.5 py-0.5 text-xs font-medium',
                           q.assignedToMe
-                            ? 'bg-primary/10 text-primary'
+                            ? 'bg-secondary text-primary'
                             : 'bg-muted text-muted-foreground',
                         )}
                       >
@@ -343,8 +343,8 @@ export function PackStationScreen() {
                 className={cn(
                   'flex items-center justify-between rounded-md border px-3 py-2',
                   l.status === 'COMPLETED' &&
-                    'border-success/40 bg-success/5 text-muted-foreground',
-                  l.status === 'EXCEPTION' && 'border-warning/60 bg-warning/10',
+                    'border-success-line bg-success-weak text-muted-foreground',
+                  l.status === 'EXCEPTION' && 'border-warning-line bg-warning-weak',
                   l.taskLineId === current?.taskLineId && 'border-primary',
                 )}
               >
@@ -400,7 +400,7 @@ export function PackStationScreen() {
           disabled={phase === 'opening' || phase === 'done'}
         />
         {phase === 'done' ? (
-          <Button className="h-[72px] text-lg" onClick={clearOrder}>
+          <Button className="h-pda-primary text-lg" onClick={clearOrder}>
             Quét đơn kế tiếp
           </Button>
         ) : phase === 'ready' ? (
@@ -408,7 +408,7 @@ export function PackStationScreen() {
             Bỏ đơn đang mở (Esc)
           </Button>
         ) : (
-          <Button className="h-[72px] text-lg" onClick={() => scanRef.current?.focus()}>
+          <Button className="h-pda-primary text-lg" onClick={() => scanRef.current?.focus()}>
             Quét mã vạch (F2)
           </Button>
         )}
@@ -424,7 +424,7 @@ export function PackStationScreen() {
       />
 
       <Dialog open={help} onOpenChange={setHelp}>
-        <DialogContent className="sm:max-w-md">
+        <DialogContent>
           <DialogHeader>
             <DialogTitle>Phím tắt trạm đóng gói</DialogTitle>
             <DialogDescription>Máy quét USB gõ mã rồi Enter — không cần chuột.</DialogDescription>

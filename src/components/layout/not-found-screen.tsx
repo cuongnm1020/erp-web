@@ -52,7 +52,7 @@ export function NotFoundCard({
           }
         >
           Tìm toàn cục
-          <kbd className="rounded border bg-muted px-1.5 font-mono text-[10px]">Ctrl K</kbd>
+          <kbd className="rounded border bg-muted px-1.5 font-mono text-xs">Ctrl K</kbd>
         </Button>
       </div>
     </div>

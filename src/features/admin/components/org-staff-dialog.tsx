@@ -104,7 +104,7 @@ export function OrgStaffDialog({
 
   return (
     <Dialog open onOpenChange={(o) => !update.isPending && onOpenChange(o)}>
-      <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-lg">
+      <DialogContent wide>
         <DialogHeader>
           <DialogTitle>Sửa nhân sự {employee.code}</DialogTitle>
           <DialogDescription>

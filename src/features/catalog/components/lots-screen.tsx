@@ -89,8 +89,8 @@ const STATE_BADGE: Record<LotState, { tone: 'err' | 'warn' | 'ok' | 'neutral'; l
 };
 
 const ROW_BG: Record<LotState, string | undefined> = {
-  expired: 'bg-destructive/10 hover:bg-destructive/10',
-  near: 'bg-warning/10 hover:bg-warning/10',
+  expired: 'bg-destructive-weak hover:bg-destructive-weak',
+  near: 'bg-warning-weak hover:bg-warning-weak',
   ok: undefined,
   empty: undefined,
   none: undefined,
@@ -140,7 +140,7 @@ function LotEditDialog({
 
   return (
     <Dialog open={open} onOpenChange={(o) => !update.isPending && onOpenChange(o)}>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent>
         <DialogHeader>
           <DialogTitle>
             Sửa lô {lot.lotNumber} · {lot.skuCode}

@@ -24,7 +24,7 @@ export function ContainerHint({
   return (
     <div className="mt-2 flex flex-col gap-1">
       {containerBarcode ? (
-        <div className="rounded-md border border-primary/40 bg-primary/5 px-2 py-1.5">
+        <div className="rounded-md border border-primary/40 bg-secondary px-2 py-1.5">
           <div className="flex items-center gap-1 text-xs font-medium text-primary">
             <Box className="h-3.5 w-3.5" aria-hidden />
             Thùng đã xếp — quét mã thùng để lấy trọn

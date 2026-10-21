@@ -683,7 +683,7 @@ function FailedOrders({
           return (
             <li
               key={f.orderId}
-              className="rounded-md border border-destructive/40 px-3 py-2 text-sm"
+              className="rounded-md border border-destructive-line px-3 py-2 text-sm"
             >
               <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
                 <Link
