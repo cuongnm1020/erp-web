@@ -9247,6 +9247,15 @@ export interface components {
              */
             source: "ORDER" | "CUSTOMER_DEFAULT";
         };
+        OrderCustomItemDto: {
+            name: string;
+            /** @description Số lượng như trên Pancake (chuỗi). */
+            qty: string;
+            /** @description Đơn giá niêm yết trên Pancake (chuỗi); null = không có. */
+            unitPrice: string | null;
+            /** @description Giảm mỗi món (chuỗi). */
+            discount: string;
+        };
         OrderApprovalDto: {
             /** @description Gửi vào POST /sales-orders/:id/approve | reject. */
             requestId: string;
@@ -9314,6 +9323,13 @@ export interface components {
             skuId: string;
             skuCode: string;
             skuName: string;
+            /**
+             * @description Đơn đồng bộ từ Pancake: tên sản phẩm GỐC trên Pancake của dòng (đúng như trên POS) — người
+             *     đóng hàng tìm hàng theo tên này. null = đơn tạo trong ERP / Pancake không gửi tên.
+             */
+            pancakeName: string | null;
+            /** @description Mã (display_id) sản phẩm gốc trên Pancake; null như trên. */
+            pancakeSkuCode: string | null;
             uomId: string;
             uomCode: string;
             /** @description Decimal(18,6) dạng chuỗi — theo `uomId`. */
@@ -9351,6 +9367,11 @@ export interface components {
         SalesOrderDetailDto: {
             /** @description Địa chỉ giao hiệu lực — null = khách chưa có địa chỉ dùng được (tra cước / cấp vận đơn sẽ 422). */
             shippingAddress: components["schemas"]["SalesOrderAddressDto"] | null;
+            /**
+             * @description Món gõ tay trên Pancake (2026-10-22) — không có SKU nên không nằm ở `lines`, không giữ chỗ /
+             *     trừ tồn; người đóng hàng tự lấy theo tên. [] = không có.
+             */
+            customItems: components["schemas"]["OrderCustomItemDto"][];
             /** @description Bước duyệt đang chờ — null = đơn không chờ duyệt. */
             approval: components["schemas"]["OrderApprovalDto"] | null;
             /** @description Trạng thái kho (pick / đóng gói / giao) — suy từ task + phiếu giao. */
@@ -9465,8 +9486,9 @@ export interface components {
             docNumber: string;
             /** @enum {string} */
             target: "PICKED" | "PACKED";
-            pickTaskId: string;
-            pickTaskDocNumber: string;
+            /** @description null = đơn chỉ có món gõ tay Pancake (không có việc PICK). */
+            pickTaskId: string | null;
+            pickTaskDocNumber: string | null;
             /** @description true = task PICK vừa được đóng tay (không quét) trong lần gọi này. */
             pickForced: boolean;
             shipmentId: string | null;

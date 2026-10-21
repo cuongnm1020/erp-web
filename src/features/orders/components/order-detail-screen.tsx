@@ -286,6 +286,42 @@ const MISSING: Array<{ title: string; need: string }> = [
 ];
 
 /** Một dòng SKU; `component` = dòng thành phần combo (thụt vào, giá đã phân bổ hiện mờ). */
+/**
+ * Món gõ tay trên Pancake (không gắn sản phẩm — 2026-10-22): chỉ hiển thị cho người đóng hàng tìm
+ * theo tên; không giữ chỗ / trừ tồn nên hai cột kho để trống.
+ */
+function CustomItemRow({ c }: { c: SalesOrderDetail['customItems'][number] }) {
+  const unit = c.unitPrice ? new Decimal(c.unitPrice).minus(c.discount || 0) : null;
+  return (
+    <TableRow data-testid="custom-item-row">
+      <TableCell className="px-2.5 py-1.5 text-muted-foreground">—</TableCell>
+      <TableCell className="px-2.5 py-1.5">
+        <div className="flex flex-wrap items-center gap-1.5 font-semibold">
+          {c.name}
+          <StatusBadge tone="warn">Gõ tay trên Pancake</StatusBadge>
+        </div>
+        <div className="text-xs text-muted-foreground">Không trừ tồn — tự lấy hàng theo tên</div>
+      </TableCell>
+      <TableCell className="px-2.5 py-1.5 text-muted-foreground">—</TableCell>
+      <TableCell className="px-2.5 py-1.5 text-right tabular-nums">{qty(c.qty)}</TableCell>
+      <TableCell className="px-2.5 py-1.5 text-right tabular-nums text-muted-foreground">
+        {c.unitPrice ? money(c.unitPrice) : '—'}
+      </TableCell>
+      <TableCell className="px-2.5 py-1.5 text-right tabular-nums">
+        {unit ? money(unit.toString()) : '—'}
+      </TableCell>
+      <TableCell className="px-2.5 py-1.5 text-right tabular-nums">
+        {money(new Decimal(c.discount || 0).mul(c.qty || 1).toString())}
+      </TableCell>
+      <TableCell className="px-2.5 py-1.5 text-right font-semibold tabular-nums">
+        {unit ? money(unit.mul(c.qty || 1).toString()) : '—'}
+      </TableCell>
+      <TableCell className="px-2.5 py-1.5 text-right text-muted-foreground">—</TableCell>
+      <TableCell className="px-2.5 py-1.5 text-right text-muted-foreground">—</TableCell>
+    </TableRow>
+  );
+}
+
 function LineRow({ l, component = false }: { l: SalesOrderLine; component?: boolean }) {
   return (
     <TableRow data-testid={component ? 'combo-component-row' : undefined}>
@@ -317,6 +353,16 @@ function LineRow({ l, component = false }: { l: SalesOrderLine; component?: bool
           {l.skuCode}
           {component && l.combo ? ` · ${qty(l.combo.componentQty)} / combo` : ''}
         </div>
+        {l.pancakeName && l.pancakeName !== l.skuName ? (
+          <div
+            className={
+              component ? 'pl-8 text-xs text-muted-foreground' : 'text-xs text-muted-foreground'
+            }
+          >
+            Trên Pancake: {l.pancakeName}
+            {l.pancakeSkuCode ? ` · ${l.pancakeSkuCode}` : ''}
+          </div>
+        ) : null}
       </TableCell>
       <TableCell className="px-2.5 py-1.5">{l.uomCode}</TableCell>
       <TableCell className="px-2.5 py-1.5 text-right tabular-nums">
@@ -533,6 +579,9 @@ function Lines({ order }: { order: SalesOrderDetail }) {
                 </Fragment>
               ),
             )}
+            {order.customItems.map((c, i) => (
+              <CustomItemRow key={`custom-${i}`} c={c} />
+            ))}
           </TableBody>
         </Table>
       </div>

@@ -206,6 +206,33 @@ describe('OrderDetailScreen — GET /sales-orders/{id} (P1-12)', () => {
   });
 });
 
+describe('OrderDetailScreen — đơn Pancake: tên gốc trên Pancake + món gõ tay (2026-10-22)', () => {
+  it('dòng có tên Pancake khác tên ERP hiện "Trên Pancake: …"; món gõ tay hiện thành dòng riêng, không cột kho', async () => {
+    const lines = DETAIL.lines.map((l, i) =>
+      i === 0 ? { ...l, pancakeName: '3 Gói Ches Thái LLan gói 100g', pancakeSkuCode: '006' } : l,
+    );
+    server.use(
+      http.get('/api/sales-orders/:id', () =>
+        HttpResponse.json({
+          ...DETAIL,
+          lines,
+          customItems: [
+            { name: '400 gói combi thái 25gr', qty: '2', unitPrice: '5600000', discount: '0' },
+          ],
+        }),
+      ),
+    );
+    renderApp(<OrderDetailScreen orderId={ORDER.id} />);
+    expect(
+      await screen.findByText('Trên Pancake: 3 Gói Ches Thái LLan gói 100g · 006'),
+    ).toBeInTheDocument();
+    const row = screen.getByTestId('custom-item-row');
+    expect(row).toHaveTextContent('400 gói combi thái 25gr');
+    expect(row).toHaveTextContent('Gõ tay trên Pancake');
+    expect(row).toHaveTextContent('Không trừ tồn');
+  });
+});
+
 describe('OrderDetailScreen — duyệt đơn Chờ duyệt (2026-10-21)', () => {
   const pending = (canAct: boolean) => ({
     ...DETAIL,

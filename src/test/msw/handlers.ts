@@ -558,6 +558,8 @@ export function makeOrderDetail(id: string) {
     skuId: uuid('00000003', i),
     skuCode: `SKU-${String(i + 1).padStart(4, '0')}`,
     skuName: `Sản phẩm ${i + 1}`,
+    pancakeName: null as string | null,
+    pancakeSkuCode: null as string | null,
     uomId: uuid('00000004', i),
     uomCode: i % 2 === 0 ? 'cái' : 'thùng',
     qty: String((i + 1) * 10),
@@ -577,6 +579,7 @@ export function makeOrderDetail(id: string) {
     ...header,
     shippingAddress: null,
     approval: null as { requestId: string; ruleName: string | null; canAct: boolean } | null,
+    customItems: [] as { name: string; qty: string; unitPrice: string | null; discount: string }[],
     fulfilment: {
       status: 'NOT_STARTED',
       pickTaskId: null,
