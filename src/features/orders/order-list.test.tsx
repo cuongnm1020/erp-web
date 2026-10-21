@@ -83,6 +83,28 @@ describe('OrderListScreen — GET /sales-orders (P1-12)', () => {
     expect(String(replace.mock.calls.at(-1)![0])).toContain('flow=RETURNED');
   });
 
+  it('đơn trùng trong ngày: chip "Trùng · N đơn" ở cột trạng thái; ?duplicate=true gửi lên server', async () => {
+    search = 'duplicate=true';
+    const seen: URLSearchParams[] = [];
+    const orders = makeOrders(2);
+    server.use(
+      http.get('/api/sales-orders', ({ request }) => {
+        seen.push(new URL(request.url).searchParams);
+        return HttpResponse.json({
+          items: [
+            { ...orders[0]!, sameDayCount: 2 },
+            { ...orders[1]!, sameDayCount: 0 },
+          ],
+          total: 2,
+        });
+      }),
+    );
+    renderApp(<OrderListScreen />);
+    expect(await screen.findByText('Trùng · 3 đơn')).toBeInTheDocument();
+    expect(screen.getAllByText(/^Trùng ·/)).toHaveLength(1);
+    expect(seen.at(-1)!.get('duplicate')).toBe('true');
+  });
+
   it('SĐT hiện đủ trên một dòng kèm nhà mạng rút gọn (Viettel / Vina / Mobi)', async () => {
     search = '';
     renderApp(<OrderListScreen />);

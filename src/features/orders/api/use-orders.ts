@@ -39,6 +39,8 @@ export interface OrderListParams {
   noCarrier?: boolean;
   /** Đơn đã gán hãng này (wms.Carrier.id). */
   carrierId?: string;
+  /** true = chỉ đơn có đơn trùng trong ngày (cùng SĐT, cùng ngày VN, chưa hủy — CSKH-5). */
+  duplicate?: boolean;
   /** Khoảng orderDate — ngày `YYYY-MM-DD` (server lấy trọn ngày VN) hoặc ISO datetime. */
   from?: string;
   to?: string;
@@ -103,6 +105,7 @@ function listQuery(params: Omit<OrderListParams, 'take' | 'skip'>) {
     weightMax: params.weightMax || undefined,
     noCarrier: params.noCarrier ? ('true' as const) : undefined,
     carrierId: params.carrierId || undefined,
+    duplicate: params.duplicate ? ('true' as const) : undefined,
     from: params.from || undefined,
     to: params.to || undefined,
   };

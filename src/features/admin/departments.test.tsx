@@ -176,8 +176,28 @@ describe('TeamsScreen — Phòng ban & team (I-05)', () => {
         managerId: null,
         sortOrder: 5, // prefill từ phòng ban
         isActive: true,
+        kind: 'SALES', // phòng ban cũ chưa có kind → mặc định Kinh doanh
       },
     });
+  });
+
+  it('Thêm phòng ban loại CSKH → POST gửi kind CSKH', async () => {
+    const { calls } = wire();
+    renderApp(<TeamsScreen />);
+    await screen.findByText('Nhân viên 1');
+    fireEvent.click(screen.getByRole('button', { name: /Thêm phòng ban/ }));
+    const dialog = await screen.findByRole('dialog');
+    fireEvent.change(within(dialog).getByLabelText(/Mã phòng ban/), {
+      target: { value: 'CSKH-MB' },
+    });
+    fireEvent.change(within(dialog).getByLabelText(/Tên phòng ban/), {
+      target: { value: 'CSKH Miền Bắc' },
+    });
+    fireEvent.click(within(dialog).getByRole('combobox', { name: 'Loại phòng ban' }));
+    fireEvent.click(await screen.findByRole('option', { name: 'Chăm sóc khách hàng (CSKH)' }));
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Thêm phòng ban' }));
+    await waitFor(() => expect(calls).toHaveLength(1));
+    expect(calls[0]!.body).toEqual({ code: 'CSKH-MB', name: 'CSKH Miền Bắc', kind: 'CSKH' });
   });
 
   it('Thêm thành viên: panel tìm nhân viên ngoài phòng ban, cảnh báo đang ở phòng khác, PUT từng người', async () => {

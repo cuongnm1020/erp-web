@@ -89,6 +89,7 @@ export function DepartmentDialog({
       managerId: department?.managerId ?? '',
       sortOrder: String(department?.sortOrder ?? ''),
       isActive: department?.isActive ?? true,
+      kind: department?.kind ?? 'SALES',
     },
   });
 
@@ -103,7 +104,7 @@ export function DepartmentDialog({
   const onSubmit = form.handleSubmit((v) => {
     const onError = (err: unknown) =>
       applyServerErrors(form, err as ApiError, {
-        knownFields: ['code', 'name', 'parentId', 'managerId', 'sortOrder', 'isActive'],
+        knownFields: ['code', 'name', 'parentId', 'managerId', 'sortOrder', 'isActive', 'kind'],
       });
     if (editing) {
       update.mutate(
@@ -113,6 +114,7 @@ export function DepartmentDialog({
           managerId: v.managerId || null,
           sortOrder: v.sortOrder ? Number(v.sortOrder) : 0,
           isActive: v.isActive,
+          kind: v.kind,
         },
         {
           onSuccess: () => {
@@ -131,6 +133,7 @@ export function DepartmentDialog({
         ...(v.parentId ? { parentId: v.parentId } : {}),
         ...(v.managerId ? { managerId: v.managerId } : {}),
         ...(v.sortOrder ? { sortOrder: Number(v.sortOrder) } : {}),
+        ...(v.kind === 'CSKH' ? { kind: v.kind } : {}),
       },
       {
         onSuccess: () => {
@@ -217,6 +220,31 @@ export function DepartmentDialog({
                       ))}
                     </SelectContent>
                   </Select>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="kind"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Loại phòng ban</FormLabel>
+                  <Select value={field.value} onValueChange={field.onChange}>
+                    <FormControl>
+                      <SelectTrigger aria-label="Loại phòng ban">
+                        <SelectValue />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      <SelectItem value="SALES">Kinh doanh</SelectItem>
+                      <SelectItem value="CSKH">Chăm sóc khách hàng (CSKH)</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <FormDescription>
+                    CSKH: cả trưởng phòng lẫn nhân viên thấy khách được chia cho phòng; nhận khách
+                    mới theo tỷ lệ ở Quản trị › Chia khách CSKH.
+                  </FormDescription>
                   <FormMessage />
                 </FormItem>
               )}

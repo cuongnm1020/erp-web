@@ -45,6 +45,8 @@ export const departmentFormSchema = z.object({
     .trim()
     .regex(/^\d{0,4}$/, 'Nhập số nguyên 0–9999'),
   isActive: z.boolean(),
+  /** SALES (mặc định) | CSKH — phòng chăm sóc khách hàng: team phòng ban mang loại CSKH (khớp DTO). */
+  kind: z.enum(['SALES', 'CSKH']),
 });
 
 export const createDepartmentSchema = departmentFormSchema.extend({ code: codeSchema });

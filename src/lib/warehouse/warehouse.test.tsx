@@ -26,6 +26,7 @@ const me = (over: Partial<AuthMe> = {}): AuthMe => ({
   roles: ['SALES_MEMBER'],
   permissions: [],
   leaderTeamIds: [],
+  careTeamIds: [],
   hasGlobalAccess: false,
   managesDepartments: false,
   warehouseIds: ['wh-la', 'wh-tt'],

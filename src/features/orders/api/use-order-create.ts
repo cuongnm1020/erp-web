@@ -8,6 +8,8 @@ export type SkuQuickRow = components['schemas']['SkuListRowDto'];
 export type OrderStaffOption = components['schemas']['OrderStaffOptionDto'];
 export type OrderTagOption = components['schemas']['TagDto'];
 export type ShippingQuotePreviewBody = components['schemas']['ShippingQuotePreviewDto'];
+export type CareLookupResult = components['schemas']['CareLookupResultDto'];
+export type SameDayOrders = components['schemas']['SameDayOrdersDto'];
 
 /** Phễu key của màn tạo đơn mới — con của ['crm','order-entry'] (danh mục phục vụ nhập đơn). */
 const createKeys = {
@@ -16,6 +18,8 @@ const createKeys = {
   skuQuick: (q: string, isCombo: boolean) =>
     [...lineEntryKeys.all, 'sku-quick', { q, isCombo }] as const,
   phone: (phone: string) => [...lineEntryKeys.all, 'phone-match', phone] as const,
+  careLookup: (phone: string) => [...lineEntryKeys.all, 'care-lookup', phone] as const,
+  sameDay: (phone: string) => [...lineEntryKeys.all, 'same-day', phone] as const,
   quote: (b: ShippingQuotePreviewBody) => [...lineEntryKeys.all, 'quote-preview', b] as const,
 };
 
@@ -73,6 +77,38 @@ export function useCustomerPhoneMatch(rawPhone: string) {
     },
     enabled: /^0\d{9,10}$/.test(phone),
     staleTime: 30_000,
+  });
+}
+
+const VALID_PHONE = /^0\d{9,10}$/;
+
+/**
+ * CSKH (2026-10-21): GET /customer-care/lookup — tra SĐT trên TOÀN hệ thống (cả khách của team
+ * khác / của sale) để lên đơn đúng khách, không tạo trùng. Chỉ gọi khi người dùng có quyền
+ * `customer.care` (`enabled`); trả mã / tên / SĐT / địa chỉ mặc định + team CSKH đang giữ khách.
+ */
+export function useCareLookup(rawPhone: string, enabled: boolean) {
+  const phone = normalizePhoneInput(rawPhone);
+  return useQuery({
+    queryKey: createKeys.careLookup(phone),
+    queryFn: () => unwrap(api.GET('/customer-care/lookup', { params: { query: { phone } } })),
+    enabled: enabled && VALID_PHONE.test(phone),
+    staleTime: 30_000,
+  });
+}
+
+/**
+ * GET /sales-orders/same-day — đơn chưa hủy cùng SĐT trong hôm nay (mọi nguồn, mọi team): màn tạo
+ * đơn nhắc ở thẻ khách và hỏi lại trước khi chốt (cảnh báo, không chặn). Đơn ngoài tầm nhìn chỉ có
+ * trong `hiddenCount`.
+ */
+export function useSameDayOrders(rawPhone: string) {
+  const phone = normalizePhoneInput(rawPhone);
+  return useQuery({
+    queryKey: createKeys.sameDay(phone),
+    queryFn: () => unwrap(api.GET('/sales-orders/same-day', { params: { query: { phone } } })),
+    enabled: VALID_PHONE.test(phone),
+    staleTime: 10_000,
   });
 }
 

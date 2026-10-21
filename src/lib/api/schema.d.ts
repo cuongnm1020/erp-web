@@ -3225,6 +3225,27 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/sales-orders/same-day": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Đơn trùng trong ngày (CSKH-5): đơn chưa hủy cùng SĐT khách, cùng ngày VN, mọi nguồn / mọi team.
+         *     Màn tạo đơn gọi trước khi lưu → cảnh báo + "Vẫn tạo". Đơn ngoài tầm nhìn chỉ tính vào
+         *     `hiddenCount`. Khai TRƯỚC `:id`.
+         */
+        get: operations["SalesOrderController_sameDayOrders"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/sales-orders/flow-counts": {
         parameters: {
             query?: never;
@@ -5038,6 +5059,84 @@ export interface paths {
         patch: operations["CustomerSegmentController_setSegment"];
         trace?: never;
     };
+    "/customer-care/lookup": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Tra SĐT trên toàn hệ thống cho màn Tạo đơn của CSKH: khách đã có (kể cả của team khác) + team
+         *     CSKH đang giữ khách so với người hỏi. Chỉ mã / tên / SĐT / địa chỉ mặc định.
+         */
+        get: operations["CustomerCareController_lookup"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/customer-care/customers": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Màn "Khách của team" (leader + member CSKH): khách được gán cho team, mới gán trước, lọc theo
+         *     ngày gán (hôm qua / 3 / 7 ngày / khoảng tùy chọn — web tính ngày).
+         */
+        get: operations["CustomerCareController_teamCustomers"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/customer-care/distribution": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Cấu hình % chia khách mới về các team CSKH + 30 lượt chạy gần nhất (CSKH-6). */
+        get: operations["CustomerCareController_distributionConfig"];
+        /** Ghi đè % theo team; tổng các team > 0 phải đúng 100 (422 CARE_DISTRIBUTION_INVALID). */
+        put: operations["CustomerCareController_updateDistribution"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/customer-care/distribution/run": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Chạy ngay một lượt chia cho khách tạo trong `day` (mặc định hôm qua) — chỉ chia khách còn chưa
+         *     thuộc team CSKH, chạy lại không chia trùng.
+         */
+        post: operations["CustomerCareController_runDistribution"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/users/{id}/pancake-profile": {
         parameters: {
             query?: never;
@@ -5202,6 +5301,8 @@ export interface components {
             permissions: string[];
             /** @description Team user là LEADER (+ team con) — bất biến 9 */
             leaderTeamIds: string[];
+            /** @description Team CSKH user là thành viên (leader hoặc member) — thấy khách của team (2026-10-21). */
+            careTeamIds: string[];
             hasGlobalAccess: boolean;
             /** @description Đang là trưởng phòng ít nhất một phòng ban — web hiện Sơ đồ nhân sự dù không có user.read. */
             managesDepartments: boolean;
@@ -6237,7 +6338,7 @@ export interface components {
             userId: string | null;
             userName: string | null;
             /** @enum {string} */
-            type: "PRIMARY" | "SUPPORT" | "TEMPORARY";
+            type: "PRIMARY" | "SUPPORT" | "TEMPORARY" | "CARE";
             assignedBy: string;
             assignedByName: string;
             reason: string | null;
@@ -8363,7 +8464,7 @@ export interface components {
             code: string;
             name: string;
             /** @enum {string} */
-            type: "SALES" | "WAREHOUSE" | "ACCOUNTING" | "MARKETING" | "OPERATION";
+            type: "SALES" | "WAREHOUSE" | "ACCOUNTING" | "MARKETING" | "OPERATION" | "CSKH";
             parentId: string | null;
         };
         DepartmentCountDto: {
@@ -8377,6 +8478,11 @@ export interface components {
             managerId: string | null;
             sortOrder: number;
             isActive: boolean;
+            /**
+             * @description SALES (mặc định) | CSKH — phòng chăm sóc khách hàng.
+             * @enum {string}
+             */
+            kind: "SALES" | "CSKH";
             _count: components["schemas"]["DepartmentCountDto"];
         };
         CreateDepartmentDto: {
@@ -8391,6 +8497,11 @@ export interface components {
             managerId?: string;
             /** @description Thứ tự giữa các phòng ban cùng cha trên sơ đồ (nhỏ đứng trước). */
             sortOrder?: number;
+            /**
+             * @description CSKH = phòng chăm sóc khách hàng → team phòng ban mang loại CSKH (docs/PLAN-cskh.md).
+             * @enum {string}
+             */
+            kind?: "SALES" | "CSKH";
         };
         UpdateDepartmentDto: {
             name?: string;
@@ -8400,6 +8511,8 @@ export interface components {
             managerId?: string | null;
             sortOrder?: number;
             isActive?: boolean;
+            /** @enum {string} */
+            kind?: "SALES" | "CSKH";
         };
         OrgEmployeeDto: {
             id: string;
@@ -8423,6 +8536,11 @@ export interface components {
             managerName: string | null;
             /** @description Thứ tự giữa các phòng ban cùng cha (nhỏ đứng trước). */
             sortOrder: number;
+            /**
+             * @description SALES (mặc định) | CSKH — phòng chăm sóc khách hàng (2026-10-21).
+             * @enum {string}
+             */
+            kind: "SALES" | "CSKH";
             /** @description Người đang xem được thêm nhân sự vào phòng ban này (user.create hoặc là trưởng phòng / phòng cha). */
             canAddMembers: boolean;
             /** @description Nhân viên thuộc TRỰC TIẾP phòng ban này (trưởng phòng xếp đầu, rồi theo tên). */
@@ -8451,7 +8569,7 @@ export interface components {
             code: string;
             name: string;
             /** @enum {string} */
-            type: "SALES" | "WAREHOUSE" | "ACCOUNTING" | "MARKETING" | "OPERATION";
+            type: "SALES" | "WAREHOUSE" | "ACCOUNTING" | "MARKETING" | "OPERATION" | "CSKH";
             isActive: boolean;
             /** @description Thành viên TRỰC TIẾP của team (LEADER xếp đầu, rồi theo tên). */
             members: components["schemas"]["OrgTeamMemberDto"][];
@@ -8981,6 +9099,11 @@ export interface components {
             statusChangedAt: string | null;
             /** @description SĐT người nhận (địa chỉ giao hiệu lực), không có thì SĐT khách. */
             phone: string | null;
+            /**
+             * @description Số đơn KHÁC chưa hủy cùng SĐT khách, cùng ngày VN, mọi nguồn / mọi team (CSKH-5) — > 0 = nhãn
+             *     "Trùng trong ngày".
+             */
+            sameDayCount: number;
             recipientName: string | null;
             /** @description Địa chỉ nhận: số nhà / thôn / xã. */
             addressLine: string | null;
@@ -9049,6 +9172,27 @@ export interface components {
         SalesOrderListResponseDto: {
             items: components["schemas"]["SalesOrderListItemDto"][];
             total: number;
+        };
+        SameDayOrderDto: {
+            id: string;
+            docNumber: string;
+            /** @description ISO datetime. */
+            orderDate: string;
+            /** @enum {string} */
+            status: "DRAFT" | "PENDING_APPROVAL" | "APPROVED" | "POSTED" | "CANCELLED";
+            /** @description Decimal(18,4) dạng chuỗi. */
+            total: string;
+            ownerName: string | null;
+            /** @enum {string} */
+            source: "ERP" | "PANCAKE";
+        };
+        SameDayOrdersDto: {
+            /** @description Ngày VN đã kiểm (`YYYY-MM-DD`). */
+            day: string;
+            /** @description Tổng số đơn trùng (gồm cả đơn không xem được). */
+            total: number;
+            hiddenCount: number;
+            orders: components["schemas"]["SameDayOrderDto"][];
         };
         SalesOrderFlowCountsDto: {
             /** @description Tất cả (khớp tab "Tất cả"). */
@@ -11804,6 +11948,108 @@ export interface components {
              * @description null = gỡ cấp độ.
              */
             tierId?: string | null;
+        };
+        CareLookupAddressDto: {
+            recipient: string;
+            phone: string;
+            line1: string;
+            hamlet: string | null;
+            ward: string | null;
+            district: string | null;
+            province: string;
+        };
+        CareLookupCustomerDto: {
+            id: string;
+            code: string;
+            name: string;
+            phone: string | null;
+            /** @description Địa chỉ mặc định (hoặc duy nhất) của khách; null = chưa có. */
+            address: components["schemas"]["CareLookupAddressDto"] | null;
+        };
+        CareLookupResultDto: {
+            /** @description null = chưa có khách cùng SĐT (lên đơn sẽ tạo khách mới thuộc team mình). */
+            customer: components["schemas"]["CareLookupCustomerDto"] | null;
+            /**
+             * @description MINE = khách của team mình; NONE = chưa thuộc team CSKH nào (lên đơn sẽ gán về team mình);
+             *     OTHER = khách của team CSKH khác (lên đơn được, doanh thu tính cho team mình). null khi chưa có
+             *     khách.
+             * @enum {string|null}
+             */
+            careTeam: "OTHER" | "NONE" | "MINE" | null;
+        };
+        TeamCustomerDto: {
+            id: string;
+            code: string;
+            name: string;
+            phone: string | null;
+            /** @description ISO — lúc khách được gán cho team (dòng CARE đang hiệu lực). */
+            assignedAt: string;
+            /**
+             * @description Nguồn gán: AUTO = job chia khách, ORDER = CSKH lên đơn, OTHER = gán tay / khác.
+             * @enum {string}
+             */
+            assignedBy: "OTHER" | "ORDER" | "AUTO";
+            /** @description ISO — ngày khách được tạo trên hệ thống. */
+            createdAt: string;
+            /** @description ISO — đơn gần nhất (mọi người lên, trong tầm nhìn); null = chưa có đơn. */
+            lastOrderAt: string | null;
+            orderCount: number;
+        };
+        TeamCustomerListDto: {
+            items: components["schemas"]["TeamCustomerDto"][];
+            total: number;
+            teamId: string;
+            teamName: string;
+        };
+        CareDistributionTeamDto: {
+            teamId: string;
+            code: string;
+            name: string;
+            /** @description Số nhân viên đang trong team. */
+            memberCount: number;
+            /** @description % đang cấu hình (chuỗi), "0" khi chưa cấu hình. */
+            percent: string;
+        };
+        CareDistributionRunTeamDto: {
+            teamId: string;
+            teamName: string;
+            count: number;
+        };
+        CareDistributionRunDto: {
+            id: string;
+            /** @description Ngày VN khách được tạo (`YYYY-MM-DD`). */
+            day: string;
+            /** @description DAILY = job theo lịch / chạy lại theo ngày; BACKFILL = script chia khách cũ. */
+            kind: string;
+            total: number;
+            perTeam: components["schemas"]["CareDistributionRunTeamDto"][];
+            startedAt: string;
+            finishedAt: string | null;
+            error: string | null;
+            actorName: string | null;
+        };
+        CareDistributionConfigDto: {
+            /** @description Mọi team CSKH đang hoạt động kèm % hiện tại. */
+            teams: components["schemas"]["CareDistributionTeamDto"][];
+            /** @description Tổng % (chuỗi) — hợp lệ khi bằng 100 (hoặc 0 = chưa cấu hình). */
+            totalPercent: string;
+            /** @description Lịch job (cron, giờ VN); "off" = tắt. */
+            cron: string;
+            /** @description 30 lượt chạy gần nhất. */
+            runs: components["schemas"]["CareDistributionRunDto"][];
+        };
+        CareDistributionItemDto: {
+            /** Format: uuid */
+            teamId: string;
+            /** @description % khách mới chia về team (chuỗi 0–100, ≤ 2 số lẻ). 0 = không chia cho team này. */
+            percent: string;
+        };
+        UpdateCareDistributionDto: {
+            items: components["schemas"]["CareDistributionItemDto"][];
+        };
+        RunCareDistributionDto: {
+            /** @description `YYYY-MM-DD` (ngày VN khách được tạo); bỏ trống = hôm qua. */
+            day?: string;
         };
         PancakeProfileShopDto: {
             shopId: string;
@@ -17658,6 +17904,11 @@ export interface operations {
                 /** @description Người phụ trách (SalesOrder.ownerId). */
                 ownerId?: string;
                 /**
+                 * @description `true` = chỉ đơn có đơn trùng trong ngày (cùng SĐT khách, cùng ngày VN, chưa hủy, mọi nguồn —
+                 *     CSKH-5). Theo from/to nếu có, không thì 7 ngày VN gần nhất.
+                 */
+                duplicate?: string;
+                /**
                  * @description Tìm theo số chứng từ, mã hoặc tên khách (không phân biệt hoa thường), SĐT khách, mã vận đơn —
                  *     hoặc id đơn Pancake (id theo shop hoặc id hệ thống trong link đơn, khớp tuyệt đối, cho phép
                  *     tiền tố `#`).
@@ -17707,6 +17958,32 @@ export interface operations {
             };
         };
     };
+    SalesOrderController_sameDayOrders: {
+        parameters: {
+            query: {
+                /** @description SĐT khách — chuẩn hoá phía server. */
+                phone: string;
+                /** @description Ngày VN `YYYY-MM-DD`; bỏ trống = hôm nay. */
+                date?: string;
+                /** @description Bỏ đơn này khỏi kết quả (màn sửa đơn kiểm lại chính nó). */
+                excludeOrderId?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SameDayOrdersDto"];
+                };
+            };
+        };
+    };
     SalesOrderController_flowCounts: {
         parameters: {
             query: {
@@ -17742,6 +18019,11 @@ export interface operations {
                 pancakeShopId?: string;
                 /** @description Người phụ trách (SalesOrder.ownerId). */
                 ownerId?: string;
+                /**
+                 * @description `true` = chỉ đơn có đơn trùng trong ngày (cùng SĐT khách, cùng ngày VN, chưa hủy, mọi nguồn —
+                 *     CSKH-5). Theo from/to nếu có, không thì 7 ngày VN gần nhất.
+                 */
+                duplicate?: string;
                 /**
                  * @description Tìm theo số chứng từ, mã hoặc tên khách (không phân biệt hoa thường), SĐT khách, mã vận đơn —
                  *     hoặc id đơn Pancake (id theo shop hoặc id hệ thống trong link đơn, khớp tuyệt đối, cho phép
@@ -20602,6 +20884,123 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["CustomerDto"];
+                };
+            };
+        };
+    };
+    CustomerCareController_lookup: {
+        parameters: {
+            query: {
+                /** @description SĐT khách — chuẩn hoá phía server (như đồng bộ Pancake). */
+                phone: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CareLookupResultDto"];
+                };
+            };
+        };
+    };
+    CustomerCareController_teamCustomers: {
+        parameters: {
+            query: {
+                /** @description Team CSKH; bỏ trống = team CSKH của người gọi. Người không thuộc team chỉ xem được team mình. */
+                teamId?: string;
+                /** @description `YYYY-MM-DD` — gán từ ngày này (giờ VN). */
+                assignedFrom?: string;
+                /** @description `YYYY-MM-DD` — gán đến hết ngày này (giờ VN). */
+                assignedTo?: string;
+                /** @description Tìm theo mã / tên / SĐT khách. */
+                q?: string;
+                take: number;
+                skip: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TeamCustomerListDto"];
+                };
+            };
+        };
+    };
+    CustomerCareController_distributionConfig: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CareDistributionConfigDto"];
+                };
+            };
+        };
+    };
+    CustomerCareController_updateDistribution: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateCareDistributionDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CareDistributionConfigDto"];
+                };
+            };
+        };
+    };
+    CustomerCareController_runDistribution: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RunCareDistributionDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CareDistributionRunDto"];
                 };
             };
         };

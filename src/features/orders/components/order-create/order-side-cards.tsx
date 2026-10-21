@@ -14,6 +14,7 @@ import {
   FormMessage,
   type EntitySearchResult,
 } from '@/components/data/form';
+import { StatusBadge } from '@/components/data/status-badge';
 import { Button } from '@/components/ui/button';
 import {
   Command,
@@ -42,9 +43,12 @@ import { useCarriers } from '@/features/wms/api/use-shipping';
 import { cn } from '@/lib/cn';
 import { messageFor } from '@/lib/error-messages';
 import { formatMoney, formatQuantity } from '@/lib/format';
+import { useAbility } from '@/lib/permission';
 import { useCustomerBrief, useCustomerSearch } from '../../api/use-line-entry';
 import {
+  useCareLookup,
   useCustomerPhoneMatch,
+  useSameDayOrders,
   useOrderStaffOptions,
   useOrderTags,
   useShippingQuotePreview,
@@ -304,7 +308,31 @@ export function CustomerCard({ form }: { form: Form }) {
   const phone = useWatch({ control: form.control, name: 'customerPhone' });
   const brief = useCustomerBrief(customerId);
   const match = useCustomerPhoneMatch(customerId ? '' : phone);
+  // CSKH: tra SĐT toàn hệ thống — khách ngoài tầm nhìn (của sale / team CSKH khác) vẫn lên đơn đúng
+  // khách, server tự gắn theo SĐT khi chốt (không gắn customerId ở đây: hồ sơ khách đó không mở được).
+  const canCare = useAbility().can('care', 'Customer');
+  const care = useCareLookup(customerId ? '' : phone, canCare && match.data === null);
+  const careCustomer = !customerId && match.data === null ? care.data?.customer : undefined;
+  const sameDay = useSameDayOrders(phone);
   const [pickOpen, setPickOpen] = useState(false);
+
+  // Khách tra được (ngoài tầm nhìn) → điền tên + địa chỉ mặc định vào các ô còn trống.
+  useEffect(() => {
+    if (!careCustomer) return;
+    const fillEmpty = (k: keyof CreateOrderValues, v: string | null | undefined) => {
+      if (v && form.getValues(k) === '') form.setValue(k, v, { shouldDirty: true });
+    };
+    fillEmpty('customerName', careCustomer.name);
+    const a = careCustomer.address;
+    if (a && form.getValues('addressId') === '' && form.getValues('line1') === '') {
+      fillEmpty('recipient', a.recipient);
+      fillEmpty('recipientPhone', a.phone);
+      fillEmpty('line1', [a.line1, a.hamlet].filter(Boolean).join(', '));
+      fillEmpty('ward', a.ward);
+      fillEmpty('district', a.district);
+      fillEmpty('province', a.province);
+    }
+  }, [careCustomer, form]);
 
   // SĐT gõ trùng khách đã có (trong tầm nhìn) → gắn khách đó vào đơn: giá theo bảng giá của khách,
   // chọn được địa chỉ đã lưu. Server cũng tự khớp theo SĐT khi chốt.
@@ -513,9 +541,33 @@ export function CustomerCard({ form }: { form: Form }) {
             Xem hồ sơ
           </a>
         </div>
+      ) : careCustomer ? (
+        <div
+          role="status"
+          className="rounded-md border border-info-line bg-info-weak px-3 py-2 text-sm"
+        >
+          <b className="font-semibold">{careCustomer.name}</b>{' '}
+          <span className="font-mono text-xs text-muted-foreground">{careCustomer.code}</span>{' '}
+          <StatusBadge tone="neutral">
+            {care.data?.careTeam === 'OTHER' ? 'Khách team khác' : 'Chưa thuộc team CSKH'}
+          </StatusBadge>
+          <p className="text-muted-foreground">
+            {care.data?.careTeam === 'OTHER'
+              ? 'Đơn này tính doanh thu cho team bạn. Khách vẫn thuộc team đang chăm.'
+              : 'Chốt đơn sẽ đưa khách về team bạn.'}
+          </p>
+        </div>
       ) : !customerId && /^0\d{9,10}$/.test(normalizePhoneInput(phone)) && match.data === null ? (
         <p className="text-xs text-muted-foreground">
           Khách mới — sẽ tạo hồ sơ khách khi chốt đơn.
+        </p>
+      ) : null}
+
+      {sameDay.data && sameDay.data.total > 0 ? (
+        <p role="status" className="rounded-md bg-warning-weak px-3 py-2 text-sm text-warning">
+          <b className="font-semibold">Khách đã có {sameDay.data.total} đơn hôm nay</b>
+          {sameDay.data.hiddenCount > 0 ? ` (${sameDay.data.hiddenCount} đơn của team khác)` : ''}.
+          Kiểm tra trước khi chốt để không giao trùng.
         </p>
       ) : null}
     </Card>

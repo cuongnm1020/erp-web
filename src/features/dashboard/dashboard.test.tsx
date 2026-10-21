@@ -158,6 +158,7 @@ const ORDERS: SalesOrderList = {
       flow: 'PENDING_APPROVAL',
       fulfilmentStatus: null,
       statusChangedAt: null,
+      sameDayCount: 0,
       phone: null,
       recipientName: null,
       addressLine: null,

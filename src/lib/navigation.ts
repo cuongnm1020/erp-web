@@ -9,6 +9,7 @@ import {
   Gauge,
   Gift,
   GitMerge,
+  Headset,
   LayoutDashboard,
   Landmark,
   List,
@@ -30,6 +31,7 @@ import {
   Settings,
   ShieldCheck,
   ShoppingCart,
+  Shuffle,
   Smartphone,
   Star,
   Table2,
@@ -137,6 +139,13 @@ export const NAV_MODULES: NavModule[] = [
         href: '/crm/customers',
         icon: UserRound,
         ability: { action: 'read', subject: 'Customer' },
+      },
+      {
+        label: 'Khách của team',
+        href: '/crm/care/customers',
+        icon: Headset,
+        // CSKH (2026-10-21): leader + member team CSKH (customer.care) — kho khách chung của team.
+        ability: { action: 'care', subject: 'Customer' },
       },
       {
         label: 'Phân công',
@@ -479,6 +488,13 @@ export const NAV_MODULES: NavModule[] = [
         href: '/admin/pancake',
         icon: Plug,
         ability: { action: 'config', subject: 'Sync' },
+      },
+      {
+        label: 'Chia khách CSKH',
+        href: '/admin/care-distribution',
+        icon: Shuffle,
+        // CSKH (2026-10-21): % khách mới chia về team CSKH + lịch sử lượt chia — chỉ quản trị.
+        ability: { action: 'distribution_config', subject: 'Customer' },
       },
       {
         label: 'Cấu hình hệ thống',

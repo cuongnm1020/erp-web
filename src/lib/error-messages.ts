@@ -103,6 +103,11 @@ const MESSAGES: Record<string, string> = {
     'Hãng này không hỗ trợ thao tác vừa gọi (tra cước / in nhãn). Chọn hãng khác hoặc làm tay.',
   CARRIER_NOT_FOUND: 'Hãng vận chuyển không tồn tại hoặc đã tắt. Tải lại danh sách hãng.',
   // Nhiều tài khoản một hãng (FE-CARRIER-ACC-1)
+  // CSKH (2026-10-21)
+  CARE_DISTRIBUTION_INVALID:
+    'Tỷ lệ chia khách chưa hợp lệ — tổng các team phải đúng 100% và chỉ chia cho team CSKH đang hoạt động.',
+  CARE_JOB_ACTOR_NOT_FOUND:
+    'Không có tài khoản quản trị nào đang hoạt động để đứng tên lượt chia khách. Báo quản trị hệ thống.',
   CARRIER_ACCOUNT_NOT_FOUND:
     'Tài khoản vận chuyển không còn hoặc không thuộc hãng đã chọn. Tải lại rồi chọn lại tài khoản.',
   CARRIER_ACCOUNT_INACTIVE:
