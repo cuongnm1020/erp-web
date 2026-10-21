@@ -53,6 +53,53 @@ describe('PancakeConfigScreen — /pancake-sync/config', () => {
     ).not.toBeInTheDocument();
   });
 
+  it('tìm shop: theo tên, mã shop, và tên sản phẩm đang gán (không dấu); shop "Tất cả" không khớp theo sản phẩm', async () => {
+    server.use(
+      http.get('/api/pancake-sync/config/:shopId/products', ({ params }) =>
+        HttpResponse.json({
+          shopId: String(params.shopId),
+          restricted: params.shopId === '123456',
+          products:
+            params.shopId === '123456'
+              ? [
+                  {
+                    id: 'p1',
+                    code: 'NPK-16',
+                    name: 'Phân bón NPK 16-16-8',
+                    isCombo: false,
+                    isActive: true,
+                  },
+                ]
+              : [],
+          updatedAt: null,
+          updatedBy: null,
+        }),
+      ),
+    );
+    renderApp(<PancakeConfigScreen />);
+    await screen.findByText('Shop chính');
+    const box = screen.getByRole('textbox', { name: /Tìm shop/ });
+
+    fireEvent.change(box, { target: { value: 'shop chinh' } });
+    expect(screen.getByText('Shop chính')).toBeInTheDocument();
+    expect(screen.queryByText('Shop test')).not.toBeInTheDocument();
+
+    fireEvent.change(box, { target: { value: '1234' } });
+    expect(screen.getByText('Shop test')).toBeInTheDocument();
+    expect(screen.queryByText('Shop chính')).not.toBeInTheDocument();
+
+    fireEvent.change(box, { target: { value: 'phan bon' } });
+    await waitFor(() => expect(screen.getByText('Shop test')).toBeInTheDocument());
+    expect(screen.queryByText('Shop chính')).not.toBeInTheDocument();
+    expect(screen.getByText('Phân bón NPK 16-16-8')).toBeInTheDocument();
+
+    fireEvent.change(box, { target: { value: 'không có' } });
+    expect(screen.getByText(/Không có shop nào khớp/)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Xóa từ khoá tìm' }));
+    expect(screen.getByText('Shop chính')).toBeInTheDocument();
+    expect(screen.getByText('Shop test')).toBeInTheDocument();
+  });
+
   it('không có sync.config → ẩn nút Thêm shop và cụm thao tác (luật 7)', async () => {
     renderApp(<PancakeConfigScreen />, { me: { ...ME_SALE, permissions: ['sync.read'] } });
     await screen.findByText('Shop chính');

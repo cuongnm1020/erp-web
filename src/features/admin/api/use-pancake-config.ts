@@ -102,7 +102,12 @@ export const pancakeShopProductKeys = {
 
 /** GET /pancake-sync/config/{shopId}/products — sản phẩm bán trên shop (POS) này. */
 export function usePancakeShopProducts(shopId: string) {
-  return useQuery({
+  return useQuery(pancakeShopProductsQuery(shopId));
+}
+
+/** Options dùng chung cho `usePancakeShopProducts` và `useQueries` (lọc shop theo sản phẩm gán). */
+export function pancakeShopProductsQuery(shopId: string) {
+  return {
     queryKey: pancakeShopProductKeys.detail(shopId),
     queryFn: () =>
       unwrap(
@@ -110,7 +115,7 @@ export function usePancakeShopProducts(shopId: string) {
           params: { path: { shopId: Number(shopId) } },
         }),
       ),
-  });
+  };
 }
 
 /**
