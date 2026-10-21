@@ -41,6 +41,8 @@ export const stockKeys = {
   bySku: (p: StockBySkuParams) => [...stockKeys.all, 'by-sku', p] as const,
   byLocation: (p: StockBreakdownParams) => [...stockKeys.all, 'by-location', p] as const,
   byLot: (p: StockBreakdownParams) => [...stockKeys.all, 'by-lot', p] as const,
+  actualCountSummary: (warehouseId: string | null) =>
+    [...stockKeys.all, 'actual-count-summary', warehouseId] as const,
 };
 
 /**
@@ -70,6 +72,22 @@ export function useStockBySku(params: StockBySkuParams, enabled = true) {
       ),
     placeholderData: keepPreviousData,
     enabled,
+  });
+}
+
+/**
+ * GET /stock/actual-count-summary — bao nhiêu SKU hàng ERP đã nhập tồn thực tế trên tổng số SKU.
+ * `warehouseId` null = theo kho làm việc (header) / mọi kho được phép.
+ */
+export function useActualCountSummary(warehouseId: string | null) {
+  return useQuery({
+    queryKey: stockKeys.actualCountSummary(warehouseId),
+    queryFn: () =>
+      unwrap(
+        api.GET('/stock/actual-count-summary', {
+          params: { query: { warehouseId: warehouseId ?? undefined } },
+        }),
+      ),
   });
 }
 

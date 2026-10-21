@@ -40,6 +40,13 @@ Luật:
   = cập nhật design system → chép tokens.json → sinh lại. Cấm hex tự do, cấm giá trị `[...]`, cấm
   pha độ mờ màu trạng thái (`bg-warning/10` → `bg-warning-weak`); `pnpm lint` chạy
   `scripts/check-tokens.mjs` bắt các lỗi này.
+- **Lớp token mới phải khai cho `cn()`:** tailwind-merge chỉ biết thang mặc định của Tailwind. Thêm
+  lớp vào `tailwind.config.ts` (màu, spacing, `max-w-*`, cỡ chữ, shadow, radius, duration…) thì
+  thêm tên ở `src/lib/design-classes.ts` — nguồn chung của tailwind.config và `cn()`. Thiếu là
+  `cn()` giữ cả hai lớp xung đột, lớp token luôn thắng theo thứ tự CSS (lỗi 2026-10-21: hộp chọn
+  sản phẩm POS đặt `max-w-6xl` vẫn co về 440px). `src/lib/cn.test.ts` duyệt mọi `theme.extend` và
+  fail khi có lớp `cn()` chưa biết — không được tắt test đó. Hộp thoại đổi bề rộng bằng prop
+  của `DialogContent` (`wide`, `xl`), không đè `className="max-w-…"` ở màn.
 - **Biến thể Button giữ tên cũ** để không sửa ~400 chỗ gọi: `default` = primary, `outline` /
   `secondary` = nút phụ (nền card, viền input), `destructive` = danger (chỉ trong hộp xác nhận),
   `danger-ghost`, `ghost`, `link`. Cỡ `default` 32px, `sm` 28px, `icon` / `icon-sm`.

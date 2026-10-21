@@ -28,22 +28,23 @@ DialogOverlay.displayName = DialogPrimitive.Overlay.displayName;
 /**
  * Hộp thoại design system Dialog: rộng `dialog-max-width` 440px (xác nhận, form ≤5 trường một cột);
  * `wide` = `dialog-wide-max-width` 672px (form 2 cột, bảng ngắn). Rộng hơn nữa → Drawer, không phải
- * hộp thoại. Cao tối đa `dialog-max-height` (màn − 32px), cuộn bên trong.
+ * hộp thoại; ngoại lệ `xl` = 80% chiều ngang màn cho hộp chọn nhiều cột (chọn sản phẩm bán theo shop). Cao tối đa `dialog-max-height` (màn − 32px), cuộn bên trong.
  */
 const DialogContent = React.forwardRef<
   React.ElementRef<typeof DialogPrimitive.Content>,
   React.ComponentPropsWithoutRef<typeof DialogPrimitive.Content> & {
     hideClose?: boolean;
     wide?: boolean;
+    xl?: boolean;
   }
->(({ className, children, hideClose, wide, ...props }, ref) => (
+>(({ className, children, hideClose, wide, xl, ...props }, ref) => (
   <DialogPortal>
     <DialogOverlay />
     <DialogPrimitive.Content
       ref={ref}
       className={cn(
         'fixed left-1/2 top-1/2 z-50 grid max-h-dialog w-full -translate-x-1/2 -translate-y-1/2 gap-4 overflow-y-auto border bg-card p-4 shadow-dialog duration-200 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 sm:rounded-lg',
-        wide ? 'max-w-dialog-wide' : 'max-w-dialog',
+        xl ? 'max-w-dialog-xl' : wide ? 'max-w-dialog-wide' : 'max-w-dialog',
         className,
       )}
       {...props}

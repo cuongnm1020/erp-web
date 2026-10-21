@@ -1,6 +1,13 @@
 import type { Config } from 'tailwindcss';
 import animate from 'tailwindcss-animate';
 import tokens from './design/tokens.json';
+import {
+  COLOR_ALIAS,
+  DIALOG_MAX_HEIGHT,
+  DIALOG_MAX_WIDTH,
+  PRIMITIVE,
+  SIZE,
+} from './src/lib/design-classes';
 
 /**
  * Tên lớp Tailwind sinh từ design system "Thiên Nông ERP" (`design/tokens.json`, bản chép của
@@ -14,11 +21,9 @@ import tokens from './design/tokens.json';
  *   36 display-number. `text-xs…2xl` của Tailwind ghi đè sang thang này để code cũ không phải sửa.
  * - Chỉ hai độ đậm 400 / 700 — `font-medium` / `font-bold` đều về 700 (đậm hơn một bậc từ 2026-10-21).
  * - Kích thước khung và component: `h-control` 32, `h-button-sm` 28, `h-chip` 18, `max-w-dialog`
- *   440, `max-w-dialog-wide` 672, `w-sidebar` 240… (bảng `SIZE` dưới).
+ *   440, `max-w-dialog-wide` 672, `w-sidebar` 240… (bảng `SIZE` ở `src/lib/design-classes.ts` — chung
+ *   với `cn()`; thêm lớp mới thì thêm tên ở đó, xem cn.test.ts).
  */
-
-/** Primitive (neutral-*, blue-*…) chỉ dùng qua token semantic — không sinh lớp. */
-const PRIMITIVE = /^(neutral|blue|red|amber|green|slate|violet)-\d+$/;
 
 type ColorToken = { name: string; value: string | Record<string, string> };
 const colorTokens = tokens.color.tokens as ColorToken[];
@@ -40,46 +45,8 @@ for (const t of colorTokens) {
     ? `rgb(var(--${t.name}) / <alpha-value>)`
     : `var(--${t.name})`;
 }
-/** Tên shadcn cũ còn dùng trong code → token tương đương. Không thêm tên mới vào đây. */
-const ALIAS: Record<string, string> = {
-  accent: 'secondary',
-  'accent-foreground': 'primary',
-  popover: 'card',
-  'popover-foreground': 'foreground',
-  'card-foreground': 'foreground',
-  'secondary-foreground': 'primary',
-  'destructive-foreground': 'primary-foreground',
-  'success-foreground': 'primary-foreground',
-  'warning-foreground': 'primary-foreground',
-  'info-foreground': 'primary-foreground',
-};
-for (const [alias, target] of Object.entries(ALIAS)) colors[alias] = colors[target]!;
+for (const [alias, target] of Object.entries(COLOR_ALIAS)) colors[alias] = colors[target]!;
 
-/** Tên lớp kích thước → token (spacing / component). Dùng cho h- w- min-h- max-w- top-… */
-const SIZE: Record<string, string> = {
-  control: 'control-height',
-  row: 'row-height',
-  'card-header': 'card-header-height',
-  topbar: 'topbar-height',
-  sidebar: 'sidebar-width',
-  'sidebar-collapsed': 'sidebar-collapsed',
-  'pda-touch': 'pda-touch-min',
-  'pda-primary': 'pda-primary-height',
-  button: 'button-height',
-  'button-sm': 'button-sm-height',
-  checkbox: 'checkbox-size',
-  'checkbox-hit': 'checkbox-hit-width',
-  chip: 'chip-height',
-  drawer: 'drawer-width',
-  'detail-label': 'detail-label-width',
-  'detail-aside': 'detail-aside-width',
-  search: 'search-width',
-  'menu-item': 'menu-item-height',
-  'menu-min': 'menu-min-width',
-  'nav-item': 'nav-item-height',
-  'sticky-topbar': 'sticky-topbar',
-  'sticky-page-header': 'sticky-page-header',
-};
 const sizes = Object.fromEntries(Object.entries(SIZE).map(([k, v]) => [k, `var(--${v})`]));
 
 /** `radius-md` → lớp `md` = var(--radius-md) (bỏ tiền tố nhóm). */
@@ -116,13 +83,8 @@ const config: Config = {
       },
       boxShadow: byPrefix(tokens.shadow, 'shadow-'),
       spacing: sizes,
-      maxWidth: {
-        dialog: 'var(--dialog-max-width)',
-        'dialog-wide': 'var(--dialog-wide-max-width)',
-      },
-      maxHeight: {
-        dialog: 'var(--dialog-max-height)',
-      },
+      maxWidth: DIALOG_MAX_WIDTH,
+      maxHeight: DIALOG_MAX_HEIGHT,
       // Danh sách nhãn–giá trị ở màn Chi tiết: cột nhãn `detail-label-width`
       gridTemplateColumns: {
         detail: 'var(--detail-label-width) minmax(0, 1fr)',

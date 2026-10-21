@@ -779,6 +779,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/stock/actual-count-summary": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Bao nhiêu SKU (hàng ERP) đã nhập tồn thực tế trên tổng số SKU — thống kê màn Tồn kho. */
+        get: operations["InventoryController_actualCountSummary"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/stock/by-location": {
         parameters: {
             query?: never;
@@ -6055,6 +6072,12 @@ export interface components {
         StockListResponseDto: {
             items: components["schemas"]["StockRowDto"][];
             total: number;
+        };
+        ActualCountSummaryDto: {
+            /** @description Số SKU hàng ERP đang có trên hệ thống (bỏ combo, hàng Pancake tự sinh, xoá mềm). */
+            totalSkuCount: number;
+            /** @description Trong số đó, bao nhiêu SKU đã nhập tồn thực tế ở kho đang xem (bất kỳ kho được phép nếu xem mọi kho). */
+            countedSkuCount: number;
         };
         StockByLocationRowDto: {
             skuId: string;
@@ -13248,6 +13271,27 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["StockListResponseDto"];
+                };
+            };
+        };
+    };
+    InventoryController_actualCountSummary: {
+        parameters: {
+            query?: {
+                warehouseId?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ActualCountSummaryDto"];
                 };
             };
         };

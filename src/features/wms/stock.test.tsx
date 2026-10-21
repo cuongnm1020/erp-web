@@ -26,6 +26,23 @@ describe('StockScreen — GET /stock, /stock/by-location, /stock/by-lot (P1-12)'
     expect(screen.getByText('1–50 / 120 dòng')).toBeInTheDocument();
   });
 
+  it('thống kê nhập tồn thực: số SKU đã nhập / tổng SKU từ GET /stock/actual-count-summary', async () => {
+    search = '';
+    server.use(
+      http.get('/api/stock/actual-count-summary', () =>
+        HttpResponse.json({ totalSkuCount: 308, countedSkuCount: 120 }),
+      ),
+    );
+    renderApp(<StockScreen />);
+    expect(await screen.findByText('120')).toBeInTheDocument();
+    expect(screen.getByText(/\/ 308 SKU · 38%/)).toBeInTheDocument();
+    expect(screen.getByText('Còn 188 SKU chưa nhập')).toBeInTheDocument();
+    expect(screen.getByRole('progressbar', { name: 'Tiến độ nhập tồn thực tế' })).toHaveAttribute(
+      'aria-valuenow',
+      '120',
+    );
+  });
+
   it('khả dụng âm được đánh dấu, không bị làm tròn về 0', async () => {
     search = '';
     renderApp(<StockScreen />);

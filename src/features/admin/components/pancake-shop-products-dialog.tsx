@@ -102,7 +102,7 @@ export function PancakeShopProductsDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-6xl">
+      <DialogContent xl>
         <DialogHeader>
           <DialogTitle>Sản phẩm bán trên {label}</DialogTitle>
           <DialogDescription>

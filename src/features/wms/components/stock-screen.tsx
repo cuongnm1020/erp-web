@@ -36,6 +36,7 @@ import { useListState, type SortState } from '@/lib/url-state';
 import { ALL_WAREHOUSES, useWarehouse } from '@/lib/warehouse';
 import {
   stockKeys,
+  useActualCountSummary,
   useSetActualStock,
   useSetSkuCosts,
   useSetSkuWeights,
@@ -520,6 +521,49 @@ function StockTable<T>({
   );
 }
 
+/** Tiến độ nhập tồn thực tế: số SKU hàng ERP đã nhập ở kho đang xem trên tổng số SKU. */
+function ActualCountProgress({
+  summary,
+  warehouseName,
+}: {
+  summary: { totalSkuCount: number; countedSkuCount: number } | undefined;
+  /** null = đang xem tất cả kho. */
+  warehouseName: string | null;
+}) {
+  if (!summary) return null;
+  const { totalSkuCount: total, countedSkuCount: counted } = summary;
+  const pct = total > 0 ? Math.floor((counted / total) * 100) : 0;
+  return (
+    <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 rounded-md border bg-card px-3 py-2 text-xs">
+      <span className="text-muted-foreground">
+        Đã nhập tồn thực {warehouseName ? `ở kho ${warehouseName}` : 'ở ít nhất một kho'}:
+      </span>
+      <span className="text-sm">
+        <b className="font-semibold tabular-nums">{counted.toLocaleString('vi-VN')}</b>
+        <span className="text-muted-foreground">
+          {' '}
+          / {total.toLocaleString('vi-VN')} SKU · {pct}%
+        </span>
+      </span>
+      <div
+        className="h-1.5 min-w-24 flex-1 overflow-hidden rounded-full bg-muted"
+        role="progressbar"
+        aria-label="Tiến độ nhập tồn thực tế"
+        aria-valuemin={0}
+        aria-valuemax={total}
+        aria-valuenow={counted}
+      >
+        <div className="h-full rounded-full bg-primary" style={{ width: `${pct}%` }} />
+      </div>
+      {total - counted > 0 ? (
+        <span className="text-muted-foreground">
+          Còn {(total - counted).toLocaleString('vi-VN')} SKU chưa nhập
+        </span>
+      ) : null}
+    </div>
+  );
+}
+
 export function StockScreen() {
   const { state, set, skipTake } = useListState<StockFilter>(DEFAULTS);
   const tab = parseTab(state.filters.tab);
@@ -676,6 +720,7 @@ export function StockScreen() {
   );
 
   const bySku = useStockBySku(skuParams, tab === 'sku');
+  const actualSummary = useActualCountSummary(countWarehouseId);
   const byLocation = useStockByLocation(breakdownParams, tab === 'location');
   const byLot = useStockByLot(breakdownParams, tab === 'lot');
   const total = (tab === 'sku' ? bySku : tab === 'location' ? byLocation : byLot).data?.total;
@@ -789,6 +834,11 @@ export function StockScreen() {
           Ba con số tách biệt, do API tính.
         </span>
       </p>
+
+      <ActualCountProgress
+        summary={actualSummary.data}
+        warehouseName={countWarehouseId ? (countWarehouseName ?? 'đang chọn') : null}
+      />
 
       <div className="flex border-b" role="tablist" aria-label="Cách xem tồn kho">
         {(counting ? TABS.filter((t) => t.key === 'sku') : TABS).map((t) => (
