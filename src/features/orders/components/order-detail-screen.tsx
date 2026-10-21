@@ -42,6 +42,7 @@ import { carrierOutcome, carrierSource, shipmentStatusBadge } from '@/features/w
 import {
   orderKeys,
   useCancelOrder,
+  useDecideOrder,
   useOrder,
   useOrders,
   type SalesOrderDetail,
@@ -381,6 +382,70 @@ function Card({
   );
 }
 
+/**
+ * Đơn Chờ duyệt: lý do (tên quy tắc) + Duyệt / Từ chối cho đúng người duyệt (`approval.canAct` —
+ * server quyết: trưởng nhóm team người tạo đơn với "Đơn giá dưới trần chiết khấu"). Từ chối → đơn
+ * về Nháp.
+ */
+function ApprovalBar({
+  order,
+  approval,
+}: {
+  order: SalesOrderDetail;
+  approval: NonNullable<SalesOrderDetail['approval']>;
+}) {
+  const decide = useDecideOrder(order.id);
+  const [comment, setComment] = useState('');
+  const act = (decision: 'approve' | 'reject') =>
+    decide.mutate(
+      { decision, requestId: approval.requestId, comment: comment.trim() || undefined },
+      {
+        onSuccess: () => {
+          setComment('');
+          toast.success(decision === 'approve' ? 'Đã duyệt đơn' : 'Đã từ chối đơn', {
+            description: order.docNumber,
+          });
+        },
+        onError: (err) => toast.error(messageFor(err)),
+      },
+    );
+  return (
+    <div
+      role="status"
+      className="flex flex-wrap items-center gap-3 rounded-md border border-warning-line bg-warning-weak px-3 py-2 text-sm"
+    >
+      <span className="min-w-0 flex-1">
+        <b className="font-semibold">Chờ duyệt</b>
+        {approval.ruleName ? ` — ${approval.ruleName}` : ''}
+        {approval.canAct ? '' : '. Chờ trưởng nhóm duyệt.'}
+      </span>
+      {approval.canAct ? (
+        <>
+          <Input
+            aria-label="Ghi chú duyệt"
+            placeholder="Ghi chú (tùy chọn)"
+            value={comment}
+            maxLength={1000}
+            onChange={(e) => setComment(e.target.value)}
+            className="h-8 w-56"
+          />
+          <Button size="sm" disabled={decide.isPending} onClick={() => act('approve')}>
+            Duyệt đơn
+          </Button>
+          <Button
+            size="sm"
+            variant="outline"
+            disabled={decide.isPending}
+            onClick={() => act('reject')}
+          >
+            Từ chối
+          </Button>
+        </>
+      ) : null}
+    </div>
+  );
+}
+
 function Field({ label, children }: { label: string; children: ReactNode }) {
   return (
     <div className="space-y-0.5">
@@ -664,6 +729,9 @@ function Detail({ order }: { order: SalesOrderDetail }) {
           </Button>
         </div>
       </div>
+      {order.status === 'PENDING_APPROVAL' && order.approval ? (
+        <ApprovalBar order={order} approval={order.approval} />
+      ) : null}
       <OrderPrintSheet order={order} printer={printer} />
       <CancelOrderDialog
         order={order}

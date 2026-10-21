@@ -9247,6 +9247,14 @@ export interface components {
              */
             source: "ORDER" | "CUSTOMER_DEFAULT";
         };
+        OrderApprovalDto: {
+            /** @description Gửi vào POST /sales-orders/:id/approve | reject. */
+            requestId: string;
+            /** @description Tên quy tắc duyệt (vd "Đơn giá dưới trần chiết khấu"). */
+            ruleName: string | null;
+            /** @description true = người đang xem duyệt / từ chối được bước này. */
+            canAct: boolean;
+        };
         OrderFulfilmentDto: {
             /** @enum {string} */
             status: "CANCELLED" | "NOT_STARTED" | "PICKING" | "PICKED" | "PACKING" | "PACKED" | "SHIPPED" | "IN_TRANSIT" | "OUT_FOR_DELIVERY" | "DELIVERED" | "FAILED" | "RETURNED" | "CARRIER_CANCELLED";
@@ -9343,6 +9351,8 @@ export interface components {
         SalesOrderDetailDto: {
             /** @description Địa chỉ giao hiệu lực — null = khách chưa có địa chỉ dùng được (tra cước / cấp vận đơn sẽ 422). */
             shippingAddress: components["schemas"]["SalesOrderAddressDto"] | null;
+            /** @description Bước duyệt đang chờ — null = đơn không chờ duyệt. */
+            approval: components["schemas"]["OrderApprovalDto"] | null;
             /** @description Trạng thái kho (pick / đóng gói / giao) — suy từ task + phiếu giao. */
             fulfilment: components["schemas"]["OrderFulfilmentDto"];
             /** @description Hãng đã chọn (tra theo carrierId) — null = chưa chọn hoặc hãng đã tắt. */

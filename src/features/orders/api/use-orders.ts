@@ -326,6 +326,36 @@ export function useCancelOrder(id: string) {
   });
 }
 
+/**
+ * POST /sales-orders/{id}/approve | reject — duyệt / từ chối bước đang chờ (requestId từ
+ * `order.approval`). Không optimistic (luật 5): duyệt xong đơn mới giữ hàng / sang kho.
+ */
+export function useDecideOrder(id: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: {
+      decision: 'approve' | 'reject';
+      requestId: string;
+      comment?: string;
+    }) => {
+      const body = {
+        requestId: input.requestId,
+        ...(input.comment ? { comment: input.comment } : {}),
+      };
+      const params = { path: { id } };
+      return unwrap(
+        input.decision === 'approve'
+          ? api.POST('/sales-orders/{id}/approve', { params, body })
+          : api.POST('/sales-orders/{id}/reject', { params, body }),
+      );
+    },
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: orderKeys.detail(id) });
+      void qc.invalidateQueries({ queryKey: orderKeys.lists() });
+    },
+  });
+}
+
 export type UpdateOrderBody = components['schemas']['UpdateOrderDto'];
 export type UpdateOrderResult = components['schemas']['UpdateOrderResultDto'];
 

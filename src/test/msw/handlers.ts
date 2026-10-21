@@ -576,6 +576,7 @@ export function makeOrderDetail(id: string) {
   return {
     ...header,
     shippingAddress: null,
+    approval: null as { requestId: string; ruleName: string | null; canAct: boolean } | null,
     fulfilment: {
       status: 'NOT_STARTED',
       pickTaskId: null,
