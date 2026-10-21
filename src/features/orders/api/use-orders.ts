@@ -218,6 +218,25 @@ export function useBulkCancelOrders() {
   });
 }
 
+export type BulkFulfilOrdersResult = components['schemas']['BulkFulfilOrdersResultDto'];
+
+/**
+ * POST /sales-orders/bulk-fulfil — "Đóng gói + in vận đơn" trên danh sách (quyền
+ * `sales_order.fulfil_manual`): mỗi đơn như "Đã đóng gói" trên màn sửa — trừ tồn + xin vận đơn.
+ * Không retry (mỗi lần gọi hãng là vận đơn thật); server tự idempotent.
+ */
+export function useBulkFulfilOrders() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (orderIds: string[]) =>
+      unwrap(api.POST('/sales-orders/bulk-fulfil', { body: { orderIds } })),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: orderKeys.lists() });
+      void qc.invalidateQueries({ queryKey: orderKeys.details() });
+    },
+  });
+}
+
 export type MoveOrdersWarehouseBody = components['schemas']['MoveOrdersWarehouseDto'];
 export type MoveOrdersWarehouseResult = components['schemas']['MoveOrdersWarehouseResultDto'];
 

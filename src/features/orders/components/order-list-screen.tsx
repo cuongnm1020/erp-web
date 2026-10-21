@@ -44,6 +44,7 @@ import {
 import { fulfilmentLabel, ORDER_FLOW_TABS, parseOrderFlow, parseOrderStatus } from '../labels';
 import { BulkCancelDialog } from './bulk-cancel-dialog';
 import { BulkMoveWarehouseDialog } from './bulk-move-warehouse-dialog';
+import { BulkFulfilPrintDialog } from './bulk-fulfil-print-dialog';
 import { BulkReprintWaybillDialog } from './bulk-reprint-waybill-dialog';
 import { BulkShippingDialog } from './bulk-shipping-dialog';
 import { FlowBadge, OrderQuickView, TelcoBadge } from './order-quick-view';
@@ -795,6 +796,12 @@ export function OrderListScreen() {
                     onDone={() => setSelected({})}
                   />
                   <BulkMoveWarehouseDialog
+                    rows={data.items.filter((r) => ids.includes(r.id))}
+                    onDone={() => setSelected({})}
+                  />
+                </Can>
+                <Can I="fulfil_manual" a="SalesOrder">
+                  <BulkFulfilPrintDialog
                     rows={data.items.filter((r) => ids.includes(r.id))}
                     onDone={() => setSelected({})}
                   />

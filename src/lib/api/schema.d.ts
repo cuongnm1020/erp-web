@@ -3308,6 +3308,27 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/sales-orders/bulk-fulfil": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * "Đóng gói + in vận đơn" trên danh sách đơn: mỗi đơn như POST /:id/fulfil target PACKED (đóng
+         *     pick, trừ tồn, xin vận đơn hãng trên đơn) — kho không pick/pack trên ERP. Đơn lỗi nằm ở
+         *     `failed` (`packed = true`: đã trừ tồn, chỉ vận đơn lỗi). Quyền `sales_order.fulfil_manual`.
+         */
+        post: operations["SalesOrderController_bulkFulfil"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/sales-orders/{id}/shipping-quote": {
         parameters: {
             query?: never;
@@ -9445,6 +9466,35 @@ export interface components {
             packed: boolean;
             alreadyPacked: boolean;
             waybill: components["schemas"]["FulfilWaybillDto"] | null;
+        };
+        BulkFulfilOrdersDto: {
+            orderIds: string[];
+        };
+        BulkFulfilDoneItemDto: {
+            orderId: string;
+            docNumber: string;
+            shipmentId: string;
+            /**
+             * @description ISSUED = hãng cấp mã ngay; ALREADY_ISSUED = đã có mã; QUEUED = hãng lỗi, worker thử lại.
+             * @enum {string}
+             */
+            outcome: "QUEUED" | "ISSUED" | "ALREADY_ISSUED";
+            trackingNo: string | null;
+        };
+        BulkFulfilFailedItemDto: {
+            orderId: string;
+            docNumber: string | null;
+            /** @description ORDER_CARRIER_REQUIRED, ORDER_IN_WAVE, ORDER_PICK_SHORTAGE, CARRIER_REJECTED… */
+            code: string;
+            message: string;
+            /** @description Nguyên văn lời hãng khi `code = CARRIER_REJECTED`; null nếu không phải. */
+            carrierMessage: string | null;
+            /** @description true = ĐÃ đóng gói (tồn đã trừ) nhưng xin vận đơn lỗi — cấp lại vận đơn, không đóng gói lại. */
+            packed: boolean;
+        };
+        BulkFulfilOrdersResultDto: {
+            done: components["schemas"]["BulkFulfilDoneItemDto"][];
+            failed: components["schemas"]["BulkFulfilFailedItemDto"][];
         };
         ShippingQuoteResultDto: {
             orderId: string;
@@ -18116,6 +18166,29 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["FulfilOrderResultDto"];
+                };
+            };
+        };
+    };
+    SalesOrderController_bulkFulfil: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BulkFulfilOrdersDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BulkFulfilOrdersResultDto"];
                 };
             };
         };
