@@ -10,7 +10,10 @@ import {
   PlugZap,
   Plus,
   RefreshCw,
+  Search,
+  X,
 } from 'lucide-react';
+import { useQueries } from '@tanstack/react-query';
 import { useState } from 'react';
 import { ConfirmDialog } from '@/components/data/confirm-dialog';
 import { RowActions } from '@/components/data/row-actions';
@@ -18,6 +21,7 @@ import { EmptyState, ListSkeleton, QueryState } from '@/components/data/states';
 import { StatusBadge } from '@/components/data/status-badge';
 import { PageHeader } from '@/components/layout/page-header';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
   Table,
@@ -33,6 +37,7 @@ import { messageFor } from '@/lib/error-messages';
 import { formatDateTime } from '@/lib/format/date';
 import { Can } from '@/lib/permission';
 import {
+  pancakeShopProductsQuery,
   useDeletePancakeConfig,
   usePancakeConfig,
   usePancakeShopProducts,
@@ -40,6 +45,7 @@ import {
   useVerifyPancakeConfig,
   type PancakeConfigList,
   type PancakeShopConfig,
+  type PancakeShopProducts,
 } from '../api/use-pancake-config';
 import { PancakeCatalogMigrationDialog } from './pancake-catalog-migration-dialog';
 import { PancakeConfigDialog } from './pancake-config-dialog';
@@ -151,7 +157,51 @@ function EnvNotice({ env }: { env: PancakeConfigList['env'] | undefined }) {
   );
 }
 
+/** Bỏ dấu + thường hoá để tìm "phan bon" ra "Phân bón". */
+function fold(s: string): string {
+  return s
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/đ/g, 'd')
+    .replace(/Đ/g, 'D')
+    .toLowerCase()
+    .trim();
+}
+
+/**
+ * Lọc shop phía client (danh sách shop đã tải hết): khớp mã shop, tên shop, hoặc tên / mã sản
+ * phẩm ĐANG GÁN cho shop (chỉ shop giới hạn sản phẩm — shop "Tất cả sản phẩm" không có danh sách
+ * gán). Trả về sản phẩm khớp theo shop để hiện dưới tên shop.
+ */
+function filterShops(
+  items: PancakeShopConfig[],
+  q: string,
+  productsByShop: Map<string, PancakeShopProducts | undefined>,
+): Array<{ shop: PancakeShopConfig; matchedProducts: PancakeShopProducts['products'] }> {
+  const needle = fold(q);
+  if (!needle) return items.map((shop) => ({ shop, matchedProducts: [] }));
+  return items.flatMap((shop) => {
+    const assigned = productsByShop.get(shop.shopId);
+    const matchedProducts = assigned?.restricted
+      ? assigned.products.filter(
+          (p) => fold(p.name).includes(needle) || fold(p.code).includes(needle),
+        )
+      : [];
+    const shopHit =
+      fold(shop.shopId).includes(needle) || fold(shop.shopName ?? '').includes(needle);
+    return shopHit || matchedProducts.length > 0 ? [{ shop, matchedProducts }] : [];
+  });
+}
+
 function ShopTable({ items }: { items: PancakeShopConfig[] }) {
+  const [q, setQ] = useState('');
+  // Cùng query key với ô "Sản phẩm bán" từng dòng — dùng chung cache, không gọi thêm.
+  const shopProducts = useQueries({
+    queries: items.map((shop) => pancakeShopProductsQuery(shop.shopId)),
+  });
+  const productsByShop = new Map(items.map((shop, i) => [shop.shopId, shopProducts[i]?.data]));
+  const productsLoading = shopProducts.some((r) => r.isPending);
+  const rows = filterShops(items, q, productsByShop);
   const [editing, setEditing] = useState<PancakeShopConfig | null>(null);
   const [catalogShop, setCatalogShop] = useState<PancakeShopConfig | null>(null);
   const [migratingShop, setMigratingShop] = useState<PancakeShopConfig | null>(null);
@@ -174,6 +224,37 @@ function ShopTable({ items }: { items: PancakeShopConfig[] }) {
 
   return (
     <>
+      <div className="mb-2 flex items-center gap-2">
+        <div className="relative">
+          <Search
+            className="pointer-events-none absolute left-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground"
+            aria-hidden
+          />
+          <Input
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+            placeholder="Tìm shop theo tên, mã, sản phẩm đang gán…"
+            aria-label="Tìm shop theo tên, mã shop hoặc sản phẩm đang gán"
+            className="h-8 w-80 pl-7 pr-7 text-xs"
+          />
+          {q ? (
+            <button
+              type="button"
+              aria-label="Xóa từ khoá tìm"
+              onClick={() => setQ('')}
+              className="absolute right-1.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+            >
+              <X className="h-3.5 w-3.5" aria-hidden />
+            </button>
+          ) : null}
+        </div>
+        {q ? (
+          <span className="text-xs text-muted-foreground">
+            {rows.length} / {items.length} shop
+            {productsLoading ? ' · đang tải sản phẩm gán…' : ''}
+          </span>
+        ) : null}
+      </div>
       <div className="overflow-x-auto rounded-md border bg-card">
         <Table>
           <TableHeader className="bg-muted">
@@ -190,7 +271,14 @@ function ShopTable({ items }: { items: PancakeShopConfig[] }) {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {items.map((shop) => {
+            {rows.length === 0 ? (
+              <TableRow>
+                <TableCell colSpan={9} className="py-6 text-center text-sm text-muted-foreground">
+                  Không có shop nào khớp “{q}”.
+                </TableCell>
+              </TableRow>
+            ) : null}
+            {rows.map(({ shop, matchedProducts }) => {
               const fromEnv = shop.source === 'env';
               const dbRow = shop.updatedAt !== null;
               return (
@@ -206,6 +294,16 @@ function ShopTable({ items }: { items: PancakeShopConfig[] }) {
                         'số của kho'
                       )}
                     </div>
+                    {matchedProducts.length > 0 ? (
+                      <div className="mt-1 text-xs">
+                        <span className="text-muted-foreground">Sản phẩm khớp: </span>
+                        {matchedProducts
+                          .slice(0, 3)
+                          .map((p) => p.name)
+                          .join(', ')}
+                        {matchedProducts.length > 3 ? ` +${matchedProducts.length - 3}` : ''}
+                      </div>
+                    ) : null}
                   </TableCell>
                   <TableCell>
                     <span className="font-mono">{shop.apiKeyHint}</span>{' '}

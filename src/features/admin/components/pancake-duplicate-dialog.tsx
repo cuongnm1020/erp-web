@@ -67,7 +67,7 @@ export function PancakeDuplicateDialog({
       {
         onSuccess: (saved) => {
           toast.success('Đã nhân bản kết nối', {
-            description: `Shop ${saved.shopId} · khoá ${saved.apiKeyHint} — dán URL + secret webhook mới vào Pancake`,
+            description: `Shop ${saved.shopId} · khoá ${saved.apiKeyHint} — dán URL + secret webhook mới vào Pancake${saved.isActive ? '; đang đẩy các kho ERP lên shop' : ''}`,
           });
           onOpenChange(false);
         },
