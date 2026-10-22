@@ -221,6 +221,58 @@ export function useDeleteImage() {
 }
 
 /** POST /skus/{id}/barcodes — bổ sung barcode; `uom` = mã ĐVT phụ (F3), bỏ trống = ĐVT cơ sở. */
+/**
+ * POST /skus/{id}/code — đổi mã SKU (vd theo mã NCC). Barcode cũ ở lại nên tem đã in vẫn quét được;
+ * API tự đẩy mã mới lên Pancake. Lệch version → 409 (tải lại).
+ */
+export function useChangeSkuCode() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ skuId, version, code }: { skuId: string; version: number; code: string }) =>
+      unwrap(
+        api.POST('/skus/{id}/code', {
+          params: { path: { id: skuId } },
+          body: { version, code },
+        }),
+      ),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: productKeys.skuLists() });
+      void qc.invalidateQueries({ queryKey: productKeys.details() });
+    },
+  });
+}
+
+/**
+ * POST /skus/{id}/barcodes/{code}/replace — thay barcode bằng mã khác (mã NCC in sẵn trên bao bì);
+ * mã mới thành mã chính, `keepOld` giữ mã cũ làm mã phụ.
+ */
+export function useReplaceBarcode() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      skuId,
+      code,
+      newCode,
+      keepOld,
+    }: {
+      skuId: string;
+      code: string;
+      newCode: string;
+      keepOld: boolean;
+    }) =>
+      unwrap(
+        api.POST('/skus/{id}/barcodes/{code}/replace', {
+          params: { path: { id: skuId, code } },
+          body: { newCode, keepOld },
+        }),
+      ),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: productKeys.skuLists() });
+      void qc.invalidateQueries({ queryKey: productKeys.details() });
+    },
+  });
+}
+
 export function useAddBarcode() {
   const qc = useQueryClient();
   return useMutation({

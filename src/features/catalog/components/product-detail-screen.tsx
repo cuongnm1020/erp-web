@@ -58,6 +58,7 @@ import {
   type ProductCodeSheetData,
   type ProductCodeSheetFormat,
 } from './product-code-sheet';
+import { ChangeSkuCodeButton, ReplaceBarcodeButton } from './sku-code-dialogs';
 
 /**
  * C-03 Chi tiết sản phẩm — nối API thật (GET /products/{id} + /stock*).
@@ -396,6 +397,9 @@ function VariantsTab({ skus }: { skus: Sku[] }) {
           <TableHead className={cn(HEAD, 'w-20')}>ĐVT bán</TableHead>
           <TableHead className={cn(HEAD, 'w-32 text-right')}>Giá bán</TableHead>
           <TableHead className={cn(HEAD, 'w-28')}>Trạng thái</TableHead>
+          <TableHead className={cn(HEAD, 'w-28 text-right')}>
+            <span className="sr-only">Thao tác</span>
+          </TableHead>
         </TableRow>
       </TableHeader>
       <TableBody>
@@ -409,6 +413,11 @@ function VariantsTab({ skus }: { skus: Sku[] }) {
               <StatusBadge tone={s.isActive ? 'ok' : 'neutral'}>
                 {s.isActive ? 'Đang bán' : 'Ngừng bán'}
               </StatusBadge>
+            </TableCell>
+            <TableCell className="px-2.5 py-1.5 text-right">
+              <Can I="update" a="Product">
+                <ChangeSkuCodeButton sku={s} />
+              </Can>
             </TableCell>
           </TableRow>
         ))}
@@ -482,7 +491,7 @@ function BarcodesTab({ product, skus }: { product: ProductDetail; skus: Sku[] })
             <TableHead className={cn(HEAD, 'w-36')}>Cấp</TableHead>
             <TableHead className={HEAD}>Barcode</TableHead>
             <TableHead className={cn(HEAD, 'w-24')}>Loại</TableHead>
-            <TableHead className={cn(HEAD, 'w-52 text-right')}>In tem</TableHead>
+            <TableHead className={cn(HEAD, 'w-72 text-right')}>In tem</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -570,10 +579,16 @@ function SkuBarcodeRows({
                   </div>
                 </TableCell>
                 <TableCell className="px-2.5 py-1.5">
-                  <StatusBadge tone="neutral">{b.type}</StatusBadge>
+                  <span className="flex flex-wrap gap-1">
+                    <StatusBadge tone="neutral">{b.type}</StatusBadge>
+                    {b.isPrimary ? <StatusBadge tone="brand">Mã chính</StatusBadge> : null}
+                  </span>
                 </TableCell>
                 <TableCell className="px-2.5 py-1.5 text-right">
                   <div className="flex justify-end gap-1.5">
+                    <Can I="update" a="Product">
+                      <ReplaceBarcodeButton sku={sku} barcode={b} />
+                    </Can>
                     <Button variant="outline" size="sm" asChild>
                       <Link href={printHref(b.id)} aria-label={`In tem ${b.code}`}>
                         <Printer /> In

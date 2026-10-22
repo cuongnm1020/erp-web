@@ -2029,6 +2029,40 @@ export interface paths {
         patch: operations["ProductController_updateSku"];
         trace?: never;
     };
+    "/skus/{id}/code": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Đổi mã SKU (2026-10-22) — mã trùng SKU khác → 409 SKU_CODE_TAKEN, trùng barcode → 409 BARCODE_TAKEN. */
+        post: operations["ProductController_changeSkuCode"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/skus/{id}/barcodes/{code}/replace": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Thay barcode bằng mã khác (mã NCC in sẵn), mã mới thành mã chính; tuỳ chọn giữ mã cũ. */
+        post: operations["ProductController_replaceBarcode"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/skus/{id}/barcodes": {
         parameters: {
             query?: never;
@@ -7862,6 +7896,8 @@ export interface components {
             uomId: string;
             /** @enum {string} */
             type: "EAN13" | "CODE128" | "QR" | "INTERNAL";
+            /** @description Mã chính ở ĐVT này — in tem mặc định + đẩy lên Pancake (2026-10-22). */
+            isPrimary: boolean;
             uom: components["schemas"]["UomDto"];
         };
         SkuUomConversionDto: {
@@ -8319,6 +8355,16 @@ export interface components {
             variantKey: string | null;
             /** @description Optimistic locking — gửi lại trong PATCH /skus/:id; lệch → 409. */
             version: number;
+        };
+        ChangeSkuCodeDto: {
+            /** @description Optimistic locking — version SKU client đang cầm. */
+            version: number;
+            code: string;
+        };
+        ReplaceBarcodeDto: {
+            newCode: string;
+            /** @description true = giữ mã cũ làm mã phụ (tem đã in vẫn quét được). */
+            keepOld: boolean;
         };
         BarcodeLookupSkuDto: {
             id: string;
@@ -16051,6 +16097,57 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["SkuSummaryDto"];
+                };
+            };
+        };
+    };
+    ProductController_changeSkuCode: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ChangeSkuCodeDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SkuDetailDto"];
+                };
+            };
+        };
+    };
+    ProductController_replaceBarcode: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+                code: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReplaceBarcodeDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SkuBarcodeDto"];
                 };
             };
         };
