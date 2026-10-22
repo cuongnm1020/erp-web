@@ -49,6 +49,7 @@ import {
   useCareLookup,
   useCustomerPhoneMatch,
   useSameDayOrders,
+  useOrderOwnerOptions,
   useOrderStaffOptions,
   useOrderTags,
   useShippingQuotePreview,
@@ -117,21 +118,26 @@ const FIELD_LABEL = 'text-xs font-semibold text-muted-foreground';
 
 // ── Thông tin ──────────────────────────────────────────────
 
-function useStaffSearch(q: string): EntitySearchResult {
-  const staff = useOrderStaffOptions();
-  const needle = q.trim().toLowerCase();
-  // Danh mục nhân viên nhỏ, đã tải hết một lần — lọc gợi ý tại chỗ.
-  const options = staff.data
-    ?.filter(
-      (u) =>
-        needle === '' ||
-        u.fullName.toLowerCase().includes(needle) ||
-        u.code.toLowerCase().includes(needle),
-    )
-    .slice(0, 30)
-    .map((u) => ({ id: u.id, label: u.fullName, hint: u.code }));
-  return { options, isPending: staff.isPending, error: staff.error };
-}
+/** Danh mục nhân viên nhỏ, đã tải hết một lần — lọc gợi ý tại chỗ. */
+const staffSearch =
+  (useList: typeof useOrderStaffOptions) =>
+  (q: string): EntitySearchResult => {
+    const staff = useList();
+    const needle = q.trim().toLowerCase();
+    const options = staff.data
+      ?.filter(
+        (u) =>
+          needle === '' ||
+          u.fullName.toLowerCase().includes(needle) ||
+          u.code.toLowerCase().includes(needle),
+      )
+      .slice(0, 30)
+      .map((u) => ({ id: u.id, label: u.fullName, hint: u.code }));
+    return { options, isPending: staff.isPending, error: staff.error };
+  };
+const useStaffSearch = staffSearch(useOrderStaffOptions);
+/** NV xử lý chỉ chọn trong team người tạo (GET /sales-orders/owner-options). */
+const useOwnerSearch = staffSearch(useOrderOwnerOptions);
 
 /**
  * Ô chọn nhân viên trên đơn. `bare` = chỉ ô chọn (nhãn do nơi gọi vẽ — dải "Thông tin đơn" đầu
@@ -150,7 +156,10 @@ export function StaffField({
   placeholder: string;
   bare?: boolean;
 }) {
-  const staff = useOrderStaffOptions();
+  const isOwner = name === 'ownerId';
+  const staffAll = useOrderStaffOptions();
+  const owners = useOrderOwnerOptions();
+  const staff = isOwner ? owners : staffAll;
   return (
     <FormField
       control={form.control}
@@ -161,7 +170,7 @@ export function StaffField({
             <EntityPicker
               value={field.value}
               onChange={(id) => field.onChange(id)}
-              useSearch={useStaffSearch}
+              useSearch={isOwner ? useOwnerSearch : useStaffSearch}
               selectedLabel={staff.data?.find((u) => u.id === field.value)?.fullName}
               placeholder={placeholder}
               searchPlaceholder="Tìm tên, mã nhân viên…"

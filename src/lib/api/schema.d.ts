@@ -3216,6 +3216,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/sales-orders/owner-options": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** NV xử lý chọn được trên màn tạo đơn: chỉ nhân viên cùng team mình (superadmin: mọi người). */
+        get: operations["SalesOrderController_ownerOptions"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/sales-orders/shipping-quote-preview": {
         parameters: {
             query?: never;
@@ -18253,6 +18270,25 @@ export interface operations {
         };
     };
     SalesOrderController_staffOptions: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OrderStaffOptionDto"][];
+                };
+            };
+        };
+    };
+    SalesOrderController_ownerOptions: {
         parameters: {
             query?: never;
             header?: never;

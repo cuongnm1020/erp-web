@@ -789,4 +789,11 @@ describe('OrderCreateScreen — màn tạo đơn mới', () => {
     );
     forgetWarehouseSelection(); // store kho là module-level — không để rò sang test sau
   });
+
+  it('ô NV xử lý chỉ liệt kê nhân viên cùng team (GET /sales-orders/owner-options), không lấy danh sách mọi nhân viên', async () => {
+    renderApp(<OrderCreateScreen />);
+    fireEvent.click(await screen.findByRole('combobox', { name: 'NV xử lý' }));
+    expect(await screen.findByRole('option', { name: /Nguyễn Văn Sale/ })).toBeInTheDocument();
+    expect(screen.queryByRole('option', { name: /Trần Thị Đóng/ })).not.toBeInTheDocument();
+  });
 });
