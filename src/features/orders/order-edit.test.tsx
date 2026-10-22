@@ -33,15 +33,22 @@ describe('OrderEditScreen — trang sửa đơn (D-05, PATCH /sales-orders/{id})
     expect(await screen.findByRole('heading', { level: 1 })).toHaveTextContent(
       `Sửa đơn ${ORDER.docNumber}`,
     );
-    for (const t of ['Sản phẩm', 'Giá trị đơn hàng', 'Thông tin', 'Khách hàng', 'Vận chuyển']) {
+    // Redesign 2026-10-22: trái = phần sửa được, phải = đơn chỉ đọc.
+    for (const t of ['Giao hàng', 'Vận chuyển', 'Ghi chú & phân công']) {
       expect(screen.getByText(t)).toBeInTheDocument();
     }
+    expect(screen.getAllByText('Đơn hàng').length).toBeGreaterThan(1); // breadcrumb + thẻ chỉ đọc
     // Dòng hàng chỉ đọc: có mã SKU, không có ô nhập số lượng
     expect(screen.getByText(DETAIL.lines[0]!.skuCode)).toBeInTheDocument();
     expect(screen.queryByRole('spinbutton')).not.toBeInTheDocument();
-    expect(screen.getByText('Tiền cần thu')).toBeInTheDocument();
+    expect(screen.getByText('Thu hộ (COD)')).toBeInTheDocument();
+    // Lối đổi dòng hàng: Nhân bản đơn (giữ đơn) hoặc hủy & tạo lại.
+    expect(screen.getByRole('link', { name: 'Nhân bản đơn' })).toHaveAttribute(
+      'href',
+      `/crm/orders/new?from=${ORDER.id}`,
+    );
     expect(screen.getByRole('button', { name: /Lưu thay đổi/ })).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'Hủy bỏ' })).toHaveAttribute(
+    expect(screen.getByRole('link', { name: /^Hủy bỏ/ })).toHaveAttribute(
       'href',
       `/crm/orders/${ORDER.id}`,
     );
@@ -371,7 +378,6 @@ describe('OrderEditScreen — trang sửa đơn (D-05, PATCH /sales-orders/{id})
     const { unmount } = renderApp(<OrderEditScreen orderId={posted.id} />);
     await screen.findByRole('heading', { level: 1 });
     expect(screen.getByRole('combobox', { name: 'Hãng vận chuyển' })).toBeDisabled();
-    expect(screen.getByText('Đã chốt lúc')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('combobox', { name: 'Trạng thái' }));
     expect((await screen.findAllByRole('option')).map((o) => o.textContent)).toEqual([
       'Đã chốt (hiện tại)',
@@ -523,6 +529,6 @@ describe('OrderEditScreen — "Trạng thái kho" đặt tay (POST /sales-orders
     });
     await screen.findByRole('heading', { level: 1 });
     expect(screen.queryByRole('combobox', { name: 'Trạng thái kho' })).not.toBeInTheDocument();
-    expect(screen.getByText('Chờ pick')).toBeInTheDocument();
+    expect(screen.getAllByText('Chờ pick').length).toBeGreaterThan(0);
   });
 });
