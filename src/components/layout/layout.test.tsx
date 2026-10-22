@@ -162,8 +162,27 @@ describe('visibleModules', () => {
     ]);
   });
 
-  it('admin thấy 7 module (Giá & KM, Tài chính đang ẩn; có Báo cáo)', () => {
-    expect(visibleModules(() => true)).toHaveLength(7);
+  it('admin thấy 8 module (Giá & KM, Tài chính đang ẩn; có Công việc, Báo cáo)', () => {
+    expect(visibleModules(() => true)).toHaveLength(8);
+  });
+
+  it('Công việc: Việc của team chỉ khi phụ trách phòng ban; URL gate theo work.*', () => {
+    const staff = visibleModules((a, s) => s === 'Work' && (a === 'read' || a === 'create'));
+    expect(staff.find((m) => m.label === 'Công việc')?.children?.map((c) => c.label)).toEqual([
+      'Việc của tôi',
+      'Hàng chờ yêu cầu',
+    ]);
+    const manager = visibleModules(
+      (a, s) => (s === 'Work' && a === 'read') || (s === 'WorkTeam' && a === 'view'),
+    );
+    expect(manager.find((m) => m.label === 'Công việc')?.children?.map((c) => c.label)).toContain(
+      'Việc của team',
+    );
+    expect(requiredAbilityFor('/work/team')).toEqual({ action: 'view', subject: 'WorkTeam' });
+    expect(requiredAbilityFor('/work/new')).toEqual({ action: 'create', subject: 'Work' });
+    expect(requiredAbilityFor('/work/abc-123')).toEqual({ action: 'read', subject: 'Work' });
+    expect(requiredAbilityFor('/admin/work-config')).toEqual({ action: 'config', subject: 'Work' });
+    expect(requiredAbilityFor('/reports/work')).toEqual({ action: 'work', subject: 'Report' });
   });
 
   it('Báo cáo (RPT-07): Doanh thu theo report.sales, Lợi nhuận theo report.profit; URL vẫn gate', () => {

@@ -5,14 +5,18 @@ import {
   Boxes,
   CalendarClock,
   ChartLine,
+  ClipboardList,
   Columns3,
   Gauge,
   Gift,
   GitMerge,
   Headset,
+  Inbox,
   LayoutDashboard,
   Landmark,
   List,
+  ListChecks,
+  ListTodo,
   ListTree,
   MailCheck,
   MapPin,
@@ -31,6 +35,7 @@ import {
   Settings,
   ShieldCheck,
   ShoppingCart,
+  SlidersHorizontal,
   Shuffle,
   Smartphone,
   Star,
@@ -96,6 +101,44 @@ export const NAV_MODULES: NavModule[] = [
     href: '/',
     icon: LayoutDashboard,
     shortcut: 'g o',
+  },
+  {
+    // Module Công việc (2026-10-22, docs/PLAN-ticket-sla.md §6): yêu cầu của khách, yêu cầu nội bộ,
+    // giao việc. Chưa có token màu mod-work trong design system → không gắn tone (dùng màu brand
+    // như Tổng quan) cho tới khi token được duyệt.
+    label: 'Công việc',
+    href: '/work',
+    icon: ListChecks,
+    ability: { action: 'read', subject: 'Work' },
+    shortcut: 'g v',
+    children: [
+      {
+        label: 'Việc của tôi',
+        href: '/work',
+        icon: ListTodo,
+        ability: { action: 'read', subject: 'Work' },
+      },
+      {
+        label: 'Việc của team',
+        href: '/work/team',
+        icon: UsersRound,
+        // Trưởng phòng / cấp trên (phụ trách phòng ban) — API tự lọc theo nhánh phụ trách.
+        ability: { action: 'view', subject: 'WorkTeam' },
+      },
+      {
+        label: 'Hàng chờ yêu cầu',
+        href: '/work/queue',
+        icon: Inbox,
+        ability: { action: 'read', subject: 'Work' },
+      },
+      {
+        label: 'Tạo việc',
+        href: '/work/new',
+        icon: Plus,
+        hidden: true,
+        ability: { action: 'create', subject: 'Work' },
+      },
+    ],
   },
   {
     label: 'Bán hàng',
@@ -193,12 +236,6 @@ export const NAV_MODULES: NavModule[] = [
         // tài khoản thật và gắn họ vào nhân sự phòng mình.
         ability: { action: 'staff_read', subject: 'Sync' },
       },
-      // {
-      //   label: 'Ticket CSKH',
-      //   href: '/crm/tickets',
-      //   icon: Ticket,
-      //   ability: { action: 'read', subject: 'Ticket' },
-      // },
     ],
   },
   {
@@ -421,6 +458,13 @@ export const NAV_MODULES: NavModule[] = [
         icon: Percent,
         ability: { action: 'profit', subject: 'Report' },
       },
+      {
+        label: 'Công việc & SLA',
+        href: '/reports/work',
+        icon: ClipboardList,
+        // report.work: quản lý (trưởng phòng / quản lý kho) — số liệu chỉ nhánh mình phụ trách.
+        ability: { action: 'work', subject: 'Report' },
+      },
       //{ label: 'Giá vốn & giá trị tồn', href: '/fin/valuation', icon: Coins },
     ],
   },
@@ -507,6 +551,13 @@ export const NAV_MODULES: NavModule[] = [
         ability: { action: 'distribution_config', subject: 'Customer' },
       },
       {
+        label: 'Cấu hình công việc',
+        href: '/admin/work-config',
+        icon: SlidersHorizontal,
+        // Loại yêu cầu, ma trận SLA, giờ làm việc, ngày lễ — work.config (quản trị).
+        ability: { action: 'config', subject: 'Work' },
+      },
+      {
         label: 'Cấu hình hệ thống',
         href: '/admin/settings',
         icon: Settings,
@@ -578,7 +629,10 @@ export const SEGMENT_LABELS: Record<string, string> = {
   orders: 'Đơn hàng',
   approvals: 'Chờ duyệt',
   returns: 'Nhập hàng hoàn',
-  tickets: 'Ticket',
+  work: 'Công việc',
+  team: 'Việc của team',
+  queue: 'Hàng chờ yêu cầu',
+  'work-config': 'Cấu hình công việc',
   invoices: 'Hóa đơn',
   payments: 'Thanh toán',
   receivables: 'Phải thu',

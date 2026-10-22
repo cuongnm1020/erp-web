@@ -1,7 +1,6 @@
-import { TicketListScreen } from '@/features/tickets/components/ticket-list-screen';
+import { redirect } from 'next/navigation';
 
-export const metadata = { title: 'Ticket CSKH — ERP' };
-
+/** Ticket CSKH (mock cũ) đã thay bằng module Công việc — hàng chờ yêu cầu (2026-10-22). */
 export default function Page() {
-  return <TicketListScreen />;
+  redirect('/work/queue');
 }
