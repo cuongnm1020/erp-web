@@ -111,13 +111,13 @@ export const EntityPicker = React.forwardRef<HTMLButtonElement, EntityPickerProp
               type="button"
               aria-label="Bỏ chọn"
               onClick={() => onChange('')}
-              className="absolute right-8 top-2.5 rounded text-muted-foreground hover:text-foreground"
+              className="absolute right-8 top-1/2 -translate-y-1/2 rounded p-0.5 text-muted-foreground hover:bg-muted hover:text-foreground"
             >
-              <X className="h-4 w-4" />
+              <X className="h-3.5 w-3.5" aria-hidden />
             </button>
           ) : null}
         </div>
-        <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
+        <PopoverContent className="w-[--radix-popover-trigger-width] min-w-72 p-0" align="start">
           <Command shouldFilter={false}>
             <CommandInput value={q} onValueChange={setQ} placeholder={searchPlaceholder} />
             <CommandList>
@@ -143,13 +143,21 @@ export const EntityPicker = React.forwardRef<HTMLButtonElement, EntityPickerProp
                     }}
                   >
                     <Check
-                      className={cn('h-4 w-4', o.id === value ? 'opacity-100' : 'opacity-0')}
+                      className={cn(
+                        'h-4 w-4 shrink-0 self-start text-primary',
+                        o.hint && 'mt-0.5',
+                        o.id === value ? 'opacity-100' : 'opacity-0',
+                      )}
                       aria-hidden
                     />
-                    <span className="flex flex-col">
-                      <span>{o.label}</span>
+                    <span className="flex min-w-0 flex-1 flex-col">
+                      <span className="truncate" title={o.label}>
+                        {o.label}
+                      </span>
                       {o.hint ? (
-                        <span className="text-xs text-muted-foreground">{o.hint}</span>
+                        <span className="truncate font-mono text-xs text-muted-foreground">
+                          {o.hint}
+                        </span>
                       ) : null}
                     </span>
                   </CommandItem>
