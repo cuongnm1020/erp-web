@@ -63,7 +63,7 @@ describe('TeamCustomersScreen — GET /customer-care/customers (CSKH)', () => {
     ).toBeInTheDocument();
     expect(seen[0]!.get('assignedFrom')).toBe(TODAY);
     expect(seen[0]!.get('assignedTo')).toBe(TODAY);
-    expect(screen.getByRole('button', { name: 'Ngày gán: 1 ngày' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /^Ngày gán: 1 ngày/ })).toBeInTheDocument();
 
     const r1 = screen.getByRole('row', { name: /KH024801/ });
     expect(within(r1).getByText('Chia tự động')).toBeInTheDocument();
@@ -101,9 +101,9 @@ describe('TeamCustomersScreen — GET /customer-care/customers (CSKH)', () => {
     renderApp(<TeamCustomersScreen />);
     await screen.findByText(/Khách của team ·/);
     // Bộ lọc khoảng ngày dùng chung (2026-10-22): mở hộp → chọn sẵn → Áp dụng.
-    fireEvent.click(screen.getByRole('button', { name: 'Ngày gán: 1 ngày' }));
+    fireEvent.click(screen.getByRole('button', { name: /^Ngày gán: 1 ngày/ }));
     fireEvent.click(await screen.findByRole('button', { name: '7 ngày' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Áp dụng' }));
+    fireEvent.click(screen.getByRole('button', { name: /^Áp dụng/ }));
     const seven = careRangePresets(TODAY)[2]!;
     expect(replace).toHaveBeenLastCalledWith(
       expect.stringContaining(`from=${seven.from}`),

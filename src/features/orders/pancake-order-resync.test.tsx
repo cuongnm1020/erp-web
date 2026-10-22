@@ -179,7 +179,7 @@ describe('Danh sách đơn — Đồng bộ đơn từ Pancake theo POS', () => 
     expect(screen.getByLabelText('Đến ngày')).toHaveValue('13/10/2026');
     type('Từ ngày', '11/10/2026');
     type('Đến ngày', '12/10/2026');
-    fireEvent.click(screen.getByRole('button', { name: 'Áp dụng' }));
+    fireEvent.click(screen.getByRole('button', { name: /^Áp dụng/ }));
     expect(
       within(dialog).getByRole('button', { name: 'Ngày cập nhật: 11/10 – 12/10/2026' }),
     ).toBeInTheDocument();
