@@ -82,7 +82,7 @@ const DEFAULT_WAREHOUSE = '__default__';
  * Mật độ riêng màn tạo đơn: cả form nằm gọn một màn hình không phải cuộn. Ô nhập / ô chọn / nút mở
  * lịch cao 32px; dòng báo lỗi dưới ô chỉ chiếm chỗ khi có lỗi (trống thì ẩn).
  */
-const DENSE = cn(
+export const DENSE = cn(
   '[&_input:not([type=checkbox]):not([type=radio]):not([type=file])]:h-8',
   '[&_button[role=combobox]]:h-8 [&_button[aria-haspopup=dialog]]:h-8',
   '[&_p[id$=-form-item-message]:empty]:hidden',
