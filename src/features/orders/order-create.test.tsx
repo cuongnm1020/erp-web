@@ -372,7 +372,7 @@ describe('OrderCreateScreen — màn tạo đơn mới', () => {
     expect(bodies[0]).not.toHaveProperty('address');
   });
 
-  it('xem trước tiền: tổng = tạm tính + ship + phụ thu − giảm; Tiền cần thu trừ chuyển khoản', async () => {
+  it('xem trước tiền: tạo lại đơn KHÔNG mang phí ship / phụ thu đơn cũ; Tiền cần thu trừ chuyển khoản', async () => {
     search = `from=${ORDER.id}`;
     server.use(
       ...skuHandlers(),
@@ -391,7 +391,9 @@ describe('OrderCreateScreen — màn tạo đơn mới', () => {
         acc + Number(l.qty) * (l.unitPrice !== l.listPrice ? Number(l.unitPrice) : 100_000),
       0,
     );
-    const ship = Number(DETAIL.shippingFee);
+    // Tạo lại đơn không mang phí vận chuyển / phụ thu của đơn cũ (2026-10-21).
+    expect(Number(DETAIL.shippingFee)).toBeGreaterThan(0);
+    const ship = 0;
     await waitFor(() =>
       expect(screen.getAllByText(new RegExp(vnd(subtotal + ship))).length).toBeGreaterThan(0),
     );

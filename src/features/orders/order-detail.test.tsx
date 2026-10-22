@@ -206,6 +206,68 @@ describe('OrderDetailScreen — GET /sales-orders/{id} (P1-12)', () => {
   });
 });
 
+describe('OrderDetailScreen — đơn Pancake: tên gốc trên Pancake + món gõ tay (2026-10-22)', () => {
+  it('dòng có tên Pancake khác tên ERP hiện "Trên Pancake: …"; món gõ tay hiện thành dòng riêng, không cột kho', async () => {
+    const lines = DETAIL.lines.map((l, i) =>
+      i === 0 ? { ...l, pancakeName: '3 Gói Ches Thái LLan gói 100g', pancakeSkuCode: '006' } : l,
+    );
+    server.use(
+      http.get('/api/sales-orders/:id', () =>
+        HttpResponse.json({
+          ...DETAIL,
+          lines,
+          customItems: [
+            { name: '400 gói combi thái 25gr', qty: '2', unitPrice: '5600000', discount: '0' },
+          ],
+        }),
+      ),
+    );
+    renderApp(<OrderDetailScreen orderId={ORDER.id} />);
+    expect(
+      await screen.findByText('Trên Pancake: 3 Gói Ches Thái LLan gói 100g · 006'),
+    ).toBeInTheDocument();
+    const row = screen.getByTestId('custom-item-row');
+    expect(row).toHaveTextContent('400 gói combi thái 25gr');
+    expect(row).toHaveTextContent('Gõ tay trên Pancake');
+    expect(row).toHaveTextContent('Không trừ tồn');
+  });
+});
+
+describe('OrderDetailScreen — duyệt đơn Chờ duyệt (2026-10-21)', () => {
+  const pending = (canAct: boolean) => ({
+    ...DETAIL,
+    status: 'PENDING_APPROVAL' as const,
+    approval: { requestId: 'req-1', ruleName: 'Đơn giá dưới trần chiết khấu', canAct },
+  });
+
+  it('người duyệt: thấy lý do + Duyệt đơn → POST approve kèm requestId + ghi chú', async () => {
+    const bodies: unknown[] = [];
+    server.use(
+      http.get('/api/sales-orders/:id', () => HttpResponse.json(pending(true))),
+      http.post('/api/sales-orders/:id/approve', async ({ request }) => {
+        bodies.push(await request.json());
+        return HttpResponse.json(
+          { orderId: DETAIL.id, docNumber: DETAIL.docNumber, status: 'APPROVED', completed: true },
+          { status: 201 },
+        );
+      }),
+    );
+    renderApp(<OrderDetailScreen orderId={ORDER.id} />);
+    expect(await screen.findByText(/Đơn giá dưới trần chiết khấu/)).toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText('Ghi chú duyệt'), { target: { value: 'Khách quen' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Duyệt đơn' }));
+    await waitFor(() => expect(bodies).toEqual([{ requestId: 'req-1', comment: 'Khách quen' }]));
+  });
+
+  it('không phải người duyệt: chỉ báo chờ trưởng nhóm, không có nút', async () => {
+    server.use(http.get('/api/sales-orders/:id', () => HttpResponse.json(pending(false))));
+    renderApp(<OrderDetailScreen orderId={ORDER.id} />);
+    expect(await screen.findByText(/Chờ trưởng nhóm duyệt/)).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Duyệt đơn' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Từ chối' })).not.toBeInTheDocument();
+  });
+});
+
 describe('OrderDetailScreen — trạng thái kho + tự mở nhãn (?printLabel=1)', () => {
   it('nhãn trạng thái kho trong tiêu đề: NOT_STARTED → "Chờ pick"; PACKED → "Đã đóng gói"', async () => {
     search = '';

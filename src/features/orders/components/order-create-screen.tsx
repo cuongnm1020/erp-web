@@ -39,10 +39,11 @@ function valuesFromOrder(o: SalesOrderDetail, warehouseId: string): CreateOrderV
     warehouseId: o.warehouseId ?? warehouseId,
     channel: o.channel,
     source: o.source ?? '',
-    shippingFee: o.shippingFee,
+    // Tạo lại đơn KHÔNG mang phí vận chuyển / phụ thu của đơn cũ (user chốt 2026-10-21).
+    shippingFee: '',
     freeShipping: o.freeShipping,
     shipFeeOnReturnOnly: o.shipFeeOnReturnOnly,
-    surcharge: new Decimal(o.surcharge).isZero() ? '' : o.surcharge,
+    surcharge: '',
     // Giảm tay cấp đơn của đơn cũ: theo % thì giữ %, không thì giữ số tiền.
     ...(o.manualDiscountRate
       ? {

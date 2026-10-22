@@ -67,6 +67,8 @@ export interface DataTableProps<T> {
   maxHeight?: string;
   /** false = bảng không phân trang (API trả đủ dòng, ví dụ báo cáo theo nhân viên) — ẩn thanh trang. */
   pagination?: boolean;
+  /** id cột đang ẩn — chọn bằng `ColumnPicker`. */
+  hiddenColumns?: string[];
   className?: string;
 }
 
@@ -91,6 +93,7 @@ export function DataTable<T>({
   bulkActions,
   maxHeight = '70vh',
   pagination = true,
+  hiddenColumns,
   className,
 }: DataTableProps<T>) {
   // Cột chọn chỉ dùng row/table API, không đọc `selection` — memo theo cờ bật/tắt, KHÔNG theo
@@ -135,7 +138,10 @@ export function DataTable<T>({
     manualPagination: true,
     manualSorting: true,
     enableRowSelection: !!selection,
-    state: { rowSelection: selection?.selected ?? {} },
+    state: {
+      rowSelection: selection?.selected ?? {},
+      columnVisibility: Object.fromEntries((hiddenColumns ?? []).map((id) => [id, false])),
+    },
     onRowSelectionChange: (updater) => {
       if (!selection) return;
       const next = typeof updater === 'function' ? updater(selection.selected) : updater;
@@ -250,7 +256,7 @@ export function DataTable<T>({
             {tableRows.length === 0 ? (
               <TableRow>
                 <TableCell
-                  colSpan={columns.length}
+                  colSpan={table.getVisibleLeafColumns().length}
                   className="h-24 text-center text-muted-foreground"
                 >
                   Không có dòng nào

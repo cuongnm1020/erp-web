@@ -102,6 +102,9 @@ export function OrderPrintSheet({
                     {l.skuCode}
                     {l.isGift ? ' · tặng' : ''}
                   </div>
+                  {l.pancakeName && l.pancakeName !== l.skuName ? (
+                    <div style={SMALL}>Pancake: {l.pancakeName}</div>
+                  ) : null}
                 </td>
                 <td className="py-1 text-right font-semibold tabular-nums">
                   {formatQuantity(l.qty)}
@@ -116,6 +119,21 @@ export function OrderPrintSheet({
                     showText={false}
                   />
                 </td>
+              </tr>
+            ))}
+            {/* Món gõ tay trên Pancake — không có mã quét, người đóng hàng lấy theo tên. */}
+            {order.customItems.map((c, i) => (
+              <tr key={`custom-${i}`} className="border-b align-top">
+                <td className="py-1 pr-1">—</td>
+                <td className="py-1 pr-2">
+                  <div>{c.name}</div>
+                  <div style={SMALL}>Gõ tay trên Pancake · không trừ tồn</div>
+                </td>
+                <td className="py-1 text-right font-semibold tabular-nums">
+                  {formatQuantity(c.qty)}
+                </td>
+                <td className="py-1 pl-2">—</td>
+                <td className="py-1 pl-2" />
               </tr>
             ))}
           </tbody>

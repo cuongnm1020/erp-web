@@ -599,3 +599,86 @@ describe('OrderListScreen — sao chép SĐT / mã vận đơn, cột kho (2026-
     expect(screen.getByText('Chưa chọn kho')).toBeInTheDocument();
   });
 });
+
+describe('OrderListScreen — chọn cột, sắp xếp theo cột, lọc SP ngoài ERP (2026-10-22)', () => {
+  it('tuỳ chọn đã lưu của người dùng: cột ẩn không hiện, sắp xếp gửi sortBy/sortDir lên server', async () => {
+    search = '';
+    const seen: URLSearchParams[] = [];
+    server.use(
+      http.get('/api/me/preferences/:key', () =>
+        HttpResponse.json({
+          key: 'orders.list',
+          value: { hidden: ['address'], sort: { id: 'total', desc: true } },
+        }),
+      ),
+      http.get('/api/sales-orders', ({ request }) => {
+        seen.push(new URL(request.url).searchParams);
+        return HttpResponse.json({ items: makeOrders(1), total: 1 });
+      }),
+    );
+    renderApp(<OrderListScreen />);
+    await screen.findByText(FIRST.docNumber);
+    await waitFor(() => expect(seen.at(-1)!.get('sortBy')).toBe('total'));
+    expect(seen.at(-1)!.get('sortDir')).toBe('desc');
+    expect(screen.queryByRole('columnheader', { name: /Địa chỉ nhận/ })).not.toBeInTheDocument();
+    expect(screen.getByRole('columnheader', { name: /Tổng tiền/ })).toHaveAttribute(
+      'aria-sort',
+      'descending',
+    );
+  });
+
+  it('bỏ tick cột trong "Cột" → cột ẩn + lưu lên server; bấm tiêu đề cột → sắp + lưu', async () => {
+    search = '';
+    const puts: unknown[] = [];
+    server.use(
+      http.put('/api/me/preferences/:key', async ({ request }) => {
+        const body = (await request.json()) as { value: unknown };
+        puts.push(body.value);
+        return HttpResponse.json({ key: 'orders.list', value: body.value });
+      }),
+    );
+    renderApp(<OrderListScreen />);
+    await screen.findByText(FIRST.docNumber);
+    expect(screen.getByRole('columnheader', { name: /Kho/ })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /^Cột/ }));
+    const mã = await screen.findByRole('checkbox', { name: 'Mã đơn' });
+    expect(mã).toBeDisabled();
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Kho' }));
+    await waitFor(() =>
+      expect(screen.queryByRole('columnheader', { name: /^Kho$/ })).not.toBeInTheDocument(),
+    );
+    await waitFor(() =>
+      expect(puts.at(-1)).toEqual({ hidden: ['orderDate', 'warehouse'], sort: null }),
+    );
+
+    replace.mockClear();
+    fireEvent.click(screen.getByRole('button', { name: 'Sắp xếp theo Khách hàng' }));
+    await waitFor(() => expect(replace).toHaveBeenCalled());
+    expect(String(replace.mock.calls.at(-1)![0])).toContain('sort=customer');
+    await waitFor(() =>
+      expect(puts.at(-1)).toEqual({
+        hidden: ['orderDate', 'warehouse'],
+        sort: { id: 'customer', desc: false },
+      }),
+    );
+  });
+
+  it('?itemOrigin=NON_ERP từ URL → gửi lên server cho danh sách và đếm tab', async () => {
+    search = 'itemOrigin=NON_ERP';
+    const seen: string[] = [];
+    server.use(
+      http.get('/api/sales-orders', ({ request }) => {
+        seen.push(`list:${new URL(request.url).searchParams.get('itemOrigin')}`);
+        return HttpResponse.json({ items: makeOrders(1), total: 1 });
+      }),
+      http.get('/api/sales-orders/flow-counts', ({ request }) => {
+        seen.push(`count:${new URL(request.url).searchParams.get('itemOrigin')}`);
+        return HttpResponse.json({ total: 1 });
+      }),
+    );
+    renderApp(<OrderListScreen />);
+    await screen.findByText(FIRST.docNumber);
+    expect(seen).toContain('list:NON_ERP');
+    expect(seen).toContain('count:NON_ERP');
+  });
+});

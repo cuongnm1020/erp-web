@@ -1,7 +1,7 @@
 import type { EntitySearchResult } from '@/components/data/form';
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api, idempotency, unwrap } from '@/lib/api/client';
-import type { components } from '@/lib/api/schema';
+import type { components, paths } from '@/lib/api/schema';
 
 /** Luật 2: shape response chỉ lấy từ schema.d.ts sinh bởi OpenAPI, không khai lại. */
 /**
@@ -45,9 +45,18 @@ export interface OrderListParams {
   /** Khoảng orderDate — ngày `YYYY-MM-DD` (server lấy trọn ngày VN) hoặc ISO datetime. */
   from?: string;
   to?: string;
+  /** Đơn có sản phẩm không phải hàng ERP: món gõ tay Pancake / SKU Pancake tự sinh / một trong hai. */
+  itemOrigin?: OrderItemOrigin;
+  /** Sắp theo cột (server); bỏ trống = ngày đặt mới nhất trước. */
+  sortBy?: OrderSortField;
+  sortDir?: 'asc' | 'desc';
   take: number;
   skip: number;
 }
+
+type OrderListQuery = NonNullable<paths['/sales-orders']['get']['parameters']['query']>;
+export type OrderItemOrigin = NonNullable<OrderListQuery['itemOrigin']>;
+export type OrderSortField = NonNullable<OrderListQuery['sortBy']>;
 
 /** Query key theo phễu (luật 3): ['crm','orders','list', params] / ['crm','orders','detail', id]. */
 export const orderKeys = {
@@ -69,9 +78,8 @@ export const orderKeys = {
 };
 
 /**
- * GET /sales-orders — đã scope sẵn theo khách hàng ở API (bất biến 8, luật 7).
- * API sắp cố định `orderDate` giảm dần và KHÔNG nhận tham số sort, nên không cột nào
- * được đánh `sortable`: hứa sort rồi không sort được còn tệ hơn là không hứa.
+ * GET /sales-orders — đã scope sẵn theo khách hàng ở API (bất biến 8, luật 7). Sắp xếp ở server
+ * theo `sortBy` / `sortDir` (2026-10-22); chỉ cột có trường sắp tương ứng mới được `sortable`.
  */
 export function useOrders(params: OrderListParams) {
   return useQuery({ ...orderListQuery(params), placeholderData: keepPreviousData });
@@ -85,7 +93,13 @@ export function orderListQuery(params: OrderListParams) {
       unwrap(
         api.GET('/sales-orders', {
           params: {
-            query: { ...listQuery(params), take: params.take, skip: params.skip },
+            query: {
+              ...listQuery(params),
+              sortBy: params.sortBy,
+              sortDir: params.sortBy ? params.sortDir : undefined,
+              take: params.take,
+              skip: params.skip,
+            },
           },
         }),
       ),
@@ -109,6 +123,7 @@ function listQuery(params: Omit<OrderListParams, 'take' | 'skip'>) {
     duplicate: params.duplicate ? ('true' as const) : undefined,
     from: params.from || undefined,
     to: params.to || undefined,
+    itemOrigin: params.itemOrigin,
   };
 }
 
@@ -326,6 +341,36 @@ export function useCancelOrder(id: string) {
   });
 }
 
+/**
+ * POST /sales-orders/{id}/approve | reject — duyệt / từ chối bước đang chờ (requestId từ
+ * `order.approval`). Không optimistic (luật 5): duyệt xong đơn mới giữ hàng / sang kho.
+ */
+export function useDecideOrder(id: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: {
+      decision: 'approve' | 'reject';
+      requestId: string;
+      comment?: string;
+    }) => {
+      const body = {
+        requestId: input.requestId,
+        ...(input.comment ? { comment: input.comment } : {}),
+      };
+      const params = { path: { id } };
+      return unwrap(
+        input.decision === 'approve'
+          ? api.POST('/sales-orders/{id}/approve', { params, body })
+          : api.POST('/sales-orders/{id}/reject', { params, body }),
+      );
+    },
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: orderKeys.detail(id) });
+      void qc.invalidateQueries({ queryKey: orderKeys.lists() });
+    },
+  });
+}
+
 export type UpdateOrderBody = components['schemas']['UpdateOrderDto'];
 export type UpdateOrderResult = components['schemas']['UpdateOrderResultDto'];
 
@@ -409,5 +454,49 @@ export function useFulfilOrder(id: string) {
       void qc.invalidateQueries({ queryKey: orderKeys.detail(id) });
       void qc.invalidateQueries({ queryKey: orderKeys.lists() });
     },
+  });
+}
+
+/** Tuỳ chọn hiển thị danh sách đơn của người đăng nhập — lưu server, theo từng user (2026-10-22). */
+export interface OrderListPrefs {
+  /** id cột đang ẩn. */
+  hidden?: string[];
+  /** Cột sắp xếp lần cuối; null = mặc định. */
+  sort?: { id: string; desc: boolean } | null;
+}
+
+const ORDER_LIST_PREFS_KEY = 'orders.list';
+const orderListPrefsKey = ['me', 'preferences', ORDER_LIST_PREFS_KEY] as const;
+
+/** GET /me/preferences/orders.list — null = chưa lưu lần nào (dùng mặc định). */
+export function useOrderListPrefs() {
+  return useQuery({
+    queryKey: orderListPrefsKey,
+    queryFn: async () => {
+      const r = await unwrap(
+        api.GET('/me/preferences/{key}', { params: { path: { key: ORDER_LIST_PREFS_KEY } } }),
+      );
+      return (r.value ?? null) as OrderListPrefs | null;
+    },
+    staleTime: Infinity,
+  });
+}
+
+/**
+ * PUT /me/preferences/orders.list — ghi trọn object. Tuỳ chọn cá nhân nên cập nhật cache ngay
+ * (luật 5 cho phép optimistic với "sắp xếp cá nhân"); lỗi thì nạp lại bản server.
+ */
+export function useSaveOrderListPrefs() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (value: OrderListPrefs) =>
+      unwrap(
+        api.PUT('/me/preferences/{key}', {
+          params: { path: { key: ORDER_LIST_PREFS_KEY } },
+          body: { value: value as Record<string, unknown> },
+        }),
+      ),
+    onMutate: (value) => qc.setQueryData(orderListPrefsKey, value),
+    onError: () => qc.invalidateQueries({ queryKey: orderListPrefsKey }),
   });
 }

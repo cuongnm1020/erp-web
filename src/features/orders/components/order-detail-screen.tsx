@@ -42,6 +42,7 @@ import { carrierOutcome, carrierSource, shipmentStatusBadge } from '@/features/w
 import {
   orderKeys,
   useCancelOrder,
+  useDecideOrder,
   useOrder,
   useOrders,
   type SalesOrderDetail,
@@ -285,6 +286,42 @@ const MISSING: Array<{ title: string; need: string }> = [
 ];
 
 /** Một dòng SKU; `component` = dòng thành phần combo (thụt vào, giá đã phân bổ hiện mờ). */
+/**
+ * Món gõ tay trên Pancake (không gắn sản phẩm — 2026-10-22): chỉ hiển thị cho người đóng hàng tìm
+ * theo tên; không giữ chỗ / trừ tồn nên hai cột kho để trống.
+ */
+function CustomItemRow({ c }: { c: SalesOrderDetail['customItems'][number] }) {
+  const unit = c.unitPrice ? new Decimal(c.unitPrice).minus(c.discount || 0) : null;
+  return (
+    <TableRow data-testid="custom-item-row">
+      <TableCell className="px-2.5 py-1.5 text-muted-foreground">—</TableCell>
+      <TableCell className="px-2.5 py-1.5">
+        <div className="flex flex-wrap items-center gap-1.5 font-semibold">
+          {c.name}
+          <StatusBadge tone="warn">Gõ tay trên Pancake</StatusBadge>
+        </div>
+        <div className="text-xs text-muted-foreground">Không trừ tồn — tự lấy hàng theo tên</div>
+      </TableCell>
+      <TableCell className="px-2.5 py-1.5 text-muted-foreground">—</TableCell>
+      <TableCell className="px-2.5 py-1.5 text-right tabular-nums">{qty(c.qty)}</TableCell>
+      <TableCell className="px-2.5 py-1.5 text-right tabular-nums text-muted-foreground">
+        {c.unitPrice ? money(c.unitPrice) : '—'}
+      </TableCell>
+      <TableCell className="px-2.5 py-1.5 text-right tabular-nums">
+        {unit ? money(unit.toString()) : '—'}
+      </TableCell>
+      <TableCell className="px-2.5 py-1.5 text-right tabular-nums">
+        {money(new Decimal(c.discount || 0).mul(c.qty || 1).toString())}
+      </TableCell>
+      <TableCell className="px-2.5 py-1.5 text-right font-semibold tabular-nums">
+        {unit ? money(unit.mul(c.qty || 1).toString()) : '—'}
+      </TableCell>
+      <TableCell className="px-2.5 py-1.5 text-right text-muted-foreground">—</TableCell>
+      <TableCell className="px-2.5 py-1.5 text-right text-muted-foreground">—</TableCell>
+    </TableRow>
+  );
+}
+
 function LineRow({ l, component = false }: { l: SalesOrderLine; component?: boolean }) {
   return (
     <TableRow data-testid={component ? 'combo-component-row' : undefined}>
@@ -316,6 +353,16 @@ function LineRow({ l, component = false }: { l: SalesOrderLine; component?: bool
           {l.skuCode}
           {component && l.combo ? ` · ${qty(l.combo.componentQty)} / combo` : ''}
         </div>
+        {l.pancakeName && l.pancakeName !== l.skuName ? (
+          <div
+            className={
+              component ? 'pl-8 text-xs text-muted-foreground' : 'text-xs text-muted-foreground'
+            }
+          >
+            Trên Pancake: {l.pancakeName}
+            {l.pancakeSkuCode ? ` · ${l.pancakeSkuCode}` : ''}
+          </div>
+        ) : null}
       </TableCell>
       <TableCell className="px-2.5 py-1.5">{l.uomCode}</TableCell>
       <TableCell className="px-2.5 py-1.5 text-right tabular-nums">
@@ -378,6 +425,70 @@ function Card({
       <header className="border-b px-3 py-2 text-sm font-semibold">{title}</header>
       {children}
     </section>
+  );
+}
+
+/**
+ * Đơn Chờ duyệt: lý do (tên quy tắc) + Duyệt / Từ chối cho đúng người duyệt (`approval.canAct` —
+ * server quyết: trưởng nhóm team người tạo đơn với "Đơn giá dưới trần chiết khấu"). Từ chối → đơn
+ * về Nháp.
+ */
+function ApprovalBar({
+  order,
+  approval,
+}: {
+  order: SalesOrderDetail;
+  approval: NonNullable<SalesOrderDetail['approval']>;
+}) {
+  const decide = useDecideOrder(order.id);
+  const [comment, setComment] = useState('');
+  const act = (decision: 'approve' | 'reject') =>
+    decide.mutate(
+      { decision, requestId: approval.requestId, comment: comment.trim() || undefined },
+      {
+        onSuccess: () => {
+          setComment('');
+          toast.success(decision === 'approve' ? 'Đã duyệt đơn' : 'Đã từ chối đơn', {
+            description: order.docNumber,
+          });
+        },
+        onError: (err) => toast.error(messageFor(err)),
+      },
+    );
+  return (
+    <div
+      role="status"
+      className="flex flex-wrap items-center gap-3 rounded-md border border-warning-line bg-warning-weak px-3 py-2 text-sm"
+    >
+      <span className="min-w-0 flex-1">
+        <b className="font-semibold">Chờ duyệt</b>
+        {approval.ruleName ? ` — ${approval.ruleName}` : ''}
+        {approval.canAct ? '' : '. Chờ trưởng nhóm duyệt.'}
+      </span>
+      {approval.canAct ? (
+        <>
+          <Input
+            aria-label="Ghi chú duyệt"
+            placeholder="Ghi chú (tùy chọn)"
+            value={comment}
+            maxLength={1000}
+            onChange={(e) => setComment(e.target.value)}
+            className="h-8 w-56"
+          />
+          <Button size="sm" disabled={decide.isPending} onClick={() => act('approve')}>
+            Duyệt đơn
+          </Button>
+          <Button
+            size="sm"
+            variant="outline"
+            disabled={decide.isPending}
+            onClick={() => act('reject')}
+          >
+            Từ chối
+          </Button>
+        </>
+      ) : null}
+    </div>
   );
 }
 
@@ -468,6 +579,9 @@ function Lines({ order }: { order: SalesOrderDetail }) {
                 </Fragment>
               ),
             )}
+            {order.customItems.map((c, i) => (
+              <CustomItemRow key={`custom-${i}`} c={c} />
+            ))}
           </TableBody>
         </Table>
       </div>
@@ -664,6 +778,9 @@ function Detail({ order }: { order: SalesOrderDetail }) {
           </Button>
         </div>
       </div>
+      {order.status === 'PENDING_APPROVAL' && order.approval ? (
+        <ApprovalBar order={order} approval={order.approval} />
+      ) : null}
       <OrderPrintSheet order={order} printer={printer} />
       <CancelOrderDialog
         order={order}

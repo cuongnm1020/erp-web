@@ -558,6 +558,8 @@ export function makeOrderDetail(id: string) {
     skuId: uuid('00000003', i),
     skuCode: `SKU-${String(i + 1).padStart(4, '0')}`,
     skuName: `Sản phẩm ${i + 1}`,
+    pancakeName: null as string | null,
+    pancakeSkuCode: null as string | null,
     uomId: uuid('00000004', i),
     uomCode: i % 2 === 0 ? 'cái' : 'thùng',
     qty: String((i + 1) * 10),
@@ -576,6 +578,8 @@ export function makeOrderDetail(id: string) {
   return {
     ...header,
     shippingAddress: null,
+    approval: null as { requestId: string; ruleName: string | null; canAct: boolean } | null,
+    customItems: [] as { name: string; qty: string; unitPrice: string | null; discount: string }[],
     fulfilment: {
       status: 'NOT_STARTED',
       pickTaskId: null,
@@ -1760,6 +1764,14 @@ export const handlers = [
       phone: null,
     }),
   ),
+  // Tuỳ chọn giao diện theo người dùng (2026-10-22) — mặc định chưa lưu.
+  http.get('/api/me/preferences/:key', ({ params }) =>
+    HttpResponse.json({ key: params.key, value: null }),
+  ),
+  http.put('/api/me/preferences/:key', async ({ params, request }) => {
+    const body = (await request.json()) as { value: Record<string, unknown> };
+    return HttpResponse.json({ key: params.key, value: body.value });
+  }),
   http.get('/api/users/:id/permissions', () => HttpResponse.json(USER_PERMISSIONS_FIXTURE)),
   http.put('/api/users/:id/permissions', async ({ request }) => {
     const body = (await request.json()) as { allow: string[]; deny: string[] };
