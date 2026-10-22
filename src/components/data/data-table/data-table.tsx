@@ -22,6 +22,7 @@ import {
 import { cn } from '@/lib/cn';
 import type { SortState } from '@/lib/url-state';
 import { ariaSort, ColumnHeader } from './column-header';
+import { StickyHorizontalScrollbar, useDragScroll } from './horizontal-scroll';
 import { DataTablePagination } from './pagination';
 
 export const VIRTUALIZE_THRESHOLD = 200;
@@ -152,6 +153,8 @@ export function DataTable<T>({
   const virtualize = rows.length > VIRTUALIZE_THRESHOLD;
   const scrollRef = useRef<HTMLDivElement>(null);
   const tableRows = table.getRowModel().rows;
+  // Bảng rộng hơn khung: giữ chuột kéo để cuộn ngang + thanh cuộn ngang dính đáy màn hình.
+  const dragging = useDragScroll(scrollRef, true);
   const virtualizer = useVirtualizer({
     count: virtualize ? tableRows.length : 0,
     getScrollElement: () => scrollRef.current,
@@ -202,84 +205,93 @@ export function DataTable<T>({
           {bulkActions(selectedIds)}
         </div>
       ) : null}
-      <div
-        ref={scrollRef}
-        className="relative overflow-auto rounded-md border bg-card"
-        style={virtualize ? { maxHeight } : undefined}
-      >
-        <Table>
-          <TableHeader className="sticky top-0 z-20">
-            {table.getHeaderGroups().map((hg) => (
-              <TableRow key={hg.id} className="hover:bg-transparent">
-                {hg.headers.map((h, i) => {
-                  const m = h.column.columnDef.meta;
-                  const title =
-                    m?.title ??
-                    (typeof h.column.columnDef.header === 'string'
-                      ? h.column.columnDef.header
-                      : '');
-                  return (
-                    <TableHead
-                      key={h.id}
-                      aria-sort={m?.sortable ? ariaSort(h.column.id, sort) : undefined}
-                      style={m?.width ? { width: m.width, minWidth: m.width } : undefined}
-                      className={cn(
-                        stickyFirstColumn && i === stickyIdx && 'sticky left-0 z-30 bg-muted',
-                        m?.className,
-                      )}
-                    >
-                      {h.isPlaceholder ? null : typeof h.column.columnDef.header === 'function' ? (
-                        flexRender(h.column.columnDef.header, h.getContext())
-                      ) : (
-                        <ColumnHeader
-                          id={h.column.id}
-                          title={title}
-                          sortable={m?.sortable}
-                          sort={sort}
-                          onSort={onSortChange}
-                          align={m?.align}
-                        />
-                      )}
-                    </TableHead>
-                  );
-                })}
-              </TableRow>
-            ))}
-          </TableHeader>
-          <TableBody
-            style={
-              virtualize
-                ? { height: virtualizer.getTotalSize(), position: 'relative', display: 'block' }
-                : undefined
-            }
-          >
-            {tableRows.length === 0 ? (
-              <TableRow>
-                <TableCell
-                  colSpan={table.getVisibleLeafColumns().length}
-                  className="h-24 text-center text-muted-foreground"
-                >
-                  Không có dòng nào
-                </TableCell>
-              </TableRow>
-            ) : virtualize ? (
-              virtualizer.getVirtualItems().map((vi) => {
-                const row = tableRows[vi.index]!;
-                return renderRow(row, {
-                  position: 'absolute',
-                  top: 0,
-                  transform: `translateY(${vi.start}px)`,
-                  height: vi.size,
-                  width: '100%',
-                  display: 'table',
-                  tableLayout: 'fixed',
-                });
-              })
-            ) : (
-              tableRows.map((row) => renderRow(row))
-            )}
-          </TableBody>
-        </Table>
+      <div className="rounded-md border bg-card">
+        <div
+          ref={scrollRef}
+          className={cn(
+            // Thanh cuộn ngang gốc ẩn — thay bằng StickyHorizontalScrollbar luôn nhìn thấy.
+            'relative overflow-auto rounded-md [&::-webkit-scrollbar]:h-0',
+            !virtualize && '[scrollbar-width:none]',
+            dragging && 'cursor-grabbing [&_*]:cursor-grabbing',
+          )}
+          style={virtualize ? { maxHeight } : undefined}
+        >
+          <Table>
+            <TableHeader className="sticky top-0 z-20">
+              {table.getHeaderGroups().map((hg) => (
+                <TableRow key={hg.id} className="hover:bg-transparent">
+                  {hg.headers.map((h, i) => {
+                    const m = h.column.columnDef.meta;
+                    const title =
+                      m?.title ??
+                      (typeof h.column.columnDef.header === 'string'
+                        ? h.column.columnDef.header
+                        : '');
+                    return (
+                      <TableHead
+                        key={h.id}
+                        aria-sort={m?.sortable ? ariaSort(h.column.id, sort) : undefined}
+                        style={m?.width ? { width: m.width, minWidth: m.width } : undefined}
+                        className={cn(
+                          stickyFirstColumn && i === stickyIdx && 'sticky left-0 z-30 bg-muted',
+                          m?.className,
+                        )}
+                      >
+                        {h.isPlaceholder ? null : typeof h.column.columnDef.header ===
+                          'function' ? (
+                          flexRender(h.column.columnDef.header, h.getContext())
+                        ) : (
+                          <ColumnHeader
+                            id={h.column.id}
+                            title={title}
+                            sortable={m?.sortable}
+                            sort={sort}
+                            onSort={onSortChange}
+                            align={m?.align}
+                          />
+                        )}
+                      </TableHead>
+                    );
+                  })}
+                </TableRow>
+              ))}
+            </TableHeader>
+            <TableBody
+              style={
+                virtualize
+                  ? { height: virtualizer.getTotalSize(), position: 'relative', display: 'block' }
+                  : undefined
+              }
+            >
+              {tableRows.length === 0 ? (
+                <TableRow>
+                  <TableCell
+                    colSpan={table.getVisibleLeafColumns().length}
+                    className="h-24 text-center text-muted-foreground"
+                  >
+                    Không có dòng nào
+                  </TableCell>
+                </TableRow>
+              ) : virtualize ? (
+                virtualizer.getVirtualItems().map((vi) => {
+                  const row = tableRows[vi.index]!;
+                  return renderRow(row, {
+                    position: 'absolute',
+                    top: 0,
+                    transform: `translateY(${vi.start}px)`,
+                    height: vi.size,
+                    width: '100%',
+                    display: 'table',
+                    tableLayout: 'fixed',
+                  });
+                })
+              ) : (
+                tableRows.map((row) => renderRow(row))
+              )}
+            </TableBody>
+          </Table>
+        </div>
+        <StickyHorizontalScrollbar targetRef={scrollRef} />
       </div>
       {pagination ? (
         <DataTablePagination

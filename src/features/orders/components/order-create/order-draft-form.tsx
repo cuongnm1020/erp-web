@@ -2,8 +2,7 @@
 
 import { zodResolver } from '@hookform/resolvers/zod';
 import Decimal from 'decimal.js';
-import { FileText, Inbox, MoreVertical, Plus, Warehouse, X } from 'lucide-react';
-import Link from 'next/link';
+import { FileText, Inbox, Plus, Warehouse, X } from 'lucide-react';
 import {
   forwardRef,
   useCallback,
@@ -27,14 +26,6 @@ import {
   MoneyInput,
 } from '@/components/data/form';
 import { Button } from '@/components/ui/button';
-import { Checkbox } from '@/components/ui/checkbox';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
-import { Input } from '@/components/ui/input';
 import {
   Select,
   SelectContent,
@@ -61,7 +52,6 @@ import {
   previewManualDiscount,
   toCreateOrderBody,
   type CreateOrderValues,
-  type ManualDiscountType,
 } from '../../schema';
 import { CART_GRID, CartLine, type LineMetrics } from './cart-line';
 import {
@@ -82,7 +72,7 @@ const DEFAULT_WAREHOUSE = '__default__';
  * Mật độ riêng màn tạo đơn: cả form nằm gọn một màn hình không phải cuộn. Ô nhập / ô chọn / nút mở
  * lịch cao 32px; dòng báo lỗi dưới ô chỉ chiếm chỗ khi có lỗi (trống thì ẩn).
  */
-const DENSE = cn(
+export const DENSE = cn(
   '[&_input:not([type=checkbox]):not([type=radio]):not([type=file])]:h-8',
   '[&_button[role=combobox]]:h-8 [&_button[aria-haspopup=dialog]]:h-8',
   '[&_p[id$=-form-item-message]:empty]:hidden',
@@ -354,8 +344,10 @@ export const OrderDraftForm = forwardRef<
             <Card title="Thông tin đơn" className="py-2.5">
               <HeaderSelects form={form} warehouseOptions={warehouseOptions} />
             </Card>
-            <Card title="Sản phẩm">
-              <ProductSearch ref={searchRef} warehouseId={warehouseId} onPick={addSku} />
+            <Card
+              title="Sản phẩm"
+              actions={<ProductSearch ref={searchRef} warehouseId={warehouseId} onPick={addSku} />}
+            >
               <div className="overflow-x-auto rounded-md border">
                 <div className="min-w-[680px]">
                   {lines.fields.length === 0 ? (
@@ -429,51 +421,11 @@ export const OrderDraftForm = forwardRef<
               ) : null}
             </Card>
 
-            <div className="flex flex-wrap items-start gap-3">
-              <ValueCard
-                form={form}
-                subtotal={subtotal}
-                gross={gross?.toFixed(4) ?? null}
-                manual={manual}
-                prepaid={prepaid.toFixed(4)}
-                cod={cod}
-              />
-              <div className="flex min-w-0 flex-[1_1_320px] flex-col gap-3">
-                <Card title="Thanh toán">
-                  <FormField
-                    control={form.control}
-                    name="prepaidAmount"
-                    render={({ field }) => (
-                      <FormItem>
-                        <div className="flex flex-wrap items-center justify-between gap-2 border-t pt-3">
-                          <FormLabel className="font-normal">Tiền chuyển khoản</FormLabel>
-                          <div className="w-full sm:w-56">
-                            <FormControl>
-                              <MoneyInput
-                                value={field.value ?? ''}
-                                onChange={field.onChange}
-                                aria-label="Tiền chuyển khoản"
-                              />
-                            </FormControl>
-                          </div>
-                        </div>
-                        {prepaidTooBig ? (
-                          <p className="text-right text-xs text-destructive">
-                            Vượt tổng đơn — hệ thống sẽ từ chối khi chốt.
-                          </p>
-                        ) : null}
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                </Card>
-                <NotesCard form={form} files={files} onFilesChange={onFilesChange} />
-              </div>
-            </div>
+            <NotesCard form={form} files={files} onFilesChange={onFilesChange} />
           </div>
 
           {/* ── Cột phải ── */}
-          <div className="flex min-w-0 max-w-full flex-[1_1_380px] flex-col gap-3 xl:max-w-[520px]">
+          <div className="flex min-w-0 max-w-full flex-[1_1_380px] flex-col gap-3 xl:max-w-md">
             <CustomerCard form={form} />
             <ReceiverCard form={form} />
             <ShippingCard form={form} estimatedWeightKg={estimatedWeightKg} codAmount={cod} />
@@ -482,27 +434,68 @@ export const OrderDraftForm = forwardRef<
                 design system Form chứng từ: tổng + nút chính ở cột phải). */}
             <section
               aria-label="Chốt đơn"
-              className="sticky bottom-3 z-20 flex flex-col gap-2 rounded-lg border border-input-soft bg-card p-3 shadow-popover"
+              className="sticky bottom-3 z-20 flex flex-col gap-1.5 rounded-lg border border-input-soft bg-card p-3 text-sm shadow-popover"
             >
-              <dl className="space-y-0.5 text-sm tabular-nums">
-                <div className="flex justify-between text-muted-foreground">
-                  <dt>Tổng tiền</dt>
-                  <dd>{total ? formatMoney(total.toFixed(4)) : '—'}</dd>
-                </div>
-                {prepaid.isZero() ? null : (
-                  <div className="flex justify-between text-muted-foreground">
-                    <dt>Đã chuyển khoản</dt>
-                    <dd>−{formatMoney(prepaid.toFixed(4))}</dd>
-                  </div>
-                )}
-                <div className="flex items-baseline justify-between border-t pt-1.5">
-                  <dt className="font-semibold">Thu hộ (COD)</dt>
-                  <dd className="text-2xl font-semibold text-primary">
-                    {cod !== null ? formatMoney(cod) : '—'}
-                  </dd>
-                </div>
-              </dl>
-              <div className="flex gap-2">
+              <div className="flex justify-between text-muted-foreground">
+                <span>Tạm tính</span>
+                <span className="tabular-nums">
+                  {subtotal !== null ? formatMoney(subtotal, { unit: '' }) : '—'}
+                </span>
+              </div>
+              <PayRow label="Phí ship thu khách">
+                <FormField
+                  control={form.control}
+                  name="shippingFee"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormControl>
+                        <MoneyInput
+                          value={freeShipping || shipFeeOnReturnOnly ? '' : (field.value ?? '')}
+                          onChange={field.onChange}
+                          disabled={freeShipping || shipFeeOnReturnOnly}
+                          // Ô tích Miễn phí giao hàng / Chỉ thu phí nếu hoàn đã ẩn (user 2026-10-22);
+                          // cờ vẫn đi theo đơn nhân bản nên nói rõ vì sao ô bị khóa.
+                          placeholder={
+                            freeShipping ? 'Miễn phí' : shipFeeOnReturnOnly ? 'Thu khi hoàn' : '0'
+                          }
+                          aria-label="Phí ship thu khách"
+                        />
+                      </FormControl>
+                    </FormItem>
+                  )}
+                />
+              </PayRow>
+              <PayRow label="Đã chuyển khoản">
+                <FormField
+                  control={form.control}
+                  name="prepaidAmount"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormControl>
+                        <MoneyInput
+                          value={field.value ?? ''}
+                          onChange={field.onChange}
+                          placeholder="0"
+                          aria-label="Tiền chuyển khoản"
+                        />
+                      </FormControl>
+                    </FormItem>
+                  )}
+                />
+              </PayRow>
+              {prepaidTooBig || form.formState.errors.prepaidAmount ? (
+                <p className="text-right text-xs text-destructive">
+                  {form.formState.errors.prepaidAmount?.message ??
+                    'Vượt tổng đơn — hệ thống sẽ từ chối khi chốt.'}
+                </p>
+              ) : null}
+              <div className="mt-0.5 flex items-baseline justify-between border-t pt-2">
+                <span className="font-semibold">Thu hộ (COD)</span>
+                <span className="text-2xl font-semibold tabular-nums text-primary">
+                  {cod !== null ? formatMoney(cod) : '—'}
+                </span>
+              </div>
+              <div className="mt-1.5 flex gap-2">
                 <Button
                   type="button"
                   variant="outline"
@@ -525,19 +518,6 @@ export const OrderDraftForm = forwardRef<
                   Chốt đơn
                 </Button>
               </div>
-              <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground">
-                <span className="flex gap-3">
-                  <span>
-                    <Kbd>F6</Kbd> Đơn mới
-                  </span>
-                  <span>
-                    <Kbd>F9</Kbd> Quét mã
-                  </span>
-                </span>
-                <Link href="/crm/orders" className="hover:text-foreground hover:underline">
-                  Hủy bỏ
-                </Link>
-              </div>
             </section>
           </div>
         </div>
@@ -546,8 +526,14 @@ export const OrderDraftForm = forwardRef<
   );
 });
 
-function Kbd({ children }: { children: string }) {
-  return <kbd className="rounded border bg-card px-1.5 py-0.5 font-mono text-xs">{children}</kbd>;
+/** Một hàng "nhãn ← → ô tiền" của khối Chốt đơn. */
+function PayRow({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <div className="flex items-center justify-between gap-3">
+      <span className="text-muted-foreground">{label}</span>
+      <div className="w-32 [&_input]:h-7">{children}</div>
+    </div>
+  );
 }
 
 /** Nhãn `caption` trên một ô của dải "Thông tin đơn". */
@@ -699,302 +685,6 @@ function HeaderSelects({
   );
 }
 
-/** Chọn giảm theo số tiền (₫) hay theo %. */
-function DiscountTypeToggle({
-  value,
-  onChange,
-}: {
-  value: ManualDiscountType;
-  onChange: (t: ManualDiscountType) => void;
-}) {
-  const options: { type: ManualDiscountType; label: string; title: string }[] = [
-    { type: 'AMOUNT', label: '₫', title: 'Giảm theo số tiền' },
-    { type: 'PERCENT', label: '%', title: 'Giảm theo phần trăm' },
-  ];
-  return (
-    <div
-      role="radiogroup"
-      aria-label="Kiểu giảm giá"
-      className="flex h-9 shrink-0 rounded-md bg-muted p-0.5"
-    >
-      {options.map((o) => (
-        <button
-          key={o.type}
-          type="button"
-          role="radio"
-          aria-checked={value === o.type}
-          title={o.title}
-          onClick={() => onChange(o.type)}
-          className={
-            value === o.type
-              ? 'w-8 rounded bg-card text-xs font-semibold text-primary shadow-sm'
-              : 'w-8 rounded text-xs text-muted-foreground hover:text-foreground'
-          }
-        >
-          {o.label}
-        </button>
-      ))}
-    </div>
-  );
-}
-
-function SumRow({
-  label,
-  value,
-  tone,
-  big,
-}: {
-  label: string;
-  value: string;
-  tone?: 'neg' | 'pos';
-  big?: boolean;
-}) {
-  return (
-    <div className="flex items-center justify-between gap-3">
-      <span className={big ? 'text-base font-semibold' : 'text-sm'}>{label}</span>
-      <b
-        className={cn(
-          'tabular-nums',
-          big ? 'text-xl' : 'text-sm',
-          tone === 'neg' && 'text-destructive',
-          tone === 'pos' && 'text-success',
-        )}
-      >
-        {value}
-      </b>
-    </div>
-  );
-}
-
-/**
- * Tạm ẩn Giảm giá / Phí vận chuyển / Phụ thu / Mã khuyến mãi trên màn tạo đơn (user yêu cầu
- * 2026-10-21) — bật lại = đổi thành true. Ô ẩn giữ giá trị trống nên đơn không mang các khoản này.
- */
-const SHOW_PRICE_ADJUSTMENTS = false;
-
-function ValueCard({
-  form,
-  subtotal,
-  gross,
-  manual,
-  prepaid,
-  cod,
-}: {
-  form: UseFormReturn<CreateOrderValues>;
-  subtotal: string | null;
-  gross: string | null;
-  manual: string | null;
-  prepaid: string;
-  cod: string | null;
-}) {
-  const [manualType, freeShipping, shipFeeOnReturnOnly, couponCode] = useWatch({
-    control: form.control,
-    name: ['manualDiscountType', 'freeShipping', 'shipFeeOnReturnOnly', 'couponCode'],
-  });
-  const [showCoupon, setShowCoupon] = useState(couponCode !== '');
-  const manualTooBig =
-    manual !== null && subtotal !== null && new Decimal(manual).greaterThan(subtotal);
-  const noShipFee = freeShipping || shipFeeOnReturnOnly;
-  const dash = (v: string | null) => (v !== null ? formatMoney(v) : '—');
-
-  return (
-    <Card
-      className="min-w-0 flex-[1_1_320px]"
-      title="Giá trị đơn hàng"
-      actions={
-        SHOW_PRICE_ADJUSTMENTS ? (
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button
-                type="button"
-                variant="outline"
-                size="icon"
-                className="h-8 w-8"
-                aria-label="Tùy chọn giá trị đơn"
-              >
-                <MoreVertical aria-hidden />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuItem onSelect={() => setShowCoupon((s) => !s)}>
-                {showCoupon ? 'Ẩn mã khuyến mãi' : 'Nhập mã khuyến mãi'}
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-        ) : undefined
-      }
-    >
-      <div className="flex flex-wrap gap-x-6 gap-y-2 border-y py-3">
-        {(
-          [
-            ['freeShipping', 'Miễn phí giao hàng'],
-            ['shipFeeOnReturnOnly', 'Chỉ thu phí nếu hoàn'],
-          ] as const
-        ).map(([name, label]) => (
-          <FormField
-            key={name}
-            control={form.control}
-            name={name}
-            render={({ field }) => (
-              <FormItem className="flex items-center gap-2 space-y-0">
-                <FormControl>
-                  <Checkbox
-                    checked={field.value}
-                    onCheckedChange={(c) => field.onChange(c === true)}
-                  />
-                </FormControl>
-                <FormLabel className="cursor-pointer font-normal">{label}</FormLabel>
-              </FormItem>
-            )}
-          />
-        ))}
-      </div>
-
-      {SHOW_PRICE_ADJUSTMENTS ? (
-        <>
-          <div className="flex flex-wrap items-start justify-between gap-2">
-            <span className="pt-2 text-sm">Giảm giá</span>
-            <div className="flex w-full flex-col items-end gap-1 sm:w-56">
-              <div className="flex w-full gap-1">
-                <DiscountTypeToggle
-                  value={manualType}
-                  onChange={(t) => {
-                    form.setValue('manualDiscountType', t);
-                    form.setValue('manualDiscountValue', '');
-                    form.clearErrors('manualDiscountValue');
-                  }}
-                />
-                <FormField
-                  control={form.control}
-                  name="manualDiscountValue"
-                  render={({ field }) => (
-                    <FormItem className="min-w-0 flex-1">
-                      <FormLabel className="sr-only">
-                        {manualType === 'PERCENT' ? 'Giảm giá (%)' : 'Giảm giá (số tiền)'}
-                      </FormLabel>
-                      <FormControl>
-                        {manualType === 'PERCENT' ? (
-                          <Input
-                            inputMode="decimal"
-                            placeholder="0"
-                            className="text-right tabular-nums"
-                            value={field.value ?? ''}
-                            onChange={field.onChange}
-                            onBlur={field.onBlur}
-                            name={field.name}
-                            ref={field.ref}
-                          />
-                        ) : (
-                          <MoneyInput value={field.value ?? ''} onChange={field.onChange} />
-                        )}
-                      </FormControl>
-                    </FormItem>
-                  )}
-                />
-              </div>
-              {form.formState.errors.manualDiscountValue ? (
-                <p className="text-right text-xs text-destructive">
-                  {form.formState.errors.manualDiscountValue.message}
-                </p>
-              ) : manualTooBig ? (
-                <p className="text-right text-xs text-destructive">
-                  Vượt tạm tính — hệ thống sẽ từ chối khi chốt.
-                </p>
-              ) : manual !== null && manualType === 'PERCENT' ? (
-                <p className="text-xs tabular-nums text-muted-foreground">−{formatMoney(manual)}</p>
-              ) : null}
-            </div>
-          </div>
-
-          <FormField
-            control={form.control}
-            name="shippingFee"
-            render={({ field }) => (
-              <FormItem>
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                  <FormLabel className="font-normal">Phí vận chuyển</FormLabel>
-                  <div className="w-full sm:w-56">
-                    <FormControl>
-                      <MoneyInput
-                        value={noShipFee ? '' : (field.value ?? '')}
-                        onChange={field.onChange}
-                        disabled={noShipFee}
-                        placeholder={noShipFee ? 'Khách không trả khi nhận' : '0'}
-                      />
-                    </FormControl>
-                  </div>
-                </div>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-          <FormField
-            control={form.control}
-            name="surcharge"
-            render={({ field }) => (
-              <FormItem>
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                  <FormLabel className="font-normal">Phụ thu</FormLabel>
-                  <div className="w-full sm:w-56">
-                    <FormControl>
-                      <MoneyInput
-                        value={field.value ?? ''}
-                        onChange={field.onChange}
-                        placeholder="0"
-                      />
-                    </FormControl>
-                  </div>
-                </div>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-          {showCoupon ? (
-            <FormField
-              control={form.control}
-              name="couponCode"
-              render={({ field }) => (
-                <FormItem>
-                  <div className="flex flex-wrap items-center justify-between gap-2">
-                    <FormLabel className="font-normal">Mã khuyến mãi</FormLabel>
-                    <div className="w-full sm:w-56">
-                      <FormControl>
-                        <Input placeholder="Nhập mã" autoComplete="off" {...field} />
-                      </FormControl>
-                    </div>
-                  </div>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-          ) : null}
-        </>
-      ) : null}
-
-      <div className="flex flex-col gap-2 border-t border-dashed pt-3">
-        <SumRow label="Tổng số tiền" value={dash(gross)} />
-        {SHOW_PRICE_ADJUSTMENTS ? (
-          <SumRow
-            label="Giảm giá"
-            value={manual !== null ? `−${formatMoney(manual)}` : formatMoney('0')}
-            tone="neg"
-          />
-        ) : null}
-        {!new Decimal(prepaid).isZero() ? (
-          <SumRow label="Đã chuyển khoản" value={`−${formatMoney(prepaid)}`} tone="neg" />
-        ) : null}
-      </div>
-      <div className="border-t border-dashed pt-3">
-        <SumRow label="Tiền cần thu" value={dash(cod)} tone="pos" big />
-      </div>
-      <p className="text-xs text-muted-foreground">
-        Giá xem trước theo bảng giá của khách; số cuối do hệ thống chốt (gồm khuyến mãi). Đơn vượt
-        ngưỡng tự chuyển chờ duyệt.
-      </p>
-    </Card>
-  );
-}
-
 function fileSize(bytes: number): string {
   return bytes >= 1024 * 1024
     ? `${(bytes / 1024 / 1024).toFixed(1)} MB`
@@ -1010,7 +700,6 @@ function NotesCard({
   files: File[];
   onFilesChange: (files: File[]) => void;
 }) {
-  const [tab, setTab] = useState<'internal' | 'print'>('internal');
   const inputRef = useRef<HTMLInputElement>(null);
   const previews = useMemo(
     () => files.map((f) => (f.type.startsWith('image/') ? URL.createObjectURL(f) : null)),
@@ -1036,57 +725,42 @@ function NotesCard({
   };
 
   return (
-    <Card title="Ghi chú">
-      <div
-        role="tablist"
-        aria-label="Loại ghi chú"
-        className="grid grid-cols-2 rounded-md bg-muted p-0.5"
-      >
+    <Card title="Ghi chú &amp; đính kèm">
+      <div className="grid gap-2.5 sm:grid-cols-2">
         {(
           [
-            ['internal', 'Nội bộ'],
-            ['print', 'Để in (lên vận đơn)'],
+            [
+              'internalNote',
+              'Nội bộ (kho, CSKH)',
+              'Ghi chú nội bộ',
+              'Ghi chú cho người trong công ty',
+            ],
+            [
+              'printNote',
+              'In lên vận đơn',
+              'Ghi chú in lên vận đơn',
+              'Cho shipper — vd: cho xem hàng, gọi trước khi giao',
+            ],
           ] as const
-        ).map(([v, label]) => (
-          <button
-            key={v}
-            type="button"
-            role="tab"
-            aria-selected={tab === v}
-            onClick={() => setTab(v)}
-            className={cn(
-              'h-8 rounded text-sm',
-              tab === v ? 'bg-card font-semibold text-primary shadow-sm' : 'text-muted-foreground',
+        ).map(([name, label, aria, placeholder]) => (
+          <FormField
+            key={name}
+            control={form.control}
+            name={name}
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel className="text-xs font-semibold text-muted-foreground">
+                  {label}
+                </FormLabel>
+                <FormControl>
+                  <Textarea rows={3} aria-label={aria} placeholder={placeholder} {...field} />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
             )}
-          >
-            {label}
-          </button>
+          />
         ))}
       </div>
-      <FormField
-        key={tab}
-        control={form.control}
-        name={tab === 'internal' ? 'internalNote' : 'printNote'}
-        render={({ field }) => (
-          <FormItem>
-            <FormLabel className="sr-only">
-              {tab === 'internal' ? 'Ghi chú nội bộ' : 'Ghi chú in lên vận đơn'}
-            </FormLabel>
-            <FormControl>
-              <Textarea
-                rows={3}
-                placeholder={
-                  tab === 'internal'
-                    ? 'Ghi chú cho người trong công ty (kho, CSKH…)'
-                    : 'In lên vận đơn cho shipper — vd: cho xem hàng, gọi trước khi giao'
-                }
-                {...field}
-              />
-            </FormControl>
-            <FormMessage />
-          </FormItem>
-        )}
-      />
       <div className="flex flex-wrap gap-2">
         {files.map((f, i) => (
           <div
@@ -1114,14 +788,16 @@ function NotesCard({
           </div>
         ))}
         {files.length < ATTACHMENT_MAX_COUNT ? (
-          <button
+          <Button
             type="button"
+            variant="outline"
+            size="sm"
+            className="self-start"
             onClick={() => inputRef.current?.click()}
-            className="flex h-16 w-16 flex-col items-center justify-center gap-1.5 rounded-md border border-dashed text-xs text-muted-foreground hover:bg-muted"
           >
-            <Plus className="h-4 w-4" aria-hidden />
-            Tải lên
-          </button>
+            <Plus aria-hidden />
+            Tải tệp lên
+          </Button>
         ) : null}
         <input
           ref={inputRef}

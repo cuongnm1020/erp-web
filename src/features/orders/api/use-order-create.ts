@@ -14,6 +14,7 @@ export type SameDayOrders = components['schemas']['SameDayOrdersDto'];
 /** Phễu key của màn tạo đơn mới — con của ['crm','order-entry'] (danh mục phục vụ nhập đơn). */
 const createKeys = {
   staff: () => [...lineEntryKeys.all, 'staff'] as const,
+  owners: () => [...lineEntryKeys.all, 'owners'] as const,
   tags: () => [...lineEntryKeys.all, 'tags'] as const,
   skuQuick: (q: string, isCombo: boolean) =>
     [...lineEntryKeys.all, 'sku-quick', { q, isCombo }] as const,
@@ -28,6 +29,18 @@ export function useOrderStaffOptions() {
   return useQuery({
     queryKey: createKeys.staff(),
     queryFn: () => unwrap(api.GET('/sales-orders/staff-options')),
+    staleTime: 5 * 60_000,
+  });
+}
+
+/**
+ * GET /sales-orders/owner-options — ô NV xử lý: chỉ nhân viên cùng team người tạo (doanh thu theo
+ * NV xử lý, 2026-10-22). Superadmin: mọi nhân viên.
+ */
+export function useOrderOwnerOptions() {
+  return useQuery({
+    queryKey: createKeys.owners(),
+    queryFn: () => unwrap(api.GET('/sales-orders/owner-options')),
     staleTime: 5 * 60_000,
   });
 }

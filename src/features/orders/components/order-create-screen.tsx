@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { ErrorState } from '@/components/data/states';
+import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { toast } from '@/components/ui/toaster';
 import { cn } from '@/lib/cn';
@@ -189,63 +190,73 @@ export function OrderCreateScreen() {
   return (
     <div className="flex flex-col gap-3">
       <h1 className="sr-only">Tạo đơn hàng</h1>
-      <div className="flex flex-wrap items-center gap-2" role="tablist" aria-label="Đơn đang soạn">
-        {drafts.drafts.map((d) => {
-          const isActive = d.id === activeId;
-          const title = d.values.customerName.trim() || `Đơn mới ${d.no}`;
-          const copy = d.origin?.startsWith('from:') ?? false;
-          return (
-            <div
-              key={d.id}
-              className={cn(
-                'flex h-9 items-center rounded-lg border text-sm',
-                isActive
-                  ? 'border-border bg-card font-semibold text-primary'
-                  : 'border-transparent text-muted-foreground',
-              )}
-            >
-              <button
-                type="button"
-                role="tab"
-                aria-selected={isActive}
-                onClick={() => activate(d.id)}
-                className="flex max-w-60 items-center gap-1.5 truncate px-3"
+      {/* Tab nháp kiểu thẻ hồ sơ (redesign Bán hàng 2026-10-22, artboard "Tạo đơn"). */}
+      <div className="flex flex-wrap items-end gap-1 border-b">
+        <div className="flex flex-wrap items-end gap-1" role="tablist" aria-label="Đơn đang soạn">
+          {drafts.drafts.map((d) => {
+            const isActive = d.id === activeId;
+            const title = d.values.customerName.trim() || `Đơn mới ${d.no}`;
+            const copy = d.origin?.startsWith('from:') ?? false;
+            return (
+              <div
+                key={d.id}
+                className={cn(
+                  '-mb-px flex h-9 items-center rounded-t-md border text-sm',
+                  isActive
+                    ? 'border-b-card border-t-2 border-t-primary bg-card font-semibold text-foreground'
+                    : 'border-b-0 bg-muted text-muted-foreground',
+                )}
               >
-                {copy ? <Copy className="h-3.5 w-3.5 flex-none text-primary" aria-hidden /> : null}
-                <span className="truncate">{title}</span>
-                {copy ? (
-                  <span className="flex-none text-xs font-normal text-muted-foreground">
-                    · bản sao
-                  </span>
-                ) : null}
-                {d.no === 1 && drafts.drafts.length === 1 ? ' (F6)' : ''}
-              </button>
-              {drafts.drafts.length > 1 || d.values.lines.length > 0 ? (
                 <button
                   type="button"
-                  aria-label={`Đóng ${title}`}
-                  title="Đóng tab (nháp bị bỏ)"
-                  onClick={() => {
-                    setFiles((m) => omitKey(m, d.id));
-                    closeDraft(d.id);
-                  }}
-                  className="mr-1 rounded p-1 hover:bg-muted"
+                  role="tab"
+                  aria-selected={isActive}
+                  onClick={() => activate(d.id)}
+                  className="flex h-full max-w-60 items-center gap-1.5 truncate pl-3 pr-1"
                 >
-                  <X className="h-3.5 w-3.5" aria-hidden />
+                  {copy ? (
+                    <Copy className="h-3.5 w-3.5 flex-none text-primary" aria-hidden />
+                  ) : null}
+                  <span className="truncate">{title}</span>
+                  {copy ? (
+                    <span className="flex-none text-xs font-normal text-muted-foreground">
+                      · bản sao
+                    </span>
+                  ) : null}
                 </button>
-              ) : null}
-            </div>
-          );
-        })}
-        <button
+                {drafts.drafts.length > 1 || d.values.lines.length > 0 ? (
+                  <button
+                    type="button"
+                    aria-label={`Đóng ${title}`}
+                    title="Đóng tab (nháp bị bỏ)"
+                    onClick={() => {
+                      setFiles((m) => omitKey(m, d.id));
+                      closeDraft(d.id);
+                    }}
+                    className="mr-1 rounded p-1 hover:bg-muted"
+                  >
+                    <X className="h-3.5 w-3.5" aria-hidden />
+                  </button>
+                ) : (
+                  <span className="w-2" />
+                )}
+              </div>
+            );
+          })}
+        </div>
+        <Button
           type="button"
+          variant="outline"
+          size="sm"
+          className="mb-1 ml-1"
+          shortcut="F6"
           onClick={() => openDraft()}
           aria-label="Thêm tab đơn mới (F6)"
-          title="Thêm tab đơn mới (F6)"
-          className="flex h-9 w-9 items-center justify-center rounded-lg border bg-card hover:bg-muted"
         >
-          <Plus className="h-4 w-4" aria-hidden />
-        </button>
+          <Plus aria-hidden />
+          Đơn mới
+        </Button>
+        <span className="mb-2 ml-auto text-xs text-muted-foreground">Nháp lưu trên máy này</span>
       </div>
 
       {drafts.ready && drafts.active.origin?.startsWith('from:') ? (

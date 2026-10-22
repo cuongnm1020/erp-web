@@ -423,18 +423,20 @@ describe('OrderCreateScreen — màn tạo đơn mới', () => {
         screen.getAllByText(new RegExp(vnd(subtotal + ship - 100_000))).length,
       ).toBeGreaterThan(0),
     );
-    // Cả thẻ Giá trị đơn lẫn khối Chốt đơn (cột phải, redesign 2026-10-22) đều hiện dòng này.
     expect(screen.getAllByText('Đã chuyển khoản').length).toBeGreaterThan(0);
   });
 
-  it('ô SĐT đứng trước tên khách; Giá trị đơn tạm ẩn Giảm giá / Phí vận chuyển / Phụ thu / Mã khuyến mãi', async () => {
+  it('ô SĐT đứng trước tên khách; khối Chốt đơn có phí ship + chuyển khoản, không Giảm giá / Phụ thu / Mã KM / Kích thước', async () => {
     server.use(...skuHandlers());
     renderApp(<OrderCreateScreen />);
     const phone = await screen.findByLabelText('Số điện thoại khách');
     const name = screen.getByLabelText('Tên khách hàng');
     expect(phone.compareDocumentPosition(name) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-    expect(screen.getByText('Giá trị đơn hàng')).toBeInTheDocument();
-    for (const label of ['Phí vận chuyển', 'Phụ thu', 'Mã khuyến mãi']) {
+    // Thiết kế redesign 2026-10-22: phí ship + chuyển khoản nằm trong khối Chốt đơn.
+    expect(screen.getByLabelText('Phí ship thu khách')).toBeInTheDocument();
+    expect(screen.getByLabelText('Tiền chuyển khoản')).toBeInTheDocument();
+    expect(screen.queryByText('Kích thước')).not.toBeInTheDocument();
+    for (const label of ['Phụ thu', 'Mã khuyến mãi', 'Dài (cm)']) {
       expect(screen.queryByLabelText(label)).not.toBeInTheDocument();
     }
     expect(screen.queryByText('Giảm giá')).not.toBeInTheDocument();
@@ -786,5 +788,26 @@ describe('OrderCreateScreen — màn tạo đơn mới', () => {
       'Kho Long An',
     );
     forgetWarehouseSelection(); // store kho là module-level — không để rò sang test sau
+  });
+
+  it('ô NV xử lý chỉ liệt kê nhân viên cùng team (GET /sales-orders/owner-options), không lấy danh sách mọi nhân viên', async () => {
+    renderApp(<OrderCreateScreen />);
+    fireEvent.click(await screen.findByRole('combobox', { name: 'NV xử lý' }));
+    expect(await screen.findByRole('option', { name: /Nguyễn Văn Sale/ })).toBeInTheDocument();
+    expect(screen.queryByRole('option', { name: /Trần Thị Đóng/ })).not.toBeInTheDocument();
+  });
+
+  it('ô ĐVVC chỉ liệt kê hãng đang bật và đã cấu hình (ẩn GHN chưa cấu hình, hãng đã tắt)', async () => {
+    renderApp(<OrderCreateScreen />);
+    const picker = await screen.findByRole('combobox', { name: 'Đơn vị vận chuyển' });
+    await waitFor(() => expect(picker).toBeEnabled());
+    fireEvent.click(picker);
+    const names = (await screen.findAllByRole('option')).map((o) => o.textContent);
+    expect(names).toEqual([
+      'Chưa chọn ĐVVC',
+      'Giao thủ công (xe nhà / khách tự lấy)',
+      'Giao Hàng Tiết Kiệm',
+      'Viettel Post',
+    ]);
   });
 });

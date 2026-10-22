@@ -39,7 +39,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { useCarriers } from '@/features/wms/api/use-shipping';
+import { isCarrierReady, readyCarrierAccounts, useCarriers } from '@/features/wms/api/use-shipping';
 import { cn } from '@/lib/cn';
 import { messageFor } from '@/lib/error-messages';
 import { formatMoney, formatQuantity } from '@/lib/format';
@@ -49,6 +49,7 @@ import {
   useCareLookup,
   useCustomerPhoneMatch,
   useSameDayOrders,
+  useOrderOwnerOptions,
   useOrderStaffOptions,
   useOrderTags,
   useShippingQuotePreview,
@@ -81,7 +82,11 @@ export function Card({
     <section className={cn('flex flex-col gap-2 rounded-lg border bg-card p-3', className)}>
       <header className="flex min-h-8 flex-wrap items-center justify-between gap-2">
         <h2 className="text-base font-semibold">{title}</h2>
-        {actions ? <div className="flex flex-wrap items-center gap-2">{actions}</div> : null}
+        {actions ? (
+          <div className="flex min-w-0 flex-1 flex-wrap items-center justify-end gap-2">
+            {actions}
+          </div>
+        ) : null}
       </header>
       {children}
     </section>
@@ -108,23 +113,31 @@ function Row({
   );
 }
 
+/** Nhãn `caption` đậm trên ô (thiết kế redesign Bán hàng 2026-10-22, artboard "Tạo đơn"). */
+const FIELD_LABEL = 'text-xs font-semibold text-muted-foreground';
+
 // ── Thông tin ──────────────────────────────────────────────
 
-function useStaffSearch(q: string): EntitySearchResult {
-  const staff = useOrderStaffOptions();
-  const needle = q.trim().toLowerCase();
-  // Danh mục nhân viên nhỏ, đã tải hết một lần — lọc gợi ý tại chỗ.
-  const options = staff.data
-    ?.filter(
-      (u) =>
-        needle === '' ||
-        u.fullName.toLowerCase().includes(needle) ||
-        u.code.toLowerCase().includes(needle),
-    )
-    .slice(0, 30)
-    .map((u) => ({ id: u.id, label: u.fullName, hint: u.code }));
-  return { options, isPending: staff.isPending, error: staff.error };
-}
+/** Danh mục nhân viên nhỏ, đã tải hết một lần — lọc gợi ý tại chỗ. */
+const staffSearch =
+  (useList: typeof useOrderStaffOptions) =>
+  (q: string): EntitySearchResult => {
+    const staff = useList();
+    const needle = q.trim().toLowerCase();
+    const options = staff.data
+      ?.filter(
+        (u) =>
+          needle === '' ||
+          u.fullName.toLowerCase().includes(needle) ||
+          u.code.toLowerCase().includes(needle),
+      )
+      .slice(0, 30)
+      .map((u) => ({ id: u.id, label: u.fullName, hint: u.code }));
+    return { options, isPending: staff.isPending, error: staff.error };
+  };
+const useStaffSearch = staffSearch(useOrderStaffOptions);
+/** NV xử lý chỉ chọn trong team người tạo (GET /sales-orders/owner-options). */
+const useOwnerSearch = staffSearch(useOrderOwnerOptions);
 
 /**
  * Ô chọn nhân viên trên đơn. `bare` = chỉ ô chọn (nhãn do nơi gọi vẽ — dải "Thông tin đơn" đầu
@@ -143,7 +156,10 @@ export function StaffField({
   placeholder: string;
   bare?: boolean;
 }) {
-  const staff = useOrderStaffOptions();
+  const isOwner = name === 'ownerId';
+  const staffAll = useOrderStaffOptions();
+  const owners = useOrderOwnerOptions();
+  const staff = isOwner ? owners : staffAll;
   return (
     <FormField
       control={form.control}
@@ -154,7 +170,7 @@ export function StaffField({
             <EntityPicker
               value={field.value}
               onChange={(id) => field.onChange(id)}
-              useSearch={useStaffSearch}
+              useSearch={isOwner ? useOwnerSearch : useStaffSearch}
               selectedLabel={staff.data?.find((u) => u.id === field.value)?.fullName}
               placeholder={placeholder}
               searchPlaceholder="Tìm tên, mã nhân viên…"
@@ -335,6 +351,13 @@ export function CustomerCard({ form }: { form: Form }) {
   const careCustomer = !customerId && match.data === null ? care.data?.customer : undefined;
   const sameDay = useSameDayOrders(phone);
   const [pickOpen, setPickOpen] = useState(false);
+  // Email / ngày sinh / giới tính không có trên thiết kế — gập sau menu ⋯, tự mở khi đã có giá trị.
+  const [extraOpen, setExtraOpen] = useState(
+    () =>
+      form.getValues('customerEmail') !== '' ||
+      form.getValues('customerBirthday') !== '' ||
+      form.getValues('customerGender') !== '',
+  );
 
   // Khách tra được (ngoài tầm nhìn) → điền tên + địa chỉ mặc định vào các ô còn trống.
   useEffect(() => {
@@ -402,32 +425,7 @@ export function CustomerCard({ form }: { form: Form }) {
       title="Khách hàng"
       actions={
         <>
-          <FormField
-            control={form.control}
-            name="customerGender"
-            render={({ field }) => (
-              <FormItem>
-                <Select
-                  value={field.value || NONE}
-                  onValueChange={(v) => field.onChange(v === NONE ? '' : v)}
-                >
-                  <FormControl>
-                    <SelectTrigger aria-label="Giới tính" className="h-8 w-28">
-                      <SelectValue placeholder="Giới tính" />
-                    </SelectTrigger>
-                  </FormControl>
-                  <SelectContent>
-                    <SelectItem value={NONE}>Giới tính</SelectItem>
-                    {GENDERS.map((g) => (
-                      <SelectItem key={g} value={g}>
-                        {GENDER_LABEL[g]}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </FormItem>
-            )}
-          />
+          {customerId && brief.data ? <StatusBadge tone="ok">Khách cũ</StatusBadge> : null}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button
@@ -443,6 +441,9 @@ export function CustomerCard({ form }: { form: Form }) {
             <DropdownMenuContent align="end">
               <DropdownMenuItem onSelect={() => setPickOpen(true)}>
                 Chọn khách có sẵn…
+              </DropdownMenuItem>
+              <DropdownMenuItem onSelect={() => setExtraOpen((o) => !o)}>
+                {extraOpen ? 'Ẩn email, ngày sinh, giới tính' : 'Thêm email, ngày sinh, giới tính'}
               </DropdownMenuItem>
               {customerId || phone ? (
                 <DropdownMenuItem onSelect={clearCustomer}>Xóa thông tin khách</DropdownMenuItem>
@@ -484,9 +485,10 @@ export function CustomerCard({ form }: { form: Form }) {
           name="customerPhone"
           render={({ field }) => (
             <FormItem>
-              <FormLabel className="sr-only">Số điện thoại khách</FormLabel>
+              <FormLabel className={FIELD_LABEL}>Số điện thoại</FormLabel>
               <FormControl>
                 <Input
+                  aria-label="Số điện thoại khách"
                   placeholder="SĐT — tìm khách đã có"
                   inputMode="tel"
                   autoComplete="off"
@@ -503,40 +505,13 @@ export function CustomerCard({ form }: { form: Form }) {
           name="customerName"
           render={({ field }) => (
             <FormItem>
-              <FormLabel className="sr-only">Tên khách hàng</FormLabel>
+              <FormLabel className={FIELD_LABEL}>Tên khách</FormLabel>
               <FormControl>
-                <Input placeholder="Tên khách hàng" autoComplete="off" {...field} />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
-        <FormField
-          control={form.control}
-          name="customerEmail"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel className="sr-only">Địa chỉ email</FormLabel>
-              <FormControl>
-                <Input placeholder="Địa chỉ email" type="email" autoComplete="off" {...field} />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
-        <FormField
-          control={form.control}
-          name="customerBirthday"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel className="sr-only">Ngày sinh</FormLabel>
-              <FormControl>
-                <DatePicker
-                  value={field.value}
-                  onChange={field.onChange}
-                  placeholder="Ngày sinh"
-                  toDate={new Date()}
-                  className="w-full"
+                <Input
+                  aria-label="Tên khách hàng"
+                  placeholder="Tên khách hàng"
+                  autoComplete="off"
+                  {...field}
                 />
               </FormControl>
               <FormMessage />
@@ -544,24 +519,88 @@ export function CustomerCard({ form }: { form: Form }) {
           )}
         />
       </div>
+      {extraOpen ? (
+        <div className="grid gap-2.5 sm:grid-cols-3">
+          <FormField
+            control={form.control}
+            name="customerEmail"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel className="sr-only">Địa chỉ email</FormLabel>
+                <FormControl>
+                  <Input placeholder="Địa chỉ email" type="email" autoComplete="off" {...field} />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+          <FormField
+            control={form.control}
+            name="customerBirthday"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel className="sr-only">Ngày sinh</FormLabel>
+                <FormControl>
+                  <DatePicker
+                    value={field.value}
+                    onChange={field.onChange}
+                    placeholder="Ngày sinh"
+                    toDate={new Date()}
+                    className="w-full"
+                  />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+          <FormField
+            control={form.control}
+            name="customerGender"
+            render={({ field }) => (
+              <FormItem>
+                <Select
+                  value={field.value || NONE}
+                  onValueChange={(v) => field.onChange(v === NONE ? '' : v)}
+                >
+                  <FormControl>
+                    <SelectTrigger aria-label="Giới tính">
+                      <SelectValue placeholder="Giới tính" />
+                    </SelectTrigger>
+                  </FormControl>
+                  <SelectContent>
+                    <SelectItem value={NONE}>Giới tính</SelectItem>
+                    {GENDERS.map((g) => (
+                      <SelectItem key={g} value={g}>
+                        {GENDER_LABEL[g]}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </FormItem>
+            )}
+          />
+        </div>
+      ) : null}
 
       {customerId && brief.data ? (
-        <div className="flex flex-wrap items-center justify-between gap-2 rounded-md bg-secondary px-3 py-2 text-sm">
-          <span>
-            <b className="font-semibold">Khách cũ</b> · {brief.data.code}
-            {brief.data.addresses.length > 0
-              ? ` · ${brief.data.addresses.length} địa chỉ đã lưu`
-              : ''}
+        <p className="flex min-w-0 items-center gap-1 whitespace-nowrap text-xs text-muted-foreground">
+          Mã KH
+          <span className="min-w-0 truncate font-mono" title={brief.data.code}>
+            {brief.data.code}
           </span>
+          {brief.data.addresses.length > 0 ? (
+            <span>· {brief.data.addresses.length} địa chỉ đã lưu</span>
+          ) : null}
+          <span>·</span>
           <a
             href={`/crm/customers/${brief.data.id}`}
             target="_blank"
             rel="noreferrer"
-            className="text-sm text-primary hover:underline"
+            className="text-primary hover:underline"
           >
             Xem hồ sơ
           </a>
-        </div>
+        </p>
       ) : careCustomer ? (
         <div
           role="status"
@@ -645,6 +684,7 @@ export function ReceiverCard({ form }: { form: Form }) {
 
   const textField = (
     name: (typeof ADDRESS_FIELDS)[number],
+    label: string,
     placeholder: string,
     extra?: { className?: string; inputMode?: 'tel' },
   ) => (
@@ -653,9 +693,10 @@ export function ReceiverCard({ form }: { form: Form }) {
       name={name}
       render={({ field }) => (
         <FormItem className={extra?.className}>
-          <FormLabel className="sr-only">{placeholder}</FormLabel>
+          <FormLabel className={FIELD_LABEL}>{label}</FormLabel>
           <FormControl>
             <Input
+              aria-label={placeholder}
               placeholder={placeholder}
               autoComplete="off"
               inputMode={extra?.inputMode}
@@ -673,10 +714,10 @@ export function ReceiverCard({ form }: { form: Form }) {
   );
 
   return (
-    <Card
-      title="Nhận hàng"
-      actions={
-        addresses.length > 0 ? (
+    <Card title="Nhận hàng">
+      {addresses.length > 0 ? (
+        <div className="flex flex-col gap-1">
+          <span className={FIELD_LABEL}>Địa chỉ đã lưu</span>
           <Select
             value={addressId || NEW_ADDRESS}
             onValueChange={(v) => {
@@ -686,23 +727,39 @@ export function ReceiverCard({ form }: { form: Form }) {
               } else fill(v);
             }}
           >
-            <SelectTrigger aria-label="Chọn địa chỉ đã lưu" className="h-8 w-56">
+            <SelectTrigger aria-label="Chọn địa chỉ đã lưu">
               <SelectValue placeholder="Chọn địa chỉ" />
             </SelectTrigger>
             <SelectContent>
               {addresses.map((a) => (
                 <SelectItem key={a.id} value={a.id}>
                   {a.label ? `${a.label} · ` : ''}
-                  {a.recipient}
+                  {a.recipient} · {[a.line1, a.ward, a.province].filter(Boolean).join(', ')}
                   {a.isDefault ? ' (mặc định)' : ''}
                 </SelectItem>
               ))}
               <SelectItem value={NEW_ADDRESS}>Địa chỉ mới (nhập tay)</SelectItem>
             </SelectContent>
           </Select>
-        ) : null
-      }
-    >
+          {addressId ? (
+            <p className="text-xs text-muted-foreground">
+              Sửa ô nào bên dưới sẽ lưu thành địa chỉ mới của khách.
+            </p>
+          ) : null}
+        </div>
+      ) : null}
+      <div className="grid gap-2.5 sm:grid-cols-2">
+        {textField('recipient', 'Người nhận', 'Tên người nhận')}
+        {textField('recipientPhone', 'SĐT người nhận', 'Số điện thoại', { inputMode: 'tel' })}
+        {textField('line1', 'Địa chỉ', 'Địa chỉ chi tiết (số nhà, đường, thôn/xóm)', {
+          className: 'sm:col-span-2',
+        })}
+      </div>
+      <div className="grid gap-2.5 sm:grid-cols-3">
+        {textField('ward', 'Xã / Phường', 'Phường / Xã')}
+        {textField('district', 'Quận / Huyện', 'Quận / Huyện (cũ)')}
+        {textField('province', 'Tỉnh / TP', 'Tỉnh / Thành phố')}
+      </div>
       <FormField
         control={form.control}
         name="expectedDeliveryDate"
@@ -723,23 +780,6 @@ export function ReceiverCard({ form }: { form: Form }) {
           </FormItem>
         )}
       />
-      <div className="grid gap-2.5 sm:grid-cols-2">
-        {textField('recipient', 'Tên người nhận')}
-        {textField('recipientPhone', 'Số điện thoại', { inputMode: 'tel' })}
-        {textField('line1', 'Địa chỉ chi tiết (số nhà, đường, thôn/xóm)', {
-          className: 'sm:col-span-2',
-        })}
-      </div>
-      <div className="grid gap-2.5 sm:grid-cols-3">
-        {textField('ward', 'Phường / Xã')}
-        {textField('district', 'Quận / Huyện (cũ)')}
-        {textField('province', 'Tỉnh / Thành phố')}
-      </div>
-      {addressId ? (
-        <p className="text-xs text-muted-foreground">
-          Địa chỉ đã lưu của khách — sửa ô nào sẽ lưu thành địa chỉ mới.
-        </p>
-      ) : null}
     </Card>
   );
 }
@@ -781,9 +821,10 @@ export function ShippingCard({
         'shippingWeightKg',
       ],
     });
-  const active = (carriers.data ?? []).filter((c) => c.isActive);
+  // Chỉ hãng đã cấu hình — hãng chưa có token / tài khoản chọn vào chỉ để hãng báo lỗi.
+  const active = (carriers.data ?? []).filter(isCarrierReady);
   const carrier = active.find((c) => c.id === carrierId);
-  const accounts = carrier?.accounts ?? [];
+  const accounts = carrier ? readyCarrierAccounts(carrier) : [];
   const canQuote = carrier?.operations.includes('quote') ?? false;
   const weightKg = weight && !new Decimal(weight).isZero() ? weight : estimatedWeightKg;
 
@@ -804,36 +845,16 @@ export function ShippingCard({
   const debouncedBody = useDebounced(body, 500);
   const quote = useShippingQuotePreview(debouncedBody);
 
-  const cmField = (name: 'lengthCm' | 'widthCm' | 'heightCm', label: string) => (
-    <FormField
-      control={form.control}
-      name={name}
-      render={({ field }) => (
-        <FormItem>
-          <FormLabel className="sr-only">{label}</FormLabel>
-          <FormControl>
-            <Input
-              inputMode="numeric"
-              aria-label={label}
-              placeholder="0"
-              className="w-16 px-2 text-right tabular-nums"
-              {...field}
-            />
-          </FormControl>
-        </FormItem>
-      )}
-    />
-  );
-
+  // Kích thước (dài × rộng × cao) ẩn theo yêu cầu 2026-10-22 — ô trống, đơn không gửi kích thước.
   return (
-    <Card
-      title="Vận chuyển"
-      actions={
+    <Card title="Vận chuyển">
+      <div className="grid gap-2.5 sm:grid-cols-2">
         <FormField
           control={form.control}
           name="carrierId"
           render={({ field }) => (
             <FormItem>
+              <FormLabel className={FIELD_LABEL}>ĐVVC</FormLabel>
               <Select
                 value={field.value || NONE}
                 onValueChange={(v) => {
@@ -843,8 +864,8 @@ export function ShippingCard({
                 disabled={carriers.isPending}
               >
                 <FormControl>
-                  <SelectTrigger aria-label="Đơn vị vận chuyển" className="h-8 w-40">
-                    <SelectValue placeholder="ĐVVC" />
+                  <SelectTrigger aria-label="Đơn vị vận chuyển">
+                    <SelectValue placeholder="Chưa chọn ĐVVC" />
                   </SelectTrigger>
                 </FormControl>
                 <SelectContent>
@@ -859,78 +880,68 @@ export function ShippingCard({
             </FormItem>
           )}
         />
-      }
-    >
-      {accounts.length > 1 ? (
         <FormField
           control={form.control}
           name="carrierAccountId"
           render={({ field }) => (
             <FormItem>
-              <Row label="Tài khoản hãng">
-                <Select
-                  value={field.value || NONE}
-                  onValueChange={(v) => field.onChange(v === NONE ? '' : v)}
-                >
-                  <FormControl>
-                    <SelectTrigger aria-label="Tài khoản hãng">
-                      <SelectValue />
-                    </SelectTrigger>
-                  </FormControl>
-                  <SelectContent>
-                    <SelectItem value={NONE}>Tài khoản mặc định</SelectItem>
-                    {accounts.map((a) => (
-                      <SelectItem key={a.id} value={a.id}>
-                        {a.name}
-                        {a.isDefault ? ' (mặc định)' : ''}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </Row>
+              <FormLabel className={FIELD_LABEL}>Tài khoản hãng</FormLabel>
+              <Select
+                value={field.value || NONE}
+                onValueChange={(v) => field.onChange(v === NONE ? '' : v)}
+                disabled={accounts.length <= 1}
+              >
+                <FormControl>
+                  <SelectTrigger aria-label="Tài khoản hãng">
+                    <SelectValue />
+                  </SelectTrigger>
+                </FormControl>
+                <SelectContent>
+                  <SelectItem value={NONE}>Mặc định</SelectItem>
+                  {accounts.map((a) => (
+                    <SelectItem key={a.id} value={a.id}>
+                      {a.name}
+                      {a.isDefault ? ' (mặc định)' : ''}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
               <FormMessage />
             </FormItem>
           )}
         />
-      ) : null}
-
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <span className="text-sm">Kích thước</span>
-        <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
-          {cmField('lengthCm', 'Dài (cm)')}×{cmField('widthCm', 'Rộng (cm)')}×
-          {cmField('heightCm', 'Cao (cm)')}
-          <span>(cm)</span>
-        </div>
-      </div>
-
-      <FormField
-        control={form.control}
-        name="shippingWeightKg"
-        render={({ field }) => (
-          <FormItem>
-            <Row label="Khối lượng (kg)" htmlFor="order-weight">
-              <FormControl>
-                <Input
-                  id="order-weight"
-                  inputMode="decimal"
-                  placeholder={
-                    estimatedWeightKg ? `${formatQuantity(estimatedWeightKg)} (theo SP)` : '0'
-                  }
-                  className="text-right tabular-nums"
-                  {...field}
-                />
-              </FormControl>
-            </Row>
-            <FormMessage />
-          </FormItem>
-        )}
-      />
-
-      <div className="grid gap-2.5 sm:grid-cols-2">
-        <Input aria-label="Mã vận đơn" placeholder="Mã vận đơn — cấp khi gửi hãng" disabled />
-        <div className="flex h-9 items-center justify-between rounded-md border bg-muted/40 px-3 text-sm">
-          <span className="text-muted-foreground">Phí</span>
-          <span className="tabular-nums">
+        <FormField
+          control={form.control}
+          name="shippingWeightKg"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel className={FIELD_LABEL} htmlFor="order-weight">
+                Khối lượng
+              </FormLabel>
+              <div className="relative">
+                <FormControl>
+                  <Input
+                    id="order-weight"
+                    aria-label="Khối lượng (kg)"
+                    inputMode="decimal"
+                    placeholder={
+                      estimatedWeightKg ? `${formatQuantity(estimatedWeightKg)} (theo SP)` : '0'
+                    }
+                    className="pr-9 tabular-nums"
+                    {...field}
+                  />
+                </FormControl>
+                <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">
+                  kg
+                </span>
+              </div>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+        <div className="flex min-w-0 flex-col gap-1">
+          <span className={FIELD_LABEL}>Cước hãng báo</span>
+          <span className="flex h-8 items-center text-sm font-semibold tabular-nums">
             {!carrierId
               ? '—'
               : !canQuote
@@ -940,7 +951,7 @@ export function ShippingCard({
                   : quote.isFetching
                     ? 'Đang tra…'
                     : quote.data
-                      ? formatMoney(quote.data.fee, { unit: '' })
+                      ? formatMoney(quote.data.fee)
                       : quote.isError
                         ? 'Không tra được'
                         : '—'}

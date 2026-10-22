@@ -1,7 +1,7 @@
 'use client';
 
 import Decimal from 'decimal.js';
-import { Loader2, ScanBarcode, Search } from 'lucide-react';
+import { Loader2, Search } from 'lucide-react';
 import { forwardRef, useEffect, useId, useMemo, useState } from 'react';
 import { Checkbox } from '@/components/ui/checkbox';
 import { cn } from '@/lib/cn';
@@ -95,7 +95,7 @@ export const ProductSearch = forwardRef<
   const showList = open && q.trim() !== '';
 
   return (
-    <div className="flex flex-wrap items-center gap-2">
+    <div className="flex w-full max-w-2xl flex-wrap items-center gap-2">
       <div role="tablist" aria-label="Loại hàng" className="inline-flex rounded-md bg-muted p-0.5">
         {[
           { v: false, label: 'Sản phẩm' },
@@ -108,7 +108,7 @@ export const ProductSearch = forwardRef<
             aria-selected={isCombo === t.v}
             onClick={() => setIsCombo(t.v)}
             className={cn(
-              'h-8 rounded px-3 text-sm',
+              'h-7 rounded px-3 text-sm',
               isCombo === t.v
                 ? 'bg-card font-semibold text-primary shadow-sm'
                 : 'text-muted-foreground hover:text-foreground',
@@ -120,7 +120,7 @@ export const ProductSearch = forwardRef<
       </div>
 
       <div className="relative min-w-0 flex-1 basis-72">
-        <div className="flex h-9 items-center gap-2 rounded-md border border-primary bg-card px-3 focus-within:ring-2 focus-within:ring-ring">
+        <div className="flex h-8 items-center gap-2 rounded-md border border-primary bg-card px-3 focus-within:ring-2 focus-within:ring-ring">
           <Search className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden />
           <input
             ref={ref}
@@ -143,6 +143,12 @@ export const ProductSearch = forwardRef<
           {search.isFetching ? (
             <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" aria-hidden />
           ) : null}
+          <kbd
+            className="shrink-0 rounded border px-1 font-mono text-xs text-muted-foreground"
+            title="Quét mã vạch: đặt con trỏ vào ô tìm rồi quét"
+          >
+            F9 quét
+          </kbd>
           <label className="flex shrink-0 cursor-pointer items-center gap-2 border-l pl-3 text-sm">
             <Checkbox
               checked={inStock}
@@ -215,17 +221,6 @@ export const ProductSearch = forwardRef<
           </ul>
         ) : null}
       </div>
-
-      <button
-        type="button"
-        onClick={() => (ref && typeof ref !== 'function' ? ref.current?.focus() : undefined)}
-        className="inline-flex h-9 items-center gap-2 rounded-md border px-3 text-sm hover:bg-muted"
-        aria-label="Quét mã vạch (F9)"
-        title="Quét mã vạch: đặt con trỏ vào ô tìm rồi quét"
-      >
-        <ScanBarcode className="h-4 w-4" aria-hidden />
-        (F9)
-      </button>
     </div>
   );
 });

@@ -1,5 +1,5 @@
 import { fireEvent, render, screen } from '@testing-library/react';
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it, onTestFinished, vi } from 'vitest';
 import type { ColumnDef } from '@tanstack/react-table';
 import { DataTable } from './data-table';
 
@@ -129,5 +129,44 @@ describe('<DataTable>', () => {
   it('rỗng → dòng "Không có dòng nào"', () => {
     render(<DataTable {...base} rows={[]} total={0} />);
     expect(screen.getAllByText('Không có dòng nào').length).toBeGreaterThan(0);
+  });
+
+  it('bảng rộng hơn khung → thanh cuộn ngang luôn hiện; giữ chuột kéo để cuộn, không mở dòng', () => {
+    // jsdom không có layout → giả lập bảng rộng 2000px trong khung 800px.
+    const sw = vi.spyOn(HTMLElement.prototype, 'scrollWidth', 'get').mockReturnValue(2000);
+    const cw = vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockReturnValue(800);
+    onTestFinished(() => {
+      sw.mockRestore();
+      cw.mockRestore();
+    });
+    const onRowClick = vi.fn();
+    render(<DataTable {...base} rows={make(3)} total={3} onRowClick={onRowClick} />);
+    expect(screen.getByRole('scrollbar', { name: 'Cuộn ngang bảng' })).toBeInTheDocument();
+
+    const cell = screen.getByText('KH 1');
+    const scroller = cell.closest('table')!.parentElement!;
+    // jsdom bỏ qua gán scrollLeft → cho thuộc tính ghi được.
+    Object.defineProperty(scroller, 'scrollLeft', { value: 0, writable: true });
+    // jsdom không có PointerEvent → dựng MouseEvent mang pointerType.
+    const pointer = (target: EventTarget, type: string, clientX: number) => {
+      const ev = new MouseEvent(type, { bubbles: true, button: 0, clientX });
+      Object.defineProperty(ev, 'pointerType', { value: 'mouse' });
+      target.dispatchEvent(ev);
+    };
+    pointer(cell, 'pointerdown', 500);
+    pointer(window, 'pointermove', 300);
+    pointer(window, 'pointerup', 300);
+    fireEvent.click(cell);
+    expect(scroller.scrollLeft).toBe(200);
+    expect(onRowClick).not.toHaveBeenCalled();
+
+    // Click thường (không kéo) vẫn mở dòng.
+    fireEvent.click(cell);
+    expect(onRowClick).toHaveBeenCalledTimes(1);
+  });
+
+  it('bảng vừa khung → không có thanh cuộn ngang', () => {
+    render(<DataTable {...base} rows={make(3)} total={3} />);
+    expect(screen.queryByRole('scrollbar')).not.toBeInTheDocument();
   });
 });

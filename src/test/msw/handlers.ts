@@ -1436,6 +1436,16 @@ export const handlers = [
       { id: '00000000-0000-4000-8000-0000000000a2', code: 'packer.01', fullName: 'Trần Thị Đóng' },
     ]),
   ),
+  // NV xử lý: chỉ nhân viên cùng team người tạo — packer.01 ngoài team nên không có ở đây.
+  http.get('/api/sales-orders/owner-options', () =>
+    HttpResponse.json([
+      {
+        id: '00000000-0000-4000-8000-0000000000a1',
+        code: 'sale.hn.1',
+        fullName: 'Nguyễn Văn Sale',
+      },
+    ]),
+  ),
   http.get('/api/pickup-warehouses', () => HttpResponse.json(PICKUP_WAREHOUSES)),
   http.get('/api/sales-orders/:id/shipping-quote', ({ params, request }) => {
     const carrierId = new URL(request.url).searchParams.get('carrierId') ?? '';

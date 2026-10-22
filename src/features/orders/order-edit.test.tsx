@@ -33,11 +33,19 @@ describe('OrderEditScreen — trang sửa đơn (D-05, PATCH /sales-orders/{id})
     expect(await screen.findByRole('heading', { level: 1 })).toHaveTextContent(
       `Sửa đơn ${ORDER.docNumber}`,
     );
-    // Redesign 2026-10-22: trái = phần sửa được, phải = đơn chỉ đọc.
-    for (const t of ['Giao hàng', 'Vận chuyển', 'Ghi chú & thẻ']) {
-      expect(screen.getByText(t)).toBeInTheDocument();
+    // 2026-10-22: bố cục chép màn tạo đơn.
+    for (const t of [
+      'Thông tin đơn',
+      'Sản phẩm',
+      'Giá trị đơn hàng',
+      'Ghi chú',
+      'Khách hàng',
+      'Nhận hàng',
+      'Vận chuyển',
+    ]) {
+      expect(screen.getByRole('heading', { level: 2, name: t })).toBeInTheDocument();
     }
-    expect(screen.getAllByText('Đơn hàng').length).toBeGreaterThan(1); // breadcrumb + thẻ chỉ đọc
+    expect(screen.getByText('Tiền cần thu')).toBeInTheDocument();
     // Dòng hàng chỉ đọc: có mã SKU, không có ô nhập số lượng
     expect(screen.getByText(DETAIL.lines[0]!.skuCode)).toBeInTheDocument();
     expect(screen.queryByRole('spinbutton')).not.toBeInTheDocument();
@@ -151,9 +159,10 @@ describe('OrderEditScreen — trang sửa đơn (D-05, PATCH /sales-orders/{id})
     expect(await screen.findByText('Cước hãng báo')).toBeInTheDocument();
     await waitFor(() =>
       expect(
-        screen.getByText(/28\.000 VND · 0\.7500 kg · lấy tại Hồ Chí Minh · Phường Tân Tạo A/),
+        screen.getByText(/0\.7500 kg · Lấy hàng tại Hồ Chí Minh · Phường Tân Tạo A/),
       ).toBeInTheDocument(),
     );
+    expect(screen.getByText('Cước hãng báo').nextElementSibling).toHaveTextContent('28.000');
     expect(asked).toEqual([`${ORDER.id}?c-ghtk`]);
 
     // GHN trong mock không có `quote` → dòng cước biến mất, không gọi thêm.
@@ -267,7 +276,7 @@ describe('OrderEditScreen — trang sửa đơn (D-05, PATCH /sales-orders/{id})
     renderApp(<OrderEditScreen orderId={ORDER.id} />);
     await screen.findByRole('heading', { level: 1 });
     // Địa chỉ hiệu lực server trả (mặc định của khách) hiện ngay, trước cả khi tải danh sách.
-    expect(await screen.findByText(/Giao tới: Nguyễn Thị Thu Hà · 0903112233/)).toBeInTheDocument();
+    expect(await screen.findByText(/Nguyễn Thị Thu Hà · 0903112233/)).toBeInTheDocument();
 
     const picker = screen.getByRole('combobox', { name: 'Địa chỉ giao' });
     await waitFor(() => expect(picker).toBeEnabled());
@@ -276,7 +285,7 @@ describe('OrderEditScreen — trang sửa đơn (D-05, PATCH /sales-orders/{id})
     expect(options[0]).toBe('— Mặc định của khách —');
     expect(options).toHaveLength(3);
     fireEvent.click(screen.getByRole('option', { name: /Trần Văn Bình/ }));
-    expect(screen.getByText(/Giao tới: Trần Văn Bình · 0912345678/)).toBeInTheDocument();
+    expect(screen.getByText(/Trần Văn Bình · 0912345678/)).toBeInTheDocument();
 
     const carrierPicker = screen.getByRole('combobox', { name: 'Hãng vận chuyển' });
     await waitFor(() => expect(carrierPicker).toBeEnabled());
@@ -307,7 +316,7 @@ describe('OrderEditScreen — trang sửa đơn (D-05, PATCH /sales-orders/{id})
       },
     });
     await screen.findByRole('heading', { level: 1 });
-    expect(await screen.findByText(/Giao tới: Nguyễn Thị Thu Hà/)).toBeInTheDocument();
+    expect(await screen.findByText(/Nguyễn Thị Thu Hà/)).toBeInTheDocument();
     expect(screen.queryByRole('combobox', { name: 'Địa chỉ giao' })).not.toBeInTheDocument();
   });
 
