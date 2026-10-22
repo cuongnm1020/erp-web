@@ -796,4 +796,18 @@ describe('OrderCreateScreen — màn tạo đơn mới', () => {
     expect(await screen.findByRole('option', { name: /Nguyễn Văn Sale/ })).toBeInTheDocument();
     expect(screen.queryByRole('option', { name: /Trần Thị Đóng/ })).not.toBeInTheDocument();
   });
+
+  it('ô ĐVVC chỉ liệt kê hãng đang bật và đã cấu hình (ẩn GHN chưa cấu hình, hãng đã tắt)', async () => {
+    renderApp(<OrderCreateScreen />);
+    const picker = await screen.findByRole('combobox', { name: 'Đơn vị vận chuyển' });
+    await waitFor(() => expect(picker).toBeEnabled());
+    fireEvent.click(picker);
+    const names = (await screen.findAllByRole('option')).map((o) => o.textContent);
+    expect(names).toEqual([
+      'Chưa chọn ĐVVC',
+      'Giao thủ công (xe nhà / khách tự lấy)',
+      'Giao Hàng Tiết Kiệm',
+      'Viettel Post',
+    ]);
+  });
 });

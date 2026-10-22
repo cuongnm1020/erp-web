@@ -39,7 +39,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { useCarriers } from '@/features/wms/api/use-shipping';
+import { isCarrierReady, readyCarrierAccounts, useCarriers } from '@/features/wms/api/use-shipping';
 import { cn } from '@/lib/cn';
 import { messageFor } from '@/lib/error-messages';
 import { formatMoney, formatQuantity } from '@/lib/format';
@@ -821,9 +821,10 @@ export function ShippingCard({
         'shippingWeightKg',
       ],
     });
-  const active = (carriers.data ?? []).filter((c) => c.isActive);
+  // Chỉ hãng đã cấu hình — hãng chưa có token / tài khoản chọn vào chỉ để hãng báo lỗi.
+  const active = (carriers.data ?? []).filter(isCarrierReady);
   const carrier = active.find((c) => c.id === carrierId);
-  const accounts = carrier?.accounts ?? [];
+  const accounts = carrier ? readyCarrierAccounts(carrier) : [];
   const canQuote = carrier?.operations.includes('quote') ?? false;
   const weightKg = weight && !new Decimal(weight).isZero() ? weight : estimatedWeightKg;
 

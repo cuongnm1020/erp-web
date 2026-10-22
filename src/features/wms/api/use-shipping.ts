@@ -64,6 +64,21 @@ export interface CarrierAccountOption {
  * hiện một dòng như cũ. Tài khoản / hãng có adapter mà chưa cấu hình thì ẩn hẳn — chọn vào chỉ để
  * hãng báo lỗi.
  */
+/** Tài khoản đủ cấu hình (token / mã shop) — gửi được đơn sang hãng. */
+export function readyCarrierAccounts(c: Carrier): Carrier['accounts'] {
+  return c.accounts.filter((a) => a.configured);
+}
+
+/**
+ * Hãng đang bật và dùng được: có ≥ 1 tài khoản đủ cấu hình, hoặc không tài khoản thì là hãng nội
+ * bộ (không adapter) hoặc đã cấu hình. Hãng chưa cấu hình ẩn khỏi ô chọn (2026-10-22).
+ */
+export function isCarrierReady(c: Carrier): boolean {
+  if (!c.isActive) return false;
+  if (c.accounts.length === 0) return !c.hasAdapter || c.configured;
+  return readyCarrierAccounts(c).length > 0;
+}
+
 export function carrierAccountOptions(carriers: Carrier[] | undefined): CarrierAccountOption[] {
   return (carriers ?? [])
     .filter((c) => c.isActive)
@@ -75,7 +90,7 @@ export function carrierAccountOptions(carriers: Carrier[] | undefined): CarrierA
           { value: `${c.id}|`, carrier: c, accountId: null, accountLabel: null, label: base },
         ];
       }
-      const ready = c.accounts.filter((a) => a.configured);
+      const ready = readyCarrierAccounts(c);
       const many = ready.length > 1;
       return ready
         .sort((a, b) => Number(b.isDefault) - Number(a.isDefault))
