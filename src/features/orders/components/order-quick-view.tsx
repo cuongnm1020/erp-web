@@ -1,30 +1,40 @@
 'use client';
 
 import * as DialogPrimitive from '@radix-ui/react-dialog';
-import { X } from 'lucide-react';
+import Decimal from 'decimal.js';
+import { Copy, X } from 'lucide-react';
 import Link from 'next/link';
+import { CopyButton } from '@/components/data/copy-button';
 import { Button } from '@/components/ui/button';
 import { DialogOverlay, DialogPortal } from '@/components/ui/dialog';
+import { Skeleton } from '@/components/ui/skeleton';
 import { messageFor } from '@/lib/error-messages';
 import {
+  formatDate,
   formatDateTime,
   formatMoney,
   formatPhone,
   formatQuantity,
+  normalizePhone,
   phoneCarrier,
+  toDecimal,
 } from '@/lib/format';
+import { Can } from '@/lib/permission';
 import { useShipmentStatusLog } from '@/features/wms/api/use-shipping';
 import { shipmentStatusBadge } from '@/features/wms/labels';
 import { cn } from '@/lib/cn';
 import { useOrder, type OrderFlow, type SalesOrderListItem } from '../api/use-orders';
 import { orderFlowClass, orderFlowLabel, telcoClass } from '../labels';
+import { OrderProgress } from './order-progress';
 import { PancakeOrderLink } from './pancake-order-link';
 
 /**
- * Xem nhanh một đơn từ danh sách (khung bên phải) — người nhận, sản phẩm, tiền, vận chuyển,
- * hành trình hãng — không rời danh sách. Chi tiết đơn từ GET /sales-orders/:id; hành trình từ
- * GET /shipments/:id/status-log (chỉ các mốc đổi trạng thái). Tiền trên dòng danh sách (thực
- * thu ĐVVC) lấy từ `row` để khớp đúng con số người dùng vừa thấy ở bảng.
+ * Xem nhanh một đơn từ danh sách (ngăn kéo phải 480px) — tiến độ, người nhận, sản phẩm, tiền,
+ * vận chuyển, hành trình hãng, ghi chú — không rời danh sách. Chi tiết đơn từ GET
+ * /sales-orders/:id; hành trình từ GET /shipments/:id/status-log (chỉ các mốc đổi trạng thái).
+ * Tiền trên dòng danh sách (thực thu ĐVVC, COD) lấy từ `row` để khớp con số vừa thấy ở bảng.
+ * Redesign Bán hàng 2026-10-22: sao chép mã / SĐT / mã vận đơn, chân ngăn kéo 3 nút
+ * (Nhân bản đơn · Sửa đơn · Mở đơn đầy đủ).
  */
 export function OrderQuickView({
   row,
@@ -36,9 +46,9 @@ export function OrderQuickView({
   return (
     <DialogPrimitive.Root open={row !== null} onOpenChange={(open) => (open ? null : onClose())}>
       <DialogPortal>
-        <DialogOverlay className="bg-black/20" />
+        <DialogOverlay />
         <DialogPrimitive.Content
-          className="fixed inset-y-0 right-0 z-50 flex w-full max-w-md flex-col border-l bg-background shadow-lg focus:outline-none"
+          className="fixed inset-y-0 right-0 z-50 flex w-full max-w-drawer flex-col border-l bg-card shadow-dialog focus:outline-none"
           aria-describedby={undefined}
         >
           {row ? <Body row={row} /> : null}
@@ -50,16 +60,26 @@ export function OrderQuickView({
 
 function Body({ row }: { row: SalesOrderListItem }) {
   const detail = useOrder(row.id);
-  const shipmentId = detail.data?.shipment?.id ?? '';
+  const d = detail.data;
+  const shipmentId = d?.shipment?.id ?? '';
   const telco = phoneCarrier(row.phone);
+  const phone = row.phone ? (normalizePhone(row.phone) ?? row.phone) : null;
+  const prepaid = toDecimal(d?.prepaidAmount ?? '0') ?? new Decimal(0);
+  const cod =
+    row.shipment?.codAmount ?? Decimal.max(new Decimal(row.total).minus(prepaid), 0).toFixed();
+  const tracking = row.shipment?.trackingNo ?? null;
+  const carrierName =
+    row.shipment?.carrierName ?? d?.carrier?.name ?? row.shipment?.carrierCode ?? null;
+  const accountName = d?.shipment?.carrierAccountName ?? d?.carrierAccount?.name ?? null;
   return (
     <>
-      <div className="flex items-start justify-between gap-3 border-b px-5 py-4">
-        <div className="space-y-1">
-          <div className="flex items-center gap-2">
-            <DialogPrimitive.Title className="font-mono text-base font-semibold">
+      <div className="flex items-start justify-between gap-3 border-b px-5 py-3.5">
+        <div className="min-w-0 space-y-0.5">
+          <div className="flex items-center gap-1.5">
+            <DialogPrimitive.Title className="font-mono text-sm font-semibold">
               {row.docNumber}
             </DialogPrimitive.Title>
+            <CopyButton value={row.docNumber} label="mã đơn" />
             <FlowBadge flow={row.flow} />
           </div>
           <p className="text-xs text-muted-foreground">
@@ -68,39 +88,51 @@ function Body({ row }: { row: SalesOrderListItem }) {
             ) : (
               'Tạo trong ERP'
             )}{' '}
-            · tạo {formatDateTime(row.createdAt)}
+            · đặt {formatDate(row.orderDate)} · tạo {formatDateTime(row.createdAt)}
             {row.ownerName ? ` · ${row.ownerName}` : ''}
           </p>
         </div>
         <DialogPrimitive.Close asChild>
-          <Button variant="outline" size="icon" className="h-8 w-8" aria-label="Đóng xem nhanh">
+          <Button variant="ghost" size="icon-sm" aria-label="Đóng xem nhanh">
             <X aria-hidden />
           </Button>
         </DialogPrimitive.Close>
       </div>
 
-      <div className="flex-1 space-y-5 overflow-y-auto px-5 py-4 text-sm">
+      <div className="flex-1 overflow-y-auto text-sm">
+        {PROGRESS_FLOWS.has(row.flow) ? (
+          <div className="border-b px-5 py-3">
+            <OrderProgress flow={row.flow} />
+          </div>
+        ) : null}
+
         <Section title="Người nhận">
           <p className="font-semibold">{row.recipientName ?? row.customer.name}</p>
-          <p className="flex items-center gap-1.5 whitespace-nowrap">
-            <span className="font-mono">{formatPhone(row.phone)}</span>
-            {telco ? <TelcoBadge name={telco} /> : null}
-          </p>
+          {phone ? (
+            <p className="flex items-center gap-1.5 whitespace-nowrap">
+              <span className="font-mono text-xs">{formatPhone(row.phone)}</span>
+              {telco ? <TelcoBadge name={telco} /> : null}
+              <CopyButton value={phone} label="số điện thoại" />
+            </p>
+          ) : null}
           <p className="text-muted-foreground">
             {[row.addressLine, row.province].filter(Boolean).join(', ') || 'Chưa có địa chỉ giao'}
           </p>
         </Section>
 
-        <Section title="Sản phẩm">
+        <Section title={d ? `Sản phẩm · ${d.lines.length} dòng` : 'Sản phẩm'}>
           {detail.isPending ? (
-            <p className="text-xs text-muted-foreground">Đang tải…</p>
+            <div className="space-y-1.5" aria-label="Đang tải sản phẩm">
+              <Skeleton className="h-4 w-3/4" />
+              <Skeleton className="h-4 w-1/2" />
+            </div>
           ) : detail.isError ? (
             <p className="text-xs text-destructive">{messageFor(detail.error)}</p>
           ) : (
-            <ul className="space-y-1.5">
+            <ul className="space-y-1">
               {detail.data.lines.map((l) => (
                 <li key={l.id} className="flex justify-between gap-3">
-                  <span>
+                  <span className="min-w-0">
                     {l.skuName}{' '}
                     <span className="text-muted-foreground">
                       × {formatQuantity(l.qty)} {l.uomCode}
@@ -111,54 +143,102 @@ function Body({ row }: { row: SalesOrderListItem }) {
               ))}
             </ul>
           )}
-          <dl className="mt-2 space-y-1 border-t border-dashed pt-2 tabular-nums">
+          <dl className="mt-2 space-y-0.5 border-t pt-2 tabular-nums">
+            <Money label="Tạm tính" value={formatMoney(row.subtotal, { unit: '' })} />
             <Money label="Phí ship thu khách" value={formatMoney(row.shippingFee, { unit: '' })} />
-            <Money label="Tổng tiền" value={formatMoney(row.total, { unit: '' })} strong />
-            <Money
-              label="Thực thu từ ĐVVC (ước tính)"
-              value={
-                row.shipment?.collectedAmount
-                  ? formatMoney(row.shipment.collectedAmount, { unit: '' })
-                  : '—'
-              }
-            />
+            {d && !prepaid.isZero() ? (
+              <Money label="Đã chuyển khoản" value={formatMoney(prepaid.toFixed(), { unit: '' })} />
+            ) : null}
+            <Money label="Tổng tiền" value={formatMoney(row.total, { unit: '' })} />
+            <Money label="Thu hộ (COD)" value={formatMoney(cod, { unit: '' })} strong />
+            {row.shipment?.collectedAmount ? (
+              <Money
+                label="Thực thu từ ĐVVC (ước tính)"
+                value={formatMoney(row.shipment.collectedAmount, { unit: '' })}
+              />
+            ) : null}
           </dl>
         </Section>
 
         <Section title="Vận chuyển">
-          {row.shipment ? (
-            <>
-              <p>
-                <span className="font-semibold">
-                  {row.shipment.carrierName ?? row.shipment.carrierCode ?? 'Chưa gán hãng'}
-                </span>
-                {row.shipment.trackingNo ? (
-                  <span className="font-mono"> · {row.shipment.trackingNo}</span>
-                ) : null}
-              </p>
-              {shipmentId ? <Journey shipmentId={shipmentId} /> : null}
-            </>
+          {carrierName ? (
+            <p>
+              <span className="font-semibold">{carrierName}</span>
+              {accountName ? (
+                <span className="text-muted-foreground"> · tài khoản {accountName}</span>
+              ) : null}
+            </p>
+          ) : (
+            <p className="text-warning">Chưa gán hãng</p>
+          )}
+          {tracking ? (
+            <p className="flex items-center gap-1.5">
+              <span className="truncate font-mono text-xs">{tracking}</span>
+              <CopyButton value={tracking} label="mã vận đơn" />
+            </p>
           ) : (
             <p className="text-muted-foreground">Kho chưa tạo phiếu giao cho đơn này.</p>
           )}
+          {shipmentId ? <Journey shipmentId={shipmentId} /> : null}
         </Section>
 
-        <Section title="Ghi chú">
-          <p className="text-muted-foreground">{row.note ?? 'Không có ghi chú.'}</p>
+        <Section title="Ghi chú" last>
+          {d?.internalNote || d?.printNote || row.note ? (
+            <dl className="grid grid-cols-[96px_1fr] gap-x-3 gap-y-1">
+              {d?.internalNote || row.note ? (
+                <>
+                  <dt className="text-muted-foreground">Nội bộ</dt>
+                  <dd className="whitespace-pre-line">{d?.internalNote ?? row.note}</dd>
+                </>
+              ) : null}
+              {d?.printNote ? (
+                <>
+                  <dt className="text-muted-foreground">In vận đơn</dt>
+                  <dd className="whitespace-pre-line">{d.printNote}</dd>
+                </>
+              ) : null}
+            </dl>
+          ) : (
+            <p className="text-muted-foreground">Không có ghi chú.</p>
+          )}
         </Section>
       </div>
 
-      <div className="flex gap-2 border-t px-5 py-3">
-        <Button asChild size="sm">
+      <div className="flex justify-end gap-2 border-t px-5 py-3">
+        <Can I="create" a="SalesOrder">
+          <Button asChild variant="outline">
+            <Link href={`/crm/orders/new?from=${row.id}`}>
+              <Copy aria-hidden />
+              Nhân bản đơn
+            </Link>
+          </Button>
+        </Can>
+        {row.status !== 'CANCELLED' ? (
+          <Can I="update" a="SalesOrder">
+            <Button asChild variant="outline">
+              <Link href={`/crm/orders/${row.id}/edit`}>Sửa đơn</Link>
+            </Button>
+          </Can>
+        ) : null}
+        <Button asChild>
           <Link href={`/crm/orders/${row.id}`}>Mở đơn đầy đủ</Link>
-        </Button>
-        <Button asChild size="sm" variant="outline">
-          <Link href={`/crm/orders/${row.id}/edit`}>Sửa đơn</Link>
         </Button>
       </div>
     </>
   );
 }
+
+/** Luồng có thanh tiến độ — đơn sự cố / hủy chỉ hiện chip trạng thái. */
+const PROGRESS_FLOWS: ReadonlySet<OrderFlow> = new Set<OrderFlow>([
+  'PENDING_APPROVAL',
+  'WAREHOUSE',
+  'PICKING',
+  'PACKED',
+  'PICKED_UP',
+  'IN_TRANSIT',
+  'OUT_FOR_DELIVERY',
+  'DELIVERED',
+]);
 
 function Journey({ shipmentId }: { shipmentId: string }) {
   const log = useShipmentStatusLog(shipmentId);
@@ -185,9 +265,17 @@ function Journey({ shipmentId }: { shipmentId: string }) {
   );
 }
 
-function Section({ title, children }: { title: string; children: React.ReactNode }) {
+function Section({
+  title,
+  last,
+  children,
+}: {
+  title: string;
+  last?: boolean;
+  children: React.ReactNode;
+}) {
   return (
-    <section className="space-y-1.5">
+    <section className={cn('space-y-1.5 px-5 py-3', !last && 'border-b')}>
       <h2 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
         {title}
       </h2>

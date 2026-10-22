@@ -136,6 +136,13 @@ describe('OrderListScreen — GET /sales-orders (P1-12)', () => {
       'href',
       `/crm/orders/${row.id}`,
     );
+    // Redesign 2026-10-22: chân ngăn kéo có Nhân bản đơn + tiến độ giao hàng.
+    expect(screen.getByRole('link', { name: /Nhân bản đơn/ })).toHaveAttribute(
+      'href',
+      `/crm/orders/new?from=${row.id}`,
+    );
+    expect(screen.getByRole('list', { name: 'Tiến độ đơn hàng' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Sao chép mã đơn/ })).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Đóng xem nhanh' }));
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
   });
