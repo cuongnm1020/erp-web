@@ -1,7 +1,7 @@
 'use client';
 
 import * as DialogPrimitive from '@radix-ui/react-dialog';
-import { Copy, X } from 'lucide-react';
+import { X } from 'lucide-react';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { DialogOverlay, DialogPortal } from '@/components/ui/dialog';
@@ -16,7 +16,6 @@ import {
 import { useShipmentStatusLog } from '@/features/wms/api/use-shipping';
 import { shipmentStatusBadge } from '@/features/wms/labels';
 import { cn } from '@/lib/cn';
-import { Can } from '@/lib/permission';
 import { useOrder, type OrderFlow, type SalesOrderListItem } from '../api/use-orders';
 import { orderFlowClass, orderFlowLabel, telcoClass } from '../labels';
 import { PancakeOrderLink } from './pancake-order-link';
@@ -156,14 +155,6 @@ function Body({ row }: { row: SalesOrderListItem }) {
         <Button asChild size="sm" variant="outline">
           <Link href={`/crm/orders/${row.id}/edit`}>Sửa đơn</Link>
         </Button>
-        <Can I="create" a="SalesOrder">
-          <Button asChild size="sm" variant="outline">
-            <Link href={`/crm/orders/new?from=${row.id}`}>
-              <Copy aria-hidden />
-              Nhân bản đơn
-            </Link>
-          </Button>
-        </Can>
       </div>
     </>
   );

@@ -1,7 +1,7 @@
 'use client';
 
 import Decimal from 'decimal.js';
-import { Boxes, Copy, CornerDownRight, Gift, Info, Printer } from 'lucide-react';
+import { Boxes, CornerDownRight, Gift, Info, Printer } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Fragment, useEffect, useRef, useState, type ReactNode } from 'react';
@@ -764,17 +764,13 @@ function Detail({ order }: { order: SalesOrderDetail }) {
                 </Button>
               </Can>
             </>
-          ) : null}
-          {/* Nhân bản (2026-10-22): mở tab tạo đơn điền sẵn khách, địa chỉ, dòng hàng, ĐVVC của đơn
-              này (?from=) — đơn cũ giữ nguyên; đơn đã hủy cũng dùng nút này để tạo lại. */}
-          <Can I="create" a="SalesOrder">
-            <Button variant="outline" size="sm" asChild>
-              <Link href={`/crm/orders/new?from=${order.id}`}>
-                <Copy aria-hidden />
-                Nhân bản đơn
-              </Link>
-            </Button>
-          </Can>
+          ) : (
+            <Can I="create" a="SalesOrder">
+              <Button variant="outline" size="sm" asChild>
+                <Link href={`/crm/orders/new?from=${order.id}`}>Tạo lại đơn</Link>
+              </Button>
+            </Can>
+          )}
           {RETURNABLE_FULFILMENT.has(order.fulfilment.status) ? (
             <Can I="receive" a="Stock">
               <Button variant="outline" size="sm" asChild>
