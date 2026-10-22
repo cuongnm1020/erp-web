@@ -757,6 +757,8 @@ export function OrderListScreen() {
             key: 'source',
             label: 'Nguồn',
             type: 'select',
+            // Hàng chục POS Pancake — gõ tìm theo tên shop.
+            searchable: true,
             options: [
               { value: 'PANCAKE', label: 'Pancake (mọi POS)' },
               ...(pancakeShops.data ?? []).map((s) => ({

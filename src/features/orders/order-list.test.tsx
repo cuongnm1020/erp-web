@@ -561,6 +561,32 @@ describe('OrderListScreen — lọc theo hãng + thời gian (2026-09-19)', () =
     }
   });
 
+  it('ô Nguồn có ô tìm theo tên POS, không phân biệt dấu (2026-10-22)', async () => {
+    search = '';
+    server.use(
+      http.get('/api/pancake-sync/shops', () =>
+        HttpResponse.json([
+          { shopId: '111', shopName: 'CSKH - DƯƠNG NỘI', isActive: true },
+          { shopId: '222', shopName: '71-TikTok Shop', isActive: true },
+          { shopId: '333', shopName: 'PN - AMINO 500ml -T6', isActive: true },
+        ]),
+      ),
+    );
+    renderApp(<OrderListScreen />);
+    fireEvent.click(await screen.findByRole('combobox', { name: 'Nguồn' }));
+    const input = await screen.findByPlaceholderText('Tìm nguồn…');
+    await screen.findByRole('option', { name: 'Pancake · 71-TikTok Shop' });
+    fireEvent.change(input, { target: { value: 'cskh duong noi' } });
+    await waitFor(() =>
+      expect(screen.queryByRole('option', { name: 'Pancake · 71-TikTok Shop' })).toBeNull(),
+    );
+    expect(screen.queryByRole('option', { name: 'Pancake · PN - AMINO 500ml -T6' })).toBeNull();
+    replace.mockClear();
+    fireEvent.click(screen.getByRole('option', { name: 'Pancake · CSKH - DƯƠNG NỘI' }));
+    await waitFor(() => expect(replace).toHaveBeenCalled());
+    expect(decodeURIComponent(String(replace.mock.calls.at(-1)![0]))).toContain('source=POS:111');
+  });
+
   it('chọn "Chưa gán hãng" → URL noCarrier=true và bỏ carrierId (hai key loại trừ nhau)', async () => {
     search = 'carrierId=c-ghtk';
     renderApp(<OrderListScreen />);
