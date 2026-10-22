@@ -12,6 +12,7 @@ import { StatusBadge } from '@/components/data/status-badge';
 import { Breadcrumb } from '@/components/layout/breadcrumb';
 import { NotFoundCard } from '@/components/layout/not-found-screen';
 import { PageHeader } from '@/components/layout/page-header';
+import { useOrderOpenWork } from '../api/use-order-work';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -776,6 +777,9 @@ function Detail({ order }: { order: SalesOrderDetail }) {
   const canRecreate = canCancel && canCreate;
   const canReturn =
     RETURNABLE_FULFILMENT.has(order.fulfilment.status) && ability.can('receive', 'Stock');
+  // Module Công việc (2026-10-22): CSKH tạo yêu cầu hỗ trợ từ đơn; ai đọc được việc thấy dải nhắc.
+  const canWorkCustomer = ability.can('create_customer', 'Work');
+  const openWork = useOrderOpenWork(order.id, ability.can('read', 'Work'));
   const flow = detailOrderFlow(order.status, order.fulfilment.status);
   const addr = order.shippingAddress;
   const phone = addr?.phone ? (normalizePhone(addr.phone) ?? addr.phone) : null;
@@ -838,7 +842,7 @@ function Detail({ order }: { order: SalesOrderDetail }) {
                 </Link>
               </Button>
             ) : null}
-            {canRecreate || canReturn || canCancel ? (
+            {canRecreate || canReturn || canCancel || canWorkCustomer ? (
               <DropdownMenu modal={false}>
                 <DropdownMenuTrigger asChild>
                   <Button variant="outline" size="icon" aria-label="Thao tác khác">
@@ -856,9 +860,20 @@ function Detail({ order }: { order: SalesOrderDetail }) {
                       <Link href={`/wms/returns/new?orderId=${order.id}`}>Nhập hàng hoàn</Link>
                     </DropdownMenuItem>
                   ) : null}
+                  {canWorkCustomer && order.customer?.id ? (
+                    <DropdownMenuItem asChild>
+                      <Link
+                        href={`/work/new?kind=CUSTOMER&customerId=${order.customer.id}&orderId=${order.id}`}
+                      >
+                        Tạo yêu cầu hỗ trợ
+                      </Link>
+                    </DropdownMenuItem>
+                  ) : null}
                   {canCancel ? (
                     <>
-                      {canRecreate || canReturn ? <DropdownMenuSeparator /> : null}
+                      {canRecreate || canReturn || canWorkCustomer ? (
+                        <DropdownMenuSeparator />
+                      ) : null}
                       <DropdownMenuItem danger onSelect={() => setDialog('cancel')}>
                         Hủy đơn…
                       </DropdownMenuItem>
@@ -875,6 +890,26 @@ function Detail({ order }: { order: SalesOrderDetail }) {
           </>
         }
       />
+      {openWork.data?.items.length ? (
+        <div className="flex flex-wrap items-center gap-x-2 gap-y-1 rounded-md border border-info-line bg-info-weak px-3 py-2 text-sm">
+          <span>Đơn có {openWork.data.total} yêu cầu hỗ trợ đang mở:</span>
+          {openWork.data.items.map((w) => (
+            <Link
+              key={w.id}
+              href={`/work/${w.id}`}
+              className="font-mono text-xs text-primary hover:underline"
+            >
+              {w.docNumber}
+            </Link>
+          ))}
+          <span className="text-muted-foreground">
+            · {openWork.data.items[0]!.title}
+            {openWork.data.items[0]!.assignee
+              ? ` · ${openWork.data.items[0]!.assignee.fullName}`
+              : ' · chưa ai nhận'}
+          </span>
+        </div>
+      ) : null}
       {order.status === 'PENDING_APPROVAL' && order.approval ? (
         <ApprovalBar order={order} approval={order.approval} />
       ) : null}

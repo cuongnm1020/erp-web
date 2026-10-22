@@ -1388,6 +1388,9 @@ export const PUBLIC_UNSUBSCRIBE = {
 };
 
 export const handlers = [
+  // Module Công việc (2026-10-22): thẻ "Yêu cầu hỗ trợ" ở hồ sơ khách + dải nhắc ở chi tiết đơn —
+  // mặc định không có việc nào; test của module work tự khai handler riêng.
+  http.get('/api/work-items', () => HttpResponse.json({ items: [], total: 0 })),
   http.get('/api/customers/:id/consents', () => HttpResponse.json(CUSTOMER_CONSENTS)),
   http.post('/api/customers/:id/consents', async ({ request, params }) => {
     const body = (await request.json()) as Record<string, unknown>;

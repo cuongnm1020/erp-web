@@ -147,9 +147,15 @@ export const EVENT_LABEL: Partial<Record<WorkEventType, string>> = {
 export function formatDuration(mins: number, workday = 1440): string {
   const m = Math.abs(Math.round(mins));
   const d = Math.floor(m / workday);
-  const h = Math.floor((m % workday) / 60);
-  const mm = m % 60;
-  if (d > 0) return h > 0 ? `${d} ngày ${h}h` : `${d} ngày`;
+  const rest = m % workday;
+  const h = Math.floor(rest / 60);
+  const mm = rest % 60;
+  if (d > 0) {
+    // Giữ đủ giờ + phút lẻ — ô SLA đọc lại đúng giá trị (không làm tròn mất phút khi lưu lại).
+    return [`${d} ngày`, h > 0 ? `${h}h` : '', mm > 0 ? `${String(mm).padStart(2, '0')}m` : '']
+      .filter(Boolean)
+      .join(' ');
+  }
   if (h > 0) return mm > 0 ? `${h}h ${String(mm).padStart(2, '0')}m` : `${h}h`;
   return `${mm}m`;
 }
