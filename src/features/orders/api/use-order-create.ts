@@ -97,8 +97,8 @@ const VALID_PHONE = /^0\d{9,10}$/;
 
 /**
  * CSKH (2026-10-21): GET /customer-care/lookup — tra SĐT trên TOÀN hệ thống (cả khách của team
- * khác / của sale) để lên đơn đúng khách, không tạo trùng. Chỉ gọi khi người dùng có quyền
- * `customer.care` (`enabled`); trả mã / tên / SĐT / địa chỉ mặc định + team CSKH đang giữ khách.
+ * khác / của sale) để lên đơn đúng khách, không tạo trùng. Mọi người lên đơn gọi được (quyền
+ * `sales_order.create`, 2026-10-22); trả mã / tên / SĐT / địa chỉ mặc định + team CSKH đang giữ khách.
  */
 export function useCareLookup(rawPhone: string, enabled: boolean) {
   const phone = normalizePhoneInput(rawPhone);

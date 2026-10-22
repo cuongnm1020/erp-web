@@ -645,7 +645,7 @@ describe('OrderCreateScreen — màn tạo đơn mới', () => {
       target: { value: '0909 888 777' },
     });
     expect(await screen.findByText('Khách team khác')).toBeInTheDocument();
-    expect(screen.getByText(/Đơn này tính doanh thu cho team bạn/)).toBeInTheDocument();
+    expect(screen.getByText(/Đơn này tính doanh thu cho bạn và team bạn/)).toBeInTheDocument();
     expect(lookups).toContain('0909888777');
     await waitFor(() =>
       expect(screen.getByLabelText('Tên khách hàng')).toHaveValue('Trần Văn Hùng'),
@@ -664,20 +664,44 @@ describe('OrderCreateScreen — màn tạo đơn mới', () => {
     });
   });
 
-  it('không có quyền customer.care → không tra SĐT toàn hệ thống', async () => {
+  it('sale (không customer.care) cũng tra SĐT toàn hệ thống: khách người khác → "Khách đã có", không tạo trùng', async () => {
     const lookups: string[] = [];
     server.use(
       http.get('/api/customer-care/lookup', () => {
         lookups.push('x');
-        return HttpResponse.json({ customer: null, careTeam: null });
+        return HttpResponse.json({
+          customer: {
+            id: 'cust-other',
+            code: 'KH024811',
+            name: 'Trần Văn Hùng',
+            phone: '0909888777',
+            address: null,
+          },
+          careTeam: 'NONE',
+        });
       }),
     );
     renderApp(<OrderCreateScreen />, { me: ME_SALE });
     fireEvent.change(await screen.findByLabelText('Số điện thoại khách'), {
       target: { value: '0909888777' },
     });
+    expect(await screen.findByText('Khách đã có')).toBeInTheDocument();
+    expect(screen.getByText(/Đơn này tính doanh thu cho bạn và team bạn/)).toBeInTheDocument();
+    expect(screen.queryByText(/Khách mới — sẽ tạo hồ sơ khách/)).not.toBeInTheDocument();
+    expect(lookups.length).toBeGreaterThan(0);
+  });
+
+  it('SĐT chưa có trên hệ thống → "Khách mới"', async () => {
+    server.use(
+      http.get('/api/customer-care/lookup', () =>
+        HttpResponse.json({ customer: null, careTeam: null }),
+      ),
+    );
+    renderApp(<OrderCreateScreen />, { me: ME_SALE });
+    fireEvent.change(await screen.findByLabelText('Số điện thoại khách'), {
+      target: { value: '0909888777' },
+    });
     expect(await screen.findByText(/Khách mới — sẽ tạo hồ sơ khách/)).toBeInTheDocument();
-    expect(lookups).toHaveLength(0);
   });
 
   it('server báo chuyển khoản vượt tổng (422 path prepaidAmount) → lỗi gắn đúng ô', async () => {
