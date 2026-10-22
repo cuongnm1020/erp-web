@@ -237,7 +237,7 @@ describe('SalesReportScreen — quyền + bộ lọc chung', () => {
     // Bộ lọc khoảng ngày dùng chung (2026-10-22): mở hộp → chọn sẵn → Áp dụng.
     fireEvent.click(screen.getByRole('button', { name: /^Kỳ:/ }));
     fireEvent.click(await screen.findByRole('button', { name: 'Hôm qua' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Áp dụng' }));
+    fireEvent.click(screen.getByRole('button', { name: /^Áp dụng/ }));
     const y = shiftDay(toLocalDateKey(new Date())!, -1);
     expect(lastUrl().get('from')).toBe(y);
     expect(lastUrl().get('to')).toBe(y);

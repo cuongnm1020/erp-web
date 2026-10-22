@@ -29,6 +29,7 @@ import {
   type WaybillOrientation,
 } from '@/features/wms/components/waybill-label';
 import type { SalesOrder } from '../api/use-orders';
+import { useControlledOpen } from '../use-controlled-open';
 
 /** Phiếu giao bị hủy (bởi mình hoặc hãng) — mã vận đơn không còn dùng được, không in lại. */
 const DEAD = new Set(['CANCELLED', 'CARRIER_CANCELLED']);
@@ -41,13 +42,24 @@ export interface ReprintShipment {
 }
 
 /** In lại tem ERP cho các đơn đã chọn trên danh sách — bọc {@link ReprintWaybillDialog}. */
-export function BulkReprintWaybillDialog({ rows }: { rows: SalesOrder[] }) {
+export function BulkReprintWaybillDialog({
+  rows,
+  open,
+  onOpenChange,
+}: {
+  rows: SalesOrder[];
+  /** Có `open` = mở từ menu "Khác" của thanh chọn nhiều — không vẽ nút riêng. */
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
+}) {
   return (
     <ReprintWaybillDialog
       shipments={rows.flatMap((r) => (r.shipment ? [r.shipment] : []))}
       total={rows.length}
       triggerLabel="In lại vận đơn"
       triggerClassName="h-7 px-2 text-xs"
+      open={open}
+      onOpenChange={onOpenChange}
     />
   );
 }
@@ -63,14 +75,18 @@ export function ReprintWaybillDialog({
   total = shipments.length,
   triggerLabel,
   triggerClassName,
+  open: openProp,
+  onOpenChange,
 }: {
   shipments: ReprintShipment[];
   /** Số đơn đã chọn (kể cả đơn chưa có phiếu giao) — để báo số bị bỏ qua. */
   total?: number;
   triggerLabel: string;
   triggerClassName?: string;
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
 }) {
-  const [open, setOpen] = useState(false);
+  const { controlled, open, setOpen } = useControlledOpen(openProp, onOpenChange);
   const [orientation, setOrientation] = useState<WaybillOrientation>('landscape');
   useEffect(() => setOrientation(readOrientation()), []);
   const [labels, setLabels] = useState<ShipmentLabelData[]>([]);
@@ -100,15 +116,17 @@ export function ReprintWaybillDialog({
 
   return (
     <>
-      <Button
-        size="sm"
-        variant="outline"
-        className={triggerClassName}
-        onClick={() => setOpen(true)}
-      >
-        <Printer aria-hidden />
-        {triggerLabel}
-      </Button>
+      {controlled ? null : (
+        <Button
+          size="sm"
+          variant="outline"
+          className={triggerClassName}
+          onClick={() => setOpen(true)}
+        >
+          <Printer aria-hidden />
+          {triggerLabel}
+        </Button>
+      )}
       <Dialog open={open} onOpenChange={(o) => !fetchLabels.isPending && setOpen(o)}>
         <DialogContent>
           <DialogHeader>

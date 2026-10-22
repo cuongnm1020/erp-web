@@ -3,6 +3,7 @@
 import { AlertTriangle, Boxes, CornerDownRight, Gift, Lock } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import Decimal from 'decimal.js';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { DetailSkeleton, QueryState } from '@/components/data/states';
 import { StatusBadge } from '@/components/data/status-badge';
@@ -10,6 +11,7 @@ import { NotFoundCard } from '@/components/layout/not-found-screen';
 import { PageHeader } from '@/components/layout/page-header';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
 import {
   Select,
   SelectContent,
@@ -19,10 +21,12 @@ import {
 } from '@/components/ui/select';
 import { toast } from '@/components/ui/toaster';
 import { groupOrderLines } from '../combo-lines';
+import { OrderTagsField } from './order-tags-field';
 import { isApiError } from '@/lib/api/errors';
+import { cn } from '@/lib/cn';
 import { messageFor, messageForCode } from '@/lib/error-messages';
-import { formatDate, formatDateTime, formatMoney, formatQuantity, toDecimal } from '@/lib/format';
-import { useAbility } from '@/lib/permission';
+import { formatDate, formatMoney, formatQuantity, toDecimal } from '@/lib/format';
+import { Can, useAbility } from '@/lib/permission';
 import { useCarriers } from '@/features/wms/api/use-shipping';
 import { useCustomerBrief } from '../api/use-line-entry';
 import {
@@ -75,15 +79,17 @@ const money = (v: string) => formatMoney(v, { unit: '' });
 function Card({
   title,
   aside,
+  className,
   children,
 }: {
   title: ReactNode;
   aside?: ReactNode;
+  className?: string;
   children: ReactNode;
 }) {
   return (
-    <section className="rounded-md border bg-card">
-      <header className="flex items-center justify-between gap-2 border-b px-3 py-2">
+    <section className={cn('rounded-lg border bg-card', className)}>
+      <header className="flex min-h-card-header items-center justify-between gap-2 border-b px-3.5">
         <span className="text-sm font-semibold">{title}</span>
         {aside}
       </header>
@@ -102,20 +108,65 @@ function Row({
   strong?: boolean;
 }) {
   return (
-    <div className="flex items-center justify-between gap-4 px-3 py-1.5 text-sm">
+    <div className="flex items-center justify-between gap-4 text-sm">
       <span className={strong ? 'font-semibold' : 'text-muted-foreground'}>{label}</span>
       <span className={strong ? 'font-semibold tabular-nums' : 'tabular-nums'}>{children}</span>
     </div>
   );
 }
 
-function Field({ label, children }: { label: string; children: ReactNode }) {
+/** Ô của form sửa đơn: nhãn `caption` trên, ô nhập, gợi ý dưới (design system Form chứng từ). */
+function FormField({
+  label,
+  help,
+  wide,
+  children,
+}: {
+  label: string;
+  help?: ReactNode;
+  /** Chiếm cả hai cột của lưới. */
+  wide?: boolean;
+  children: ReactNode;
+}) {
   return (
-    <div className="grid grid-cols-[130px_1fr] items-center gap-2 px-3 py-1.5 text-sm">
-      <span className="text-muted-foreground">{label}</span>
-      <span className="min-w-0">{children}</span>
+    <div className={cn('flex min-w-0 flex-col gap-1', wide && 'sm:col-span-2')}>
+      <span className="text-xs font-semibold text-muted-foreground">{label}</span>
+      {children}
+      {help ? <span className="text-xs text-muted-foreground">{help}</span> : null}
     </div>
   );
+}
+
+/** Ô vừa đổi chưa lưu: viền + nền `warning` (design system — Ma trận chọn / form). */
+const DIRTY = 'border-warning bg-warning-weak';
+/** "Tài khoản mặc định của hãng" (Radix Select không nhận value rỗng). */
+const DEFAULT_ACCOUNT = '__default__';
+
+/** `YYYY-MM-DD` → "01/11/2026". */
+const formatYmd = (ymd: string) => formatDate(`${ymd}T00:00:00Z`);
+
+/** Tên trường trong `changed` của PATCH → chữ trên toast "Đã lưu thay đổi". */
+function changedLabel(c: string): string {
+  switch (c) {
+    case 'addressId':
+      return 'địa chỉ giao';
+    case 'shippingWeightKg':
+      return 'cân nặng gửi hãng';
+    case 'carrierAccountId':
+      return 'tài khoản hãng';
+    case 'internalNote':
+      return 'ghi chú nội bộ';
+    case 'printNote':
+      return 'ghi chú in vận đơn';
+    case 'tagIds':
+      return 'thẻ';
+    case 'expectedDeliveryDate':
+      return 'ngày hẹn nhận';
+    case 'warehouseId':
+      return 'kho lấy hàng';
+    default:
+      return 'hãng vận chuyển';
+  }
 }
 
 /**
@@ -150,6 +201,12 @@ function Editor({ order }: { order: SalesOrderDetail }) {
   const addresses = customer.data?.addresses ?? [];
   // Cân nặng gửi hãng: ô trống = dùng cân nặng tính từ dòng (server: shippingWeightKg null).
   const [weightKg, setWeightKg] = useState<string>(order.shippingWeightKg ?? '');
+  // Ghi chú / thẻ / hẹn nhận / tài khoản hãng — PATCH nhận từ 2026-10-22 (đơn chưa kết thúc).
+  const [internalNote, setInternalNote] = useState(order.internalNote ?? '');
+  const [printNote, setPrintNote] = useState(order.printNote ?? '');
+  const [tagIds, setTagIds] = useState<string[]>(() => order.tags.map((t) => t.id));
+  const [expectedDate, setExpectedDate] = useState(order.expectedDeliveryDate ?? '');
+  const [accountId, setAccountId] = useState<string>(order.carrierAccountId ?? DEFAULT_ACCOUNT);
   // "Trạng thái kho" đặt tay (2026-09-15): đóng pick / đóng gói KHÔNG quét — quyền riêng
   // sales_order.fulfil_manual (kho + admin), chỉ đơn ĐÃ DUYỆT; đích chép từ bảng của server.
   const fulfil = useFulfilOrder(order.id);
@@ -203,8 +260,24 @@ function Editor({ order }: { order: SalesOrderDetail }) {
   // Đổi kho đi đường chuyển đơn (PLAN-warehouse-context K3: dời giữ chỗ + lập lại PICK) — không
   // qua PATCH (PATCH chặn ORDER_WAREHOUSE_LOCKED khi hàng đã giữ ở kho cũ).
   const moveTo = warehouseChanged && nextWarehouse ? nextWarehouse : null;
-  const patchDirty =
-    statusChanged || carrierChanged || addressChanged || weightChanged || moveTo !== null;
+  const trimOrNull = (v: string) => (v.trim() === '' ? null : v.trim());
+  const internalChanged = trimOrNull(internalNote) !== (order.internalNote ?? null);
+  const printChanged = trimOrNull(printNote) !== (order.printNote ?? null);
+  const originalTags = order.tags.map((t) => t.id);
+  const tagsChanged =
+    tagIds.length !== originalTags.length || tagIds.some((t) => !originalTags.includes(t));
+  const dateChanged = (expectedDate || null) !== (order.expectedDeliveryDate ?? null);
+  const nextAccount = accountId === DEFAULT_ACCOUNT ? null : accountId;
+  // Đổi hãng → server tự về tài khoản mặc định; chỉ gửi tài khoản khi người dùng chọn khác đi.
+  const accountChanged = carrierChanged
+    ? nextAccount !== null
+    : nextAccount !== (order.carrierAccountId ?? null);
+  const extrasChanged =
+    internalChanged || printChanged || tagsChanged || dateChanged || accountChanged;
+  const patchFieldsDirty =
+    statusChanged || carrierChanged || addressChanged || weightChanged || extrasChanged;
+  const patchDirty = patchFieldsDirty || moveTo !== null;
+  const carrierAccounts = selectedCarrier?.accounts ?? [];
 
   const detailHref = `/crm/orders/${order.id}`;
   const totalQty = order.lines.reduce(
@@ -271,7 +344,7 @@ function Editor({ order }: { order: SalesOrderDetail }) {
               setWarehouseId(order.warehouseId ?? NO_WAREHOUSE);
               return;
             }
-            if (statusChanged || carrierChanged || addressChanged || weightChanged) patch();
+            if (patchFieldsDirty) patch();
             else {
               toast.success('Đã lưu thay đổi', {
                 description: `${order.docNumber} · kho lấy hàng`,
@@ -295,6 +368,11 @@ function Editor({ order }: { order: SalesOrderDetail }) {
         ...(carrierChanged ? { carrierId: nextCarrier } : {}),
         ...(addressChanged ? { addressId: nextAddress } : {}),
         ...(weightChanged ? { shippingWeightKg: nextWeight } : {}),
+        ...(accountChanged ? { carrierAccountId: nextAccount } : {}),
+        ...(internalChanged ? { internalNote: trimOrNull(internalNote) } : {}),
+        ...(printChanged ? { printNote: trimOrNull(printNote) } : {}),
+        ...(tagsChanged ? { tagIds } : {}),
+        ...(dateChanged ? { expectedDeliveryDate: expectedDate || null } : {}),
         ...(statusChanged && status === 'CANCELLED' && reason.trim()
           ? { reason: reason.trim() }
           : {}),
@@ -304,13 +382,7 @@ function Editor({ order }: { order: SalesOrderDetail }) {
           toast.success('Đã lưu thay đổi', {
             description: `${order.docNumber} · ${r.changed
               .map((c) =>
-                c === 'status'
-                  ? `trạng thái → ${orderStatusLabel(r.status)}`
-                  : c === 'addressId'
-                    ? 'địa chỉ giao'
-                    : c === 'shippingWeightKg'
-                      ? 'cân nặng gửi hãng'
-                      : 'hãng vận chuyển',
+                c === 'status' ? `trạng thái → ${orderStatusLabel(r.status)}` : changedLabel(c),
               )
               .join(', ')}`,
           });
@@ -350,11 +422,110 @@ function Editor({ order }: { order: SalesOrderDetail }) {
         ? 'Đơn đã hủy — trạng thái cuối, không sửa được gì nữa.'
         : null;
 
+  const carrierLabel = (id: string | null) =>
+    id ? (activeCarriers.find((c) => c.id === id)?.name ?? 'hãng khác') : 'Chưa chọn';
+  const warehouseLabel = (id: string | null) =>
+    id
+      ? ((warehouses.data ?? []).find((w) => w.id === id)?.name ??
+        (id === order.warehouseId ? (order.warehouse?.name ?? 'kho cũ') : 'kho khác'))
+      : 'Chưa chọn';
+  const weightLabel = (w: string | null) =>
+    w ? formatQuantity(w, { unit: 'kg' }) : 'theo cân nặng SKU';
+  // "n thay đổi chưa lưu" ở PageHeader + thẻ liệt kê cũ → mới ở cột phải.
+  const changes: Array<{ label: string; from: string; to: string }> = [
+    ...(statusChanged
+      ? [
+          {
+            label: 'Trạng thái',
+            from: orderStatusLabel(order.status),
+            to: orderStatusLabel(status),
+          },
+        ]
+      : []),
+    ...(fulfilTarget
+      ? [
+          {
+            label: 'Trạng thái kho',
+            from: fulfilmentLabel(order.fulfilment.status),
+            to: fulfilTargetLabel(fulfilTarget),
+          },
+        ]
+      : []),
+    ...(addressChanged ? [{ label: 'Địa chỉ giao', from: 'địa chỉ cũ', to: 'địa chỉ mới' }] : []),
+    ...(warehouseChanged
+      ? [
+          {
+            label: 'Kho lấy hàng',
+            from: warehouseLabel(order.warehouseId ?? null),
+            to: warehouseLabel(nextWarehouse),
+          },
+        ]
+      : []),
+    ...(carrierChanged
+      ? [
+          {
+            label: 'ĐVVC',
+            from: carrierLabel(order.carrierId ?? null),
+            to: carrierLabel(nextCarrier),
+          },
+        ]
+      : []),
+    ...(weightChanged
+      ? [
+          {
+            label: 'Cân nặng gửi hãng',
+            from: weightLabel(order.shippingWeightKg),
+            to: weightLabel(nextWeight),
+          },
+        ]
+      : []),
+    ...(accountChanged
+      ? [
+          {
+            label: 'Tài khoản hãng',
+            from: order.carrierAccount?.name ?? 'Mặc định',
+            to: carrierAccounts.find((a) => a.id === nextAccount)?.name ?? 'Mặc định',
+          },
+        ]
+      : []),
+    ...(dateChanged
+      ? [
+          {
+            label: 'Hẹn nhận',
+            from: order.expectedDeliveryDate ? formatYmd(order.expectedDeliveryDate) : 'Chưa đặt',
+            to: expectedDate ? formatYmd(expectedDate) : 'Bỏ hẹn',
+          },
+        ]
+      : []),
+    ...(internalChanged ? [{ label: 'Ghi chú nội bộ', from: 'cũ', to: 'mới' }] : []),
+    ...(printChanged ? [{ label: 'Ghi chú in vận đơn', from: 'cũ', to: 'mới' }] : []),
+    ...(tagsChanged
+      ? [
+          {
+            label: 'Thẻ',
+            from: `${originalTags.length} thẻ`,
+            to: `${tagIds.length} thẻ`,
+          },
+        ]
+      : []),
+  ];
+  const saving = update.isPending || fulfil.isPending || moveWarehouse.isPending;
+
   return (
     <div className="flex flex-col gap-3">
       <PageHeader
         title={`Sửa đơn ${order.docNumber}`}
-        description={`${order.customer.name} · Đặt ngày ${formatDate(order.orderDate)} · Kênh ${orderChannelLabel(order.channel)}`}
+        status={
+          <>
+            <StatusBadge tone={orderStatusTone(order.status)}>
+              {orderStatusLabel(order.status)}
+            </StatusBadge>
+            <StatusBadge tone={fulfilmentTone(order.fulfilment.status)}>
+              {fulfilmentLabel(order.fulfilment.status)}
+            </StatusBadge>
+          </>
+        }
+        description={`${order.customer.name} · đặt ${formatDate(order.orderDate)} · ${orderChannelLabel(order.channel)}`}
         breadcrumb={[
           { label: 'Bán hàng' },
           { label: 'Đơn hàng', href: '/crm/orders' },
@@ -363,19 +534,23 @@ function Editor({ order }: { order: SalesOrderDetail }) {
         ]}
         actions={
           <>
-            <Button variant="ghost" size="sm" asChild>
+            {changes.length > 0 ? (
+              <span className="text-xs font-semibold text-warning" role="status">
+                {changes.length} thay đổi chưa lưu
+              </span>
+            ) : null}
+            <Button variant="ghost" asChild shortcut="Esc">
               <Link href={detailHref}>Hủy bỏ</Link>
             </Button>
             {canUpdate || canFulfil ? (
               <Button
-                size="sm"
                 onClick={save}
-                disabled={update.isPending || fulfil.isPending || readOnlyReason !== null}
+                shortcut="Ctrl S"
+                loading={saving}
+                loadingText="Đang lưu…"
+                disabled={readOnlyReason !== null}
               >
-                {update.isPending || fulfil.isPending ? 'Đang lưu…' : 'Lưu thay đổi'}{' '}
-                <kbd className="rounded-sm border border-primary-foreground/50 px-1 font-mono text-xs">
-                  Ctrl S
-                </kbd>
+                Lưu thay đổi
               </Button>
             ) : null}
           </>
@@ -390,163 +565,52 @@ function Editor({ order }: { order: SalesOrderDetail }) {
           <Lock className="h-3.5 w-3.5 text-warning" aria-hidden />
           {readOnlyReason}
         </div>
-      ) : null}
-
-      <div className="grid items-start gap-3 lg:grid-cols-5">
-        {/* ── Cột trái: sản phẩm + giá trị đơn ─────────────────────── */}
-        <div className="flex flex-col gap-3 lg:col-span-3">
-          <Card
-            title="Sản phẩm"
-            aside={
-              <span className="text-xs text-muted-foreground">
-                Số mẫu mã: <b className="text-foreground">{order.lines.length}</b> · Số lượng SP:{' '}
-                <b className="text-foreground">{totalQty}</b>
-              </span>
-            }
-          >
-            <ul className="divide-y">
-              {groupOrderLines(order.lines)
-                .flatMap((g) =>
-                  g.kind === 'line'
-                    ? [g.line]
-                    : [
-                        /* Dòng tổng combo — không phải SalesOrderLine, vẽ riêng ngay dưới */
-                        { comboGroup: g } as const,
-                        ...g.lines,
-                      ],
-                )
-                .map((item) =>
-                  'comboGroup' in item ? (
-                    <li
-                      key={`combo-${item.comboGroup.groupNo}`}
-                      className="grid gap-x-3 gap-y-1 bg-muted/40 px-3 py-2 sm:grid-cols-[1fr_auto]"
-                    >
-                      <div className="flex flex-wrap items-center gap-1.5">
-                        <span className="rounded border px-1.5 font-mono text-xs text-primary">
-                          {item.comboGroup.skuCode}
-                        </span>
-                        <span className="font-medium">{item.comboGroup.skuName}</span>
-                        <StatusBadge tone="brand">
-                          <Boxes className="h-3 w-3" aria-hidden />
-                          Combo
-                        </StatusBadge>
-                      </div>
-                      <div className="text-right tabular-nums">
-                        <div className="text-sm">
-                          {money(item.comboGroup.unitPrice)} ₫{' '}
-                          <span className="text-muted-foreground">×</span>{' '}
-                          {formatQuantity(item.comboGroup.qty)} combo
-                        </div>
-                        <div className="font-semibold text-primary">
-                          {money(item.comboGroup.lineTotal)} ₫
-                        </div>
-                      </div>
-                    </li>
-                  ) : (
-                    <li
-                      key={item.id}
-                      className={
-                        item.combo
-                          ? 'grid gap-x-3 gap-y-1 px-3 py-2 pl-7 sm:grid-cols-[1fr_auto]'
-                          : 'grid gap-x-3 gap-y-1 px-3 py-2 sm:grid-cols-[1fr_auto]'
-                      }
-                    >
-                      <div className="min-w-0">
-                        <div className="flex flex-wrap items-center gap-1.5">
-                          {item.combo ? (
-                            <CornerDownRight
-                              className="h-3 w-3 text-muted-foreground"
-                              aria-hidden
-                            />
-                          ) : null}
-                          <span className="rounded border px-1.5 font-mono text-xs text-primary">
-                            {item.skuCode}
-                          </span>
-                          <span className="font-medium">{item.skuName}</span>
-                          {item.isGift ? (
-                            <StatusBadge tone="brand">
-                              <Gift className="h-3 w-3" aria-hidden />
-                              Hàng tặng
-                            </StatusBadge>
-                          ) : null}
-                        </div>
-                        <div className="mt-1 flex flex-wrap gap-x-4 text-xs text-muted-foreground">
-                          <span>Chiết khấu: {money(item.discount)} ₫</span>
-                          {item.nonStock ? (
-                            <span>Gõ tay trên Pancake — không quản lý tồn</span>
-                          ) : (
-                            <>
-                              <span>Đang giữ: {formatQuantity(item.reservedQty)}</span>
-                              <span>Đã pick: {formatQuantity(item.pickedQty)}</span>
-                            </>
-                          )}
-                        </div>
-                      </div>
-                      <div className="text-right tabular-nums">
-                        <div className="text-sm">
-                          {money(item.unitPrice)} ₫ <span className="text-muted-foreground">×</span>{' '}
-                          {formatQuantity(item.qty)} {item.uomCode}
-                        </div>
-                        <div className="font-semibold text-primary">{money(item.lineTotal)} ₫</div>
-                      </div>
-                    </li>
-                  ),
-                )}
-            </ul>
-            <p className="flex items-center gap-1.5 border-t px-3 py-2 text-xs text-muted-foreground">
-              <AlertTriangle className="h-3.5 w-3.5" aria-hidden />
-              Dòng hàng và giá thuộc chứng từ đã chốt — muốn đổi thì{' '}
-              <Link href={detailHref} className="text-primary underline">
-                hủy &amp; tạo lại
+      ) : (
+        <div
+          role="note"
+          className="flex items-center gap-2 rounded-md border border-info-line bg-info-weak px-3 py-2 text-sm"
+        >
+          <Lock className="h-3.5 w-3.5 flex-none text-info" aria-hidden />
+          <span>
+            Khách, dòng hàng và giá đã chốt. Muốn đổi:{' '}
+            <Can I="create" a="SalesOrder">
+              <Link
+                href={`/crm/orders/new?from=${order.id}`}
+                className="font-semibold text-primary hover:underline"
+              >
+                Nhân bản đơn
               </Link>{' '}
-              ở màn chi tiết.
-            </p>
-          </Card>
-
-          <Card title="Giá trị đơn hàng">
-            <div className="py-1">
-              <Row label="Tạm tính">{money(order.subtotal)} ₫</Row>
-              <Row label="Giảm giá">{money(order.discount)} ₫</Row>
-              {manualDiscountNote(order) ? (
-                <p className="px-3 pb-1 text-right text-xs text-muted-foreground">
-                  trong đó {manualDiscountNote(order)} ₫
-                </p>
-              ) : null}
-              <Row label="Phí vận chuyển (thu khách)">{money(order.shippingFee)} ₫</Row>
-              <Row label="Thuế">{money(order.taxAmount)} ₫</Row>
-            </div>
-            <div className="border-t py-1">
-              <Row label="Tổng số tiền" strong>
-                {money(order.total)} {order.currencyCode}
-              </Row>
-              <div className="flex items-center justify-between px-3 py-1.5">
-                <span className="text-base font-semibold">Tiền cần thu</span>
-                <span className="text-lg font-semibold tabular-nums text-primary">
-                  {money(order.total)} {order.currencyCode}
-                </span>
-              </div>
-            </div>
-          </Card>
+              (giữ đơn này) hoặc{' '}
+            </Can>
+            <Link href={detailHref} className="font-semibold text-primary hover:underline">
+              Hủy &amp; tạo lại
+            </Link>{' '}
+            ở màn chi tiết (hủy đơn này).
+          </span>
         </div>
+      )}
 
-        {/* ── Cột phải: thông tin / khách hàng / vận chuyển ─────────── */}
-        <div className="flex flex-col gap-3 lg:col-span-2">
-          <Card
-            title="Thông tin"
-            aside={
-              <StatusBadge tone={orderStatusTone(order.status)}>
-                {orderStatusLabel(order.status)}
-              </StatusBadge>
-            }
-          >
-            <div className="py-1">
-              <Field label="Trạng thái">
+      <div className="flex flex-col items-start gap-3 lg:flex-row">
+        {/* ── Cột trái: các phần sửa được ─────────────────────────── */}
+        <div className="flex w-full min-w-0 flex-1 flex-col gap-3">
+          <Card title="Trạng thái">
+            <div className="grid gap-3.5 p-3.5 sm:grid-cols-2">
+              <FormField
+                label="Trạng thái đơn"
+                help={
+                  canUpdate && targets.length === 0
+                    ? order.status === 'PENDING_APPROVAL'
+                      ? 'Đơn chờ duyệt: duyệt ở màn chi tiết; ở đây chỉ hủy được khi có quyền hủy.'
+                      : 'Không có bước chuyển nào bạn được phép đặt tay.'
+                    : 'Chỉ hiện bước bạn có quyền chuyển (duyệt / chốt / hủy).'
+                }
+              >
                 <Select
                   value={status}
                   onValueChange={(v) => setStatus(v as SalesOrderStatus)}
                   disabled={!statusEditable}
                 >
-                  <SelectTrigger aria-label="Trạng thái" className="h-8">
+                  <SelectTrigger aria-label="Trạng thái" className={cn(statusChanged && DIRTY)}>
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -560,20 +624,21 @@ function Editor({ order }: { order: SalesOrderDetail }) {
                     ))}
                   </SelectContent>
                 </Select>
-              </Field>
-              {statusChanged && status === 'CANCELLED' ? (
-                <Field label="Lý do hủy">
-                  <Input
-                    aria-label="Lý do hủy"
-                    className="h-8"
-                    value={reason}
-                    onChange={(e) => setReason(e.target.value)}
-                    placeholder="Khách đổi ý, đặt nhầm… (tùy chọn)"
-                    maxLength={1000}
-                  />
-                </Field>
-              ) : null}
-              <Field label="Trạng thái kho">
+              </FormField>
+              <FormField
+                label="Trạng thái kho"
+                help={
+                  fulfilTarget ? (
+                    <span className="text-warning">
+                      {fulfilTarget === 'PACKED'
+                        ? 'Đóng gói KHÔNG quét: trừ tồn ngay, xin vận đơn của hãng đã chọn (ĐVVC) và mở nhãn in. Không hoàn tác được.'
+                        : 'Đóng việc pick KHÔNG quét: phiếu giao sinh ngay, chưa trừ tồn — trừ khi đóng gói.'}
+                    </span>
+                  ) : fulfilTargets.length > 0 ? (
+                    '"Đã pick xong / Đã đóng gói" làm tay cần chọn ĐVVC trước.'
+                  ) : undefined
+                }
+              >
                 {fulfilTargets.length > 0 ? (
                   <Select
                     value={fulfilTarget || CURRENT_FULFILMENT}
@@ -582,7 +647,10 @@ function Editor({ order }: { order: SalesOrderDetail }) {
                     }
                     disabled={fulfil.isPending}
                   >
-                    <SelectTrigger aria-label="Trạng thái kho" className="h-8">
+                    <SelectTrigger
+                      aria-label="Trạng thái kho"
+                      className={cn(fulfilTarget && DIRTY)}
+                    >
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -597,61 +665,64 @@ function Editor({ order }: { order: SalesOrderDetail }) {
                     </SelectContent>
                   </Select>
                 ) : (
-                  <StatusBadge tone={fulfilmentTone(order.fulfilment.status)}>
-                    {fulfilmentLabel(order.fulfilment.status)}
-                  </StatusBadge>
+                  <span className="flex h-control items-center">
+                    <StatusBadge tone={fulfilmentTone(order.fulfilment.status)}>
+                      {fulfilmentLabel(order.fulfilment.status)}
+                    </StatusBadge>
+                  </span>
                 )}
-              </Field>
-              {fulfilTarget ? (
-                <p className="px-3 pb-1 text-xs text-warning">
-                  {fulfilTarget === 'PACKED'
-                    ? 'Đóng gói KHÔNG quét: trừ tồn ngay, xin vận đơn của hãng đã chọn (ĐVVC) và mở nhãn in. Không hoàn tác được.'
-                    : 'Đóng việc pick KHÔNG quét: phiếu giao sinh ngay, chưa trừ tồn — trừ khi đóng gói.'}
-                </p>
-              ) : null}
-              <p className="px-3 pb-1 text-xs text-muted-foreground">
-                {canUpdate && targets.length === 0
-                  ? order.status === 'PENDING_APPROVAL'
-                    ? 'Đơn chờ duyệt: duyệt ở hàng chờ duyệt; ở đây chỉ hủy được khi có quyền hủy.'
-                    : 'Không có bước chuyển nào bạn được phép đặt tay.'
-                  : 'Chỉ hiện các bước server cho phép và bạn có quyền (duyệt / chốt / hủy).'}
-              </p>
-              <Field label="Tạo lúc">{formatDateTime(order.createdAt)}</Field>
-              <Field label="Ngày đặt">{formatDate(order.orderDate)}</Field>
-              <Field label="Nhân viên phụ trách">
-                {order.ownerId ? (
-                  'đã có người phụ trách'
-                ) : (
-                  <span className="text-muted-foreground">đơn của team, chưa chia cho ai</span>
-                )}
-              </Field>
-              {order.postedAt ? (
-                <Field label="Đã chốt lúc">{formatDateTime(order.postedAt)}</Field>
+              </FormField>
+              {statusChanged && status === 'CANCELLED' ? (
+                <FormField label="Lý do hủy" wide>
+                  <Input
+                    aria-label="Lý do hủy"
+                    value={reason}
+                    onChange={(e) => setReason(e.target.value)}
+                    placeholder="Khách đổi ý, đặt nhầm… (tùy chọn)"
+                    maxLength={1000}
+                  />
+                </FormField>
               ) : null}
             </div>
           </Card>
 
-          <Card title="Khách hàng">
-            <div className="py-1">
-              <Field label="Tên">
-                <Link
-                  href={`/crm/customers/${order.customer.id}`}
-                  className="font-semibold text-primary hover:underline"
-                >
-                  {order.customer.name}
-                </Link>
-              </Field>
-              <Field label="Mã khách">
-                <span className="font-mono text-xs">{order.customer.code}</span>
-              </Field>
-              {canReadCustomer ? (
-                <Field label="Địa chỉ giao">
+          <Card title="Giao hàng">
+            <div className="grid gap-3.5 p-3.5 sm:grid-cols-2">
+              <FormField
+                label="Địa chỉ giao"
+                wide
+                help={
+                  <>
+                    {effectiveAddress
+                      ? `Giao tới: ${effectiveAddress.recipient} · ${effectiveAddress.phone} · ${orderAddressLine(effectiveAddress)}`
+                      : canReadCustomer && !customer.isPending && addresses.length === 0
+                        ? 'Khách chưa có địa chỉ giao — thêm ở hồ sơ khách hàng rồi quay lại chọn.'
+                        : canReadCustomer && !customer.isPending
+                          ? 'Khách có nhiều địa chỉ mà chưa đặt mặc định — chọn một địa chỉ để tra cước / gửi hãng.'
+                          : 'Chưa có địa chỉ giao — thêm ở hồ sơ khách hàng.'}
+                    <span className="block">
+                      Thêm hay sửa nội dung địa chỉ ở{' '}
+                      <Link
+                        href={`/crm/customers/${order.customer.id}`}
+                        className="text-primary hover:underline"
+                      >
+                        hồ sơ khách
+                      </Link>{' '}
+                      — đơn chỉ chọn địa chỉ có sẵn.
+                    </span>
+                  </>
+                }
+              >
+                {canReadCustomer ? (
                   <Select
                     value={addressId}
                     onValueChange={setAddressId}
                     disabled={!carrierEditable || customer.isPending}
                   >
-                    <SelectTrigger aria-label="Địa chỉ giao" className="h-8">
+                    <SelectTrigger
+                      aria-label="Địa chỉ giao"
+                      className={cn(addressChanged && DIRTY)}
+                    >
                       <SelectValue placeholder="Mặc định của khách" />
                     </SelectTrigger>
                     <SelectContent>
@@ -665,33 +736,51 @@ function Editor({ order }: { order: SalesOrderDetail }) {
                       ))}
                     </SelectContent>
                   </Select>
-                </Field>
-              ) : null}
-              <p className="px-3 pb-1 text-xs text-muted-foreground">
-                {effectiveAddress
-                  ? `Giao tới: ${effectiveAddress.recipient} · ${effectiveAddress.phone} · ${orderAddressLine(effectiveAddress)}`
-                  : canReadCustomer && !customer.isPending && addresses.length === 0
-                    ? 'Khách chưa có địa chỉ giao — thêm ở hồ sơ khách hàng rồi quay lại chọn.'
-                    : canReadCustomer && !customer.isPending
-                      ? 'Khách có nhiều địa chỉ mà chưa đặt mặc định — chọn một địa chỉ để tra cước / gửi hãng.'
-                      : 'Chưa có địa chỉ giao — thêm ở hồ sơ khách hàng.'}
-              </p>
-              <p className="px-3 pb-1 text-xs text-muted-foreground">
-                Đổi khách hay sửa nội dung địa chỉ: làm ở hồ sơ khách hàng; đơn không đổi khách sau
-                khi chốt.
-              </p>
-            </div>
-          </Card>
-
-          <Card title="Vận chuyển">
-            <div className="py-1">
-              <Field label="Kho lấy hàng">
+                ) : (
+                  <span className="text-sm">
+                    {order.shippingAddress
+                      ? orderAddressLine(order.shippingAddress)
+                      : 'Chưa có địa chỉ giao'}
+                  </span>
+                )}
+              </FormField>
+              <FormField label="Hẹn nhận hàng" help="Để trống = không hẹn ngày.">
+                <Input
+                  type="date"
+                  aria-label="Hẹn nhận hàng"
+                  value={expectedDate}
+                  onChange={(e) => setExpectedDate(e.target.value)}
+                  disabled={!carrierEditable}
+                  className={cn('tabular-nums', dateChanged && DIRTY)}
+                />
+              </FormField>
+              <FormField
+                label="Kho lấy hàng"
+                wide
+                help={
+                  selectedWarehouse
+                    ? selectedWarehouse.pickupReady
+                      ? `Điểm lấy hàng gửi hãng: ${[
+                          selectedWarehouse.address,
+                          selectedWarehouse.hamlet,
+                          selectedWarehouse.ward,
+                          selectedWarehouse.province,
+                        ]
+                          .filter(Boolean)
+                          .join(', ')}`
+                      : 'Kho này chưa khai tỉnh/thành, phường/xã hoặc số điện thoại — không tra cước / gửi hãng được từ kho này. Khai ở Kho › Sửa kho.'
+                    : undefined
+                }
+              >
                 <Select
                   value={warehouseId}
                   onValueChange={setWarehouseId}
                   disabled={!carrierEditable || warehouses.isPending}
                 >
-                  <SelectTrigger aria-label="Kho lấy hàng" className="h-8">
+                  <SelectTrigger
+                    aria-label="Kho lấy hàng"
+                    className={cn(warehouseChanged && DIRTY)}
+                  >
                     <SelectValue placeholder="Chưa chọn" />
                   </SelectTrigger>
                   <SelectContent>
@@ -706,28 +795,39 @@ function Editor({ order }: { order: SalesOrderDetail }) {
                     ))}
                   </SelectContent>
                 </Select>
-              </Field>
-              {selectedWarehouse ? (
-                <p className="px-3 pb-1 text-xs text-muted-foreground">
-                  {selectedWarehouse.pickupReady
-                    ? `Điểm lấy hàng gửi hãng: ${[
-                        selectedWarehouse.address,
-                        selectedWarehouse.hamlet,
-                        selectedWarehouse.ward,
-                        selectedWarehouse.province,
-                      ]
-                        .filter(Boolean)
-                        .join(', ')}`
-                    : 'Kho này chưa khai tỉnh/thành, phường/xã hoặc số điện thoại — không tra cước / gửi hãng được từ kho này. Khai ở Kho › Sửa kho.'}
-                </p>
-              ) : null}
-              <Field label="ĐVVC">
+              </FormField>
+            </div>
+          </Card>
+
+          <Card title="Vận chuyển">
+            <div className="grid gap-3.5 p-3.5 sm:grid-cols-2">
+              <FormField
+                label="Đơn vị vận chuyển"
+                help={
+                  carrierChanged && order.carrierId ? (
+                    <span className="text-warning">Đã đổi từ {carrierLabel(order.carrierId)}</span>
+                  ) : carrierEditable ? (
+                    'Phiếu giao tạo sau khi pick lấy sẵn hãng này.'
+                  ) : canUpdate ? (
+                    'Đơn đã kết thúc — không đổi hãng.'
+                  ) : (
+                    'Cần quyền sửa đơn để đổi hãng.'
+                  )
+                }
+              >
                 <Select
                   value={carrierId}
-                  onValueChange={setCarrierId}
+                  onValueChange={(v) => {
+                    setCarrierId(v);
+                    // Tài khoản thuộc hãng cũ không còn nghĩa — về mặc định của hãng mới.
+                    setAccountId(DEFAULT_ACCOUNT);
+                  }}
                   disabled={!carrierEditable || carriers.isPending}
                 >
-                  <SelectTrigger aria-label="Hãng vận chuyển" className="h-8">
+                  <SelectTrigger
+                    aria-label="Hãng vận chuyển"
+                    className={cn(carrierChanged && DIRTY)}
+                  >
                     <SelectValue placeholder="Chưa chọn" />
                   </SelectTrigger>
                   <SelectContent>
@@ -739,27 +839,52 @@ function Editor({ order }: { order: SalesOrderDetail }) {
                     ))}
                   </SelectContent>
                 </Select>
-              </Field>
-              <Field label="Cân nặng gửi hãng">
-                <span className="flex items-center gap-2">
-                  <Input
-                    value={weightKg}
-                    onChange={(e) => setWeightKg(e.target.value)}
-                    inputMode="decimal"
-                    placeholder={`Tính từ dòng: ${formatQuantity(order.lineWeightKg, { unit: 'kg' })}`}
-                    aria-label="Cân nặng gửi hãng (kg)"
-                    aria-invalid={weightInvalid || undefined}
+              </FormField>
+              {carrierAccounts.length > 1 ? (
+                <FormField label="Tài khoản hãng" help="Tài khoản gửi đơn sang hãng (shop, kho).">
+                  <Select
+                    value={accountId}
+                    onValueChange={setAccountId}
                     disabled={!carrierEditable}
-                    className="h-8 w-36 text-right tabular-nums"
-                  />
-                  <span className="text-xs text-muted-foreground">
-                    kg · trống = tính từ cân nặng SKU
-                  </span>
-                </span>
-              </Field>
+                  >
+                    <SelectTrigger
+                      aria-label="Tài khoản hãng"
+                      className={cn(accountChanged && DIRTY)}
+                    >
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value={DEFAULT_ACCOUNT}>Tài khoản mặc định</SelectItem>
+                      {carrierAccounts.map((a) => (
+                        <SelectItem key={a.id} value={a.id}>
+                          {a.name}
+                          {a.isDefault ? ' (mặc định)' : ''}
+                          {a.configured ? '' : ' — chưa cấu hình'}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </FormField>
+              ) : null}
+              <FormField label="Cân nặng gửi hãng" help="kg · để trống = tính từ cân nặng SKU">
+                <Input
+                  value={weightKg}
+                  onChange={(e) => setWeightKg(e.target.value)}
+                  inputMode="decimal"
+                  placeholder={`Tính từ dòng: ${formatQuantity(order.lineWeightKg, { unit: 'kg' })}`}
+                  aria-label="Cân nặng gửi hãng (kg)"
+                  aria-invalid={weightInvalid || undefined}
+                  disabled={!carrierEditable}
+                  className={cn('text-right tabular-nums', weightChanged && DIRTY)}
+                />
+              </FormField>
               {canQuote ? (
-                <Field label="Cước hãng báo">
-                  <span role="status" aria-live="polite" className="tabular-nums">
+                <FormField label="Cước hãng báo">
+                  <span
+                    role="status"
+                    aria-live="polite"
+                    className="flex min-h-control items-center text-sm tabular-nums"
+                  >
                     {quote.isPending
                       ? 'Đang hỏi cước…'
                       : quote.isError
@@ -772,21 +897,171 @@ function Editor({ order }: { order: SalesOrderDetail }) {
                             ` · lấy tại ${quote.data.pickupSummary}`
                           : null}
                   </span>
-                </Field>
+                </FormField>
               ) : null}
-              <Field label="Phí thu khách">
-                {money(order.shippingFee)} {order.currencyCode}
-              </Field>
-              <p className="px-3 pb-1 text-xs text-muted-foreground">
-                {carrierEditable
-                  ? 'Phiếu giao tạo sau khi pick sẽ lấy sẵn hãng này; mã vận đơn và cước hãng cấp ở bàn đóng gói.'
-                  : canUpdate
-                    ? 'Đơn đã kết thúc — không đổi hãng.'
-                    : 'Cần quyền sửa đơn để đổi hãng.'}
-              </p>
+              <FormField label="Phí thu khách">
+                <span className="flex min-h-control items-center text-sm tabular-nums">
+                  {money(order.shippingFee)} {order.currencyCode}
+                </span>
+              </FormField>
+            </div>
+          </Card>
+
+          <Card title="Ghi chú & thẻ">
+            <div className="grid gap-3.5 p-3.5 sm:grid-cols-2">
+              <FormField label="Ghi chú nội bộ" help="Cho người trong công ty (kho, CSKH).">
+                <Textarea
+                  aria-label="Ghi chú nội bộ"
+                  value={internalNote}
+                  onChange={(e) => setInternalNote(e.target.value)}
+                  maxLength={2000}
+                  rows={3}
+                  disabled={!carrierEditable}
+                  className={cn(internalChanged && DIRTY)}
+                />
+              </FormField>
+              <FormField label="Ghi chú in vận đơn" help="In lên tem gửi hãng (tối đa 500 ký tự).">
+                <Textarea
+                  aria-label="Ghi chú in vận đơn"
+                  value={printNote}
+                  onChange={(e) => setPrintNote(e.target.value)}
+                  maxLength={500}
+                  rows={3}
+                  disabled={!carrierEditable}
+                  className={cn(printChanged && DIRTY)}
+                />
+              </FormField>
+              <FormField label="Thẻ">
+                <OrderTagsField
+                  value={tagIds}
+                  onChange={setTagIds}
+                  disabled={!carrierEditable}
+                  dirty={tagsChanged}
+                />
+              </FormField>
+              <FormField label="NV phụ trách">
+                <span className="flex min-h-control items-center text-sm">
+                  {order.ownerName ??
+                    (order.ownerId ? 'Đã có người phụ trách' : 'Đơn của team, chưa chia')}
+                </span>
+              </FormField>
             </div>
           </Card>
         </div>
+
+        {/* ── Cột phải: đơn chỉ đọc + thay đổi chưa lưu ──────────────── */}
+        <aside className="flex w-full flex-col gap-3 lg:sticky lg:top-28 lg:w-detail-aside lg:flex-none">
+          <Card
+            title="Đơn hàng"
+            aside={
+              <span className="text-xs text-muted-foreground">
+                {order.lines.length} mẫu · {totalQty} SP · chỉ đọc
+              </span>
+            }
+          >
+            <ul className="divide-y">
+              {groupOrderLines(order.lines).map((g) =>
+                g.kind === 'line' ? (
+                  <li key={g.line.id} className="px-3.5 py-2 text-sm">
+                    <div className="flex justify-between gap-3">
+                      <span className="min-w-0">
+                        <span className="font-semibold">{g.line.skuName}</span>
+                        {g.line.isGift ? (
+                          <StatusBadge tone="brand" className="ml-1.5">
+                            <Gift className="h-3 w-3" aria-hidden />
+                            Tặng
+                          </StatusBadge>
+                        ) : null}
+                      </span>
+                      <span className="tabular-nums">{money(g.line.lineTotal)}</span>
+                    </div>
+                    <div className="text-xs text-muted-foreground">
+                      <span className="font-mono">{g.line.skuCode}</span> ·{' '}
+                      {formatQuantity(g.line.qty)} {g.line.uomCode} × {money(g.line.unitPrice)}
+                      {g.line.nonStock ? ' · gõ tay, không quản lý tồn' : ''}
+                    </div>
+                  </li>
+                ) : (
+                  <li key={`combo-${g.groupNo}`} className="px-3.5 py-2 text-sm">
+                    <div className="flex justify-between gap-3">
+                      <span className="flex min-w-0 items-center gap-1.5 font-semibold">
+                        {g.skuName}
+                        <StatusBadge tone="brand">
+                          <Boxes className="h-3 w-3" aria-hidden />
+                          Combo
+                        </StatusBadge>
+                      </span>
+                      <span className="tabular-nums">{money(g.lineTotal)}</span>
+                    </div>
+                    <div className="text-xs text-muted-foreground">
+                      <span className="font-mono">{g.skuCode}</span> · {formatQuantity(g.qty)} combo
+                      × {money(g.unitPrice)}
+                    </div>
+                    {g.lines.map((l) => (
+                      <div
+                        key={l.id}
+                        className="flex items-center gap-1 pl-2 text-xs text-muted-foreground"
+                      >
+                        <CornerDownRight className="h-3 w-3" aria-hidden />
+                        {l.skuName} × {formatQuantity(l.qty)} {l.uomCode}
+                      </div>
+                    ))}
+                  </li>
+                ),
+              )}
+            </ul>
+            <div className="space-y-1 border-t px-3.5 py-3">
+              <Row label="Tạm tính">{money(order.subtotal)}</Row>
+              <Row label="Giảm giá">{money(order.discount)}</Row>
+              {manualDiscountNote(order) ? (
+                <p className="text-right text-xs text-muted-foreground">
+                  trong đó {manualDiscountNote(order)}
+                </p>
+              ) : null}
+              <Row label="Phí ship thu khách">{money(order.shippingFee)}</Row>
+              {toDecimal(order.taxAmount)?.isZero() ? null : (
+                <Row label="Thuế">{money(order.taxAmount)}</Row>
+              )}
+              <div className="flex items-center justify-between border-t pt-2">
+                <span className="text-base font-semibold">Thu hộ (COD)</span>
+                <span className="text-base font-semibold tabular-nums text-primary">
+                  {formatMoney(
+                    Decimal.max(
+                      new Decimal(order.total).minus(order.prepaidAmount || 0),
+                      0,
+                    ).toFixed(),
+                  )}
+                </span>
+              </div>
+            </div>
+            <p className="flex items-start gap-1.5 border-t px-3.5 py-2 text-xs text-muted-foreground">
+              <AlertTriangle className="mt-0.5 h-3.5 w-3.5 flex-none" aria-hidden />
+              Dòng hàng và giá thuộc chứng từ đã chốt — không sửa ở đây.
+            </p>
+          </Card>
+
+          {changes.length > 0 ? (
+            <section
+              className="rounded-lg border border-warning-line bg-card"
+              aria-label="Thay đổi chưa lưu"
+            >
+              <header className="flex min-h-card-header items-center border-b border-warning-line bg-warning-weak px-3.5 text-sm font-semibold text-warning">
+                {changes.length} thay đổi chưa lưu
+              </header>
+              <dl className="space-y-1.5 px-3.5 py-3 text-sm">
+                {changes.map((c) => (
+                  <div key={c.label} className="flex justify-between gap-3">
+                    <dt className="text-muted-foreground">{c.label}</dt>
+                    <dd className="text-right">
+                      <s className="text-muted-foreground">{c.from}</s> →{' '}
+                      <b className="font-semibold">{c.to}</b>
+                    </dd>
+                  </div>
+                ))}
+              </dl>
+            </section>
+          ) : null}
+        </aside>
       </div>
     </div>
   );

@@ -1,7 +1,8 @@
 'use client';
 
 import Decimal from 'decimal.js';
-import { Plus, X } from 'lucide-react';
+import { Copy, Plus, X } from 'lucide-react';
+import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { ErrorState } from '@/components/data/states';
@@ -192,6 +193,7 @@ export function OrderCreateScreen() {
         {drafts.drafts.map((d) => {
           const isActive = d.id === activeId;
           const title = d.values.customerName.trim() || `Đơn mới ${d.no}`;
+          const copy = d.origin?.startsWith('from:') ?? false;
           return (
             <div
               key={d.id}
@@ -207,9 +209,15 @@ export function OrderCreateScreen() {
                 role="tab"
                 aria-selected={isActive}
                 onClick={() => activate(d.id)}
-                className="max-w-[220px] truncate px-3"
+                className="flex max-w-60 items-center gap-1.5 truncate px-3"
               >
-                {title}
+                {copy ? <Copy className="h-3.5 w-3.5 flex-none text-primary" aria-hidden /> : null}
+                <span className="truncate">{title}</span>
+                {copy ? (
+                  <span className="flex-none text-xs font-normal text-muted-foreground">
+                    · bản sao
+                  </span>
+                ) : null}
                 {d.no === 1 && drafts.drafts.length === 1 ? ' (F6)' : ''}
               </button>
               {drafts.drafts.length > 1 || d.values.lines.length > 0 ? (
@@ -240,6 +248,10 @@ export function OrderCreateScreen() {
         </button>
       </div>
 
+      {drafts.ready && drafts.active.origin?.startsWith('from:') ? (
+        <DuplicateBanner orderId={drafts.active.origin.slice('from:'.length)} />
+      ) : null}
+
       {!drafts.ready || (fromId && !seeded.current) ? (
         <div className="flex flex-wrap gap-4" aria-busy="true" aria-label="Đang tải">
           <div className="flex min-w-0 flex-[999_1_640px] flex-col gap-4">
@@ -263,6 +275,33 @@ export function OrderCreateScreen() {
           onCreated={(r, mode) => void onCreated(r, mode)}
         />
       )}
+    </div>
+  );
+}
+
+/**
+ * Tab nháp nhân bản từ đơn cũ (?from=, redesign Bán hàng 2026-10-22): nói rõ chép gì / không chép gì
+ * để sale kiểm lại phí ship và tiền chuyển khoản trước khi chốt. Đơn gốc giữ nguyên.
+ */
+function DuplicateBanner({ orderId }: { orderId: string }) {
+  const source = useOrder(orderId);
+  return (
+    <div
+      role="note"
+      className="flex items-center gap-2 rounded-md border border-info-line bg-secondary px-3 py-2 text-sm"
+    >
+      <Copy className="h-4 w-4 flex-none text-primary" aria-hidden />
+      <span>
+        <b className="font-semibold">
+          Nhân bản từ{' '}
+          <Link href={`/crm/orders/${orderId}`} className="font-mono text-primary hover:underline">
+            {source.data?.docNumber ?? 'đơn cũ'}
+          </Link>
+        </b>{' '}
+        — đã chép khách, địa chỉ, sản phẩm, kho, ĐVVC, thẻ, ghi chú.{' '}
+        <b className="font-semibold">Không chép</b> phí ship, phụ thu, tiền chuyển khoản. Đơn gốc
+        giữ nguyên.
+      </span>
     </div>
   );
 }

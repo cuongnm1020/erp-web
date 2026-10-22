@@ -46,6 +46,46 @@ export function useCarriers() {
   });
 }
 
+/** Một lựa chọn "hãng + tài khoản" trong ô chọn hãng (hãng nhiều tài khoản = nhiều dòng). */
+export interface CarrierAccountOption {
+  /** `${carrier.id}|${accountId ?? ''}` — dùng làm value của Select. */
+  value: string;
+  carrier: Carrier;
+  /** null = hãng không có tài khoản (không adapter) — server dùng mặc định. */
+  accountId: string | null;
+  label: string;
+  /** Tài khoản thiếu cấu hình — hiện nhưng không chọn được (gọi hãng sẽ lỗi). */
+  disabled: boolean;
+}
+
+/**
+ * Mọi hãng đang bật × mọi tài khoản đang bật của hãng (2026-10-22): hãng có ≥ 2 tài khoản hiện
+ * "Hãng · Tài khoản" từng dòng, tài khoản mặc định lên đầu; hãng một tài khoản / không adapter
+ * hiện một dòng như cũ.
+ */
+export function carrierAccountOptions(carriers: Carrier[] | undefined): CarrierAccountOption[] {
+  return (carriers ?? [])
+    .filter((c) => c.isActive)
+    .flatMap((c): CarrierAccountOption[] => {
+      const base = `${c.name} (${c.code})`;
+      if (c.accounts.length === 0) {
+        return [{ value: `${c.id}|`, carrier: c, accountId: null, label: base, disabled: false }];
+      }
+      const many = c.accounts.length > 1;
+      return [...c.accounts]
+        .sort((a, b) => Number(b.isDefault) - Number(a.isDefault))
+        .map((a) => ({
+          value: `${c.id}|${a.id}`,
+          carrier: c,
+          accountId: a.id,
+          label:
+            (many ? `${c.name} · ${a.name}${a.isDefault ? ' (mặc định)' : ''}` : base) +
+            (a.configured ? '' : ' — thiếu cấu hình'),
+          disabled: !a.configured,
+        }));
+    });
+}
+
 /** GET /shipments/:id/status-log — timeline tín hiệu hãng (webhook + poll). */
 export function useShipmentStatusLog(shipmentId: string) {
   return useQuery({

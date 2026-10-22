@@ -153,11 +153,20 @@ export type PdaPacked = components['schemas']['PdaPackedDto'];
 export function useRequestWaybill() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: ({ shipmentId, carrierCode }: { shipmentId: string; carrierCode: string }) =>
+    mutationFn: ({
+      shipmentId,
+      carrierCode,
+      carrierAccountId,
+    }: {
+      shipmentId: string;
+      carrierCode: string;
+      /** Bỏ trống = tài khoản đơn đã chọn, không có thì mặc định của hãng. */
+      carrierAccountId?: string;
+    }) =>
       unwrap(
         api.POST('/shipments/{id}/waybill', {
           params: { path: { id: shipmentId } },
-          body: { carrierCode },
+          body: { carrierCode, ...(carrierAccountId ? { carrierAccountId } : {}) },
         }),
       ),
     onSuccess: (r) => {

@@ -12,6 +12,7 @@ import {
   useMemo,
   useRef,
   useState,
+  type ReactNode,
 } from 'react';
 import { useFieldArray, useForm, useWatch, type Path, type UseFormReturn } from 'react-hook-form';
 import {
@@ -63,7 +64,15 @@ import {
   type ManualDiscountType,
 } from '../../schema';
 import { CART_GRID, CartLine, type LineMetrics } from './cart-line';
-import { Card, CustomerCard, InfoCard, ReceiverCard, ShippingCard } from './order-side-cards';
+import {
+  Card,
+  CustomerCard,
+  InfoCard,
+  ReceiverCard,
+  ShippingCard,
+  StaffField,
+  TagPicker,
+} from './order-side-cards';
 import { ProductSearch } from './product-search';
 import { SameDayDialog } from './same-day-dialog';
 
@@ -337,15 +346,15 @@ export const OrderDraftForm = forwardRef<
           afterCreate.current = 'open';
           void onSubmit(e);
         }}
-        className={cn('flex flex-col gap-3 pb-24', DENSE)}
+        className={cn('flex flex-col gap-3', DENSE)}
       >
         <div className="flex flex-wrap items-start gap-3">
           {/* ── Cột trái ── */}
           <div className="flex min-w-0 flex-[999_1_640px] flex-col gap-3">
-            <Card
-              title="Sản phẩm"
-              actions={<HeaderSelects form={form} warehouseOptions={warehouseOptions} />}
-            >
+            <Card title="Thông tin đơn" className="py-2.5">
+              <HeaderSelects form={form} warehouseOptions={warehouseOptions} />
+            </Card>
+            <Card title="Sản phẩm">
               <ProductSearch ref={searchRef} warehouseId={warehouseId} onPick={addSku} />
               <div className="overflow-x-auto rounded-md border">
                 <div className="min-w-[680px]">
@@ -465,49 +474,71 @@ export const OrderDraftForm = forwardRef<
 
           {/* ── Cột phải ── */}
           <div className="flex min-w-0 max-w-full flex-[1_1_380px] flex-col gap-3 xl:max-w-[520px]">
-            <InfoCard form={form} />
             <CustomerCard form={form} />
             <ReceiverCard form={form} />
             <ShippingCard form={form} estimatedWeightKg={estimatedWeightKg} codAmount={cod} />
-          </div>
-        </div>
-
-        <div className="sticky bottom-0 z-20 -mx-4 flex flex-wrap items-center justify-between gap-3 border-t bg-card px-4 py-2.5 shadow-lg">
-          <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
-            <span>
-              <Kbd>F6</Kbd> Đơn mới
-            </span>
-            <span>
-              <Kbd>F9</Kbd> Quét mã
-            </span>
-            <span>
-              <Kbd>F10</Kbd> Chốt đơn
-            </span>
-          </div>
-          <div className="flex flex-wrap items-center gap-2">
-            <span className="mr-2 text-sm text-muted-foreground">
-              Tiền cần thu
-              <b className="ml-2 text-lg tabular-nums text-success">
-                {cod !== null ? formatMoney(cod) : '—'}
-              </b>
-            </span>
-            <Button variant="ghost" asChild>
-              <Link href="/crm/orders">Hủy bỏ</Link>
-            </Button>
-            <Button
-              type="button"
-              variant="outline"
-              disabled={create.isPending}
-              onClick={() => {
-                afterCreate.current = 'next';
-                void onSubmit();
-              }}
+            <InfoCard form={form} />
+            {/* Khối chốt đơn dính đáy màn khi cuộn (thay thanh dưới cùng cũ — redesign 2026-10-22,
+                design system Form chứng từ: tổng + nút chính ở cột phải). */}
+            <section
+              aria-label="Chốt đơn"
+              className="sticky bottom-3 z-20 flex flex-col gap-2 rounded-lg border border-input-soft bg-card p-3 shadow-popover"
             >
-              Chốt &amp; tạo đơn mới
-            </Button>
-            <Button type="submit" disabled={create.isPending}>
-              {create.isPending ? 'Đang chốt…' : 'Chốt đơn (F10)'}
-            </Button>
+              <dl className="space-y-0.5 text-sm tabular-nums">
+                <div className="flex justify-between text-muted-foreground">
+                  <dt>Tổng tiền</dt>
+                  <dd>{total ? formatMoney(total.toFixed(4)) : '—'}</dd>
+                </div>
+                {prepaid.isZero() ? null : (
+                  <div className="flex justify-between text-muted-foreground">
+                    <dt>Đã chuyển khoản</dt>
+                    <dd>−{formatMoney(prepaid.toFixed(4))}</dd>
+                  </div>
+                )}
+                <div className="flex items-baseline justify-between border-t pt-1.5">
+                  <dt className="font-semibold">Thu hộ (COD)</dt>
+                  <dd className="text-2xl font-semibold text-primary">
+                    {cod !== null ? formatMoney(cod) : '—'}
+                  </dd>
+                </div>
+              </dl>
+              <div className="flex gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="flex-1"
+                  disabled={create.isPending}
+                  onClick={() => {
+                    afterCreate.current = 'next';
+                    void onSubmit();
+                  }}
+                >
+                  Chốt &amp; tạo đơn mới
+                </Button>
+                <Button
+                  type="submit"
+                  className="flex-1"
+                  shortcut="F10"
+                  loading={create.isPending}
+                  loadingText="Đang chốt…"
+                >
+                  Chốt đơn
+                </Button>
+              </div>
+              <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground">
+                <span className="flex gap-3">
+                  <span>
+                    <Kbd>F6</Kbd> Đơn mới
+                  </span>
+                  <span>
+                    <Kbd>F9</Kbd> Quét mã
+                  </span>
+                </span>
+                <Link href="/crm/orders" className="hover:text-foreground hover:underline">
+                  Hủy bỏ
+                </Link>
+              </div>
+            </section>
           </div>
         </div>
       </form>
@@ -519,7 +550,20 @@ function Kbd({ children }: { children: string }) {
   return <kbd className="rounded border bg-card px-1.5 py-0.5 font-mono text-xs">{children}</kbd>;
 }
 
-/** Kênh bán · Nguồn đơn · Kho xuất — đầu card Sản phẩm. */
+/** Nhãn `caption` trên một ô của dải "Thông tin đơn". */
+function HeaderField({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <div className="flex min-w-0 flex-col gap-1">
+      <span className="text-xs font-semibold text-muted-foreground">{label}</span>
+      {children}
+    </div>
+  );
+}
+
+/**
+ * Dải "Thông tin đơn" đầu màn (redesign 2026-10-22): Kênh · Nguồn (+ POS khi Facebook) · Kho xuất ·
+ * NV xử lý · Thẻ trên một hàng, nhãn trên ô — trước nằm rải ở đầu card Sản phẩm + card Thông tin.
+ */
 function HeaderSelects({
   form,
   warehouseOptions,
@@ -530,111 +574,128 @@ function HeaderSelects({
   // Nguồn Facebook → chọn POS (shop Pancake đã liên kết) của đơn (2026-10-21).
   const source = useWatch({ control: form.control, name: 'source' });
   return (
-    <>
-      <FormField
-        control={form.control}
-        name="channel"
-        render={({ field }) => (
-          <FormItem>
-            <Select value={field.value} onValueChange={field.onChange}>
-              <FormControl>
-                <SelectTrigger aria-label="Kênh bán" className="h-8 w-32">
-                  <SelectValue />
-                </SelectTrigger>
-              </FormControl>
-              <SelectContent>
-                {ORDER_CHANNELS.map((c) => (
-                  <SelectItem key={c} value={c}>
-                    {orderChannelLabel(c)}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </FormItem>
-        )}
-      />
-      <FormField
-        control={form.control}
-        name="source"
-        render={({ field }) => (
-          <FormItem>
-            <Select
-              value={field.value || NONE}
-              onValueChange={(v) => field.onChange(v === NONE ? '' : v)}
-            >
-              <FormControl>
-                <SelectTrigger aria-label="Nguồn đơn" className="h-8 w-44">
-                  <SelectValue placeholder="Chọn nguồn đơn" />
-                </SelectTrigger>
-              </FormControl>
-              <SelectContent>
-                <SelectItem value={NONE}>Chọn nguồn đơn</SelectItem>
-                {ORDER_SOURCES.map((s) => (
-                  <SelectItem key={s} value={s}>
-                    {orderSourceLabel(s)}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </FormItem>
-        )}
-      />
-      {source === 'FACEBOOK' ? (
+    <div className="grid grid-cols-2 gap-x-2.5 gap-y-2 sm:grid-cols-3 xl:grid-cols-5">
+      <HeaderField label="Kênh">
         <FormField
           control={form.control}
-          name="posShopId"
+          name="channel"
           render={({ field }) => (
             <FormItem>
-              <FormControl>
-                <EntityPicker
-                  value={field.value ?? ''}
-                  onChange={(id) => field.onChange(id)}
-                  useSearch={usePosShopSearch}
-                  placeholder="Chọn POS"
-                  searchPlaceholder="Tìm POS theo tên, mã…"
-                  emptyText="Không có POS đã liên kết"
-                  clearable
-                  aria-label="POS"
-                  className="h-8 w-56"
-                />
-              </FormControl>
+              <Select value={field.value} onValueChange={field.onChange}>
+                <FormControl>
+                  <SelectTrigger aria-label="Kênh bán">
+                    <SelectValue />
+                  </SelectTrigger>
+                </FormControl>
+                <SelectContent>
+                  {ORDER_CHANNELS.map((c) => (
+                    <SelectItem key={c} value={c}>
+                      {orderChannelLabel(c)}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </FormItem>
           )}
         />
-      ) : null}
-      <FormField
-        control={form.control}
-        name="warehouseId"
-        render={({ field }) => (
-          <FormItem>
-            <Select
-              value={field.value || DEFAULT_WAREHOUSE}
-              onValueChange={(v) => field.onChange(v === DEFAULT_WAREHOUSE ? '' : v)}
-            >
-              <FormControl>
-                <SelectTrigger aria-label="Kho xuất" className="h-8 w-56">
-                  <div className="flex min-w-0 items-center gap-2">
-                    <Warehouse className="h-4 w-4 shrink-0" aria-hidden />
-                    <span className="truncate">
-                      <SelectValue placeholder="Kho mặc định" />
-                    </span>
-                  </div>
-                </SelectTrigger>
-              </FormControl>
-              <SelectContent>
-                <SelectItem value={DEFAULT_WAREHOUSE}>Kho mặc định của bạn</SelectItem>
-                {warehouseOptions.map((w) => (
-                  <SelectItem key={w.id} value={w.id}>
-                    {w.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <FormMessage />
-          </FormItem>
-        )}
-      />
-    </>
+      </HeaderField>
+      <HeaderField label="Nguồn đơn">
+        <FormField
+          control={form.control}
+          name="source"
+          render={({ field }) => (
+            <FormItem>
+              <Select
+                value={field.value || NONE}
+                onValueChange={(v) => field.onChange(v === NONE ? '' : v)}
+              >
+                <FormControl>
+                  <SelectTrigger aria-label="Nguồn đơn">
+                    <SelectValue placeholder="Chọn nguồn đơn" />
+                  </SelectTrigger>
+                </FormControl>
+                <SelectContent>
+                  <SelectItem value={NONE}>Chọn nguồn đơn</SelectItem>
+                  {ORDER_SOURCES.map((s) => (
+                    <SelectItem key={s} value={s}>
+                      {orderSourceLabel(s)}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </FormItem>
+          )}
+        />
+        {source === 'FACEBOOK' ? (
+          <FormField
+            control={form.control}
+            name="posShopId"
+            render={({ field }) => (
+              <FormItem>
+                <FormControl>
+                  <EntityPicker
+                    value={field.value ?? ''}
+                    onChange={(id) => field.onChange(id)}
+                    useSearch={usePosShopSearch}
+                    placeholder="Chọn POS"
+                    searchPlaceholder="Tìm POS theo tên, mã…"
+                    emptyText="Không có POS đã liên kết"
+                    clearable
+                    aria-label="POS"
+                  />
+                </FormControl>
+              </FormItem>
+            )}
+          />
+        ) : null}
+      </HeaderField>
+      <HeaderField label="Kho xuất">
+        <FormField
+          control={form.control}
+          name="warehouseId"
+          render={({ field }) => (
+            <FormItem>
+              <Select
+                value={field.value || DEFAULT_WAREHOUSE}
+                onValueChange={(v) => field.onChange(v === DEFAULT_WAREHOUSE ? '' : v)}
+              >
+                <FormControl>
+                  <SelectTrigger aria-label="Kho xuất">
+                    <div className="flex min-w-0 items-center gap-2">
+                      <Warehouse className="h-4 w-4 shrink-0" aria-hidden />
+                      <span className="truncate">
+                        <SelectValue placeholder="Kho mặc định" />
+                      </span>
+                    </div>
+                  </SelectTrigger>
+                </FormControl>
+                <SelectContent>
+                  <SelectItem value={DEFAULT_WAREHOUSE}>Kho mặc định của bạn</SelectItem>
+                  {warehouseOptions.map((w) => (
+                    <SelectItem key={w.id} value={w.id}>
+                      {w.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+      </HeaderField>
+      <HeaderField label="NV xử lý">
+        <StaffField
+          form={form}
+          name="ownerId"
+          label="NV xử lý"
+          placeholder="Tôi (người tạo)"
+          bare
+        />
+      </HeaderField>
+      <HeaderField label="Thẻ">
+        <TagPicker form={form} />
+      </HeaderField>
+    </div>
   );
 }
 

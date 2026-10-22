@@ -9402,6 +9402,22 @@ export interface components {
             CARRIER_CANCELLED: number;
             CANCELLED: number;
         };
+        OrderTimelineDto: {
+            /** @description Lần đầu đơn sang Đã duyệt (audit `status.after = APPROVED`); đơn tạo thẳng Đã duyệt = giờ tạo. */
+            approvedAt: string | null;
+            /** @description Task PICK hoàn thành. */
+            pickedAt: string | null;
+            /** @description Task PACK hoàn thành (điểm trừ tồn). */
+            packedAt: string | null;
+            /** @description Người được giao task PACK. */
+            packedByName: string | null;
+            /** @description "Gửi sang ĐVVC" (vận đơn cấp / lưu hãng). */
+            sentToCarrierAt: string | null;
+            /** @description Hãng báo đã lấy hàng (Shipment.shippedAt). */
+            shippedAt: string | null;
+            /** @description Hãng báo giao thành công (Shipment.deliveredAt). */
+            deliveredAt: string | null;
+        };
         SalesOrderAddressDto: {
             id: string;
             recipient: string;
@@ -9542,6 +9558,14 @@ export interface components {
             color: string | null;
         };
         SalesOrderDetailDto: {
+            /** @description NV phụ trách (ownerId) — tên hiển thị; null = đơn của team chưa chia / người dùng đã xoá. */
+            ownerName: string | null;
+            careStaffName: string | null;
+            packerName: string | null;
+            marketerName: string | null;
+            /** @description Người tạo đơn (SalesOrder.createdBy); null = hệ thống / đồng bộ Pancake. */
+            createdByName: string | null;
+            timeline: components["schemas"]["OrderTimelineDto"];
             /** @description Địa chỉ giao hiệu lực — null = khách chưa có địa chỉ dùng được (tra cước / cấp vận đơn sẽ 422). */
             shippingAddress: components["schemas"]["SalesOrderAddressDto"] | null;
             /**
@@ -9985,6 +10009,27 @@ export interface components {
             shippingWeightKg?: string | null;
             /** @description Tuỳ chọn gửi hãng; `null` = xoá (về mặc định hãng); bỏ trống = giữ nguyên. */
             shippingOptions?: components["schemas"]["ShippingOptionsDto"] | null;
+            /**
+             * Format: uuid
+             * @description Tài khoản của hãng (wms.CarrierAccount.id thuộc hãng trên đơn); `null` = tài khoản mặc định.
+             */
+            carrierAccountId?: string | null;
+            internalNote?: string | null;
+            /** @description Ghi chú in lên vận đơn. */
+            printNote?: string | null;
+            /** @description Thẻ đơn (core.Tag.id) — THAY toàn bộ danh sách; `[]` = bỏ hết thẻ. */
+            tagIds?: string[];
+            /**
+             * Format: uuid
+             * @description NV chăm sóc / đóng hàng / marketer (core.User.id đang hoạt động); `null` = bỏ chọn.
+             */
+            careStaffId?: string | null;
+            /** Format: uuid */
+            packerId?: string | null;
+            /** Format: uuid */
+            marketerId?: string | null;
+            /** @description Ngày hẹn nhận hàng `YYYY-MM-DD`; `null` = bỏ hẹn. */
+            expectedDeliveryDate?: string | null;
             /** @description Lý do (khi hủy) — ghi vào event OrderCancelled. */
             reason?: string;
         };
@@ -10000,7 +10045,11 @@ export interface components {
             shippingWeightKg: string | null;
             /** @description Tuỳ chọn gửi hãng sau khi sửa; null = mặc định hãng. */
             shippingOptions: components["schemas"]["ShippingOptionsViewDto"] | null;
-            /** @description Trường đã đổi thật ('status' | 'carrierId' | 'warehouseId' | 'shippingWeightKg' | 'shippingOptions'); rỗng = không có gì thay đổi. */
+            /**
+             * @description Trường đã đổi thật ('status' | 'carrierId' | 'carrierAccountId' | 'warehouseId' | 'addressId' |
+             *     'shippingWeightKg' | 'shippingOptions' | 'internalNote' | 'printNote' | 'tagIds' | 'careStaffId' |
+             *     'packerId' | 'marketerId' | 'expectedDeliveryDate'); rỗng = không có gì thay đổi.
+             */
             changed: string[];
         };
         BulkUpdateOrdersDto: {
@@ -10010,6 +10059,12 @@ export interface components {
              * @description wms.Carrier.id đang hoạt động; `null` = bỏ chọn hãng; bỏ trống = giữ nguyên.
              */
             carrierId?: string | null;
+            /**
+             * Format: uuid
+             * @description Tài khoản của hãng (wms.CarrierAccount.id thuộc `carrierId`) cho cả lô; chỉ đi kèm `carrierId`.
+             *     Bỏ trống = tài khoản mặc định của hãng.
+             */
+            carrierAccountId?: string;
             /** @description Cân nặng gửi hãng (kg) cho TẤT CẢ đơn đã chọn; `null` = về cân nặng tính từ dòng. */
             shippingWeightKg?: string | null;
         };

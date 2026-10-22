@@ -23,6 +23,10 @@ vi.mock('next/navigation', () => ({
 }));
 
 const ORDER = makeOrders(1)[0]!;
+
+/** Menu "⋯" ở đầu trang chi tiết — Radix mở bằng bàn phím trong jsdom. */
+const openMoreMenu = () =>
+  fireEvent.keyDown(screen.getByRole('button', { name: 'Thao tác khác' }), { key: 'ArrowDown' });
 const DETAIL = makeOrderDetail(ORDER.id)!;
 
 describe('OrderDetailScreen — GET /sales-orders/{id} (P1-12)', () => {
@@ -72,6 +76,63 @@ describe('OrderDetailScreen — GET /sales-orders/{id} (P1-12)', () => {
     expect(screen.queryByRole('button', { name: 'Hủy đơn' })).not.toBeInTheDocument();
   });
 
+  it('Nhân bản đơn: link sang /crm/orders/new?from=<id>; phím D / E mở nhân bản / sửa', async () => {
+    push.mockClear();
+    renderApp(<OrderDetailScreen orderId={ORDER.id} />);
+    await screen.findByRole('heading', { level: 1 });
+    expect(screen.getByRole('link', { name: /^Nhân bản đơn/ })).toHaveAttribute(
+      'href',
+      `/crm/orders/new?from=${ORDER.id}`,
+    );
+    fireEvent.keyDown(window, { key: 'd' });
+    expect(push).toHaveBeenCalledWith(`/crm/orders/new?from=${ORDER.id}`);
+    fireEvent.keyDown(window, { key: 'e' });
+    expect(push).toHaveBeenCalledWith(`/crm/orders/${ORDER.id}/edit`);
+  });
+
+  it('tên NV phụ trách / người tạo + giờ dưới bước đã xong (API 2026-10-22)', async () => {
+    server.use(
+      http.get('/api/sales-orders/:id', () =>
+        HttpResponse.json({
+          ...DETAIL,
+          status: 'APPROVED',
+          ownerName: 'Mai Hương',
+          careStaffName: 'Nguyễn Thu Trang',
+          createdByName: 'Quản trị',
+          fulfilment: { ...DETAIL.fulfilment, status: 'PACKED' },
+          timeline: {
+            ...DETAIL.timeline,
+            approvedAt: '2026-10-22T02:39:00Z',
+            packedAt: '2026-10-22T02:50:00Z',
+            packedByName: 'packer.01',
+          },
+        }),
+      ),
+    );
+    renderApp(<OrderDetailScreen orderId={ORDER.id} />);
+    await screen.findByRole('heading', { level: 1 });
+    expect(screen.getAllByText('Mai Hương').length).toBeGreaterThan(0);
+    expect(screen.getByText('Nguyễn Thu Trang')).toBeInTheDocument();
+    const progress = screen.getByRole('list', { name: 'Tiến độ đơn hàng' });
+    expect(progress).toHaveTextContent('22/10 09:39');
+    expect(progress).toHaveTextContent('22/10 09:50 · packer.01');
+  });
+
+  it('sale không có quyền tạo đơn → không có "Nhân bản đơn" (luật 7)', async () => {
+    renderApp(<OrderDetailScreen orderId={ORDER.id} />, {
+      me: { ...ME_SALE, permissions: ['sales_order.read'] },
+    });
+    await screen.findByRole('heading', { level: 1 });
+    expect(screen.queryByRole('link', { name: /Nhân bản đơn/ })).not.toBeInTheDocument();
+  });
+
+  it('không còn thẻ "Chưa nối được" và dải 4 ô tổng; tổng tiền có Thu hộ (COD)', async () => {
+    renderApp(<OrderDetailScreen orderId={ORDER.id} />);
+    await screen.findByRole('heading', { level: 1 });
+    expect(screen.queryByText('Chưa nối được')).not.toBeInTheDocument();
+    expect(screen.getByText('Thu hộ (COD)')).toBeInTheDocument();
+  });
+
   it('Hủy đơn: xác nhận kèm lý do → POST /sales-orders/:id/cancel', async () => {
     const calls: Array<{ id: string; reason?: string }> = [];
     server.use(
@@ -83,14 +144,13 @@ describe('OrderDetailScreen — GET /sales-orders/{id} (P1-12)', () => {
     );
     renderApp(<OrderDetailScreen orderId={ORDER.id} />); // ME_ADMIN mặc định: manage all
     await screen.findByRole('heading', { level: 1 });
-    fireEvent.click(screen.getByRole('button', { name: 'Hủy đơn' }));
+    openMoreMenu();
+    fireEvent.click(await screen.findByRole('menuitem', { name: 'Hủy đơn…' }));
     expect(await screen.findByText(`Hủy đơn ${ORDER.docNumber}?`)).toBeInTheDocument();
     fireEvent.change(screen.getByLabelText('Lý do hủy (tùy chọn)'), {
       target: { value: 'Khách đổi ý' },
     });
-    // Trong dialog nút xác nhận cũng tên "Hủy đơn" — là nút cuối
-    const buttons = screen.getAllByRole('button', { name: 'Hủy đơn' });
-    fireEvent.click(buttons[buttons.length - 1]!);
+    fireEvent.click(screen.getByRole('button', { name: 'Hủy đơn' }));
     await waitFor(() => expect(calls).toEqual([{ id: ORDER.id, reason: 'Khách đổi ý' }]));
     await waitFor(() =>
       expect(screen.queryByText(`Hủy đơn ${ORDER.docNumber}?`)).not.toBeInTheDocument(),
@@ -106,7 +166,8 @@ describe('OrderDetailScreen — GET /sales-orders/{id} (P1-12)', () => {
     );
     renderApp(<OrderDetailScreen orderId={ORDER.id} />);
     await screen.findByRole('heading', { level: 1 });
-    fireEvent.click(screen.getByRole('button', { name: 'Sửa (hủy & tạo lại)' }));
+    openMoreMenu();
+    fireEvent.click(await screen.findByRole('menuitem', { name: 'Sửa (hủy & tạo lại)' }));
     expect(
       await screen.findByText(`Sửa đơn ${ORDER.docNumber} — hủy & tạo lại?`),
     ).toBeInTheDocument();
@@ -117,17 +178,17 @@ describe('OrderDetailScreen — GET /sales-orders/{id} (P1-12)', () => {
   it('không có sales_order.update → không thấy "Sửa đơn" (luật 7); admin thấy link tới trang sửa', async () => {
     renderApp(<OrderDetailScreen orderId={ORDER.id} />, { me: ME_SALE });
     await screen.findByRole('heading', { level: 1 });
-    expect(screen.queryByRole('link', { name: 'Sửa đơn' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: /^Sửa đơn/ })).not.toBeInTheDocument();
   });
 
   it('admin: "Sửa đơn" là link sang /crm/orders/:id/edit (trang riêng, không popup); hãng chưa chọn nói rõ', async () => {
     renderApp(<OrderDetailScreen orderId={ORDER.id} />);
     await screen.findByRole('heading', { level: 1 });
-    expect(screen.getByRole('link', { name: 'Sửa đơn' })).toHaveAttribute(
+    expect(screen.getByRole('link', { name: /^Sửa đơn/ })).toHaveAttribute(
       'href',
       `/crm/orders/${ORDER.id}/edit`,
     );
-    expect(screen.getByText('chưa chọn — chọn ở trang Sửa đơn')).toBeInTheDocument();
+    expect(screen.getByText('Chưa gán hãng')).toBeInTheDocument();
   });
 
   it('đơn có hãng + đã POSTED: hiện tên hãng và mốc chốt', async () => {

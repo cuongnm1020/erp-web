@@ -29,7 +29,7 @@ import {
   useShipmentLabelData,
   type PdaWaybill,
 } from '../api/use-pda';
-import { useCarriers } from '../api/use-shipping';
+import { carrierAccountOptions, useCarriers } from '../api/use-shipping';
 import { WaybillLabel, WaybillLabelPrintSheet, type WaybillOrientation } from './waybill-label';
 
 /** A6 / A5 = PDF của hãng; `ERP_100x75` = nhãn ERP tự vẽ cho máy in nhiệt 3 inch (2026-10-13). */
@@ -432,8 +432,14 @@ function CarrierPicker({
 }) {
   const carriers = useCarriers();
   const request = useRequestWaybill();
-  const [code, setCode] = useState(currentCarrier ?? '');
-  const options = (carriers.data ?? []).filter((c) => c.isActive);
+  const options = carrierAccountOptions(carriers.data);
+  // Mặc định: tài khoản đầu (mặc định) của hãng đang gán; chưa tải xong hãng thì chưa chọn.
+  const [picked, setPicked] = useState('');
+  const value =
+    picked || options.find((o) => !o.disabled && o.carrier.code === currentCarrier)?.value || '';
+  const option = options.find((o) => o.value === value);
+  // Danh mục hãng chưa tải xong vẫn xin lại được theo hãng đang gán.
+  const carrierCode = option?.carrier.code ?? (picked ? '' : (currentCarrier ?? ''));
 
   return (
     <div className="flex flex-col gap-3">
@@ -443,24 +449,32 @@ function CarrierPicker({
           : 'Đơn chưa gán hãng vận chuyển. Chọn hãng để xin vận đơn ngay cho kiện này.'}
       </p>
       <div className="flex flex-wrap items-center gap-2">
-        <Select value={code} onValueChange={setCode}>
+        <Select value={value} onValueChange={setPicked}>
           <SelectTrigger className="h-9 w-64" aria-label="Hãng vận chuyển">
             <SelectValue placeholder={carriers.isPending ? 'Đang tải hãng…' : 'Chọn hãng…'} />
           </SelectTrigger>
           <SelectContent>
-            {options.map((c) => (
-              <SelectItem key={c.code} value={c.code}>
-                {c.name}
-                {c.operations.includes('printLabel') ? '' : ' (không in nhãn được)'}
+            {options.map((o) => (
+              <SelectItem key={o.value} value={o.value} disabled={o.disabled}>
+                {o.label}
+                {o.carrier.operations.includes('printLabel') ? '' : ' (không in nhãn được)'}
               </SelectItem>
             ))}
           </SelectContent>
         </Select>
         <Button
-          disabled={!code || request.isPending}
+          disabled={!carrierCode || request.isPending}
           onClick={() =>
             request.mutate(
-              { shipmentId, carrierCode: code },
+              {
+                shipmentId,
+                carrierCode,
+                // Chỉ gửi tài khoản khi người dùng tự chọn một trong nhiều tài khoản — chọn sẵn
+                // thì để server dùng tài khoản đã gán trên đơn (không ghi đè về mặc định).
+                ...(picked && option?.accountId && option.carrier.accounts.length > 1
+                  ? { carrierAccountId: option.accountId }
+                  : {}),
+              },
               {
                 onSuccess: (r) => onIssued(r),
                 onError: (err) => toast.error(messageFor(err)),

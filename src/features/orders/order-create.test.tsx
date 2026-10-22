@@ -301,7 +301,7 @@ describe('OrderCreateScreen — màn tạo đơn mới', () => {
     );
     renderApp(<OrderCreateScreen />);
     expect(await screen.findByText('Chưa có sản phẩm trong giỏ')).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: 'Chốt đơn (F10)' }));
+    fireEvent.click(screen.getByRole('button', { name: /^Chốt đơn F10/ }));
     expect(await screen.findByText('Nhập tên khách hàng')).toBeInTheDocument();
     expect(screen.getByText('Đơn phải có ít nhất một dòng hàng')).toBeInTheDocument();
     expect(posts).toHaveLength(0);
@@ -323,6 +323,25 @@ describe('OrderCreateScreen — màn tạo đơn mới', () => {
     expect(screen.getAllByLabelText('Số lượng')).toHaveLength(1);
   });
 
+  it('?from= (nhân bản): banner "Nhân bản từ <mã đơn>" + tab đánh dấu bản sao; khối chốt ở cột phải', async () => {
+    search = `from=${ORDER.id}`;
+    server.use(...skuHandlers());
+    renderApp(<OrderCreateScreen />);
+    const note = await screen.findByRole('note');
+    expect(note).toHaveTextContent(`Nhân bản từ ${ORDER.docNumber}`);
+    expect(note).toHaveTextContent('Không chép phí ship, phụ thu, tiền chuyển khoản');
+    expect(screen.getByRole('link', { name: ORDER.docNumber })).toHaveAttribute(
+      'href',
+      `/crm/orders/${ORDER.id}`,
+    );
+    expect(
+      within(screen.getByRole('tablist', { name: 'Đơn đang soạn' })).getByRole('tab', {
+        selected: true,
+      }),
+    ).toHaveTextContent('bản sao');
+    expect(screen.getByRole('region', { name: 'Chốt đơn' })).toHaveTextContent('Thu hộ (COD)');
+  });
+
   it('?from=<đơn cũ> đổ sẵn dòng hàng (bỏ hàng tặng) → chốt gửi đúng body + Idempotency-Key, điều hướng về chi tiết', async () => {
     search = `from=${ORDER.id}`;
     const captured: Array<{ key: string | null; body: Record<string, unknown> }> = [];
@@ -341,7 +360,7 @@ describe('OrderCreateScreen — màn tạo đơn mới', () => {
       () => expect(screen.getAllByLabelText('Số lượng')).toHaveLength(REAL_LINES.length),
       { timeout: 3000 },
     );
-    fireEvent.click(screen.getByRole('button', { name: 'Chốt đơn (F10)' }));
+    fireEvent.click(screen.getByRole('button', { name: /^Chốt đơn F10/ }));
     await waitFor(() => expect(captured).toHaveLength(1));
     expect(captured[0]!.key).toMatch(/[0-9a-f-]{36}/);
     expect(captured[0]!.body).toMatchObject({
@@ -366,7 +385,7 @@ describe('OrderCreateScreen — màn tạo đơn mới', () => {
     renderApp(<OrderCreateScreen />);
     const recipient = await screen.findByLabelText('Tên người nhận');
     await waitFor(() => expect(recipient).toHaveValue(addrs.find((a) => a.isDefault)!.recipient));
-    fireEvent.click(screen.getByRole('button', { name: 'Chốt đơn (F10)' }));
+    fireEvent.click(screen.getByRole('button', { name: /^Chốt đơn F10/ }));
     await waitFor(() => expect(bodies).toHaveLength(1));
     expect(bodies[0]).toMatchObject({ addressId: addrs.find((a) => a.isDefault)!.id });
     expect(bodies[0]).not.toHaveProperty('address');
@@ -404,7 +423,8 @@ describe('OrderCreateScreen — màn tạo đơn mới', () => {
         screen.getAllByText(new RegExp(vnd(subtotal + ship - 100_000))).length,
       ).toBeGreaterThan(0),
     );
-    expect(screen.getByText('Đã chuyển khoản')).toBeInTheDocument();
+    // Cả thẻ Giá trị đơn lẫn khối Chốt đơn (cột phải, redesign 2026-10-22) đều hiện dòng này.
+    expect(screen.getAllByText('Đã chuyển khoản').length).toBeGreaterThan(0);
   });
 
   it('ô SĐT đứng trước tên khách; Giá trị đơn tạm ẩn Giảm giá / Phí vận chuyển / Phụ thu / Mã khuyến mãi', async () => {
@@ -460,7 +480,7 @@ describe('OrderCreateScreen — màn tạo đơn mới', () => {
       target: { value: '0912000111' },
     });
     fireEvent.change(screen.getByLabelText('Tên khách hàng'), { target: { value: 'Khách lẻ' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Chốt đơn (F10)' }));
+    fireEvent.click(screen.getByRole('button', { name: /^Chốt đơn F10/ }));
     await waitFor(() => expect(bodies).toHaveLength(1));
     expect(bodies[0]!.lines).toEqual([
       expect.objectContaining({ skuId: SKU.id, qty: '2', unitPrice: '85000' }),
@@ -516,7 +536,7 @@ describe('OrderCreateScreen — màn tạo đơn mới', () => {
     fireEvent.change(box, { target: { value: 'amino' } });
     fireEvent.click(await screen.findByRole('option', { name: /Amino GA3 500ml/ }));
     await waitFor(() => expect(screen.getAllByLabelText('Số lượng')).toHaveLength(1));
-    fireEvent.click(screen.getByRole('button', { name: 'Chốt đơn (F10)' }));
+    fireEvent.click(screen.getByRole('button', { name: /^Chốt đơn F10/ }));
     await waitFor(() => expect(bodies).toHaveLength(1));
     expect(bodies[0]).toMatchObject({ customerId: CUST.id });
   });
@@ -567,7 +587,7 @@ describe('OrderCreateScreen — màn tạo đơn mới', () => {
       expect(screen.getAllByLabelText('Số lượng')).toHaveLength(REAL_LINES.length),
     );
 
-    fireEvent.click(screen.getByRole('button', { name: 'Chốt đơn (F10)' }));
+    fireEvent.click(screen.getByRole('button', { name: /^Chốt đơn F10/ }));
     const dialog = await screen.findByRole('dialog', { name: 'Khách này đã có 3 đơn hôm nay' });
     expect(within(dialog).getByText('DH2610-01234')).toBeInTheDocument();
     expect(within(dialog).getByText('Pancake')).toBeInTheDocument();
@@ -576,7 +596,7 @@ describe('OrderCreateScreen — màn tạo đơn mới', () => {
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
     expect(posts).toHaveLength(0);
 
-    fireEvent.click(screen.getByRole('button', { name: 'Chốt đơn (F10)' }));
+    fireEvent.click(screen.getByRole('button', { name: /^Chốt đơn F10/ }));
     const again = await screen.findByRole('dialog', { name: 'Khách này đã có 3 đơn hôm nay' });
     fireEvent.click(within(again).getByRole('button', { name: 'Vẫn tạo đơn' }));
     await waitFor(() => expect(posts).toHaveLength(1));
@@ -633,7 +653,7 @@ describe('OrderCreateScreen — màn tạo đơn mới', () => {
     fireEvent.change(box, { target: { value: 'amino' } });
     fireEvent.click(await screen.findByRole('option', { name: /Amino GA3 500ml/ }));
     await waitFor(() => expect(screen.getAllByLabelText('Số lượng')).toHaveLength(1));
-    fireEvent.click(screen.getByRole('button', { name: 'Chốt đơn (F10)' }));
+    fireEvent.click(screen.getByRole('button', { name: /^Chốt đơn F10/ }));
     await waitFor(() => expect(bodies).toHaveLength(1));
     expect(bodies[0]).not.toHaveProperty('customerId');
     expect(bodies[0]).toMatchObject({
@@ -679,7 +699,7 @@ describe('OrderCreateScreen — màn tạo đơn mới', () => {
       () => expect(screen.getAllByLabelText('Số lượng')).toHaveLength(REAL_LINES.length),
       { timeout: 3000 },
     );
-    fireEvent.click(screen.getByRole('button', { name: 'Chốt đơn (F10)' }));
+    fireEvent.click(screen.getByRole('button', { name: /^Chốt đơn F10/ }));
     expect((await screen.findAllByText('Tiền chuyển khoản vượt tổng đơn')).length).toBeGreaterThan(
       0,
     );
@@ -738,7 +758,7 @@ describe('OrderCreateScreen — màn tạo đơn mới', () => {
     const file = new File(['abc'], 'a.png', { type: 'image/png' });
     fireEvent.change(screen.getByLabelText('Chọn tệp đính kèm'), { target: { files: [file] } });
     expect(await screen.findByRole('button', { name: 'Bỏ tệp a.png' })).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: 'Chốt đơn (F10)' }));
+    fireEvent.click(screen.getByRole('button', { name: /^Chốt đơn F10/ }));
     await waitFor(() => expect(uploads).toEqual(['new-order-1']));
     await waitFor(() => expect(push).toHaveBeenCalledWith('/crm/orders/new-order-1'));
   });

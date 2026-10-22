@@ -17,14 +17,26 @@ import { toast } from '@/components/ui/toaster';
 import { messageFor } from '@/lib/error-messages';
 import { useBulkCancelOrders, type SalesOrder } from '../api/use-orders';
 import { orderCancellable } from '../labels';
+import { useControlledOpen } from '../use-controlled-open';
 
 /**
  * Hủy các đơn đã chọn trên danh sách — POST /sales-orders/bulk-cancel, cùng một lý do (tùy
  * chọn). Đơn đã hủy / kho đã đóng gói bị bỏ qua ngay ở client; server hủy từng đơn, nhả hàng
  * đang giữ, đơn lệch pha về `failed` và được báo riêng. Không hoàn tác, không optimistic (luật 5).
  */
-export function BulkCancelDialog({ rows, onDone }: { rows: SalesOrder[]; onDone: () => void }) {
-  const [open, setOpen] = useState(false);
+export function BulkCancelDialog({
+  rows,
+  onDone,
+  open: openProp,
+  onOpenChange,
+}: {
+  rows: SalesOrder[];
+  onDone: () => void;
+  /** Có `open` = mở từ menu "Khác" của thanh chọn nhiều — không vẽ nút riêng. */
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
+}) {
+  const { controlled, open, setOpen } = useControlledOpen(openProp, onOpenChange);
   const [reason, setReason] = useState('');
   const bulk = useBulkCancelOrders();
 
@@ -58,15 +70,17 @@ export function BulkCancelDialog({ rows, onDone }: { rows: SalesOrder[]; onDone:
 
   return (
     <>
-      <Button
-        size="sm"
-        variant="outline"
-        className="h-7 border-destructive-line px-2 text-xs text-destructive hover:bg-destructive-weak hover:text-destructive"
-        onClick={() => setOpen(true)}
-      >
-        <Ban aria-hidden />
-        Hủy đơn
-      </Button>
+      {controlled ? null : (
+        <Button
+          size="sm"
+          variant="outline"
+          className="h-7 border-destructive-line px-2 text-xs text-destructive hover:bg-destructive-weak hover:text-destructive"
+          onClick={() => setOpen(true)}
+        >
+          <Ban aria-hidden />
+          Hủy đơn
+        </Button>
+      )}
       <Dialog open={open} onOpenChange={(o) => !bulk.isPending && setOpen(o)}>
         <DialogContent>
           <DialogHeader>

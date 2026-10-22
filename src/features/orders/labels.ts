@@ -231,24 +231,78 @@ export function manualDiscountNote(
 
 // ── Tab danh sách đơn (2026-10-12) — luồng chung, docs/carrier-status-mapping.md ở apps/api ──
 
-/** Thứ tự tab; `group` tách ba nhóm bằng vạch: ở kho / đang đi đường / đã xong. */
+/**
+ * Họ trạng thái theo giai đoạn (design system: 5 họ `flow-*` + `flow-off`) — tab cùng họ đứng
+ * cạnh nhau, vạch dọc tách họ, chấm màu ở tab đầu họ (redesign Bán hàng 2026-10-22).
+ */
+export type OrderFlowFamily = 'wait' | 'fulfil' | 'ship' | 'done' | 'issue' | 'off';
+
+/** Thứ tự tab; `family` = họ màu của trạng thái. */
 export const ORDER_FLOW_TABS: ReadonlyArray<{
   flow: OrderFlow;
   label: string;
-  group: 'warehouse' | 'shipping' | 'done';
+  family: OrderFlowFamily;
 }> = [
-  { flow: 'PENDING_APPROVAL', label: 'Chờ duyệt', group: 'warehouse' },
-  { flow: 'WAREHOUSE', label: 'Chờ xử lý kho', group: 'warehouse' },
-  { flow: 'PICKING', label: 'Đang pick', group: 'warehouse' },
-  { flow: 'PACKED', label: 'Đã đóng gói', group: 'warehouse' },
-  { flow: 'PICKED_UP', label: 'Đã lấy hàng', group: 'shipping' },
-  { flow: 'IN_TRANSIT', label: 'Đang vận chuyển', group: 'shipping' },
-  { flow: 'OUT_FOR_DELIVERY', label: 'Đang giao hàng', group: 'shipping' },
-  { flow: 'DELIVERED', label: 'Thành công', group: 'done' },
-  { flow: 'RETURNED', label: 'Sự cố hoàn', group: 'done' },
-  { flow: 'CARRIER_CANCELLED', label: 'Hãng hủy', group: 'done' },
-  { flow: 'CANCELLED', label: 'Đã hủy', group: 'done' },
+  { flow: 'PENDING_APPROVAL', label: 'Chờ duyệt', family: 'wait' },
+  { flow: 'WAREHOUSE', label: 'Chờ xử lý kho', family: 'fulfil' },
+  { flow: 'PICKING', label: 'Đang lấy hàng', family: 'fulfil' },
+  { flow: 'PACKED', label: 'Đã đóng gói', family: 'fulfil' },
+  { flow: 'PICKED_UP', label: 'Đã lấy hàng', family: 'ship' },
+  { flow: 'IN_TRANSIT', label: 'Đang vận chuyển', family: 'ship' },
+  { flow: 'OUT_FOR_DELIVERY', label: 'Đang giao hàng', family: 'ship' },
+  { flow: 'DELIVERED', label: 'Thành công', family: 'done' },
+  { flow: 'RETURNED', label: 'Sự cố hoàn', family: 'issue' },
+  { flow: 'CARRIER_CANCELLED', label: 'Hãng hủy', family: 'issue' },
+  { flow: 'CANCELLED', label: 'Đã hủy', family: 'off' },
 ];
+
+/**
+ * Luồng chung của một đơn ở màn chi tiết (DTO chi tiết không có `flow` như dòng danh sách): suy từ
+ * trạng thái chứng từ + trạng thái kho/giao. `null` = không xếp được vào luồng (việc kho bị hủy
+ * trong khi đơn còn sống) — màn không vẽ thanh tiến độ.
+ */
+export function detailOrderFlow(
+  status: SalesOrderStatus,
+  fulfilment: OrderFulfilmentStatus,
+): OrderFlow | null {
+  if (status === 'CANCELLED') return 'CANCELLED';
+  if (status === 'DRAFT' || status === 'PENDING_APPROVAL') return 'PENDING_APPROVAL';
+  switch (fulfilment) {
+    case 'NOT_STARTED':
+      return 'WAREHOUSE';
+    case 'PICKING':
+    case 'PICKED':
+    case 'PACKING':
+      return 'PICKING';
+    case 'PACKED':
+      return 'PACKED';
+    case 'SHIPPED':
+      return 'PICKED_UP';
+    case 'IN_TRANSIT':
+      return 'IN_TRANSIT';
+    case 'OUT_FOR_DELIVERY':
+    case 'FAILED':
+      return 'OUT_FOR_DELIVERY';
+    case 'DELIVERED':
+      return 'DELIVERED';
+    case 'RETURNED':
+      return 'RETURNED';
+    case 'CARRIER_CANCELLED':
+      return 'CARRIER_CANCELLED';
+    default:
+      return null;
+  }
+}
+
+/** Chấm màu của họ trạng thái (nguyên class để Tailwind thấy). */
+export const FLOW_FAMILY_DOT: Record<OrderFlowFamily, string> = {
+  wait: 'bg-flow-wait',
+  fulfil: 'bg-flow-fulfil',
+  ship: 'bg-flow-ship',
+  done: 'bg-flow-done',
+  issue: 'bg-flow-issue',
+  off: 'bg-flow-off',
+};
 
 /**
  * Mỗi trạng thái một màu chữ, nền cùng màu 10% (token --flow-* trong globals.css). Viết nguyên

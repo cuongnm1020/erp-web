@@ -61,7 +61,7 @@ describe('DateRangeFilter (2026-10-22)', () => {
 
     open('Ngày đặt: tất cả');
     fireEvent.click(await screen.findByRole('button', { name: '7 ngày qua' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Áp dụng' }));
+    fireEvent.click(screen.getByRole('button', { name: /^Áp dụng/ }));
     expect(screen.getByTestId('v')).toHaveTextContent('2026-10-16|2026-10-22');
     expect(screen.getByRole('button', { name: 'Ngày đặt: 7 ngày qua' })).toBeInTheDocument();
   });
@@ -76,7 +76,7 @@ describe('DateRangeFilter (2026-10-22)', () => {
     fireEvent.change(to, { target: { value: '05/10/2026' } });
     fireEvent.blur(to);
     expect(screen.getByText('3 ngày')).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: 'Áp dụng' }));
+    fireEvent.click(screen.getByRole('button', { name: /^Áp dụng/ }));
     expect(screen.getByTestId('v')).toHaveTextContent('2026-10-03|2026-10-05');
     open('Xóa lọc ngày đặt');
     expect(screen.getByTestId('v')).toHaveTextContent(/^\|$/);
@@ -84,7 +84,7 @@ describe('DateRangeFilter (2026-10-22)', () => {
 
   it('bắt buộc: không có "Mọi lúc" / "Xóa ngày" / nút ×', async () => {
     renderApp(<Harness required initial={{ from: '2026-10-01', to: TODAY }} />);
-    open('Ngày đặt: Đầu tháng đến nay');
+    open('Ngày đặt: Đầu tháng đến nay · 01/10 – 22/10/2026');
     await screen.findByRole('button', { name: 'Hôm nay' });
     expect(screen.queryByRole('button', { name: 'Mọi lúc' })).toBeNull();
     expect(screen.queryByRole('button', { name: 'Xóa ngày' })).toBeNull();
@@ -109,7 +109,7 @@ describe('DateRangeFilter (2026-10-22)', () => {
     open('Ngày đặt: tất cả');
     fireEvent.click(await screen.findByRole('button', { name: '30 ngày qua' }));
     fireEvent.click(screen.getByRole('checkbox', { name: 'Ghi nhớ khoảng ngày cho lần sau' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Áp dụng' }));
+    fireEvent.click(screen.getByRole('button', { name: /^Áp dụng/ }));
     await waitFor(() =>
       expect(saved).toEqual([{ key: 'date.orders', value: { preset: 'last30' } }]),
     );
@@ -117,5 +117,27 @@ describe('DateRangeFilter (2026-10-22)', () => {
 
     renderApp(<Harness rememberKey="date.orders" />);
     await waitFor(() => expect(screen.getByTestId('v')).toHaveTextContent('2026-09-23|2026-10-22'));
+  });
+
+  it('lịch 2 tháng theo thiết kế: tháng trái = tháng của ngày cuối, "Tháng 10 / 2026", T2…CN; bấm 2 ngày = khoảng', async () => {
+    renderApp(<Harness />);
+    open('Ngày đặt: tất cả');
+    expect(await screen.findByRole('group', { name: 'Tháng 10 / 2026' })).toBeInTheDocument();
+    expect(screen.getByRole('group', { name: 'Tháng 11 / 2026' })).toBeInTheDocument();
+    expect(screen.getAllByText('T2')).toHaveLength(2);
+    fireEvent.click(screen.getByRole('button', { name: '05/10/2026' }));
+    fireEvent.click(screen.getByRole('button', { name: '12/10/2026' }));
+    expect(screen.getByRole('button', { name: '08/10/2026' })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    );
+    expect(screen.getByText('8 ngày')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Xem tháng trước' }));
+    expect(screen.getByRole('group', { name: 'Tháng 9 / 2026' })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /^Áp dụng/ }));
+    expect(screen.getByTestId('v')).toHaveTextContent('2026-10-05|2026-10-12');
+    expect(
+      screen.getByRole('button', { name: 'Ngày đặt: 05/10 – 12/10/2026' }),
+    ).toBeInTheDocument();
   });
 });

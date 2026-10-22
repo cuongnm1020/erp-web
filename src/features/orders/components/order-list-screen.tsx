@@ -1,15 +1,38 @@
 'use client';
 
 import type { RowSelectionState } from '@tanstack/react-table';
-import { MessageSquareText, Plus, X } from 'lucide-react';
+import Decimal from 'decimal.js';
+import {
+  Check,
+  ChevronDown,
+  Copy,
+  Eye,
+  ExternalLink,
+  MessageSquareText,
+  Pencil,
+  Plus,
+  X,
+} from 'lucide-react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { useEffect, useMemo, useState } from 'react';
+import { BulkActionBar } from '@/components/data/bulk-action-bar';
+import { CopyButton } from '@/components/data/copy-button';
 import { CopyText } from '@/components/data/copy-text';
 import { ColumnPicker, DataTable, FilterBar, type ColumnDef } from '@/components/data/data-table';
+import { RowActions, type RowActionItem } from '@/components/data/row-actions';
 import { EmptyState, ListSkeleton, QueryState } from '@/components/data/states';
 import { StatusBadge } from '@/components/data/status-badge';
 import { PageHeader } from '@/components/layout/page-header';
 import { Button } from '@/components/ui/button';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { Input } from '@/components/ui/input';
 import {
   Select,
@@ -23,16 +46,17 @@ import {
   formatDateTime,
   formatMoney,
   formatPhone,
+  groupVi,
   normalizePhone,
   formatQuantity,
   formatRelative,
   phoneCarrier,
   toDecimal,
 } from '@/lib/format';
-import { Can } from '@/lib/permission';
+import { Can, useAbility } from '@/lib/permission';
 import { useInvalidateOn } from '@/lib/realtime';
+import { useHotkey } from '@/lib/use-hotkey';
 import { useListState, type SortState } from '@/lib/url-state';
-import { useWarehouse } from '@/lib/warehouse';
 import { useCarriers } from '@/features/wms/api/use-shipping';
 import {
   orderKeys,
@@ -46,13 +70,20 @@ import {
   type OrderSortField,
   type SalesOrderListItem,
 } from '../api/use-orders';
-import { fulfilmentLabel, ORDER_FLOW_TABS, parseOrderFlow, parseOrderStatus } from '../labels';
+import {
+  FLOW_FAMILY_DOT,
+  fulfilmentLabel,
+  ORDER_FLOW_TABS,
+  parseOrderFlow,
+  parseOrderStatus,
+} from '../labels';
 import { BulkCancelDialog } from './bulk-cancel-dialog';
 import { BulkMoveWarehouseDialog } from './bulk-move-warehouse-dialog';
 import { BulkFulfilPrintDialog } from './bulk-fulfil-print-dialog';
 import { BulkReprintWaybillDialog } from './bulk-reprint-waybill-dialog';
 import { BulkShippingDialog } from './bulk-shipping-dialog';
 import { FlowBadge, OrderQuickView, TelcoBadge } from './order-quick-view';
+import { OrderSavedViews } from './order-saved-views';
 import { PancakeOrderResyncButton } from './pancake-order-resync-button';
 import { SendToCarrierMenu } from './send-to-carrier-menu';
 import { PancakeOrderLink } from './pancake-order-link';
@@ -70,8 +101,12 @@ import { PancakeOrderLink } from './pancake-order-link';
  * "Gửi sang ĐVVC" / "Gán hãng / cân nặng" / "In lại vận đơn" (tem ERP 100×75, đơn đã có mã).
  *
  * Trạng thái không sửa tay trên dòng (khác Pancake): trạng thái do quy trình kho + hãng cập nhật.
- * Chưa làm so với canvas (cần API riêng): Nhập / Xuất Excel, In nhãn hàng loạt, Hủy đơn hàng
- * loạt, lọc theo người phụ trách (chưa có danh bạ người dùng cho sale).
+ * Chưa làm so với canvas (cần API riêng): Nhập / Xuất Excel, lọc theo người phụ trách (chưa có
+ * danh bạ người dùng cho sale).
+ *
+ * Redesign Bán hàng 2026-10-22 (canvas "Redesign Bán hàng", đã duyệt): tab chia họ màu, thanh lọc
+ * gọn (lọc ít dùng vào "Thêm lọc"), "Bộ lọc đã lưu", cột cuối RowActions (Xem nhanh + ⋯ có
+ * Nhân bản đơn), chọn nhiều → BulkActionBar thay chỗ thanh lọc, F2 tạo đơn.
  */
 const DEFAULTS = {
   size: 50,
@@ -114,18 +149,67 @@ const SORT_FIELD: Record<string, OrderSortField> = {
   time: 'time',
 };
 
-/** Cột ẩn khi người dùng chưa chọn lần nào. */
-const DEFAULT_HIDDEN = ['orderDate'];
+/**
+ * Cột ẩn khi người dùng chưa chọn lần nào. "Thực thu ĐVVC" gần như toàn "—" tới khi hãng đối
+ * soát → ẩn mặc định, bật lại ở "Cột".
+ */
+const DEFAULT_HIDDEN = ['orderDate', 'collected'];
 
 type OrderFilter = (typeof DEFAULTS.filterKeys)[number];
 
+/** Lọc ít dùng — nằm sau nút "Thêm lọc", tự hiện trên thanh khi đang có giá trị. */
+const EXTRA_FILTERS = [
+  { key: 'duplicate', label: 'Trùng trong ngày' },
+  { key: 'itemOrigin', label: 'Sản phẩm ngoài ERP' },
+  { key: 'weightMin', label: 'Cân nặng' },
+] as const satisfies ReadonlyArray<{ key: OrderFilter; label: string }>;
+type ExtraFilter = (typeof EXTRA_FILTERS)[number]['key'];
+
+/** Quyền + handler mà cột thao tác cần — tính một lần ở màn, không gọi hook trong cell. */
+interface RowActionContext {
+  canUpdate: boolean;
+  canCreate: boolean;
+  onPeek: (row: SalesOrderListItem) => void;
+}
+
+/** Menu "⋯" của một dòng đơn: mở / sửa / nhân bản (redesign 2026-10-22). */
+function orderRowItems(o: SalesOrderListItem, ctx: RowActionContext): RowActionItem[] {
+  return [
+    {
+      label: 'Mở chi tiết',
+      icon: <ExternalLink aria-hidden />,
+      href: `/crm/orders/${o.id}`,
+    },
+    ...(ctx.canUpdate
+      ? [
+          {
+            label: 'Sửa đơn',
+            icon: <Pencil aria-hidden />,
+            href: `/crm/orders/${o.id}/edit`,
+            disabledReason: o.status === 'CANCELLED' ? 'Đơn đã hủy' : undefined,
+          },
+        ]
+      : []),
+    ...(ctx.canCreate
+      ? [
+          {
+            // ?from= mở tab tạo đơn điền sẵn từ đơn này; đơn gốc giữ nguyên.
+            label: 'Nhân bản đơn',
+            icon: <Copy aria-hidden />,
+            href: `/crm/orders/new?from=${o.id}`,
+          },
+        ]
+      : []),
+  ];
+}
+
 /**
- * Cột của bảng — `carrierOf` tra mã + tên hãng chọn trên đơn khi kho chưa tạo phiếu giao,
- * `warehouseName` tra tên kho xuất của đơn.
+ * Cột của bảng — `carrierOf` tra mã + tên hãng chọn trên đơn khi kho chưa tạo phiếu giao.
+ * Cột Kho đã bỏ (2026-10-22): danh sách luôn lọc theo kho làm việc ở ô chọn kho.
  */
 const buildColumns = (
   carrierOf: (id: string) => CarrierRef | null,
-  warehouseName: (id: string) => string | null,
+  actions: RowActionContext,
 ): ColumnDef<SalesOrderListItem, unknown>[] => [
   {
     id: 'docNumber',
@@ -133,37 +217,37 @@ const buildColumns = (
     meta: { width: 170, sortable: true },
     cell: ({ row }) => {
       const o = row.original;
+      // Nguồn (Pancake # / ERP) + sale trên MỘT dòng phụ, cắt gọn — tên đầy đủ ở title.
+      const meta = [o.pancakeOrderId ? null : 'Tạo trong ERP', o.ownerName].filter(Boolean);
       return (
-        <div className="space-y-1">
+        <div className="space-y-0.5">
           <div className="flex items-center gap-1.5">
             <Link
               href={`/crm/orders/${o.id}`}
               onClick={(e) => e.stopPropagation()}
-              className="font-mono text-xs font-medium text-primary hover:underline"
+              className="font-mono text-xs font-semibold text-primary hover:underline"
             >
               {o.docNumber}
             </Link>
+            <CopyButton value={o.docNumber} label="mã đơn" />
             {o.note ? (
               <span title={o.note} className="inline-flex text-warning">
                 <MessageSquareText className="h-3.5 w-3.5" aria-label="Có ghi chú" />
               </span>
             ) : null}
           </div>
-          <div className="text-xs text-muted-foreground">
-            <span className="rounded-sm bg-muted px-1.5 font-medium">
-              {o.pancakeOrderId ? (
-                <PancakeOrderLink orderId={o.pancakeOrderId} link={o.pancakeOrderLink} />
-              ) : (
-                'ERP'
-              )}
-            </span>
+          <div
+            className="max-w-40 truncate text-xs text-muted-foreground"
+            title={[o.pancakeOrderId ? `Pancake #${o.pancakeOrderId}` : null, ...meta]
+              .filter(Boolean)
+              .join(' · ')}
+          >
+            {o.pancakeOrderId ? (
+              <PancakeOrderLink orderId={o.pancakeOrderId} link={o.pancakeOrderLink} />
+            ) : null}
+            {o.pancakeOrderId && meta.length > 0 ? ' · ' : null}
+            {meta.join(' · ')}
           </div>
-          {/* Sale một dòng riêng dưới mã Pancake — tên sale dài không còn đẩy / cắt mã đơn nguồn. */}
-          {o.ownerName ? (
-            <div className="max-w-40 truncate text-xs text-muted-foreground" title={o.ownerName}>
-              {o.ownerName}
-            </div>
-          ) : null}
         </div>
       );
     },
@@ -189,17 +273,15 @@ const buildColumns = (
             {o.recipientName ?? o.customer.name}
           </span>
           <span className="flex items-center gap-1.5 whitespace-nowrap">
-            {o.phone ? (
-              // Viết liền (0356523006) để dán thẳng vào Zalo / tổng đài; bấm là sao chép.
-              <CopyText
-                value={normalizePhone(o.phone) ?? o.phone}
-                what="số điện thoại"
-                className="font-mono text-xs"
-              />
-            ) : (
-              <span className="font-mono text-xs">{formatPhone(o.phone)}</span>
-            )}
+            {/* Viết liền (0356523006) như trước — dán thẳng vào Zalo / tổng đài (2026-10-13). */}
+            <span className="font-mono text-xs">
+              {o.phone ? (normalizePhone(o.phone) ?? o.phone) : formatPhone(o.phone)}
+            </span>
             {telco ? <TelcoBadge name={telco} /> : null}
+            {o.phone ? (
+              // Chép dạng viết liền (0356523006) để dán thẳng vào Zalo / tổng đài.
+              <CopyButton value={normalizePhone(o.phone) ?? o.phone} label="số điện thoại" />
+            ) : null}
           </span>
         </div>
       );
@@ -245,22 +327,6 @@ const buildColumns = (
     cell: ({ row }) => <ShippingCell order={row.original} carrierOf={carrierOf} />,
   },
   {
-    id: 'warehouse',
-    header: 'Kho',
-    meta: { width: 120 },
-    cell: ({ row }) => {
-      const id = row.original.warehouseId;
-      const name = id ? warehouseName(id) : null;
-      return name ? (
-        <span className="block max-w-28 truncate text-xs" title={name}>
-          {name}
-        </span>
-      ) : (
-        <span className="text-xs text-warning">Chưa chọn kho</span>
-      );
-    },
-  },
-  {
     id: 'total',
     header: 'Tổng tiền',
     meta: { align: 'right', width: 120, sortable: true },
@@ -301,36 +367,51 @@ const buildColumns = (
     },
   },
   {
-    id: 'flow',
+    // Trạng thái + thời gian gộp một cột (2026-10-22); id giữ 'time' để sắp xếp theo thời gian
+    // (và tuỳ chọn sắp đã lưu của người dùng) vẫn chạy.
+    id: 'time',
     header: 'Trạng thái',
-    meta: { width: 140 },
+    meta: { width: 160, sortable: true, title: 'Trạng thái' },
     cell: ({ row }) => {
       const o = row.original;
       return (
-        <span className="flex flex-wrap items-center gap-1">
-          <span title={o.fulfilmentStatus ? fulfilmentLabel(o.fulfilmentStatus) : undefined}>
-            <FlowBadge flow={o.flow} />
-          </span>
-          {o.sameDayCount > 0 ? (
-            <span title={`Cùng SĐT khách còn ${o.sameDayCount} đơn khác hôm đặt đơn này`}>
-              <StatusBadge tone="warn">Trùng · {o.sameDayCount + 1} đơn</StatusBadge>
+        <div className="space-y-0.5">
+          <span className="flex flex-wrap items-center gap-1">
+            <span title={o.fulfilmentStatus ? fulfilmentLabel(o.fulfilmentStatus) : undefined}>
+              <FlowBadge flow={o.flow} />
             </span>
-          ) : null}
-        </span>
+            {o.sameDayCount > 0 ? (
+              <span title={`Cùng SĐT khách còn ${o.sameDayCount} đơn khác hôm đặt đơn này`}>
+                <StatusBadge tone="warn">Trùng · {o.sameDayCount + 1} đơn</StatusBadge>
+              </span>
+            ) : null}
+          </span>
+          <span
+            className="block text-xs text-muted-foreground"
+            title={`Tạo ${formatDateTime(o.createdAt)} · đổi trạng thái ${formatDateTime(
+              o.statusChangedAt ?? o.updatedAt,
+            )}`}
+          >
+            {formatRelative(o.statusChangedAt ?? o.updatedAt)}
+          </span>
+        </div>
       );
     },
   },
   {
-    id: 'time',
-    header: 'Thời gian',
-    meta: { width: 130, sortable: true },
+    id: 'actions',
+    header: () => <span className="sr-only">Thao tác</span>,
+    meta: { width: 72, title: 'Thao tác' },
     cell: ({ row }) => (
-      <div className="space-y-1 text-xs">
-        <span className="block">{formatRelative(row.original.createdAt)}</span>
-        <span className="block text-muted-foreground">
-          TT: {formatRelative(row.original.statusChangedAt ?? row.original.updatedAt)}
-        </span>
-      </div>
+      <RowActions
+        itemName={`đơn ${row.original.docNumber}`}
+        primary={{
+          label: 'Xem nhanh',
+          icon: <Eye aria-hidden />,
+          onClick: () => actions.onPeek(row.original),
+        }}
+        items={orderRowItems(row.original, actions)}
+      />
     ),
   },
 ];
@@ -419,7 +500,10 @@ function WeightNote({ order }: { order: SalesOrderListItem }) {
   );
 }
 
-/** Tab luồng đơn + số đếm (API). Vạch dọc tách ba nhóm: ở kho / đang đi đường / đã xong. */
+/**
+ * Tab luồng đơn + số đếm (API). Tab cùng họ màu (design system `flow-*`) đứng cạnh nhau, vạch
+ * dọc tách họ, chấm màu ở tab đầu họ; tab đang 0 đơn chữ mờ (vẫn bấm được).
+ */
 function FlowTabs({
   value,
   counts,
@@ -429,13 +513,17 @@ function FlowTabs({
   counts: Record<string, number> | undefined;
   onChange: (v: OrderFlow | undefined) => void;
 }) {
-  const tabs: Array<{ key: OrderFlow | undefined; label: string; divider: boolean }> = [
-    { key: undefined, label: 'Tất cả', divider: false },
-    ...ORDER_FLOW_TABS.map((t, i) => ({
-      key: t.flow,
-      label: t.label,
-      divider: i > 0 && ORDER_FLOW_TABS[i - 1]!.group !== t.group,
-    })),
+  const tabs = [
+    { key: undefined as OrderFlow | undefined, label: 'Tất cả', divider: false, dot: null },
+    ...ORDER_FLOW_TABS.map((t, i) => {
+      const first = i === 0 || ORDER_FLOW_TABS[i - 1]!.family !== t.family;
+      return {
+        key: t.flow as OrderFlow | undefined,
+        label: t.label,
+        divider: first,
+        dot: first ? FLOW_FAMILY_DOT[t.family] : null,
+      };
+    }),
   ];
   return (
     <div
@@ -446,35 +534,81 @@ function FlowTabs({
       {tabs.map((t) => {
         const active = value === t.key;
         const n = counts?.[t.key ?? 'total'];
+        const zero = n === 0;
         return (
           <div key={t.key ?? '__all__'} className="flex flex-none items-stretch">
-            {t.divider ? <span aria-hidden className="my-2.5 mx-1.5 w-px bg-border" /> : null}
+            {t.divider ? <span aria-hidden className="mx-1 my-3 w-px bg-input-soft" /> : null}
             <button
               type="button"
               role="tab"
               aria-selected={active}
               onClick={() => onChange(t.key)}
               className={cn(
-                '-mb-px flex h-10 items-center gap-1.5 whitespace-nowrap border-b-2 px-3 text-sm',
+                '-mb-px flex h-10 items-center gap-1.5 whitespace-nowrap border-b-2 px-2.5 text-sm',
                 active
-                  ? 'border-primary font-semibold text-primary'
-                  : 'border-transparent text-muted-foreground hover:text-foreground',
+                  ? 'border-primary font-semibold text-foreground'
+                  : zero
+                    ? 'border-transparent text-subtle-foreground hover:text-foreground'
+                    : 'border-transparent font-semibold text-muted-foreground hover:text-foreground',
               )}
             >
+              {t.dot ? (
+                <span aria-hidden className={cn('h-1.5 w-1.5 rounded-full', t.dot)} />
+              ) : null}
               {t.label}
-              <span
-                className={cn(
-                  'rounded-full px-1.5 text-xs font-semibold tabular-nums',
-                  active ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground',
-                )}
-              >
-                {n === undefined ? '…' : n.toLocaleString('vi-VN')}
+              <span className="font-normal tabular-nums text-subtle-foreground">
+                {n === undefined ? '…' : groupVi(String(n))}
               </span>
             </button>
           </div>
         );
       })}
     </div>
+  );
+}
+
+/**
+ * "Thêm lọc": bật / tắt các lọc ít dùng trên thanh lọc. Lọc đang có giá trị luôn hiện (không tắt
+ * được ở đây — bỏ giá trị bằng chính ô lọc hoặc "Xóa lọc").
+ */
+function MoreFilters({
+  shown,
+  active,
+  onToggle,
+}: {
+  shown: ReadonlySet<ExtraFilter>;
+  active: ReadonlySet<ExtraFilter>;
+  onToggle: (key: ExtraFilter) => void;
+}) {
+  return (
+    <DropdownMenu modal={false}>
+      <DropdownMenuTrigger asChild>
+        <Button variant="ghost" size="sm" className="text-primary hover:text-primary-hover">
+          <Plus aria-hidden />
+          Thêm lọc
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="start">
+        <DropdownMenuLabel>Lọc thêm theo</DropdownMenuLabel>
+        {EXTRA_FILTERS.map((f) => (
+          <DropdownMenuItem
+            key={f.key}
+            disabled={active.has(f.key)}
+            hint={active.has(f.key) ? 'đang lọc' : undefined}
+            onSelect={(e) => {
+              e.preventDefault();
+              onToggle(f.key);
+            }}
+          >
+            <Check
+              aria-hidden
+              className={cn(shown.has(f.key) || active.has(f.key) ? 'opacity-100' : 'opacity-0')}
+            />
+            {f.label}
+          </DropdownMenuItem>
+        ))}
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 }
 
@@ -652,30 +786,55 @@ export function OrderListScreen() {
     [filterParams, flow, sortBy, sort?.desc, skipTake],
   );
   const carriers = useCarriers();
-  // Tên kho: kho được phép từ /auth/me — đơn ngoài kho được phép không bao giờ về tới đây.
-  const { options: warehouses } = useWarehouse();
+  const router = useRouter();
+  const ability = useAbility();
+  const canUpdate = ability.can('update', 'SalesOrder');
+  const canCreate = ability.can('create', 'SalesOrder');
+  const [peek, setPeek] = useState<SalesOrderListItem | null>(null);
   const columns = useMemo(() => {
     const carrierById = new Map((carriers.data ?? []).map((c) => [c.id, c]));
-    const whById = new Map(warehouses.map((w) => [w.id, w.name]));
-    return buildColumns(
-      (id) => carrierById.get(id) ?? null,
-      (id) => whById.get(id) ?? null,
-    );
-  }, [carriers.data, warehouses]);
+    return buildColumns((id) => carrierById.get(id) ?? null, {
+      canUpdate,
+      canCreate,
+      onPeek: setPeek,
+    });
+  }, [carriers.data, canUpdate, canCreate]);
   const pickerColumns = useMemo(
     () =>
-      columns.map((c) => ({
-        id: c.id!,
-        title: c.meta?.title ?? (typeof c.header === 'string' ? c.header : c.id!),
-        required: c.id === 'docNumber',
-      })),
+      columns
+        .filter((c) => c.id !== 'actions')
+        .map((c) => ({
+          id: c.id!,
+          title: c.meta?.title ?? (typeof c.header === 'string' ? c.header : c.id!),
+          required: c.id === 'docNumber',
+        })),
     [columns],
   );
   const query = useOrders(params);
   const counts = useOrderFlowCounts(filterParams);
   useInvalidateOn(['order.created', 'order.updated'], [orderKeys.lists()]);
   const [selected, setSelected] = useState<RowSelectionState>({});
-  const [peek, setPeek] = useState<SalesOrderListItem | null>(null);
+  // Lọc ít dùng người dùng vừa bật qua "Thêm lọc" (chưa có giá trị) — chỉ sống trong phiên.
+  const [shownExtras, setShownExtras] = useState<ReadonlySet<ExtraFilter>>(new Set());
+  const activeExtras = useMemo(
+    () =>
+      new Set<ExtraFilter>(
+        EXTRA_FILTERS.filter((f) =>
+          f.key === 'weightMin' ? !!(weightMin || weightMax) : !!state.filters[f.key],
+        ).map((f) => f.key),
+      ),
+    [weightMin, weightMax, state.filters],
+  );
+  const toggleExtra = (key: ExtraFilter) =>
+    setShownExtras((s) => {
+      const next = new Set(s);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  const showExtra = (key: ExtraFilter) => activeExtras.has(key) || shownExtras.has(key);
+
+  useHotkey('F2', () => router.push('/crm/orders/new'), { enabled: canCreate });
 
   const setFilter = (patch: Partial<Record<OrderFilter, string | undefined>>) =>
     set({ filters: { ...state.filters, ...patch } });
@@ -695,13 +854,17 @@ export function OrderListScreen() {
     duplicate ||
     itemOrigin !== undefined;
   const customerName = query.data?.items[0]?.customer.name;
+  const selectedRows = (query.data?.items ?? []).filter((r) => selected[r.id]);
+  const clearSelection = () => setSelected({});
 
   return (
     <>
       <PageHeader
         title="Đơn hàng"
         description={
-          query.data ? `${query.data.total} đơn khớp bộ lọc` : 'Đang đếm số đơn khớp bộ lọc…'
+          query.data
+            ? `${groupVi(String(query.data.total))} đơn khớp bộ lọc`
+            : 'Đang đếm số đơn khớp bộ lọc…'
         }
         breadcrumb={[{ label: 'Bán hàng' }, { label: 'Đơn hàng' }]}
         actions={
@@ -710,7 +873,7 @@ export function OrderListScreen() {
               <PancakeOrderResyncButton defaultShopId={posShopId} />
             </Can>
             <Can I="create" a="SalesOrder">
-              <Button size="sm" asChild>
+              <Button asChild shortcut="F2">
                 <Link href="/crm/orders/new">
                   <Plus aria-hidden />
                   Tạo đơn
@@ -727,109 +890,127 @@ export function OrderListScreen() {
         onChange={(v) => setFilter({ flow: v })}
       />
 
-      <FilterBar<OrderFilter>
-        q={state.q}
-        onQChange={(q) => set({ q })}
-        filters={[
-          {
-            key: 'from',
-            toKey: 'to',
-            label: 'Ngày đặt',
-            type: 'dateRange',
-            rememberKey: 'date.orders',
-          },
-          {
-            // Một ô cho cả "chưa gán hãng" lẫn "đã gán hãng X" — hai key URL (noCarrier / carrierId)
-            // loại trừ nhau.
-            key: 'carrierId',
-            label: 'Hãng vận chuyển',
-            type: 'custom',
-            render: () => (
-              <CarrierFilter
-                value={noCarrier ? NO_CARRIER : carrierId}
-                carriers={carriers.data ?? []}
-                onChange={(v) =>
-                  setFilter(
-                    v === NO_CARRIER
-                      ? { noCarrier: 'true', carrierId: undefined }
-                      : { noCarrier: undefined, carrierId: v || undefined },
-                  )
-                }
-              />
-            ),
-          },
-          {
-            key: 'source',
-            label: 'Nguồn',
-            type: 'select',
-            // Hàng chục POS Pancake — gõ tìm theo tên shop.
-            searchable: true,
-            options: [
-              { value: 'PANCAKE', label: 'Pancake (mọi POS)' },
-              ...(pancakeShops.data ?? []).map((s) => ({
-                value: `POS:${s.shopId}`,
-                label: `Pancake · ${s.shopName ?? `POS ${s.shopId}`}${s.isActive ? '' : ' (đã ngắt)'}`,
-              })),
-              { value: 'ERP', label: 'Tạo trong ERP' },
-            ],
-          },
-          {
-            key: 'duplicate',
-            label: 'Trùng trong ngày',
-            type: 'select',
-            options: [{ value: 'true', label: 'Chỉ đơn trùng trong ngày' }],
-          },
-          {
-            key: 'itemOrigin',
-            label: 'Sản phẩm ngoài ERP',
-            type: 'select',
-            options: ITEM_ORIGIN_OPTIONS,
-          },
-          {
-            key: 'weightMin',
-            label: 'Cân nặng',
-            type: 'custom',
-            render: () => (
-              <WeightRangeFilter
-                min={state.filters.weightMin}
-                max={state.filters.weightMax}
-                onChange={setFilter}
-              />
-            ),
-          },
-        ]}
-        values={{
-          flow: state.filters.flow,
-          status: state.filters.status,
-          customerId: state.filters.customerId,
-          weightMin: state.filters.weightMin,
-          weightMax: state.filters.weightMax,
-          noCarrier: state.filters.noCarrier,
-          carrierId: state.filters.carrierId,
-          source: state.filters.source,
-          from: state.filters.from,
-          to: state.filters.to,
-          duplicate: state.filters.duplicate,
-          itemOrigin: state.filters.itemOrigin,
-        }}
-        onFilterChange={setFilter}
-        searchPlaceholder="Mã đơn, mã Pancake, SĐT, tên khách, mã vận đơn"
-        right={
-          <>
-            {customerId ? (
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setFilter({ customerId: undefined })}
-              >
-                <X aria-hidden />
-                Đang lọc theo khách {customerName ? `“${customerName}”` : 'đã chọn'}
-              </Button>
-            ) : null}
-            <ColumnPicker columns={pickerColumns} hidden={hidden} onChange={changeHidden} />
-          </>
-        }
-      />
+      {selectedRows.length > 0 ? (
+        <OrderBulkBar rows={selectedRows} onClear={clearSelection} />
+      ) : (
+        <FilterBar<OrderFilter>
+          q={state.q}
+          onQChange={(q) => set({ q })}
+          filters={[
+            {
+              key: 'from',
+              toKey: 'to',
+              label: 'Ngày đặt',
+              type: 'dateRange',
+              rememberKey: 'date.orders',
+            },
+            {
+              // Một ô cho cả "chưa gán hãng" lẫn "đã gán hãng X" — hai key URL (noCarrier / carrierId)
+              // loại trừ nhau.
+              key: 'carrierId',
+              label: 'Hãng vận chuyển',
+              type: 'custom',
+              render: () => (
+                <CarrierFilter
+                  value={noCarrier ? NO_CARRIER : carrierId}
+                  carriers={carriers.data ?? []}
+                  onChange={(v) =>
+                    setFilter(
+                      v === NO_CARRIER
+                        ? { noCarrier: 'true', carrierId: undefined }
+                        : { noCarrier: undefined, carrierId: v || undefined },
+                    )
+                  }
+                />
+              ),
+            },
+            {
+              key: 'source',
+              label: 'Nguồn',
+              type: 'select',
+              // Hàng chục POS Pancake — gõ tìm theo tên shop.
+              searchable: true,
+              options: [
+                { value: 'PANCAKE', label: 'Pancake (mọi POS)' },
+                ...(pancakeShops.data ?? []).map((s) => ({
+                  value: `POS:${s.shopId}`,
+                  label: `Pancake · ${s.shopName ?? `POS ${s.shopId}`}${s.isActive ? '' : ' (đã ngắt)'}`,
+                })),
+                { value: 'ERP', label: 'Tạo trong ERP' },
+              ],
+            },
+            ...(showExtra('duplicate')
+              ? [
+                  {
+                    key: 'duplicate' as const,
+                    label: 'Trùng trong ngày',
+                    type: 'select' as const,
+                    options: [{ value: 'true', label: 'Chỉ đơn trùng trong ngày' }],
+                  },
+                ]
+              : []),
+            ...(showExtra('itemOrigin')
+              ? [
+                  {
+                    key: 'itemOrigin' as const,
+                    label: 'Sản phẩm ngoài ERP',
+                    type: 'select' as const,
+                    options: ITEM_ORIGIN_OPTIONS,
+                  },
+                ]
+              : []),
+            ...(showExtra('weightMin')
+              ? [
+                  {
+                    key: 'weightMin' as const,
+                    label: 'Cân nặng',
+                    type: 'custom' as const,
+                    render: () => (
+                      <WeightRangeFilter
+                        min={state.filters.weightMin}
+                        max={state.filters.weightMax}
+                        onChange={setFilter}
+                      />
+                    ),
+                  },
+                ]
+              : []),
+          ]}
+          after={<MoreFilters shown={shownExtras} active={activeExtras} onToggle={toggleExtra} />}
+          values={{
+            flow: state.filters.flow,
+            status: state.filters.status,
+            customerId: state.filters.customerId,
+            weightMin: state.filters.weightMin,
+            weightMax: state.filters.weightMax,
+            noCarrier: state.filters.noCarrier,
+            carrierId: state.filters.carrierId,
+            source: state.filters.source,
+            from: state.filters.from,
+            to: state.filters.to,
+            duplicate: state.filters.duplicate,
+            itemOrigin: state.filters.itemOrigin,
+          }}
+          onFilterChange={setFilter}
+          searchPlaceholder="Mã đơn, mã Pancake, SĐT, tên khách, mã vận đơn"
+          right={
+            <>
+              {customerId ? (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setFilter({ customerId: undefined })}
+                >
+                  <X aria-hidden />
+                  Đang lọc theo khách {customerName ? `“${customerName}”` : 'đã chọn'}
+                </Button>
+              ) : null}
+              <OrderSavedViews />
+              <ColumnPicker columns={pickerColumns} hidden={hidden} onChange={changeHidden} />
+            </>
+          }
+        />
+      )}
 
       <QueryState
         query={query}
@@ -877,52 +1058,113 @@ export function OrderListScreen() {
             onSortChange={changeSort}
             onRowClick={setPeek}
             selection={{ selected, onChange: setSelected }}
-            bulkActions={(ids) => (
-              <>
-                <Can I="update" a="SalesOrder">
-                  <SendToCarrierMenu
-                    rows={data.items.filter((r) => ids.includes(r.id))}
-                    onDone={() => setSelected({})}
-                  />
-                  <BulkShippingDialog
-                    rows={data.items.filter((r) => ids.includes(r.id))}
-                    onDone={() => setSelected({})}
-                  />
-                  <BulkMoveWarehouseDialog
-                    rows={data.items.filter((r) => ids.includes(r.id))}
-                    onDone={() => setSelected({})}
-                  />
-                </Can>
-                <Can I="fulfil_manual" a="SalesOrder">
-                  <BulkFulfilPrintDialog
-                    rows={data.items.filter((r) => ids.includes(r.id))}
-                    onDone={() => setSelected({})}
-                  />
-                </Can>
-                <Can I="pack" a="Shipment">
-                  <BulkReprintWaybillDialog rows={data.items.filter((r) => ids.includes(r.id))} />
-                </Can>
-                <Can I="cancel" a="SalesOrder">
-                  <BulkCancelDialog
-                    rows={data.items.filter((r) => ids.includes(r.id))}
-                    onDone={() => setSelected({})}
-                  />
-                </Can>
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  className="h-7 px-2 text-xs"
-                  onClick={() => setSelected({})}
-                >
-                  Bỏ chọn
-                </Button>
-              </>
-            )}
           />
         )}
       </QueryState>
 
       <OrderQuickView row={peek} onClose={() => setPeek(null)} />
     </>
+  );
+}
+
+type BulkDialog = 'shipping' | 'reprint' | 'cancel' | null;
+
+/**
+ * Thanh chọn nhiều (design system BulkActionBar, thay chỗ thanh lọc): tổng tiền / COD của các đơn
+ * đã chọn; nút phụ Chuyển kho · Đóng gói + in vận đơn; "Khác" gom Gán hãng / cân nặng · In lại vận
+ * đơn · Hủy đơn (cuối); nút chính "Gửi sang ĐVVC" ở mép phải. Hộp thoại mở từ "Khác" sống ngoài
+ * menu (menu đóng là gỡ nội dung).
+ */
+function OrderBulkBar({ rows, onClear }: { rows: SalesOrderListItem[]; onClear: () => void }) {
+  const ability = useAbility();
+  const [dialog, setDialog] = useState<BulkDialog>(null);
+  const openChange = (d: Exclude<BulkDialog, null>) => (o: boolean) => setDialog(o ? d : null);
+  const total = rows.reduce((s, r) => s.plus(r.total), new Decimal(0));
+  const cod = rows.reduce((s, r) => s.plus(r.shipment?.codAmount ?? r.total), new Decimal(0));
+  const canUpdate = ability.can('update', 'SalesOrder');
+  const canReprint = ability.can('pack', 'Shipment');
+  const canCancel = ability.can('cancel', 'SalesOrder');
+
+  return (
+    <div className="mb-3">
+      <BulkActionBar
+        count={rows.length}
+        noun="đơn"
+        onClear={onClear}
+        // Cao đúng bằng thanh lọc (32px) — bảng không nhảy khi tick / bỏ tick.
+        className="min-h-8 rounded-md border-b-0 py-0"
+        selectAll={
+          <span className="text-xs text-muted-foreground">
+            tổng {formatMoney(total.toFixed(), { unit: '' })} · COD{' '}
+            {formatMoney(cod.toFixed(), { unit: '' })}
+          </span>
+        }
+      >
+        <span className="ml-auto" />
+        <Can I="update" a="SalesOrder">
+          <BulkMoveWarehouseDialog rows={rows} onDone={onClear} />
+        </Can>
+        <Can I="fulfil_manual" a="SalesOrder">
+          <BulkFulfilPrintDialog rows={rows} onDone={onClear} />
+        </Can>
+        {canUpdate || canReprint || canCancel ? (
+          <DropdownMenu modal={false}>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" size="sm">
+                Khác
+                <ChevronDown aria-hidden />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              {canUpdate ? (
+                <DropdownMenuItem onSelect={() => setDialog('shipping')}>
+                  Gán hãng / cân nặng
+                </DropdownMenuItem>
+              ) : null}
+              {canReprint ? (
+                <DropdownMenuItem onSelect={() => setDialog('reprint')}>
+                  In lại vận đơn
+                </DropdownMenuItem>
+              ) : null}
+              {canCancel ? (
+                <>
+                  {canUpdate || canReprint ? <DropdownMenuSeparator /> : null}
+                  <DropdownMenuItem danger onSelect={() => setDialog('cancel')}>
+                    <X aria-hidden />
+                    Hủy đơn…
+                  </DropdownMenuItem>
+                </>
+              ) : null}
+            </DropdownMenuContent>
+          </DropdownMenu>
+        ) : null}
+        <Can I="update" a="SalesOrder">
+          <SendToCarrierMenu rows={rows} onDone={onClear} />
+        </Can>
+      </BulkActionBar>
+      {canUpdate ? (
+        <BulkShippingDialog
+          rows={rows}
+          onDone={onClear}
+          open={dialog === 'shipping'}
+          onOpenChange={openChange('shipping')}
+        />
+      ) : null}
+      {canReprint ? (
+        <BulkReprintWaybillDialog
+          rows={rows}
+          open={dialog === 'reprint'}
+          onOpenChange={openChange('reprint')}
+        />
+      ) : null}
+      {canCancel ? (
+        <BulkCancelDialog
+          rows={rows}
+          onDone={onClear}
+          open={dialog === 'cancel'}
+          onOpenChange={openChange('cancel')}
+        />
+      ) : null}
+    </div>
   );
 }
