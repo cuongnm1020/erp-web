@@ -14,6 +14,7 @@ import {
   type ReactNode,
 } from 'react';
 import { DataTable, FilterBar, type ColumnDef } from '@/components/data/data-table';
+import { MoneyInput } from '@/components/data/form';
 import { EmptyState, ListSkeleton, QueryState } from '@/components/data/states';
 import { StatusBadge } from '@/components/data/status-badge';
 import { PageHeader } from '@/components/layout/page-header';
@@ -189,16 +190,15 @@ function CountCostCell({ row }: { row: StockRow }) {
   const value = d?.unitCost ?? '';
   const invalid = value !== '' && !COST_RE.test(value);
   return (
-    <Input
-      inputMode="decimal"
+    <MoneyInput
+      unit=""
+      dp={4}
       aria-label={`Giá vốn ${row.skuCode}`}
       placeholder={row.unitCost === null ? 'chưa có' : formatMoney(row.unitCost)}
       value={value}
-      onChange={(e) =>
-        ctx.setDraft(row, { unitCost: e.target.value.trim().replace(/[.,\s]/g, '') })
-      }
+      onChange={(v) => ctx.setDraft(row, { unitCost: v })}
       aria-invalid={invalid || undefined}
-      className={cn('h-8 text-right', invalid && 'border-destructive')}
+      className={cn('h-8', invalid && 'border-destructive')}
     />
   );
 }

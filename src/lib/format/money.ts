@@ -81,3 +81,27 @@ export function parseMoneyInput(raw: string): string | null {
   if (!d) return null;
   return (neg ? d.neg() : d).toString();
 }
+
+/**
+ * Chuỗi đang gõ trong ô tiền → chuỗi hiển thị có dấu chấm nhóm nghìn kiểu VN, vd "1234567" →
+ * "1.234.567", "1234,5" (dp ≥ 1) → "1.234,5". Dấu chấm người dùng tự gõ coi là dấu nhóm (bỏ đi, nhóm
+ * lại); phẩy là thập phân, cắt còn `dp` số lẻ; dp = 0 thì bỏ phần lẻ. Gõ dấu chấm ở cuối khi chưa có
+ * phẩy (dp ≥ 1) hiểu là dấu thập phân. Giữ dấu âm ở đầu. Không đổi giá trị — chỉ định dạng.
+ */
+export function groupMoneyTyping(raw: string, dp: number): string {
+  const neg = /^\s*[-−]/.test(raw);
+  let s = raw.replace(/[^\d.,]/g, '');
+  if (dp > 0 && !s.includes(',') && s.endsWith('.')) s = `${s.slice(0, -1)},`;
+  const ci = s.indexOf(',');
+  const intPart = (ci >= 0 ? s.slice(0, ci) : s).replace(/[.,]/g, '').replace(/^0+(?=\d)/, '');
+  const frac =
+    ci >= 0 && dp > 0
+      ? s
+          .slice(ci + 1)
+          .replace(/[.,]/g, '')
+          .slice(0, dp)
+      : null;
+  const grouped = intPart ? groupVi(intPart) : frac !== null ? '0' : '';
+  const body = frac !== null ? `${grouped},${frac}` : grouped;
+  return neg ? `-${body}` : body;
+}

@@ -761,14 +761,15 @@ describe('Giá nhập theo quyền stock.cost + tiến độ Chờ nhập giá �
     expect(screen.getByText('Tổng giá trị')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Nhân bản' })).toBeNull(); // không có stock.receive
 
-    // Giá sai → báo tại dòng, không gọi API.
+    // Ô giá chỉ nhận số: chữ bị bỏ ngay lúc gõ, chưa có giá thì không gọi API.
     fireEvent.change(input, { target: { value: 'abc' } });
-    fireEvent.click(screen.getByRole('button', { name: /^Lưu giá/ }));
-    expect(await screen.findByText(/Giá không hợp lệ/)).toBeInTheDocument();
+    expect(input).toHaveValue('');
     expect(posts).toHaveLength(0);
 
     // 120.000 / BOX (10 REAM) → thành tiền 5 thùng = 600.000 hiện ngay; gửi đúng giá theo ĐVT nhập.
+    // Gõ "120000" → ô tự chèn dấu chấm nhóm nghìn.
     fireEvent.change(input, { target: { value: '120000' } });
+    expect(input).toHaveValue('120.000');
     expect(screen.getAllByText(/^600\.000/).length).toBeGreaterThan(0); // dòng + Tổng giá trị
     fireEvent.click(screen.getByRole('button', { name: /^Lưu giá/ }));
     await waitFor(() => expect(posts).toHaveLength(1));
@@ -797,7 +798,7 @@ describe('Giá nhập theo quyền stock.cost + tiến độ Chờ nhập giá �
     expect(screen.getAllByText(/^340\.000/).length).toBeGreaterThan(0);
     expect(screen.queryByLabelText('Đơn giá dòng 1')).toBeNull();
     fireEvent.click(screen.getByRole('button', { name: /Sửa giá nhập/ }));
-    expect(screen.getByLabelText('Đơn giá dòng 1')).toHaveValue('340000');
+    expect(screen.getByLabelText('Đơn giá dòng 1')).toHaveValue('340.000');
   });
 });
 

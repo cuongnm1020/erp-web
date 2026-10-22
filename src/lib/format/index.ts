@@ -1,4 +1,12 @@
-export { EMPTY, NBSP, formatMoney, groupVi, parseMoneyInput, toDecimal } from './money';
+export {
+  EMPTY,
+  NBSP,
+  formatMoney,
+  groupMoneyTyping,
+  groupVi,
+  parseMoneyInput,
+  toDecimal,
+} from './money';
 export type { MoneyFormatOptions, MoneyInput } from './money';
 export { formatQuantity, gramsToKg, kgToGrams } from './quantity';
 export type { QuantityFormatOptions } from './quantity';
