@@ -72,6 +72,12 @@ describe('OrderDetailScreen — GET /sales-orders/{id} (P1-12)', () => {
     expect(screen.queryByRole('button', { name: 'Hủy đơn' })).not.toBeInTheDocument();
   });
 
+  it('Nhân bản đơn: link sang màn tạo đơn điền sẵn từ đơn này (?from=)', async () => {
+    renderApp(<OrderDetailScreen orderId={ORDER.id} />);
+    const link = await screen.findByRole('link', { name: 'Nhân bản đơn' });
+    expect(link).toHaveAttribute('href', `/crm/orders/new?from=${ORDER.id}`);
+  });
+
   it('Hủy đơn: xác nhận kèm lý do → POST /sales-orders/:id/cancel', async () => {
     const calls: Array<{ id: string; reason?: string }> = [];
     server.use(
