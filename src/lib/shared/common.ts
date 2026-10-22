@@ -46,6 +46,12 @@ export const barcodeCodeSchema = z
   .trim()
   .regex(/^[\x21-\x7E]{4,128}$/, 'Mã 4–128 ký tự, không dấu tiếng Việt, không khoảng trắng');
 
+/** Mã SKU — khớp `ChangeSkuCodeDto.code` / `CreateSkuDto.code` của API: 1–50 ký tự chữ không dấu, số, . _ -. */
+export const skuCodeSchema = z
+  .string()
+  .trim()
+  .regex(/^[A-Za-z0-9._-]{1,50}$/, 'Mã SKU 1–50 ký tự: chữ không dấu, số, dấu . _ -');
+
 /**
  * Loại mã theo nội dung — khớp `inferBarcodeType` của API: 13 số → EAN13; có ký tự ngoài chữ/số/
  * gạch (link) → QR; còn lại CODE128.

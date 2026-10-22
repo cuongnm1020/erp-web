@@ -84,7 +84,9 @@ function rowsOf(products: ProductDetail[]): LabelRow[] {
 
 /** Mã mặc định = mã gắn ĐVT cơ sở (tem lẻ), không có thì mã đầu tiên. */
 function defaultBarcodeId(row: LabelRow): string | null {
-  return row.barcodes.find((b) => b.uomId === row.baseUomId)?.id ?? row.barcodes[0]?.id ?? null;
+  // Mã chính (mã NCC đã đổi, 2026-10-22) thắng; không có thì mã đầu ở ĐVT cơ sở.
+  const base = row.barcodes.filter((b) => b.uomId === row.baseUomId);
+  return (base.find((b) => b.isPrimary) ?? base[0] ?? row.barcodes[0])?.id ?? null;
 }
 
 function labelOf(row: LabelRow, state: RowState): SkuLabelData | null {

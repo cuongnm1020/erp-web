@@ -94,6 +94,7 @@ const MESSAGES: Record<string, string> = {
   CARRIER_REJECTED:
     'Hãng vận chuyển từ chối dữ liệu đơn (thường là địa chỉ giao). Sửa đơn theo lý do hãng báo rồi xin vận đơn lại.',
   BARCODE_TAKEN: 'Mã này đã gán cho sản phẩm khác — mỗi mã chỉ thuộc một sản phẩm.',
+  SKU_CODE_TAKEN: 'Mã này đã là mã của SKU khác — chọn mã khác.',
   /** Hồ sơ Pancake — fb_id thuộc tài khoản thật khác (messageFor ghép thêm người đang giữ). */
   PANCAKE_FB_ID_TAKEN:
     'Facebook ID này đang gắn với tài khoản khác. Gỡ Facebook ID ở tài khoản đó trước nếu nhập đúng người.',
@@ -261,6 +262,12 @@ export function messageFor(err: unknown): string {
       const d = err.details as { code?: unknown; skuCode?: unknown; skuName?: unknown } | null;
       if (d && typeof d.skuCode === 'string') {
         return `Mã ${String(d.code ?? '')} đã gán cho ${d.skuCode}${typeof d.skuName === 'string' ? ` — ${d.skuName}` : ''}. Mỗi mã chỉ thuộc một sản phẩm.`;
+      }
+    }
+    if (err.code === 'SKU_CODE_TAKEN') {
+      const d = err.details as { code?: unknown; skuCode?: unknown; skuName?: unknown } | null;
+      if (d && typeof d.skuCode === 'string') {
+        return `Mã ${String(d.code ?? '')} đã là mã của SKU ${d.skuCode}${typeof d.skuName === 'string' ? ` — ${d.skuName}` : ''}. Chọn mã khác.`;
       }
     }
     if (err.code === 'PANCAKE_FB_ID_TAKEN') {

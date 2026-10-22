@@ -44,8 +44,22 @@ const SKU_BLUE = {
   salesUomId: UOM_HOP.id,
   salesUom: UOM_HOP,
   barcodes: [
-    { id: uuid(11), code: '8935001234567', uomId: UOM_CAI.id, type: 'EAN13', uom: UOM_CAI },
-    { id: uuid(12), code: 'THUNG-TL08-B', uomId: UOM_HOP.id, type: 'CODE128', uom: UOM_HOP },
+    {
+      id: uuid(11),
+      code: '8935001234567',
+      uomId: UOM_CAI.id,
+      type: 'EAN13',
+      isPrimary: true,
+      uom: UOM_CAI,
+    },
+    {
+      id: uuid(12),
+      code: 'THUNG-TL08-B',
+      uomId: UOM_HOP.id,
+      type: 'CODE128',
+      isPrimary: false,
+      uom: UOM_HOP,
+    },
   ],
   uomConversions: [
     {
@@ -389,6 +403,88 @@ describe('ProductDetailScreen — C-03 chi tiết sản phẩm (GET /products/:i
         {
           id: SKU_RED.id,
           body: { code: 'https://www.thiennongnamviet.com.vn/combi', type: 'QR' },
+        },
+      ]),
+    );
+  });
+
+  it('tab SKU: "Đổi mã" → POST /skus/:id/code kèm version; mã có dấu báo lỗi; trùng SKU khác báo SKU đang giữ mã', async () => {
+    const posts: Array<{ id: string; body: unknown }> = [];
+    let taken = true;
+    server.use(
+      http.post('/api/skus/:id/code', async ({ params, request }) => {
+        posts.push({ id: params.id as string, body: await request.json() });
+        if (taken) {
+          taken = false;
+          return HttpResponse.json(
+            {
+              code: 'SKU_CODE_TAKEN',
+              message: 'raw',
+              details: { code: 'NCC-01', skuCode: 'KHAC-1', skuName: 'Hàng khác' },
+              traceId: 't1',
+            },
+            { status: 409 },
+          );
+        }
+        return HttpResponse.json({ ...SKU_BLUE, code: 'NCC-01' });
+      }),
+    );
+    renderApp(<ProductDetailScreen productId={PRODUCT.id} />);
+    await screen.findByText(PRODUCT.name);
+    fireEvent.click(screen.getByRole('tab', { name: /^SKU|Biến thể/ }));
+    fireEvent.click(screen.getByRole('button', { name: `Đổi mã SKU ${SKU_BLUE.code}` }));
+    const input = await screen.findByLabelText('Mã SKU mới');
+    expect(input).toHaveValue(SKU_BLUE.code);
+    fireEvent.change(input, { target: { value: 'mã có dấu' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Đổi mã SKU' }));
+    expect(
+      await screen.findByText('Mã SKU 1–50 ký tự: chữ không dấu, số, dấu . _ -'),
+    ).toBeInTheDocument();
+    expect(posts).toHaveLength(0);
+
+    fireEvent.change(input, { target: { value: 'NCC-01' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Đổi mã SKU' }));
+    expect(
+      await screen.findByText('Mã NCC-01 đã là mã của SKU KHAC-1 — Hàng khác. Chọn mã khác.'),
+    ).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Đổi mã SKU' }));
+    await waitFor(() => expect(posts).toHaveLength(2));
+    expect(posts[1]).toEqual({ id: SKU_BLUE.id, body: { version: 3, code: 'NCC-01' } });
+    await waitFor(() => expect(screen.queryByLabelText('Mã SKU mới')).not.toBeInTheDocument());
+  });
+
+  it('tab Barcode: chip "Mã chính"; "Đổi mã" → POST replace với mã NCC, mặc định giữ mã cũ', async () => {
+    const posts: Array<{ id: string; code: string; body: unknown }> = [];
+    server.use(
+      http.post('/api/skus/:id/barcodes/:code/replace', async ({ params, request }) => {
+        posts.push({
+          id: params.id as string,
+          code: params.code as string,
+          body: await request.json(),
+        });
+        return HttpResponse.json({});
+      }),
+    );
+    renderApp(<ProductDetailScreen productId={PRODUCT.id} />);
+    await screen.findByText(PRODUCT.name);
+    fireEvent.click(screen.getByRole('tab', { name: /Barcode/ }));
+    const primaryRow = document.querySelector('[data-barcode-row="8935001234567"]') as HTMLElement;
+    expect(within(primaryRow).getByText('Mã chính')).toBeInTheDocument();
+    const boxRow = document.querySelector('[data-barcode-row="THUNG-TL08-B"]') as HTMLElement;
+    expect(within(boxRow).queryByText('Mã chính')).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Đổi mã THUNG-TL08-B' }));
+    fireEvent.change(await screen.findByLabelText('Barcode mới'), {
+      target: { value: 'NCC128-THUNG' },
+    });
+    expect(screen.getByRole('checkbox', { name: 'Giữ mã cũ làm mã phụ' })).toBeChecked();
+    fireEvent.click(screen.getByRole('button', { name: 'Đổi barcode' }));
+    await waitFor(() =>
+      expect(posts).toEqual([
+        {
+          id: SKU_BLUE.id,
+          code: 'THUNG-TL08-B',
+          body: { newCode: 'NCC128-THUNG', keepOld: true },
         },
       ]),
     );
