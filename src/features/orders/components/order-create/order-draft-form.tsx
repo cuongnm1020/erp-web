@@ -26,7 +26,6 @@ import {
   MoneyInput,
 } from '@/components/data/form';
 import { Button } from '@/components/ui/button';
-import { Checkbox } from '@/components/ui/checkbox';
 import {
   Select,
   SelectContent,
@@ -454,7 +453,11 @@ export const OrderDraftForm = forwardRef<
                           value={freeShipping || shipFeeOnReturnOnly ? '' : (field.value ?? '')}
                           onChange={field.onChange}
                           disabled={freeShipping || shipFeeOnReturnOnly}
-                          placeholder="0"
+                          // Ô tích Miễn phí giao hàng / Chỉ thu phí nếu hoàn đã ẩn (user 2026-10-22);
+                          // cờ vẫn đi theo đơn nhân bản nên nói rõ vì sao ô bị khóa.
+                          placeholder={
+                            freeShipping ? 'Miễn phí' : shipFeeOnReturnOnly ? 'Thu khi hoàn' : '0'
+                          }
                           aria-label="Phí ship thu khách"
                         />
                       </FormControl>
@@ -462,33 +465,6 @@ export const OrderDraftForm = forwardRef<
                   )}
                 />
               </PayRow>
-              <div className="flex flex-wrap justify-end gap-x-4 gap-y-1">
-                {(
-                  [
-                    ['freeShipping', 'Miễn phí giao hàng'],
-                    ['shipFeeOnReturnOnly', 'Chỉ thu phí nếu hoàn'],
-                  ] as const
-                ).map(([name, label]) => (
-                  <FormField
-                    key={name}
-                    control={form.control}
-                    name={name}
-                    render={({ field }) => (
-                      <FormItem className="flex items-center gap-1.5 space-y-0">
-                        <FormControl>
-                          <Checkbox
-                            checked={field.value}
-                            onCheckedChange={(c) => field.onChange(c === true)}
-                          />
-                        </FormControl>
-                        <FormLabel className="cursor-pointer text-xs font-normal text-muted-foreground">
-                          {label}
-                        </FormLabel>
-                      </FormItem>
-                    )}
-                  />
-                ))}
-              </div>
               <PayRow label="Đã chuyển khoản">
                 <FormField
                   control={form.control}
