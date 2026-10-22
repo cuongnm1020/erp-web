@@ -435,8 +435,7 @@ function CarrierPicker({
   const options = carrierAccountOptions(carriers.data);
   // Mặc định: tài khoản đầu (mặc định) của hãng đang gán; chưa tải xong hãng thì chưa chọn.
   const [picked, setPicked] = useState('');
-  const value =
-    picked || options.find((o) => !o.disabled && o.carrier.code === currentCarrier)?.value || '';
+  const value = picked || options.find((o) => o.carrier.code === currentCarrier)?.value || '';
   const option = options.find((o) => o.value === value);
   // Danh mục hãng chưa tải xong vẫn xin lại được theo hãng đang gán.
   const carrierCode = option?.carrier.code ?? (picked ? '' : (currentCarrier ?? ''));
@@ -455,7 +454,7 @@ function CarrierPicker({
           </SelectTrigger>
           <SelectContent>
             {options.map((o) => (
-              <SelectItem key={o.value} value={o.value} disabled={o.disabled}>
+              <SelectItem key={o.value} value={o.value}>
                 {o.label}
                 {o.carrier.operations.includes('printLabel') ? '' : ' (không in nhãn được)'}
               </SelectItem>

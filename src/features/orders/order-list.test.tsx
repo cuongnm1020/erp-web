@@ -276,7 +276,7 @@ describe('OrderListScreen — cân nặng gửi hãng + gán hãng hàng loạt'
     await waitFor(() => expect(screen.queryByRole('toolbar')).not.toBeInTheDocument());
   });
 
-  it('Gán hãng: hãng nhiều tài khoản hiện từng tài khoản (thiếu cấu hình thì khóa) → gửi carrierAccountId', async () => {
+  it('Gán hãng: hãng nhiều tài khoản hiện từng tài khoản (chưa cấu hình thì ẩn, GHN chưa cấu hình ẩn) → gửi carrierAccountId', async () => {
     search = '';
     const ghtk = CARRIERS.find((c) => c.code === 'GHTK')!;
     server.use(
@@ -324,10 +324,8 @@ describe('OrderListScreen — cân nặng gửi hãng + gán hãng hàng loạt'
     expect(
       await screen.findByRole('option', { name: /Thiên Nông Nam Việt \(mặc định\)/ }),
     ).toBeInTheDocument();
-    expect(screen.getByRole('option', { name: /Shop chưa xong — thiếu cấu hình/ })).toHaveAttribute(
-      'aria-disabled',
-      'true',
-    );
+    expect(screen.queryByRole('option', { name: /Shop chưa xong/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole('option', { name: /GHN/ })).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole('option', { name: /Thiên Nông Nam Việt 03/ }));
     fireEvent.click(screen.getByRole('button', { name: /Cập nhật 1 đơn/ }));
     await waitFor(() => expect(bodies).toHaveLength(1));

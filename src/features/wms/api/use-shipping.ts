@@ -53,15 +53,16 @@ export interface CarrierAccountOption {
   carrier: Carrier;
   /** null = hãng không có tài khoản (không adapter) — server dùng mặc định. */
   accountId: string | null;
+  /** Tên tài khoản khi hãng có ≥ 2 tài khoản đủ cấu hình (kèm "(mặc định)"); còn lại null. */
+  accountLabel: string | null;
   label: string;
-  /** Tài khoản thiếu cấu hình — hiện nhưng không chọn được (gọi hãng sẽ lỗi). */
-  disabled: boolean;
 }
 
 /**
- * Mọi hãng đang bật × mọi tài khoản đang bật của hãng (2026-10-22): hãng có ≥ 2 tài khoản hiện
+ * Mọi hãng đang bật × mọi tài khoản ĐỦ CẤU HÌNH của hãng (2026-10-22): hãng có ≥ 2 tài khoản hiện
  * "Hãng · Tài khoản" từng dòng, tài khoản mặc định lên đầu; hãng một tài khoản / không adapter
- * hiện một dòng như cũ.
+ * hiện một dòng như cũ. Tài khoản / hãng có adapter mà chưa cấu hình thì ẩn hẳn — chọn vào chỉ để
+ * hãng báo lỗi.
  */
 export function carrierAccountOptions(carriers: Carrier[] | undefined): CarrierAccountOption[] {
   return (carriers ?? [])
@@ -69,20 +70,25 @@ export function carrierAccountOptions(carriers: Carrier[] | undefined): CarrierA
     .flatMap((c): CarrierAccountOption[] => {
       const base = `${c.name} (${c.code})`;
       if (c.accounts.length === 0) {
-        return [{ value: `${c.id}|`, carrier: c, accountId: null, label: base, disabled: false }];
+        if (c.hasAdapter && !c.configured) return [];
+        return [
+          { value: `${c.id}|`, carrier: c, accountId: null, accountLabel: null, label: base },
+        ];
       }
-      const many = c.accounts.length > 1;
-      return [...c.accounts]
+      const ready = c.accounts.filter((a) => a.configured);
+      const many = ready.length > 1;
+      return ready
         .sort((a, b) => Number(b.isDefault) - Number(a.isDefault))
-        .map((a) => ({
-          value: `${c.id}|${a.id}`,
-          carrier: c,
-          accountId: a.id,
-          label:
-            (many ? `${c.name} · ${a.name}${a.isDefault ? ' (mặc định)' : ''}` : base) +
-            (a.configured ? '' : ' — thiếu cấu hình'),
-          disabled: !a.configured,
-        }));
+        .map((a) => {
+          const accountLabel = many ? `${a.name}${a.isDefault ? ' (mặc định)' : ''}` : null;
+          return {
+            value: `${c.id}|${a.id}`,
+            carrier: c,
+            accountId: a.id,
+            accountLabel,
+            label: accountLabel ? `${c.name} · ${accountLabel}` : base,
+          };
+        });
     });
 }
 

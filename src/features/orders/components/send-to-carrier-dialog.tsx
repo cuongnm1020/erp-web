@@ -65,12 +65,15 @@ const NO_SERVICE = '__default__';
  */
 export function SendToCarrierDialog({
   carrier,
+  accountId: pickedAccountId = null,
   rows,
   open,
   onOpenChange,
   onDone,
 }: {
   carrier: Carrier;
+  /** Tài khoản chọn từ menu "Sang <hãng> · <tài khoản>"; null = mặc định của hãng. */
+  accountId?: string | null;
   rows: SalesOrder[];
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -85,13 +88,17 @@ export function SendToCarrierDialog({
   const warehouses = usePickupWarehouses();
   const send = useSendOrdersToCarrier();
   /**
-   * Tài khoản của hãng (FE-CARRIER-ACC-1): chỉ hỏi khi hãng có từ 2 tài khoản đang bật; chọn sẵn
-   * tài khoản mặc định (chưa đủ cấu hình thì tài khoản đủ cấu hình đầu tiên).
+   * Tài khoản của hãng (FE-CARRIER-ACC-1): chỉ hỏi khi hãng có từ 2 tài khoản đủ cấu hình (tài
+   * khoản chưa cấu hình ẩn, 2026-10-22); chọn sẵn tài khoản chọn từ menu, không có thì mặc định
+   * (chưa đủ cấu hình thì tài khoản đủ cấu hình đầu tiên).
    */
-  const accounts = carrier.accounts;
+  const accounts = carrier.accounts.filter((a) => a.configured);
   const initialAccountId =
-    (accounts.find((a) => a.isDefault && a.configured) ?? accounts.find((a) => a.configured))?.id ??
-    null;
+    (
+      accounts.find((a) => a.id === pickedAccountId) ??
+      accounts.find((a) => a.isDefault) ??
+      accounts[0]
+    )?.id ?? null;
   const [accountId, setAccountId] = useState<string | null>(initialAccountId);
 
   // Mở lại với lô khác → nạp lại danh sách + reset form.
@@ -159,7 +166,7 @@ export function SendToCarrierDialog({
       const r = await send.mutateAsync({
         orderIds: sendable.map((o) => o.id),
         carrierId: carrier.id,
-        ...(accounts.length > 1 && accountId ? { carrierAccountId: accountId } : {}),
+        ...(carrier.accounts.length > 1 && accountId ? { carrierAccountId: accountId } : {}),
         options: toShippingOptions(v),
         ...(v.customPickup && v.warehouseId ? { warehouseId: v.warehouseId } : {}),
       });
@@ -327,16 +334,12 @@ export function SendToCarrierDialog({
                         aria-label={`Tài khoản ${carrier.code}`}
                       >
                         {accounts.map((a) => (
-                          <label
-                            key={a.id}
-                            className={`flex items-center gap-1.5 text-sm ${a.configured ? '' : 'text-muted-foreground'}`}
-                          >
+                          <label key={a.id} className="flex items-center gap-1.5 text-sm">
                             <input
                               type="radio"
                               name="carrierAccount"
                               value={a.id}
                               checked={accountId === a.id}
-                              disabled={!a.configured}
                               onChange={() => setAccountId(a.id)}
                               className="h-4 w-4 accent-primary"
                             />
@@ -344,7 +347,6 @@ export function SendToCarrierDialog({
                             {a.isDefault ? (
                               <span className="text-xs text-muted-foreground">(mặc định)</span>
                             ) : null}
-                            {a.configured ? null : <span className="text-xs">(chưa cấu hình)</span>}
                           </label>
                         ))}
                       </div>

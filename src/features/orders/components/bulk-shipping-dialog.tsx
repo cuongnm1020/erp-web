@@ -126,7 +126,7 @@ export function BulkShippingDialog({
                   <SelectItem value={KEEP}>— Giữ nguyên —</SelectItem>
                   <SelectItem value={NONE}>— Bỏ chọn hãng —</SelectItem>
                   {options.map((o) => (
-                    <SelectItem key={o.value} value={o.value} disabled={o.disabled}>
+                    <SelectItem key={o.value} value={o.value}>
                       {o.label}
                     </SelectItem>
                   ))}
