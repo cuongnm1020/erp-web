@@ -9502,6 +9502,11 @@ export interface components {
             pancakeName: string | null;
             /** @description Mã (display_id) sản phẩm gốc trên Pancake; null như trên. */
             pancakeSkuCode: string | null;
+            /**
+             * @description Món gõ tay trên Pancake (SKU một lần, 2026-10-22): có giá nhưng không quản lý tồn — không giữ
+             *     chỗ, không lấy hàng, không trừ tồn (reservedQty / pickedQty luôn 0).
+             */
+            nonStock: boolean;
             uomId: string;
             uomCode: string;
             /** @description Decimal(18,6) dạng chuỗi — theo `uomId`. */

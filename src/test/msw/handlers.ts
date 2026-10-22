@@ -560,6 +560,7 @@ export function makeOrderDetail(id: string) {
     skuName: `Sản phẩm ${i + 1}`,
     pancakeName: null as string | null,
     pancakeSkuCode: null as string | null,
+    nonStock: false,
     uomId: uuid('00000004', i),
     uomCode: i % 2 === 0 ? 'cái' : 'thùng',
     qty: String((i + 1) * 10),
