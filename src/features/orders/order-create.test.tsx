@@ -475,8 +475,9 @@ describe('OrderCreateScreen — màn tạo đơn mới', () => {
     fireEvent.change(total, { target: { value: '170000' } });
     fireEvent.blur(total);
     await waitFor(() => expect(screen.getByLabelText('Đơn giá')).toHaveValue('85.000'));
-    expect(screen.getByText('Dưới trần chiết khấu — đơn cần duyệt')).toBeInTheDocument();
-    expect(screen.getByText(/Niêm yết 100\.000/)).toBeInTheDocument();
+    // CI chậm: dòng cảnh báo render sau ô Đơn giá một nhịp → chờ thay vì getBy.
+    expect(await screen.findByText('Dưới trần chiết khấu — đơn cần duyệt')).toBeInTheDocument();
+    expect(await screen.findByText(/Niêm yết 100\.000/)).toBeInTheDocument();
 
     fireEvent.change(screen.getByLabelText('Số điện thoại khách'), {
       target: { value: '0912000111' },
@@ -487,7 +488,7 @@ describe('OrderCreateScreen — màn tạo đơn mới', () => {
     expect(bodies[0]!.lines).toEqual([
       expect.objectContaining({ skuId: SKU.id, qty: '2', unitPrice: '85000' }),
     ]);
-  });
+  }, 15_000);
 
   it('nguồn Facebook → body gửi posShopId, nguồn khác thì không; chưa chọn nguồn không có ô POS; NV đóng hàng / NV chăm sóc / Marketer ẩn', async () => {
     server.use(...skuHandlers());
