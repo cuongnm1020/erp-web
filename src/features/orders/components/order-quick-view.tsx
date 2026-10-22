@@ -184,7 +184,7 @@ function Body({ row }: { row: SalesOrderListItem }) {
 
         <Section title="Ghi chú" last>
           {d?.internalNote || d?.printNote || row.note ? (
-            <dl className="grid grid-cols-[96px_1fr] gap-x-3 gap-y-1">
+            <dl className="grid grid-cols-detail gap-x-3 gap-y-1">
               {d?.internalNote || row.note ? (
                 <>
                   <dt className="text-muted-foreground">Nội bộ</dt>

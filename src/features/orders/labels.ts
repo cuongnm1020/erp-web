@@ -256,6 +256,44 @@ export const ORDER_FLOW_TABS: ReadonlyArray<{
   { flow: 'CANCELLED', label: 'Đã hủy', family: 'off' },
 ];
 
+/**
+ * Luồng chung của một đơn ở màn chi tiết (DTO chi tiết không có `flow` như dòng danh sách): suy từ
+ * trạng thái chứng từ + trạng thái kho/giao. `null` = không xếp được vào luồng (việc kho bị hủy
+ * trong khi đơn còn sống) — màn không vẽ thanh tiến độ.
+ */
+export function detailOrderFlow(
+  status: SalesOrderStatus,
+  fulfilment: OrderFulfilmentStatus,
+): OrderFlow | null {
+  if (status === 'CANCELLED') return 'CANCELLED';
+  if (status === 'DRAFT' || status === 'PENDING_APPROVAL') return 'PENDING_APPROVAL';
+  switch (fulfilment) {
+    case 'NOT_STARTED':
+      return 'WAREHOUSE';
+    case 'PICKING':
+    case 'PICKED':
+    case 'PACKING':
+      return 'PICKING';
+    case 'PACKED':
+      return 'PACKED';
+    case 'SHIPPED':
+      return 'PICKED_UP';
+    case 'IN_TRANSIT':
+      return 'IN_TRANSIT';
+    case 'OUT_FOR_DELIVERY':
+    case 'FAILED':
+      return 'OUT_FOR_DELIVERY';
+    case 'DELIVERED':
+      return 'DELIVERED';
+    case 'RETURNED':
+      return 'RETURNED';
+    case 'CARRIER_CANCELLED':
+      return 'CARRIER_CANCELLED';
+    default:
+      return null;
+  }
+}
+
 /** Chấm màu của họ trạng thái (nguyên class để Tailwind thấy). */
 export const FLOW_FAMILY_DOT: Record<OrderFlowFamily, string> = {
   wait: 'bg-flow-wait',

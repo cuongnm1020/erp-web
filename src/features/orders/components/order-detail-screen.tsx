@@ -1,16 +1,17 @@
 'use client';
 
 import Decimal from 'decimal.js';
-import { Boxes, CornerDownRight, Gift, Info, Printer } from 'lucide-react';
+import { Boxes, Copy, CornerDownRight, Gift, MoreHorizontal, Printer } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Fragment, useEffect, useRef, useState, type ReactNode } from 'react';
-import { KpiCard } from '@/components/data/kpi-card';
+import { CopyButton } from '@/components/data/copy-button';
 import { PdfPrintDialog } from '@/components/data/pdf-print-dialog';
 import { DetailSkeleton, QueryState } from '@/components/data/states';
 import { StatusBadge } from '@/components/data/status-badge';
 import { Breadcrumb } from '@/components/layout/breadcrumb';
 import { NotFoundCard } from '@/components/layout/not-found-screen';
+import { PageHeader } from '@/components/layout/page-header';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -20,6 +21,13 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import {
@@ -32,11 +40,21 @@ import {
 } from '@/components/ui/table';
 import { toast } from '@/components/ui/toaster';
 import { isApiError } from '@/lib/api/errors';
+import { cn } from '@/lib/cn';
 import { messageFor } from '@/lib/error-messages';
-import { formatDate, formatDateTime, formatMoney, formatQuantity } from '@/lib/format';
+import {
+  formatDate,
+  formatDateTime,
+  formatMoney,
+  formatPhone,
+  formatQuantity,
+  normalizePhone,
+  phoneCarrier,
+} from '@/lib/format';
 import { Can, useAbility } from '@/lib/permission';
 import { usePrint } from '@/lib/print';
 import { useInvalidateOn } from '@/lib/realtime';
+import { useHotkey } from '@/lib/use-hotkey';
 import { useShipmentStatusLog } from '@/features/wms/api/use-shipping';
 import { carrierOutcome, carrierSource, shipmentStatusBadge } from '@/features/wms/labels';
 import {
@@ -49,6 +67,7 @@ import {
   type SalesOrderLine,
 } from '../api/use-orders';
 import {
+  detailOrderFlow,
   fulfilmentLabel,
   fulfilmentTone,
   orderAddressLine,
@@ -60,6 +79,8 @@ import {
 } from '../labels';
 import { groupOrderLines } from '../combo-lines';
 import { OrderPrintSheet } from './order-print-sheet';
+import { OrderProgress } from './order-progress';
+import { TelcoBadge } from './order-quick-view';
 import { ReprintWaybillDialog } from './bulk-reprint-waybill-dialog';
 import { PancakeOrderLink } from './pancake-order-link';
 
@@ -279,11 +300,6 @@ function ShipmentCard({ order, autoPrint }: { order: SalesOrderDetail; autoPrint
     </Card>
   );
 }
-const MISSING: Array<{ title: string; need: string }> = [
-  { title: 'Thanh toán / còn phải thu', need: 'chưa có mặt đọc công nợ theo đơn' },
-  { title: 'Dòng thời gian chứng từ', need: 'chưa có endpoint lịch sử trạng thái đơn' },
-  { title: 'Người tạo, người phụ trách', need: 'chỉ có ownerId; chưa có danh bạ user' },
-];
 
 /** Một dòng SKU; `component` = dòng thành phần combo (thụt vào, giá đã phân bổ hiện mờ). */
 /**
@@ -428,10 +444,10 @@ function Card({
   className?: string;
 }) {
   return (
-    <section
-      className={className ? `rounded-md border bg-card ${className}` : 'rounded-md border bg-card'}
-    >
-      <header className="border-b px-3 py-2 text-sm font-semibold">{title}</header>
+    <section className={cn('rounded-lg border bg-card', className)}>
+      <header className="flex min-h-card-header items-center border-b px-3.5 text-sm font-semibold">
+        <div className="w-full">{title}</div>
+      </header>
       {children}
     </section>
   );
@@ -594,39 +610,7 @@ function Lines({ order }: { order: SalesOrderDetail }) {
           </TableBody>
         </Table>
       </div>
-      <div className="flex flex-wrap gap-6 border-t px-3 py-2 text-sm text-muted-foreground">
-        <span>
-          Tạm tính{' '}
-          <span className="font-semibold tabular-nums text-foreground">
-            {money(order.subtotal)}
-          </span>
-        </span>
-        <span>
-          Chiết khấu{' '}
-          <span className="font-semibold tabular-nums text-foreground">
-            {money(order.discount)}
-          </span>
-        </span>
-        <span>
-          Thuế{' '}
-          <span className="font-semibold tabular-nums text-foreground">
-            {money(order.taxAmount)}
-          </span>
-        </span>
-        <span>
-          Vận chuyển{' '}
-          <span className="font-semibold tabular-nums text-foreground">
-            {money(order.shippingFee)}
-          </span>
-        </span>
-        <span className="ml-auto">
-          Tổng cộng{' '}
-          <span className="text-base font-semibold tabular-nums text-foreground">
-            {money(order.total)}
-          </span>{' '}
-          {order.currencyCode}
-        </span>
-      </div>
+      <OrderTotals order={order} />
     </Card>
   );
 }
@@ -715,78 +699,176 @@ const RETURNABLE_FULFILMENT: ReadonlySet<SalesOrderDetail['fulfilment']['status'
   'RETURNED',
 ]);
 
+/** Tổng tiền cuối bảng dòng hàng — căn phải, dòng 0 đồng thì ẩn (trừ Tạm tính / Tổng). */
+function OrderTotals({ order }: { order: SalesOrderDetail }) {
+  const nonZero = (v: string) => !new Decimal(v || 0).isZero();
+  const prepaid = new Decimal(order.prepaidAmount || 0);
+  const cod = Decimal.max(new Decimal(order.total).minus(prepaid), 0).toFixed();
+  const manual = manualDiscountNote(order);
+  const Row = ({ label, value, hint }: { label: string; value: string; hint?: string }) => (
+    <>
+      <dt className="text-muted-foreground">
+        {label}
+        {hint ? <span className="block text-xs text-subtle-foreground">{hint}</span> : null}
+      </dt>
+      <dd className="tabular-nums">{value}</dd>
+    </>
+  );
+  return (
+    <div className="flex justify-end border-t px-3.5 py-3">
+      <dl className="grid w-full max-w-sm grid-cols-[1fr_auto] gap-x-6 gap-y-1 text-right text-sm">
+        <Row label="Tạm tính" value={money(order.subtotal)} />
+        {nonZero(order.discount) ? (
+          <Row label="Chiết khấu" value={`−${money(order.discount)}`} hint={manual ?? undefined} />
+        ) : null}
+        {nonZero(order.taxAmount) ? <Row label="Thuế" value={money(order.taxAmount)} /> : null}
+        <Row
+          label="Phí ship thu khách"
+          value={order.freeShipping ? 'Miễn phí' : money(order.shippingFee)}
+          hint={order.shipFeeOnReturnOnly ? 'chỉ thu nếu hoàn' : undefined}
+        />
+        {nonZero(order.surcharge) ? <Row label="Phụ thu" value={money(order.surcharge)} /> : null}
+        <dt className="border-t pt-1.5 font-semibold">Tổng cộng</dt>
+        <dd className="border-t pt-1.5 font-semibold tabular-nums">{money(order.total)}</dd>
+        {!prepaid.isZero() ? (
+          <Row label="Đã chuyển khoản" value={`−${money(prepaid.toFixed())}`} />
+        ) : null}
+        <dt className="text-base font-semibold">Thu hộ (COD)</dt>
+        <dd className="text-base font-semibold tabular-nums text-primary">{formatMoney(cod)}</dd>
+      </dl>
+    </div>
+  );
+}
+
+/**
+ * Danh sách nhãn – giá trị của cột Hồ sơ 320px: nhãn `caption` nằm trên giá trị (cột hẹp không đủ
+ * chỗ cho nhãn `detail-label-width` 140px bên cạnh — SĐT + nhà mạng bị bẻ dòng).
+ */
+function ProfileList({ children }: { children: ReactNode }) {
+  return <dl className="grid gap-y-2.5 px-3.5 py-3 text-sm">{children}</dl>;
+}
+
+function ProfileItem({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <div className="min-w-0">
+      <dt className="text-xs text-muted-foreground">{label}</dt>
+      <dd className="min-w-0">{children}</dd>
+    </div>
+  );
+}
+
+/**
+ * Redesign Bán hàng 2026-10-22 (canvas "Redesign Bán hàng", màn 4, đã duyệt): PageHeader ≤ 3 nút
+ * + "⋯" (In phiếu đơn · Nhân bản đơn [D] · ⋯ · Sửa đơn [E]); thanh tiến độ; cột trái 320px
+ * khách / giao hàng / phân công / ghi chú; cột phải dòng hàng + tổng tiền + vận đơn. Bỏ dải 4 ô
+ * tổng tiền và thẻ "Chưa nối được". Lịch sử đơn, tên người phụ trách, giờ từng bước: chờ API.
+ */
 function Detail({ order }: { order: SalesOrderDetail }) {
+  const router = useRouter();
   const [dialog, setDialog] = useState<'cancel' | 'recreate' | null>(null);
   const printer = usePrint();
   const ability = useAbility();
   const autoPrint = useSearchParams().get('printLabel') === '1';
-  const canRecreate = ability.can('cancel', 'SalesOrder') && ability.can('create', 'SalesOrder');
+  const live = order.status !== 'CANCELLED';
+  const canEdit = live && ability.can('update', 'SalesOrder');
+  const canCreate = ability.can('create', 'SalesOrder');
+  const canCancel = live && ability.can('cancel', 'SalesOrder');
+  const canRecreate = canCancel && canCreate;
+  const canReturn =
+    RETURNABLE_FULFILMENT.has(order.fulfilment.status) && ability.can('receive', 'Stock');
+  const flow = detailOrderFlow(order.status, order.fulfilment.status);
+  const addr = order.shippingAddress;
+  const phone = addr?.phone ? (normalizePhone(addr.phone) ?? addr.phone) : null;
+  const telco = phoneCarrier(addr?.phone ?? null);
+
+  useHotkey('e', () => router.push(`/crm/orders/${order.id}/edit`), { enabled: canEdit });
+  useHotkey('d', () => router.push(`/crm/orders/new?from=${order.id}`), { enabled: canCreate });
+
   return (
     <>
-      <div className="flex min-h-9 items-start justify-between gap-4">
-        <div className="min-w-0">
-          <h1 className="flex flex-wrap items-center gap-2 text-xl font-semibold leading-tight">
-            Đơn <span className="font-mono">{order.docNumber}</span>
+      <PageHeader
+        breadcrumb={[
+          { label: 'Bán hàng' },
+          { label: 'Đơn hàng', href: '/crm/orders' },
+          { label: order.docNumber },
+        ]}
+        title={`Đơn ${order.docNumber}`}
+        status={
+          <>
+            <CopyButton value={order.docNumber} label="mã đơn" />
             <StatusBadge tone={orderStatusTone(order.status)}>
               {orderStatusLabel(order.status)}
             </StatusBadge>
-            <StatusBadge tone={fulfilmentTone(order.fulfilment.status)}>
-              {fulfilmentLabel(order.fulfilment.status)}
-            </StatusBadge>
-          </h1>
-          <p className="text-sm text-muted-foreground">
-            Đặt ngày {formatDate(order.orderDate)} · Kênh {orderChannelLabel(order.channel)} ·{' '}
-            {order.lineCount} dòng hàng
+            {live ? (
+              <StatusBadge tone={fulfilmentTone(order.fulfilment.status)}>
+                {fulfilmentLabel(order.fulfilment.status)}
+              </StatusBadge>
+            ) : null}
+          </>
+        }
+        description={
+          <>
+            Đặt {formatDate(order.orderDate)} · {orderChannelLabel(order.channel)}
+            {order.source ? ` · nguồn ${orderSourceLabel(order.source)}` : ''}
             {order.pancakeOrderId ? (
               <>
                 {' '}
                 · <PancakeOrderLink orderId={order.pancakeOrderId} link={order.pancakeOrderLink} />
               </>
             ) : null}
-          </p>
-        </div>
-        <div className="flex shrink-0 gap-2">
-          {order.status !== 'CANCELLED' ? (
-            <>
-              <Can I="update" a="SalesOrder">
-                <Button size="sm" asChild>
-                  <Link href={`/crm/orders/${order.id}/edit`}>Sửa đơn</Link>
-                </Button>
-              </Can>
-              {canRecreate ? (
-                <Button variant="outline" size="sm" onClick={() => setDialog('recreate')}>
-                  Sửa (hủy & tạo lại)
-                </Button>
-              ) : null}
-              <Can I="cancel" a="SalesOrder">
-                <Button variant="destructive" size="sm" onClick={() => setDialog('cancel')}>
-                  Hủy đơn
-                </Button>
-              </Can>
-            </>
-          ) : (
-            <Can I="create" a="SalesOrder">
-              <Button variant="outline" size="sm" asChild>
-                <Link href={`/crm/orders/new?from=${order.id}`}>Tạo lại đơn</Link>
+          </>
+        }
+        actions={
+          <>
+            <Button variant="outline" onClick={printer.print}>
+              <Printer aria-hidden />
+              In phiếu đơn
+            </Button>
+            {canCreate ? (
+              <Button variant="outline" asChild shortcut="D">
+                <Link href={`/crm/orders/new?from=${order.id}`}>
+                  <Copy aria-hidden />
+                  Nhân bản đơn
+                </Link>
               </Button>
-            </Can>
-          )}
-          {RETURNABLE_FULFILMENT.has(order.fulfilment.status) ? (
-            <Can I="receive" a="Stock">
-              <Button variant="outline" size="sm" asChild>
-                <Link href={`/wms/returns/new?orderId=${order.id}`}>Nhập hàng hoàn</Link>
+            ) : null}
+            {canRecreate || canReturn || canCancel ? (
+              <DropdownMenu modal={false}>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline" size="icon" aria-label="Thao tác khác">
+                    <MoreHorizontal aria-hidden />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  {canRecreate ? (
+                    <DropdownMenuItem onSelect={() => setDialog('recreate')}>
+                      Sửa (hủy &amp; tạo lại)
+                    </DropdownMenuItem>
+                  ) : null}
+                  {canReturn ? (
+                    <DropdownMenuItem asChild>
+                      <Link href={`/wms/returns/new?orderId=${order.id}`}>Nhập hàng hoàn</Link>
+                    </DropdownMenuItem>
+                  ) : null}
+                  {canCancel ? (
+                    <>
+                      {canRecreate || canReturn ? <DropdownMenuSeparator /> : null}
+                      <DropdownMenuItem danger onSelect={() => setDialog('cancel')}>
+                        Hủy đơn…
+                      </DropdownMenuItem>
+                    </>
+                  ) : null}
+                </DropdownMenuContent>
+              </DropdownMenu>
+            ) : null}
+            {canEdit ? (
+              <Button asChild shortcut="E">
+                <Link href={`/crm/orders/${order.id}/edit`}>Sửa đơn</Link>
               </Button>
-            </Can>
-          ) : null}
-          <Button variant="outline" size="sm" onClick={printer.print}>
-            <Printer aria-hidden />
-            In phiếu đơn
-          </Button>
-          <Button variant="outline" size="sm" asChild>
-            <Link href="/crm/orders">Về danh sách đơn</Link>
-          </Button>
-        </div>
-      </div>
+            ) : null}
+          </>
+        }
+      />
       {order.status === 'PENDING_APPROVAL' && order.approval ? (
         <ApprovalBar order={order} approval={order.approval} />
       ) : null}
@@ -798,201 +880,163 @@ function Detail({ order }: { order: SalesOrderDetail }) {
         onOpenChange={(o) => setDialog(o ? dialog : null)}
       />
 
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <KpiCard label="Tạm tính" value={money(order.subtotal)} detail="trước thuế và vận chuyển" />
-        <KpiCard
-          label="Chiết khấu"
-          value={money(order.discount)}
-          detail={
-            manualDiscountNote(order)
-              ? `khuyến mãi + ${manualDiscountNote(order)}`
-              : 'giảm trừ khuyến mãi'
-          }
-        />
-        <KpiCard label="Thuế" value={money(order.taxAmount)} detail="theo dòng hàng" />
-        <KpiCard label="Tổng cộng" value={money(order.total)} detail={order.currencyCode} />
-      </div>
-
-      <div className="grid items-start gap-3 lg:grid-cols-5">
-        <Card className="lg:col-span-3" title="Thông tin đơn">
-          <dl className="grid grid-cols-2 gap-x-4 gap-y-3 px-3 py-3 sm:grid-cols-3">
-            <Field label="Khách hàng">
-              {/* Kho mở đơn bằng sales_order.read_all nhưng không có customer.read → link
-                  sẽ 404; hiện chữ thường thay vì dẫn vào ngõ cụt. */}
-              {ability.can('read', 'Customer') ? (
-                <Link
-                  href={`/crm/customers/${order.customer.id}`}
-                  className="font-semibold text-primary hover:underline"
-                >
-                  {order.customer.name}
-                </Link>
-              ) : (
-                <span className="font-semibold">{order.customer.name}</span>
-              )}
-            </Field>
-            <Field label="Mã khách hàng">
-              <span className="font-mono text-xs">{order.customer.code}</span>
-            </Field>
-            <Field label="Địa chỉ giao">
-              {order.shippingAddress ? (
-                <span>
-                  {order.shippingAddress.recipient} · {order.shippingAddress.phone} ·{' '}
-                  {orderAddressLine(order.shippingAddress)}
-                  {order.shippingAddress.source === 'CUSTOMER_DEFAULT' ? (
-                    <span className="text-xs text-muted-foreground"> (mặc định của khách)</span>
-                  ) : null}
-                </span>
-              ) : (
-                <span className="text-muted-foreground">
-                  Chưa có — khách chưa có địa chỉ giao dùng được, thêm ở hồ sơ khách
-                </span>
-              )}
-            </Field>
-            <Field label="Số chứng từ">
-              <span className="font-mono text-xs">{order.docNumber}</span>
-            </Field>
-            <Field label="Kênh bán">{orderChannelLabel(order.channel)}</Field>
-            {order.source ? (
-              <Field label="Nguồn đơn">{orderSourceLabel(order.source)}</Field>
-            ) : null}
-            {!new Decimal(order.surcharge).isZero() ? (
-              <Field label="Phụ thu">{money(order.surcharge)}</Field>
-            ) : null}
-            {!new Decimal(order.prepaidAmount).isZero() ? (
-              <Field label="Đã chuyển khoản">
-                {money(order.prepaidAmount)}
-                <span className="block text-xs text-muted-foreground">
-                  Thu hộ còn{' '}
-                  {money(
-                    Decimal.max(new Decimal(order.total).minus(order.prepaidAmount), 0).toFixed(4),
-                  )}
-                </span>
-              </Field>
-            ) : null}
-            {order.freeShipping || order.shipFeeOnReturnOnly ? (
-              <Field label="Phí giao hàng">
-                {order.freeShipping ? 'Miễn phí giao hàng' : 'Chỉ thu phí nếu hoàn'}
-              </Field>
-            ) : null}
-            {order.expectedDeliveryDate ? (
-              <Field label="Hẹn nhận hàng">
-                {formatDate(`${order.expectedDeliveryDate}T00:00:00Z`)}
-              </Field>
-            ) : null}
-            {order.tags.length > 0 ? (
-              <Field label="Thẻ">
-                <span className="flex flex-wrap gap-1">
-                  {order.tags.map((t) => (
-                    <span key={t.id} className="rounded bg-warning-weak px-1.5 text-xs font-medium">
-                      {t.name}
-                    </span>
-                  ))}
-                </span>
-              </Field>
-            ) : null}
-            <Field label="Ngày đặt">{formatDate(order.orderDate)}</Field>
-            <Field label="Tiền tệ">{order.currencyCode}</Field>
-            <Field label="Tạo lúc">{formatDateTime(order.createdAt)}</Field>
-            <Field label="Cập nhật gần nhất">{formatDateTime(order.updatedAt)}</Field>
-            <Field label="Phân công">
-              {order.ownerId ? 'đã có người phụ trách' : 'đơn của team, chưa chia cho ai'}
-            </Field>
-            <Field label="Kho lấy hàng">
-              {order.warehouse ? (
-                <>
-                  {order.warehouse.name}{' '}
-                  <span className="font-mono text-xs text-muted-foreground">
-                    ({order.warehouse.code})
-                  </span>
-                </>
-              ) : (
-                <span className="text-muted-foreground">chưa chọn kho — chọn ở trang Sửa đơn</span>
-              )}
-            </Field>
-            <Field label="Hãng vận chuyển">
-              {order.carrier ? (
-                <>
-                  {order.carrier.name}{' '}
-                  <span className="font-mono text-xs text-muted-foreground">
-                    ({order.carrier.code})
-                  </span>
-                  <span className="block text-xs text-muted-foreground">
-                    Tài khoản: {order.carrierAccount?.name ?? 'mặc định'}
-                  </span>
-                </>
-              ) : (
-                <span className="text-muted-foreground">chưa chọn — chọn ở trang Sửa đơn</span>
-              )}
-            </Field>
-            {order.postedAt ? (
-              <Field label="Đã chốt lúc">{formatDateTime(order.postedAt)}</Field>
-            ) : null}
-          </dl>
-        </Card>
-
-        <Card
-          className="lg:col-span-2"
-          title={
-            <span className="flex items-center gap-1.5">
-              <Info className="h-3.5 w-3.5 text-muted-foreground" aria-hidden />
-              Chưa nối được
-            </span>
-          }
-        >
-          <ul className="flex flex-col gap-2 px-3 py-3 text-sm">
-            {MISSING.map((m) => (
-              <li key={m.title} className="flex flex-col">
-                <span className="font-medium">{m.title}</span>
-                <span className="text-xs text-muted-foreground">{m.need}</span>
-              </li>
-            ))}
-          </ul>
-          <p className="border-t px-3 py-2 text-xs text-muted-foreground">
-            Luật 2: shape response phải sinh từ OpenAPI của apps/api. Khi backend khai báo DTO cho
-            các mục trên thì nối được ngay, không cần sửa gì ở màn hình.
-          </p>
-        </Card>
-      </div>
-
-      {order.internalNote || order.printNote || order.attachments.length > 0 ? (
-        <Card title="Ghi chú & đính kèm">
-          <dl className="grid gap-x-4 gap-y-3 px-3 py-3 sm:grid-cols-2">
-            {order.internalNote ? (
-              <Field label="Ghi chú nội bộ">
-                <span className="whitespace-pre-line">{order.internalNote}</span>
-              </Field>
-            ) : null}
-            {order.printNote ? (
-              <Field label="Ghi chú in lên vận đơn">
-                <span className="whitespace-pre-line">{order.printNote}</span>
-              </Field>
-            ) : null}
-            {order.attachments.length > 0 ? (
-              <Field label={`Tệp đính kèm (${order.attachments.length})`}>
-                <span className="flex flex-wrap gap-2">
-                  {order.attachments.map((a) => (
-                    <a
-                      key={a.id}
-                      href={a.url}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="text-primary hover:underline"
-                    >
-                      {a.fileName}
-                    </a>
-                  ))}
-                </span>
-              </Field>
-            ) : null}
-          </dl>
-        </Card>
+      {flow && flow !== 'CANCELLED' && flow !== 'RETURNED' && flow !== 'CARRIER_CANCELLED' ? (
+        <section className="rounded-lg border bg-card px-4 py-3" aria-label="Tiến độ">
+          <OrderProgress flow={flow} />
+        </section>
       ) : null}
 
-      <div className="grid items-start gap-3 lg:grid-cols-5">
-        <ShipmentCard order={order} autoPrint={autoPrint} />
-      </div>
+      <div className="flex flex-col items-start gap-3 lg:flex-row">
+        <div className="flex w-full min-w-0 flex-col gap-3 lg:w-detail-aside lg:flex-none">
+          <Card title="Khách & giao hàng">
+            <ProfileList>
+              <ProfileItem label="Khách hàng">
+                {/* Kho mở đơn bằng sales_order.read_all nhưng không có customer.read → link
+                    sẽ 404; hiện chữ thường thay vì dẫn vào ngõ cụt. */}
+                {ability.can('read', 'Customer') ? (
+                  <Link
+                    href={`/crm/customers/${order.customer.id}`}
+                    className="font-semibold text-primary hover:underline"
+                  >
+                    {order.customer.name}
+                  </Link>
+                ) : (
+                  <span className="font-semibold">{order.customer.name}</span>
+                )}
+                <span className="block truncate font-mono text-xs text-muted-foreground">
+                  {order.customer.code}
+                </span>
+              </ProfileItem>
+              {phone ? (
+                <ProfileItem label="Điện thoại">
+                  <span className="flex items-center gap-1.5">
+                    <span className="font-mono text-xs">{formatPhone(addr?.phone ?? null)}</span>
+                    {telco ? <TelcoBadge name={telco} /> : null}
+                    <CopyButton value={phone} label="số điện thoại" />
+                  </span>
+                </ProfileItem>
+              ) : null}
+              <ProfileItem label="Giao tới">
+                {addr ? (
+                  <>
+                    {addr.recipient ? (
+                      <span className="block font-semibold">{addr.recipient}</span>
+                    ) : null}
+                    {orderAddressLine(addr)}
+                    {addr.source === 'CUSTOMER_DEFAULT' ? (
+                      <span className="block text-xs text-muted-foreground">
+                        địa chỉ mặc định của khách
+                      </span>
+                    ) : null}
+                  </>
+                ) : (
+                  <span className="text-muted-foreground">
+                    Chưa có — thêm địa chỉ ở hồ sơ khách
+                  </span>
+                )}
+              </ProfileItem>
+              {order.expectedDeliveryDate ? (
+                <ProfileItem label="Hẹn nhận">
+                  {formatDate(`${order.expectedDeliveryDate}T00:00:00Z`)}
+                </ProfileItem>
+              ) : null}
+              <ProfileItem label="Kho lấy hàng">
+                {order.warehouse ? (
+                  <>
+                    {order.warehouse.name}{' '}
+                    <span className="font-mono text-xs text-muted-foreground">
+                      {order.warehouse.code}
+                    </span>
+                  </>
+                ) : (
+                  <span className="text-warning">Chưa chọn kho</span>
+                )}
+              </ProfileItem>
+              <ProfileItem label="Hãng vận chuyển">
+                {order.carrier ? (
+                  <>
+                    {order.carrier.name}
+                    <span className="block text-xs text-muted-foreground">
+                      tài khoản {order.carrierAccount?.name ?? 'mặc định'}
+                    </span>
+                  </>
+                ) : (
+                  <span className="text-warning">Chưa gán hãng</span>
+                )}
+              </ProfileItem>
+            </ProfileList>
+          </Card>
 
-      <Lines order={order} />
+          <Card title="Phân công & ghi chú">
+            <ProfileList>
+              <ProfileItem label="Phụ trách">
+                {order.ownerId ? (
+                  'Đã có người phụ trách'
+                ) : (
+                  <span className="text-muted-foreground">Đơn của team, chưa chia</span>
+                )}
+              </ProfileItem>
+              {order.tags.length > 0 ? (
+                <ProfileItem label="Thẻ">
+                  <span className="flex flex-wrap gap-1">
+                    {order.tags.map((t) => (
+                      <span key={t.id} className="rounded-chip bg-muted px-2 text-xs">
+                        {t.name}
+                      </span>
+                    ))}
+                  </span>
+                </ProfileItem>
+              ) : null}
+              <ProfileItem label="Ghi chú nội bộ">
+                {order.internalNote ? (
+                  <span className="whitespace-pre-line">{order.internalNote}</span>
+                ) : (
+                  <span className="text-muted-foreground">—</span>
+                )}
+              </ProfileItem>
+              <ProfileItem label="In vận đơn">
+                {order.printNote ? (
+                  <span className="whitespace-pre-line">{order.printNote}</span>
+                ) : (
+                  <span className="text-muted-foreground">—</span>
+                )}
+              </ProfileItem>
+              {order.attachments.length > 0 ? (
+                <ProfileItem label={`Đính kèm (${order.attachments.length})`}>
+                  <span className="flex flex-col gap-0.5">
+                    {order.attachments.map((a) => (
+                      <a
+                        key={a.id}
+                        href={a.url}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="truncate text-primary hover:underline"
+                      >
+                        {a.fileName}
+                      </a>
+                    ))}
+                  </span>
+                </ProfileItem>
+              ) : null}
+            </ProfileList>
+          </Card>
+
+          <Card title="Chứng từ">
+            <ProfileList>
+              <ProfileItem label="Tạo lúc">{formatDateTime(order.createdAt)}</ProfileItem>
+              <ProfileItem label="Cập nhật">{formatDateTime(order.updatedAt)}</ProfileItem>
+              {order.postedAt ? (
+                <ProfileItem label="Đã chốt lúc">{formatDateTime(order.postedAt)}</ProfileItem>
+              ) : null}
+            </ProfileList>
+          </Card>
+        </div>
+
+        <div className="flex w-full min-w-0 flex-1 flex-col gap-3">
+          <Lines order={order} />
+          <ShipmentCard order={order} autoPrint={autoPrint} />
+        </div>
+      </div>
     </>
   );
 }
@@ -1044,13 +1088,16 @@ export function OrderDetailScreen({ orderId }: { orderId: string }) {
 
   return (
     <div className="flex flex-col gap-3">
-      <Breadcrumb
-        items={[
-          { label: 'Bán hàng' },
-          { label: 'Đơn hàng', href: '/crm/orders' },
-          { label: query.data?.docNumber ?? 'Chi tiết' },
-        ]}
-      />
+      {/* Có dữ liệu thì PageHeader của Detail vẽ breadcrumb (dính khi cuộn). */}
+      {query.data ? null : (
+        <Breadcrumb
+          items={[
+            { label: 'Bán hàng' },
+            { label: 'Đơn hàng', href: '/crm/orders' },
+            { label: 'Chi tiết' },
+          ]}
+        />
+      )}
       {isApiError(query.error) && query.error.isNotFound ? (
         <OrderNotFound orderId={orderId} />
       ) : (
