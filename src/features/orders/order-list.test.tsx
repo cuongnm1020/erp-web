@@ -2,7 +2,7 @@ import { fireEvent, screen, waitFor } from '@testing-library/react';
 import { http, HttpResponse } from 'msw';
 import { describe, expect, it, vi } from 'vitest';
 import { WarehouseProvider } from '@/lib/warehouse';
-import { ME_SALE, makeOrders, scenario } from '@/test/msw/handlers';
+import { CARRIERS, ME_SALE, makeOrders, scenario } from '@/test/msw/handlers';
 import { server } from '@/test/msw/server';
 import { renderApp } from '@/test/render';
 import { OrderListScreen } from './components/order-list-screen';
@@ -274,6 +274,64 @@ describe('OrderListScreen — cân nặng gửi hãng + gán hãng hàng loạt'
     );
     expect(toastError.mock.calls).toEqual([]);
     await waitFor(() => expect(screen.queryByRole('toolbar')).not.toBeInTheDocument());
+  });
+
+  it('Gán hãng: hãng nhiều tài khoản hiện từng tài khoản (thiếu cấu hình thì khóa) → gửi carrierAccountId', async () => {
+    search = '';
+    const ghtk = CARRIERS.find((c) => c.code === 'GHTK')!;
+    server.use(
+      http.get('/api/carriers', () =>
+        HttpResponse.json(
+          CARRIERS.map((c) =>
+            c.code === 'GHTK'
+              ? {
+                  ...c,
+                  accounts: [
+                    {
+                      id: 'acc-tnnv',
+                      name: 'Thiên Nông Nam Việt',
+                      isDefault: true,
+                      configured: true,
+                    },
+                    {
+                      id: 'acc-03',
+                      name: 'Thiên Nông Nam Việt 03',
+                      isDefault: false,
+                      configured: true,
+                    },
+                    { id: 'acc-x', name: 'Shop chưa xong', isDefault: false, configured: false },
+                  ],
+                }
+              : c,
+          ),
+        ),
+      ),
+    );
+    const bodies: Record<string, unknown>[] = [];
+    server.use(
+      http.post('/api/sales-orders/bulk-update', async ({ request }) => {
+        const body = (await request.json()) as Record<string, unknown>;
+        bodies.push(body);
+        return HttpResponse.json({ updated: [], failed: [] }, { status: 201 });
+      }),
+    );
+    renderApp(<OrderListScreen />);
+    await screen.findByText(FIRST.docNumber);
+    fireEvent.click(screen.getAllByRole('checkbox', { name: 'Chọn dòng' })[0]!);
+    openMoreMenu();
+    fireEvent.click(await screen.findByRole('menuitem', { name: /Gán hãng \/ cân nặng/ }));
+    fireEvent.click(await screen.findByRole('combobox', { name: 'Hãng vận chuyển' }));
+    expect(
+      await screen.findByRole('option', { name: /Thiên Nông Nam Việt \(mặc định\)/ }),
+    ).toBeInTheDocument();
+    expect(screen.getByRole('option', { name: /Shop chưa xong — thiếu cấu hình/ })).toHaveAttribute(
+      'aria-disabled',
+      'true',
+    );
+    fireEvent.click(screen.getByRole('option', { name: /Thiên Nông Nam Việt 03/ }));
+    fireEvent.click(screen.getByRole('button', { name: /Cập nhật 1 đơn/ }));
+    await waitFor(() => expect(bodies).toHaveLength(1));
+    expect(bodies[0]).toMatchObject({ carrierId: ghtk.id, carrierAccountId: 'acc-03' });
   });
 
   it('chọn 3 đơn (1 đã hủy) → "Hủy đơn" → POST /sales-orders/bulk-cancel chỉ 2 đơn còn hủy được + lý do, báo đơn lỗi, bỏ chọn', async () => {

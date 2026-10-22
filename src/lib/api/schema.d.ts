@@ -10059,6 +10059,12 @@ export interface components {
              * @description wms.Carrier.id đang hoạt động; `null` = bỏ chọn hãng; bỏ trống = giữ nguyên.
              */
             carrierId?: string | null;
+            /**
+             * Format: uuid
+             * @description Tài khoản của hãng (wms.CarrierAccount.id thuộc `carrierId`) cho cả lô; chỉ đi kèm `carrierId`.
+             *     Bỏ trống = tài khoản mặc định của hãng.
+             */
+            carrierAccountId?: string;
             /** @description Cân nặng gửi hãng (kg) cho TẤT CẢ đơn đã chọn; `null` = về cân nặng tính từ dòng. */
             shippingWeightKg?: string | null;
         };

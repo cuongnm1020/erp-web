@@ -23,7 +23,7 @@ import {
 } from '@/components/ui/select';
 import { toast } from '@/components/ui/toaster';
 import { messageFor } from '@/lib/error-messages';
-import { useCarriers } from '@/features/wms/api/use-shipping';
+import { carrierAccountOptions, useCarriers } from '@/features/wms/api/use-shipping';
 import { useBulkUpdateOrders, type SalesOrder } from '../api/use-orders';
 import { orderEditable } from '../labels';
 import { useControlledOpen } from '../use-controlled-open';
@@ -61,7 +61,10 @@ export function BulkShippingDialog({
   const skipped = rows.length - editable.length;
   const nextWeight = normalizeWeightInput(weight);
   const weightInvalid = !clearWeight && weight.trim() !== '' && nextWeight === null;
-  const carrierPatch = carrierId === KEEP ? undefined : carrierId === NONE ? null : carrierId;
+  const options = carrierAccountOptions(carriers.data);
+  const picked = options.find((o) => o.value === carrierId);
+  const carrierPatch =
+    carrierId === KEEP ? undefined : carrierId === NONE ? null : picked?.carrier.id;
   const weightPatch = clearWeight ? null : nextWeight === null ? undefined : nextWeight;
   const nothing = carrierPatch === undefined && weightPatch === undefined;
 
@@ -71,6 +74,7 @@ export function BulkShippingDialog({
       const r = await bulk.mutateAsync({
         orderIds: editable.map((o) => o.id),
         ...(carrierPatch !== undefined ? { carrierId: carrierPatch } : {}),
+        ...(picked?.accountId ? { carrierAccountId: picked.accountId } : {}),
         ...(weightPatch !== undefined ? { shippingWeightKg: weightPatch } : {}),
       });
       const failedDocs = r.failed.map((f) => f.docNumber ?? f.orderId.slice(0, 8)).join(', ');
@@ -121,13 +125,11 @@ export function BulkShippingDialog({
                 <SelectContent>
                   <SelectItem value={KEEP}>— Giữ nguyên —</SelectItem>
                   <SelectItem value={NONE}>— Bỏ chọn hãng —</SelectItem>
-                  {(carriers.data ?? [])
-                    .filter((c) => c.isActive)
-                    .map((c) => (
-                      <SelectItem key={c.id} value={c.id}>
-                        {c.name} ({c.code})
-                      </SelectItem>
-                    ))}
+                  {options.map((o) => (
+                    <SelectItem key={o.value} value={o.value} disabled={o.disabled}>
+                      {o.label}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
