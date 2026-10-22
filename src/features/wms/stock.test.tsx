@@ -315,10 +315,114 @@ describe('StockScreen — nhập tồn thực tế (POST /cycle-counts/actual-st
     expect(screen.queryByLabelText('Tồn thực tế SKU-0001')).not.toBeInTheDocument();
   });
 
+  it('Xuất Excel: chọn kho (mặc định kho đang chọn) → link tải GET /stock/excel?warehouseId=', async () => {
+    search = '';
+    renderApp(<StockScreen />, { warehouses: WH });
+    fireEvent.click(await screen.findByRole('button', { name: /Xuất Excel/ }));
+    const dialog = await screen.findByRole('dialog');
+    expect(dialog).toHaveTextContent('Xuất Excel tồn kho');
+    expect(screen.getByRole('combobox', { name: 'Kho xuất Excel' })).toHaveTextContent('Kho HN-1');
+    expect(screen.getByRole('link', { name: 'Tải file' })).toHaveAttribute(
+      'href',
+      '/api/stock/excel?warehouseId=wh-1',
+    );
+  });
+
+  it('Nhập Excel: chọn file → Kiểm tra (dryRun, không key) → xem trước dòng tăng / giảm / lỗi → Ghi tồn kèm Idempotency-Key', async () => {
+    search = '';
+    const calls: Array<{ query: string; key: string | null; hasFile: boolean }> = [];
+    const result = (dryRun: boolean) => ({
+      warehouseId: 'wh-1',
+      warehouseCode: 'WH01',
+      warehouseName: 'Kho HN-1',
+      dryRun,
+      increase: 1,
+      decrease: 1,
+      unchanged: 3,
+      skipped: 10,
+      errors: 1,
+      docNumbers: dryRun ? [] : ['CC2610-00009'],
+      rows: [
+        {
+          row: 6,
+          skuId: 's1',
+          skuCode: 'SKU-A',
+          skuName: 'Hàng A',
+          current: '5',
+          counted: '9',
+          action: 'INCREASE',
+          note: null,
+        },
+        {
+          row: 7,
+          skuId: 's2',
+          skuCode: 'SKU-B',
+          skuName: 'Hàng B',
+          current: '5',
+          counted: '2',
+          action: 'DECREASE',
+          note: null,
+        },
+        {
+          row: 8,
+          skuId: 's3',
+          skuCode: 'SKU-C',
+          skuName: 'Hàng C',
+          current: '8',
+          counted: '1',
+          action: 'ERROR',
+          note: 'Thấp hơn phần đang giữ cho đơn (6) — không ghi được',
+        },
+        {
+          row: 9,
+          skuId: 's4',
+          skuCode: 'SKU-D',
+          skuName: 'Hàng D',
+          current: '1',
+          counted: '1',
+          action: 'UNCHANGED',
+          note: null,
+        },
+      ],
+    });
+    server.use(
+      http.post('/api/stock/excel/import', async ({ request }) => {
+        const url = new URL(request.url);
+        const fd = await request.formData();
+        calls.push({
+          query: url.search,
+          key: request.headers.get('idempotency-key'),
+          hasFile: fd.has('file'),
+        });
+        return HttpResponse.json(result(url.searchParams.get('dryRun') === 'true'));
+      }),
+    );
+    renderApp(<StockScreen />, { warehouses: WH });
+    fireEvent.click(await screen.findByRole('button', { name: /Nhập Excel/ }));
+    const check = await screen.findByRole('button', { name: 'Kiểm tra file' });
+    expect(check).toBeDisabled();
+    fireEvent.change(screen.getByLabelText('File Excel tồn kho'), {
+      target: { files: [new File(['x'], 'ton-kho.xlsx')] },
+    });
+    fireEvent.click(check);
+    const table = await screen.findByRole('table', { name: 'Xem trước nhập Excel' });
+    expect(table).toHaveTextContent('SKU-A');
+    expect(table).toHaveTextContent('Thấp hơn phần đang giữ cho đơn (6)');
+    expect(table).not.toHaveTextContent('SKU-D'); // khớp thì không liệt kê
+    expect(calls[0]).toEqual({ query: '?warehouseId=wh-1&dryRun=true', key: '', hasFile: true });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Ghi tồn 2 SKU vào Kho HN-1' }));
+    await waitFor(() => expect(calls).toHaveLength(2));
+    expect(calls[1]!.query).toBe('?warehouseId=wh-1');
+    expect(calls[1]!.key).toMatch(/^[0-9a-f-]{36}$/);
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+  });
+
   it('không có quyền điều chỉnh tồn / giá vốn → không có nút nhập', async () => {
     search = '';
     renderApp(<StockScreen />, { me: ME_SALE });
     await screen.findByText(/khớp bộ lọc|Bạn không có quyền/);
     expect(screen.queryByRole('button', { name: /Nhập tồn|Nhập giá vốn/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Nhập Excel/ })).not.toBeInTheDocument();
   });
 });

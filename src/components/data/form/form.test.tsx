@@ -13,27 +13,60 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '
 import { MoneyInput } from './money-input';
 import { QuantityInput } from './quantity-input';
 
-function MoneyHarness({ initial = '' }: { initial?: string }) {
+function MoneyHarness({ initial = '', dp }: { initial?: string; dp?: number }) {
   const [v, setV] = useState(initial);
   return (
     <>
-      <MoneyInput aria-label="Giá" value={v} onChange={setV} />
+      <MoneyInput aria-label="Giá" value={v} onChange={setV} dp={dp} />
       <output data-testid="raw">{v}</output>
     </>
   );
 }
 
 describe('MoneyInput', () => {
-  it('gõ "1.234,5" → giá trị "1234.5"; blur hiển thị nhóm nghìn', async () => {
+  it('đang gõ tự chèn dấu chấm nhóm nghìn: "1234567" → "1.234.567", giá trị "1234567"', async () => {
     const user = userEvent.setup();
     render(<MoneyHarness />);
     const input = screen.getByLabelText('Giá');
     await user.click(input);
-    await user.type(input, '1.234,5');
+    await user.type(input, '1234');
+    expect(input).toHaveValue('1.234');
+    await user.type(input, '567');
+    expect(input).toHaveValue('1.234.567');
+    expect(screen.getByTestId('raw')).toHaveTextContent('1234567');
+    await user.tab();
+    expect(input).toHaveValue('1.234.567');
+  });
+
+  it('VND (dp 0) bỏ phần lẻ; dp 2: "1234,5" → "1.234,5", giá trị "1234.5"', async () => {
+    const user = userEvent.setup();
+    render(<MoneyHarness dp={2} />);
+    const input = screen.getByLabelText('Giá');
+    await user.click(input);
+    await user.type(input, '1234,5');
+    expect(input).toHaveValue('1.234,5');
     expect(screen.getByTestId('raw')).toHaveTextContent('1234.5');
     await user.tab();
-    expect(input).toHaveValue('1.235');
-    expect(screen.getByTestId('raw')).toHaveTextContent('1234.5');
+    expect(input).toHaveValue('1.234,5');
+  });
+
+  it('bấm vào ô đang có "720000.0000" hiện "720.000", không nhảy sang số thô', async () => {
+    const user = userEvent.setup();
+    render(<MoneyHarness initial="720000.0000" />);
+    const input = screen.getByLabelText('Giá');
+    expect(input).toHaveValue('720.000');
+    await user.click(input);
+    expect(input).toHaveValue('720.000');
+  });
+
+  it('dán "1,234,567" kiểu EN → hiểu đúng 1234567', async () => {
+    const user = userEvent.setup();
+    render(<MoneyHarness />);
+    const input = screen.getByLabelText('Giá');
+    await user.click(input);
+    await user.paste('1,234,567');
+    expect(input).toHaveValue('1.234.567');
+    expect(screen.getByTestId('raw')).toHaveTextContent('1234567');
   });
 
   it('giữ nguyên "1234.5000" — không qua Number', () => {

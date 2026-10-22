@@ -191,3 +191,52 @@ export function useSetSkuWeights() {
     },
   });
 }
+
+export type StockExcelImportResult = components['schemas']['StockExcelImportResultDto'];
+export type StockExcelImportRow = StockExcelImportResult['rows'][number];
+
+/** Link tải file Excel tồn của một kho — GET /stock/excel (anchor thật, cookie phiên đi kèm). */
+export const stockExcelHref = (warehouseId: string) =>
+  `/api/stock/excel?warehouseId=${encodeURIComponent(warehouseId)}`;
+
+/**
+ * POST /stock/excel/import — file Excel tồn kho đã điền. `dryRun` = chỉ xem trước; ghi thật kèm
+ * Idempotency-Key sinh lúc bấm (luật 4). Không optimistic (luật 5): chờ server rồi mới tải lại tồn.
+ */
+export function useImportStockExcel() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      warehouseId,
+      file,
+      dryRun,
+      key,
+    }: {
+      warehouseId: string;
+      file: File;
+      dryRun: boolean;
+      key?: string;
+    }) => {
+      const fd = new FormData();
+      fd.append('file', file);
+      return unwrap(
+        api.POST('/stock/excel/import', {
+          params: {
+            query: { warehouseId, ...(dryRun ? { dryRun: 'true' } : {}) },
+            // Xem trước không ghi gì nên không cần key — server bỏ qua chuỗi rỗng.
+            header: { 'idempotency-key': key ?? '' },
+          },
+          body: fd as never,
+          bodySerializer: (b: unknown) => b as FormData,
+          // Bỏ Content-Type mặc định (json) để browser tự đặt multipart boundary.
+          headers: { 'Content-Type': null },
+        }),
+      );
+    },
+    onSuccess: (r) => {
+      if (r.dryRun) return;
+      void qc.invalidateQueries({ queryKey: stockKeys.all });
+      void qc.invalidateQueries({ queryKey: ['wms', 'cycle-counts'] });
+    },
+  });
+}

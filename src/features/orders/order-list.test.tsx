@@ -433,6 +433,52 @@ describe('OrderListScreen — cân nặng gửi hãng + gán hãng hàng loạt'
     await waitFor(() => expect(screen.queryByRole('toolbar')).not.toBeInTheDocument());
   });
 
+  it('"Đóng gói + in vận đơn" với đơn đã có vận đơn (gửi ngoài ERP) → báo chỉ in lại tem, không "đã đóng gói" (SOP2610-49238)', async () => {
+    search = '';
+    toastSuccess.mockClear();
+    const rows = makeOrders(1).map((o) => ({
+      ...o,
+      status: 'APPROVED' as const,
+      carrierId: 'c-ghtk',
+    }));
+    const labelBodies: unknown[] = [];
+    server.use(
+      http.get('/api/sales-orders', () => HttpResponse.json({ items: rows, total: 1 })),
+      http.post('/api/sales-orders/bulk-fulfil', () =>
+        HttpResponse.json(
+          {
+            done: [
+              {
+                orderId: rows[0]!.id,
+                docNumber: rows[0]!.docNumber,
+                shipmentId: 'sh-out',
+                outcome: 'ALREADY_ISSUED',
+                trackingNo: 'S23013020.MN7-18-E02.1882917107',
+              },
+            ],
+            failed: [],
+          },
+          { status: 201 },
+        ),
+      ),
+      http.post('/api/shipments/label-data', async ({ request }) => {
+        labelBodies.push(await request.json());
+        return HttpResponse.json([]);
+      }),
+    );
+    renderApp(<OrderListScreen />);
+    await screen.findByText(rows[0]!.docNumber);
+    fireEvent.click(screen.getAllByRole('checkbox', { name: 'Chọn dòng' })[0]!);
+    fireEvent.click(await screen.findByRole('button', { name: /Đóng gói \+ in vận đơn/ }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Đóng gói + in 1 đơn' }));
+    await waitFor(() =>
+      expect(toastSuccess).toHaveBeenCalledWith('Không đơn nào cần đóng gói, in 1 tem', {
+        description: '1 đơn đã có vận đơn — chỉ in lại tem, không đóng gói lại.',
+      }),
+    );
+    expect(labelBodies).toEqual([{ shipmentIds: ['sh-out'] }]);
+  });
+
   it('không có quyền sales_order.fulfil_manual → không có nút "Đóng gói + in vận đơn" (luật 7)', async () => {
     search = '';
     renderApp(<OrderListScreen />, {

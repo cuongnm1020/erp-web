@@ -221,8 +221,7 @@ export function CartLine({
         name={`lines.${index}.qty`}
         render={({ field }) => (
           <FormItem>
-            <FormLabel className="sr-only">Số lượng</FormLabel>
-            <div className="flex h-9 items-stretch overflow-hidden rounded-md border">
+            <div className="flex h-control items-stretch overflow-hidden rounded-md border border-control-border">
               <button
                 type="button"
                 aria-label="Giảm số lượng"
@@ -248,6 +247,8 @@ export function CartLine({
                 <Plus className="mx-auto h-3.5 w-3.5" aria-hidden />
               </button>
             </div>
+            {/* Nhãn ẩn đứng SAU ô: đứng trước thì space-y của FormItem đẩy ô xuống, lệch hàng. */}
+            <FormLabel className="sr-only">Số lượng</FormLabel>
             <FormMessage />
           </FormItem>
         )}
@@ -258,18 +259,18 @@ export function CartLine({
         name={`lines.${index}.unitPrice`}
         render={({ field }) => (
           <FormItem>
-            <FormLabel className="sr-only">Đơn giá</FormLabel>
             <FormControl>
               <MoneyInput
                 aria-label="Đơn giá"
                 unit=""
-                dp={unitPrice !== null && !new Decimal(unitPrice).isInteger() ? 2 : 0}
+                dp={2}
                 value={unitPrice ?? ''}
                 placeholder={price.isFetching ? '…' : 'Nhập giá'}
                 onChange={(v) => field.onChange(v === listPrice ? '' : v)}
                 className={belowFloor ? 'border-warning' : undefined}
               />
             </FormControl>
+            <FormLabel className="sr-only">Đơn giá</FormLabel>
             {manualPrice !== '' && listPrice !== null ? (
               <p className="text-right text-xs text-muted-foreground">
                 Niêm yết {formatMoney(listPrice, { unit: '' })}

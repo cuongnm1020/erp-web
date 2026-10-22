@@ -4,11 +4,11 @@ import Decimal from 'decimal.js';
 import { AlertCircle, Box, Coins, CopyPlus, Lock, Printer } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { MoneyInput } from '@/components/data/form';
 import { DetailSkeleton, QueryState } from '@/components/data/states';
 import { StatusBadge } from '@/components/data/status-badge';
 import { PageHeader } from '@/components/layout/page-header';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import {
   Table,
   TableBody,
@@ -367,14 +367,15 @@ function DetailBody({
                           {editing ? (
                             <div className="flex flex-col items-end gap-0.5">
                               <div className="flex items-center gap-1">
-                                <Input
-                                  inputMode="decimal"
+                                <MoneyInput
+                                  unit=""
+                                  dp={4}
                                   placeholder="0"
                                   aria-label={`Đơn giá dòng ${l.lineNo}`}
                                   aria-invalid={Boolean(err)}
-                                  className="w-32 text-right"
+                                  className="w-32"
                                   value={cost.drafts[l.id] ?? ''}
-                                  onChange={(e) => cost.setDraft(l.id, e.target.value)}
+                                  onChange={(v) => cost.setDraft(l.id, v)}
                                 />
                                 <span className="text-xs text-muted-foreground">
                                   / {l.uomCode ?? l.baseUomCode}

@@ -105,11 +105,18 @@ export function BulkFulfilPrintDialog({
         } else toast.error('Không lấy được dữ liệu tem của đơn nào.');
       }
       if (r.done.length > 0) {
+        // ALREADY_ISSUED = đơn đã có vận đơn (đóng gói trước đó / gửi qua hãng ngoài ERP) — chỉ in lại.
+        const reprinted = r.done.filter((d) => d.outcome === 'ALREADY_ISSUED').length;
+        const packedNow = r.done.length - reprinted;
+        const notes = [
+          reprinted > 0
+            ? `${reprinted} đơn đã có vận đơn — chỉ in lại tem, không đóng gói lại.`
+            : '',
+          queued > 0 ? `${queued} đơn hãng chưa cấp mã vận đơn (đang thử lại) — in lại sau.` : '',
+        ].filter(Boolean);
         toast.success(
-          `Đã đóng gói ${r.done.length} đơn${printable.length > 0 ? `, in ${printable.length} tem` : ''}`,
-          queued > 0
-            ? { description: `${queued} đơn hãng chưa cấp mã vận đơn (đang thử lại) — in lại sau.` }
-            : undefined,
+          `${packedNow > 0 ? `Đã đóng gói ${packedNow} đơn` : 'Không đơn nào cần đóng gói'}${printable.length > 0 ? `, in ${printable.length} tem` : ''}`,
+          notes.length > 0 ? { description: notes.join(' ') } : undefined,
         );
       }
       if (r.failed.length > 0) setFailed(r.failed);

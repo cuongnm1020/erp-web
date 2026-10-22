@@ -16,6 +16,7 @@ import {
   FormItem,
   FormLabel,
   FormMessage,
+  MoneyInput,
 } from '@/components/data/form';
 import { ScanInput } from '@/components/data/scan-input';
 import { EmptyState, FormSkeleton, QueryState } from '@/components/data/states';
@@ -676,11 +677,15 @@ function LineRows({
                 render={({ field }) => (
                   <FormItem>
                     <FormControl>
-                      <Input
-                        inputMode="decimal"
+                      <MoneyInput
+                        unit=""
+                        dp={4}
                         placeholder="0"
                         aria-label={`Đơn giá dòng ${i + 1}`}
-                        {...field}
+                        name={field.name}
+                        value={field.value ?? ''}
+                        onChange={field.onChange}
+                        onBlur={field.onBlur}
                       />
                     </FormControl>
                     <FormMessage />
