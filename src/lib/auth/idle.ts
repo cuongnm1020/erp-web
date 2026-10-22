@@ -1,9 +1,10 @@
 /**
  * Tự đăng xuất khi không thao tác (AUTH-IDLE). Mốc "thao tác cuối" lưu localStorage để mọi tab
  * dùng chung: làm việc ở tab này thì tab kia không đá ra. Chỉ là một mốc thời gian, không phải token.
- * Chốt chặn phía server: apps/api WEB_REFRESH_TTL (45m) — cookie refresh cùng thời hạn.
+ * Chốt chặn phía server: apps/api WEB_REFRESH_TTL (135m = 2 giờ + 15 phút access token) — cookie
+ * refresh cùng thời hạn. 2026-10-22: nâng từ 30 phút lên 2 giờ.
  */
-export const IDLE_TIMEOUT_MS = 30 * 60 * 1000;
+export const IDLE_TIMEOUT_MS = 2 * 60 * 60 * 1000;
 export const IDLE_STORAGE_KEY = 'erp:last-activity';
 /** Lý do trên URL /login?reason= để màn đăng nhập giải thích. */
 export const IDLE_LOGOUT_REASON = 'idle';
