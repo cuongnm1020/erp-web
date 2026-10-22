@@ -33,6 +33,7 @@ const ME_ADMIN = {
   careTeamIds: [],
   hasGlobalAccess: true,
   managesDepartments: false,
+  managesCareTeam: false,
   warehouseIds: null,
   warehouses: [],
   defaultWarehouseId: null,

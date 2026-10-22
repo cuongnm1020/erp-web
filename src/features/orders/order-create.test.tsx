@@ -749,6 +749,7 @@ describe('OrderCreateScreen — màn tạo đơn mới', () => {
         me={{
           ...ME_ADMIN,
           managesDepartments: false,
+          managesCareTeam: false,
           warehouseIds: ['wh-tt', 'wh-la'],
           warehouses: [
             { id: 'wh-tt', code: 'KHO-TT-01', name: 'Kho Thạch Thất' },

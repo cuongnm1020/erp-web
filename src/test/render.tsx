@@ -10,7 +10,7 @@ import { ME_ADMIN } from './msw/handlers';
 export interface AppRenderOptions extends Omit<RenderOptions, 'wrapper'> {
   me?:
     | (Pick<AuthMe, 'permissions' | 'hasGlobalAccess'> &
-        Partial<Pick<AuthMe, 'managesDepartments'>>)
+        Partial<Pick<AuthMe, 'managesDepartments' | 'managesCareTeam'>>)
     | null;
   socket?: RealtimeSocket;
   queryClient?: QueryClient;
@@ -36,6 +36,7 @@ export function renderApp(ui: ReactElement, opts: AppRenderOptions = {}) {
     ? {
         ...ME_ADMIN,
         managesDepartments: false,
+        managesCareTeam: false,
         warehouseIds: opts.warehouses.map((w) => w.id),
         warehouses: opts.warehouses,
         defaultWarehouseId: opts.warehouses[0]?.id ?? null,

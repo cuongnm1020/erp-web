@@ -148,6 +148,14 @@ export const NAV_MODULES: NavModule[] = [
         ability: { action: 'care', subject: 'Customer' },
       },
       {
+        label: 'Nhân viên của team',
+        href: '/crm/care/staff',
+        icon: UserCog,
+        // Trưởng nhóm CSKH (2026-10-22): thêm / sửa / khóa nhân viên phòng CSKH mình phụ trách +
+        // doanh thu từng người — thay Sơ đồ nhân sự (ẩn với CSKH).
+        ability: { action: 'manage', subject: 'CareStaff' },
+      },
+      {
         label: 'Phân công',
         href: '/crm/customers/assign',
         icon: UsersRound,
@@ -215,13 +223,14 @@ export const NAV_MODULES: NavModule[] = [
         label: 'Danh mục · thương hiệu',
         href: '/catalog/categories',
         icon: List,
-        ability: { action: 'read', subject: 'Product' },
+        // Quyền riêng (2026-10-22): mọi vai trò xem sản phẩm trừ CSKH.
+        ability: { action: 'categories', subject: 'Product' },
       },
       {
         label: 'In tem barcode',
         href: '/catalog/barcode-print',
         icon: Barcode,
-        ability: { action: 'read', subject: 'Product' },
+        ability: { action: 'barcode_print', subject: 'Product' },
       },
       {
         label: 'Lô & hạn dùng',
@@ -579,6 +588,8 @@ export const SEGMENT_LABELS: Record<string, string> = {
   categories: 'Danh mục',
   combos: 'Combo sản phẩm',
   'barcode-print': 'In tem barcode',
+  care: 'CSKH',
+  staff: 'Nhân viên của team',
   lots: 'Lô & hạn dùng',
   suppliers: 'Nhà cung cấp',
   stock: 'Tồn kho',

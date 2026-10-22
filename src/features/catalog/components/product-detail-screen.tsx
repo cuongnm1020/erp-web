@@ -135,11 +135,13 @@ function DetailBody({ product }: { product: ProductDetail }) {
             <StatusBadge tone={product.isActive ? 'ok' : 'neutral'}>
               {product.isActive ? 'Đang bán' : 'Ngừng bán'}
             </StatusBadge>
-            <Button variant="outline" size="sm" asChild>
-              <Link href={`/catalog/barcode-print?productId=${product.id}`}>
-                <Printer /> In tem
-              </Link>
-            </Button>
+            <Can I="barcode_print" a="Product">
+              <Button variant="outline" size="sm" asChild>
+                <Link href={`/catalog/barcode-print?productId=${product.id}`}>
+                  <Printer /> In tem
+                </Link>
+              </Button>
+            </Can>
             <Can I="update" a="Product">
               <Button variant="outline" size="sm" asChild>
                 <Link href={`/catalog/products/${product.id}/edit`}>Sửa</Link>

@@ -29,7 +29,7 @@ export function parsePermission(code: string): { action: AppAction; subject: App
 export function buildAbility(
   me:
     | (Pick<AuthMe, 'permissions' | 'hasGlobalAccess'> &
-        Partial<Pick<AuthMe, 'managesDepartments'>>)
+        Partial<Pick<AuthMe, 'managesDepartments' | 'managesCareTeam'>>)
     | null,
 ): AppAbility {
   const rules: Array<{ action: AppAction; subject: AppSubject }> = [];
@@ -41,6 +41,8 @@ export function buildAbility(
   // Sơ đồ nhân sự: user.read HOẶC đang là trưởng phòng (GET /org/tree cho phép cả hai).
   if (me?.managesDepartments || me?.permissions.includes('user.read'))
     rules.push({ action: 'view', subject: 'OrgChart' });
+  // Nhân viên của team CSKH (2026-10-22): phụ trách phòng ban CSKH — API tự lọc phạm vi.
+  if (me?.managesCareTeam) rules.push({ action: 'manage', subject: 'CareStaff' });
   return createMongoAbility<[AppAction, AppSubject]>(rules);
 }
 

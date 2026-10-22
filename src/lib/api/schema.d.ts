@@ -2544,6 +2544,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/org/care-staff": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Nhân viên các phòng CSKH người gọi phụ trách — màn "Nhân viên của team" (2026-10-22). Không
+         *     gắn @RequirePermission: phạm vi tính theo phòng ban phụ trách, không phụ trách thì rỗng.
+         */
+        get: operations["OrgTreeController_careStaffList"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/org/tree": {
         parameters: {
             query?: never;
@@ -5417,8 +5437,13 @@ export interface components {
             /** @description Team CSKH user là thành viên (leader hoặc member) — thấy khách của team (2026-10-21). */
             careTeamIds: string[];
             hasGlobalAccess: boolean;
-            /** @description Đang là trưởng phòng ít nhất một phòng ban — web hiện Sơ đồ nhân sự dù không có user.read. */
+            /**
+             * @description Đang là trưởng phòng ít nhất một phòng ban KHÔNG phải CSKH — web hiện Sơ đồ nhân sự dù không có
+             *     user.read. Trưởng nhóm CSKH đi màn "Nhân viên của team" (`managesCareTeam`), không thấy sơ đồ.
+             */
             managesDepartments: boolean;
+            /** @description Phụ trách ít nhất một phòng ban CSKH (2026-10-22) — web hiện màn "Nhân viên của team". */
+            managesCareTeam: boolean;
             /** @description Kho được phép (id) — null = mọi kho (superadmin / quyền `warehouse.all`). */
             warehouseIds: string[] | null;
             /** @description Kho được phép kèm mã + tên, kho mặc định hệ thống trước rồi theo mã — cho ô chọn kho. */
@@ -8650,6 +8675,37 @@ export interface components {
             isActive?: boolean;
             /** @enum {string} */
             kind?: "SALES" | "CSKH";
+        };
+        CareStaffDepartmentDto: {
+            id: string;
+            code: string;
+            name: string;
+        };
+        CareStaffRoleDto: {
+            code: string;
+            name: string;
+        };
+        CareStaffDto: {
+            /** @description Dạng chuẩn chỉ chữ số; null = chưa khai. */
+            phone: string | null;
+            departmentName: string | null;
+            roles: components["schemas"]["CareStaffRoleDto"][];
+            createdAt: string;
+            id: string;
+            code: string;
+            fullName: string;
+            email: string;
+            isActive: boolean;
+            departmentId: string | null;
+            /** @description Người tạo tài khoản (NULL = tạo trước khi ghi nhận / từ seed — chỉ superadmin quản lý). */
+            createdById: string | null;
+            /** @description Người đang xem được sửa / khóa / chuyển phòng ban người này (chỉ để ẩn nút — server vẫn kiểm). */
+            canManage: boolean;
+        };
+        CareStaffListDto: {
+            /** @description Phòng ban CSKH người gọi phụ trách (gồm phòng con) — nơi thêm nhân viên mới. */
+            departments: components["schemas"]["CareStaffDepartmentDto"][];
+            staff: components["schemas"]["CareStaffDto"][];
         };
         OrgEmployeeDto: {
             id: string;
@@ -17096,6 +17152,28 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+        };
+    };
+    OrgTreeController_careStaffList: {
+        parameters: {
+            query?: {
+                /** @description Query string → boolean tường minh; @Type(() => Boolean) biến "false" thành true. */
+                includeInactive?: boolean;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CareStaffListDto"];
+                };
             };
         };
     };

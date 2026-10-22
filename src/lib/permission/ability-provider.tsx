@@ -19,7 +19,7 @@ export function AbilityProvider({
 }: {
   me:
     | (Pick<AuthMe, 'permissions' | 'hasGlobalAccess'> &
-        Partial<Pick<AuthMe, 'managesDepartments'>>)
+        Partial<Pick<AuthMe, 'managesDepartments' | 'managesCareTeam'>>)
     | null
     | undefined;
   children: ReactNode;

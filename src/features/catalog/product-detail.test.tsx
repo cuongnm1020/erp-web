@@ -520,12 +520,20 @@ describe('ProductDetailScreen — C-03 chi tiết sản phẩm (GET /products/:i
     await waitFor(() => expect(byLotCalls.at(-1)?.get('skuId')).toBe(SKU_BLUE.id));
   });
 
-  it('chỉ product.read → không có nút Sửa (luật 7); In tem vẫn hiện', async () => {
+  it('product.read + product.barcode_print → không có nút Sửa (luật 7); In tem vẫn hiện', async () => {
     renderApp(<ProductDetailScreen productId={PRODUCT.id} />, {
-      me: { ...ME_SALE, permissions: ['product.read', 'stock.read'] },
+      me: { ...ME_SALE, permissions: ['product.read', 'product.barcode_print', 'stock.read'] },
     });
     await screen.findByText(PRODUCT.name);
     expect(screen.queryByRole('link', { name: 'Sửa' })).not.toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'In tem' })).toBeInTheDocument();
+  });
+
+  it('chỉ product.read (trưởng nhóm CSKH, 2026-10-22) → không có nút In tem', async () => {
+    renderApp(<ProductDetailScreen productId={PRODUCT.id} />, {
+      me: { ...ME_SALE, permissions: ['product.read'] },
+    });
+    await screen.findByText(PRODUCT.name);
+    expect(screen.queryByRole('link', { name: 'In tem' })).not.toBeInTheDocument();
   });
 });
