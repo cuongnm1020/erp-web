@@ -399,12 +399,21 @@ function LineRow({ l, component = false }: { l: SalesOrderLine; component?: bool
       >
         {money(l.lineTotal)}
       </TableCell>
-      <TableCell className="px-2.5 py-1.5 text-right font-semibold tabular-nums text-primary">
-        {qty(l.reservedQty)}
-      </TableCell>
-      <TableCell className="px-2.5 py-1.5 text-right tabular-nums text-muted-foreground">
-        {qty(l.pickedQty)}
-      </TableCell>
+      {l.nonStock ? (
+        // Món gõ tay Pancake (SKU một lần, 2026-10-22): không giữ chỗ / lấy hàng / trừ tồn.
+        <TableCell colSpan={2} className="px-2.5 py-1.5 text-right text-xs text-muted-foreground">
+          Gõ tay trên Pancake — không quản lý tồn
+        </TableCell>
+      ) : (
+        <>
+          <TableCell className="px-2.5 py-1.5 text-right font-semibold tabular-nums text-primary">
+            {qty(l.reservedQty)}
+          </TableCell>
+          <TableCell className="px-2.5 py-1.5 text-right tabular-nums text-muted-foreground">
+            {qty(l.pickedQty)}
+          </TableCell>
+        </>
+      )}
     </TableRow>
   );
 }

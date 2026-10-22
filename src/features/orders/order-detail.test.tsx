@@ -231,6 +231,20 @@ describe('OrderDetailScreen — đơn Pancake: tên gốc trên Pancake + món g
     expect(row).toHaveTextContent('Gõ tay trên Pancake');
     expect(row).toHaveTextContent('Không trừ tồn');
   });
+
+  it('dòng món gõ tay thành SKU một lần (nonStock, 2026-10-22): có tiền, cột giữ / đã pick thay bằng "không quản lý tồn"', async () => {
+    const lines = DETAIL.lines.map((l, i) =>
+      i === 0
+        ? { ...l, skuName: '5 chai hạt ngọc sữa', nonStock: true, reservedQty: '0', pickedQty: '0' }
+        : l,
+    );
+    server.use(http.get('/api/sales-orders/:id', () => HttpResponse.json({ ...DETAIL, lines })));
+    renderApp(<OrderDetailScreen orderId={ORDER.id} />);
+    const name = await screen.findByText('5 chai hạt ngọc sữa');
+    const row = name.closest('tr')!;
+    expect(row).toHaveTextContent('Gõ tay trên Pancake — không quản lý tồn');
+    expect(screen.getAllByText('Gõ tay trên Pancake — không quản lý tồn')).toHaveLength(1);
+  });
 });
 
 describe('OrderDetailScreen — duyệt đơn Chờ duyệt (2026-10-21)', () => {

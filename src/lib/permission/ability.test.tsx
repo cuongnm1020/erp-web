@@ -42,6 +42,28 @@ describe('buildAbility', () => {
     expect(manager.can('sales_all', 'Report')).toBe(true);
   });
 
+  it('trưởng nhóm CSKH (2026-10-22): managesCareTeam → manage CareStaff, không có OrgChart; trưởng phòng thường vẫn có OrgChart', () => {
+    const cskh = buildAbility({
+      permissions: ['product.read', 'user.manage_department'],
+      hasGlobalAccess: false,
+      managesDepartments: false,
+      managesCareTeam: true,
+    });
+    expect(cskh.can('manage', 'CareStaff')).toBe(true);
+    expect(cskh.can('view', 'OrgChart')).toBe(false);
+    expect(cskh.can('categories', 'Product')).toBe(false);
+    expect(cskh.can('barcode_print', 'Product')).toBe(false);
+    const sales = buildAbility({
+      permissions: ['product.read', 'product.categories', 'product.barcode_print'],
+      hasGlobalAccess: false,
+      managesDepartments: true,
+      managesCareTeam: false,
+    });
+    expect(sales.can('view', 'OrgChart')).toBe(true);
+    expect(sales.can('manage', 'CareStaff')).toBe(false);
+    expect(sales.can('categories', 'Product')).toBe(true);
+  });
+
   it('hasGlobalAccess → manage all', () => {
     const a = buildAbility(ADMIN);
     expect(a.can('delete', 'Customer')).toBe(true);

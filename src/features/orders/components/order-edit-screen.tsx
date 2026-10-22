@@ -472,8 +472,14 @@ function Editor({ order }: { order: SalesOrderDetail }) {
                         </div>
                         <div className="mt-1 flex flex-wrap gap-x-4 text-xs text-muted-foreground">
                           <span>Chiết khấu: {money(item.discount)} ₫</span>
-                          <span>Đang giữ: {formatQuantity(item.reservedQty)}</span>
-                          <span>Đã pick: {formatQuantity(item.pickedQty)}</span>
+                          {item.nonStock ? (
+                            <span>Gõ tay trên Pancake — không quản lý tồn</span>
+                          ) : (
+                            <>
+                              <span>Đang giữ: {formatQuantity(item.reservedQty)}</span>
+                              <span>Đã pick: {formatQuantity(item.pickedQty)}</span>
+                            </>
+                          )}
                         </div>
                       </div>
                       <div className="text-right tabular-nums">

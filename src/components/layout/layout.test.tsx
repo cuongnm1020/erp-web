@@ -46,6 +46,25 @@ describe('visibleModules', () => {
     expect(labels).not.toContain('Kho');
   });
 
+  it('trưởng nhóm CSKH (2026-10-22): có product.read nhưng không thấy Danh mục / In tem barcode / Sơ đồ nhân sự; thấy Nhân viên của team', () => {
+    const ab = new Set(['read:Product', 'read:Customer', 'care:Customer', 'manage:CareStaff']);
+    const mods = visibleModules((a, s) => ab.has(`${a}:${s}`));
+    const children = mods.flatMap((m) => m.children ?? []).map((c) => c.label);
+    expect(children).toContain('Danh sách sản phẩm');
+    expect(children).not.toContain('Danh mục · thương hiệu');
+    expect(children).not.toContain('In tem barcode');
+    expect(children).not.toContain('Sơ đồ nhân sự');
+    expect(children).toContain('Nhân viên của team');
+    expect(requiredAbilityFor('/crm/care/staff')).toEqual({
+      action: 'manage',
+      subject: 'CareStaff',
+    });
+    expect(requiredAbilityFor('/catalog/categories')).toEqual({
+      action: 'categories',
+      subject: 'Product',
+    });
+  });
+
   it('không có quyền nào → chỉ thấy Tổng quan (Giá & KM đang ẩn)', () => {
     expect(visibleModules(() => false).map((m) => m.label)).toEqual(['Tổng quan']);
   });

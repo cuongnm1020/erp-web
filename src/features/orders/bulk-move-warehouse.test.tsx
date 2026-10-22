@@ -18,6 +18,7 @@ vi.mock('@/components/ui/toaster', () => ({
 const ME = {
   ...ME_ADMIN,
   managesDepartments: false,
+  managesCareTeam: false,
   warehouseIds: null,
   warehouses: [
     { id: 'wh-tt', code: 'KHO-TT-01', name: 'Kho Thạch Thất' },

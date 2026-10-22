@@ -1,0 +1,347 @@
+'use client';
+
+import { Lock, LockOpen, Pencil, Plus } from 'lucide-react';
+import { useMemo, useState } from 'react';
+import { ConfirmDialog } from '@/components/data/confirm-dialog';
+import { DataTable, type ColumnDef } from '@/components/data/data-table';
+import {
+  DateRangePicker,
+  defaultRangePresets,
+  normalizeRange,
+} from '@/components/data/date-range-picker';
+import { EmptyState, ListSkeleton, QueryState } from '@/components/data/states';
+import { StatusBadge } from '@/components/data/status-badge';
+import { PageHeader } from '@/components/layout/page-header';
+import { Button } from '@/components/ui/button';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { toast } from '@/components/ui/toaster';
+import { messageFor } from '@/lib/error-messages';
+import { formatMoney, formatPhone, groupVi, toLocalDateKey, toDecimal } from '@/lib/format';
+import { useListState } from '@/lib/url-state';
+import {
+  useCareStaff,
+  useStaffRevenue,
+  type CareStaff,
+  type StaffRevenue,
+} from '../api/use-org-tree';
+import { useUpdateUser } from '../api/use-users';
+import { OrgStaffDialog } from './org-staff-dialog';
+import { UserCreateDialog } from './user-create-dialog';
+
+const MAX_DAYS = 366;
+const ALL_DEPTS = '__all__';
+
+type Row = CareStaff & { revenue: StaffRevenue | null };
+
+/**
+ * Nhân viên của team — trưởng nhóm CSKH (2026-10-22, thay Sơ đồ nhân sự với CSKH). Danh sách
+ * GET /org/care-staff (phòng CSKH mình phụ trách, API lọc phạm vi) + doanh thu kỳ chọn theo người
+ * phụ trách đơn (GET /reports/sales/by-staff, đã lọc theo team). Thêm = POST /users vào phòng CSKH;
+ * Sửa / Khóa / Mở khóa = PATCH /users/{id} — server kiểm lại quyền (StaffAccessService).
+ * Danh sách team nhỏ (vài chục người) nên API trả đủ, không phân trang. URL: ?from&to&inactive&dept.
+ */
+export function CareStaffScreen() {
+  const { state, set } = useListState<'from' | 'to' | 'inactive' | 'dept'>({
+    filterKeys: ['from', 'to', 'inactive', 'dept'],
+  });
+  const today = toLocalDateKey(new Date()) ?? '';
+  const presets = defaultRangePresets(today);
+  const monthStart = `${today.slice(0, 8)}01`;
+  const range = useMemo(
+    () =>
+      normalizeRange(
+        { from: state.filters.from, to: state.filters.to },
+        { from: monthStart, to: today },
+        MAX_DAYS,
+      ),
+    [state.filters.from, state.filters.to, monthStart, today],
+  );
+  const includeInactive = state.filters.inactive === '1';
+  const dept = state.filters.dept ?? ALL_DEPTS;
+  const setFilter = (patch: Partial<Record<'from' | 'to' | 'inactive' | 'dept', string>>) =>
+    set({ filters: { ...state.filters, ...patch } });
+
+  const staff = useCareStaff(includeInactive);
+  const revenue = useStaffRevenue(range.from, range.to);
+  const [creating, setCreating] = useState(false);
+  const [editing, setEditing] = useState<CareStaff | null>(null);
+  const [locking, setLocking] = useState<CareStaff | null>(null);
+
+  const departments = staff.data?.departments ?? [];
+  const createDept =
+    departments.find((d) => d.id === dept) ?? (departments.length === 1 ? departments[0] : null);
+  const revenueByUser = useMemo(
+    () => new Map((revenue.data?.items ?? []).map((r) => [r.key.id, r])),
+    [revenue.data],
+  );
+
+  const columns = useMemo<ColumnDef<Row, unknown>[]>(
+    () => [
+      {
+        id: 'name',
+        header: 'Nhân viên',
+        meta: { width: 220 },
+        cell: ({ row }) => (
+          <div className="space-y-0.5">
+            <span className="block font-medium">{row.original.fullName}</span>
+            <span className="block font-mono text-xs text-muted-foreground">
+              {row.original.code}
+            </span>
+          </div>
+        ),
+      },
+      {
+        id: 'contact',
+        header: 'Liên hệ',
+        meta: { width: 220 },
+        cell: ({ row }) => (
+          <div className="space-y-0.5 text-xs">
+            <span className="block max-w-52 truncate" title={row.original.email}>
+              {row.original.email}
+            </span>
+            <span className="block text-muted-foreground">
+              {row.original.phone ? formatPhone(row.original.phone) : '—'}
+            </span>
+          </div>
+        ),
+      },
+      {
+        id: 'roles',
+        header: 'Vai trò',
+        meta: { width: 170 },
+        cell: ({ row }) => (
+          <span className="text-xs">{row.original.roles.map((r) => r.name).join(', ') || '—'}</span>
+        ),
+      },
+      {
+        id: 'department',
+        header: 'Phòng ban',
+        meta: { width: 150 },
+        cell: ({ row }) => <span className="text-xs">{row.original.departmentName ?? '—'}</span>,
+      },
+      {
+        id: 'revenue',
+        header: 'Doanh thu',
+        meta: { align: 'right', width: 140 },
+        cell: ({ row }) => {
+          const r = row.original.revenue;
+          if (revenue.isPending) return <span className="text-muted-foreground">…</span>;
+          return (
+            <div className="space-y-0.5">
+              <span className="block font-semibold">
+                {formatMoney(r?.revenue ?? '0', { unit: '' })}
+              </span>
+              <span className="block text-xs text-muted-foreground">
+                {groupVi(String(r?.orderCount ?? 0))} đơn
+              </span>
+            </div>
+          );
+        },
+      },
+      {
+        id: 'status',
+        header: 'Trạng thái',
+        meta: { width: 110 },
+        cell: ({ row }) =>
+          row.original.isActive ? (
+            <StatusBadge tone="ok">Đang làm</StatusBadge>
+          ) : (
+            <StatusBadge tone="neutral">Đã khóa</StatusBadge>
+          ),
+      },
+      {
+        id: 'actions',
+        header: () => <span className="sr-only">Thao tác</span>,
+        meta: { width: 180 },
+        cell: ({ row }) =>
+          row.original.canManage ? (
+            <div className="flex justify-end gap-1">
+              <Button
+                variant="ghost"
+                size="sm"
+                aria-label={`Sửa ${row.original.code}`}
+                onClick={() => setEditing(row.original)}
+              >
+                <Pencil aria-hidden /> Sửa
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                aria-label={`${row.original.isActive ? 'Khóa' : 'Mở khóa'} ${row.original.code}`}
+                onClick={() => setLocking(row.original)}
+              >
+                {row.original.isActive ? <Lock aria-hidden /> : <LockOpen aria-hidden />}
+                {row.original.isActive ? 'Khóa' : 'Mở khóa'}
+              </Button>
+            </div>
+          ) : null,
+      },
+    ],
+    [revenue.isPending],
+  );
+
+  const rows: Row[] = (staff.data?.staff ?? [])
+    .filter((s) => dept === ALL_DEPTS || s.departmentId === dept)
+    .map((s) => ({ ...s, revenue: revenueByUser.get(s.id) ?? null }));
+  const teamRevenue = rows.reduce(
+    (acc, r) => acc.plus(toDecimal(r.revenue?.revenue ?? '0') ?? 0),
+    toDecimal('0')!,
+  );
+
+  return (
+    <>
+      <PageHeader
+        title="Nhân viên của team"
+        description={
+          staff.data
+            ? `${rows.length} nhân viên · doanh thu kỳ chọn ${formatMoney(teamRevenue.toString())}`
+            : 'Đang tải nhân viên của team…'
+        }
+        breadcrumb={[
+          { label: 'Khách hàng', href: '/crm/customers' },
+          { label: 'Nhân viên của team' },
+        ]}
+        actions={
+          createDept ? (
+            <Button onClick={() => setCreating(true)}>
+              <Plus aria-hidden />
+              Thêm nhân viên
+            </Button>
+          ) : null
+        }
+      />
+
+      <div className="mb-3 flex flex-wrap items-end gap-2 rounded-lg border bg-card p-3">
+        <span className="pb-1.5 text-sm font-semibold text-muted-foreground">Doanh thu</span>
+        <DateRangePicker
+          value={range}
+          today={today}
+          maxDays={MAX_DAYS}
+          presets={presets}
+          onChange={(r) => setFilter({ from: r.from, to: r.to })}
+        />
+        {departments.length > 1 ? (
+          <Select value={dept} onValueChange={(v) => setFilter({ dept: v === ALL_DEPTS ? '' : v })}>
+            <SelectTrigger className="w-56" aria-label="Phòng ban">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value={ALL_DEPTS}>Mọi phòng CSKH</SelectItem>
+              {departments.map((d) => (
+                <SelectItem key={d.id} value={d.id}>
+                  {d.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        ) : null}
+        <Button
+          type="button"
+          size="sm"
+          variant={includeInactive ? 'default' : 'outline'}
+          aria-pressed={includeInactive}
+          onClick={() => setFilter({ inactive: includeInactive ? '' : '1' })}
+        >
+          Hiện cả nhân viên đã khóa
+        </Button>
+      </div>
+
+      <QueryState
+        query={staff}
+        skeleton={<ListSkeleton rows={8} columns={7} />}
+        isEmpty={(d) => d.departments.length === 0 || d.staff.length === 0}
+        empty={
+          <EmptyState
+            title={
+              staff.data?.departments.length === 0
+                ? 'Bạn chưa phụ trách phòng CSKH nào'
+                : 'Team chưa có nhân viên'
+            }
+            description={
+              staff.data?.departments.length === 0
+                ? 'Màn này dành cho trưởng nhóm CSKH — nhờ quản trị gán bạn làm trưởng phòng CSKH.'
+                : 'Thêm nhân viên đầu tiên để chia khách chăm sóc.'
+            }
+            action={
+              createDept ? (
+                <Button onClick={() => setCreating(true)}>
+                  <Plus aria-hidden />
+                  Thêm nhân viên
+                </Button>
+              ) : undefined
+            }
+          />
+        }
+      >
+        {() => (
+          <DataTable
+            columns={columns}
+            rows={rows}
+            getRowId={(r) => r.id}
+            total={rows.length}
+            page={1}
+            size={rows.length || 1}
+            sort={null}
+            onPageChange={() => undefined}
+            onSizeChange={() => undefined}
+            onSortChange={() => undefined}
+            pagination={false}
+          />
+        )}
+      </QueryState>
+
+      {creating && createDept ? (
+        <UserCreateDialog
+          open
+          onOpenChange={setCreating}
+          fixedDepartment={{ id: createDept.id, name: createDept.name }}
+        />
+      ) : null}
+      {editing ? (
+        <OrgStaffDialog
+          employee={editing}
+          departments={departments.map((d) => ({ id: d.id, name: d.name, path: '' }))}
+          allowUnassign={false}
+          onOpenChange={(o) => !o && setEditing(null)}
+        />
+      ) : null}
+      {locking ? <LockDialog staff={locking} onClose={() => setLocking(null)} /> : null}
+    </>
+  );
+}
+
+/** Khóa = không đăng nhập được + rời team phòng ban; Mở khóa = vào lại. PATCH /users/{id}. */
+function LockDialog({ staff, onClose }: { staff: CareStaff; onClose: () => void }) {
+  const update = useUpdateUser(staff.id);
+  const lock = staff.isActive;
+  return (
+    <ConfirmDialog
+      open
+      onOpenChange={(o) => !o && onClose()}
+      title={`${lock ? 'Khóa' : 'Mở khóa'} ${staff.fullName}?`}
+      description={
+        lock
+          ? 'Nhân viên không đăng nhập được nữa và rời team. Đơn, khách và doanh thu cũ giữ nguyên; mở khóa lại bất cứ lúc nào.'
+          : 'Nhân viên đăng nhập lại được và vào lại team của phòng ban.'
+      }
+      confirmLabel={lock ? 'Khóa' : 'Mở khóa'}
+      destructive={lock}
+      onConfirm={async () => {
+        try {
+          await update.mutateAsync({ isActive: !lock });
+          toast.success(lock ? 'Đã khóa' : 'Đã mở khóa', {
+            description: `${staff.code} · ${staff.fullName}`,
+          });
+        } catch (err) {
+          toast.error(messageFor(err));
+        }
+      }}
+    />
+  );
+}

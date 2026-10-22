@@ -27,3 +27,37 @@ export function useOrgTree(includeInactive = false) {
     placeholderData: keepPreviousData,
   });
 }
+
+export type CareStaffList = components['schemas']['CareStaffListDto'];
+export type CareStaff = components['schemas']['CareStaffDto'];
+
+/**
+ * GET /org/care-staff — nhân viên các phòng CSKH người gọi phụ trách (màn "Nhân viên của team",
+ * 2026-10-22). Key dưới prefix org-tree: thêm / sửa / khóa nhân viên (use-users) tải lại luôn.
+ */
+export function useCareStaff(includeInactive: boolean) {
+  return useQuery({
+    queryKey: [...orgTreeKeys.all, 'care-staff', { includeInactive }] as const,
+    queryFn: () => unwrap(api.GET('/org/care-staff', { params: { query: { includeInactive } } })),
+    placeholderData: keepPreviousData,
+  });
+}
+
+export type StaffRevenue = components['schemas']['SalesByStaffItemDto'];
+
+/**
+ * Doanh thu theo người phụ trách trong kỳ — GET /reports/sales/by-staff?groupBy=owner (API đã lọc
+ * theo team trưởng nhóm, bất biến 8 / D-CR2). Key dưới prefix ['reports','sales'] như màn báo cáo.
+ */
+export function useStaffRevenue(from: string, to: string) {
+  return useQuery({
+    queryKey: ['reports', 'sales', 'care-staff', { from, to }] as const,
+    queryFn: () =>
+      unwrap(
+        api.GET('/reports/sales/by-staff', {
+          params: { query: { from, to, groupBy: 'owner' } },
+        }),
+      ),
+    placeholderData: keepPreviousData,
+  });
+}
