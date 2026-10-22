@@ -95,6 +95,8 @@ const MESSAGES: Record<string, string> = {
     'Hãng vận chuyển từ chối dữ liệu đơn (thường là địa chỉ giao). Sửa đơn theo lý do hãng báo rồi xin vận đơn lại.',
   BARCODE_TAKEN: 'Mã này đã gán cho sản phẩm khác — mỗi mã chỉ thuộc một sản phẩm.',
   SKU_CODE_TAKEN: 'Mã này đã là mã của SKU khác — chọn mã khác.',
+  STOCK_EXCEL_WAREHOUSE_MISMATCH:
+    'File này là tồn của kho khác — chọn đúng kho đã xuất file, hoặc xuất lại file của kho này.',
   /** Hồ sơ Pancake — fb_id thuộc tài khoản thật khác (messageFor ghép thêm người đang giữ). */
   PANCAKE_FB_ID_TAKEN:
     'Facebook ID này đang gắn với tài khoản khác. Gỡ Facebook ID ở tài khoản đó trước nếu nhập đúng người.',
@@ -262,6 +264,12 @@ export function messageFor(err: unknown): string {
       const d = err.details as { code?: unknown; skuCode?: unknown; skuName?: unknown } | null;
       if (d && typeof d.skuCode === 'string') {
         return `Mã ${String(d.code ?? '')} đã gán cho ${d.skuCode}${typeof d.skuName === 'string' ? ` — ${d.skuName}` : ''}. Mỗi mã chỉ thuộc một sản phẩm.`;
+      }
+    }
+    if (err.code === 'STOCK_EXCEL_WAREHOUSE_MISMATCH') {
+      const d = err.details as { fileWarehouseCode?: unknown; warehouseName?: unknown } | null;
+      if (d && typeof d.fileWarehouseCode === 'string') {
+        return `File này là tồn của kho ${d.fileWarehouseCode}, đang nhập vào ${typeof d.warehouseName === 'string' ? d.warehouseName : 'kho khác'}. Chọn đúng kho đã xuất file, hoặc xuất lại file của kho này.`;
       }
     }
     if (err.code === 'SKU_CODE_TAKEN') {

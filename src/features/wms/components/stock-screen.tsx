@@ -48,6 +48,7 @@ import {
   type StockRow,
   type StockSortField,
 } from '../api/use-stock';
+import { StockExcelExportButton, StockExcelImportButton } from './stock-excel-dialogs';
 import { isNegativeQty, locationTypeLabel } from '../labels';
 
 /**
@@ -769,18 +770,22 @@ export function StockScreen() {
         }
         breadcrumb={[{ label: 'Kho' }, { label: 'Tồn kho' }]}
         actions={
-          (canAdjust || canCost) && !counting ? (
-            <Button
-              variant="outline"
-              onClick={() => {
-                setCounting(true);
-                if (tab !== 'sku') setFilter({ tab: undefined });
-              }}
-            >
-              <ClipboardCheck className="h-4 w-4" aria-hidden />
-              {editLabel}
-            </Button>
-          ) : null
+          <>
+            {!counting ? <StockExcelExportButton /> : null}
+            {canAdjust && !counting ? <StockExcelImportButton /> : null}
+            {(canAdjust || canCost) && !counting ? (
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setCounting(true);
+                  if (tab !== 'sku') setFilter({ tab: undefined });
+                }}
+              >
+                <ClipboardCheck className="h-4 w-4" aria-hidden />
+                {editLabel}
+              </Button>
+            ) : null}
+          </>
         }
       />
 

@@ -4819,6 +4819,44 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/stock/excel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** File xlsx: hàng ERP + tồn sổ / đang giữ của kho, cột "Tồn thực tế" để điền. */
+        get: operations["StockExcelController_download"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/stock/excel/import": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Nhập file đã điền (multipart field "file", ≤ 5 MB). `dryRun=true` chỉ trả bảng xem trước;
+         *     không thì ghi phần lệch như "Nhập tồn thực tế" (sổ cái + phiếu kiểm POSTED, cần stock.adjust).
+         *     File mang mã kho khác `warehouseId` → 422 STOCK_EXCEL_WAREHOUSE_MISMATCH.
+         */
+        post: operations["StockExcelController_import"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/payment-gateways": {
         parameters: {
             query?: never;
@@ -11928,6 +11966,36 @@ export interface components {
             docNumber: string;
             status: string;
             adjustedLineCount: number;
+        };
+        StockExcelImportRowDto: {
+            /** @enum {string} */
+            action: "INCREASE" | "DECREASE" | "UNCHANGED" | "SKIPPED" | "ERROR";
+            /** @description Số dòng trong file Excel (1-based). */
+            row: number;
+            skuId: string | null;
+            skuCode: string | null;
+            skuName: string | null;
+            /** @description Tồn sổ của kho lúc nhập — Decimal(18,6) chuỗi; null = không nhận ra SKU. */
+            current: string | null;
+            /** @description Tồn thực tế trong file; null = ô trống. */
+            counted: string | null;
+            /** @description Lý do lỗi / bỏ qua (câu tiếng Việt dựng ở server từ dữ liệu, không phải lỗi thô). */
+            note: string | null;
+        };
+        StockExcelImportResultDto: {
+            warehouseId: string;
+            warehouseCode: string;
+            warehouseName: string;
+            dryRun: boolean;
+            increase: number;
+            decrease: number;
+            unchanged: number;
+            skipped: number;
+            errors: number;
+            /** @description Phiếu kiểm kê POSTED đã sinh (rỗng khi dryRun / không lệch). */
+            docNumbers: string[];
+            /** @description Mọi dòng có SKU trong file, theo thứ tự file. */
+            rows: components["schemas"]["StockExcelImportRowDto"][];
         };
         CreatePaymentLinkDto: {
             /**
@@ -20557,6 +20625,57 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["CycleCountStateResultDto"];
+                };
+            };
+        };
+    };
+    StockExcelController_download: {
+        parameters: {
+            query: {
+                warehouseId: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    StockExcelController_import: {
+        parameters: {
+            query: {
+                warehouseId: string;
+                /** @description `true` = chỉ kiểm tra + xem trước, không ghi. */
+                dryRun?: string;
+            };
+            header: {
+                "idempotency-key": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": {
+                    /** Format: binary */
+                    file: string;
+                };
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StockExcelImportResultDto"];
                 };
             };
         };
