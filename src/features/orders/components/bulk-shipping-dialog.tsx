@@ -26,6 +26,7 @@ import { messageFor } from '@/lib/error-messages';
 import { useCarriers } from '@/features/wms/api/use-shipping';
 import { useBulkUpdateOrders, type SalesOrder } from '../api/use-orders';
 import { orderEditable } from '../labels';
+import { useControlledOpen } from '../use-controlled-open';
 import { normalizeWeightInput } from './order-edit-screen';
 
 const KEEP = '__keep__';
@@ -37,8 +38,19 @@ const NONE = '__none__';
  * /sales-orders/bulk-update; server sửa từng đơn, đơn hỏng về `failed` và được báo riêng.
  * Không optimistic (luật 5): chờ server rồi mới bỏ chọn và invalidate.
  */
-export function BulkShippingDialog({ rows, onDone }: { rows: SalesOrder[]; onDone: () => void }) {
-  const [open, setOpen] = useState(false);
+export function BulkShippingDialog({
+  rows,
+  onDone,
+  open: openProp,
+  onOpenChange,
+}: {
+  rows: SalesOrder[];
+  onDone: () => void;
+  /** Có `open` = mở từ menu "Khác" của thanh chọn nhiều — không vẽ nút riêng. */
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
+}) {
+  const { controlled, open, setOpen } = useControlledOpen(openProp, onOpenChange);
   const [carrierId, setCarrierId] = useState(KEEP);
   const [weight, setWeight] = useState('');
   const [clearWeight, setClearWeight] = useState(false);
@@ -83,10 +95,12 @@ export function BulkShippingDialog({ rows, onDone }: { rows: SalesOrder[]; onDon
 
   return (
     <>
-      <Button size="sm" className="h-7 px-2 text-xs" onClick={() => setOpen(true)}>
-        <Truck aria-hidden />
-        Gán hãng / cân nặng
-      </Button>
+      {controlled ? null : (
+        <Button size="sm" className="h-7 px-2 text-xs" onClick={() => setOpen(true)}>
+          <Truck aria-hidden />
+          Gán hãng / cân nặng
+        </Button>
+      )}
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent>
           <DialogHeader>

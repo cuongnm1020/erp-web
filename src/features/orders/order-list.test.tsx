@@ -28,6 +28,10 @@ vi.mock('next/navigation', () => ({
 
 const FIRST = makeOrders(1)[0]!;
 
+/** Menu "Khác" của thanh chọn nhiều — Radix mở bằng bàn phím trong jsdom. */
+const openMoreMenu = () =>
+  fireEvent.keyDown(screen.getByRole('button', { name: /^Khác/ }), { key: 'ArrowDown' });
+
 describe('OrderListScreen — GET /sales-orders (P1-12)', () => {
   it('loading → bảng dữ liệu thật, tổng hiện trên tiêu đề', async () => {
     search = '';
@@ -240,7 +244,8 @@ describe('OrderListScreen — cân nặng gửi hãng + gán hãng hàng loạt'
     fireEvent.click(screen.getAllByRole('checkbox', { name: 'Chọn dòng' })[0]!);
     fireEvent.click(screen.getAllByRole('checkbox', { name: 'Chọn dòng' })[1]!);
     expect(await screen.findByRole('toolbar')).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: /Gán hãng \/ cân nặng/ }));
+    openMoreMenu();
+    fireEvent.click(await screen.findByRole('menuitem', { name: /Gán hãng \/ cân nặng/ }));
     expect(await screen.findByRole('dialog')).toBeInTheDocument();
     const submit = screen.getByRole('button', { name: /Cập nhật 2 đơn/ });
     expect(submit).toBeDisabled(); // chưa chọn gì để áp
@@ -305,7 +310,8 @@ describe('OrderListScreen — cân nặng gửi hãng + gán hãng hàng loạt'
       fireEvent.click(screen.getAllByRole('checkbox', { name: 'Chọn dòng' })[i]!);
     }
     expect(await screen.findByRole('toolbar')).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: /Hủy đơn/ }));
+    openMoreMenu();
+    fireEvent.click(await screen.findByRole('menuitem', { name: /Hủy đơn/ }));
     const dialog = await screen.findByRole('dialog');
     expect(dialog).toHaveTextContent('Hủy 2 đơn đã chọn?');
     expect(dialog).toHaveTextContent('1 đơn đã hủy hoặc kho đã đóng gói sẽ bị bỏ qua');
@@ -486,7 +492,8 @@ describe('OrderListScreen — cân nặng gửi hãng + gán hãng hàng loạt'
     });
     await screen.findByText(FIRST.docNumber);
     fireEvent.click(screen.getAllByRole('checkbox', { name: 'Chọn dòng' })[0]!);
-    expect(await screen.findByRole('button', { name: /In lại vận đơn/ })).toBeInTheDocument();
+    openMoreMenu();
+    expect(await screen.findByRole('menuitem', { name: /In lại vận đơn/ })).toBeInTheDocument();
     expect(
       screen.queryByRole('button', { name: /Đóng gói \+ in vận đơn/ }),
     ).not.toBeInTheDocument();
@@ -500,8 +507,11 @@ describe('OrderListScreen — cân nặng gửi hãng + gán hãng hàng loạt'
     await screen.findByText(FIRST.docNumber);
     fireEvent.click(screen.getAllByRole('checkbox', { name: 'Chọn dòng' })[0]!);
     expect(await screen.findByRole('toolbar')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /Gán hãng \/ cân nặng/ })).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: /Hủy đơn/ })).not.toBeInTheDocument();
+    openMoreMenu();
+    expect(
+      await screen.findByRole('menuitem', { name: /Gán hãng \/ cân nặng/ }),
+    ).toBeInTheDocument();
+    expect(screen.queryByRole('menuitem', { name: /Hủy đơn/ })).not.toBeInTheDocument();
   });
 });
 
@@ -667,10 +677,11 @@ describe('OrderListScreen — sao chép SĐT / mã vận đơn, cột kho (2026-
     expect(screen.queryByRole('dialog')).toBeNull();
   });
 
-  it('cột Kho: tên kho xuất của đơn; đơn chưa có kho → "Chưa chọn kho"', async () => {
+  it('không còn cột Kho — danh sách đã lọc theo kho làm việc (redesign 2026-10-22)', async () => {
     setup();
-    expect(await screen.findByText('Kho Thạch Thất')).toBeInTheDocument();
-    expect(screen.getByText('Chưa chọn kho')).toBeInTheDocument();
+    await screen.findByRole('columnheader', { name: /Khách hàng/ });
+    expect(screen.queryByRole('columnheader', { name: /^Kho$/ })).not.toBeInTheDocument();
+    expect(screen.queryByText('Kho Thạch Thất')).not.toBeInTheDocument();
   });
 });
 
@@ -713,16 +724,18 @@ describe('OrderListScreen — chọn cột, sắp xếp theo cột, lọc SP ngo
     );
     renderApp(<OrderListScreen />);
     await screen.findByText(FIRST.docNumber);
-    expect(screen.getByRole('columnheader', { name: /Kho/ })).toBeInTheDocument();
+    expect(screen.getByRole('columnheader', { name: /Sản phẩm/ })).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: /^Cột/ }));
     const mã = await screen.findByRole('checkbox', { name: 'Mã đơn' });
     expect(mã).toBeDisabled();
-    fireEvent.click(screen.getByRole('checkbox', { name: 'Kho' }));
+    // Cột thao tác không nằm trong "Cột" (không ẩn được).
+    expect(screen.queryByRole('checkbox', { name: 'Thao tác' })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Sản phẩm' }));
     await waitFor(() =>
-      expect(screen.queryByRole('columnheader', { name: /^Kho$/ })).not.toBeInTheDocument(),
+      expect(screen.queryByRole('columnheader', { name: /Sản phẩm/ })).not.toBeInTheDocument(),
     );
     await waitFor(() =>
-      expect(puts.at(-1)).toEqual({ hidden: ['orderDate', 'warehouse'], sort: null }),
+      expect(puts.at(-1)).toEqual({ hidden: ['orderDate', 'collected', 'product'], sort: null }),
     );
 
     replace.mockClear();
@@ -731,7 +744,7 @@ describe('OrderListScreen — chọn cột, sắp xếp theo cột, lọc SP ngo
     expect(String(replace.mock.calls.at(-1)![0])).toContain('sort=customer');
     await waitFor(() =>
       expect(puts.at(-1)).toEqual({
-        hidden: ['orderDate', 'warehouse'],
+        hidden: ['orderDate', 'collected', 'product'],
         sort: { id: 'customer', desc: false },
       }),
     );
@@ -754,5 +767,93 @@ describe('OrderListScreen — chọn cột, sắp xếp theo cột, lọc SP ngo
     await screen.findByText(FIRST.docNumber);
     expect(seen).toContain('list:NON_ERP');
     expect(seen).toContain('count:NON_ERP');
+  });
+});
+
+describe('OrderListScreen — redesign Bán hàng (2026-10-22)', () => {
+  it('menu "⋯" của dòng có "Nhân bản đơn" → /crm/orders/new?from=<id>', async () => {
+    search = '';
+    renderApp(<OrderListScreen />);
+    await screen.findByText(FIRST.docNumber);
+    fireEvent.keyDown(
+      screen.getByRole('button', { name: `Thao tác khác cho đơn ${FIRST.docNumber}` }),
+      { key: 'ArrowDown' },
+    );
+    const item = await screen.findByRole('menuitem', { name: /Nhân bản đơn/ });
+    expect(item).toHaveAttribute('href', `/crm/orders/new?from=${FIRST.id}`);
+    expect(screen.getByRole('menuitem', { name: /Mở chi tiết/ })).toHaveAttribute(
+      'href',
+      `/crm/orders/${FIRST.id}`,
+    );
+  });
+
+  it('sale không có quyền tạo đơn → menu dòng không có "Nhân bản đơn" (luật 7)', async () => {
+    search = '';
+    renderApp(<OrderListScreen />, {
+      me: { ...ME_SALE, permissions: ['sales_order.read'] },
+    });
+    await screen.findByText(FIRST.docNumber);
+    fireEvent.keyDown(
+      screen.getByRole('button', { name: `Thao tác khác cho đơn ${FIRST.docNumber}` }),
+      { key: 'ArrowDown' },
+    );
+    await screen.findByRole('menuitem', { name: /Mở chi tiết/ });
+    expect(screen.queryByRole('menuitem', { name: /Nhân bản đơn/ })).not.toBeInTheDocument();
+  });
+
+  it('lọc ít dùng nằm sau "Thêm lọc"; đang có giá trị trên URL thì tự hiện', async () => {
+    search = '';
+    renderApp(<OrderListScreen />);
+    await screen.findByText(FIRST.docNumber);
+    expect(screen.queryByRole('combobox', { name: 'Trùng trong ngày' })).not.toBeInTheDocument();
+    fireEvent.keyDown(screen.getByRole('button', { name: /Thêm lọc/ }), { key: 'ArrowDown' });
+    fireEvent.click(await screen.findByRole('menuitem', { name: /Trùng trong ngày/ }));
+    expect(await screen.findByRole('combobox', { name: 'Trùng trong ngày' })).toBeInTheDocument();
+  });
+
+  it('?duplicate=true → ô "Trùng trong ngày" hiện sẵn', async () => {
+    search = 'duplicate=true';
+    renderApp(<OrderListScreen />);
+    await screen.findByText(FIRST.docNumber);
+    expect(screen.getByRole('combobox', { name: 'Trùng trong ngày' })).toBeInTheDocument();
+  });
+
+  it('chọn dòng → thanh chọn nhiều thay thanh lọc, có tổng tiền; Esc / "Bỏ chọn" trả lại thanh lọc', async () => {
+    search = '';
+    renderApp(<OrderListScreen />);
+    await screen.findByText(FIRST.docNumber);
+    fireEvent.click(screen.getAllByRole('checkbox', { name: 'Chọn dòng' })[0]!);
+    const bar = await screen.findByRole('toolbar');
+    expect(bar).toHaveTextContent('1 đơn đã chọn');
+    expect(bar).toHaveTextContent('tổng');
+    expect(screen.queryByRole('textbox', { name: 'Tìm nhanh' })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Bỏ chọn' }));
+    expect(await screen.findByRole('textbox', { name: 'Tìm nhanh' })).toBeInTheDocument();
+  });
+
+  it('"Lưu bộ lọc hiện tại…" → PUT /me/preferences/orders.views với query đang lọc', async () => {
+    search = 'flow=WAREHOUSE&noCarrier=true&page=3';
+    const puts: Array<{ key: string; value: unknown }> = [];
+    server.use(
+      http.put('/api/me/preferences/:key', async ({ request, params }) => {
+        const body = (await request.json()) as { value: unknown };
+        puts.push({ key: String(params.key), value: body.value });
+        return HttpResponse.json({ key: params.key, value: body.value });
+      }),
+      http.get('/api/sales-orders', () => HttpResponse.json({ items: makeOrders(1), total: 1 })),
+    );
+    renderApp(<OrderListScreen />);
+    await screen.findByRole('columnheader', { name: /Khách hàng/ });
+    fireEvent.keyDown(screen.getByRole('button', { name: /Bộ lọc đã lưu/ }), { key: 'ArrowDown' });
+    fireEvent.click(await screen.findByRole('menuitem', { name: /Lưu bộ lọc hiện tại/ }));
+    fireEvent.change(await screen.findByLabelText('Tên bộ lọc'), {
+      target: { value: 'Kho chưa gán hãng' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Lưu bộ lọc' }));
+    await waitFor(() => expect(puts).toHaveLength(1));
+    expect(puts[0]).toEqual({
+      key: 'orders.views',
+      value: { views: [{ name: 'Kho chưa gán hãng', query: 'flow=WAREHOUSE&noCarrier=true' }] },
+    });
   });
 });

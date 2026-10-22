@@ -69,6 +69,7 @@ export function FilterBar<F extends string = string>({
   values,
   onFilterChange,
   searchPlaceholder = 'Tìm nhanh…',
+  after,
   right,
 }: {
   q: string;
@@ -77,6 +78,8 @@ export function FilterBar<F extends string = string>({
   values: Partial<Record<F, string>>;
   onFilterChange: (patch: Partial<Record<F, string | undefined>>) => void;
   searchPlaceholder?: string;
+  /** Ngay sau ô lọc cuối, trước "Xóa lọc" — vd nút "Thêm lọc" bật lọc ít dùng. */
+  after?: ReactNode;
   right?: ReactNode;
 }) {
   const active =
@@ -181,6 +184,7 @@ export function FilterBar<F extends string = string>({
           />
         );
       })}
+      {after}
       {active > 0 ? (
         <Button
           variant="ghost"
