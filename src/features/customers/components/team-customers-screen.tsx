@@ -187,6 +187,7 @@ export function TeamCustomersScreen() {
       <div className="mb-3 flex flex-wrap items-end gap-2 rounded-lg border bg-card p-3">
         <span className="pb-1.5 text-sm font-semibold text-muted-foreground">Mới được gán</span>
         <DateRangePicker
+          label="Ngày gán"
           value={range}
           today={today}
           maxDays={MAX_DAYS}

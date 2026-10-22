@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { useCallback, useMemo } from 'react';
 import { DataTable, type ColumnDef } from '@/components/data/data-table';
+import { DateRangePicker } from '@/components/data/date-range-picker';
 import { KpiCard } from '@/components/data/kpi-card';
 import { EmptyState, ForbiddenState, ListSkeleton, QueryState } from '@/components/data/states';
 import { StatusBadge, type StatusTone } from '@/components/data/status-badge';
@@ -51,13 +52,6 @@ const COST_STATUS: Record<ProfitCostStatus, { tone: StatusTone; label: string; h
     hint: 'Có SKU chưa từng nhập kho — giá vốn phần đó tính 0, lợi nhuận đang cao hơn thực tế',
   },
 };
-
-function shiftDay(key: string, days: number): string {
-  const [y, m, d] = key.split('-').map((x) => Number.parseInt(x, 10));
-  return new Date(Date.UTC(y!, m! - 1, d! + days)).toISOString().slice(0, 10);
-}
-const daysBetween = (from: string, to: string) =>
-  Math.round((Date.parse(`${to}T00:00:00Z`) - Date.parse(`${from}T00:00:00Z`)) / 86_400_000);
 
 const pct = (v: string | null) => (v === null ? '—' : `${v.replace('.', ',')}%`);
 const negative = (v: string) => v.startsWith('-');
@@ -127,26 +121,6 @@ export function ProfitScreen() {
     (f: string, t: string) => set({ filters: { ...state.filters, from: f, to: t } }),
     [set, state.filters],
   );
-  const onFrom = (v: string) => {
-    if (!v) return;
-    const t = v > to ? v : daysBetween(v, to) >= MAX_DAYS ? shiftDay(v, MAX_DAYS - 1) : to;
-    setRange(v, t);
-  };
-  const onTo = (v: string) => {
-    if (!v) return;
-    const f = v < from ? v : daysBetween(from, v) >= MAX_DAYS ? shiftDay(v, -(MAX_DAYS - 1)) : from;
-    setRange(f, v);
-  };
-  const presets = [
-    { label: 'Hôm nay', from: today, to: today },
-    { label: '7 ngày', from: shiftDay(today, -6), to: today },
-    { label: 'Tháng này', from: monthStart, to: today },
-    {
-      label: 'Tháng trước',
-      from: `${shiftDay(monthStart, -1).slice(0, 8)}01`,
-      to: shiftDay(monthStart, -1),
-    },
-  ];
   const rangeLabel = from === to ? formatDate(from) : `${formatDate(from)} – ${formatDate(to)}`;
 
   const orderColumns = useMemo<ColumnDef<ProfitOrderRow, unknown>[]>(
@@ -368,40 +342,13 @@ export function ProfitScreen() {
       />
 
       <div className="flex flex-wrap items-end gap-2 rounded-md border bg-card px-3 py-2">
-        <div className="flex gap-1" role="group" aria-label="Chọn nhanh khoảng ngày">
-          {presets.map((p) => (
-            <Button
-              key={p.label}
-              size="sm"
-              variant={p.from === from && p.to === to ? 'default' : 'outline'}
-              onClick={() => setRange(p.from, p.to)}
-            >
-              {p.label}
-            </Button>
-          ))}
-        </div>
-        <label className="flex flex-col gap-0.5 text-xs text-muted-foreground">
-          Từ ngày
-          <Input
-            type="date"
-            className="h-8 w-40"
-            value={from}
-            max={today}
-            onChange={(e) => onFrom(e.target.value)}
-            aria-label="Từ ngày"
-          />
-        </label>
-        <label className="flex flex-col gap-0.5 text-xs text-muted-foreground">
-          Đến ngày
-          <Input
-            type="date"
-            className="h-8 w-40"
-            value={to}
-            max={today}
-            onChange={(e) => onTo(e.target.value)}
-            aria-label="Đến ngày"
-          />
-        </label>
+        <DateRangePicker
+          label="Kỳ"
+          value={{ from, to }}
+          today={today}
+          maxDays={MAX_DAYS}
+          onChange={(r) => setRange(r.from, r.to)}
+        />
         <div className="flex gap-1" role="group" aria-label="Xem theo">
           {(
             [

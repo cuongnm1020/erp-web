@@ -522,8 +522,9 @@ describe('OrderListScreen — lọc theo hãng + thời gian (2026-09-19)', () =
         'Giao Hàng Tiết Kiệm',
       ),
     );
-    expect(screen.getByLabelText('Từ ngày')).toHaveValue('2026-08-20');
-    expect(screen.getByLabelText('Đến ngày')).toHaveValue('2026-08-22');
+    expect(
+      screen.getByRole('button', { name: 'Ngày đặt: 20/08 – 22/08/2026' }),
+    ).toBeInTheDocument();
   });
 
   it('lọc theo POS Pancake: ô Nguồn liệt kê từng POS; source=POS:<mã> → gửi source=PANCAKE + pancakeShopId cho danh sách và đếm tab', async () => {

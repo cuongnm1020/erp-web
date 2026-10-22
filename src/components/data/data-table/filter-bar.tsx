@@ -2,6 +2,7 @@
 
 import { Check, ChevronDown, Search, X } from 'lucide-react';
 import { useId, useState, type ReactNode } from 'react';
+import { DateRangeFilter } from '@/components/data/date-range-filter';
 import { DraftInput } from '@/components/data/draft-input';
 import { Button } from '@/components/ui/button';
 import {
@@ -34,6 +35,16 @@ export type FilterDef<F extends string = string> =
     }
   | { key: F; label: string; type: 'text'; placeholder?: string }
   | { key: F; label: string; type: 'date'; placeholder?: string }
+  | {
+      /** Khoá URL ngày đầu; `toKey` = khoá ngày cuối (2026-10-22, bộ lọc khoảng ngày dùng chung). */
+      key: F;
+      toKey: F;
+      label: string;
+      type: 'dateRange';
+      /** Lưu "Ghi nhớ khoảng ngày" theo tài khoản dưới khoá này. */
+      rememberKey?: string;
+      maxDays?: number;
+    }
   | {
       key: F;
       label: string;
@@ -69,7 +80,13 @@ export function FilterBar<F extends string = string>({
   right?: ReactNode;
 }) {
   const active =
-    Object.values(values).filter((v) => v !== undefined && v !== '').length + (q ? 1 : 0);
+    Object.entries(values).filter(
+      // Ngày cuối của khoảng ngày đi cùng ngày đầu — một bộ lọc, đếm một lần.
+      ([k, v]) =>
+        v !== undefined &&
+        v !== '' &&
+        !(filters ?? []).some((f) => f.type === 'dateRange' && f.toKey === k && values[f.key]),
+    ).length + (q ? 1 : 0);
 
   return (
     <div className="mb-3 flex flex-wrap items-center gap-2">
@@ -124,6 +141,22 @@ export function FilterBar<F extends string = string>({
           );
         }
         if (f.type === 'custom') return <div key={f.key}>{f.render({ value, onChange: set })}</div>;
+        if (f.type === 'dateRange') {
+          return (
+            <DateRangeFilter
+              key={f.key}
+              label={f.label}
+              rememberKey={f.rememberKey}
+              maxDays={f.maxDays}
+              value={{ from: value, to: values[f.toKey] }}
+              onChange={(r) =>
+                onFilterChange({ [f.key]: r.from, [f.toKey]: r.to } as Partial<
+                  Record<F, string | undefined>
+                >)
+              }
+            />
+          );
+        }
         if (f.type === 'date') {
           return (
             <Input
@@ -155,7 +188,10 @@ export function FilterBar<F extends string = string>({
           onClick={() => {
             onQChange('');
             const clear = {} as Partial<Record<F, string | undefined>>;
-            for (const f of filters ?? []) clear[f.key] = undefined;
+            for (const f of filters ?? []) {
+              clear[f.key] = undefined;
+              if (f.type === 'dateRange') clear[f.toKey] = undefined;
+            }
             // Cả các filter màn hình tự vẽ ngoài FilterBar (tab trạng thái, chip khách…)
             // miễn là có mặt trong `values` — không thì "Xóa lọc" đếm mà không xóa được.
             for (const k of Object.keys(values) as F[]) clear[k] = undefined;

@@ -220,6 +220,7 @@ export function CareStaffScreen() {
       <div className="mb-3 flex flex-wrap items-end gap-2 rounded-lg border bg-card p-3">
         <span className="pb-1.5 text-sm font-semibold text-muted-foreground">Doanh thu</span>
         <DateRangePicker
+          label="Kỳ doanh thu"
           value={range}
           today={today}
           maxDays={MAX_DAYS}

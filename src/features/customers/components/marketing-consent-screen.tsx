@@ -177,8 +177,13 @@ export function MarketingConsentScreen() {
               { value: 'false', label: 'Từ chối' },
             ],
           },
-          { key: 'from', label: 'Cập nhật từ ngày', type: 'date' },
-          { key: 'to', label: 'Cập nhật đến ngày', type: 'date' },
+          {
+            key: 'from',
+            toKey: 'to',
+            label: 'Ngày cập nhật',
+            type: 'dateRange',
+            rememberKey: 'date.consents',
+          },
         ]}
       />
 
