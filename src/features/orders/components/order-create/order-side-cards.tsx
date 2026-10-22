@@ -344,10 +344,11 @@ export function CustomerCard({ form }: { form: Form }) {
   const phone = useWatch({ control: form.control, name: 'customerPhone' });
   const brief = useCustomerBrief(customerId);
   const match = useCustomerPhoneMatch(customerId ? '' : phone);
-  // CSKH: tra SĐT toàn hệ thống — khách ngoài tầm nhìn (của sale / team CSKH khác) vẫn lên đơn đúng
-  // khách, server tự gắn theo SĐT khi chốt (không gắn customerId ở đây: hồ sơ khách đó không mở được).
+  // Tra SĐT toàn hệ thống (mọi người lên đơn, 2026-10-22 — trước chỉ CSKH) — khách ngoài tầm nhìn
+  // (của sale / team khác) vẫn lên đơn đúng khách, không tạo trùng; server tự gắn theo SĐT khi chốt
+  // (không gắn customerId ở đây: hồ sơ khách đó không mở được).
   const canCare = useAbility().can('care', 'Customer');
-  const care = useCareLookup(customerId ? '' : phone, canCare && match.data === null);
+  const care = useCareLookup(customerId ? '' : phone, match.data === null);
   const careCustomer = !customerId && match.data === null ? care.data?.customer : undefined;
   const sameDay = useSameDayOrders(phone);
   const [pickOpen, setPickOpen] = useState(false);
@@ -609,11 +610,15 @@ export function CustomerCard({ form }: { form: Form }) {
           <b className="font-semibold">{careCustomer.name}</b>{' '}
           <span className="font-mono text-xs text-muted-foreground">{careCustomer.code}</span>{' '}
           <StatusBadge tone="neutral">
-            {care.data?.careTeam === 'OTHER' ? 'Khách team khác' : 'Chưa thuộc team CSKH'}
+            {!canCare
+              ? 'Khách đã có'
+              : care.data?.careTeam === 'OTHER'
+                ? 'Khách team khác'
+                : 'Chưa thuộc team CSKH'}
           </StatusBadge>
           <p className="text-muted-foreground">
-            {care.data?.careTeam === 'OTHER'
-              ? 'Đơn này tính doanh thu cho team bạn. Khách vẫn thuộc team đang chăm.'
+            {!canCare || care.data?.careTeam === 'OTHER'
+              ? 'Đơn này tính doanh thu cho bạn và team bạn. Khách vẫn do người / team đang quản lý chăm.'
               : 'Chốt đơn sẽ đưa khách về team bạn.'}
           </p>
         </div>
