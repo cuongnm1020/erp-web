@@ -498,57 +498,8 @@ function Editor({ order }: { order: SalesOrderDetail }) {
         {/* ── Cột trái ── */}
         <div className="flex min-w-0 flex-[999_1_640px] flex-col gap-3">
           <Card title="Thông tin đơn" className="py-2.5">
-            <div className="grid grid-cols-2 gap-x-2.5 gap-y-2 sm:grid-cols-3 xl:grid-cols-5">
-              <HeaderField label="Kênh">
-                <ReadValue>{orderChannelLabel(order.channel)}</ReadValue>
-              </HeaderField>
-              <HeaderField label="Nguồn đơn">
-                <ReadValue>{order.source ? orderSourceLabel(order.source) : '—'}</ReadValue>
-              </HeaderField>
-              <HeaderField label="Kho xuất">
-                <Select
-                  value={warehouseId}
-                  onValueChange={setWarehouseId}
-                  disabled={!carrierEditable || warehouses.isPending}
-                >
-                  <SelectTrigger
-                    aria-label="Kho lấy hàng"
-                    className={cn(warehouseChanged && DIRTY)}
-                  >
-                    <div className="flex min-w-0 items-center gap-2">
-                      <WarehouseIcon className="h-4 w-4 shrink-0" aria-hidden />
-                      <span className="truncate">
-                        <SelectValue placeholder="Chưa chọn" />
-                      </span>
-                    </div>
-                  </SelectTrigger>
-                  <SelectContent>
-                    {/* Đơn đã có kho thì chỉ chuyển sang kho khác, không bỏ kho. */}
-                    {order.warehouseId ? null : (
-                      <SelectItem value={NO_WAREHOUSE}>— Chưa chọn —</SelectItem>
-                    )}
-                    {(warehouses.data ?? []).map((w) => (
-                      <SelectItem key={w.id} value={w.id}>
-                        {w.name} ({w.code}){w.pickupReady ? '' : ' — chưa khai địa chỉ'}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </HeaderField>
-              <HeaderField label="NV xử lý">
-                <ReadValue>
-                  {order.ownerName ??
-                    (order.ownerId ? 'Đã có người phụ trách' : 'Đơn của team, chưa chia')}
-                </ReadValue>
-              </HeaderField>
-              <HeaderField label="Thẻ">
-                <OrderTagsField
-                  value={tagIds}
-                  onChange={setTagIds}
-                  disabled={!carrierEditable}
-                  dirty={tagsChanged}
-                />
-              </HeaderField>
+            {/* Hàng đầu: Trạng thái đơn · Trạng thái kho · Kho xuất (user 2026-10-22). */}
+            <div className="grid gap-x-2.5 gap-y-2 sm:grid-cols-3">
               <HeaderField label="Trạng thái đơn">
                 <Select
                   value={status}
@@ -604,8 +555,38 @@ function Editor({ order }: { order: SalesOrderDetail }) {
                   </span>
                 )}
               </HeaderField>
+              <HeaderField label="Kho xuất">
+                <Select
+                  value={warehouseId}
+                  onValueChange={setWarehouseId}
+                  disabled={!carrierEditable || warehouses.isPending}
+                >
+                  <SelectTrigger
+                    aria-label="Kho lấy hàng"
+                    className={cn(warehouseChanged && DIRTY)}
+                  >
+                    <div className="flex min-w-0 items-center gap-2">
+                      <WarehouseIcon className="h-4 w-4 shrink-0" aria-hidden />
+                      <span className="truncate">
+                        <SelectValue placeholder="Chưa chọn" />
+                      </span>
+                    </div>
+                  </SelectTrigger>
+                  <SelectContent>
+                    {/* Đơn đã có kho thì chỉ chuyển sang kho khác, không bỏ kho. */}
+                    {order.warehouseId ? null : (
+                      <SelectItem value={NO_WAREHOUSE}>— Chưa chọn —</SelectItem>
+                    )}
+                    {(warehouses.data ?? []).map((w) => (
+                      <SelectItem key={w.id} value={w.id}>
+                        {w.name} ({w.code}){w.pickupReady ? '' : ' — chưa khai địa chỉ'}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </HeaderField>
               {statusChanged && status === 'CANCELLED' ? (
-                <div className="col-span-2 sm:col-span-3">
+                <div className="sm:col-span-3">
                   <HeaderField label="Lý do hủy">
                     <Input
                       aria-label="Lý do hủy"
@@ -617,6 +598,28 @@ function Editor({ order }: { order: SalesOrderDetail }) {
                   </HeaderField>
                 </div>
               ) : null}
+            </div>
+            <div className="grid grid-cols-2 gap-x-2.5 gap-y-2 sm:grid-cols-4">
+              <HeaderField label="Kênh">
+                <ReadValue>{orderChannelLabel(order.channel)}</ReadValue>
+              </HeaderField>
+              <HeaderField label="Nguồn đơn">
+                <ReadValue>{order.source ? orderSourceLabel(order.source) : '—'}</ReadValue>
+              </HeaderField>
+              <HeaderField label="NV xử lý">
+                <ReadValue>
+                  {order.ownerName ??
+                    (order.ownerId ? 'Đã có người phụ trách' : 'Đơn của team, chưa chia')}
+                </ReadValue>
+              </HeaderField>
+              <HeaderField label="Thẻ">
+                <OrderTagsField
+                  value={tagIds}
+                  onChange={setTagIds}
+                  disabled={!carrierEditable}
+                  dirty={tagsChanged}
+                />
+              </HeaderField>
             </div>
             <div className="flex flex-col gap-0.5 text-xs text-muted-foreground">
               {fulfilTarget ? (
