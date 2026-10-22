@@ -102,7 +102,7 @@ function Body({ row }: { row: SalesOrderListItem }) {
       <div className="flex-1 overflow-y-auto text-sm">
         {PROGRESS_FLOWS.has(row.flow) ? (
           <div className="border-b px-5 py-3">
-            <OrderProgress flow={row.flow} />
+            <OrderProgress flow={row.flow} timeline={d?.timeline} />
           </div>
         ) : null}
 

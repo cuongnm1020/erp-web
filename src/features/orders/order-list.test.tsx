@@ -657,15 +657,25 @@ describe('OrderListScreen — sao chép SĐT / mã vận đơn, cột kho (2026-
     return rows;
   };
 
-  it('bấm SĐT (viết liền) → sao chép, không mở xem nhanh', async () => {
+  it('icon sao chép cạnh SĐT (viết liền) → sao chép, không mở xem nhanh (2026-10-22)', async () => {
     const [row] = setup();
-    const phone = await screen.findByRole('button', {
+    expect((await screen.findAllByText(row!.phone!)).length).toBeGreaterThan(0);
+    const copy = screen.getAllByRole('button', {
       name: `Sao chép số điện thoại ${row!.phone}`,
-    });
-    expect(phone).toHaveTextContent(row!.phone!);
-    fireEvent.click(phone);
+    })[0]!;
+    fireEvent.click(copy);
     await waitFor(() => expect(writeText).toHaveBeenCalledWith(row!.phone));
-    expect(toastSuccess).toHaveBeenCalledWith(`Đã sao chép số điện thoại ${row!.phone}`);
+    expect(await screen.findByText('Đã sao chép')).toBeInTheDocument();
+    expect(screen.queryByRole('dialog')).toBeNull();
+  });
+
+  it('icon sao chép cạnh mã đơn → chép đúng mã, không mở xem nhanh', async () => {
+    const [row] = setup();
+    const copy = await screen.findByRole('button', {
+      name: `Sao chép mã đơn ${row!.docNumber}`,
+    });
+    fireEvent.click(copy);
+    await waitFor(() => expect(writeText).toHaveBeenCalledWith(row!.docNumber));
     expect(screen.queryByRole('dialog')).toBeNull();
   });
 

@@ -90,6 +90,34 @@ describe('OrderDetailScreen — GET /sales-orders/{id} (P1-12)', () => {
     expect(push).toHaveBeenCalledWith(`/crm/orders/${ORDER.id}/edit`);
   });
 
+  it('tên NV phụ trách / người tạo + giờ dưới bước đã xong (API 2026-10-22)', async () => {
+    server.use(
+      http.get('/api/sales-orders/:id', () =>
+        HttpResponse.json({
+          ...DETAIL,
+          status: 'APPROVED',
+          ownerName: 'Mai Hương',
+          careStaffName: 'Nguyễn Thu Trang',
+          createdByName: 'Quản trị',
+          fulfilment: { ...DETAIL.fulfilment, status: 'PACKED' },
+          timeline: {
+            ...DETAIL.timeline,
+            approvedAt: '2026-10-22T02:39:00Z',
+            packedAt: '2026-10-22T02:50:00Z',
+            packedByName: 'packer.01',
+          },
+        }),
+      ),
+    );
+    renderApp(<OrderDetailScreen orderId={ORDER.id} />);
+    await screen.findByRole('heading', { level: 1 });
+    expect(screen.getAllByText('Mai Hương').length).toBeGreaterThan(0);
+    expect(screen.getByText('Nguyễn Thu Trang')).toBeInTheDocument();
+    const progress = screen.getByRole('list', { name: 'Tiến độ đơn hàng' });
+    expect(progress).toHaveTextContent('22/10 09:39');
+    expect(progress).toHaveTextContent('22/10 09:50 · packer.01');
+  });
+
   it('sale không có quyền tạo đơn → không có "Nhân bản đơn" (luật 7)', async () => {
     renderApp(<OrderDetailScreen orderId={ORDER.id} />, {
       me: { ...ME_SALE, permissions: ['sales_order.read'] },

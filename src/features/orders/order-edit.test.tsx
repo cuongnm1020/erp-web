@@ -34,7 +34,7 @@ describe('OrderEditScreen — trang sửa đơn (D-05, PATCH /sales-orders/{id})
       `Sửa đơn ${ORDER.docNumber}`,
     );
     // Redesign 2026-10-22: trái = phần sửa được, phải = đơn chỉ đọc.
-    for (const t of ['Giao hàng', 'Vận chuyển', 'Ghi chú & phân công']) {
+    for (const t of ['Giao hàng', 'Vận chuyển', 'Ghi chú & thẻ']) {
       expect(screen.getByText(t)).toBeInTheDocument();
     }
     expect(screen.getAllByText('Đơn hàng').length).toBeGreaterThan(1); // breadcrumb + thẻ chỉ đọc
@@ -94,6 +94,38 @@ describe('OrderEditScreen — trang sửa đơn (D-05, PATCH /sales-orders/{id})
     fireEvent.click(screen.getByRole('button', { name: /Lưu thay đổi/ }));
     await waitFor(() =>
       expect(calls).toEqual([{ id: ORDER.id, body: { status: 'APPROVED', carrierId: 'c-ghn' } }]),
+    );
+    await waitFor(() => expect(push).toHaveBeenCalledWith(`/crm/orders/${ORDER.id}`));
+  });
+
+  it('sửa ghi chú nội bộ + ngày hẹn nhận → ô tô vàng, PATCH gửi đúng 2 trường (API 2026-10-22)', async () => {
+    push.mockClear();
+    const calls: Array<Record<string, unknown>> = [];
+    server.use(
+      http.patch('/api/sales-orders/:id', async ({ params, request }) => {
+        const body = (await request.json()) as Record<string, unknown>;
+        calls.push(body);
+        return HttpResponse.json({
+          orderId: params.id,
+          docNumber: ORDER.docNumber,
+          status: ORDER.status,
+          carrierId: null,
+          changed: Object.keys(body),
+        });
+      }),
+    );
+    renderApp(<OrderEditScreen orderId={ORDER.id} />);
+    await screen.findByRole('heading', { level: 1 });
+    fireEvent.change(screen.getByLabelText('Ghi chú nội bộ'), {
+      target: { value: '  Gọi trước 30 phút ' },
+    });
+    fireEvent.change(screen.getByLabelText('Hẹn nhận hàng'), { target: { value: '2026-11-01' } });
+    expect(screen.getAllByText('2 thay đổi chưa lưu').length).toBeGreaterThan(0);
+    fireEvent.click(screen.getByRole('button', { name: /Lưu thay đổi/ }));
+    await waitFor(() =>
+      expect(calls).toEqual([
+        { internalNote: 'Gọi trước 30 phút', expectedDeliveryDate: '2026-11-01' },
+      ]),
     );
     await waitFor(() => expect(push).toHaveBeenCalledWith(`/crm/orders/${ORDER.id}`));
   });

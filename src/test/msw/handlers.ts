@@ -578,6 +578,21 @@ export function makeOrderDetail(id: string) {
   }));
   return {
     ...header,
+    // Tên NV + mốc giờ (API 2026-10-22). Danh sách đã có ownerName; chi tiết trả thêm 4 tên.
+    careStaffName: null as string | null,
+    packerName: null as string | null,
+    marketerName: null as string | null,
+    createdByName: 'Quản trị hệ thống' as string | null,
+    timeline: {
+      approvedAt:
+        header.status === 'APPROVED' || header.status === 'POSTED' ? header.createdAt : null,
+      pickedAt: null as string | null,
+      packedAt: null as string | null,
+      packedByName: null as string | null,
+      sentToCarrierAt: null as string | null,
+      shippedAt: null as string | null,
+      deliveredAt: null as string | null,
+    },
     shippingAddress: null,
     approval: null as { requestId: string; ruleName: string | null; canAct: boolean } | null,
     customItems: [] as { name: string; qty: string; unitPrice: string | null; discount: string }[],

@@ -17,6 +17,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useEffect, useMemo, useState } from 'react';
 import { BulkActionBar } from '@/components/data/bulk-action-bar';
+import { CopyButton } from '@/components/data/copy-button';
 import { CopyText } from '@/components/data/copy-text';
 import { ColumnPicker, DataTable, FilterBar, type ColumnDef } from '@/components/data/data-table';
 import { RowActions, type RowActionItem } from '@/components/data/row-actions';
@@ -228,6 +229,7 @@ const buildColumns = (
             >
               {o.docNumber}
             </Link>
+            <CopyButton value={o.docNumber} label="mã đơn" />
             {o.note ? (
               <span title={o.note} className="inline-flex text-warning">
                 <MessageSquareText className="h-3.5 w-3.5" aria-label="Có ghi chú" />
@@ -271,17 +273,15 @@ const buildColumns = (
             {o.recipientName ?? o.customer.name}
           </span>
           <span className="flex items-center gap-1.5 whitespace-nowrap">
-            {o.phone ? (
-              // Viết liền (0356523006) để dán thẳng vào Zalo / tổng đài; bấm là sao chép.
-              <CopyText
-                value={normalizePhone(o.phone) ?? o.phone}
-                what="số điện thoại"
-                className="font-mono text-xs"
-              />
-            ) : (
-              <span className="font-mono text-xs">{formatPhone(o.phone)}</span>
-            )}
+            {/* Viết liền (0356523006) như trước — dán thẳng vào Zalo / tổng đài (2026-10-13). */}
+            <span className="font-mono text-xs">
+              {o.phone ? (normalizePhone(o.phone) ?? o.phone) : formatPhone(o.phone)}
+            </span>
             {telco ? <TelcoBadge name={telco} /> : null}
+            {o.phone ? (
+              // Chép dạng viết liền (0356523006) để dán thẳng vào Zalo / tổng đài.
+              <CopyButton value={normalizePhone(o.phone) ?? o.phone} label="số điện thoại" />
+            ) : null}
           </span>
         </div>
       );

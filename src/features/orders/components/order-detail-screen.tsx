@@ -761,7 +761,7 @@ function ProfileItem({ label, children }: { label: string; children: ReactNode }
  * Redesign Bán hàng 2026-10-22 (canvas "Redesign Bán hàng", màn 4, đã duyệt): PageHeader ≤ 3 nút
  * + "⋯" (In phiếu đơn · Nhân bản đơn [D] · ⋯ · Sửa đơn [E]); thanh tiến độ; cột trái 320px
  * khách / giao hàng / phân công / ghi chú; cột phải dòng hàng + tổng tiền + vận đơn. Bỏ dải 4 ô
- * tổng tiền và thẻ "Chưa nối được". Lịch sử đơn, tên người phụ trách, giờ từng bước: chờ API.
+ * tổng tiền và thẻ "Chưa nối được". Tên NV + giờ từng bước: `ownerName…` / `timeline` (API 2026-10-22).
  */
 function Detail({ order }: { order: SalesOrderDetail }) {
   const router = useRouter();
@@ -814,6 +814,12 @@ function Detail({ order }: { order: SalesOrderDetail }) {
               <>
                 {' '}
                 · <PancakeOrderLink orderId={order.pancakeOrderId} link={order.pancakeOrderLink} />
+              </>
+            ) : null}
+            {order.ownerName ? (
+              <>
+                {' '}
+                · NV phụ trách <b className="font-semibold text-foreground">{order.ownerName}</b>
               </>
             ) : null}
           </>
@@ -882,7 +888,7 @@ function Detail({ order }: { order: SalesOrderDetail }) {
 
       {flow && flow !== 'CANCELLED' && flow !== 'RETURNED' && flow !== 'CARRIER_CANCELLED' ? (
         <section className="rounded-lg border bg-card px-4 py-3" aria-label="Tiến độ">
-          <OrderProgress flow={flow} />
+          <OrderProgress flow={flow} timeline={order.timeline} />
         </section>
       ) : null}
 
@@ -969,13 +975,23 @@ function Detail({ order }: { order: SalesOrderDetail }) {
 
           <Card title="Phân công & ghi chú">
             <ProfileList>
-              <ProfileItem label="Phụ trách">
-                {order.ownerId ? (
-                  'Đã có người phụ trách'
-                ) : (
-                  <span className="text-muted-foreground">Đơn của team, chưa chia</span>
-                )}
+              <ProfileItem label="NV phụ trách">
+                {order.ownerName ??
+                  (order.ownerId ? (
+                    'Đã có người phụ trách'
+                  ) : (
+                    <span className="text-muted-foreground">Đơn của team, chưa chia</span>
+                  ))}
               </ProfileItem>
+              {order.careStaffName ? (
+                <ProfileItem label="NV chăm sóc">{order.careStaffName}</ProfileItem>
+              ) : null}
+              {order.packerName ? (
+                <ProfileItem label="NV đóng hàng">{order.packerName}</ProfileItem>
+              ) : null}
+              {order.marketerName ? (
+                <ProfileItem label="Marketer">{order.marketerName}</ProfileItem>
+              ) : null}
               {order.tags.length > 0 ? (
                 <ProfileItem label="Thẻ">
                   <span className="flex flex-wrap gap-1">
@@ -1023,7 +1039,12 @@ function Detail({ order }: { order: SalesOrderDetail }) {
 
           <Card title="Chứng từ">
             <ProfileList>
-              <ProfileItem label="Tạo lúc">{formatDateTime(order.createdAt)}</ProfileItem>
+              <ProfileItem label="Tạo lúc">
+                {formatDateTime(order.createdAt)}
+                {order.createdByName ? (
+                  <span className="text-muted-foreground"> · {order.createdByName}</span>
+                ) : null}
+              </ProfileItem>
               <ProfileItem label="Cập nhật">{formatDateTime(order.updatedAt)}</ProfileItem>
               {order.postedAt ? (
                 <ProfileItem label="Đã chốt lúc">{formatDateTime(order.postedAt)}</ProfileItem>

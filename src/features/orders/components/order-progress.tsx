@@ -1,6 +1,7 @@
 import { Check } from 'lucide-react';
 import { Fragment } from 'react';
 import { cn } from '@/lib/cn';
+import { formatDateTime } from '@/lib/format';
 import type { OrderFlow } from '../api/use-orders';
 
 const STEPS = ['Đã duyệt', 'Đóng gói', 'Hãng lấy hàng', 'Đang giao', 'Thành công'] as const;
@@ -20,13 +21,36 @@ const PROGRESS: Partial<Record<OrderFlow, { done: number; current: number | null
   DELIVERED: { done: STEPS.length, current: null },
 };
 
+/** Mốc giờ của đơn (GET /sales-orders/:id → `timeline`) — ISO, null = chưa tới bước. */
+export interface OrderProgressTimeline {
+  approvedAt: string | null;
+  packedAt: string | null;
+  packedByName?: string | null;
+  shippedAt: string | null;
+  deliveredAt: string | null;
+}
+
 /**
  * Thanh tiến độ giao hàng của một đơn (redesign Bán hàng 2026-10-22) — dùng ở xem nhanh và chi
- * tiết đơn. Chỉ trạng thái hiện tại; giờ từng bước chờ API (mục #3 trong danh sách API cần review).
+ * tiết đơn. Có `timeline` thì ghi giờ dưới các bước đã xong (Đang giao không có mốc riêng).
  */
-export function OrderProgress({ flow, className }: { flow: OrderFlow; className?: string }) {
+export function OrderProgress({
+  flow,
+  timeline,
+  className,
+}: {
+  flow: OrderFlow;
+  timeline?: OrderProgressTimeline | null;
+  className?: string;
+}) {
   const p = PROGRESS[flow];
   if (!p) return null;
+  const stamps: Array<string | null> = timeline
+    ? [timeline.approvedAt, timeline.packedAt, timeline.shippedAt, null, timeline.deliveredAt].map(
+        (v) => (v ? formatDateTimeShort(v) : null),
+      )
+    : [];
+  if (stamps[1] && timeline?.packedByName) stamps[1] = `${stamps[1]} · ${timeline.packedByName}`;
   return (
     <ol className={cn('flex items-start', className)} aria-label="Tiến độ đơn hàng">
       {STEPS.map((label, i) => {
@@ -72,10 +96,20 @@ export function OrderProgress({ flow, className }: { flow: OrderFlow; className?
                 {label}
                 {done ? <span className="sr-only"> (xong)</span> : null}
               </span>
+              {done && stamps[i] ? (
+                <span className="whitespace-nowrap tabular-nums text-muted-foreground">
+                  {stamps[i]}
+                </span>
+              ) : null}
             </li>
           </Fragment>
         );
       })}
     </ol>
   );
+}
+
+/** "22/10/2026 09:39" → "22/10 09:39" — thanh tiến độ hẹp, năm đã rõ ở đầu trang. */
+function formatDateTimeShort(iso: string): string {
+  return formatDateTime(iso).replace(/^(\d{2}\/\d{2})\/\d{4}/, '$1');
 }

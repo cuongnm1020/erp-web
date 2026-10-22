@@ -11,6 +11,7 @@ import { NotFoundCard } from '@/components/layout/not-found-screen';
 import { PageHeader } from '@/components/layout/page-header';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
 import {
   Select,
   SelectContent,
@@ -20,6 +21,7 @@ import {
 } from '@/components/ui/select';
 import { toast } from '@/components/ui/toaster';
 import { groupOrderLines } from '../combo-lines';
+import { OrderTagsField } from './order-tags-field';
 import { isApiError } from '@/lib/api/errors';
 import { cn } from '@/lib/cn';
 import { messageFor, messageForCode } from '@/lib/error-messages';
@@ -137,6 +139,35 @@ function FormField({
 
 /** Ô vừa đổi chưa lưu: viền + nền `warning` (design system — Ma trận chọn / form). */
 const DIRTY = 'border-warning bg-warning-weak';
+/** "Tài khoản mặc định của hãng" (Radix Select không nhận value rỗng). */
+const DEFAULT_ACCOUNT = '__default__';
+
+/** `YYYY-MM-DD` → "01/11/2026". */
+const formatYmd = (ymd: string) => formatDate(`${ymd}T00:00:00Z`);
+
+/** Tên trường trong `changed` của PATCH → chữ trên toast "Đã lưu thay đổi". */
+function changedLabel(c: string): string {
+  switch (c) {
+    case 'addressId':
+      return 'địa chỉ giao';
+    case 'shippingWeightKg':
+      return 'cân nặng gửi hãng';
+    case 'carrierAccountId':
+      return 'tài khoản hãng';
+    case 'internalNote':
+      return 'ghi chú nội bộ';
+    case 'printNote':
+      return 'ghi chú in vận đơn';
+    case 'tagIds':
+      return 'thẻ';
+    case 'expectedDeliveryDate':
+      return 'ngày hẹn nhận';
+    case 'warehouseId':
+      return 'kho lấy hàng';
+    default:
+      return 'hãng vận chuyển';
+  }
+}
 
 /**
  * Ô cân nặng gửi hãng: trống → null (dùng Σ dòng); "1,2" hay "1.2" → "1.2"; số ≤ 0, quá 4 số
@@ -170,6 +201,12 @@ function Editor({ order }: { order: SalesOrderDetail }) {
   const addresses = customer.data?.addresses ?? [];
   // Cân nặng gửi hãng: ô trống = dùng cân nặng tính từ dòng (server: shippingWeightKg null).
   const [weightKg, setWeightKg] = useState<string>(order.shippingWeightKg ?? '');
+  // Ghi chú / thẻ / hẹn nhận / tài khoản hãng — PATCH nhận từ 2026-10-22 (đơn chưa kết thúc).
+  const [internalNote, setInternalNote] = useState(order.internalNote ?? '');
+  const [printNote, setPrintNote] = useState(order.printNote ?? '');
+  const [tagIds, setTagIds] = useState<string[]>(() => order.tags.map((t) => t.id));
+  const [expectedDate, setExpectedDate] = useState(order.expectedDeliveryDate ?? '');
+  const [accountId, setAccountId] = useState<string>(order.carrierAccountId ?? DEFAULT_ACCOUNT);
   // "Trạng thái kho" đặt tay (2026-09-15): đóng pick / đóng gói KHÔNG quét — quyền riêng
   // sales_order.fulfil_manual (kho + admin), chỉ đơn ĐÃ DUYỆT; đích chép từ bảng của server.
   const fulfil = useFulfilOrder(order.id);
@@ -223,8 +260,24 @@ function Editor({ order }: { order: SalesOrderDetail }) {
   // Đổi kho đi đường chuyển đơn (PLAN-warehouse-context K3: dời giữ chỗ + lập lại PICK) — không
   // qua PATCH (PATCH chặn ORDER_WAREHOUSE_LOCKED khi hàng đã giữ ở kho cũ).
   const moveTo = warehouseChanged && nextWarehouse ? nextWarehouse : null;
-  const patchDirty =
-    statusChanged || carrierChanged || addressChanged || weightChanged || moveTo !== null;
+  const trimOrNull = (v: string) => (v.trim() === '' ? null : v.trim());
+  const internalChanged = trimOrNull(internalNote) !== (order.internalNote ?? null);
+  const printChanged = trimOrNull(printNote) !== (order.printNote ?? null);
+  const originalTags = order.tags.map((t) => t.id);
+  const tagsChanged =
+    tagIds.length !== originalTags.length || tagIds.some((t) => !originalTags.includes(t));
+  const dateChanged = (expectedDate || null) !== (order.expectedDeliveryDate ?? null);
+  const nextAccount = accountId === DEFAULT_ACCOUNT ? null : accountId;
+  // Đổi hãng → server tự về tài khoản mặc định; chỉ gửi tài khoản khi người dùng chọn khác đi.
+  const accountChanged = carrierChanged
+    ? nextAccount !== null
+    : nextAccount !== (order.carrierAccountId ?? null);
+  const extrasChanged =
+    internalChanged || printChanged || tagsChanged || dateChanged || accountChanged;
+  const patchFieldsDirty =
+    statusChanged || carrierChanged || addressChanged || weightChanged || extrasChanged;
+  const patchDirty = patchFieldsDirty || moveTo !== null;
+  const carrierAccounts = selectedCarrier?.accounts ?? [];
 
   const detailHref = `/crm/orders/${order.id}`;
   const totalQty = order.lines.reduce(
@@ -291,7 +344,7 @@ function Editor({ order }: { order: SalesOrderDetail }) {
               setWarehouseId(order.warehouseId ?? NO_WAREHOUSE);
               return;
             }
-            if (statusChanged || carrierChanged || addressChanged || weightChanged) patch();
+            if (patchFieldsDirty) patch();
             else {
               toast.success('Đã lưu thay đổi', {
                 description: `${order.docNumber} · kho lấy hàng`,
@@ -315,6 +368,11 @@ function Editor({ order }: { order: SalesOrderDetail }) {
         ...(carrierChanged ? { carrierId: nextCarrier } : {}),
         ...(addressChanged ? { addressId: nextAddress } : {}),
         ...(weightChanged ? { shippingWeightKg: nextWeight } : {}),
+        ...(accountChanged ? { carrierAccountId: nextAccount } : {}),
+        ...(internalChanged ? { internalNote: trimOrNull(internalNote) } : {}),
+        ...(printChanged ? { printNote: trimOrNull(printNote) } : {}),
+        ...(tagsChanged ? { tagIds } : {}),
+        ...(dateChanged ? { expectedDeliveryDate: expectedDate || null } : {}),
         ...(statusChanged && status === 'CANCELLED' && reason.trim()
           ? { reason: reason.trim() }
           : {}),
@@ -324,13 +382,7 @@ function Editor({ order }: { order: SalesOrderDetail }) {
           toast.success('Đã lưu thay đổi', {
             description: `${order.docNumber} · ${r.changed
               .map((c) =>
-                c === 'status'
-                  ? `trạng thái → ${orderStatusLabel(r.status)}`
-                  : c === 'addressId'
-                    ? 'địa chỉ giao'
-                    : c === 'shippingWeightKg'
-                      ? 'cân nặng gửi hãng'
-                      : 'hãng vận chuyển',
+                c === 'status' ? `trạng thái → ${orderStatusLabel(r.status)}` : changedLabel(c),
               )
               .join(', ')}`,
           });
@@ -424,6 +476,35 @@ function Editor({ order }: { order: SalesOrderDetail }) {
             label: 'Cân nặng gửi hãng',
             from: weightLabel(order.shippingWeightKg),
             to: weightLabel(nextWeight),
+          },
+        ]
+      : []),
+    ...(accountChanged
+      ? [
+          {
+            label: 'Tài khoản hãng',
+            from: order.carrierAccount?.name ?? 'Mặc định',
+            to: carrierAccounts.find((a) => a.id === nextAccount)?.name ?? 'Mặc định',
+          },
+        ]
+      : []),
+    ...(dateChanged
+      ? [
+          {
+            label: 'Hẹn nhận',
+            from: order.expectedDeliveryDate ? formatYmd(order.expectedDeliveryDate) : 'Chưa đặt',
+            to: expectedDate ? formatYmd(expectedDate) : 'Bỏ hẹn',
+          },
+        ]
+      : []),
+    ...(internalChanged ? [{ label: 'Ghi chú nội bộ', from: 'cũ', to: 'mới' }] : []),
+    ...(printChanged ? [{ label: 'Ghi chú in vận đơn', from: 'cũ', to: 'mới' }] : []),
+    ...(tagsChanged
+      ? [
+          {
+            label: 'Thẻ',
+            from: `${originalTags.length} thẻ`,
+            to: `${tagIds.length} thẻ`,
           },
         ]
       : []),
@@ -663,6 +744,16 @@ function Editor({ order }: { order: SalesOrderDetail }) {
                   </span>
                 )}
               </FormField>
+              <FormField label="Hẹn nhận hàng" help="Để trống = không hẹn ngày.">
+                <Input
+                  type="date"
+                  aria-label="Hẹn nhận hàng"
+                  value={expectedDate}
+                  onChange={(e) => setExpectedDate(e.target.value)}
+                  disabled={!carrierEditable}
+                  className={cn('tabular-nums', dateChanged && DIRTY)}
+                />
+              </FormField>
               <FormField
                 label="Kho lấy hàng"
                 wide
@@ -726,7 +817,11 @@ function Editor({ order }: { order: SalesOrderDetail }) {
               >
                 <Select
                   value={carrierId}
-                  onValueChange={setCarrierId}
+                  onValueChange={(v) => {
+                    setCarrierId(v);
+                    // Tài khoản thuộc hãng cũ không còn nghĩa — về mặc định của hãng mới.
+                    setAccountId(DEFAULT_ACCOUNT);
+                  }}
                   disabled={!carrierEditable || carriers.isPending}
                 >
                   <SelectTrigger
@@ -745,6 +840,32 @@ function Editor({ order }: { order: SalesOrderDetail }) {
                   </SelectContent>
                 </Select>
               </FormField>
+              {carrierAccounts.length > 1 ? (
+                <FormField label="Tài khoản hãng" help="Tài khoản gửi đơn sang hãng (shop, kho).">
+                  <Select
+                    value={accountId}
+                    onValueChange={setAccountId}
+                    disabled={!carrierEditable}
+                  >
+                    <SelectTrigger
+                      aria-label="Tài khoản hãng"
+                      className={cn(accountChanged && DIRTY)}
+                    >
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value={DEFAULT_ACCOUNT}>Tài khoản mặc định</SelectItem>
+                      {carrierAccounts.map((a) => (
+                        <SelectItem key={a.id} value={a.id}>
+                          {a.name}
+                          {a.isDefault ? ' (mặc định)' : ''}
+                          {a.configured ? '' : ' — chưa cấu hình'}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </FormField>
+              ) : null}
               <FormField label="Cân nặng gửi hãng" help="kg · để trống = tính từ cân nặng SKU">
                 <Input
                   value={weightKg}
@@ -786,28 +907,45 @@ function Editor({ order }: { order: SalesOrderDetail }) {
             </div>
           </Card>
 
-          <Card
-            title="Ghi chú & phân công"
-            aside={<span className="text-xs text-muted-foreground">chỉ đọc ở màn này</span>}
-          >
-            <dl className="grid gap-3.5 p-3.5 text-sm sm:grid-cols-2">
-              <div>
-                <dt className="text-xs font-semibold text-muted-foreground">Ghi chú nội bộ</dt>
-                <dd className="whitespace-pre-line">{order.internalNote || '—'}</dd>
-              </div>
-              <div>
-                <dt className="text-xs font-semibold text-muted-foreground">In vận đơn</dt>
-                <dd className="whitespace-pre-line">{order.printNote || '—'}</dd>
-              </div>
-              <div>
-                <dt className="text-xs font-semibold text-muted-foreground">Phụ trách</dt>
-                <dd>{order.ownerId ? 'Đã có người phụ trách' : 'Đơn của team, chưa chia'}</dd>
-              </div>
-              <div>
-                <dt className="text-xs font-semibold text-muted-foreground">Thẻ</dt>
-                <dd>{order.tags.length > 0 ? order.tags.map((t) => t.name).join(', ') : '—'}</dd>
-              </div>
-            </dl>
+          <Card title="Ghi chú & thẻ">
+            <div className="grid gap-3.5 p-3.5 sm:grid-cols-2">
+              <FormField label="Ghi chú nội bộ" help="Cho người trong công ty (kho, CSKH).">
+                <Textarea
+                  aria-label="Ghi chú nội bộ"
+                  value={internalNote}
+                  onChange={(e) => setInternalNote(e.target.value)}
+                  maxLength={2000}
+                  rows={3}
+                  disabled={!carrierEditable}
+                  className={cn(internalChanged && DIRTY)}
+                />
+              </FormField>
+              <FormField label="Ghi chú in vận đơn" help="In lên tem gửi hãng (tối đa 500 ký tự).">
+                <Textarea
+                  aria-label="Ghi chú in vận đơn"
+                  value={printNote}
+                  onChange={(e) => setPrintNote(e.target.value)}
+                  maxLength={500}
+                  rows={3}
+                  disabled={!carrierEditable}
+                  className={cn(printChanged && DIRTY)}
+                />
+              </FormField>
+              <FormField label="Thẻ">
+                <OrderTagsField
+                  value={tagIds}
+                  onChange={setTagIds}
+                  disabled={!carrierEditable}
+                  dirty={tagsChanged}
+                />
+              </FormField>
+              <FormField label="NV phụ trách">
+                <span className="flex min-h-control items-center text-sm">
+                  {order.ownerName ??
+                    (order.ownerId ? 'Đã có người phụ trách' : 'Đơn của team, chưa chia')}
+                </span>
+              </FormField>
+            </div>
           </Card>
         </div>
 
