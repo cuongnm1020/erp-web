@@ -423,18 +423,20 @@ describe('OrderCreateScreen — màn tạo đơn mới', () => {
         screen.getAllByText(new RegExp(vnd(subtotal + ship - 100_000))).length,
       ).toBeGreaterThan(0),
     );
-    // Cả thẻ Giá trị đơn lẫn khối Chốt đơn (cột phải, redesign 2026-10-22) đều hiện dòng này.
     expect(screen.getAllByText('Đã chuyển khoản').length).toBeGreaterThan(0);
   });
 
-  it('ô SĐT đứng trước tên khách; Giá trị đơn tạm ẩn Giảm giá / Phí vận chuyển / Phụ thu / Mã khuyến mãi', async () => {
+  it('ô SĐT đứng trước tên khách; khối Chốt đơn có phí ship + chuyển khoản, không Giảm giá / Phụ thu / Mã KM / Kích thước', async () => {
     server.use(...skuHandlers());
     renderApp(<OrderCreateScreen />);
     const phone = await screen.findByLabelText('Số điện thoại khách');
     const name = screen.getByLabelText('Tên khách hàng');
     expect(phone.compareDocumentPosition(name) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-    expect(screen.getByText('Giá trị đơn hàng')).toBeInTheDocument();
-    for (const label of ['Phí vận chuyển', 'Phụ thu', 'Mã khuyến mãi']) {
+    // Thiết kế redesign 2026-10-22: phí ship + chuyển khoản nằm trong khối Chốt đơn.
+    expect(screen.getByLabelText('Phí ship thu khách')).toBeInTheDocument();
+    expect(screen.getByLabelText('Tiền chuyển khoản')).toBeInTheDocument();
+    expect(screen.queryByText('Kích thước')).not.toBeInTheDocument();
+    for (const label of ['Phụ thu', 'Mã khuyến mãi', 'Dài (cm)']) {
       expect(screen.queryByLabelText(label)).not.toBeInTheDocument();
     }
     expect(screen.queryByText('Giảm giá')).not.toBeInTheDocument();
