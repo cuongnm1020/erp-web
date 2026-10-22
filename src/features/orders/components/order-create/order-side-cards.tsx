@@ -126,47 +126,56 @@ function useStaffSearch(q: string): EntitySearchResult {
   return { options, isPending: staff.isPending, error: staff.error };
 }
 
-function StaffField({
+/**
+ * Ô chọn nhân viên trên đơn. `bare` = chỉ ô chọn (nhãn do nơi gọi vẽ — dải "Thông tin đơn" đầu
+ * màn, redesign 2026-10-22); mặc định = hàng nhãn ← → ô của card bên phải.
+ */
+export function StaffField({
   form,
   name,
   label,
   placeholder,
+  bare = false,
 }: {
   form: Form;
   name: 'ownerId' | 'packerId' | 'careStaffId' | 'marketerId';
   label: string;
   placeholder: string;
+  bare?: boolean;
 }) {
   const staff = useOrderStaffOptions();
   return (
     <FormField
       control={form.control}
       name={name}
-      render={({ field }) => (
-        <FormItem>
-          <Row label={label}>
-            <FormControl>
-              <EntityPicker
-                value={field.value}
-                onChange={(id) => field.onChange(id)}
-                useSearch={useStaffSearch}
-                selectedLabel={staff.data?.find((u) => u.id === field.value)?.fullName}
-                placeholder={placeholder}
-                searchPlaceholder="Tìm tên, mã nhân viên…"
-                emptyText="Không có nhân viên khớp"
-                clearable
-                aria-label={label}
-              />
-            </FormControl>
-          </Row>
-          <FormMessage />
-        </FormItem>
-      )}
+      render={({ field }) => {
+        const picker = (
+          <FormControl>
+            <EntityPicker
+              value={field.value}
+              onChange={(id) => field.onChange(id)}
+              useSearch={useStaffSearch}
+              selectedLabel={staff.data?.find((u) => u.id === field.value)?.fullName}
+              placeholder={placeholder}
+              searchPlaceholder="Tìm tên, mã nhân viên…"
+              emptyText="Không có nhân viên khớp"
+              clearable
+              aria-label={label}
+            />
+          </FormControl>
+        );
+        return (
+          <FormItem>
+            {bare ? picker : <Row label={label}>{picker}</Row>}
+            <FormMessage />
+          </FormItem>
+        );
+      }}
     />
   );
 }
 
-function TagPicker({ form }: { form: Form }) {
+export function TagPicker({ form }: { form: Form }) {
   const tags = useOrderTags();
   const selected = useWatch({ control: form.control, name: 'tagIds' });
   const byId = useMemo(() => new Map((tags.data ?? []).map((t) => [t.id, t])), [tags.data]);
@@ -232,8 +241,13 @@ function TagPicker({ form }: { form: Form }) {
   );
 }
 
+/**
+ * Giờ tạo đơn (ghi lùi) + NV phụ (đang ẩn). NV xử lý và Thẻ đã lên dải "Thông tin đơn" đầu màn
+ * (redesign 2026-10-22) — card này đóng sẵn vì hiếm dùng.
+ */
 export function InfoCard({ form }: { form: Form }) {
-  const [open, setOpen] = useState(true);
+  const orderDate = useWatch({ control: form.control, name: 'orderDate' });
+  const [open, setOpen] = useState(Boolean(orderDate));
   return (
     <Card
       title={
@@ -243,7 +257,7 @@ export function InfoCard({ form }: { form: Form }) {
           onClick={() => setOpen((o) => !o)}
           className="inline-flex items-center gap-1.5"
         >
-          Thông tin
+          Giờ tạo đơn
           {open ? (
             <ChevronUp className="h-4 w-4" aria-hidden />
           ) : (
@@ -278,12 +292,6 @@ export function InfoCard({ form }: { form: Form }) {
               </FormItem>
             )}
           />
-          <StaffField
-            form={form}
-            name="ownerId"
-            label="NV xử lý"
-            placeholder="Tôi (người tạo đơn)"
-          />
           {/* Tạm ẩn NV đóng hàng / NV chăm sóc / Marketer (user yêu cầu 2026-10-21) — bật lại bằng cờ. */}
           {SHOW_EXTRA_STAFF ? (
             <>
@@ -307,7 +315,6 @@ export function InfoCard({ form }: { form: Form }) {
               />
             </>
           ) : null}
-          <TagPicker form={form} />
         </>
       ) : null}
     </Card>
