@@ -182,7 +182,8 @@ export const NAV_MODULES: NavModule[] = [
         href: '/crm/customers/consent',
         icon: MailCheck,
         // CRM-13: GET /consents cần customer.read — dữ liệu đã scope theo khách người xem phụ trách.
-        ability: { action: 'read', subject: 'Customer' },
+        // Menu (2026-10-22): chỉ Admin / vai trò được cấp riêng customer.consent_view.
+        ability: { action: 'consent_view', subject: 'Customer' },
       },
       {
         label: 'Nhân viên Pancake',
@@ -223,7 +224,7 @@ export const NAV_MODULES: NavModule[] = [
         label: 'Danh mục · thương hiệu',
         href: '/catalog/categories',
         icon: List,
-        // Quyền riêng (2026-10-22): mọi vai trò xem sản phẩm trừ CSKH.
+        // Quyền riêng (2026-10-22): chỉ Admin / vai trò được cấp riêng product.categories.
         ability: { action: 'categories', subject: 'Product' },
       },
       {

@@ -208,8 +208,13 @@ export function GrnListScreen() {
         values={state.filters}
         onFilterChange={(patch) => set({ filters: { ...state.filters, ...patch } })}
         filters={[
-          { key: 'from', label: 'Từ ngày', type: 'date' },
-          { key: 'to', label: 'Đến ngày', type: 'date' },
+          {
+            key: 'from',
+            toKey: 'to',
+            label: 'Ngày nhập',
+            type: 'dateRange',
+            rememberKey: 'date.grn',
+          },
         ]}
       />
 

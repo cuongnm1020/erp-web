@@ -65,6 +65,33 @@ describe('visibleModules', () => {
     });
   });
 
+  it('Danh mục / In tem barcode / Đồng ý marketing (2026-10-22): sale có read Product + Customer không thấy; cấp riêng thì thấy', () => {
+    const base = ['read:Product', 'read:Customer', 'read:SalesOrder'];
+    const labels = (extra: string[]) => {
+      const ab = new Set([...base, ...extra]);
+      return visibleModules((a, s) => ab.has(`${a}:${s}`))
+        .flatMap((m) => m.children ?? [])
+        .map((c) => c.label);
+    };
+    const sale = labels([]);
+    expect(sale).toContain('Danh sách sản phẩm');
+    expect(sale).not.toContain('Danh mục · thương hiệu');
+    expect(sale).not.toContain('In tem barcode');
+    expect(sale).not.toContain('Đồng ý marketing');
+    const granted = labels([
+      'categories:Product',
+      'barcode_print:Product',
+      'consent_view:Customer',
+    ]);
+    expect(granted).toEqual(
+      expect.arrayContaining(['Danh mục · thương hiệu', 'In tem barcode', 'Đồng ý marketing']),
+    );
+    expect(requiredAbilityFor('/crm/customers/consent')).toEqual({
+      action: 'consent_view',
+      subject: 'Customer',
+    });
+  });
+
   it('không có quyền nào → chỉ thấy Tổng quan (Giá & KM đang ẩn)', () => {
     expect(visibleModules(() => false).map((m) => m.label)).toEqual(['Tổng quan']);
   });

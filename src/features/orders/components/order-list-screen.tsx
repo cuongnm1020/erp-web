@@ -731,8 +731,13 @@ export function OrderListScreen() {
         q={state.q}
         onQChange={(q) => set({ q })}
         filters={[
-          { key: 'from', label: 'Từ ngày', type: 'date' },
-          { key: 'to', label: 'Đến ngày', type: 'date' },
+          {
+            key: 'from',
+            toKey: 'to',
+            label: 'Ngày đặt',
+            type: 'dateRange',
+            rememberKey: 'date.orders',
+          },
           {
             // Một ô cho cả "chưa gán hãng" lẫn "đã gán hãng X" — hai key URL (noCarrier / carrierId)
             // loại trừ nhau.
@@ -757,6 +762,8 @@ export function OrderListScreen() {
             key: 'source',
             label: 'Nguồn',
             type: 'select',
+            // Hàng chục POS Pancake — gõ tìm theo tên shop.
+            searchable: true,
             options: [
               { value: 'PANCAKE', label: 'Pancake (mọi POS)' },
               ...(pancakeShops.data ?? []).map((s) => ({

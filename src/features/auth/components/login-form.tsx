@@ -43,7 +43,7 @@ export function LoginForm() {
 
   const idleNotice =
     !err && params.get('reason') === IDLE_LOGOUT_REASON
-      ? 'Phiên làm việc đã kết thúc vì không thao tác 30 phút. Đăng nhập lại để tiếp tục đúng trang đang làm.'
+      ? 'Phiên làm việc đã kết thúc vì không thao tác 2 giờ. Đăng nhập lại để tiếp tục đúng trang đang làm.'
       : undefined;
 
   return (

@@ -128,7 +128,7 @@ describe('Danh sách đơn — Đồng bộ đơn từ Pancake theo POS', () => 
     expect(within(dialog).getByText('Kho đã nhận việc lấy hàng PK2610-00001')).toBeInTheDocument();
   });
 
-  it('khoảng ngày: POST kèm fromDate/toDate; khoảng sai → báo + khóa nút; đếm đơn mới / đã gửi qua Pancake', async () => {
+  it('khoảng ngày: POST kèm fromDate/toDate; khoảng ngược chiều tự đổi, quá 31 ngày tự kéo lại; đếm đơn mới / đã gửi qua Pancake', async () => {
     const posted: unknown[] = [];
     server.use(
       http.post('/api/pancake-sync/transform/orders/resync', async ({ request }) => {
@@ -160,23 +160,29 @@ describe('Danh sách đơn — Đồng bộ đơn từ Pancake theo POS', () => 
     await within(dialog).findByRole('radio', { name: /Thiên Nông chính/ });
 
     fireEvent.click(within(dialog).getByRole('radio', { name: /Mọi đơn Pancake cập nhật/ }));
-    const from = within(dialog).getByLabelText('Từ ngày');
-    const to = within(dialog).getByLabelText('Đến ngày');
     const startBtn = within(dialog).getByRole('button', { name: 'Đồng bộ đơn' });
-
-    // Ngược chiều → báo, khóa nút.
-    fireEvent.change(from, { target: { value: '2026-10-12' } });
-    fireEvent.change(to, { target: { value: '2026-10-01' } });
-    expect(within(dialog).getByRole('alert')).toHaveTextContent(
-      'Từ ngày phải trước hoặc bằng đến ngày',
-    );
-    expect(startBtn).toBeDisabled();
-    // Quá 31 ngày → báo.
-    fireEvent.change(from, { target: { value: '2026-08-01' } });
-    expect(within(dialog).getByRole('alert')).toHaveTextContent('Khoảng ngày tối đa 31 ngày');
-
-    fireEvent.change(from, { target: { value: '2026-10-11' } });
-    fireEvent.change(to, { target: { value: '2026-10-12' } });
+    // Bộ lọc khoảng ngày dùng chung (2026-10-22): mở hộp, gõ ngày, Áp dụng.
+    const type = (label: string, v: string) => {
+      const input = screen.getByLabelText(label);
+      fireEvent.change(input, { target: { value: v } });
+      fireEvent.blur(input);
+    };
+    fireEvent.click(within(dialog).getByRole('button', { name: /^Ngày cập nhật:/ }));
+    // Quá 31 ngày → đầu kia tự kéo lại cho vừa trần API.
+    type('Từ ngày', '01/08/2026');
+    expect(screen.getByLabelText('Đến ngày')).toHaveValue('31/08/2026');
+    type('Đến ngày', '12/10/2026');
+    expect(screen.getByLabelText('Từ ngày')).toHaveValue('12/09/2026');
+    // Gõ ngược chiều → tự đổi chỗ.
+    type('Từ ngày', '13/10/2026');
+    expect(screen.getByLabelText('Từ ngày')).toHaveValue('12/10/2026');
+    expect(screen.getByLabelText('Đến ngày')).toHaveValue('13/10/2026');
+    type('Từ ngày', '11/10/2026');
+    type('Đến ngày', '12/10/2026');
+    fireEvent.click(screen.getByRole('button', { name: 'Áp dụng' }));
+    expect(
+      within(dialog).getByRole('button', { name: 'Ngày cập nhật: 11/10 – 12/10/2026' }),
+    ).toBeInTheDocument();
     expect(within(dialog).queryByRole('alert')).not.toBeInTheDocument();
     fireEvent.click(startBtn);
     await waitFor(() =>

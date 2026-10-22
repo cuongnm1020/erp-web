@@ -2,7 +2,7 @@
 
 import { CalendarIcon, X } from 'lucide-react';
 import * as React from 'react';
-import type { DateRange } from 'react-day-picker';
+import { DateRangeFilter } from '../date-range-filter';
 import { Button } from '@/components/ui/button';
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
@@ -124,7 +124,10 @@ export interface DateRangeValue {
   to: DateKey | '';
 }
 
-/** Khoảng ngày cho FilterBar (custom) / báo cáo. Giá trị 'yyyy-mm-dd'. */
+/**
+ * Khoảng ngày không bắt buộc (trống = mọi lúc). Giá trị 'yyyy-mm-dd'. Từ 2026-10-22 hiện bằng bộ
+ * lọc khoảng ngày dùng chung; `placeholder` là tên trường ngày trên nút.
+ */
 export function DateRangePicker({
   value,
   onChange,
@@ -136,54 +139,13 @@ export function DateRangePicker({
   placeholder?: string;
   className?: string;
 }) {
-  const [open, setOpen] = React.useState(false);
-  const range: DateRange | undefined = value.from
-    ? { from: keyToDate(value.from), to: keyToDate(value.to) }
-    : undefined;
-  const label = value.from
-    ? `${keyLabel(value.from)}${value.to ? ` – ${keyLabel(value.to)}` : ''}`
-    : placeholder;
   return (
-    <Popover open={open} onOpenChange={setOpen}>
-      <div className={cn('relative', className)}>
-        <PopoverTrigger asChild>
-          <Button
-            type="button"
-            variant="outline"
-            className={cn(
-              'h-8 justify-start font-normal',
-              !value.from && 'text-muted-foreground',
-              value.from && 'pr-8',
-            )}
-          >
-            <CalendarIcon aria-hidden />
-            {label}
-          </Button>
-        </PopoverTrigger>
-        {value.from ? (
-          <button
-            type="button"
-            aria-label="Xóa khoảng ngày"
-            onClick={() => onChange({ from: '', to: '' })}
-            className="absolute right-2 top-2.5 rounded text-muted-foreground hover:text-foreground"
-          >
-            <X className="h-4 w-4" />
-          </button>
-        ) : null}
-      </div>
-      <PopoverContent className="w-auto p-0" align="start">
-        <Calendar
-          mode="range"
-          numberOfMonths={2}
-          selected={range}
-          defaultMonth={range?.from}
-          onSelect={(r) => {
-            onChange({ from: r?.from ? dateToKey(r.from) : '', to: r?.to ? dateToKey(r.to) : '' });
-            if (r?.from && r?.to) setOpen(false);
-          }}
-        />
-      </PopoverContent>
-    </Popover>
+    <DateRangeFilter
+      label={placeholder}
+      className={className}
+      value={{ from: value.from || undefined, to: value.to || undefined }}
+      onChange={(r) => onChange({ from: r.from ?? '', to: r.to ?? r.from ?? '' })}
+    />
   );
 }
 

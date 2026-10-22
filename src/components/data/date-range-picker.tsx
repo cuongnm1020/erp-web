@@ -1,7 +1,6 @@
 'use client';
 
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
+import { DateRangeFilter } from './date-range-filter';
 
 /**
  * Chọn một ngày hoặc khoảng ngày (khoá `YYYY-MM-DD` theo giờ VN, gồm cả hai đầu) + preset.
@@ -60,12 +59,18 @@ export function normalizeRange(
   return { from, to };
 }
 
+/**
+ * Khoảng ngày BẮT BUỘC (báo cáo, khách của team…) — từ 2026-10-22 hiện bằng bộ lọc khoảng ngày
+ * dùng chung (nút + hộp lịch 2 tháng, khoảng chọn sẵn, Áp dụng). Giữ chữ ký cũ cho màn đang gọi.
+ */
 export function DateRangePicker({
   value,
   onChange,
   today,
   maxDays,
-  presets = defaultRangePresets(today),
+  presets,
+  label = 'Kỳ',
+  rememberKey,
 }: {
   value: DateRange;
   onChange: (next: DateRange) => void;
@@ -73,64 +78,23 @@ export function DateRangePicker({
   today: string;
   /** Trần số ngày (gồm hai đầu) của API. */
   maxDays: number;
+  /** Thay khoảng chọn sẵn chuẩn (Hôm nay … Tháng trước). */
   presets?: DateRangePreset[];
+  label?: string;
+  rememberKey?: string;
 }) {
-  const { from, to } = value;
-  const activePreset = presets.find((p) => p.from === from && p.to === to);
-  const onFrom = (v: string) => {
-    if (!isDateKey(v)) return;
-    const t = v > to ? v : daysBetween(v, to) >= maxDays ? shiftDay(v, maxDays - 1) : to;
-    onChange({ from: v, to: t });
-  };
-  const onTo = (v: string) => {
-    if (!isDateKey(v)) return;
-    const f = v < from ? v : daysBetween(from, v) >= maxDays ? shiftDay(v, -(maxDays - 1)) : from;
-    onChange({ from: f, to: v });
-  };
-
   return (
-    <div className="flex flex-wrap items-end gap-2">
-      <div className="flex flex-wrap gap-1" role="group" aria-label="Chọn nhanh khoảng ngày">
-        {presets.map((p) => (
-          <Button
-            key={p.label}
-            type="button"
-            size="sm"
-            variant={activePreset?.label === p.label ? 'default' : 'outline'}
-            aria-pressed={activePreset?.label === p.label}
-            onClick={() => onChange({ from: p.from, to: p.to })}
-          >
-            {p.label}
-          </Button>
-        ))}
-        {activePreset ? null : (
-          <span className="inline-flex h-8 items-center rounded-md bg-secondary px-3 text-xs font-semibold text-secondary-foreground">
-            Tùy chọn
-          </span>
-        )}
-      </div>
-      <label className="flex flex-col gap-0.5 text-xs text-muted-foreground">
-        Từ ngày
-        <Input
-          type="date"
-          className="h-8 w-40"
-          value={from}
-          max={today}
-          onChange={(e) => onFrom(e.target.value)}
-          aria-label="Từ ngày"
-        />
-      </label>
-      <label className="flex flex-col gap-0.5 text-xs text-muted-foreground">
-        Đến ngày
-        <Input
-          type="date"
-          className="h-8 w-40"
-          value={to}
-          max={today}
-          onChange={(e) => onTo(e.target.value)}
-          aria-label="Đến ngày"
-        />
-      </label>
-    </div>
+    <DateRangeFilter
+      label={label}
+      required
+      today={today}
+      maxDays={maxDays}
+      presets={presets}
+      rememberKey={rememberKey}
+      value={value}
+      onChange={(r) => {
+        if (r.from) onChange({ from: r.from, to: r.to ?? r.from });
+      }}
+    />
   );
 }

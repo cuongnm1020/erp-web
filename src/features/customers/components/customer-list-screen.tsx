@@ -351,8 +351,13 @@ export function CustomerListScreen() {
             type: 'custom',
             render: ({ value, onChange }) => <ProvinceInput value={value} onChange={onChange} />,
           },
-          { key: 'from', label: 'Tạo từ ngày', type: 'date' },
-          { key: 'to', label: 'Tạo đến ngày', type: 'date' },
+          {
+            key: 'from',
+            toKey: 'to',
+            label: 'Ngày tạo',
+            type: 'dateRange',
+            rememberKey: 'date.customers',
+          },
         ]}
       />
 

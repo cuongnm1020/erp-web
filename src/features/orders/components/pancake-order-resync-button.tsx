@@ -4,6 +4,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { RefreshCw } from 'lucide-react';
 import Link from 'next/link';
 import { useEffect, useRef, useState } from 'react';
+import { DateRangeFilter } from '@/components/data/date-range-filter';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -16,7 +17,6 @@ import {
 import { toast } from '@/components/ui/toaster';
 import { messageFor } from '@/lib/error-messages';
 import { formatDateTime, toLocalDateKey } from '@/lib/format';
-import { Input } from '@/components/ui/input';
 import {
   RESYNC_MAX_DAYS,
   isResyncRunning,
@@ -158,31 +158,19 @@ export function PancakeOrderResyncButton({ defaultShopId = '' }: { defaultShopId
               </span>
             </label>
             {mode === 'range' ? (
-              <div className="grid grid-cols-2 gap-3 pl-6">
-                <label className="space-y-1 text-sm">
-                  <span className="text-muted-foreground">Từ ngày</span>
-                  <Input
-                    type="date"
-                    value={fromDate}
-                    max={toDate || undefined}
-                    onChange={(e) => setFromDate(e.target.value)}
-                    disabled={running}
-                    aria-label="Từ ngày"
-                  />
-                </label>
-                <label className="space-y-1 text-sm">
-                  <span className="text-muted-foreground">Đến ngày</span>
-                  <Input
-                    type="date"
-                    value={toDate}
-                    min={fromDate || undefined}
-                    onChange={(e) => setToDate(e.target.value)}
-                    disabled={running}
-                    aria-label="Đến ngày"
-                  />
-                </label>
+              <div className="space-y-1 pl-6">
+                <DateRangeFilter
+                  label="Ngày cập nhật"
+                  required
+                  maxDays={RESYNC_MAX_DAYS}
+                  value={{ from: fromDate, to: toDate }}
+                  onChange={(r) => {
+                    setFromDate(r.from ?? '');
+                    setToDate(r.to ?? r.from ?? '');
+                  }}
+                />
                 {invalidRange ? (
-                  <p role="alert" className="col-span-2 text-xs text-destructive">
+                  <p role="alert" className="text-xs text-destructive">
                     {invalidRange}
                   </p>
                 ) : null}
