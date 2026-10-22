@@ -498,7 +498,7 @@ function Editor({ order }: { order: SalesOrderDetail }) {
         {/* ── Cột trái ── */}
         <div className="flex min-w-0 flex-[999_1_640px] flex-col gap-3">
           <Card title="Thông tin đơn" className="py-2.5">
-            {/* Hàng đầu: Trạng thái đơn · Trạng thái kho · Kho xuất (user 2026-10-22). */}
+            {/* Ô sửa được: Trạng thái đơn · Trạng thái kho · Kho xuất một hàng, Thẻ dưới (user 2026-10-22). */}
             <div className="grid gap-x-2.5 gap-y-2 sm:grid-cols-3">
               <HeaderField label="Trạng thái đơn">
                 <Select
@@ -599,28 +599,14 @@ function Editor({ order }: { order: SalesOrderDetail }) {
                 </div>
               ) : null}
             </div>
-            <div className="grid grid-cols-2 gap-x-2.5 gap-y-2 sm:grid-cols-4">
-              <HeaderField label="Kênh">
-                <ReadValue>{orderChannelLabel(order.channel)}</ReadValue>
-              </HeaderField>
-              <HeaderField label="Nguồn đơn">
-                <ReadValue>{order.source ? orderSourceLabel(order.source) : '—'}</ReadValue>
-              </HeaderField>
-              <HeaderField label="NV xử lý">
-                <ReadValue>
-                  {order.ownerName ??
-                    (order.ownerId ? 'Đã có người phụ trách' : 'Đơn của team, chưa chia')}
-                </ReadValue>
-              </HeaderField>
-              <HeaderField label="Thẻ">
-                <OrderTagsField
-                  value={tagIds}
-                  onChange={setTagIds}
-                  disabled={!carrierEditable}
-                  dirty={tagsChanged}
-                />
-              </HeaderField>
-            </div>
+            <HeaderField label="Thẻ">
+              <OrderTagsField
+                value={tagIds}
+                onChange={setTagIds}
+                disabled={!carrierEditable}
+                dirty={tagsChanged}
+              />
+            </HeaderField>
             <div className="flex flex-col gap-0.5 text-xs text-muted-foreground">
               {fulfilTarget ? (
                 <p className="text-warning">
@@ -653,6 +639,26 @@ function Editor({ order }: { order: SalesOrderDetail }) {
                 </p>
               ) : null}
             </div>
+            {/* Khối chỉ xem tách khỏi các ô sửa được (user 2026-10-22). */}
+            <section
+              aria-label="Thông tin chỉ xem"
+              className="flex flex-col gap-1.5 rounded-md bg-muted/40 px-3 py-2"
+            >
+              <span className="flex items-center gap-1.5 text-xs font-semibold text-muted-foreground">
+                <Lock className="h-3.5 w-3.5" aria-hidden />
+                Chỉ xem
+              </span>
+              <dl className="grid grid-cols-2 gap-x-4 gap-y-1 text-sm sm:grid-cols-3">
+                <ReadOnlyItem label="Kênh">{orderChannelLabel(order.channel)}</ReadOnlyItem>
+                <ReadOnlyItem label="Nguồn đơn">
+                  {order.source ? orderSourceLabel(order.source) : '—'}
+                </ReadOnlyItem>
+                <ReadOnlyItem label="NV xử lý">
+                  {order.ownerName ??
+                    (order.ownerId ? 'Đã có người phụ trách' : 'Đơn của team, chưa chia')}
+                </ReadOnlyItem>
+              </dl>
+            </section>
           </Card>
 
           <Card
@@ -1103,6 +1109,16 @@ function HeaderField({ label, children }: { label: string; children: ReactNode }
     <div className="flex min-w-0 flex-col gap-1">
       <span className="text-xs font-semibold text-muted-foreground">{label}</span>
       {children}
+    </div>
+  );
+}
+
+/** Một cặp nhãn – giá trị của khối "Chỉ xem". */
+function ReadOnlyItem({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <div className="flex min-w-0 flex-col">
+      <dt className="text-xs text-muted-foreground">{label}</dt>
+      <dd className="truncate">{children}</dd>
     </div>
   );
 }
