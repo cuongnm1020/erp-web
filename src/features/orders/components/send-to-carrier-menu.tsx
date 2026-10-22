@@ -12,20 +12,24 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { useCarriers, type Carrier } from '@/features/wms/api/use-shipping';
+import {
+  carrierAccountOptions,
+  useCarriers,
+  type CarrierAccountOption,
+} from '@/features/wms/api/use-shipping';
 import type { SalesOrder } from '../api/use-orders';
 import { SendToCarrierDialog } from './send-to-carrier-dialog';
 
 /**
  * Nút "Gửi sang ĐVVC" trên thanh hành động hàng loạt: menu "Sang <hãng>" dựng từ GET /carriers
- * (hãng đang bật và có adapter thật — MANUAL / xe nhà không có cấu hình để gửi). Hãng chưa có
- * token trên server vẫn hiện nhưng mờ, để người dùng biết vì sao chưa gửi được thay vì đoán.
- * Chọn một hãng → SendToCarrierDialog cho lô đã chọn.
+ * (hãng đang bật và có adapter thật — MANUAL / xe nhà không có cấu hình để gửi). Hãng nhiều tài
+ * khoản hiện từng tài khoản đủ cấu hình (2026-10-22); hãng / tài khoản chưa cấu hình thì ẩn.
+ * Chọn một dòng → SendToCarrierDialog cho lô đã chọn, chọn sẵn tài khoản đó.
  */
 export function SendToCarrierMenu({ rows, onDone }: { rows: SalesOrder[]; onDone: () => void }) {
   const carriers = useCarriers();
-  const [carrier, setCarrier] = useState<Carrier | null>(null);
-  const options = (carriers.data ?? []).filter((c) => c.isActive && c.hasAdapter);
+  const [picked, setPicked] = useState<CarrierAccountOption | null>(null);
+  const options = carrierAccountOptions(carriers.data).filter((o) => o.carrier.hasAdapter);
 
   return (
     <>
@@ -40,40 +44,32 @@ export function SendToCarrierMenu({ rows, onDone }: { rows: SalesOrder[]; onDone
           <DropdownMenuLabel>Gửi {rows.length} đơn sang hãng</DropdownMenuLabel>
           <DropdownMenuSeparator />
           {options.length === 0 ? (
-            <DropdownMenuItem disabled>Chưa có hãng vận chuyển nào được bật</DropdownMenuItem>
+            <DropdownMenuItem disabled>Chưa có hãng vận chuyển nào được cấu hình</DropdownMenuItem>
           ) : (
-            options.map((c) => {
-              // Hãng gửi được khi có ÍT NHẤT một tài khoản đủ cấu hình (FE-CARRIER-ACC-1).
-              const ready = c.configured || c.accounts.some((a) => a.configured);
-              return (
-                <DropdownMenuItem
-                  key={c.id}
-                  disabled={!ready}
-                  onSelect={() => setCarrier(c)}
-                  aria-label={`Sang ${c.code}`}
-                >
-                  Sang
-                  <StatusBadge tone="brand" className="ml-1.5">
-                    {c.code}
-                  </StatusBadge>
-                  {ready ? null : (
-                    <span className="ml-auto pl-3 text-xs text-muted-foreground">
-                      chưa cấu hình
-                    </span>
-                  )}
-                </DropdownMenuItem>
-              );
-            })
+            options.map((o) => (
+              <DropdownMenuItem
+                key={o.value}
+                onSelect={() => setPicked(o)}
+                aria-label={`Sang ${o.carrier.code}${o.accountLabel ? ` · ${o.accountLabel}` : ''}`}
+              >
+                Sang
+                <StatusBadge tone="brand" className="ml-1.5">
+                  {o.carrier.code}
+                </StatusBadge>
+                {o.accountLabel ? <span className="ml-1.5 text-sm">{o.accountLabel}</span> : null}
+              </DropdownMenuItem>
+            ))
           )}
         </DropdownMenuContent>
       </DropdownMenu>
-      {carrier ? (
+      {picked ? (
         <SendToCarrierDialog
-          carrier={carrier}
+          carrier={picked.carrier}
+          accountId={picked.accountId}
           rows={rows}
           open
           onOpenChange={(o) => {
-            if (!o) setCarrier(null);
+            if (!o) setPicked(null);
           }}
           onDone={onDone}
         />

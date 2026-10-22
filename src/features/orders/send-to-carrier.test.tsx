@@ -47,23 +47,15 @@ const openFor = async (code: string) => {
 };
 
 describe('Gửi sang ĐVVC — SendToCarrierMenu + SendToCarrierDialog', () => {
-  it('menu dựng từ GET /carriers: chỉ hãng bật và có adapter (GHN chưa cấu hình → mờ, MANUAL/OLD ẩn)', async () => {
+  it('menu dựng từ GET /carriers: chỉ hãng bật, có adapter và đủ cấu hình (GHN chưa cấu hình, MANUAL/OLD ẩn)', async () => {
     search = '';
     toastSuccess.mockClear();
     await selectTwoRows();
     openMenu();
     const menu = await screen.findByRole('menu');
     const items = within(menu).getAllByRole('menuitem');
-    expect(items.map((i) => i.getAttribute('aria-label'))).toEqual([
-      'Sang GHN',
-      'Sang GHTK',
-      'Sang VTP',
-    ]);
-    expect(within(menu).getByRole('menuitem', { name: 'Sang GHN' })).toHaveAttribute(
-      'aria-disabled',
-      'true',
-    );
-    expect(within(menu).queryByText(/MANUAL|OLD/)).not.toBeInTheDocument();
+    expect(items.map((i) => i.getAttribute('aria-label'))).toEqual(['Sang GHTK', 'Sang VTP']);
+    expect(within(menu).queryByText(/GHN|MANUAL|OLD|chưa cấu hình/)).not.toBeInTheDocument();
   });
 
   it('GHTK: dialog hai cột — trái liệt kê đơn đã chọn (✕ bỏ đơn), phải có tuỳ chọn đường bay / ca lấy; Cập nhật → POST đúng orderIds + options, bỏ chọn sau khi xong', async () => {
@@ -318,7 +310,7 @@ describe('Gửi sang ĐVVC — SendToCarrierMenu + SendToCarrierDialog', () => {
     expect(first).not.toHaveTextContent('raw server message');
   });
 
-  it('hãng nhiều tài khoản (FE-CARRIER-ACC-1): chọn sẵn tài khoản mặc định, tài khoản chưa cấu hình mờ; chọn tài khoản phụ → POST kèm carrierAccountId; GHN mặc định thiếu cấu hình nhưng có tài khoản khác đủ → menu bật', async () => {
+  it('hãng nhiều tài khoản (FE-CARRIER-ACC-1): menu hiện từng tài khoản đủ cấu hình (chưa cấu hình ẩn); chọn tài khoản phụ → dialog chọn sẵn → POST kèm carrierAccountId; GHN mặc định thiếu cấu hình nhưng có tài khoản khác đủ → menu có GHN', async () => {
     search = '';
     toastSuccess.mockClear();
     const bodies: Record<string, unknown>[] = [];
@@ -378,16 +370,22 @@ describe('Gửi sang ĐVVC — SendToCarrierMenu + SendToCarrierDialog', () => {
     await selectTwoRows();
     openMenu();
     const menu = await screen.findByRole('menu');
-    expect(within(menu).getByRole('menuitem', { name: 'Sang GHN' })).not.toHaveAttribute(
-      'aria-disabled',
-      'true',
-    );
-    fireEvent.click(within(menu).getByRole('menuitem', { name: 'Sang GHTK' }));
+    expect(
+      within(menu)
+        .getAllByRole('menuitem')
+        .map((i) => i.getAttribute('aria-label')),
+    ).toEqual([
+      'Sang GHN',
+      'Sang GHTK · Mặc định (mặc định)',
+      'Sang GHTK · GHTK cửa hàng 2',
+      'Sang VTP',
+    ]);
+    expect(within(menu).queryByText(/GHTK mới/)).not.toBeInTheDocument();
+    fireEvent.click(within(menu).getByRole('menuitem', { name: 'Sang GHTK · GHTK cửa hàng 2' }));
     const dialog = await screen.findByRole('dialog');
     const group = within(dialog).getByRole('radiogroup', { name: 'Tài khoản GHTK' });
-    expect(within(group).getByRole('radio', { name: /Mặc định/ })).toBeChecked();
-    expect(within(group).getByRole('radio', { name: /GHTK mới/ })).toBeDisabled();
-    fireEvent.click(within(group).getByRole('radio', { name: /GHTK cửa hàng 2/ }));
+    expect(within(group).getByRole('radio', { name: /GHTK cửa hàng 2/ })).toBeChecked();
+    expect(within(group).queryByRole('radio', { name: /GHTK mới/ })).not.toBeInTheDocument();
     fireEvent.click(within(dialog).getByRole('button', { name: 'Cập nhật 2 đơn' }));
     await waitFor(() => expect(bodies).toHaveLength(1));
     expect(bodies[0]).toMatchObject({ carrierId: 'c-ghtk', carrierAccountId: 'acc-ghtk-shop2' });
