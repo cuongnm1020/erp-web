@@ -31,6 +31,10 @@ export interface ProductListParams {
   supplierId?: string;
   /** true = chỉ SP đã gán NCC chính, false = chỉ SP chưa gán. */
   hasSupplier?: boolean;
+  /** Lọc theo thuế suất (2026-10-23). */
+  taxRateId?: string;
+  /** false = chỉ sản phẩm CHƯA gán thuế suất. */
+  hasTaxRate?: boolean;
   isActive?: boolean;
   trackingMode?: TrackingMode;
   /** true = chỉ sản phẩm còn ít nhất một SKU có tồn (onHand > 0). */
@@ -372,6 +376,8 @@ export function useProducts(params: ProductListParams, opts: { enabled?: boolean
               brandId: params.brandId,
               supplierId: params.supplierId,
               hasSupplier: params.hasSupplier,
+              taxRateId: params.taxRateId,
+              hasTaxRate: params.hasTaxRate,
               isActive: params.isActive,
               trackingMode: params.trackingMode,
               hasStock: params.hasStock,

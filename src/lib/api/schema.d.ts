@@ -2478,6 +2478,54 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/tax-rates": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["TaxRateController_list"];
+        put?: never;
+        post: operations["TaxRateController_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/tax-rates/assign": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["TaxRateController_assign"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/tax-rates/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["TaxRateController_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch: operations["TaxRateController_update"];
+        trace?: never;
+    };
     "/teams": {
         parameters: {
             query?: never;
@@ -8589,6 +8637,8 @@ export interface components {
             searchAliases: string[];
             /** @description Tên in trên hóa đơn — null = dùng tên thương mại. */
             invoiceName: string | null;
+            /** @description fin.TaxRate.id — thuế suất cấp sản phẩm (mọi SKU chép theo); null = sản phẩm cũ chưa gán. */
+            taxRateId: string | null;
             /** @description Mức tồn kho cảnh báo nhập hàng — Decimal(18,6) chuỗi; null = không cảnh báo. */
             reorderLevel: string | null;
             /** @description Optimistic locking — client giữ nguyên và gửi lại trong PATCH; lệch → 409. */
@@ -8699,6 +8749,8 @@ export interface components {
             searchAliases: string[];
             /** @description Tên in trên hóa đơn — null = dùng tên thương mại (`name`). */
             invoiceName: string | null;
+            /** @description fin.TaxRate.id — thuế suất cấp sản phẩm (mọi SKU chép theo); null = sản phẩm cũ chưa gán. */
+            taxRateId: string | null;
             /** @description Mức tồn kho cảnh báo nhập hàng — Decimal(18,6) chuỗi theo ĐVT cơ sở; null = không cảnh báo. */
             reorderLevel: string | null;
             /** @description Optimistic locking — form sửa giữ nguyên và gửi lại trong PATCH; lệch → 409. */
@@ -8753,6 +8805,12 @@ export interface components {
             /** @description Tên in trên hóa đơn — bỏ trống / null = dùng tên thương mại (`name`). */
             invoiceName?: string | null;
             /**
+             * Format: uuid
+             * @description fin.TaxRate.id (2026-10-23) — thuế suất của sản phẩm, chép xuống mọi SKU. Bỏ trống = mức mặc
+             *     định của danh mục (trigger DB) → sản phẩm luôn có thuế suất; form web bắt buộc chọn.
+             */
+            taxRateId?: string;
+            /**
              * @description Mức tồn kho cảnh báo nhập hàng — Decimal(18,6) chuỗi theo ĐVT cơ sở, KHÔNG phải số tồn.
              *     null = tắt cảnh báo cho sản phẩm này (GET /stock/replenishment bỏ qua).
              */
@@ -8792,6 +8850,8 @@ export interface components {
             searchAliases: string[];
             /** @description Tên in trên hóa đơn — null = dùng tên thương mại (`name`). */
             invoiceName: string | null;
+            /** @description fin.TaxRate.id — thuế suất cấp sản phẩm (mọi SKU chép theo); null = sản phẩm cũ chưa gán. */
+            taxRateId: string | null;
             /** @description Mức tồn kho cảnh báo nhập hàng — Decimal(18,6) chuỗi theo ĐVT cơ sở; null = không cảnh báo. */
             reorderLevel: string | null;
             /** @description Optimistic locking — client giữ nguyên và gửi lại trong PATCH; lệch → 409. */
@@ -8834,6 +8894,11 @@ export interface components {
             allowNegativeStock?: boolean;
             /** @description Tên in trên hóa đơn — null = xóa, dùng lại tên thương mại. */
             invoiceName?: string | null;
+            /**
+             * Format: uuid
+             * @description Đổi thuế suất — áp cho đơn tạo SAU khi lưu (dòng đơn chép thuế suất lúc tạo). Không xóa được.
+             */
+            taxRateId?: string;
             /** @description Mức tồn kho cảnh báo nhập hàng — Decimal(18,6) chuỗi; null = tắt cảnh báo. */
             reorderLevel?: string | null;
             searchAliases?: string[];
@@ -8884,11 +8949,6 @@ export interface components {
             baseUom?: string;
             /** @description Mã Uom bán mặc định — phải là baseUom hoặc có conversion. Bỏ trống = baseUom. */
             salesUom?: string;
-            /**
-             * Format: uuid
-             * @description fin.TaxRate.id — chỉ LƯU, chưa tính thuế (chờ kế toán).
-             */
-            taxRateId?: string;
             /**
              * @description Bỏ trống → copy Product.trackingMode (denormalize, bất biến cross-schema).
              * @enum {string}
@@ -9052,8 +9112,6 @@ export interface components {
             isActive?: boolean;
             /** @description Mã Uom bán mặc định — null = quay về baseUom. */
             salesUom?: string | null;
-            /** Format: uuid */
-            taxRateId?: string | null;
             /**
              * @description Đổi bị chặn (409) khi SKU đã có movement. baseUom KHÔNG BAO GIỜ đổi được qua API.
              * @enum {string}
@@ -9277,6 +9335,85 @@ export interface components {
             baseUom?: string;
             /** @description Sinh barcode INTERNAL tự động cho mỗi SKU mới */
             generateBarcode?: boolean;
+        };
+        TaxRateDto: {
+            id: string;
+            code: string;
+            name: string;
+            /** @enum {string} */
+            kind: "TAXABLE" | "EXEMPT" | "NOT_DECLARED";
+            /** @description Phần trăm, chuỗi ("8", "3.5"); KCT / KKKNT = "0". */
+            ratePercent: string;
+            /** @description Chuỗi gửi MISA (`VATRateName`): "5%", "8%", "KCT", "KKKNT". */
+            misaName: string;
+            /** @description YYYY-MM-DD; null = không giới hạn. */
+            validFrom: string | null;
+            validTo: string | null;
+            replacementId: string | null;
+            isDefault: boolean;
+            isActive: boolean;
+            /** @description Số sản phẩm (chưa xóa) đang gán mức này. */
+            productCount: number;
+            /** @description true = đã có dòng đơn dùng mức này → không đổi được loại / %. */
+            usedByOrders: boolean;
+            version: number;
+            createdAt: string;
+            updatedAt: string;
+        };
+        TaxRateListResponseDto: {
+            items: components["schemas"]["TaxRateDto"][];
+            /** @description Số sản phẩm (chưa xóa, không tính món một lần) chưa gán thuế suất. */
+            unassignedProductCount: number;
+        };
+        CreateTaxRateDto: {
+            code: string;
+            name: string;
+            /**
+             * @description Mặc định TAXABLE. KCT / KKKNT luôn lưu 0%.
+             * @enum {string}
+             */
+            kind?: "TAXABLE" | "EXEMPT" | "NOT_DECLARED";
+            /** @description Thuế suất theo PHẦN TRĂM, chuỗi ("8" = 8%). Bỏ qua khi `kind` ≠ TAXABLE. */
+            ratePercent?: string;
+            /** @description Ngày bắt đầu hiệu lực YYYY-MM-DD; null / bỏ trống = không giới hạn. */
+            validFrom?: string | null;
+            validTo?: string | null;
+            /**
+             * Format: uuid
+             * @description Hết hiệu lực thì sản phẩm chuyển sang mức nào (fin.TaxRate.id).
+             */
+            replacementId?: string | null;
+            /** @description true = mức điền sẵn cho sản phẩm mới; mức mặc định cũ tự bỏ cờ. */
+            isDefault?: boolean;
+        };
+        AssignTaxRateDto: {
+            /** Format: uuid */
+            taxRateId: string;
+            productIds: string[];
+        };
+        AssignTaxRateResultDto: {
+            /** @description Số sản phẩm đã đổi thuế suất (sản phẩm đã mang đúng mức này không tính). */
+            updated: number;
+        };
+        UpdateTaxRateDto: {
+            /** @description Optimistic locking — lệch → 409. */
+            version: number;
+            code?: string;
+            name?: string;
+            /**
+             * @description Đổi loại / % bị chặn (409) khi đã có đơn dùng mức này — tạo mức mới rồi gán lại.
+             * @enum {string}
+             */
+            kind?: "TAXABLE" | "EXEMPT" | "NOT_DECLARED";
+            ratePercent?: string;
+            validFrom?: string | null;
+            validTo?: string | null;
+            /** Format: uuid */
+            replacementId?: string | null;
+            /** @description Chỉ nhận `true` (đặt làm mặc định) — bỏ mặc định bằng cách đặt mức khác. */
+            isDefault?: boolean;
+            /** @description false = ngừng dùng (không chọn được cho sản phẩm nữa; sản phẩm đang gán giữ nguyên). */
+            isActive?: boolean;
         };
         TeamDto: {
             id: string;
@@ -17415,6 +17552,10 @@ export interface operations {
                 supplierId?: string;
                 /** @description true = chỉ SP đã gán NCC chính, false = chỉ SP CHƯA gán (dọn dữ liệu). */
                 hasSupplier?: boolean;
+                /** @description Lọc theo thuế suất (fin.TaxRate.id). */
+                taxRateId?: string;
+                /** @description false = chỉ sản phẩm CHƯA gán thuế suất (kế toán gán bù), true = đã gán. */
+                hasTaxRate?: boolean;
                 isActive?: boolean;
                 trackingMode?: "NONE" | "LOT" | "SERIAL";
                 /** @description true = chỉ product có ít nhất một SKU còn tồn (onHand > 0). */
@@ -18473,6 +18614,120 @@ export interface operations {
                 };
                 content: {
                     "application/json": Record<string, never>[];
+                };
+            };
+        };
+    };
+    TaxRateController_list: {
+        parameters: {
+            query?: {
+                /** @description true = kèm mức đã ngừng dùng (màn danh mục, lọc trạng thái). Mặc định chỉ mức đang dùng. */
+                includeInactive?: boolean;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TaxRateListResponseDto"];
+                };
+            };
+        };
+    };
+    TaxRateController_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateTaxRateDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TaxRateDto"];
+                };
+            };
+        };
+    };
+    TaxRateController_assign: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AssignTaxRateDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AssignTaxRateResultDto"];
+                };
+            };
+        };
+    };
+    TaxRateController_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TaxRateDto"];
+                };
+            };
+        };
+    };
+    TaxRateController_update: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateTaxRateDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TaxRateDto"];
                 };
             };
         };

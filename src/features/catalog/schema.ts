@@ -20,6 +20,11 @@ export const createProductSchema = z.object({
   brandId: z.string().optional(),
   /** RPT-05a — nhà cung cấp chính (mọi SKU thừa kế); '' = chưa gán (sửa gửi null để bỏ gán). */
   supplierId: z.string().optional(),
+  /**
+   * fin.TaxRate.id — thuế suất cấp sản phẩm, mọi SKU dùng chung (2026-10-23). Bắt buộc trên form;
+   * sản phẩm mới điền sẵn mức mặc định của danh mục.
+   */
+  taxRateId: z.string().min(1, 'Chọn thuế suất'),
   trackingMode: z.enum(['NONE', 'LOT', 'SERIAL']),
   shelfLifeDays: z.string().trim().regex(/^\d*$/, 'Nhập số nguyên ngày, không âm'),
   defaultWarehouseId: z.string().optional(),

@@ -265,6 +265,13 @@ export const NAV_MODULES: NavModule[] = [
         ability: { action: 'categories', subject: 'Product' },
       },
       {
+        label: 'Thuế suất',
+        href: '/catalog/tax-rates',
+        icon: Percent,
+        // Danh mục thuế suất (2026-10-23): kế toán + Admin (tax_rate.manage).
+        ability: { action: 'manage', subject: 'TaxRate' },
+      },
+      {
         label: 'In tem barcode',
         href: '/catalog/barcode-print',
         icon: Barcode,

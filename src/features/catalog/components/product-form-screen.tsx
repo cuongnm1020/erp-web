@@ -70,6 +70,7 @@ import {
   type ProductFormValues,
   type RowPack,
 } from '../schema';
+import { useTaxRates, type TaxRate } from '../api/use-tax-rates';
 import { ImageDropzone, ProductGallery } from './product-images';
 import { UomManagerDialog } from './uom-manager-dialog';
 
@@ -88,8 +89,9 @@ import { UomManagerDialog } from './uom-manager-dialog';
  *   trận là task riêng → bảng SKU nhập tay, nút "Thêm biến thể".
  * - Giá niêm yết theo biến thể: giá nằm ở bảng giá (PriceList), không phải trên SKU.
  * - NCC chính (RPT-05a): picker tìm NCC đang giao dịch; sửa mà bỏ chọn gửi null = bỏ gán.
- * - Nhóm thuế: taxRateId đã lưu được theo SKU nhưng fin.TaxRate chưa có API danh mục
- *   (chờ chốt cách tính thuế với kế toán) → vẫn hiện "Chưa cấu hình".
+ * - Thuế suất (2026-10-23): đặt ở CẤP SẢN PHẨM (khối "Thuế & hóa đơn", mockup canvas
+ *   CVnCtWbPyUCdn7pppHaRWX màn 8), bắt buộc; sản phẩm mới điền sẵn mức mặc định. Không có cột
+ *   thuế suất trên dòng SKU — user chốt chỉ đặt ở cấp sản phẩm.
  * Giữ đúng design: banner lỗi 422 trên đầu "N trường chưa hợp lệ — chưa lưu", lỗi map
  * vào đúng dòng, dữ liệu đã nhập giữ nguyên; xóa dòng chỉ với biến thể CHƯA lưu, biến
  * thể đã có chỉ "Ngừng bán"; Ctrl+S lưu, Esc hủy.
@@ -104,7 +106,6 @@ const PENDING_API: Array<{ title: string; need: string }> = [
     need: 'API /attributes đã có — màn ma trận làm sau',
   },
   { title: 'Giá niêm yết theo biến thể', need: 'giá thuộc bảng giá — màn Bảng giá quản lý' },
-  { title: 'Nhóm thuế theo SKU', need: 'chờ chốt cách tính thuế — chưa có danh mục thuế suất' },
 ];
 
 interface RowError {
@@ -136,6 +137,7 @@ function initialValues(p?: ProductDetail): ProductFormValues {
     categoryId: p?.categoryId ?? '',
     brandId: p?.brandId ?? '',
     supplierId: p?.supplierId ?? '',
+    taxRateId: p?.taxRateId ?? '',
     trackingMode: p?.trackingMode ?? 'NONE',
     shelfLifeDays: p?.shelfLifeDays == null ? '' : String(p.shelfLifeDays),
     defaultWarehouseId: p?.defaultWarehouseId ?? '',
@@ -283,6 +285,14 @@ function ProductFormBody({
     resolver: zodResolver(productFormSchema),
     defaultValues: initialValues(product),
   });
+  // Sản phẩm mới: điền sẵn mức mặc định khi danh mục thuế suất về (người dùng vẫn đổi được).
+  const taxRates = useTaxRates();
+  const defaultTaxRateId = taxRates.data?.items.find((r) => r.isDefault)?.id;
+  useEffect(() => {
+    if (!editing && defaultTaxRateId && !form.getValues('taxRateId')) {
+      form.setValue('taxRateId', defaultTaxRateId);
+    }
+  }, [editing, defaultTaxRateId, form]);
   const rows = useFieldArray({ control: form.control, name: 'skus' });
   const [rowErrors, setRowErrors] = useState<RowError[]>([]);
   const [saving, setSaving] = useState(false);
@@ -324,6 +334,7 @@ function ProductFormBody({
         ...(v.brandId ? { brandId: v.brandId } : {}),
         // NCC chính: tạo bỏ trống = không gửi; sửa luôn gửi (null = bỏ gán, server khóa theo version).
         ...(v.supplierId ? { supplierId: v.supplierId } : editing ? { supplierId: null } : {}),
+        taxRateId: v.taxRateId,
         trackingMode: v.trackingMode,
         ...(v.shelfLifeDays ? { shelfLifeDays: Number.parseInt(v.shelfLifeDays, 10) } : {}),
         ...(v.defaultWarehouseId ? { defaultWarehouseId: v.defaultWarehouseId } : {}),
@@ -354,6 +365,7 @@ function ProductFormBody({
               'categoryId',
               'brandId',
               'supplierId',
+              'taxRateId',
               'trackingMode',
               'searchAliases',
             ],
@@ -382,6 +394,7 @@ function ProductFormBody({
               'categoryId',
               'brandId',
               'supplierId',
+              'taxRateId',
               'trackingMode',
               'searchAliases',
             ],
@@ -613,22 +626,6 @@ function ProductFormBody({
             />
             <FormField
               control={form.control}
-              name="invoiceName"
-              render={({ field }) => (
-                <FormItem className="lg:col-span-2">
-                  <FormLabel>Tên xuất hóa đơn</FormLabel>
-                  <FormControl>
-                    <Input placeholder="Thuốc kích chồi Vua Bật Chồi 40gr (gói)" {...field} />
-                  </FormControl>
-                  <FormDescription>
-                    Tên in trên hóa đơn theo yêu cầu kế toán — bỏ trống thì dùng tên thương mại
-                  </FormDescription>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            <FormField
-              control={form.control}
               name="code"
               render={({ field }) => (
                 <FormItem>
@@ -848,7 +845,31 @@ function ProductFormBody({
           </div>
         </section>
 
-        {/* Nhóm 2: quy tắc kho vận — ĐVT, theo dõi lô, kho mặc định, thuế, tồn âm. */}
+        {/* Thuế & hóa đơn (2026-10-23): thuế suất cấp sản phẩm + tên in trên hóa đơn. */}
+        <section className="rounded-md border bg-card">
+          <header className="border-b px-3 py-2 text-sm font-semibold">Thuế &amp; hóa đơn</header>
+          <div className="grid gap-x-4 gap-y-3 px-3 py-3 sm:grid-cols-2 lg:grid-cols-4">
+            <TaxRateField form={form} rates={taxRates.data?.items ?? []} />
+            <FormField
+              control={form.control}
+              name="invoiceName"
+              render={({ field }) => (
+                <FormItem className="lg:col-span-2">
+                  <FormLabel>Tên xuất hóa đơn</FormLabel>
+                  <FormControl>
+                    <Input placeholder="Thuốc kích chồi Vua Bật Chồi 40gr (gói)" {...field} />
+                  </FormControl>
+                  <FormDescription>
+                    Tên in trên hóa đơn theo yêu cầu kế toán — bỏ trống thì dùng tên thương mại
+                  </FormDescription>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+          </div>
+        </section>
+
+        {/* Nhóm 2: quy tắc kho vận — ĐVT, theo dõi lô, kho mặc định, tồn âm. */}
         <section className="rounded-md border bg-card">
           <header className="border-b px-3 py-2 text-sm font-semibold">
             Kho vận &amp; theo dõi
@@ -987,11 +1008,6 @@ function ProductFormBody({
                 </FormItem>
               )}
             />
-            {/* <FormItem>
-              <FormLabel>Nhóm thuế</FormLabel>
-              <Input value="Chưa cấu hình" disabled />
-              <FormDescription>Chờ chốt cách tính thuế với kế toán</FormDescription>
-            </FormItem> */}
             <FormField
               control={form.control}
               name="allowNegativeStock"
@@ -1736,5 +1752,60 @@ function SkuRow({
         </div>
       ) : null}
     </div>
+  );
+}
+
+/**
+ * Ô "Thuế suất *" — chọn từ danh mục /catalog/tax-rates. Sản phẩm đang mang mức đã ngừng dùng vẫn
+ * hiện mức đó (để lưu form không đổi gì vẫn qua), kèm cảnh báo chọn mức khác.
+ */
+function TaxRateField({
+  form,
+  rates,
+}: {
+  form: UseFormReturn<ProductFormValues>;
+  rates: TaxRate[];
+}) {
+  return (
+    <FormField
+      control={form.control}
+      name="taxRateId"
+      render={({ field }) => {
+        const current = field.value ? rates.find((r) => r.id === field.value) : undefined;
+        const unknown = field.value !== '' && current === undefined;
+        return (
+          <FormItem className="lg:col-span-2">
+            <FormLabel>Thuế suất *</FormLabel>
+            <Select value={field.value} onValueChange={field.onChange}>
+              <FormControl>
+                <SelectTrigger>
+                  <SelectValue placeholder="Chọn thuế suất" />
+                </SelectTrigger>
+              </FormControl>
+              <SelectContent>
+                {rates.map((r) => (
+                  <SelectItem key={r.id} value={r.id}>
+                    <span className="inline-block w-12 font-semibold">{r.misaName}</span>
+                    {r.name}
+                    {r.isDefault ? ' · mặc định' : ''}
+                  </SelectItem>
+                ))}
+                {unknown ? <SelectItem value={field.value}>Mức đã ngừng dùng</SelectItem> : null}
+              </SelectContent>
+            </Select>
+            <FormDescription>
+              {unknown ? 'Mức đang gán đã ngừng dùng — chọn mức khác. ' : null}
+              Mọi biến thể dùng chung. Đổi thuế suất chỉ áp cho đơn tạo sau khi lưu.{' '}
+              <Can I="manage" a="TaxRate">
+                <Link href="/catalog/tax-rates" className="text-primary underline">
+                  Quản lý danh mục
+                </Link>
+              </Can>
+            </FormDescription>
+            <FormMessage />
+          </FormItem>
+        );
+      }}
+    />
   );
 }
