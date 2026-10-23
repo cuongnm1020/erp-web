@@ -447,8 +447,7 @@ export const NAV_MODULES: NavModule[] = [
     tone: 'rpt',
     ability: { action: 'read', subject: 'Invoice' },
     shortcut: 'g h',
-    // Ẩn cả nhóm Tài chính (2026-10-04).
-    hidden: true,
+    // Ẩn cả nhóm Tài chính 2026-10-04; mở lại 2026-10-23 để kiểm các màn phần xuất hóa đơn.
     children: [
       {
         label: 'Hóa đơn',
