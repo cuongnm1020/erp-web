@@ -623,6 +623,8 @@ describe('ProductFormScreen — sửa', () => {
       reorderLevel: '120.000000',
     });
     expect(productPatches[0]).not.toHaveProperty('code');
+    // SKU duy nhất chuyển Ngừng bán → sản phẩm cũng Ngừng bán (danh sách đọc Product.isActive)
+    expect(productPatches[0]).toMatchObject({ isActive: false });
     // Chỉ gửi field dirty — tên không đổi thì không nằm trong PATCH; version luôn kèm
     expect(patches[0]).toEqual({ skuId: 's-1', body: { version: 5, isActive: false } });
     // Lưu xong ở lại màn sửa, tải lại dữ liệu — lần lưu tiếp mang version mới

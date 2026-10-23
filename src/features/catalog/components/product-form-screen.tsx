@@ -366,6 +366,9 @@ function ProductFormBody({
           await updateProduct.mutateAsync({
             version: product.version,
             ...headerBody,
+            // Trạng thái chỉ chọn trên dòng SKU; danh sách sản phẩm đọc Product.isActive —
+            // còn ít nhất một SKU đang bán thì sản phẩm Đang bán (SP tắt bởi import Excel).
+            isActive: v.skus.some((s) => s.isActive),
             // code chỉ gửi khi người dùng thật sự đổi — server chặn 409 nếu đã có chứng từ.
             ...(form.formState.dirtyFields.code && v.code ? { code: v.code } : {}),
           });
