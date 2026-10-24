@@ -1,10 +1,13 @@
 'use client';
 
 import Decimal from 'decimal.js';
-import { Search } from 'lucide-react';
+import { Info, Search } from 'lucide-react';
+import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useRef, useState } from 'react';
+import { Copyable } from '@/components/data/copy-button';
 import { ScanInput } from '@/components/data/scan-input';
+import { StatusBadge } from '@/components/data/status-badge';
 import { EmptyState, ListSkeleton, QueryState } from '@/components/data/states';
 import { PageHeader } from '@/components/layout/page-header';
 import { Button } from '@/components/ui/button';
@@ -23,16 +26,22 @@ import { isApiError } from '@/lib/api/errors';
 import { messageFor } from '@/lib/error-messages';
 import { formatMoney, formatQuantity } from '@/lib/format';
 import { useAbility } from '@/lib/permission';
-import { quantitySchema } from '@/lib/shared';
 import {
   useCreateReturn,
   usePostReturn,
   useReturnable,
-  type CreateReturnBody,
-  type ReturnableLine,
   type ReturnableOrder,
 } from '../api/use-returns';
 import { useBarcodeLookup } from '../api/use-locations';
+import { SHIPMENT_STATUS_BADGE } from '../labels';
+import {
+  dec,
+  RETURN_REASONS,
+  returnBodyLines,
+  returnLineError,
+  usedQty,
+  type ReturnLineInput,
+} from '../return-lines';
 
 /**
  * Lập phiếu nhập hàng hoàn (2026-10-02) — tra đơn theo số đơn (hoặc ?orderId= từ màn đơn), mỗi
@@ -42,41 +51,22 @@ import { useBarcodeLookup } from '../api/use-locations';
  * Bin / lô nhận lại mặc định là nơi đã lấy hàng cho dòng đó (server chọn); giá vốn nhập lại là giá
  * FIFO đã xuất — màn chỉ hiển thị. Số lượng tính bằng decimal.js (luật 10).
  */
-const REASONS = [
-  'Khách trả hàng',
-  'ĐVVC hoàn (giao không thành)',
-  'Sai hàng / thiếu hàng',
-  'Hàng lỗi',
-];
-
-interface LineInput {
-  restock: string;
-  scrap: string;
-}
-
-const qtyOk = (v: string) => v === '' || quantitySchema.safeParse(v).success;
-const dec = (v: string) => (v && quantitySchema.safeParse(v).success ? new Decimal(v) : null);
-
-function lineError(l: ReturnableLine, input: LineInput | undefined): string | null {
-  if (!input) return null;
-  if (!qtyOk(input.restock) || !qtyOk(input.scrap)) return 'SL không hợp lệ';
-  const total = (dec(input.restock) ?? new Decimal(0)).add(dec(input.scrap) ?? 0);
-  if (total.gt(l.qtyReturnable)) return `Tối đa ${formatQuantity(l.qtyReturnable)}`;
-  return null;
-}
 
 function LinesForm({ order }: { order: ReturnableOrder }) {
   const router = useRouter();
   const create = useCreateReturn();
   const post = usePostReturn();
-  const [inputs, setInputs] = useState<Record<string, LineInput>>({});
-  const [reason, setReason] = useState(REASONS[0]!);
+  const [inputs, setInputs] = useState<Record<string, ReturnLineInput>>({});
+  // Tra theo mã vận đơn → kiện hãng hoàn về; tra theo số đơn → mặc định khách trả.
+  const [reason, setReason] = useState<string>(
+    order.shipment?.status === 'RETURNED' ? RETURN_REASONS[1] : RETURN_REASONS[0],
+  );
   const [note, setNote] = useState('');
   // Idempotency-Key theo phiên form — sinh khi bấm lần đầu, đổi khi form đổi (luật 4).
   const idemKey = useRef<string | null>(null);
   const pending = create.isPending || post.isPending;
 
-  const setLine = (id: string, patch: Partial<LineInput>) => {
+  const setLine = (id: string, patch: Partial<ReturnLineInput>) => {
     idemKey.current = null;
     setInputs((cur) => ({ ...cur, [id]: { restock: '', scrap: '', ...cur[id], ...patch } }));
   };
@@ -118,11 +108,7 @@ function LinesForm({ order }: { order: ReturnableOrder }) {
       toast.error(`${lookup.sku.code} — ${lookup.sku.name} không có trong đơn ${order.docNumber}.`);
       return;
     }
-    const used = (l: ReturnableLine) => {
-      const i = inputs[l.orderLineId];
-      return (dec(i?.restock ?? '') ?? new Decimal(0)).add(dec(i?.scrap ?? '') ?? 0);
-    };
-    const target = same.find((l) => used(l).add(step).lte(l.qtyReturnable));
+    const target = same.find((l) => usedQty(inputs[l.orderLineId]).add(step).lte(l.qtyReturnable));
     if (!target) {
       toast.error(`${lookup.sku.name}: đã đủ số còn hoàn được của đơn.`);
       return;
@@ -132,16 +118,8 @@ function LinesForm({ order }: { order: ReturnableOrder }) {
     toast.success(`${lookup.sku.name}: nhập lại kho ${formatQuantity(next.toString())}`);
   };
 
-  const errors = order.lines.map((l) => lineError(l, inputs[l.orderLineId]));
-  const body: CreateReturnBody['lines'] = order.lines.flatMap((l) => {
-    const i = inputs[l.orderLineId];
-    const out: CreateReturnBody['lines'] = [];
-    if (i && dec(i.restock)?.gt(0)) out.push({ orderLineId: l.orderLineId, qty: i.restock });
-    if (i && dec(i.scrap)?.gt(0)) {
-      out.push({ orderLineId: l.orderLineId, qty: i.scrap, disposition: 'SCRAP' });
-    }
-    return out;
-  });
+  const errors = order.lines.map((l) => returnLineError(l, inputs[l.orderLineId]));
+  const body = returnBodyLines(order.lines, inputs);
   const canSubmit = body.length > 0 && errors.every((e) => e === null) && !pending;
   const nothingLeft = order.lines.every((l) => new Decimal(l.qtyReturnable).isZero());
 
@@ -195,7 +173,7 @@ function LinesForm({ order }: { order: ReturnableOrder }) {
             aria-label="Lý do hoàn"
           />
           <datalist id="return-reasons">
-            {REASONS.map((r) => (
+            {RETURN_REASONS.map((r) => (
               <option key={r} value={r} />
             ))}
           </datalist>
@@ -323,12 +301,13 @@ export function ReturnCreateScreen() {
   const router = useRouter();
   const canReceive = useAbility().can('receive', 'Stock');
   const orderId = params.get('orderId') ?? undefined;
-  const docNumber = params.get('order') ?? undefined;
-  const [search, setSearch] = useState(docNumber ?? '');
-  const query = useReturnable(orderId ? { orderId } : { docNumber });
+  // `?order=` = số đơn hoặc mã vận đơn quét trên kiện (2026-10-24) — server tự nhận dạng.
+  const code = params.get('order') ?? undefined;
+  const [search, setSearch] = useState(code ?? '');
+  const query = useReturnable(orderId ? { orderId } : { code });
 
-  const lookup = () => {
-    const v = search.trim();
+  const lookup = (raw: string = search) => {
+    const v = raw.trim();
     if (v) router.replace(`/wms/returns/new?order=${encodeURIComponent(v)}`);
   };
 
@@ -351,13 +330,13 @@ export function ReturnCreateScreen() {
         }}
       >
         <label className="flex flex-col gap-1 text-xs text-muted-foreground">
-          Số đơn bán
+          Số đơn hoặc mã vận đơn
           <Input
-            className="h-9 w-64 font-mono"
+            className="w-search font-mono"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="SO2610-00001"
-            aria-label="Số đơn bán"
+            placeholder="SO2610-00001 / mã vận đơn"
+            aria-label="Số đơn hoặc mã vận đơn"
             autoFocus
           />
         </label>
@@ -365,18 +344,24 @@ export function ReturnCreateScreen() {
           <Search aria-hidden />
           Tìm đơn
         </Button>
+        <span className="pb-2 text-xs text-subtle-foreground">
+          Quét bằng súng mã vạch: mã vào ô và tự tìm.
+        </span>
       </form>
 
-      {!orderId && !docNumber ? (
+      {!orderId && !code ? (
         <EmptyState
-          title="Nhập số đơn để bắt đầu"
-          description="Gõ hoặc quét số đơn trên phiếu giao / vận đơn hoàn."
+          title="Nhập số đơn hoặc mã vận đơn để bắt đầu"
+          description="Gõ hoặc quét mã vạch vận đơn trên kiện hoàn, hoặc số đơn trên phiếu giao."
         />
       ) : (
         <QueryState query={query} skeleton={<ListSkeleton rows={4} columns={8} />}>
           {(order) =>
             canReceive ? (
-              <LinesForm key={order.orderId} order={order} />
+              <>
+                <ReturnOrderHead order={order} />
+                <LinesForm key={order.orderId} order={order} />
+              </>
             ) : (
               <EmptyState
                 title="Bạn không có quyền nhập kho"
@@ -387,5 +372,47 @@ export function ReturnCreateScreen() {
         </QueryState>
       )}
     </>
+  );
+}
+
+/** Dải phiếu giao (đối chiếu đúng kiện) + thông tin đơn gửi ngoài ERP. */
+function ReturnOrderHead({ order }: { order: ReturnableOrder }) {
+  const sh = order.shipment;
+  const badge = sh ? SHIPMENT_STATUS_BADGE[sh.status] : undefined;
+  return (
+    <div className="mb-3 flex flex-col gap-2">
+      <section
+        aria-label="Phiếu giao của đơn"
+        className="flex flex-wrap items-center gap-x-4 gap-y-1 rounded-lg border bg-card px-3.5 py-2.5"
+      >
+        <span>
+          Đơn{' '}
+          <Link href={`/crm/orders/${order.orderId}`} className="font-mono text-xs text-primary">
+            {order.docNumber}
+          </Link>
+        </span>
+        {sh ? (
+          <>
+            {sh.carrierName ? (
+              <span className="text-muted-foreground">{sh.carrierName}</span>
+            ) : null}
+            {sh.trackingNo ? (
+              <Copyable value={sh.trackingNo} label="mã vận đơn" className="font-mono text-xs" />
+            ) : null}
+            {badge ? <StatusBadge tone={badge.tone}>{badge.label}</StatusBadge> : null}
+            <span className="text-muted-foreground">Phiếu giao {sh.docNumber}</span>
+          </>
+        ) : (
+          <span className="text-muted-foreground">Đơn chưa có phiếu giao</span>
+        )}
+      </section>
+      {order.stockNotDeducted ? (
+        <p role="note" className="flex items-center gap-2 rounded-lg bg-info-weak px-3 py-2">
+          <Info className="h-4 w-4 shrink-0 text-info" aria-hidden />
+          Đơn gửi qua Pancake, kho chưa trừ tồn lúc gửi — SL hoàn tối đa theo SL đặt, hàng vào vị
+          trí DEFAULT, giá vốn tạm tính theo lô đang mở.
+        </p>
+      ) : null}
+    </div>
   );
 }

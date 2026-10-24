@@ -32,6 +32,8 @@ const RETURNABLE: ReturnableOrder = {
   orderId: 'o-1',
   docNumber: 'SO2610-00001',
   status: 'APPROVED',
+  stockNotDeducted: false,
+  shipment: null,
   lines: [
     {
       orderLineId: 'ol-1',
@@ -172,6 +174,35 @@ describe('Nhập hàng hoàn', () => {
       ],
     });
     await waitFor(() => expect(push).toHaveBeenCalledWith('/wms/returns/r-1'));
+  });
+
+  it('tìm theo mã vận đơn (?order=) → gửi code, hiện hãng + vận đơn, lý do mặc định ĐVVC hoàn', async () => {
+    search = 'order=PKE450373047160385';
+    server.use(
+      http.get('/api/return-receipts/returnable', ({ request }) => {
+        expect(new URL(request.url).searchParams.get('code')).toBe('PKE450373047160385');
+        return HttpResponse.json({
+          ...RETURNABLE,
+          stockNotDeducted: true,
+          shipment: {
+            id: 'sh-1',
+            docNumber: 'SHP2610-00001',
+            trackingNo: 'PKE450373047160385',
+            carrierCode: 'VTP',
+            carrierName: 'Viettel Post',
+            status: 'RETURNED',
+            shippedOutsideErp: true,
+          },
+        });
+      }),
+    );
+    renderApp(<ReturnCreateScreen />);
+    const head = await screen.findByRole('region', { name: 'Phiếu giao của đơn' });
+    expect(within(head).getByText('Viettel Post')).toBeInTheDocument();
+    expect(within(head).getByText('PKE450373047160385')).toBeInTheDocument();
+    expect(within(head).getByText('Sự cố hoàn')).toBeInTheDocument();
+    expect(screen.getByRole('note')).toHaveTextContent(/kho chưa trừ tồn/);
+    expect(screen.getByLabelText('Lý do hoàn')).toHaveValue('ĐVVC hoàn (giao không thành)');
   });
 
   it('vượt phần còn hoàn được → báo lỗi trên dòng, khoá nút lưu', async () => {
