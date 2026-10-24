@@ -1,6 +1,6 @@
 'use client';
 
-import { Lock, LockOpen, Pencil, Plus } from 'lucide-react';
+import { Lock, LockOpen, Pencil, Plus, ShieldCheck } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { ConfirmDialog } from '@/components/data/confirm-dialog';
 import { DataTable, type ColumnDef } from '@/components/data/data-table';
@@ -9,6 +9,7 @@ import {
   defaultRangePresets,
   normalizeRange,
 } from '@/components/data/date-range-picker';
+import { SearchSelect, type StaffSelectItem } from '@/components/data/form';
 import { EmptyState, ListSkeleton, QueryState } from '@/components/data/states';
 import { StatusBadge } from '@/components/data/status-badge';
 import { PageHeader } from '@/components/layout/page-header';
@@ -27,17 +28,29 @@ import { useListState } from '@/lib/url-state';
 import {
   useCareStaff,
   useStaffRevenue,
+  type CarePosition,
   type CareStaff,
   type StaffRevenue,
 } from '../api/use-org-tree';
 import { useUpdateUser } from '../api/use-users';
+import { CARE_GRANT_LABELS } from '../labels';
+import { CareGrantDialog } from './care-grant-dialog';
 import { OrgStaffDialog } from './org-staff-dialog';
 import { UserCreateDialog } from './user-create-dialog';
 
 const MAX_DAYS = 366;
 const ALL_DEPTS = '__all__';
+/** Lọc nhóm: nhân viên chưa có nhóm. */
+const NO_GROUP = 'none';
 
-type Row = CareStaff & { revenue: StaffRevenue | null };
+type Row = CareStaff & { revenue: StaffRevenue | null; groupLeaderName: string | null };
+
+const POSITION: Record<CarePosition, { label: string; tone: 'brand' | 'draft' | 'neutral' }> = {
+  MANAGER: { label: 'Trưởng phòng', tone: 'brand' },
+  GROUP_LEAD: { label: 'Trưởng nhóm', tone: 'draft' },
+  MEMBER: { label: 'Nhân viên', tone: 'neutral' },
+};
+type Filter = 'from' | 'to' | 'inactive' | 'dept' | 'pos' | 'group';
 
 /**
  * Nhân viên của team — trưởng nhóm CSKH (2026-10-22, thay Sơ đồ nhân sự với CSKH). Danh sách
@@ -47,8 +60,8 @@ type Row = CareStaff & { revenue: StaffRevenue | null };
  * Danh sách team nhỏ (vài chục người) nên API trả đủ, không phân trang. URL: ?from&to&inactive&dept.
  */
 export function CareStaffScreen() {
-  const { state, set } = useListState<'from' | 'to' | 'inactive' | 'dept'>({
-    filterKeys: ['from', 'to', 'inactive', 'dept'],
+  const { state, set } = useListState<Filter>({
+    filterKeys: ['from', 'to', 'inactive', 'dept', 'pos', 'group'],
   });
   const today = toLocalDateKey(new Date()) ?? '';
   const presets = defaultRangePresets(today);
@@ -64,7 +77,9 @@ export function CareStaffScreen() {
   );
   const includeInactive = state.filters.inactive === '1';
   const dept = state.filters.dept ?? ALL_DEPTS;
-  const setFilter = (patch: Partial<Record<'from' | 'to' | 'inactive' | 'dept', string>>) =>
+  const pos = (state.filters.pos ?? '') as CarePosition | '';
+  const group = state.filters.group ?? '';
+  const setFilter = (patch: Partial<Record<Filter, string>>) =>
     set({ filters: { ...state.filters, ...patch } });
 
   const staff = useCareStaff(includeInactive);
@@ -72,6 +87,8 @@ export function CareStaffScreen() {
   const [creating, setCreating] = useState(false);
   const [editing, setEditing] = useState<CareStaff | null>(null);
   const [locking, setLocking] = useState<CareStaff | null>(null);
+  const [granting, setGranting] = useState<CareStaff | null>(null);
+  const viewer = staff.data?.viewer;
 
   const departments = staff.data?.departments ?? [];
   const createDept =
@@ -80,6 +97,11 @@ export function CareStaffScreen() {
     () => new Map((revenue.data?.items ?? []).map((r) => [r.key.id, r])),
     [revenue.data],
   );
+  const all = staff.data?.staff ?? [];
+  const groupLeads = all.filter((s) => s.position === 'GROUP_LEAD');
+  const nameById = new Map(all.map((s) => [s.id, s.fullName]));
+  // Cột "Quyền thêm" chỉ cho người cấp được (trưởng phòng / quản trị).
+  const showGrants = all.some((s) => s.position === 'GROUP_LEAD' && s.canLead);
 
   const columns = useMemo<ColumnDef<Row, unknown>[]>(
     () => [
@@ -112,13 +134,59 @@ export function CareStaffScreen() {
         ),
       },
       {
-        id: 'roles',
-        header: 'Vai trò',
-        meta: { width: 170 },
+        id: 'position',
+        header: 'Chức vụ',
+        meta: { width: 130 },
         cell: ({ row }) => (
-          <span className="text-xs">{row.original.roles.map((r) => r.name).join(', ') || '—'}</span>
+          <StatusBadge tone={POSITION[row.original.position].tone}>
+            {POSITION[row.original.position].label}
+          </StatusBadge>
         ),
       },
+      {
+        id: 'group',
+        header: 'Nhóm',
+        meta: { width: 170 },
+        cell: ({ row }) => {
+          const r = row.original;
+          if (r.position === 'GROUP_LEAD')
+            return (
+              <span className="text-xs">
+                {r.groupSize > 0
+                  ? `${groupVi(String(r.groupSize))} nhân viên`
+                  : 'Chưa có — cả phòng'}
+              </span>
+            );
+          if (r.position === 'MANAGER') return <span className="text-muted-foreground">—</span>;
+          return r.groupLeaderName ? (
+            <span className="text-xs">Nhóm {r.groupLeaderName}</span>
+          ) : (
+            <StatusBadge tone="warn">Chưa có nhóm</StatusBadge>
+          );
+        },
+      },
+      ...(showGrants
+        ? [
+            {
+              id: 'grants',
+              header: 'Quyền thêm',
+              meta: { width: 220 },
+              cell: ({ row }: { row: { original: Row } }) => {
+                const r = row.original;
+                if (r.position !== 'GROUP_LEAD')
+                  return <span className="text-muted-foreground">—</span>;
+                if (r.grantedPermissions.length === 0)
+                  return <span className="text-xs text-muted-foreground">Chưa cấp quyền nào</span>;
+                const names = r.grantedPermissions.map((c) => CARE_GRANT_LABELS[c] ?? c);
+                return (
+                  <span className="line-clamp-2 text-xs" title={names.join(' · ')}>
+                    {names.join(' · ')}
+                  </span>
+                );
+              },
+            } satisfies ColumnDef<Row, unknown>,
+          ]
+        : []),
       {
         id: 'department',
         header: 'Phòng ban',
@@ -158,37 +226,70 @@ export function CareStaffScreen() {
       {
         id: 'actions',
         header: () => <span className="sr-only">Thao tác</span>,
-        meta: { width: 180 },
-        cell: ({ row }) =>
-          row.original.canManage ? (
+        meta: { width: 240 },
+        cell: ({ row }) => {
+          const r = row.original;
+          return (
             <div className="flex justify-end gap-1">
-              <Button
-                variant="ghost"
-                size="sm"
-                aria-label={`Sửa ${row.original.code}`}
-                onClick={() => setEditing(row.original)}
-              >
-                <Pencil aria-hidden /> Sửa
-              </Button>
-              <Button
-                variant="ghost"
-                size="sm"
-                aria-label={`${row.original.isActive ? 'Khóa' : 'Mở khóa'} ${row.original.code}`}
-                onClick={() => setLocking(row.original)}
-              >
-                {row.original.isActive ? <Lock aria-hidden /> : <LockOpen aria-hidden />}
-                {row.original.isActive ? 'Khóa' : 'Mở khóa'}
-              </Button>
+              {r.position === 'GROUP_LEAD' && r.canLead ? (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  aria-label={`Phân quyền ${r.code}`}
+                  onClick={() => setGranting(r)}
+                >
+                  <ShieldCheck aria-hidden /> Phân quyền
+                </Button>
+              ) : null}
+              {r.canEdit ? (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  aria-label={`Sửa ${r.code}`}
+                  onClick={() => setEditing(r)}
+                >
+                  <Pencil aria-hidden /> Sửa
+                </Button>
+              ) : null}
+              {r.canLock ? (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  aria-label={`${r.isActive ? 'Khóa' : 'Mở khóa'} ${r.code}`}
+                  onClick={() => setLocking(r)}
+                >
+                  {r.isActive ? <Lock aria-hidden /> : <LockOpen aria-hidden />}
+                  {r.isActive ? 'Khóa' : 'Mở khóa'}
+                </Button>
+              ) : null}
             </div>
-          ) : null,
+          );
+        },
       },
     ],
-    [revenue.isPending],
+    [revenue.isPending, showGrants],
   );
 
-  const rows: Row[] = (staff.data?.staff ?? [])
+  const rows: Row[] = all
     .filter((s) => dept === ALL_DEPTS || s.departmentId === dept)
-    .map((s) => ({ ...s, revenue: revenueByUser.get(s.id) ?? null }));
+    .filter((s) => !pos || s.position === pos)
+    .filter((s) =>
+      !group
+        ? true
+        : group === NO_GROUP
+          ? s.position === 'MEMBER' && !s.groupLeaderId
+          : s.groupLeaderId === group || s.id === group,
+    )
+    .map((s) => ({
+      ...s,
+      revenue: revenueByUser.get(s.id) ?? null,
+      groupLeaderName: s.groupLeaderId ? (nameById.get(s.groupLeaderId) ?? null) : null,
+    }));
+  const groupLeadItems: StaffSelectItem[] = groupLeads.map((g) => ({
+    id: g.id,
+    fullName: g.fullName,
+    code: g.code,
+  }));
   const teamRevenue = rows.reduce(
     (acc, r) => acc.plus(toDecimal(r.revenue?.revenue ?? '0') ?? 0),
     toDecimal('0')!,
@@ -242,6 +343,40 @@ export function CareStaffScreen() {
             </SelectContent>
           </Select>
         ) : null}
+        {groupLeads.length > 0 ? (
+          <SearchSelect
+            aria-label="Nhóm"
+            className="w-52"
+            value={group}
+            onChange={(v) => setFilter({ group: v })}
+            noneLabel="Nhóm: tất cả"
+            options={[
+              { value: NO_GROUP, label: 'Chưa có nhóm' },
+              ...groupLeads.map((g) => ({
+                value: g.id,
+                label: `Nhóm ${g.fullName}`,
+                hint: `${g.groupSize} NV`,
+              })),
+            ]}
+            searchPlaceholder="Tìm trưởng nhóm…"
+          />
+        ) : null}
+        <Select
+          value={pos || ALL_DEPTS}
+          onValueChange={(v) => setFilter({ pos: v === ALL_DEPTS ? '' : v })}
+        >
+          <SelectTrigger className="w-44" aria-label="Chức vụ">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value={ALL_DEPTS}>Chức vụ: tất cả</SelectItem>
+            {(['MANAGER', 'GROUP_LEAD', 'MEMBER'] as const).map((p) => (
+              <SelectItem key={p} value={p}>
+                {POSITION[p].label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
         <Button
           type="button"
           size="sm"
@@ -310,8 +445,19 @@ export function CareStaffScreen() {
           departments={departments.map((d) => ({ id: d.id, name: d.name, path: '' }))}
           allowUnassign={false}
           onOpenChange={(o) => !o && setEditing(null)}
+          care={
+            editing.canLead
+              ? {
+                  position: editing.position,
+                  groupLeaderId: editing.groupLeaderId,
+                  canSetManager: viewer?.canSetManager ?? false,
+                  groupLeads: groupLeadItems.filter((g) => g.id !== editing.id),
+                }
+              : undefined
+          }
         />
       ) : null}
+      {granting ? <CareGrantDialog lead={granting} onClose={() => setGranting(null)} /> : null}
       {locking ? <LockDialog staff={locking} onClose={() => setLocking(null)} /> : null}
     </>
   );

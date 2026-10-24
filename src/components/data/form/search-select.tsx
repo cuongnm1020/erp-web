@@ -126,8 +126,9 @@ export const SearchSelect = React.forwardRef<HTMLButtonElement, SearchSelectProp
           align="start"
         >
           <Command
-            filter={(itemValue, search, keywords) =>
-              itemValue === NONE || matchesVi((keywords ?? []).join(' '), search) ? 1 : 0
+            filter={(_value, search, keywords) =>
+              // Dòng "chưa chọn" cũng lọc theo nhãn — không chiếm dòng đầu khi đang gõ tìm người.
+              matchesVi((keywords ?? []).join(' '), search) ? 1 : 0
             }
           >
             <CommandInput placeholder={searchPlaceholder} />
@@ -135,7 +136,7 @@ export const SearchSelect = React.forwardRef<HTMLButtonElement, SearchSelectProp
               <CommandEmpty>{emptyText}</CommandEmpty>
               <CommandGroup>
                 {noneLabel ? (
-                  <CommandItem value={NONE} onSelect={() => pick('')}>
+                  <CommandItem value={NONE} keywords={[noneLabel]} onSelect={() => pick('')}>
                     <Check
                       className={cn('h-4 w-4 shrink-0', value ? 'opacity-0' : 'opacity-100')}
                       aria-hidden

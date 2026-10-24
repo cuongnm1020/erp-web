@@ -1,4 +1,4 @@
-import { keepPreviousData, useQuery } from '@tanstack/react-query';
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api, unwrap } from '@/lib/api/client';
 import type { components } from '@/lib/api/schema';
 
@@ -40,6 +40,66 @@ export function useCareStaff(includeInactive: boolean) {
     queryKey: [...orgTreeKeys.all, 'care-staff', { includeInactive }] as const,
     queryFn: () => unwrap(api.GET('/org/care-staff', { params: { query: { includeInactive } } })),
     placeholderData: keepPreviousData,
+  });
+}
+
+export type CarePosition = CareStaff['position'];
+export type CareGrants = components['schemas']['CareGrantsDto'];
+
+/** Quyền trưởng phòng tick được cho trưởng nhóm + quyền đang cấp (GET /org/care-staff/{id}/grants). */
+export function useCareGrants(userId: string) {
+  return useQuery({
+    queryKey: [...orgTreeKeys.all, 'care-grants', userId] as const,
+    queryFn: () =>
+      unwrap(api.GET('/org/care-staff/{userId}/grants', { params: { path: { userId } } })),
+  });
+}
+
+/** Thay toàn bộ quyền cấp cho trưởng nhóm — PUT …/grants. Tải lại danh sách nhân viên của team. */
+export function useSetCareGrants(userId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (permissions: string[]) =>
+      unwrap(
+        api.PUT('/org/care-staff/{userId}/grants', {
+          params: { path: { userId } },
+          body: { permissions },
+        }),
+      ),
+    onSuccess: () => void qc.invalidateQueries({ queryKey: orgTreeKeys.all }),
+  });
+}
+
+/** Đổi chức vụ (nhân viên ↔ trưởng nhóm; trưởng phòng = quản trị) — PUT …/position. */
+export function useSetCarePosition(userId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (position: CarePosition) =>
+      unwrap(
+        api.PUT('/org/care-staff/{userId}/position', {
+          params: { path: { userId } },
+          body: { position },
+        }),
+      ),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: orgTreeKeys.all });
+      void qc.invalidateQueries({ queryKey: ['admin', 'departments'] });
+    },
+  });
+}
+
+/** Đưa nhân viên vào nhóm của trưởng nhóm (null = bỏ nhóm) — PUT …/group. */
+export function useSetCareGroup(userId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (groupLeaderId: string | null) =>
+      unwrap(
+        api.PUT('/org/care-staff/{userId}/group', {
+          params: { path: { userId } },
+          body: { groupLeaderId },
+        }),
+      ),
+    onSuccess: () => void qc.invalidateQueries({ queryKey: orgTreeKeys.all }),
   });
 }
 

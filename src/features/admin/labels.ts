@@ -38,3 +38,14 @@ export const ACTION_LABELS: Record<string, string> = {
 
 export const moduleLabel = (m: string): string => MODULE_LABELS[m] ?? m;
 export const actionLabel = (a: string): string => ACTION_LABELS[a] ?? a;
+
+/** Nhãn ngắn các quyền trưởng phòng CSKH cấp cho trưởng nhóm (danh mục GROUP_GRANTABLE của api). */
+export const CARE_GRANT_LABELS: Record<string, string> = {
+  'user.group_add': 'Thêm NV',
+  'user.group_edit': 'Sửa NV',
+  'user.group_lock': 'Khóa NV',
+  'sales_order.approve': 'Duyệt đơn',
+  'sales_order.cancel': 'Hủy đơn',
+  'report.sales_group': 'Doanh thu nhóm',
+  'report.work': 'Báo cáo công việc',
+};

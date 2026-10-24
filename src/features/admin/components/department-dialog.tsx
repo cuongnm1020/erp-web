@@ -12,6 +12,7 @@ import {
   FormItem,
   FormLabel,
   FormMessage,
+  StaffMultiSelect,
   StaffSelect,
 } from '@/components/data/form';
 import { Button } from '@/components/ui/button';
@@ -91,8 +92,27 @@ export function DepartmentDialog({
       sortOrder: String(department?.sortOrder ?? ''),
       isActive: department?.isActive ?? true,
       kind: department?.kind ?? 'SALES',
+      managerIds: department?.managerIds ?? [],
+      groupLeadIds: department?.groupLeadIds ?? [],
     },
   });
+  // Phòng CSKH đã có (đang sửa, chưa đổi loại): nhiều trưởng phòng + trưởng nhóm, chọn trong phòng.
+  const kind = form.watch('kind');
+  const careLeaders = editing && department.kind === 'CSKH' && kind === 'CSKH';
+  // Người trong phòng + trưởng phòng đang ghi trên phòng mà thuộc phòng khác (dữ liệu cũ — server
+  // cho giữ, không cho thêm mới người ngoài phòng).
+  const members = useMemo(
+    () =>
+      editing
+        ? users.filter(
+            (u) =>
+              (u.departmentId === department.id && u.isActive) || u.id === department.managerId,
+          )
+        : [],
+    [users, editing, department],
+  );
+  const managerIds = form.watch('managerIds');
+  const groupLeadIds = form.watch('groupLeadIds');
 
   // Không cho chọn chính nó / con cháu làm cha (vòng).
   const parentOptions = useMemo(() => {
@@ -105,14 +125,26 @@ export function DepartmentDialog({
   const onSubmit = form.handleSubmit((v) => {
     const onError = (err: unknown) =>
       applyServerErrors(form, err as ApiError, {
-        knownFields: ['code', 'name', 'parentId', 'managerId', 'sortOrder', 'isActive', 'kind'],
+        knownFields: [
+          'code',
+          'name',
+          'parentId',
+          'managerId',
+          'sortOrder',
+          'isActive',
+          'kind',
+          'managerIds',
+          'groupLeadIds',
+        ],
       });
     if (editing) {
       update.mutate(
         {
           name: v.name,
           parentId: v.parentId || null,
-          managerId: v.managerId || null,
+          ...(careLeaders
+            ? { managerIds: v.managerIds, groupLeadIds: v.groupLeadIds }
+            : { managerId: v.managerId || null }),
           sortOrder: v.sortOrder ? Number(v.sortOrder) : 0,
           isActive: v.isActive,
           kind: v.kind,
@@ -250,25 +282,89 @@ export function DepartmentDialog({
                 </FormItem>
               )}
             />
-            <FormField
-              control={form.control}
-              name="managerId"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Trưởng phòng</FormLabel>
-                  <FormControl>
-                    <StaffSelect
-                      aria-label="Trưởng phòng"
-                      value={field.value ?? ''}
-                      onChange={field.onChange}
-                      staff={users}
-                      noneLabel="— Chưa có —"
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+            {careLeaders ? (
+              <>
+                <FormField
+                  control={form.control}
+                  name="managerIds"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>
+                        Trưởng phòng{' '}
+                        <span className="font-normal text-muted-foreground">
+                          · {field.value.length} người
+                        </span>
+                      </FormLabel>
+                      <FormControl>
+                        <StaffMultiSelect
+                          value={field.value}
+                          onChange={field.onChange}
+                          staff={members}
+                          exclude={groupLeadIds}
+                          roleLabel="trưởng phòng"
+                          addPlaceholder="Thêm trưởng phòng…"
+                        />
+                      </FormControl>
+                      <FormDescription>
+                        Các trưởng phòng ngang hàng: cùng quản lý nhân viên và trưởng nhóm của
+                        phòng, không sửa / khóa được nhau.
+                      </FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="groupLeadIds"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>
+                        Trưởng nhóm{' '}
+                        <span className="font-normal text-muted-foreground">
+                          · {field.value.length} người
+                        </span>
+                      </FormLabel>
+                      <FormControl>
+                        <StaffMultiSelect
+                          value={field.value}
+                          onChange={field.onChange}
+                          staff={members.filter((u) => u.departmentId === department?.id)}
+                          exclude={managerIds}
+                          roleLabel="trưởng nhóm"
+                          addPlaceholder="Thêm trưởng nhóm…"
+                        />
+                      </FormControl>
+                      <FormDescription>
+                        Chỉ chọn được người trong phòng. Bỏ trưởng nhóm thì nhân viên của nhóm đó về
+                        &ldquo;Chưa có nhóm&rdquo;. Quyền của từng trưởng nhóm đặt ở màn Nhân viên
+                        của team.
+                      </FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </>
+            ) : (
+              <FormField
+                control={form.control}
+                name="managerId"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Trưởng phòng</FormLabel>
+                    <FormControl>
+                      <StaffSelect
+                        aria-label="Trưởng phòng"
+                        value={field.value ?? ''}
+                        onChange={field.onChange}
+                        staff={users}
+                        noneLabel="— Chưa có —"
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            )}
             <FormField
               control={form.control}
               name="sortOrder"
