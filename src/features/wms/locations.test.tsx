@@ -110,6 +110,18 @@ describe('LocationsPanel — cây vị trí kho + CRUD', () => {
     expect(screen.queryByText('Ngừng dùng')).not.toBeInTheDocument();
   });
 
+  it('LOC-2 in tem vị trí: chỉ ô chứa hàng có mã mới chọn được; chọn → thanh in tem 2 khổ', async () => {
+    renderApp(<WarehousesScreen />);
+    fireEvent.click(await screen.findByRole('button', { name: 'Mở rộng A01' }));
+    // Khu / dãy không có ô chọn; ô kệ có mã vạch thì có.
+    expect(screen.queryByRole('checkbox', { name: 'Chọn A01 để in tem' })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Chọn A01-01 để in tem' }));
+    expect(screen.getByRole('button', { name: /In tem 100×75/ })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /In tem 50×30/ })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Chọn mọi vị trí đang hiện để in tem' }));
+    expect(screen.queryByRole('button', { name: /In tem 100×75/ })).not.toBeInTheDocument();
+  });
+
   it('vị trí Ngừng dùng ẩn mặc định; nút "Hiện N vị trí ngừng dùng" bật/tắt', async () => {
     renderApp(<WarehousesScreen />);
     await screen.findByText('A01');

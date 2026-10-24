@@ -130,6 +130,11 @@ export function PickScreen() {
         openPutAway(r.task.id);
         return;
       }
+      if (r.kind === 'location' && r.location) {
+        // Tem vị trí ở màn chờ → tra hàng ở vị trí đó (LOC-3).
+        router.push(`/pda/location?id=${encodeURIComponent(r.location.id)}`);
+        return;
+      }
       if (r.kind === 'wave' && r.wave) {
         setMode('wave');
         task.clear();
