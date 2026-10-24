@@ -96,11 +96,11 @@ describe('visibleModules', () => {
     expect(visibleModules(() => false).map((m) => m.label)).toEqual(['Tổng quan']);
   });
 
-  it('mục ẩn (2026-10-04): Phân công, cả nhóm Giá & KM và Tài chính — URL vẫn gate', () => {
+  it('mục ẩn (2026-10-04): Phân công, cả nhóm Giá & KM — URL vẫn gate; Tài chính mở lại 2026-10-23', () => {
     const mods = visibleModules(() => true);
     const labels = mods.map((m) => m.label);
     expect(labels).not.toContain('Giá & KM');
-    expect(labels).not.toContain('Tài chính');
+    expect(labels).toContain('Tài chính');
     const children = mods.flatMap((m) => m.children ?? []).map((c) => c.label);
     expect(children).not.toContain('Phân công');
     // CRM-10: mục hiện với customer.merge (ở đây ability = true).
@@ -162,8 +162,27 @@ describe('visibleModules', () => {
     ]);
   });
 
-  it('admin thấy 7 module (Giá & KM, Tài chính đang ẩn; có Báo cáo)', () => {
-    expect(visibleModules(() => true)).toHaveLength(7);
+  it('admin thấy 9 module (Giá & KM đang ẩn; có Công việc, Báo cáo, Tài chính)', () => {
+    expect(visibleModules(() => true)).toHaveLength(9);
+  });
+
+  it('Công việc: Việc của team chỉ khi phụ trách phòng ban; URL gate theo work.*', () => {
+    const staff = visibleModules((a, s) => s === 'Work' && (a === 'read' || a === 'create'));
+    expect(staff.find((m) => m.label === 'Công việc')?.children?.map((c) => c.label)).toEqual([
+      'Việc của tôi',
+      'Hàng chờ yêu cầu',
+    ]);
+    const manager = visibleModules(
+      (a, s) => (s === 'Work' && a === 'read') || (s === 'WorkTeam' && a === 'view'),
+    );
+    expect(manager.find((m) => m.label === 'Công việc')?.children?.map((c) => c.label)).toContain(
+      'Việc của team',
+    );
+    expect(requiredAbilityFor('/work/team')).toEqual({ action: 'view', subject: 'WorkTeam' });
+    expect(requiredAbilityFor('/work/new')).toEqual({ action: 'create', subject: 'Work' });
+    expect(requiredAbilityFor('/work/abc-123')).toEqual({ action: 'read', subject: 'Work' });
+    expect(requiredAbilityFor('/admin/work-config')).toEqual({ action: 'config', subject: 'Work' });
+    expect(requiredAbilityFor('/reports/work')).toEqual({ action: 'work', subject: 'Report' });
   });
 
   it('Báo cáo (RPT-07): Doanh thu theo report.sales, Lợi nhuận theo report.profit; URL vẫn gate', () => {
@@ -236,14 +255,21 @@ describe('<Sidebar>', () => {
     expect(screen.queryByText('Tài chính')).not.toBeInTheDocument();
   });
 
-  it('admin thấy 7 nhóm/mục; Giá & KM và Tài chính đang ẩn', () => {
+  it('admin thấy 8 nhóm/mục; Giá & KM đang ẩn, Tài chính mở lại 2026-10-23', () => {
     renderSidebar(ADMIN);
     expect(screen.getByRole('link', { name: 'Tổng quan' })).toBeInTheDocument();
-    for (const l of ['Bán hàng', 'Khách hàng', 'Sản phẩm', 'Kho', 'Báo cáo', 'Quản trị']) {
+    for (const l of [
+      'Bán hàng',
+      'Khách hàng',
+      'Sản phẩm',
+      'Kho',
+      'Báo cáo',
+      'Tài chính',
+      'Quản trị',
+    ]) {
       expect(screen.getByText(l)).toBeInTheDocument();
     }
     expect(screen.queryByText('Giá & KM')).not.toBeInTheDocument();
-    expect(screen.queryByText('Tài chính')).not.toBeInTheDocument();
   });
 
   it('đóng nhóm → ẩn mục con, nhớ vào localStorage qua F5', () => {

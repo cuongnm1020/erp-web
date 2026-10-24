@@ -11,6 +11,7 @@ import {
   FormItem,
   FormLabel,
   FormMessage,
+  StaffSelect,
 } from '@/components/data/form';
 import { Button } from '@/components/ui/button';
 import {
@@ -250,24 +251,15 @@ export function PdaDeviceDialog({
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>Khóa cho nhân viên</FormLabel>
-                  <Select
-                    value={field.value || NONE}
-                    onValueChange={(v) => field.onChange(v === NONE ? '' : v)}
-                  >
-                    <FormControl>
-                      <SelectTrigger aria-label="Khóa cho nhân viên">
-                        <SelectValue />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      <SelectItem value={NONE}>— Ai cũng đăng nhập được —</SelectItem>
-                      {userOptions.map((u) => (
-                        <SelectItem key={u.id} value={u.id}>
-                          {u.fullName} · {u.code}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <FormControl>
+                    <StaffSelect
+                      aria-label="Khóa cho nhân viên"
+                      value={field.value ?? ''}
+                      onChange={field.onChange}
+                      staff={userOptions}
+                      noneLabel="— Ai cũng đăng nhập được —"
+                    />
+                  </FormControl>
                   <FormMessage />
                 </FormItem>
               )}

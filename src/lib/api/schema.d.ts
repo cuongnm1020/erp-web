@@ -2478,6 +2478,54 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/tax-rates": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["TaxRateController_list"];
+        put?: never;
+        post: operations["TaxRateController_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/tax-rates/assign": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["TaxRateController_assign"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/tax-rates/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["TaxRateController_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch: operations["TaxRateController_update"];
+        trace?: never;
+    };
     "/teams": {
         parameters: {
             query?: never;
@@ -5217,8 +5265,9 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * Tra SĐT trên toàn hệ thống cho màn Tạo đơn của CSKH: khách đã có (kể cả của team khác) + team
-         *     CSKH đang giữ khách so với người hỏi. Chỉ mã / tên / SĐT / địa chỉ mặc định.
+         * Tra SĐT trên toàn hệ thống cho màn Tạo đơn: khách đã có (kể cả của team / sale khác) + team
+         *     CSKH đang giữ khách so với người hỏi. Chỉ mã / tên / SĐT / địa chỉ mặc định. Mọi người lên
+         *     đơn được (2026-10-22 — trước chỉ CSKH): nhập SĐT luôn ra khách đã có, không tạo trùng.
          */
         get: operations["CustomerCareController_lookup"];
         put?: never;
@@ -5281,6 +5330,645 @@ export interface paths {
          *     thuộc team CSKH, chạy lại không chia trùng.
          */
         post: operations["CustomerCareController_runDistribution"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/work-config": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Toàn bộ cấu hình cho màn Quản trị › Công việc: loại (kể cả ngừng dùng), SLA, lịch, lễ, phòng ban. */
+        get: operations["WorkConfigController_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/work-config/categories": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Loại yêu cầu cho ô chọn ở màn Tạo việc (mặc định chỉ loại đang dùng). */
+        get: operations["WorkConfigController_categories"];
+        put?: never;
+        post: operations["WorkConfigController_createCategory"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/work-config/categories/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Chưa có yêu cầu → xoá hẳn; đã có → ngừng dùng. */
+        delete: operations["WorkConfigController_deleteCategory"];
+        options?: never;
+        head?: never;
+        patch: operations["WorkConfigController_updateCategory"];
+        trace?: never;
+    };
+    "/work-config/sla": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Ghi đè ma trận SLA của các loại gửi lên. Không đổi hạn của yêu cầu đã tạo. */
+        put: operations["WorkConfigController_updateSla"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/work-config/calendar": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put: operations["WorkConfigController_updateCalendar"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/work-config/holidays": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Thêm một ngày / một khoảng ngày lễ (trùng ngày → đổi tên). */
+        post: operations["WorkConfigController_addHolidays"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/work-config/holidays/{date}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete: operations["WorkConfigController_removeHoliday"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/work-items": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Danh sách theo góc nhìn (`view`) + bộ lọc; mặc định sắp theo hạn đang chạy gần nhất. */
+        get: operations["WorkController_list"];
+        put?: never;
+        /**
+         * Tạo việc. Yêu cầu của khách cần work.create_customer (CSKH). Giao việc cho nhiều người: mỗi
+         *     người một việc (mặc định) hoặc `shared`. Có `recurrence` → tạo lần đầu ngay, job sinh lần sau.
+         *     `Idempotency-Key` (web luật 4): bấm lại cùng key trả đúng các việc lần đầu, không tạo trùng.
+         */
+        post: operations["WorkController_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/work-items/counts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Số đếm cho tab + huy hiệu menu (web tải lại 30 giây). */
+        get: operations["WorkController_counts"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/work-items/assignees": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Người giao được: không `deptId` = mình + nhánh mình phụ trách (giao việc); có = phòng nhận. */
+        get: operations["WorkController_assignees"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/work-items/workload": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Khối lượng theo người của nhánh mình phụ trách (màn Việc của team). */
+        get: operations["WorkController_workload"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/work-items/notifications": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Chuông thông báo: sự kiện 7 ngày gần nhất trên việc liên quan tới mình (trừ việc mình làm). */
+        get: operations["WorkController_notifications"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/work-items/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["WorkController_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch: operations["WorkController_update"];
+        trace?: never;
+    };
+    "/work-items/{id}/attachments": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Đính kèm — multipart field "file" (ảnh, ghi âm, PDF, Excel, Word ≤ 10 MB, tối đa 20 / việc). */
+        post: operations["WorkController_upload"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/work-items/bulk-assign": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["WorkFlowController_bulkAssign"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/work-items/reassign": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Chuyển một / nhiều việc được giao sang người khác trong nhánh mình. */
+        post: operations["WorkFlowController_reassign"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/work-items/{id}/claim": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["WorkFlowController_claim"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/work-items/{id}/assign": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Trưởng phòng nhận giao / trả về hàng chờ / chuyển phòng. */
+        post: operations["WorkFlowController_assign"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/work-items/{id}/reply": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Ghi phản hồi khách (lần đầu = phản hồi đầu của SLA). */
+        post: operations["WorkFlowController_reply"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/work-items/{id}/note": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Ghi chú nội bộ / bình luận — mọi người thấy việc. */
+        post: operations["WorkFlowController_note"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/work-items/{id}/wait": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Chờ khách — dừng đồng hồ xử lý. */
+        post: operations["WorkFlowController_wait"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/work-items/{id}/resume": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Khách phản hồi — chạy lại đồng hồ, đẩy hạn xử lý bằng thời gian đã dừng. */
+        post: operations["WorkFlowController_resume"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/work-items/{id}/resolve": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["WorkFlowController_resolve"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/work-items/{id}/reopen": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Mở lại yêu cầu đã xử lý (khách báo lại / người yêu cầu báo "Chưa xong"). */
+        post: operations["WorkFlowController_reopen"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/work-items/{id}/close": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Đóng yêu cầu của khách đã xử lý (không chờ tự đóng). */
+        post: operations["WorkFlowController_close"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/work-items/{id}/confirm": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Người yêu cầu xác nhận yêu cầu nội bộ đã xong. */
+        post: operations["WorkFlowController_confirm"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/work-items/{id}/cancel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Hủy (yêu cầu: người yêu cầu / trưởng phòng nhận; giao việc: người giao / quản lý). */
+        post: operations["WorkFlowController_cancel"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/work-items/{id}/start": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["WorkFlowController_start"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/work-items/{id}/submit": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Báo xong — cần duyệt → Chờ duyệt, không → Xong. */
+        post: operations["WorkFlowController_submit"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/work-items/{id}/approve": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["WorkFlowController_approve"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/work-items/{id}/rework": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["WorkFlowController_rework"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/work-items/{id}/extension": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Người làm xin dời hạn chót. */
+        post: operations["WorkFlowController_requestExtension"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/work-items/{id}/extension/decision": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Người giao đồng ý / từ chối xin gia hạn. */
+        post: operations["WorkFlowController_decideExtension"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/work-items/{id}/checklist": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["WorkFlowController_addChecklist"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/work-items/{id}/checklist/{itemId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete: operations["WorkFlowController_removeChecklist"];
+        options?: never;
+        head?: never;
+        patch: operations["WorkFlowController_updateChecklist"];
+        trace?: never;
+    };
+    "/work-items/{id}/watchers": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["WorkFlowController_watchers"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/reports/work/requests": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** SLA yêu cầu (khách + nội bộ): chỉ tiêu, theo loại, theo người xử lý, theo hướng xử lý. */
+        get: operations["WorkReportController_requests"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/reports/work/tasks": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Hiệu suất giao việc theo người làm. */
+        get: operations["WorkReportController_tasks"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -5695,7 +6383,7 @@ export interface components {
         };
         CreateApprovalRuleDto: {
             /** @enum {string} */
-            docType: "SALES_ORDER" | "PURCHASE_ORDER" | "GOODS_RECEIPT" | "DELIVERY_NOTE" | "STOCK_ADJUSTMENT" | "CYCLE_COUNT" | "INVOICE" | "CREDIT_NOTE" | "PAYMENT" | "CONTAINER";
+            docType: "SALES_ORDER" | "PURCHASE_ORDER" | "GOODS_RECEIPT" | "DELIVERY_NOTE" | "STOCK_ADJUSTMENT" | "CYCLE_COUNT" | "INVOICE" | "CREDIT_NOTE" | "PAYMENT" | "CONTAINER" | "WORK_ITEM";
             name: string;
             /** @description JsonLogic — vd { ">=": [{ "var": "total" }, 50000000] } */
             conditionJson: {
@@ -6233,7 +6921,7 @@ export interface components {
         };
         ShipmentMonitorListDto: {
             /** @enum {string} */
-            view: "PACKED" | "HANDED_OVER" | "HOLDING" | "OVERDUE";
+            view: "PACKED" | "OVERDUE" | "HANDED_OVER" | "HOLDING";
             items: components["schemas"]["ShipmentMonitorRowDto"][];
             total: number;
         };
@@ -7949,6 +8637,8 @@ export interface components {
             searchAliases: string[];
             /** @description Tên in trên hóa đơn — null = dùng tên thương mại. */
             invoiceName: string | null;
+            /** @description fin.TaxRate.id — thuế suất cấp sản phẩm (mọi SKU chép theo); null = sản phẩm cũ chưa gán. */
+            taxRateId: string | null;
             /** @description Mức tồn kho cảnh báo nhập hàng — Decimal(18,6) chuỗi; null = không cảnh báo. */
             reorderLevel: string | null;
             /** @description Optimistic locking — client giữ nguyên và gửi lại trong PATCH; lệch → 409. */
@@ -8059,6 +8749,8 @@ export interface components {
             searchAliases: string[];
             /** @description Tên in trên hóa đơn — null = dùng tên thương mại (`name`). */
             invoiceName: string | null;
+            /** @description fin.TaxRate.id — thuế suất cấp sản phẩm (mọi SKU chép theo); null = sản phẩm cũ chưa gán. */
+            taxRateId: string | null;
             /** @description Mức tồn kho cảnh báo nhập hàng — Decimal(18,6) chuỗi theo ĐVT cơ sở; null = không cảnh báo. */
             reorderLevel: string | null;
             /** @description Optimistic locking — form sửa giữ nguyên và gửi lại trong PATCH; lệch → 409. */
@@ -8113,6 +8805,12 @@ export interface components {
             /** @description Tên in trên hóa đơn — bỏ trống / null = dùng tên thương mại (`name`). */
             invoiceName?: string | null;
             /**
+             * Format: uuid
+             * @description fin.TaxRate.id (2026-10-23) — thuế suất của sản phẩm, chép xuống mọi SKU. Bỏ trống = mức mặc
+             *     định của danh mục (trigger DB) → sản phẩm luôn có thuế suất; form web bắt buộc chọn.
+             */
+            taxRateId?: string;
+            /**
              * @description Mức tồn kho cảnh báo nhập hàng — Decimal(18,6) chuỗi theo ĐVT cơ sở, KHÔNG phải số tồn.
              *     null = tắt cảnh báo cho sản phẩm này (GET /stock/replenishment bỏ qua).
              */
@@ -8152,6 +8850,8 @@ export interface components {
             searchAliases: string[];
             /** @description Tên in trên hóa đơn — null = dùng tên thương mại (`name`). */
             invoiceName: string | null;
+            /** @description fin.TaxRate.id — thuế suất cấp sản phẩm (mọi SKU chép theo); null = sản phẩm cũ chưa gán. */
+            taxRateId: string | null;
             /** @description Mức tồn kho cảnh báo nhập hàng — Decimal(18,6) chuỗi theo ĐVT cơ sở; null = không cảnh báo. */
             reorderLevel: string | null;
             /** @description Optimistic locking — client giữ nguyên và gửi lại trong PATCH; lệch → 409. */
@@ -8194,6 +8894,11 @@ export interface components {
             allowNegativeStock?: boolean;
             /** @description Tên in trên hóa đơn — null = xóa, dùng lại tên thương mại. */
             invoiceName?: string | null;
+            /**
+             * Format: uuid
+             * @description Đổi thuế suất — áp cho đơn tạo SAU khi lưu (dòng đơn chép thuế suất lúc tạo). Không xóa được.
+             */
+            taxRateId?: string;
             /** @description Mức tồn kho cảnh báo nhập hàng — Decimal(18,6) chuỗi; null = tắt cảnh báo. */
             reorderLevel?: string | null;
             searchAliases?: string[];
@@ -8244,11 +8949,6 @@ export interface components {
             baseUom?: string;
             /** @description Mã Uom bán mặc định — phải là baseUom hoặc có conversion. Bỏ trống = baseUom. */
             salesUom?: string;
-            /**
-             * Format: uuid
-             * @description fin.TaxRate.id — chỉ LƯU, chưa tính thuế (chờ kế toán).
-             */
-            taxRateId?: string;
             /**
              * @description Bỏ trống → copy Product.trackingMode (denormalize, bất biến cross-schema).
              * @enum {string}
@@ -8412,8 +9112,6 @@ export interface components {
             isActive?: boolean;
             /** @description Mã Uom bán mặc định — null = quay về baseUom. */
             salesUom?: string | null;
-            /** Format: uuid */
-            taxRateId?: string | null;
             /**
              * @description Đổi bị chặn (409) khi SKU đã có movement. baseUom KHÔNG BAO GIỜ đổi được qua API.
              * @enum {string}
@@ -8637,6 +9335,85 @@ export interface components {
             baseUom?: string;
             /** @description Sinh barcode INTERNAL tự động cho mỗi SKU mới */
             generateBarcode?: boolean;
+        };
+        TaxRateDto: {
+            id: string;
+            code: string;
+            name: string;
+            /** @enum {string} */
+            kind: "TAXABLE" | "EXEMPT" | "NOT_DECLARED";
+            /** @description Phần trăm, chuỗi ("8", "3.5"); KCT / KKKNT = "0". */
+            ratePercent: string;
+            /** @description Chuỗi gửi MISA (`VATRateName`): "5%", "8%", "KCT", "KKKNT". */
+            misaName: string;
+            /** @description YYYY-MM-DD; null = không giới hạn. */
+            validFrom: string | null;
+            validTo: string | null;
+            replacementId: string | null;
+            isDefault: boolean;
+            isActive: boolean;
+            /** @description Số sản phẩm (chưa xóa) đang gán mức này. */
+            productCount: number;
+            /** @description true = đã có dòng đơn dùng mức này → không đổi được loại / %. */
+            usedByOrders: boolean;
+            version: number;
+            createdAt: string;
+            updatedAt: string;
+        };
+        TaxRateListResponseDto: {
+            items: components["schemas"]["TaxRateDto"][];
+            /** @description Số sản phẩm (chưa xóa, không tính món một lần) chưa gán thuế suất. */
+            unassignedProductCount: number;
+        };
+        CreateTaxRateDto: {
+            code: string;
+            name: string;
+            /**
+             * @description Mặc định TAXABLE. KCT / KKKNT luôn lưu 0%.
+             * @enum {string}
+             */
+            kind?: "TAXABLE" | "EXEMPT" | "NOT_DECLARED";
+            /** @description Thuế suất theo PHẦN TRĂM, chuỗi ("8" = 8%). Bỏ qua khi `kind` ≠ TAXABLE. */
+            ratePercent?: string;
+            /** @description Ngày bắt đầu hiệu lực YYYY-MM-DD; null / bỏ trống = không giới hạn. */
+            validFrom?: string | null;
+            validTo?: string | null;
+            /**
+             * Format: uuid
+             * @description Hết hiệu lực thì sản phẩm chuyển sang mức nào (fin.TaxRate.id).
+             */
+            replacementId?: string | null;
+            /** @description true = mức điền sẵn cho sản phẩm mới; mức mặc định cũ tự bỏ cờ. */
+            isDefault?: boolean;
+        };
+        AssignTaxRateDto: {
+            /** Format: uuid */
+            taxRateId: string;
+            productIds: string[];
+        };
+        AssignTaxRateResultDto: {
+            /** @description Số sản phẩm đã đổi thuế suất (sản phẩm đã mang đúng mức này không tính). */
+            updated: number;
+        };
+        UpdateTaxRateDto: {
+            /** @description Optimistic locking — lệch → 409. */
+            version: number;
+            code?: string;
+            name?: string;
+            /**
+             * @description Đổi loại / % bị chặn (409) khi đã có đơn dùng mức này — tạo mức mới rồi gán lại.
+             * @enum {string}
+             */
+            kind?: "TAXABLE" | "EXEMPT" | "NOT_DECLARED";
+            ratePercent?: string;
+            validFrom?: string | null;
+            validTo?: string | null;
+            /** Format: uuid */
+            replacementId?: string | null;
+            /** @description Chỉ nhận `true` (đặt làm mặc định) — bỏ mặc định bằng cách đặt mức khác. */
+            isDefault?: boolean;
+            /** @description false = ngừng dùng (không chọn được cho sản phẩm nữa; sản phẩm đang gán giữ nguyên). */
+            isActive?: boolean;
         };
         TeamDto: {
             id: string;
@@ -12422,6 +13199,732 @@ export interface components {
             /** @description `YYYY-MM-DD` (ngày VN khách được tạo); bỏ trống = hôm qua. */
             day?: string;
         };
+        WorkSlaPolicyDto: {
+            /**
+             * @description null = mặc định của loại.
+             * @enum {string|null}
+             */
+            priority: "LOW" | "NORMAL" | "HIGH" | "URGENT" | null;
+            id: string;
+            firstResponseMins: number;
+            resolveMins: number;
+        };
+        WorkCategoryDto: {
+            /** @enum {string} */
+            kind: "CUSTOMER" | "INTERNAL";
+            /** @enum {string} */
+            defaultPriority: "LOW" | "NORMAL" | "HIGH" | "URGENT";
+            id: string;
+            code: string;
+            name: string;
+            description: string | null;
+            /** @description Phòng nhận; null + CUSTOMER = phòng của người tạo (CSKH tiếp nhận). */
+            ownerDeptId: string | null;
+            ownerDeptName: string | null;
+            requiresOrder: boolean;
+            sortOrder: number;
+            isActive: boolean;
+            /** @description Số yêu cầu đang mở của loại. */
+            openCount: number;
+            policies: components["schemas"]["WorkSlaPolicyDto"][];
+        };
+        WorkCalendarDto: {
+            weekdays: number[];
+            startMinute: number;
+            endMinute: number;
+            warnPercent: number;
+            autoCloseDays: number;
+        };
+        WorkHolidayDto: {
+            /** @description YYYY-MM-DD */
+            date: string;
+            name: string;
+        };
+        WorkDepartmentOptionDto: {
+            id: string;
+            code: string;
+            name: string;
+            kind: string;
+            parentId: string | null;
+        };
+        WorkConfigDto: {
+            categories: components["schemas"]["WorkCategoryDto"][];
+            calendar: components["schemas"]["WorkCalendarDto"];
+            holidays: components["schemas"]["WorkHolidayDto"][];
+            departments: components["schemas"]["WorkDepartmentOptionDto"][];
+        };
+        WorkSlaCellDto: {
+            /** @description Phút làm việc tới hạn phản hồi đầu. */
+            firstResponseMins: number;
+            /** @description Phút làm việc tới hạn xử lý xong. */
+            resolveMins: number;
+        };
+        CreateWorkCategoryDto: {
+            code: string;
+            name: string;
+            description?: string;
+            /** @enum {string} */
+            kind: "CUSTOMER" | "INTERNAL";
+            /** @enum {string} */
+            defaultPriority?: "LOW" | "NORMAL" | "HIGH" | "URGENT";
+            /** Format: uuid */
+            ownerDeptId?: string | null;
+            requiresOrder?: boolean;
+            sortOrder?: number;
+            /** @description SLA mặc định của loại — bắt buộc khi tạo. */
+            sla: components["schemas"]["WorkSlaCellDto"];
+        };
+        UpdateWorkCategoryDto: {
+            /** @description Đổi được khi loại chưa có yêu cầu nào. */
+            code?: string;
+            name?: string;
+            description?: string | null;
+            /**
+             * @description Đổi được khi loại chưa có yêu cầu nào.
+             * @enum {string}
+             */
+            kind?: "CUSTOMER" | "INTERNAL";
+            /** @enum {string} */
+            defaultPriority?: "LOW" | "NORMAL" | "HIGH" | "URGENT";
+            /** Format: uuid */
+            ownerDeptId?: string | null;
+            requiresOrder?: boolean;
+            sortOrder?: number;
+            isActive?: boolean;
+        };
+        WorkSlaRowDto: {
+            /** Format: uuid */
+            categoryId: string;
+            default: components["schemas"]["WorkSlaCellDto"];
+            /** @description Ô riêng theo mức ưu tiên; thiếu / null = dùng mặc định. */
+            LOW?: components["schemas"]["WorkSlaCellDto"] | null;
+            NORMAL?: components["schemas"]["WorkSlaCellDto"] | null;
+            HIGH?: components["schemas"]["WorkSlaCellDto"] | null;
+            URGENT?: components["schemas"]["WorkSlaCellDto"] | null;
+        };
+        UpdateWorkSlaDto: {
+            rows: components["schemas"]["WorkSlaRowDto"][];
+        };
+        UpdateWorkCalendarDto: {
+            weekdays: number[];
+            startMinute: number;
+            endMinute: number;
+            warnPercent: number;
+            autoCloseDays: number;
+        };
+        CreateWorkHolidayDto: {
+            date: string;
+            /** @description Kết thúc (gồm) — nhập một khoảng nghỉ (vd. Tết). Bỏ trống = một ngày. */
+            toDate?: string;
+            name: string;
+        };
+        WorkCustomerBriefDto: {
+            id: string;
+            code: string;
+            name: string;
+            phone: string | null;
+        };
+        WorkPersonDto: {
+            id: string;
+            code: string;
+            fullName: string;
+        };
+        WorkDeadlineDto: {
+            /**
+             * @description Hạn đang tính: DUE = hạn chót giao việc, FIRST_RESPONSE / RESOLVE = SLA yêu cầu.
+             * @enum {string|null}
+             */
+            kind: "DUE" | "FIRST_RESPONSE" | "RESOLVE" | null;
+            /**
+             * @description OVERDUE quá hạn · WARNING sắp quá hạn · RUNNING còn hạn · PAUSED chờ khách · MET xong đúng hạn
+             *     · MISSED xong trễ · NONE không có hạn.
+             * @enum {string}
+             */
+            state: "OVERDUE" | "WARNING" | "RUNNING" | "PAUSED" | "MET" | "MISSED" | "NONE";
+            at: string | null;
+            /**
+             * @description Phút còn lại (âm = đã quá). Yêu cầu: phút GIỜ LÀM VIỆC; giao việc: phút thực. null khi không
+             *     có hạn / đã xong.
+             */
+            minutesLeft: number | null;
+            /** @description % thời gian đã dùng (0–100+), null khi không có hạn. */
+            usedPercent: number | null;
+        };
+        WorkItemSummaryDto: {
+            /** @enum {string} */
+            kind: "CUSTOMER" | "INTERNAL" | "TASK";
+            /** @enum {string} */
+            status: "OPEN" | "IN_PROGRESS" | "WAITING_CUSTOMER" | "SUBMITTED" | "RESOLVED" | "CLOSED" | "DONE" | "CANCELLED";
+            /** @enum {string} */
+            priority: "LOW" | "NORMAL" | "HIGH" | "URGENT";
+            /** @enum {string|null} */
+            channel: "PHONE" | "ZALO" | "FACEBOOK" | "WALK_IN" | "INTERNAL" | null;
+            id: string;
+            docNumber: string;
+            title: string;
+            categoryId: string | null;
+            categoryName: string | null;
+            /** @description Khách trong phạm vi người xem; null khi không gắn khách hoặc ngoài phạm vi (xem customerHidden). */
+            customer: components["schemas"]["WorkCustomerBriefDto"] | null;
+            /** @description Việc gắn khách nhưng người xem không thấy khách — chỉ hiện contactName / contactPhone. */
+            customerHidden: boolean;
+            contactName: string | null;
+            contactPhone: string | null;
+            orderId: string | null;
+            orderDocNumber: string | null;
+            ownerDeptId: string | null;
+            ownerDeptName: string | null;
+            assignee: components["schemas"]["WorkPersonDto"] | null;
+            assigner: components["schemas"]["WorkPersonDto"] | null;
+            requester: components["schemas"]["WorkPersonDto"];
+            dueAt: string | null;
+            originalDueAt: string | null;
+            pendingDueAt: string | null;
+            pendingDueReason: string | null;
+            extensionCount: number;
+            needsApproval: boolean;
+            firstResponseDueAt: string | null;
+            resolveDueAt: string | null;
+            firstReplyAt: string | null;
+            deadline: components["schemas"]["WorkDeadlineDto"];
+            checklistTotal: number;
+            checklistDone: number;
+            parentId: string | null;
+            openChildren: number;
+            recurrenceId: string | null;
+            submittedAt: string | null;
+            resolvedAt: string | null;
+            closedAt: string | null;
+            createdAt: string;
+            updatedAt: string;
+            version: number;
+        };
+        WorkItemListDto: {
+            items: components["schemas"]["WorkItemSummaryDto"][];
+            total: number;
+        };
+        WorkCountsDto: {
+            mine: {
+                open: number;
+                overdue: number;
+                dueToday: number;
+                submitted: number;
+                doneToday: number;
+            };
+            requested: {
+                open: number;
+                awaitingConfirm: number;
+            };
+            watching: {
+                open: number;
+            };
+            queue: {
+                open: number;
+                unassigned: number;
+                dueSoon: number;
+                overdue: number;
+            };
+            team: {
+                open: number;
+                overdue: number;
+                dueToday: number;
+                awaitingMyApproval: number;
+                extensionRequests: number;
+            };
+            /** @description Huy hiệu menu: quá hạn của tôi + hàng chờ quá hạn + việc chờ tôi duyệt. */
+            badge: number;
+        };
+        WorkAssigneeOptionDto: {
+            id: string;
+            code: string;
+            fullName: string;
+            departmentId: string | null;
+            departmentName: string | null;
+            isSelf: boolean;
+            open: number;
+            overdue: number;
+            dueTomorrow: number;
+        };
+        WorkWorkloadRowDto: {
+            user: components["schemas"]["WorkPersonDto"];
+            departmentId: string | null;
+            departmentName: string | null;
+            isManager: boolean;
+            open: number;
+            overdue: number;
+            dueToday: number;
+            submitted: number;
+            done7d: number;
+            /** @description % xong đúng hạn 30 ngày (việc có hạn / SLA); null = chưa có việc nào. */
+            onTimePercent30d: number | null;
+        };
+        WorkWorkloadDto: {
+            rows: components["schemas"]["WorkWorkloadRowDto"][];
+            unassigned: number;
+            departments: {
+                id: string;
+                name: string;
+            }[];
+        };
+        WorkNotificationDto: {
+            /** @enum {string} */
+            type: "CREATED" | "ASSIGNED" | "UNASSIGNED" | "DEPT_CHANGED" | "STATUS_CHANGED" | "PRIORITY_CHANGED" | "CATEGORY_CHANGED" | "DUE_CHANGED" | "REPLY" | "NOTE" | "ATTACHMENT" | "CHECKLIST" | "WATCHER" | "SUBMITTED" | "APPROVED" | "REWORK" | "EXTENSION_REQUESTED" | "EXTENSION_APPROVED" | "EXTENSION_REJECTED" | "CHILD_CREATED" | "CHILD_RESOLVED" | "SLA_WARNING" | "SLA_BREACHED" | "DUE_WARNING" | "OVERDUE" | "REOPENED" | "CONFIRMED" | "AUTO_CLOSED";
+            eventId: string;
+            workItemId: string;
+            docNumber: string;
+            title: string;
+            body: string | null;
+            actor: components["schemas"]["WorkPersonDto"] | null;
+            createdAt: string;
+        };
+        WorkSlaBriefDto: {
+            firstResponseMins: number;
+            resolveMins: number;
+        };
+        WorkRecurrenceBriefDto: {
+            /** @enum {string} */
+            freq: "DAILY" | "WEEKLY" | "MONTHLY";
+            dayOfWeek: number | null;
+            dayOfMonth: number | null;
+            /** @description YYYY-MM-DD */
+            until: string | null;
+            isActive: boolean;
+            nextRunAt: string | null;
+        };
+        WorkEventDto: {
+            /** @enum {string} */
+            type: "CREATED" | "ASSIGNED" | "UNASSIGNED" | "DEPT_CHANGED" | "STATUS_CHANGED" | "PRIORITY_CHANGED" | "CATEGORY_CHANGED" | "DUE_CHANGED" | "REPLY" | "NOTE" | "ATTACHMENT" | "CHECKLIST" | "WATCHER" | "SUBMITTED" | "APPROVED" | "REWORK" | "EXTENSION_REQUESTED" | "EXTENSION_APPROVED" | "EXTENSION_REJECTED" | "CHILD_CREATED" | "CHILD_RESOLVED" | "SLA_WARNING" | "SLA_BREACHED" | "DUE_WARNING" | "OVERDUE" | "REOPENED" | "CONFIRMED" | "AUTO_CLOSED";
+            fromValue: (string | number | boolean | {
+                [key: string]: unknown;
+            }) | null;
+            toValue: (string | number | boolean | {
+                [key: string]: unknown;
+            }) | null;
+            /** @enum {string|null} */
+            channel: "PHONE" | "ZALO" | "FACEBOOK" | "WALK_IN" | "INTERNAL" | null;
+            id: string;
+            body: string | null;
+            actor: components["schemas"]["WorkPersonDto"] | null;
+            createdAt: string;
+        };
+        WorkChecklistItemDto: {
+            id: string;
+            title: string;
+            sortOrder: number;
+            refType: string | null;
+            refId: string | null;
+            note: string | null;
+            doneAt: string | null;
+            doneBy: components["schemas"]["WorkPersonDto"] | null;
+        };
+        WorkAttachmentDto: {
+            id: string;
+            fileName: string;
+            mime: string;
+            size: number;
+            /** @description URL đọc có chữ ký 1 giờ; null khi kho file chưa cấu hình. */
+            url: string | null;
+            uploadedBy: components["schemas"]["WorkPersonDto"] | null;
+            createdAt: string;
+        };
+        WorkActionsDto: {
+            edit: boolean;
+            claim: boolean;
+            assign: boolean;
+            reply: boolean;
+            note: boolean;
+            wait: boolean;
+            resume: boolean;
+            resolve: boolean;
+            reopen: boolean;
+            close: boolean;
+            confirm: boolean;
+            cancel: boolean;
+            start: boolean;
+            submit: boolean;
+            approve: boolean;
+            rework: boolean;
+            requestExtension: boolean;
+            decideExtension: boolean;
+            reassign: boolean;
+            checklist: boolean;
+            watchers: boolean;
+            createChild: boolean;
+        };
+        WorkItemDetailDto: {
+            /** @enum {string} */
+            kind: "CUSTOMER" | "INTERNAL" | "TASK";
+            /** @enum {string} */
+            status: "OPEN" | "IN_PROGRESS" | "WAITING_CUSTOMER" | "SUBMITTED" | "RESOLVED" | "CLOSED" | "DONE" | "CANCELLED";
+            /** @enum {string} */
+            priority: "LOW" | "NORMAL" | "HIGH" | "URGENT";
+            /** @enum {string|null} */
+            channel: "PHONE" | "ZALO" | "FACEBOOK" | "WALK_IN" | "INTERNAL" | null;
+            /** @enum {string|null} */
+            outcome: "SEND_REPLACEMENT" | "EXCHANGE" | "REFUND" | "ADVISED" | "UNRESOLVABLE" | "OTHER" | null;
+            slaPolicy: components["schemas"]["WorkSlaBriefDto"] | null;
+            recurrence: components["schemas"]["WorkRecurrenceBriefDto"] | null;
+            description: string | null;
+            resolution: string | null;
+            resolutionRef: string | null;
+            cancelReason: string | null;
+            reopenCount: number;
+            remindBeforeMins: number | null;
+            pausedMins: number;
+            pausedAt: string | null;
+            startedAt: string | null;
+            firstResponseBreachedAt: string | null;
+            resolveBreachedAt: string | null;
+            events: components["schemas"]["WorkEventDto"][];
+            checklist: components["schemas"]["WorkChecklistItemDto"][];
+            watchers: components["schemas"]["WorkPersonDto"][];
+            attachments: components["schemas"]["WorkAttachmentDto"][];
+            children: components["schemas"]["WorkItemSummaryDto"][];
+            parent: components["schemas"]["WorkItemSummaryDto"] | null;
+            can: components["schemas"]["WorkActionsDto"];
+            id: string;
+            docNumber: string;
+            title: string;
+            categoryId: string | null;
+            categoryName: string | null;
+            /** @description Khách trong phạm vi người xem; null khi không gắn khách hoặc ngoài phạm vi (xem customerHidden). */
+            customer: components["schemas"]["WorkCustomerBriefDto"] | null;
+            /** @description Việc gắn khách nhưng người xem không thấy khách — chỉ hiện contactName / contactPhone. */
+            customerHidden: boolean;
+            contactName: string | null;
+            contactPhone: string | null;
+            orderId: string | null;
+            orderDocNumber: string | null;
+            ownerDeptId: string | null;
+            ownerDeptName: string | null;
+            assignee: components["schemas"]["WorkPersonDto"] | null;
+            assigner: components["schemas"]["WorkPersonDto"] | null;
+            requester: components["schemas"]["WorkPersonDto"];
+            dueAt: string | null;
+            originalDueAt: string | null;
+            pendingDueAt: string | null;
+            pendingDueReason: string | null;
+            extensionCount: number;
+            needsApproval: boolean;
+            firstResponseDueAt: string | null;
+            resolveDueAt: string | null;
+            firstReplyAt: string | null;
+            deadline: components["schemas"]["WorkDeadlineDto"];
+            checklistTotal: number;
+            checklistDone: number;
+            parentId: string | null;
+            openChildren: number;
+            recurrenceId: string | null;
+            submittedAt: string | null;
+            resolvedAt: string | null;
+            closedAt: string | null;
+            createdAt: string;
+            updatedAt: string;
+            version: number;
+        };
+        WorkChecklistInputDto: {
+            title: string;
+            /**
+             * @description Đối tượng gắn kèm để mở nhanh / tạo yêu cầu từ mục (vd. "customer", "order").
+             * @enum {string}
+             */
+            refType?: "customer" | "order";
+            /** Format: uuid */
+            refId?: string;
+            note?: string;
+        };
+        WorkRecurrenceInputDto: {
+            /** @enum {string} */
+            freq: "MONTHLY" | "DAILY" | "WEEKLY";
+            /** @description WEEKLY: 1 = thứ Hai … 7 = Chủ nhật. */
+            dayOfWeek?: number;
+            /** @description MONTHLY: ngày 1..28. */
+            dayOfMonth?: number;
+            /** @description Giờ sinh việc — phút trong ngày giờ VN (mặc định 08:00). */
+            atMinute?: number;
+            /** @description Lặp đến hết ngày này (YYYY-MM-DD). */
+            until?: string;
+            /** @description Hạn chót của mỗi lần = sau chừng này ngày làm việc kể từ lúc sinh. */
+            dueAfterWorkdays: number;
+        };
+        CreateWorkItemDto: {
+            /** @description Thay cho header Idempotency-Key khi client không đặt được header (header thắng). */
+            idempotencyKey?: string;
+            /** @enum {string} */
+            kind: "INTERNAL" | "CUSTOMER" | "TASK";
+            title: string;
+            description?: string;
+            /**
+             * @description Bỏ trống: yêu cầu = ưu tiên mặc định của loại; giao việc = NORMAL.
+             * @enum {string}
+             */
+            priority?: "LOW" | "NORMAL" | "HIGH" | "URGENT";
+            /**
+             * Format: uuid
+             * @description Bắt buộc với yêu cầu (CUSTOMER / INTERNAL); giao việc không có loại.
+             */
+            categoryId?: string;
+            /** @enum {string} */
+            channel?: "FACEBOOK" | "ZALO" | "PHONE" | "WALK_IN" | "INTERNAL";
+            /**
+             * Format: uuid
+             * @description Bắt buộc với yêu cầu của khách.
+             */
+            customerId?: string;
+            /** Format: uuid */
+            orderId?: string;
+            /** @description Tên / SĐT liên hệ ghi lên việc — người nhận ngoài phạm vi khách chỉ thấy phần này. */
+            contactName?: string;
+            contactPhone?: string;
+            /**
+             * Format: uuid
+             * @description Hàng chờ (phòng nhận). Bỏ trống = phòng nhận của loại → phòng của người tạo.
+             */
+            ownerDeptId?: string;
+            /**
+             * Format: uuid
+             * @description YN con của một yêu cầu khách ("Nhờ phòng khác") — kế thừa khách / đơn / liên hệ.
+             */
+            parentId?: string;
+            /** @description Yêu cầu: tạo xong tự nhận luôn. */
+            claim?: boolean;
+            /** @description Giao việc: người làm; bỏ trống = tự giao cho mình. */
+            assigneeIds?: string[];
+            /** @description Giao nhiều người: true = MỘT việc làm chung (người đầu làm chính, còn lại theo dõi). */
+            shared?: boolean;
+            /** @description Giao việc: hạn chót (ISO). */
+            dueAt?: string;
+            needsApproval?: boolean;
+            remindBeforeMins?: number;
+            watcherIds?: string[];
+            checklist?: components["schemas"]["WorkChecklistInputDto"][];
+            /** @description Giao nhiều người, mỗi người một việc: chia đều checklist thay vì chép cho từng người. */
+            splitChecklist?: boolean;
+            /** @description Giao việc lặp lại — tạo lần đầu ngay, các lần sau do job sinh. */
+            recurrence?: components["schemas"]["WorkRecurrenceInputDto"];
+        };
+        CreateWorkItemResultDto: {
+            items: components["schemas"]["WorkItemSummaryDto"][];
+        };
+        UpdateWorkItemDto: {
+            title?: string;
+            description?: string | null;
+            /** @enum {string} */
+            priority?: "LOW" | "NORMAL" | "HIGH" | "URGENT";
+            /**
+             * Format: uuid
+             * @description Yêu cầu: đổi loại → tính lại SLA từ lúc tạo.
+             */
+            categoryId?: string;
+            contactName?: string | null;
+            contactPhone?: string | null;
+            /** @description Giao việc: người giao đổi hạn chót trực tiếp. */
+            dueAt?: string | null;
+            needsApproval?: boolean;
+            remindBeforeMins?: number | null;
+            /** @description Bản đang xem — lệch → 409 WORK_STALE. Bỏ trống = không kiểm. */
+            version?: number;
+        };
+        WorkBulkAssignDto: {
+            ids: string[];
+            /** Format: uuid */
+            assigneeId?: string | null;
+            /** Format: uuid */
+            ownerDeptId?: string;
+            /** @enum {string} */
+            priority?: "LOW" | "NORMAL" | "HIGH" | "URGENT";
+            note?: string;
+        };
+        WorkBulkFailureDto: {
+            id: string;
+            docNumber: string | null;
+            code: string;
+            message: string;
+        };
+        WorkBulkResultDto: {
+            updated: number;
+            failed: components["schemas"]["WorkBulkFailureDto"][];
+        };
+        WorkReassignDto: {
+            ids: string[];
+            /** Format: uuid */
+            assigneeId: string;
+            reason: string;
+            /** @description Cộng thêm chừng này ngày làm việc vào hạn chót (0 / bỏ trống = giữ hạn). */
+            extendWorkdays?: number;
+            keepPreviousAsWatcher?: boolean;
+        };
+        WorkVersionDto: {
+            /** @description Bản đang xem — lệch → 409 WORK_STALE. */
+            version?: number;
+        };
+        WorkAssignDto: {
+            /**
+             * Format: uuid
+             * @description Người xử lý mới; null = trả về hàng chờ.
+             */
+            assigneeId?: string | null;
+            /**
+             * Format: uuid
+             * @description Chuyển hàng chờ sang phòng khác.
+             */
+            ownerDeptId?: string;
+            note?: string;
+            /** @description Bản đang xem — lệch → 409 WORK_STALE. Bỏ trống = không kiểm. */
+            version?: number;
+        };
+        WorkReplyDto: {
+            /** @enum {string} */
+            channel?: "FACEBOOK" | "ZALO" | "PHONE" | "WALK_IN" | "INTERNAL";
+            /** @description Ghi phản hồi xong chuyển luôn sang Chờ khách. */
+            waitCustomer?: boolean;
+            body: string;
+            /** @description Bản đang xem — lệch → 409 WORK_STALE. Bỏ trống = không kiểm. */
+            version?: number;
+        };
+        WorkNoteDto: {
+            body: string;
+            /** @description Bản đang xem — lệch → 409 WORK_STALE. Bỏ trống = không kiểm. */
+            version?: number;
+        };
+        WorkOptionalCommentDto: {
+            comment?: string;
+            /** @description Bản đang xem — lệch → 409 WORK_STALE. Bỏ trống = không kiểm. */
+            version?: number;
+        };
+        WorkResolveDto: {
+            resolution: string;
+            /** @enum {string} */
+            outcome?: "SEND_REPLACEMENT" | "EXCHANGE" | "REFUND" | "ADVISED" | "UNRESOLVABLE" | "OTHER";
+            resolutionRef?: string;
+            /** @description Bản đang xem — lệch → 409 WORK_STALE. Bỏ trống = không kiểm. */
+            version?: number;
+        };
+        WorkReasonDto: {
+            reason: string;
+            /** @description Bản đang xem — lệch → 409 WORK_STALE. Bỏ trống = không kiểm. */
+            version?: number;
+        };
+        WorkSubmitDto: {
+            /** @description Kết quả người làm ghi khi báo xong. */
+            result?: string;
+            /** @description Bản đang xem — lệch → 409 WORK_STALE. Bỏ trống = không kiểm. */
+            version?: number;
+        };
+        WorkReworkDto: {
+            comment: string;
+            dueAt?: string;
+            /** @description Bản đang xem — lệch → 409 WORK_STALE. Bỏ trống = không kiểm. */
+            version?: number;
+        };
+        WorkExtensionRequestDto: {
+            dueAt: string;
+            reason: string;
+            /** @description Bản đang xem — lệch → 409 WORK_STALE. Bỏ trống = không kiểm. */
+            version?: number;
+        };
+        WorkExtensionDecisionDto: {
+            approve: boolean;
+            comment?: string;
+            /** @description Bản đang xem — lệch → 409 WORK_STALE. Bỏ trống = không kiểm. */
+            version?: number;
+        };
+        WorkChecklistAddDto: {
+            items: components["schemas"]["WorkChecklistInputDto"][];
+        };
+        WorkChecklistUpdateDto: {
+            done?: boolean;
+            title?: string;
+            note?: string | null;
+        };
+        WorkWatchersDto: {
+            add?: string[];
+            remove?: string[];
+        };
+        WorkRequestKpisDto: {
+            created: number;
+            resolved: number;
+            /** @description Đang mở (tại thời điểm xem). */
+            open: number;
+            overdueOpen: number;
+            /** @description % đúng SLA phản hồi đầu / xử lý; null = chưa có dữ liệu. */
+            firstResponseOnTimePct: number | null;
+            resolveOnTimePct: number | null;
+            /** @description Phút giờ làm việc trung bình. */
+            avgFirstResponseMins: number | null;
+            avgResolveMins: number | null;
+            reopened: number;
+        };
+        WorkRequestCategoryRowDto: {
+            categoryId: string | null;
+            categoryName: string;
+            created: number;
+            resolved: number;
+            open: number;
+            overdueOpen: number;
+            firstResponseOnTimePct: number | null;
+            resolveOnTimePct: number | null;
+            avgResolveMins: number | null;
+            reopened: number;
+        };
+        WorkRequestAssigneeRowDto: {
+            user: components["schemas"]["WorkPersonDto"];
+            handled: number;
+            resolved: number;
+            open: number;
+            overdueOpen: number;
+            firstResponseOnTimePct: number | null;
+            resolveOnTimePct: number | null;
+            avgFirstResponseMins: number | null;
+        };
+        WorkOutcomeRowDto: {
+            /** @description SEND_REPLACEMENT | EXCHANGE | REFUND | ADVISED | UNRESOLVABLE | OTHER | null (không ghi). */
+            outcome: string | null;
+            count: number;
+            pct: number;
+        };
+        WorkRequestReportDto: {
+            from: string;
+            to: string;
+            kpis: components["schemas"]["WorkRequestKpisDto"];
+            /** @description Cùng độ dài, ngay trước `from`. */
+            previous: components["schemas"]["WorkRequestKpisDto"];
+            byCategory: components["schemas"]["WorkRequestCategoryRowDto"][];
+            byAssignee: components["schemas"]["WorkRequestAssigneeRowDto"][];
+            byOutcome: components["schemas"]["WorkOutcomeRowDto"][];
+        };
+        WorkTaskKpisDto: {
+            assigned: number;
+            done: number;
+            /** @description % xong đúng hạn (theo hạn đã duyệt gia hạn — T12); null = chưa có. */
+            onTimePct: number | null;
+            /** @description % xong đúng hạn GỐC (trước gia hạn). */
+            onTimeOriginalPct: number | null;
+            overdueOpen: number;
+            extended: number;
+            extensions: number;
+            /** @description Giờ thực trung bình từ lúc giao tới lúc báo xong. */
+            avgHoursToSubmit: number | null;
+            reworked: number;
+        };
+        WorkTaskAssigneeRowDto: {
+            user: components["schemas"]["WorkPersonDto"];
+            departmentName: string | null;
+            assigned: number;
+            done: number;
+            open: number;
+            overdueOpen: number;
+            onTimePct: number | null;
+            extensions: number;
+            reworked: number;
+        };
+        WorkTaskReportDto: {
+            from: string;
+            to: string;
+            kpis: components["schemas"]["WorkTaskKpisDto"];
+            previous: components["schemas"]["WorkTaskKpisDto"];
+            byAssignee: components["schemas"]["WorkTaskAssigneeRowDto"][];
+        };
         PancakeProfileShopDto: {
             shopId: string;
             shopName: string | null;
@@ -16049,6 +17552,10 @@ export interface operations {
                 supplierId?: string;
                 /** @description true = chỉ SP đã gán NCC chính, false = chỉ SP CHƯA gán (dọn dữ liệu). */
                 hasSupplier?: boolean;
+                /** @description Lọc theo thuế suất (fin.TaxRate.id). */
+                taxRateId?: string;
+                /** @description false = chỉ sản phẩm CHƯA gán thuế suất (kế toán gán bù), true = đã gán. */
+                hasTaxRate?: boolean;
                 isActive?: boolean;
                 trackingMode?: "NONE" | "LOT" | "SERIAL";
                 /** @description true = chỉ product có ít nhất một SKU còn tồn (onHand > 0). */
@@ -17107,6 +18614,120 @@ export interface operations {
                 };
                 content: {
                     "application/json": Record<string, never>[];
+                };
+            };
+        };
+    };
+    TaxRateController_list: {
+        parameters: {
+            query?: {
+                /** @description true = kèm mức đã ngừng dùng (màn danh mục, lọc trạng thái). Mặc định chỉ mức đang dùng. */
+                includeInactive?: boolean;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TaxRateListResponseDto"];
+                };
+            };
+        };
+    };
+    TaxRateController_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateTaxRateDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TaxRateDto"];
+                };
+            };
+        };
+    };
+    TaxRateController_assign: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AssignTaxRateDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AssignTaxRateResultDto"];
+                };
+            };
+        };
+    };
+    TaxRateController_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TaxRateDto"];
+                };
+            };
+        };
+    };
+    TaxRateController_update: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateTaxRateDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TaxRateDto"];
                 };
             };
         };
@@ -21603,6 +23224,1060 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["CareDistributionRunDto"];
+                };
+            };
+        };
+    };
+    WorkConfigController_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WorkConfigDto"];
+                };
+            };
+        };
+    };
+    WorkConfigController_categories: {
+        parameters: {
+            query?: {
+                kind?: "CUSTOMER" | "INTERNAL";
+                /** @description "true" = cả loại ngừng dùng (màn cấu hình). Mặc định chỉ loại đang dùng. */
+                includeInactive?: "true" | "false";
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WorkCategoryDto"][];
+                };
+            };
+        };
+    };
+    WorkConfigController_createCategory: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateWorkCategoryDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WorkCategoryDto"];
+                };
+            };
+        };
+    };
+    WorkConfigController_deleteCategory: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    WorkConfigController_updateCategory: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateWorkCategoryDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WorkCategoryDto"];
+                };
+            };
+        };
+    };
+    WorkConfigController_updateSla: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateWorkSlaDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WorkCategoryDto"][];
+                };
+            };
+        };
+    };
+    WorkConfigController_updateCalendar: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateWorkCalendarDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WorkCalendarDto"];
+                };
+            };
+        };
+    };
+    WorkConfigController_addHolidays: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateWorkHolidayDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WorkHolidayDto"][];
+                };
+            };
+        };
+    };
+    WorkConfigController_removeHoliday: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                date: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WorkHolidayDto"][];
+                };
+            };
+        };
+    };
+    WorkController_list: {
+        parameters: {
+            query: {
+                /**
+                 * @description mine = giao cho tôi (đang mở) · requested = tôi yêu cầu · watching = tôi theo dõi · done = tôi đã
+                 *     xong · team = việc của người trong nhánh tôi phụ trách + việc tôi giao · queue = hàng chờ phòng
+                 *     tôi / phòng tôi phụ trách · all = mọi việc tôi thấy.
+                 */
+                view: "mine" | "requested" | "watching" | "done" | "team" | "queue" | "all";
+                kind?: ("INTERNAL" | "CUSTOMER" | "TASK")[];
+                status?: ("CANCELLED" | "OPEN" | "CLOSED" | "IN_PROGRESS" | "WAITING_CUSTOMER" | "SUBMITTED" | "RESOLVED" | "DONE")[];
+                /** @description open = chưa xong (mặc định cho mine / queue / team), closed = đã xong / hủy, all. */
+                state?: "open" | "closed" | "all";
+                priority?: "LOW" | "NORMAL" | "HIGH" | "URGENT";
+                categoryId?: string;
+                /** @description uuid | "me" | "none" (chưa ai nhận). */
+                assigneeId?: string;
+                /** @description uuid | "me". */
+                assignerId?: string;
+                ownerDeptId?: string;
+                customerId?: string;
+                orderId?: string;
+                parentId?: string;
+                due?: "overdue" | "soon" | "today" | "week" | "none";
+                /** @description Có xin gia hạn đang chờ duyệt. */
+                pendingExtension?: "true";
+                /** @description Mã / tiêu đề / tên + SĐT liên hệ. */
+                q?: string;
+                /** @description Ngày tạo từ / đến (YYYY-MM-DD, giờ VN). */
+                from?: string;
+                to?: string;
+                /** @description deadline = hạn gần nhất trước (mặc định), updated, created. */
+                sort?: "deadline" | "updated" | "created";
+                take: number;
+                skip: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WorkItemListDto"];
+                };
+            };
+        };
+    };
+    WorkController_create: {
+        parameters: {
+            query?: never;
+            header: {
+                "idempotency-key": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateWorkItemDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CreateWorkItemResultDto"];
+                };
+            };
+        };
+    };
+    WorkController_counts: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WorkCountsDto"];
+                };
+            };
+        };
+    };
+    WorkController_assignees: {
+        parameters: {
+            query?: {
+                /** @description Việc giao (TASK) → người trong nhánh mình; yêu cầu → người trong phòng nhận `deptId`. */
+                deptId?: string;
+                q?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WorkAssigneeOptionDto"][];
+                };
+            };
+        };
+    };
+    WorkController_workload: {
+        parameters: {
+            query?: {
+                /** @description Phòng gốc (trong nhánh mình phụ trách); bỏ trống = cả nhánh. */
+                deptId?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WorkWorkloadDto"];
+                };
+            };
+        };
+    };
+    WorkController_notifications: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WorkNotificationDto"][];
+                };
+            };
+        };
+    };
+    WorkController_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WorkItemDetailDto"];
+                };
+            };
+        };
+    };
+    WorkController_update: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateWorkItemDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WorkItemDetailDto"];
+                };
+            };
+        };
+    };
+    WorkController_upload: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": {
+                    /** Format: binary */
+                    file: string;
+                };
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WorkAttachmentDto"];
+                };
+            };
+        };
+    };
+    WorkFlowController_bulkAssign: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WorkBulkAssignDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WorkBulkResultDto"];
+                };
+            };
+        };
+    };
+    WorkFlowController_reassign: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WorkReassignDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WorkBulkResultDto"];
+                };
+            };
+        };
+    };
+    WorkFlowController_claim: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WorkVersionDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WorkItemDetailDto"];
+                };
+            };
+        };
+    };
+    WorkFlowController_assign: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WorkAssignDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WorkItemDetailDto"];
+                };
+            };
+        };
+    };
+    WorkFlowController_reply: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WorkReplyDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WorkItemDetailDto"];
+                };
+            };
+        };
+    };
+    WorkFlowController_note: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WorkNoteDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WorkItemDetailDto"];
+                };
+            };
+        };
+    };
+    WorkFlowController_wait: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WorkOptionalCommentDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WorkItemDetailDto"];
+                };
+            };
+        };
+    };
+    WorkFlowController_resume: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WorkOptionalCommentDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WorkItemDetailDto"];
+                };
+            };
+        };
+    };
+    WorkFlowController_resolve: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WorkResolveDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WorkItemDetailDto"];
+                };
+            };
+        };
+    };
+    WorkFlowController_reopen: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WorkReasonDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WorkItemDetailDto"];
+                };
+            };
+        };
+    };
+    WorkFlowController_close: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WorkOptionalCommentDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WorkItemDetailDto"];
+                };
+            };
+        };
+    };
+    WorkFlowController_confirm: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WorkOptionalCommentDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WorkItemDetailDto"];
+                };
+            };
+        };
+    };
+    WorkFlowController_cancel: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WorkReasonDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WorkItemDetailDto"];
+                };
+            };
+        };
+    };
+    WorkFlowController_start: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WorkOptionalCommentDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WorkItemDetailDto"];
+                };
+            };
+        };
+    };
+    WorkFlowController_submit: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WorkSubmitDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WorkItemDetailDto"];
+                };
+            };
+        };
+    };
+    WorkFlowController_approve: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WorkOptionalCommentDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WorkItemDetailDto"];
+                };
+            };
+        };
+    };
+    WorkFlowController_rework: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WorkReworkDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WorkItemDetailDto"];
+                };
+            };
+        };
+    };
+    WorkFlowController_requestExtension: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WorkExtensionRequestDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WorkItemDetailDto"];
+                };
+            };
+        };
+    };
+    WorkFlowController_decideExtension: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WorkExtensionDecisionDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WorkItemDetailDto"];
+                };
+            };
+        };
+    };
+    WorkFlowController_addChecklist: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WorkChecklistAddDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WorkItemDetailDto"];
+                };
+            };
+        };
+    };
+    WorkFlowController_removeChecklist: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+                itemId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WorkItemDetailDto"];
+                };
+            };
+        };
+    };
+    WorkFlowController_updateChecklist: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+                itemId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WorkChecklistUpdateDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WorkItemDetailDto"];
+                };
+            };
+        };
+    };
+    WorkFlowController_watchers: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WorkWatchersDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WorkItemDetailDto"];
+                };
+            };
+        };
+    };
+    WorkReportController_requests: {
+        parameters: {
+            query?: {
+                /** @description YYYY-MM-DD (giờ VN). Mặc định 30 ngày gần nhất. */
+                from?: string;
+                to?: string;
+                /** @description Yêu cầu: phòng nhận; giao việc: phòng của người làm (gồm phòng con). Bỏ trống = nhánh mình. */
+                deptId?: string;
+                categoryId?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WorkRequestReportDto"];
+                };
+            };
+        };
+    };
+    WorkReportController_tasks: {
+        parameters: {
+            query?: {
+                /** @description YYYY-MM-DD (giờ VN). Mặc định 30 ngày gần nhất. */
+                from?: string;
+                to?: string;
+                /** @description Yêu cầu: phòng nhận; giao việc: phòng của người làm (gồm phòng con). Bỏ trống = nhánh mình. */
+                deptId?: string;
+                categoryId?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WorkTaskReportDto"];
                 };
             };
         };

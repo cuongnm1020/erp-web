@@ -4,6 +4,7 @@ import { AlertTriangle, ChevronDown, ChevronRight, Layers, Printer, RefreshCw } 
 import Link from 'next/link';
 import { Fragment, useMemo, useState } from 'react';
 import { DataTable, type ColumnDef } from '@/components/data/data-table';
+import { StaffSelect, type StaffSelectItem } from '@/components/data/form';
 import { ListSkeleton, QueryState } from '@/components/data/states';
 import { StatusBadge } from '@/components/data/status-badge';
 import { Button } from '@/components/ui/button';
@@ -200,9 +201,14 @@ const ROLE_HINT: Record<string, string> = {
   PACKER: 'đóng hàng',
 };
 
-export function staffLabel(s: WarehouseStaff): string {
+function staffRoleHint(s: WarehouseStaff): string | undefined {
   const hints = s.roles.map((r) => ROLE_HINT[r]).filter((h): h is string => Boolean(h));
-  return hints.length > 0 ? `${s.fullName} · ${hints.join(', ')}` : s.fullName;
+  return hints.length > 0 ? hints.join(', ') : undefined;
+}
+
+/** Danh bạ kho cho StaffSelect — vai trò hiện mờ bên phải, gõ "đóng hàng" cũng lọc được. */
+function staffItems(staff: WarehouseStaff[]): StaffSelectItem[] {
+  return staff.map((s) => ({ id: s.id, fullName: s.fullName, hint: staffRoleHint(s) }));
 }
 
 /** Thẻ gộp được thành lượt: PICK chưa gán, chưa thuộc lượt (server cũng chặn — INVALID_WAVE_INPUT). */
@@ -278,27 +284,20 @@ function RowActions({ task, staff }: { task: Task; staff: WarehouseStaff[] }) {
   }
   if (task.status === 'PENDING') {
     return (
-      <Select
+      <StaffSelect
         value=""
-        onValueChange={(userId) =>
+        onChange={(userId) =>
           assign
             .mutateAsync({ taskId: task.id, userId })
             .then(() => toast.success(`Đã gán ${task.docNumber}`))
             .catch((err) => toast.error(messageFor(err)))
         }
         disabled={assign.isPending}
-      >
-        <SelectTrigger className="h-7 w-44 text-xs" aria-label={`Gán ${task.docNumber}`}>
-          <SelectValue placeholder={assign.isPending ? 'Đang gán…' : 'Gán cho…'} />
-        </SelectTrigger>
-        <SelectContent>
-          {staff.map((s) => (
-            <SelectItem key={s.id} value={s.id}>
-              {staffLabel(s)}
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
+        className="h-7 w-44 text-xs"
+        aria-label={`Gán ${task.docNumber}`}
+        placeholder={assign.isPending ? 'Đang gán…' : 'Gán cho…'}
+        staff={staffItems(staff)}
+      />
     );
   }
   if (task.status === 'ASSIGNED') {
@@ -706,22 +705,14 @@ export function DispatchScreen() {
           </SelectContent>
         </Select>
         {staff ? (
-          <Select
-            value={assignedTo || ALL_TYPES}
-            onValueChange={(v) => setFilter({ assignedTo: v === ALL_TYPES ? undefined : v })}
-          >
-            <SelectTrigger className="h-9 w-52" aria-label="Người nhận việc">
-              <SelectValue placeholder="Người nhận việc" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value={ALL_TYPES}>Người nhận: tất cả</SelectItem>
-              {staff.map((s) => (
-                <SelectItem key={s.id} value={s.id}>
-                  {staffLabel(s)}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <StaffSelect
+            value={assignedTo}
+            onChange={(v) => setFilter({ assignedTo: v || undefined })}
+            className="h-9 w-52"
+            aria-label="Người nhận việc"
+            noneLabel="Người nhận: tất cả"
+            staff={staffItems(staff)}
+          />
         ) : null}
       </div>
 
@@ -897,18 +888,15 @@ function SelectionToolbar({
       <span>
         Đã chọn <b>{selected.length}</b> việc
       </span>
-      <Select value={bulkUserId} onValueChange={setBulkUserId} disabled={assignBulk.isPending}>
-        <SelectTrigger className="h-8 w-56 text-xs" aria-label="Gán việc đã chọn cho">
-          <SelectValue placeholder="Gán cho…" />
-        </SelectTrigger>
-        <SelectContent>
-          {staff.map((s) => (
-            <SelectItem key={s.id} value={s.id}>
-              {staffLabel(s)}
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
+      <StaffSelect
+        value={bulkUserId}
+        onChange={setBulkUserId}
+        disabled={assignBulk.isPending}
+        className="h-8 w-56 text-xs"
+        aria-label="Gán việc đã chọn cho"
+        placeholder="Gán cho…"
+        staff={staffItems(staff)}
+      />
       <Button size="sm" disabled={!bulkUserId || assignBulk.isPending} onClick={bulkAssign}>
         {assignBulk.isPending ? 'Đang gán…' : `Gán ${selected.length} việc`}
       </Button>
@@ -933,18 +921,15 @@ function SelectionToolbar({
               lượng về từng đơn. Hàng về bàn đóng gói được tách theo đơn khi quét đóng gói.
             </DialogDescription>
           </DialogHeader>
-          <Select value={userId} onValueChange={setUserId}>
-            <SelectTrigger className="h-9" aria-label="Giao lượt cho">
-              <SelectValue placeholder="Giao cho… (để trống = nhân viên tự quét nhận)" />
-            </SelectTrigger>
-            <SelectContent>
-              {staff.map((s) => (
-                <SelectItem key={s.id} value={s.id}>
-                  {staffLabel(s)}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <StaffSelect
+            value={userId}
+            onChange={setUserId}
+            className="h-9"
+            aria-label="Giao lượt cho"
+            placeholder="Giao cho… (để trống = nhân viên tự quét nhận)"
+            noneLabel={userId ? 'Để trống — nhân viên tự quét nhận' : undefined}
+            staff={staffItems(staff)}
+          />
           <DialogFooter>
             <Button variant="outline" disabled={create.isPending} onClick={() => setOpen(false)}>
               Hủy bỏ
@@ -1082,18 +1067,14 @@ function WaveRow({
       </span>
       <span className="ml-auto flex items-center gap-1">
         {open ? (
-          <Select value="" onValueChange={onAssign}>
-            <SelectTrigger className="h-7 w-40 text-xs" aria-label={`Gán lượt ${wave.docNumber}`}>
-              <SelectValue placeholder={wave.assigneeName ? 'Đổi người…' : 'Gán cho…'} />
-            </SelectTrigger>
-            <SelectContent>
-              {staff.map((s) => (
-                <SelectItem key={s.id} value={s.id}>
-                  {staffLabel(s)}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <StaffSelect
+            value=""
+            onChange={onAssign}
+            className="h-7 w-40 text-xs"
+            aria-label={`Gán lượt ${wave.docNumber}`}
+            placeholder={wave.assigneeName ? 'Đổi người…' : 'Gán cho…'}
+            staff={staffItems(staff)}
+          />
         ) : null}
         {wave.status === 'ASSIGNED' ? (
           <Button size="sm" variant="ghost" onClick={onUnassign}>
@@ -1316,18 +1297,16 @@ function MergeDialog({
             đơn lúc gộp — có đơn đã huỷ hoặc đã gán thì không gộp, tải lại gợi ý.
           </DialogDescription>
         </DialogHeader>
-        <Select value={userId} onValueChange={setUserId} disabled={merge.isPending}>
-          <SelectTrigger className="h-9" aria-label="Giao lượt cho">
-            <SelectValue placeholder="Giao cho… (để trống = lượt nằm ở Chưa gán)" />
-          </SelectTrigger>
-          <SelectContent>
-            {staff.map((s) => (
-              <SelectItem key={s.id} value={s.id}>
-                {staffLabel(s)}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        <StaffSelect
+          value={userId}
+          onChange={setUserId}
+          disabled={merge.isPending}
+          className="h-9"
+          aria-label="Giao lượt cho"
+          placeholder="Giao cho… (để trống = lượt nằm ở Chưa gán)"
+          noneLabel={userId ? 'Để trống — lượt nằm ở Chưa gán' : undefined}
+          staff={staffItems(staff)}
+        />
         <DialogFooter>
           <Button variant="outline" disabled={merge.isPending} onClick={onClose}>
             Hủy bỏ

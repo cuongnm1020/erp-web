@@ -17,6 +17,7 @@ import { customerKeys, useCustomer, type CustomerDetail } from '../api/use-custo
 import { customerTypeLabel, customerTypeTone } from '../labels';
 import { formatAddress } from './customer-address-section';
 import { CustomerConsentCard } from './customer-consent-card';
+import { CustomerWorkCard } from './customer-work-card';
 import { CustomerPurchaseHistory } from './customer-purchase-history';
 import { CustomerTagsEditor } from './customer-segment-fields';
 
@@ -284,6 +285,9 @@ function Profile({ c }: { c: CustomerDetail }) {
         </div>
       </div>
 
+      <Can I="read" a="Work">
+        <CustomerWorkCard customerId={c.id} />
+      </Can>
       <CustomerConsentCard customerId={c.id} />
 
       <CustomerPurchaseHistory customerId={c.id} />

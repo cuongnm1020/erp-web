@@ -1,6 +1,6 @@
 'use client';
 
-import { ChevronDown, History } from 'lucide-react';
+import { History } from 'lucide-react';
 import Link from 'next/link';
 import { useMemo, useState } from 'react';
 import {
@@ -9,6 +9,7 @@ import {
   type ColumnDef,
   type RowSelectionState,
 } from '@/components/data/data-table';
+import { StaffSelect } from '@/components/data/form';
 import { EmptyState, ForbiddenState, ListSkeleton, QueryState } from '@/components/data/states';
 import { StatusBadge } from '@/components/data/status-badge';
 import { UserAvatar } from '@/components/data/user-avatar';
@@ -21,14 +22,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
 import {
   Select,
   SelectContent,
@@ -427,25 +420,22 @@ function AssignmentWorkspace({
               stickyFirstColumn
               bulkActions={(ids) => (
                 <>
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button size="sm" className="h-7 px-2 text-xs" disabled={assign.isPending}>
-                        Gán cho <ChevronDown aria-hidden />
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="start">
-                      <DropdownMenuLabel>Thành viên {team.name}</DropdownMenuLabel>
-                      <DropdownMenuSeparator />
-                      {members.map((m) => (
-                        <DropdownMenuItem key={m.userId} onSelect={() => void doAssign(ids, m)}>
-                          {m.fullName}
-                          <span className="ml-auto pl-4 text-xs text-muted-foreground">
-                            {m.holding}
-                          </span>
-                        </DropdownMenuItem>
-                      ))}
-                    </DropdownMenuContent>
-                  </DropdownMenu>
+                  <StaffSelect
+                    value=""
+                    onChange={(userId) => {
+                      const m = members.find((x) => x.userId === userId);
+                      if (m) void doAssign(ids, m);
+                    }}
+                    disabled={assign.isPending}
+                    className="h-7 w-44 text-xs"
+                    aria-label="Gán cho"
+                    placeholder="Gán cho…"
+                    staff={members.map((m) => ({
+                      id: m.userId,
+                      fullName: m.fullName,
+                      hint: `${m.holding} KH`,
+                    }))}
+                  />
                   {tab === 'assigned' ? (
                     <Button
                       variant="outline"

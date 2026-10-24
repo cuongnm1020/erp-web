@@ -95,6 +95,11 @@ const MESSAGES: Record<string, string> = {
     'Hãng vận chuyển từ chối dữ liệu đơn (thường là địa chỉ giao). Sửa đơn theo lý do hãng báo rồi xin vận đơn lại.',
   BARCODE_TAKEN: 'Mã này đã gán cho sản phẩm khác — mỗi mã chỉ thuộc một sản phẩm.',
   SKU_CODE_TAKEN: 'Mã này đã là mã của SKU khác — chọn mã khác.',
+  // Danh mục thuế suất (2026-10-23)
+  TAX_RATE_IN_USE:
+    'Đã có đơn hàng dùng mức này nên không đổi được %. Thêm mức mới rồi gán cho sản phẩm.',
+  TAX_RATE_DEFAULT_REQUIRED: 'Phải luôn có một mức mặc định — đặt mức khác làm mặc định trước.',
+  TAX_RATE_CODE_TAKEN: 'Mã này đã có trong danh mục thuế suất — chọn mã khác.',
   STOCK_EXCEL_WAREHOUSE_MISMATCH:
     'File này là tồn của kho khác — chọn đúng kho đã xuất file, hoặc xuất lại file của kho này.',
   /** Hồ sơ Pancake — fb_id thuộc tài khoản thật khác (messageFor ghép thêm người đang giữ). */
@@ -236,6 +241,20 @@ const MESSAGES: Record<string, string> = {
     'Tồn thực tế thấp hơn phần đang giữ cho đơn. Xử lý đơn đang giữ hàng (hủy hoặc đổi kho) rồi nhập lại.',
   TIER_JOB_ACTOR_NOT_FOUND:
     'Không có tài khoản quản trị đang hoạt động để đứng tên lượt nâng hạng. Báo IT kiểm tra tài khoản admin.',
+  // Module Công việc (/work-items, /work-config — docs/PLAN-ticket-sla.md §6)
+  WORK_INVALID_TRANSITION:
+    'Việc đã đổi trạng thái nên thao tác này không còn hợp lệ. Tải lại để xem trạng thái mới.',
+  WORK_STALE: 'Việc vừa được người khác cập nhật. Tải lại để xem thay đổi rồi làm tiếp.',
+  WORK_ALREADY_CLAIMED: 'Yêu cầu này vừa có người nhận. Tải lại để xem ai đang xử lý.',
+  WORK_ASSIGN_OUT_OF_TREE:
+    'Chỉ giao được việc cho người trong phòng ban bạn phụ trách. Người ở phòng khác → gửi Yêu cầu nội bộ.',
+  WORK_ACTION_FORBIDDEN:
+    'Bạn không làm được thao tác này trên việc đang mở (không phải người làm / người giao / trưởng phòng nhận).',
+  WORK_INVALID: 'Thông tin việc chưa hợp lệ. Kiểm tra các ô được đánh dấu.',
+  WORK_CONFIG_INVALID: 'Cấu hình chưa hợp lệ. Kiểm tra các ô được đánh dấu.',
+  IDEMPOTENCY_KEY_OWNER_MISMATCH:
+    'Yêu cầu bị trùng mã gửi với người khác. Tải lại trang rồi gửi lại.',
+  IDEMPOTENCY_IN_PROGRESS: 'Yêu cầu trước vẫn đang xử lý. Đợi vài giây rồi tải lại để xem kết quả.',
 };
 
 const BY_STATUS: Record<number, string> = {
@@ -288,6 +307,13 @@ export function messageFor(err: unknown): string {
         .join(', ');
       if (who) {
         return `Facebook ID này đang gắn với tài khoản ${who}. Gỡ Facebook ID ở tài khoản đó trước nếu nhập đúng người.`;
+      }
+    }
+    if (err.code === 'WORK_ALREADY_CLAIMED') {
+      // Tên người vừa nhận là dữ liệu (details.assigneeName), không phải message thô của server.
+      const d = err.details as { assigneeName?: unknown; docNumber?: unknown } | null;
+      if (d && typeof d.assigneeName === 'string') {
+        return `${d.assigneeName} vừa nhận ${typeof d.docNumber === 'string' ? d.docNumber : 'yêu cầu này'}. Chọn yêu cầu khác trong hàng chờ.`;
       }
     }
     if (err.code === 'ACTUAL_STOCK_BELOW_RESERVED') {

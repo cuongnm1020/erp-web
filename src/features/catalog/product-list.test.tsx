@@ -121,6 +121,7 @@ const PRODUCTS = [
     category: CATEGORY,
     brand: BRAND,
     supplier: { id: uuid(401), code: 'NCC01', name: 'Phân bón Bình Điền' },
+    taxRateId: uuid(501),
     skus: [
       { id: uuid(1), code: 'TL08-BLUE', name: 'TL-08 xanh', baseUom: { code: 'cái' } },
       { id: uuid(4), code: 'TL08-RED', name: 'TL-08 đỏ', baseUom: { code: 'cái' } },
@@ -149,6 +150,7 @@ const PRODUCTS = [
     category: null,
     brand: null,
     supplier: null,
+    taxRateId: uuid(502),
     skus: [{ id: uuid(2), code: 'TP-BK48-100', name: 'BK 48', baseUom: { code: 'cây' } }],
     skuCount: 1,
     hasVariants: false,
@@ -171,6 +173,7 @@ const MINUS_14 = '−14';
 /** Request danh sách (take ≠ 1) — hai query đếm take=1 không tính vào đây. */
 let listCalls: URLSearchParams[] = [];
 let productCalls: URLSearchParams[] = [];
+const assignBodies: unknown[] = [];
 
 const countHandler = http.get('/api/skus', ({ request }) => {
   const url = new URL(request.url);
@@ -196,6 +199,53 @@ const productHandlers = [
   }),
   http.get('/api/categories', () => HttpResponse.json([CATEGORY])),
   http.get('/api/brands', () => HttpResponse.json([BRAND])),
+  http.get('/api/tax-rates', () =>
+    HttpResponse.json({
+      items: [
+        {
+          id: uuid(501),
+          code: 'VAT5',
+          name: 'Thuế GTGT 5%',
+          kind: 'TAXABLE',
+          ratePercent: '5',
+          misaName: '5%',
+          validFrom: null,
+          validTo: null,
+          replacementId: null,
+          isDefault: true,
+          isActive: true,
+          productCount: 1,
+          usedByOrders: false,
+          version: 0,
+          createdAt: '2026-10-23T00:00:00Z',
+          updatedAt: '2026-10-23T00:00:00Z',
+        },
+        {
+          id: uuid(502),
+          code: 'VAT8',
+          name: 'Thuế GTGT 8%',
+          kind: 'TAXABLE',
+          ratePercent: '8',
+          misaName: '8%',
+          validFrom: null,
+          validTo: null,
+          replacementId: null,
+          isDefault: false,
+          isActive: true,
+          productCount: 1,
+          usedByOrders: false,
+          version: 0,
+          createdAt: '2026-10-23T00:00:00Z',
+          updatedAt: '2026-10-23T00:00:00Z',
+        },
+      ],
+      unassignedProductCount: 0,
+    }),
+  ),
+  http.post('/api/tax-rates/assign', async ({ request }) => {
+    assignBodies.push(await request.json());
+    return HttpResponse.json({ updated: 2 }, { status: 201 });
+  }),
 ];
 
 describe('ProductListScreen — góc nhìn Sản phẩm (mặc định, GET /products)', () => {
@@ -245,6 +295,23 @@ describe('ProductListScreen — góc nhìn Sản phẩm (mặc định, GET /pro
     expect(await screen.findByText('Phân bón Bình Điền')).toBeInTheDocument();
     expect(screen.getByText('Chưa gán')).toBeInTheDocument();
     expect(productCalls.at(-1)!.get('supplierId')).toBeNull();
+  });
+
+  it('thuế suất: cột hiện 5% / 8% từ danh mục; ?taxRate=none → hasTaxRate=false, ?taxRate=<id> → taxRateId', async () => {
+    const first = renderApp(<ProductListScreen />);
+    expect(await screen.findByText('8%')).toBeInTheDocument();
+    expect(screen.getByText('5%')).toBeInTheDocument();
+    first.unmount();
+    search = 'taxRate=none';
+    const second = renderApp(<ProductListScreen />);
+    await screen.findByText(FIRST_PRODUCT.code);
+    await waitFor(() => expect(productCalls.at(-1)!.get('hasTaxRate')).toBe('false'));
+    second.unmount();
+    search = `taxRate=${uuid(502)}`;
+    renderApp(<ProductListScreen />);
+    await screen.findByText(FIRST_PRODUCT.code);
+    await waitFor(() => expect(productCalls.at(-1)!.get('taxRateId')).toBe(uuid(502)));
+    expect(productCalls.at(-1)!.get('hasTaxRate')).toBeNull();
   });
 
   it('RPT-05a: lọc NCC trên URL đi xuống server', async () => {

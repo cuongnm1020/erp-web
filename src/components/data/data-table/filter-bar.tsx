@@ -23,6 +23,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { cn } from '@/lib/cn';
+import { matchesVi } from '../form/search-select';
 
 export type FilterDef<F extends string = string> =
   | {
@@ -211,13 +212,6 @@ export function FilterBar<F extends string = string>({
 }
 
 /** Chữ thường, bỏ dấu tiếng Việt (đ → d) — để gõ "duong noi" vẫn ra "DƯƠNG NỘI". */
-const fold = (s: string) =>
-  s
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .replace(/đ/gi, 'd')
-    .toLowerCase();
-
 /**
  * Ô chọn một giá trị có ô tìm (Popover + Command) — cùng kích thước / nhãn "<label>: tất cả" như
  * filter select thường. Khớp khi mọi từ gõ vào đều có trong nhãn (không phân biệt hoa thường / dấu).
@@ -256,17 +250,7 @@ function SearchableSelect({
         </button>
       </PopoverTrigger>
       <PopoverContent id={listId} className="w-80 p-0" align="start">
-        <Command
-          filter={(itemValue, search) => {
-            const hay = fold(itemValue);
-            return fold(search)
-              .split(/\s+/)
-              .filter(Boolean)
-              .every((w) => hay.includes(w))
-              ? 1
-              : 0;
-          }}
-        >
+        <Command filter={(itemValue, search) => (matchesVi(itemValue, search) ? 1 : 0)}>
           <CommandInput placeholder={`Tìm ${label.toLowerCase()}…`} />
           <CommandList>
             <CommandEmpty>Không có mục nào khớp</CommandEmpty>

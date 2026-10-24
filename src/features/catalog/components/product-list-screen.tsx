@@ -16,6 +16,13 @@ import { EmptyState, ListSkeleton, QueryState } from '@/components/data/states';
 import { StatusBadge } from '@/components/data/status-badge';
 import { PageHeader } from '@/components/layout/page-header';
 import { Button } from '@/components/ui/button';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { toast } from '@/components/ui/toaster';
 import { cn } from '@/lib/cn';
 import { messageFor } from '@/lib/error-messages';
@@ -35,6 +42,7 @@ import {
   type SkuListRow,
   type TrackingMode,
 } from '../api/use-products';
+import { useAssignTaxRate, useTaxRates } from '../api/use-tax-rates';
 import { PancakeSyncButton } from './pancake-sync-button';
 
 /**
@@ -64,6 +72,7 @@ const DEFAULTS = {
     'categoryId',
     'brandId',
     'supplier',
+    'taxRate',
     'trackingMode',
     'stock',
   ] as const,
@@ -88,6 +97,8 @@ const TRACKING_LABELS: Record<TrackingMode, string> = {
 
 /** Giá trị URL `?supplier=none` = lọc sản phẩm CHƯA gán NCC chính (hasSupplier=false). */
 const SUPPLIER_NONE = 'none';
+/** Giá trị URL `?taxRate=none` = sản phẩm CHƯA gán thuế suất (hasTaxRate=false). */
+const TAX_RATE_NONE = 'none';
 
 /** Cột được sort phía server trên GET /products — id cột = sortBy gửi lên API. */
 const PRODUCT_SORTABLE = new Set(['code', 'name', 'createdAt']);
@@ -154,6 +165,12 @@ const productColumns: ColumnDef<ProductListItem, unknown>[] = [
       ) : (
         <span className="text-muted-foreground">Chưa gán</span>
       ),
+  },
+  {
+    id: 'taxRate',
+    header: 'Thuế suất',
+    meta: { width: 90 },
+    cell: ({ row }) => <TaxRateCell taxRateId={row.original.taxRateId} />,
   },
   {
     id: 'skus',
@@ -232,6 +249,58 @@ const productColumns: ColumnDef<ProductListItem, unknown>[] = [
     cell: ({ row }) => <ProductRowActions product={row.original} />,
   },
 ];
+
+/** "8%" từ danh mục thuế suất (query nhỏ, cache 5 phút); chưa gán → chip cảnh báo. */
+function TaxRateCell({ taxRateId }: { taxRateId: string | null }) {
+  const rates = useTaxRates(true);
+  if (!taxRateId) return <StatusBadge tone="warn">Chưa gán</StatusBadge>;
+  const r = rates.data?.items.find((x) => x.id === taxRateId);
+  return <span title={r?.name}>{r ? r.misaName : '…'}</span>;
+}
+
+/**
+ * Gán thuế suất cho các sản phẩm đã chọn (POST /tax-rates/assign) — kế toán (tax_rate.manage)
+ * hoặc người sửa được sản phẩm. Đảo ngược được (gán lại) nên không hỏi xác nhận.
+ */
+function BulkAssignTaxRate({ ids, onDone }: { ids: string[]; onDone: () => void }) {
+  const rates = useTaxRates();
+  const assign = useAssignTaxRate();
+  const [rateId, setRateId] = useState('');
+  return (
+    <div className="flex items-center gap-2">
+      <Select value={rateId} onValueChange={setRateId}>
+        <SelectTrigger className="h-7 w-40" aria-label="Thuế suất cần gán">
+          <SelectValue placeholder="Chọn thuế suất" />
+        </SelectTrigger>
+        <SelectContent>
+          {(rates.data?.items ?? []).map((r) => (
+            <SelectItem key={r.id} value={r.id}>
+              {r.misaName} · {r.name}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+      <Button
+        size="sm"
+        disabled={!rateId}
+        loading={assign.isPending}
+        loadingText="Đang gán…"
+        onClick={async () => {
+          try {
+            const res = await assign.mutateAsync({ taxRateId: rateId, productIds: ids });
+            const name = rates.data?.items.find((r) => r.id === rateId)?.misaName ?? '';
+            toast.success(`Đã gán thuế suất ${name} cho ${res.updated} sản phẩm`);
+            onDone();
+          } catch (err) {
+            toast.error(messageFor(err));
+          }
+        }}
+      >
+        Gán thuế suất
+      </Button>
+    </div>
+  );
+}
 
 /** Sửa (route riêng) + Xóa mềm — server chặn 409 khi SKU còn tồn hoặc đang giữ hàng. */
 function ProductRowActions({ product }: { product: ProductListItem }) {
@@ -727,6 +796,9 @@ function ProductView({
   const categories = useCategories();
   const brands = useBrands();
   const suppliers = useSupplierFilterOptions();
+  const taxRates = useTaxRates(true);
+  const ability = useAbility();
+  const canAssignTax = ability.can('manage', 'TaxRate') || ability.can('update', 'Product');
   const supplierFilter = state.filters.supplier;
   // Chỉ cột nằm trong whitelist sort của API mới gửi lên — cột khác bấm không có tác dụng.
   const sort = state.sort && PRODUCT_SORTABLE.has(state.sort.id) ? state.sort : null;
@@ -737,6 +809,11 @@ function ProductView({
       brandId: state.filters.brandId,
       supplierId: supplierFilter && supplierFilter !== SUPPLIER_NONE ? supplierFilter : undefined,
       hasSupplier: supplierFilter === SUPPLIER_NONE ? false : undefined,
+      taxRateId:
+        state.filters.taxRate && state.filters.taxRate !== TAX_RATE_NONE
+          ? state.filters.taxRate
+          : undefined,
+      hasTaxRate: state.filters.taxRate === TAX_RATE_NONE ? false : undefined,
       isActive: status === undefined ? undefined : status === 'active',
       trackingMode: parseTracking(state.filters.trackingMode),
       hasStock: state.filters.stock === 'in' ? true : undefined,
@@ -775,6 +852,18 @@ function ProductView({
       ],
     },
     {
+      key: 'taxRate',
+      label: 'Thuế suất',
+      type: 'select',
+      options: [
+        { value: TAX_RATE_NONE, label: 'Chưa gán thuế suất' },
+        ...(taxRates.data?.items ?? []).map((r) => ({
+          value: r.id,
+          label: `${r.misaName} · ${r.name}`,
+        })),
+      ],
+    },
+    {
       key: 'trackingMode',
       label: 'Theo dõi',
       type: 'select',
@@ -803,6 +892,7 @@ function ProductView({
           categoryId: state.filters.categoryId,
           brandId: state.filters.brandId,
           supplier: state.filters.supplier,
+          taxRate: state.filters.taxRate,
           trackingMode: state.filters.trackingMode,
           stock: state.filters.stock,
         }}
@@ -855,6 +945,11 @@ function ProductView({
               onSizeChange={(size) => set({ size })}
               onSortChange={(s) => set({ sort: s })}
               selection={selection}
+              bulkActions={
+                canAssignTax
+                  ? (ids) => <BulkAssignTaxRate ids={ids} onDone={() => selection.onChange({})} />
+                  : undefined
+              }
             />
             <p className="mt-2 text-xs text-muted-foreground">
               Lọc danh mục gộp cả danh mục con · &quot;Còn hàng&quot; = có ít nhất một SKU còn tồn ·

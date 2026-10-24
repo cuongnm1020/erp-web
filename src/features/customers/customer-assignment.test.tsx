@@ -164,7 +164,7 @@ describe('CustomerAssignmentScreen — P2-04', () => {
     expect(await screen.findByRole('toolbar', { name: 'Hành động hàng loạt' })).toHaveTextContent(
       'Đã chọn 1',
     );
-    expect(screen.getByRole('button', { name: 'Gán cho' })).toBeInTheDocument();
+    expect(screen.getByRole('combobox', { name: 'Gán cho' })).toBeInTheDocument();
     // Tab Chưa phân không có "Trả về chưa phân"
     expect(screen.queryByRole('button', { name: 'Trả về chưa phân' })).not.toBeInTheDocument();
 

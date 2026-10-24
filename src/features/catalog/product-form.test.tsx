@@ -43,8 +43,54 @@ function baseHandlers() {
     http.get('/api/warehouses', () =>
       HttpResponse.json([{ id: 'wh-1', code: 'WH01', name: 'Kho HN-1' }]),
     ),
+    http.get('/api/tax-rates', () => HttpResponse.json(TAX_RATES)),
   ];
 }
+
+const TAX_RATES = {
+  items: [
+    {
+      id: 'tr-5',
+      code: 'VAT5',
+      name: 'Thuế GTGT 5%',
+      kind: 'TAXABLE',
+      ratePercent: '5',
+      misaName: '5%',
+      validFrom: null,
+      validTo: null,
+      replacementId: null,
+      isDefault: true,
+      isActive: true,
+      productCount: 0,
+      usedByOrders: false,
+      version: 0,
+      createdAt: '2026-10-23T00:00:00Z',
+      updatedAt: '2026-10-23T00:00:00Z',
+    },
+    {
+      id: 'tr-8',
+      code: 'VAT8',
+      name: 'Thuế GTGT 8%',
+      kind: 'TAXABLE',
+      ratePercent: '8',
+      misaName: '8%',
+      validFrom: null,
+      validTo: null,
+      replacementId: null,
+      isDefault: false,
+      isActive: true,
+      productCount: 0,
+      usedByOrders: false,
+      version: 0,
+      createdAt: '2026-10-23T00:00:00Z',
+      updatedAt: '2026-10-23T00:00:00Z',
+    },
+  ],
+  unassignedProductCount: 0,
+};
+
+/** Ô "Thuế suất *" bắt buộc — chờ danh mục về và mức mặc định (sản phẩm mới) / mức đang gán hiện ra. */
+const taxReady = () => screen.findAllByText(/Thuế GTGT \d+%/);
 
 const fill = (label: string, value: string) =>
   fireEvent.change(screen.getByLabelText(label), { target: { value } });
@@ -65,6 +111,7 @@ describe('ProductFormScreen — tạo (design/Products/ProductForm)', () => {
       }),
     );
     renderApp(<ProductFormScreen />);
+    await taxReady();
     fireEvent.click(screen.getByRole('button', { name: /Lưu sản phẩm/ }));
     expect(await screen.findByText('Nhập tên thương mại')).toBeInTheDocument();
     expect(posts).toHaveLength(0);
@@ -73,6 +120,7 @@ describe('ProductFormScreen — tạo (design/Products/ProductForm)', () => {
   it('ô mã sản phẩm + tên xuất hóa đơn + mức tồn kho có mặt (2026-09-22); mã SKU / barcode lẻ vẫn ẩn; cân nặng (g) + ĐVT phụ có mặt', async () => {
     server.use(...baseHandlers());
     renderApp(<ProductFormScreen />);
+    await taxReady();
     await screen.findByLabelText('Tên thương mại *');
     expect(screen.getByLabelText('Mã sản phẩm')).toBeInTheDocument();
     expect(screen.getByLabelText('Tên xuất hóa đơn')).toBeInTheDocument();
@@ -119,6 +167,7 @@ describe('ProductFormScreen — tạo (design/Products/ProductForm)', () => {
       }),
     );
     renderApp(<ProductFormScreen />);
+    await taxReady();
     fill('Tên thương mại *', 'Bút bi TL-08');
     // Sản phẩm đơn: không có ô "Tên biến thể", không có nút "Thêm biến thể"
     expect(screen.queryByLabelText('Tên biến thể')).not.toBeInTheDocument();
@@ -157,6 +206,7 @@ describe('ProductFormScreen — tạo (design/Products/ProductForm)', () => {
       }),
     );
     renderApp(<ProductFormScreen />);
+    await taxReady();
     fill('Tên thương mại *', 'Bút bi TL-08');
     // Chưa chọn ĐVT thùng → số lượng / barcode thùng bị khoá, pallet bị khoá
     expect(screen.getByLabelText('Số PCS trong 1 thùng')).toBeDisabled();
@@ -196,6 +246,7 @@ describe('ProductFormScreen — tạo (design/Products/ProductForm)', () => {
       }),
     );
     renderApp(<ProductFormScreen />);
+    await taxReady();
     fill('Tên thương mại *', 'Bút bi TL-08');
     fireEvent.click(screen.getByRole('combobox', { name: 'Nhập theo thùng' }));
     fireEvent.click(await screen.findByRole('option', { name: 'Có' }));
@@ -242,6 +293,7 @@ describe('ProductFormScreen — tạo (design/Products/ProductForm)', () => {
       }),
     );
     renderApp(<ProductFormScreen />);
+    await taxReady();
     fill('Tên thương mại *', 'Thuốc trĩ');
     fireEvent.click(screen.getByRole('checkbox', { name: /Có nhiều biến thể/ }));
     expect(await screen.findByLabelText('Tên biến thể')).toBeInTheDocument();
@@ -288,6 +340,7 @@ describe('ProductFormScreen — tạo (design/Products/ProductForm)', () => {
       http.post('/api/products/:id/skus', () => HttpResponse.json({}, { status: 201 })),
     );
     renderApp(<ProductFormScreen />);
+    await taxReady();
     fill('Tên thương mại *', 'Thuốc bật chồi X');
     fill('Tên lên đơn Pancake', 'thuốc bật chồi, cheshaland, , thuốc bật chồi');
     fireEvent.click(screen.getByRole('button', { name: /Lưu sản phẩm/ }));
@@ -331,6 +384,7 @@ describe('ProductFormScreen — tạo (design/Products/ProductForm)', () => {
       }),
     );
     renderApp(<ProductFormScreen />);
+    await taxReady();
     fill('Tên thương mại *', 'Bút bi TL-09');
     fireEvent.click(screen.getByRole('checkbox', { name: /Có nhiều biến thể/ }));
     fill('Tên biến thể', 'Bút TL-09');
@@ -380,6 +434,7 @@ describe('ProductFormScreen — tạo (design/Products/ProductForm)', () => {
       }),
     );
     renderApp(<ProductFormScreen />);
+    await taxReady();
     fill('Tên thương mại *', 'Bút TL-11');
     // 2026-09-22: mã nhập tay, tên xuất hóa đơn, mức tồn kho (string decimal — luật 10)
     fill('Mã sản phẩm', 'TL11');
@@ -439,6 +494,7 @@ describe('ProductFormScreen — tạo (design/Products/ProductForm)', () => {
       }),
     );
     renderApp(<ProductFormScreen />);
+    await taxReady();
     fill('Tên thương mại *', 'Vua Bật Chồi');
     fireEvent.click(screen.getByRole('combobox', { name: 'Nhập theo thùng' }));
     fireEvent.click(await screen.findByRole('option', { name: 'Có' }));
@@ -495,6 +551,7 @@ describe('ProductFormScreen — tạo (design/Products/ProductForm)', () => {
       }),
     );
     renderApp(<ProductFormScreen />);
+    await taxReady();
 
     const dropzone = screen.getByRole('button', { name: 'Kéo thả ảnh vào đây hoặc bấm để chọn' });
     const a = new File([new Uint8Array([1, 2, 3, 4])], 'a.png', { type: 'image/png' });
@@ -532,6 +589,7 @@ describe('ProductFormScreen — sửa', () => {
     category: null,
     brand: null,
     searchAliases: ['bút tl'],
+    taxRateId: 'tr-5',
     invoiceName: 'Bút bi Thiên Long TL-08 (hộp)',
     reorderLevel: '120.000000',
     version: 7,
@@ -597,6 +655,7 @@ describe('ProductFormScreen — sửa', () => {
       }),
     );
     renderApp(<ProductFormScreen productId="p-9" />);
+    await taxReady();
     expect(await screen.findByDisplayValue('Bút bi TL-08 xanh')).toBeInTheDocument();
     // Alias prefill vào ô "Tên lên đơn Pancake".
     expect(screen.getByDisplayValue('bút tl')).toBeInTheDocument();
@@ -650,6 +709,7 @@ describe('ProductFormScreen — sửa', () => {
       ),
     );
     renderApp(<ProductFormScreen productId="p-9" />);
+    await taxReady();
     await screen.findByDisplayValue('Bút bi TL-08 xanh');
     fireEvent.click(screen.getByRole('button', { name: /Lưu thay đổi/ }));
     // Câu từ bộ dịch (luật 6) — không render message thô của server.
@@ -690,6 +750,7 @@ describe('ProductFormScreen — sửa', () => {
       }),
     );
     renderApp(<ProductFormScreen productId="p-9" />);
+    await taxReady();
     await screen.findByDisplayValue('Bút bi TL-08 xanh');
     // Gallery cha: ảnh chính có badge
     expect(screen.getByText('Ảnh chính')).toBeInTheDocument();
@@ -726,6 +787,7 @@ describe('ProductFormScreen — NCC chính (RPT-05a)', () => {
       http.post('/api/products/:id/skus', () => HttpResponse.json({}, { status: 201 })),
     );
     renderApp(<ProductFormScreen />);
+    await taxReady();
     fill('Tên thương mại *', 'Phân NPK 20-20-15');
     fireEvent.click(screen.getByRole('combobox', { name: 'Nhà cung cấp chính' }));
     fireEvent.click(await screen.findByText('Thuốc BVTV Lộc Trời'));
@@ -748,6 +810,7 @@ describe('ProductFormScreen — NCC chính (RPT-05a)', () => {
       http.post('/api/products/:id/skus', () => HttpResponse.json({}, { status: 201 })),
     );
     renderApp(<ProductFormScreen />);
+    await taxReady();
     fill('Tên thương mại *', 'Phân NPK 20-20-15');
     fireEvent.click(screen.getByRole('button', { name: /Lưu sản phẩm/ }));
     await waitFor(() => expect(bodies).toHaveLength(1));
@@ -767,6 +830,7 @@ describe('ProductFormScreen — NCC chính (RPT-05a)', () => {
           brandId: null,
           supplierId: 'sup-1',
           supplier: { id: 'sup-1', code: 'NCC01', name: 'Phân bón Bình Điền' },
+          taxRateId: 'tr-8',
           trackingMode: 'NONE',
           shelfLifeDays: null,
           isActive: true,
@@ -800,12 +864,92 @@ describe('ProductFormScreen — NCC chính (RPT-05a)', () => {
       }),
     );
     renderApp(<ProductFormScreen productId="p-9" />);
+    await taxReady();
     expect(await screen.findByRole('combobox', { name: 'Nhà cung cấp chính' })).toHaveTextContent(
       'Phân bón Bình Điền',
     );
     fireEvent.click(screen.getByRole('button', { name: 'Bỏ chọn' }));
     fireEvent.click(screen.getByRole('button', { name: /Lưu thay đổi/ }));
     await waitFor(() => expect(patches).toHaveLength(1));
-    expect(patches[0]).toMatchObject({ version: 3, supplierId: null });
+    expect(patches[0]).toMatchObject({ version: 3, supplierId: null, taxRateId: 'tr-8' });
+  });
+});
+
+describe('ProductFormScreen — thuế suất cấp sản phẩm (2026-10-23)', () => {
+  it('tạo: điền sẵn mức mặc định, POST /products kèm taxRateId', async () => {
+    const bodies: unknown[] = [];
+    server.use(
+      ...baseHandlers(),
+      http.post('/api/products', async ({ request }) => {
+        bodies.push(await request.json());
+        return HttpResponse.json(
+          { id: 'p-1', code: 'SP-1', name: 'Keo liền sẹo' },
+          { status: 201 },
+        );
+      }),
+      http.post('/api/products/:id/skus', () => HttpResponse.json({}, { status: 201 })),
+    );
+    renderApp(<ProductFormScreen />);
+    await taxReady();
+    expect(screen.getByRole('combobox', { name: 'Thuế suất *' })).toHaveTextContent('5%');
+    fill('Tên thương mại *', 'Keo liền sẹo');
+    fireEvent.click(screen.getByRole('button', { name: /Lưu sản phẩm/ }));
+    await waitFor(() => expect(bodies).toHaveLength(1));
+    expect(bodies[0]).toMatchObject({ name: 'Keo liền sẹo', taxRateId: 'tr-5' });
+  });
+
+  it('sửa sản phẩm cũ chưa gán thuế suất → chặn lưu, báo "Chọn thuế suất", KHÔNG gọi API', async () => {
+    const patches: unknown[] = [];
+    server.use(
+      ...baseHandlers(),
+      http.get('/api/products/:id', () =>
+        HttpResponse.json({
+          id: 'p-9',
+          code: 'NPK',
+          name: 'Phân NPK',
+          categoryId: null,
+          brandId: null,
+          supplierId: null,
+          supplier: null,
+          taxRateId: null,
+          trackingMode: 'NONE',
+          shelfLifeDays: null,
+          isActive: true,
+          category: null,
+          brand: null,
+          searchAliases: [],
+          invoiceName: null,
+          reorderLevel: null,
+          version: 3,
+          images: [],
+          hasVariants: false,
+          skus: [
+            {
+              id: 's-1',
+              productId: 'p-9',
+              code: 'NPK',
+              name: 'Phân NPK',
+              isActive: true,
+              version: 1,
+              baseUom: UOMS[0],
+              barcodes: [],
+              uomConversions: [],
+              images: [],
+            },
+          ],
+        }),
+      ),
+      http.patch('/api/products/:id', async ({ request }) => {
+        patches.push(await request.json());
+        return HttpResponse.json({});
+      }),
+    );
+    renderApp(<ProductFormScreen productId="p-9" />);
+    expect(await screen.findByRole('combobox', { name: 'Thuế suất *' })).toHaveTextContent(
+      'Chọn thuế suất',
+    );
+    fireEvent.click(screen.getByRole('button', { name: /Lưu thay đổi/ }));
+    expect(await screen.findByText('Chọn thuế suất', { selector: 'p' })).toBeInTheDocument();
+    expect(patches).toHaveLength(0);
   });
 });

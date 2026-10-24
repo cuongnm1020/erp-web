@@ -43,6 +43,8 @@ export function buildAbility(
     rules.push({ action: 'view', subject: 'OrgChart' });
   // Nhân viên của team CSKH (2026-10-22): phụ trách phòng ban CSKH — API tự lọc phạm vi.
   if (me?.managesCareTeam) rules.push({ action: 'manage', subject: 'CareStaff' });
+  // Việc của team (module Công việc, 2026-10-22): người phụ trách phòng ban — API lọc theo nhánh.
+  if (me?.managesDepartments) rules.push({ action: 'view', subject: 'WorkTeam' });
   return createMongoAbility<[AppAction, AppSubject]>(rules);
 }
 
