@@ -12,6 +12,7 @@ import {
   FormItem,
   FormLabel,
   FormMessage,
+  StaffSelect,
 } from '@/components/data/form';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -255,24 +256,15 @@ export function DepartmentDialog({
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>Trưởng phòng</FormLabel>
-                  <Select
-                    value={field.value || NONE}
-                    onValueChange={(v) => field.onChange(v === NONE ? '' : v)}
-                  >
-                    <FormControl>
-                      <SelectTrigger aria-label="Trưởng phòng">
-                        <SelectValue />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      <SelectItem value={NONE}>— Chưa có —</SelectItem>
-                      {users.map((u) => (
-                        <SelectItem key={u.id} value={u.id}>
-                          {u.fullName} · {u.code}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <FormControl>
+                    <StaffSelect
+                      aria-label="Trưởng phòng"
+                      value={field.value ?? ''}
+                      onChange={field.onChange}
+                      staff={users}
+                      noneLabel="— Chưa có —"
+                    />
+                  </FormControl>
                   <FormMessage />
                 </FormItem>
               )}

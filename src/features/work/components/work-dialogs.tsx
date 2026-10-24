@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState, type ReactNode } from 'react';
+import { matchesVi } from '@/components/data/form';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import {
@@ -388,9 +389,23 @@ export function PeoplePicker({
   loading?: boolean;
   allowEmpty?: string;
 }) {
+  const [q, setQ] = useState('');
+  // Người đang chọn luôn còn trong danh sách dù không khớp ô tìm.
+  const shown = q.trim()
+    ? people.filter(
+        (p) => p.id === value || matchesVi(`${p.fullName} ${p.departmentName ?? ''}`, q),
+      )
+    : people;
   return (
     <fieldset className="flex flex-col gap-1">
       <legend className="mb-1 text-sm font-semibold">Người xử lý</legend>
+      <Input
+        type="search"
+        value={q}
+        onChange={(e) => setQ(e.target.value)}
+        placeholder="Tìm theo tên hoặc phòng ban…"
+        aria-label="Tìm người xử lý"
+      />
       <div
         className="max-h-64 overflow-y-auto rounded-md border"
         role="radiogroup"
@@ -414,7 +429,10 @@ export function PeoplePicker({
         {loading ? (
           <p className="px-2.5 py-2 text-sm text-muted-foreground">Đang tải nhân sự…</p>
         ) : null}
-        {people.map((p) => (
+        {!loading && q.trim() && shown.length === 0 ? (
+          <p className="px-2.5 py-2 text-sm text-muted-foreground">Không có nhân viên khớp</p>
+        ) : null}
+        {shown.map((p) => (
           <label
             key={p.id}
             className={cn(

@@ -12,6 +12,7 @@ import {
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
+import { StaffSelect } from '@/components/data/form';
 import { StatusBadge } from '@/components/data/status-badge';
 import { PageHeader } from '@/components/layout/page-header';
 import { Button } from '@/components/ui/button';
@@ -371,29 +372,21 @@ function TaskForm() {
                     </button>
                   </span>
                 ))}
-                <Select
+                <StaffSelect
                   value={pick}
-                  onValueChange={(v) => {
+                  onChange={(v) => {
                     setAssignees([...assignees, v]);
                     setPick('');
                   }}
-                >
-                  <SelectTrigger
-                    className="h-7 w-52 border-transparent"
-                    aria-label="Thêm người làm"
-                  >
-                    <SelectValue placeholder="Thêm người…" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {others.map((p) => (
-                      <SelectItem key={p.id} value={p.id}>
-                        {p.fullName}
-                        {p.isSelf ? ' (bạn)' : ''} · {p.open} việc
-                        {p.overdue ? ` · ${p.overdue} quá hạn` : ''}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                  className="h-7 w-52 border-transparent"
+                  aria-label="Thêm người làm"
+                  placeholder="Thêm người…"
+                  staff={others.map((p) => ({
+                    id: p.id,
+                    fullName: p.isSelf ? `${p.fullName} (bạn)` : p.fullName,
+                    hint: `${p.open} việc${p.overdue ? ` · ${p.overdue} quá hạn` : ''}`,
+                  }))}
+                />
               </div>
             </Field>
             {assignees.length > 1 ? (
@@ -546,20 +539,14 @@ function TaskForm() {
                     </span>
                   );
                 })}
-                <Select value="" onValueChange={(v) => setWatchers([...watchers, v])}>
-                  <SelectTrigger className="w-52" aria-label="Thêm người theo dõi">
-                    <SelectValue placeholder="Thêm người…" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {(people.data ?? [])
-                      .filter((p) => !p.isSelf && !watchers.includes(p.id))
-                      .map((p) => (
-                        <SelectItem key={p.id} value={p.id}>
-                          {p.fullName}
-                        </SelectItem>
-                      ))}
-                  </SelectContent>
-                </Select>
+                <StaffSelect
+                  value=""
+                  onChange={(v) => setWatchers([...watchers, v])}
+                  className="w-52"
+                  aria-label="Thêm người theo dõi"
+                  placeholder="Thêm người…"
+                  staff={(people.data ?? []).filter((p) => !p.isSelf && !watchers.includes(p.id))}
+                />
               </div>
             </Field>
             <Field label="Lặp lại">

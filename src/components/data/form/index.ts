@@ -16,4 +16,8 @@ export { DatePicker, DateRangePicker, dateToKey, keyToDate } from './date-picker
 export type { DateKey, DatePickerProps, DateRangeValue } from './date-picker';
 export { EntityPicker } from './entity-picker';
 export type { EntityOption, EntityPickerProps, EntitySearchResult } from './entity-picker';
+export { SearchSelect, foldVi, matchesVi } from './search-select';
+export type { SearchSelectOption, SearchSelectProps } from './search-select';
+export { StaffSelect, staffOptions } from './staff-select';
+export type { StaffSelectItem, StaffSelectProps } from './staff-select';
 export { applyServerErrors } from './apply-server-errors';

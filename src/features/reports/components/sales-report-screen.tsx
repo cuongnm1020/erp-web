@@ -2,6 +2,7 @@
 
 import { RefreshCw, X } from 'lucide-react';
 import { DateRangePicker } from '@/components/data/date-range-picker';
+import { StaffSelect } from '@/components/data/form';
 import { ForbiddenState } from '@/components/data/states';
 import { PageHeader } from '@/components/layout/page-header';
 import { Button } from '@/components/ui/button';
@@ -138,12 +139,17 @@ export function SalesReportScreen() {
           />
         ) : null}
         {ownerPicker ? (
-          <FilterSelect
-            label="Nhân viên phụ trách"
-            value={showOwnerChip ? undefined : ownerId}
-            options={ownerOptions.map((u) => ({ value: u.id, label: u.fullName }))}
-            onChange={(v) => setFilters({ ownerId: v, ownerName: undefined })}
-          />
+          <label className="flex flex-col gap-0.5 text-xs text-muted-foreground">
+            Nhân viên phụ trách
+            <StaffSelect
+              aria-label="Nhân viên phụ trách"
+              className="h-8 w-44"
+              value={showOwnerChip ? '' : (ownerId ?? '')}
+              onChange={(v) => setFilters({ ownerId: v || undefined, ownerName: undefined })}
+              noneLabel="Tất cả"
+              staff={ownerOptions}
+            />
+          </label>
         ) : null}
         {shopOptions.length > 0 ? (
           <FilterSelect
