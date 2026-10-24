@@ -2612,6 +2612,61 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/org/care-staff/{userId}/position": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Chức vụ trong phòng CSKH (2026-10-24): nhân viên ↔ trưởng nhóm = trưởng phòng quản lý người
+         *     đó; trưởng phòng = quản trị. Kiểm trong service.
+         */
+        put: operations["OrgTreeController_setCarePosition"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/org/care-staff/{userId}/group": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Đưa nhân viên CSKH vào nhóm của một trưởng nhóm (null = bỏ nhóm). */
+        put: operations["OrgTreeController_setCareGroup"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/org/care-staff/{userId}/grants": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Quyền trưởng phòng tick được cho trưởng nhóm này + quyền đang cấp. */
+        get: operations["OrgTreeController_careGrants"];
+        /** Thay toàn bộ quyền cấp cho trưởng nhóm — chỉ quyền người gọi đang có. */
+        put: operations["OrgTreeController_setCareGrants"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/org/tree": {
         parameters: {
             query?: never;
@@ -9439,6 +9494,13 @@ export interface components {
              * @enum {string}
              */
             kind: "SALES" | "CSKH";
+            /**
+             * @description Trưởng phòng: phòng CSKH = mọi người trong phòng mang vai trò trưởng phòng CSKH (+ `managerId`);
+             *     phòng khác = [managerId] (2026-10-24).
+             */
+            managerIds: string[];
+            /** @description Trưởng nhóm (chỉ phòng CSKH; phòng khác []). */
+            groupLeadIds: string[];
             _count: components["schemas"]["DepartmentCountDto"];
         };
         CreateDepartmentDto: {
@@ -9469,6 +9531,13 @@ export interface components {
             isActive?: boolean;
             /** @enum {string} */
             kind?: "SALES" | "CSKH";
+            /**
+             * @description Phòng CSKH (2026-10-24): TOÀN BỘ trưởng phòng — người trong phòng, ngang hàng. Có trường này
+             *     thì `managerId` bị bỏ qua (ghi = người đầu danh sách còn chức). Phòng khác: bỏ qua.
+             */
+            managerIds?: string[];
+            /** @description Phòng CSKH: TOÀN BỘ trưởng nhóm — người trong phòng, không trùng `managerIds`. */
+            groupLeadIds?: string[];
         };
         CareStaffDepartmentDto: {
             id: string;
@@ -9480,11 +9549,28 @@ export interface components {
             name: string;
         };
         CareStaffDto: {
+            /**
+             * @description Trưởng phòng / trưởng nhóm / nhân viên.
+             * @enum {string}
+             */
+            position: "MANAGER" | "GROUP_LEAD" | "MEMBER";
             /** @description Dạng chuẩn chỉ chữ số; null = chưa khai. */
             phone: string | null;
             departmentName: string | null;
             roles: components["schemas"]["CareStaffRoleDto"][];
             createdAt: string;
+            /** @description Trưởng nhóm của nhân viên; null = chưa có nhóm (hoặc không phải nhân viên). */
+            groupLeaderId: string | null;
+            /** @description Trưởng nhóm: số nhân viên đang trong nhóm (kể cả đã khóa); còn lại 0. */
+            groupSize: number;
+            /** @description Trưởng nhóm: quyền trưởng phòng đã cấp (mã quyền); còn lại []. */
+            grantedPermissions: string[];
+            /** @description Người xem sửa được thông tin người này. */
+            canEdit: boolean;
+            /** @description Người xem khóa / mở khóa được người này. */
+            canLock: boolean;
+            /** @description Người xem đổi chức vụ (nhân viên ↔ trưởng nhóm) / nhóm / cấp quyền trưởng nhóm được. */
+            canLead: boolean;
             id: string;
             code: string;
             fullName: string;
@@ -9496,10 +9582,47 @@ export interface components {
             /** @description Người đang xem được sửa / khóa / chuyển phòng ban người này (chỉ để ẩn nút — server vẫn kiểm). */
             canManage: boolean;
         };
+        CareStaffViewerDto: {
+            /**
+             * @description Chức vụ của người xem; null = admin / không thuộc phòng CSKH nào trong danh sách.
+             * @enum {string|null}
+             */
+            position: "MANAGER" | "GROUP_LEAD" | "MEMBER" | null;
+            /** @description Được thêm nhân viên (trưởng nhóm: người mới vào nhóm mình). */
+            canAdd: boolean;
+            /** @description Được đặt trưởng phòng (admin). */
+            canSetManager: boolean;
+        };
         CareStaffListDto: {
             /** @description Phòng ban CSKH người gọi phụ trách (gồm phòng con) — nơi thêm nhân viên mới. */
             departments: components["schemas"]["CareStaffDepartmentDto"][];
             staff: components["schemas"]["CareStaffDto"][];
+            viewer: components["schemas"]["CareStaffViewerDto"];
+        };
+        SetCarePositionDto: {
+            /** @enum {string} */
+            position: "MANAGER" | "GROUP_LEAD" | "MEMBER";
+        };
+        SetCareGroupDto: {
+            /**
+             * Format: uuid
+             * @description null = bỏ nhóm.
+             */
+            groupLeaderId: string | null;
+        };
+        CareGrantableDto: {
+            code: string;
+            /** @description Nhóm hiển thị: "Nhân sự trong nhóm", "Đơn hàng", "Báo cáo". */
+            group: string;
+            label: string;
+            hint: string | null;
+        };
+        CareGrantsDto: {
+            grantable: components["schemas"]["CareGrantableDto"][];
+            granted: string[];
+        };
+        SetCareGrantsDto: {
+            permissions: string[];
         };
         OrgEmployeeDto: {
             id: string;
@@ -18871,6 +18994,98 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["CareStaffListDto"];
+                };
+            };
+        };
+    };
+    OrgTreeController_setCarePosition: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                userId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SetCarePositionDto"];
+            };
+        };
+        responses: {
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    OrgTreeController_setCareGroup: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                userId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SetCareGroupDto"];
+            };
+        };
+        responses: {
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    OrgTreeController_careGrants: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                userId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CareGrantsDto"];
+                };
+            };
+        };
+    };
+    OrgTreeController_setCareGrants: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                userId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SetCareGrantsDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CareGrantsDto"];
                 };
             };
         };

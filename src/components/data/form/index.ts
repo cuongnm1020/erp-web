@@ -20,4 +20,6 @@ export { SearchSelect, foldVi, matchesVi } from './search-select';
 export type { SearchSelectOption, SearchSelectProps } from './search-select';
 export { StaffSelect, staffOptions } from './staff-select';
 export type { StaffSelectItem, StaffSelectProps } from './staff-select';
+export { StaffMultiSelect } from './staff-multi-select';
+export type { StaffMultiSelectProps } from './staff-multi-select';
 export { applyServerErrors } from './apply-server-errors';

@@ -28,16 +28,31 @@ const staff = (id: string, over: Record<string, unknown> = {}) => ({
   departmentName: DEPT.name,
   createdById: null,
   canManage: true,
+  canEdit: true,
+  canLock: true,
+  canLead: true,
   createdAt: '2026-10-21T01:00:00.000Z',
   roles: [{ code: 'CSKH_MEMBER', name: 'Nhân viên CSKH' }],
+  position: 'MEMBER',
+  groupLeaderId: null,
+  groupSize: 0,
+  grantedPermissions: [],
   ...over,
 });
 const LIST = {
   departments: [DEPT],
   staff: [
-    staff('lead', { canManage: false, roles: [{ code: 'CSKH_LEADER', name: 'Trưởng nhóm CSKH' }] }),
+    staff('lead', {
+      canManage: false,
+      canEdit: false,
+      canLock: false,
+      canLead: false,
+      position: 'MANAGER',
+      roles: [{ code: 'CSKH_LEADER', name: 'Trưởng phòng CSKH' }],
+    }),
     staff('a'),
   ],
+  viewer: { position: 'MANAGER', canAdd: true, canSetManager: false },
 };
 const revenue = (id: string, value: string, orders: number) => ({
   key: { id, name: id, shopId: null, shopName: null },
@@ -127,5 +142,74 @@ describe('CareStaffScreen — Nhân viên của team (trưởng nhóm CSKH, 2026
     renderApp(<CareStaffScreen />, { me: ME_CSKH_LEAD });
     expect(await screen.findByText('Bạn chưa phụ trách phòng CSKH nào')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /Thêm nhân viên/ })).toBeNull();
+  });
+
+  it('trưởng nhóm (2026-10-24): cột Chức vụ / Nhóm / Quyền thêm; "Phân quyền" tick quyền → PUT grants', async () => {
+    search = '';
+    const puts: unknown[] = [];
+    server.use(
+      http.get('/api/org/care-staff', () =>
+        HttpResponse.json({
+          ...LIST,
+          staff: [
+            ...LIST.staff,
+            staff('g', {
+              fullName: 'Lê Thị Huế',
+              position: 'GROUP_LEAD',
+              groupSize: 1,
+              grantedPermissions: ['user.group_edit'],
+            }),
+            staff('b', { fullName: 'Nhân viên b', groupLeaderId: 'g' }),
+          ],
+        }),
+      ),
+      http.get('/api/reports/sales/by-staff', () =>
+        HttpResponse.json({ items: [], groupBy: 'owner', totals: {} }),
+      ),
+      http.get('/api/org/care-staff/:id/grants', () =>
+        HttpResponse.json({
+          grantable: [
+            {
+              code: 'user.group_edit',
+              group: 'Nhân sự trong nhóm',
+              label: 'Sửa thông tin nhân viên',
+              hint: null,
+            },
+            {
+              code: 'user.group_lock',
+              group: 'Nhân sự trong nhóm',
+              label: 'Khóa / mở khóa nhân viên',
+              hint: null,
+            },
+            { code: 'sales_order.approve', group: 'Đơn hàng', label: 'Duyệt đơn', hint: null },
+          ],
+          granted: ['user.group_edit'],
+        }),
+      ),
+      http.put('/api/org/care-staff/:id/grants', async ({ params, request }) => {
+        const body = (await request.json()) as { permissions: string[] };
+        puts.push({ id: params.id, ...body });
+        return HttpResponse.json({ grantable: [], granted: body.permissions });
+      }),
+    );
+    renderApp(<CareStaffScreen />, { me: ME_CSKH_LEAD });
+    const rowG = (await screen.findByText('Lê Thị Huế')).closest('tr')!;
+    expect(within(rowG).getByText('Trưởng nhóm')).toBeInTheDocument();
+    expect(within(rowG).getByText('1 nhân viên')).toBeInTheDocument();
+    expect(within(rowG).getByText('Sửa NV')).toBeInTheDocument();
+    const rowB = screen.getByText('Nhân viên b').closest('tr')!;
+    expect(within(rowB).getByText('Nhóm Lê Thị Huế')).toBeInTheDocument();
+    const rowA = screen.getByText('Nhân viên a').closest('tr')!;
+    expect(within(rowA).getByText('Chưa có nhóm')).toBeInTheDocument();
+
+    fireEvent.click(within(rowG).getByRole('button', { name: 'Phân quyền cs.g' }));
+    const dialog = await screen.findByRole('dialog');
+    expect(await within(dialog).findByText('Duyệt đơn')).toBeInTheDocument();
+    fireEvent.click(within(dialog).getByRole('checkbox', { name: /Duyệt đơn/ }));
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Lưu quyền' }));
+    await waitFor(() =>
+      expect(puts).toEqual([{ id: 'g', permissions: ['user.group_edit', 'sales_order.approve'] }]),
+    );
+    expect(toastSuccess).toHaveBeenCalledWith('Đã lưu quyền', { description: 'cs.g · Lê Thị Huế' });
   });
 });

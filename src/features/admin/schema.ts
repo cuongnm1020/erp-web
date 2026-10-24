@@ -47,6 +47,9 @@ export const departmentFormSchema = z.object({
   isActive: z.boolean(),
   /** SALES (mặc định) | CSKH — phòng chăm sóc khách hàng: team phòng ban mang loại CSKH (khớp DTO). */
   kind: z.enum(['SALES', 'CSKH']),
+  /** Phòng CSKH đang sửa (2026-10-24): mọi trưởng phòng / trưởng nhóm — người trong phòng. */
+  managerIds: z.array(z.string()).max(20, 'Tối đa 20 trưởng phòng'),
+  groupLeadIds: z.array(z.string()).max(50, 'Tối đa 50 trưởng nhóm'),
 });
 
 export const createDepartmentSchema = departmentFormSchema.extend({ code: codeSchema });

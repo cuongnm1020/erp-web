@@ -1,6 +1,7 @@
 'use client';
 
 import { zodResolver } from '@hookform/resolvers/zod';
+import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import {
   applyServerErrors,
@@ -11,7 +12,10 @@ import {
   FormItem,
   FormLabel,
   FormMessage,
+  StaffSelect,
+  type StaffSelectItem,
 } from '@/components/data/form';
+import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -31,13 +35,35 @@ import {
 } from '@/components/ui/select';
 import { toast } from '@/components/ui/toaster';
 import type { ApiError } from '@/lib/api/errors';
-import type { OrgEmployee } from '../api/use-org-tree';
+import { messageFor } from '@/lib/error-messages';
+import {
+  useSetCareGroup,
+  useSetCarePosition,
+  type CarePosition,
+  type OrgEmployee,
+} from '../api/use-org-tree';
 import { useUpdateUserPancakeProfile, useUserPancakeProfile } from '../api/use-pancake-profile';
 import { useUpdateUser } from '../api/use-users';
 import { editStaffSchema, type EditStaffValues } from '../schema';
 import { PancakeProfileSection } from './pancake-profile-section';
 
 const NONE = '__none__';
+
+const POSITION_LABEL: Record<CarePosition, string> = {
+  MEMBER: 'Nhân viên',
+  GROUP_LEAD: 'Trưởng nhóm',
+  MANAGER: 'Trưởng phòng',
+};
+
+/** Chức vụ + nhóm trong phòng CSKH (2026-10-24) — chỉ khi người sửa là trưởng phòng / quản trị. */
+export interface CareEditOptions {
+  position: CarePosition;
+  groupLeaderId: string | null;
+  /** Quản trị: được đặt / bỏ trưởng phòng. */
+  canSetManager: boolean;
+  /** Trưởng nhóm cùng phòng (để chọn nhóm). */
+  groupLeads: StaffSelectItem[];
+}
 
 /**
  * Sửa nhân sự ngay trên Sơ đồ nhân sự — PATCH /users/{id} (họ tên, email, phòng ban, đặt lại
@@ -51,14 +77,22 @@ export function OrgStaffDialog({
   departments,
   allowUnassign,
   onOpenChange,
+  care,
 }: {
   employee: OrgEmployee;
+  /** Có = hiện Chức vụ + Trưởng nhóm (màn Nhân viên của team, người sửa là trưởng phòng / quản trị). */
+  care?: CareEditOptions;
   departments: { id: string; name: string; path: string }[];
   /** Có user.update → được bỏ khỏi phòng ban. */
   allowUnassign: boolean;
   onOpenChange: (open: boolean) => void;
 }) {
   const update = useUpdateUser(employee.id);
+  const setPosition = useSetCarePosition(employee.id);
+  const setGroup = useSetCareGroup(employee.id);
+  const [position, setPositionValue] = useState<CarePosition>(care?.position ?? 'MEMBER');
+  const [groupLeaderId, setGroupLeaderId] = useState(care?.groupLeaderId ?? '');
+  const busy = update.isPending || setPosition.isPending || setGroup.isPending;
   const pancakeProfile = useUserPancakeProfile(employee.id);
   const updatePancakeProfile = useUpdateUserPancakeProfile(employee.id);
   const form = useForm<EditStaffValues>({
@@ -71,6 +105,15 @@ export function OrgStaffDialog({
     },
   });
 
+  /** Sau khi lưu thông tin: đổi chức vụ rồi nhóm (nhóm chỉ áp cho nhân viên). */
+  const saveCare = async () => {
+    if (!care) return;
+    if (position !== care.position) await setPosition.mutateAsync(position);
+    const nextGroup = groupLeaderId || null;
+    if (position === 'MEMBER' && nextGroup !== (care.groupLeaderId ?? null))
+      await setGroup.mutateAsync(nextGroup);
+  };
+
   const onSubmit = form.handleSubmit((v) => {
     update.mutate(
       {
@@ -82,7 +125,13 @@ export function OrgStaffDialog({
         ...(v.password ? { password: v.password } : {}),
       },
       {
-        onSuccess: () => {
+        onSuccess: async () => {
+          try {
+            await saveCare();
+          } catch (err) {
+            form.setError('root.server', { message: messageFor(err) });
+            return;
+          }
           toast.success('Đã lưu thay đổi', { description: `${employee.code} · ${v.fullName}` });
           onOpenChange(false);
         },
@@ -103,7 +152,7 @@ export function OrgStaffDialog({
       : departments;
 
   return (
-    <Dialog open onOpenChange={(o) => !update.isPending && onOpenChange(o)}>
+    <Dialog open onOpenChange={(o) => !busy && onOpenChange(o)}>
       <DialogContent wide>
         <DialogHeader>
           <DialogTitle>Sửa nhân sự {employee.code}</DialogTitle>
@@ -174,6 +223,50 @@ export function OrgStaffDialog({
                 </FormItem>
               )}
             />
+            {care ? (
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div className="space-y-1.5">
+                  <Label htmlFor="care-position">Chức vụ</Label>
+                  <Select
+                    value={position}
+                    onValueChange={(v) => setPositionValue(v as CarePosition)}
+                    disabled={busy || (care.position === 'MANAGER' && !care.canSetManager)}
+                  >
+                    <SelectTrigger id="care-position">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {(['MEMBER', 'GROUP_LEAD', 'MANAGER'] as const)
+                        .filter((p) => p !== 'MANAGER' || care.canSetManager || care.position === p)
+                        .map((p) => (
+                          <SelectItem key={p} value={p}>
+                            {POSITION_LABEL[p]}
+                          </SelectItem>
+                        ))}
+                    </SelectContent>
+                  </Select>
+                  <p className="text-xs text-muted-foreground">
+                    {care.canSetManager
+                      ? 'Đổi chức vụ thay vai trò CSKH của người này.'
+                      : 'Chỉ quản trị đặt / bỏ trưởng phòng.'}
+                  </p>
+                </div>
+                {position === 'MEMBER' ? (
+                  <div className="space-y-1.5">
+                    <Label htmlFor="care-group">Trưởng nhóm</Label>
+                    <StaffSelect
+                      id="care-group"
+                      aria-label="Trưởng nhóm"
+                      value={groupLeaderId}
+                      onChange={setGroupLeaderId}
+                      staff={care.groupLeads}
+                      noneLabel="— Chưa có nhóm —"
+                      disabled={busy}
+                    />
+                  </div>
+                ) : null}
+              </div>
+            ) : null}
             <FormField
               control={form.control}
               name="password"
@@ -192,12 +285,12 @@ export function OrgStaffDialog({
               <Button
                 type="button"
                 variant="outline"
-                disabled={update.isPending}
+                disabled={busy}
                 onClick={() => onOpenChange(false)}
               >
                 Hủy bỏ
               </Button>
-              <Button type="submit" disabled={update.isPending}>
+              <Button type="submit" loading={busy}>
                 Lưu thay đổi
               </Button>
             </DialogFooter>
