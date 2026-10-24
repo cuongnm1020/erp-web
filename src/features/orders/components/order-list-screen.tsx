@@ -85,6 +85,7 @@ import { BulkReprintWaybillDialog } from './bulk-reprint-waybill-dialog';
 import { BulkShippingDialog } from './bulk-shipping-dialog';
 import { FlowBadge, OrderQuickView, TelcoBadge } from './order-quick-view';
 import { OrderSavedViews } from './order-saved-views';
+import { OrderScanButton } from './order-scan-button';
 import { PancakeOrderResyncButton } from './pancake-order-resync-button';
 import { SendToCarrierMenu } from './send-to-carrier-menu';
 import { PancakeOrderLink } from './pancake-order-link';
@@ -819,6 +820,19 @@ export function OrderListScreen() {
   );
   const query = useOrders(params);
   const counts = useOrderFlowCounts(filterParams);
+  // Quét bằng camera: bỏ mọi lọc (đơn có thể ở tab khác) rồi tìm theo mã; ra đúng một đơn thì mở
+  // xem nhanh luôn — mã vận đơn / số đơn gần như luôn khớp một đơn.
+  const [scanned, setScanned] = useState<string | null>(null);
+  const onScan = (code: string) => {
+    setScanned(code);
+    set({ q: code, filters: {} });
+  };
+  useEffect(() => {
+    if (scanned === null || state.q !== scanned || !query.data || query.isPlaceholderData) return;
+    setScanned(null);
+    const only = query.data.items.length === 1 ? query.data.items[0] : undefined;
+    if (only) setPeek(only);
+  }, [scanned, state.q, query.data, query.isPlaceholderData]);
   useInvalidateOn(['order.created', 'order.updated'], [orderKeys.lists()]);
   const [selected, setSelected] = useState<RowSelectionState>({});
   // Lọc ít dùng người dùng vừa bật qua "Thêm lọc" (chưa có giá trị) — chỉ sống trong phiên.
@@ -877,6 +891,7 @@ export function OrderListScreen() {
         breadcrumb={[{ label: 'Bán hàng' }, { label: 'Đơn hàng' }]}
         actions={
           <>
+            <OrderScanButton onScan={onScan} />
             <Can I="map" a="Sync">
               <PancakeOrderResyncButton defaultShopId={posShopId} />
             </Can>
