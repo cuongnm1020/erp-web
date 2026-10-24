@@ -23,6 +23,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
+import { PasswordInput } from '@/components/ui/password-input';
 import {
   Select,
   SelectContent,
@@ -176,7 +177,7 @@ export function UserCreateDialog({
                 <FormItem>
                   <FormLabel required>Mật khẩu ban đầu</FormLabel>
                   <FormControl>
-                    <Input {...field} type="password" autoComplete="new-password" />
+                    <PasswordInput {...field} autoComplete="new-password" />
                   </FormControl>
                   <FormMessage />
                 </FormItem>

@@ -6,6 +6,7 @@ import { useId } from 'react';
 import { useForm } from 'react-hook-form';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { PasswordInput } from '@/components/ui/password-input';
 import { Label } from '@/components/ui/label';
 import { isApiError } from '@/lib/api/errors';
 import { IDLE_LOGOUT_REASON } from '@/lib/auth/idle';
@@ -66,9 +67,8 @@ export function LoginForm() {
       </div>
       <div className="space-y-1.5">
         <Label htmlFor={ids.p}>Mật khẩu</Label>
-        <Input
+        <PasswordInput
           id={ids.p}
-          type="password"
           autoComplete="current-password"
           aria-invalid={!!form.formState.errors.password}
           {...form.register('password')}

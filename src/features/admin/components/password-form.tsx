@@ -12,7 +12,7 @@ import {
   applyServerErrors,
 } from '@/components/data/form';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
+import { PasswordInput } from '@/components/ui/password-input';
 import { toast } from '@/components/ui/toaster';
 import { useChangeMyPassword } from '../api/use-me';
 import { changeMyPasswordSchema, type ChangeMyPasswordValues } from '../schema';
@@ -63,7 +63,7 @@ export function PasswordForm({ onChanged }: { onChanged?: () => void }) {
               <FormItem>
                 <FormLabel>{f.label}</FormLabel>
                 <FormControl>
-                  <Input {...field} type="password" className="h-8" autoComplete={f.auto} />
+                  <PasswordInput {...field} className="h-8" autoComplete={f.auto} />
                 </FormControl>
                 <FormMessage />
               </FormItem>
