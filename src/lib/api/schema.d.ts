@@ -4606,7 +4606,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Dòng đơn còn hoàn được (đã xuất − đã hoàn) + bin / lô / giá vốn mặc định. */
+        /**
+         * Dòng đơn còn hoàn được (đã xuất − đã hoàn) + bin / lô / giá vốn mặc định. `?code=` = mã quét
+         *     trên kiện hoàn (số đơn / vận đơn hãng / số phiếu giao) — PDA và camera điện thoại dùng.
+         */
         get: operations["ReturnsController_returnable"];
         put?: never;
         post?: never;
@@ -12494,6 +12497,18 @@ export interface components {
             items: components["schemas"]["ReturnReceiptListRowDto"][];
             total: number;
         };
+        ReturnShipmentDto: {
+            id: string;
+            docNumber: string;
+            /** @description Mã vận đơn hãng. null = chưa có vận đơn. */
+            trackingNo: string | null;
+            carrierCode: string | null;
+            carrierName: string | null;
+            /** @enum {string} */
+            status: "CANCELLED" | "PENDING" | "IN_TRANSIT" | "OUT_FOR_DELIVERY" | "DELIVERED" | "FAILED" | "RETURNED" | "CARRIER_CANCELLED" | "PICKED_UP";
+            /** @description Gửi qua kết nối hãng của Pancake — ERP không trừ tồn lúc gửi. */
+            shippedOutsideErp: boolean;
+        };
         ReturnableLineDto: {
             orderLineId: string;
             lineNo: number;
@@ -12520,6 +12535,13 @@ export interface components {
             orderId: string;
             docNumber: string;
             status: string;
+            /**
+             * @description Đơn gửi ngoài ERP, kho chưa từng trừ tồn (2026-10-24, user chốt): SL hoàn được tính theo SL đặt
+             *     thay vì SL đã xuất, nhận lại vào vị trí DEFAULT, giá vốn theo lô FIFO đang mở.
+             */
+            stockNotDeducted: boolean;
+            /** @description Phiếu giao còn hiệu lực gần nhất (hoặc phiếu khớp mã quét). null = đơn chưa có phiếu giao. */
+            shipment: components["schemas"]["ReturnShipmentDto"] | null;
             lines: components["schemas"]["ReturnableLineDto"][];
         };
         ReturnReceiptLineDto: {
@@ -22238,6 +22260,11 @@ export interface operations {
             query?: {
                 orderId?: string;
                 docNumber?: string;
+                /**
+                 * @description Mã quét / gõ trên kiện hoàn về (2026-10-24): số đơn bán, mã vận đơn hãng, số phiếu giao, hoặc
+                 *     đoạn số cuối trên mã vạch tem GHTK.
+                 */
+                code?: string;
             };
             header?: never;
             path?: never;

@@ -1,6 +1,6 @@
 'use client';
 
-import { Plus } from 'lucide-react';
+import { Plus, ScanBarcode } from 'lucide-react';
 import Link from 'next/link';
 import { useMemo } from 'react';
 import { DataTable, FilterBar, type ColumnDef } from '@/components/data/data-table';
@@ -147,13 +147,22 @@ export function ReturnListScreen() {
     [canReceive, cancel],
   );
 
+  // Nút chính cuối; "Quét trên PDA / điện thoại" mở màn quét kiện cầm tay (2026-10-24).
   const newButton = canReceive ? (
-    <Button size="sm" asChild>
-      <Link href="/wms/returns/new">
-        <Plus aria-hidden />
-        Nhập hàng hoàn
-      </Link>
-    </Button>
+    <>
+      <Button size="sm" variant="outline" asChild>
+        <Link href="/pda/returns">
+          <ScanBarcode aria-hidden />
+          Quét trên PDA / điện thoại
+        </Link>
+      </Button>
+      <Button size="sm" asChild>
+        <Link href="/wms/returns/new">
+          <Plus aria-hidden />
+          Nhập hàng hoàn
+        </Link>
+      </Button>
+    </>
   ) : undefined;
 
   return (

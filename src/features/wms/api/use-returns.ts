@@ -5,6 +5,9 @@ import type { components, operations } from '@/lib/api/schema';
 /** Luật 2: shape response chỉ lấy từ schema.d.ts sinh bởi OpenAPI. */
 export type ReturnableOrder = components['schemas']['ReturnableOrderDto'];
 export type ReturnableLine = components['schemas']['ReturnableLineDto'];
+export type ReturnShipment = components['schemas']['ReturnShipmentDto'];
+/** Tra đơn hoàn: id đơn, số đơn, hoặc mã quét trên kiện (số đơn / vận đơn hãng / số phiếu giao). */
+export type ReturnableRef = { orderId?: string; docNumber?: string; code?: string };
 export type ReturnReceiptRow = components['schemas']['ReturnReceiptListRowDto'];
 export type ReturnReceiptDetail = components['schemas']['ReturnReceiptDetailDto'];
 export type ReturnReceiptStatus = ReturnReceiptRow['status'];
@@ -19,8 +22,7 @@ export const returnKeys = {
   lists: () => [...returnKeys.all, 'list'] as const,
   list: (params: ReturnListParams) => [...returnKeys.lists(), params] as const,
   detail: (id: string) => [...returnKeys.all, 'detail', id] as const,
-  returnable: (ref: { orderId?: string; docNumber?: string }) =>
-    [...returnKeys.all, 'returnable', ref] as const,
+  returnable: (ref: ReturnableRef) => [...returnKeys.all, 'returnable', ref] as const,
 };
 
 /** GET /return-receipts — phiếu nhập hàng hoàn; cần stock.read. */
@@ -41,13 +43,14 @@ export function useReturnReceipt(id: string) {
 
 /**
  * GET /return-receipts/returnable — dòng đơn còn hoàn được (đã xuất − đã hoàn), bin / lô / giá vốn
- * mặc định. Tra theo id đơn hoặc số đơn; không có ref thì không gọi.
+ * mặc định, phiếu giao của đơn. Tra theo id đơn, số đơn hoặc `code` = mã quét trên kiện hoàn
+ * (vận đơn hãng, đoạn số cuối tem GHTK…); không có ref thì không gọi.
  */
-export function useReturnable(ref: { orderId?: string; docNumber?: string }) {
+export function useReturnable(ref: ReturnableRef) {
   return useQuery({
     queryKey: returnKeys.returnable(ref),
     queryFn: () => unwrap(api.GET('/return-receipts/returnable', { params: { query: ref } })),
-    enabled: !!(ref.orderId || ref.docNumber),
+    enabled: !!(ref.orderId || ref.docNumber || ref.code),
     retry: false,
   });
 }
