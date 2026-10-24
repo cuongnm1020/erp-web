@@ -26,6 +26,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
+import { PasswordInput } from '@/components/ui/password-input';
 import {
   Select,
   SelectContent,
@@ -274,7 +275,7 @@ export function OrgStaffDialog({
                 <FormItem>
                   <FormLabel>Mật khẩu mới</FormLabel>
                   <FormControl>
-                    <Input {...field} type="password" autoComplete="new-password" />
+                    <PasswordInput {...field} autoComplete="new-password" />
                   </FormControl>
                   <FormDescription>Tối thiểu 8 ký tự; để trống = giữ nguyên</FormDescription>
                   <FormMessage />

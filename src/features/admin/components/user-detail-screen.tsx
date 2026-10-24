@@ -19,6 +19,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
+import { PasswordInput } from '@/components/ui/password-input';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
   Table,
@@ -190,9 +191,8 @@ function EditDialog({
           </label>
           <label className="block text-sm">
             Mật khẩu mới (bỏ trống nếu không đổi)
-            <Input
+            <PasswordInput
               value={password}
-              type="password"
               autoComplete="new-password"
               onChange={(e) => setPassword(e.target.value)}
             />

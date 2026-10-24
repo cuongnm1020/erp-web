@@ -63,6 +63,7 @@ import {
   useOrderFlowCounts,
   useOrderListPrefs,
   useOrders,
+  useCareTeamOptions,
   usePancakeShops,
   useSaveOrderListPrefs,
   type OrderFlow,
@@ -126,6 +127,8 @@ const DEFAULTS = {
     'duplicate',
     // Đơn có sản phẩm không phải hàng ERP (món gõ tay / SKU Pancake tự sinh), 2026-10-22.
     'itemOrigin',
+    // Team CSKH lên đơn (phòng ban loại CSKH), 2026-10-24.
+    'careTeamId',
   ] as const,
 };
 
@@ -726,6 +729,8 @@ export function OrderListScreen() {
   const to = state.filters.to ?? '';
   const duplicate = state.filters.duplicate === 'true';
   const itemOrigin = parseItemOrigin(state.filters.itemOrigin);
+  const careTeamId = state.filters.careTeamId ?? '';
+  const careTeams = useCareTeamOptions();
   // Cột ẩn + sắp xếp lưu theo người dùng ở server (đăng xuất / đổi máy vẫn giữ). Sắp xếp trên URL
   // (link dán cho đồng nghiệp) thắng; URL không có thì lấy lần sắp gần nhất của người dùng.
   const prefs = useOrderListPrefs();
@@ -758,6 +763,7 @@ export function OrderListScreen() {
       from,
       to,
       itemOrigin,
+      careTeamId,
     }),
     [
       state.q,
@@ -773,6 +779,7 @@ export function OrderListScreen() {
       from,
       to,
       itemOrigin,
+      careTeamId,
     ],
   );
   const params = useMemo(
@@ -852,7 +859,8 @@ export function OrderListScreen() {
     from !== '' ||
     to !== '' ||
     duplicate ||
-    itemOrigin !== undefined;
+    itemOrigin !== undefined ||
+    careTeamId !== '';
   const customerName = query.data?.items[0]?.customer.name;
   const selectedRows = (query.data?.items ?? []).filter((r) => selected[r.id]);
   const clearSelection = () => setSelected({});
@@ -931,13 +939,23 @@ export function OrderListScreen() {
               // Hàng chục POS Pancake — gõ tìm theo tên shop.
               searchable: true,
               options: [
+                { value: 'ERP', label: 'Tạo trong ERP' },
                 { value: 'PANCAKE', label: 'Pancake (mọi POS)' },
                 ...(pancakeShops.data ?? []).map((s) => ({
                   value: `POS:${s.shopId}`,
                   label: `Pancake · ${s.shopName ?? `POS ${s.shopId}`}${s.isActive ? '' : ' (đã ngắt)'}`,
                 })),
-                { value: 'ERP', label: 'Tạo trong ERP' },
               ],
+            },
+            {
+              key: 'careTeamId',
+              label: 'Team CSKH',
+              type: 'select',
+              searchable: true,
+              options: (careTeams.data ?? []).map((t) => ({
+                value: t.teamId,
+                label: t.isActive ? t.name : `${t.name} (ngừng hoạt động)`,
+              })),
             },
             ...(showExtra('duplicate')
               ? [
@@ -990,6 +1008,7 @@ export function OrderListScreen() {
             to: state.filters.to,
             duplicate: state.filters.duplicate,
             itemOrigin: state.filters.itemOrigin,
+            careTeamId: state.filters.careTeamId,
           }}
           onFilterChange={setFilter}
           searchPlaceholder="Mã đơn, mã Pancake, SĐT, tên khách, mã vận đơn"
