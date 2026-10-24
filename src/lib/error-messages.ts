@@ -249,7 +249,7 @@ const MESSAGES: Record<string, string> = {
   WORK_ASSIGN_OUT_OF_TREE:
     'Chỉ giao được việc cho người trong phòng ban bạn phụ trách. Người ở phòng khác → gửi Yêu cầu nội bộ.',
   WORK_ACTION_FORBIDDEN:
-    'Bạn không làm được thao tác này trên việc đang mở (không phải người làm / người giao / trưởng phòng nhận).',
+    'Bạn không làm được thao tác này trên việc đang mở (không phải người làm / người giao / leader nhận).',
   WORK_INVALID: 'Thông tin việc chưa hợp lệ. Kiểm tra các ô được đánh dấu.',
   WORK_CONFIG_INVALID: 'Cấu hình chưa hợp lệ. Kiểm tra các ô được đánh dấu.',
   IDEMPOTENCY_KEY_OWNER_MISMATCH:

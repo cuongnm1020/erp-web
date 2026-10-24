@@ -178,7 +178,7 @@ function DepartmentPanel({
           {node.children.length ? ` (gồm ${node.children.length} phòng ban con)` : ''}
         </p>
         <p className="text-sm">
-          Trưởng phòng: {node.managerName ?? <span className="text-muted-foreground">Chưa có</span>}
+          Leader: {node.managerName ?? <span className="text-muted-foreground">Chưa có</span>}
         </p>
       </div>
 
@@ -309,7 +309,7 @@ function MemberList({
                 {m.fullName}
                 {m.id === managerId ? (
                   <StatusBadge tone="brand" className="ml-1.5 align-middle">
-                    Trưởng phòng
+                    Leader
                   </StatusBadge>
                 ) : null}
                 {m.isActive ? null : (

@@ -52,7 +52,7 @@ const NONE = '__none__';
 const POSITION_LABEL: Record<CarePosition, string> = {
   MEMBER: 'Nhân viên',
   GROUP_LEAD: 'Trưởng nhóm',
-  MANAGER: 'Trưởng phòng',
+  MANAGER: 'Leader',
 };
 
 /** Chức vụ + nhóm trong phòng CSKH (2026-10-24) — chỉ khi người sửa là trưởng phòng / quản trị. */
@@ -248,7 +248,7 @@ export function OrgStaffDialog({
                   <p className="text-xs text-muted-foreground">
                     {care.canSetManager
                       ? 'Đổi chức vụ thay vai trò CSKH của người này.'
-                      : 'Chỉ quản trị đặt / bỏ trưởng phòng.'}
+                      : 'Chỉ quản trị đặt / bỏ leader.'}
                   </p>
                 </div>
                 {position === 'MEMBER' ? (

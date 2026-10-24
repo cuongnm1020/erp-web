@@ -46,7 +46,7 @@ const NO_GROUP = 'none';
 type Row = CareStaff & { revenue: StaffRevenue | null; groupLeaderName: string | null };
 
 const POSITION: Record<CarePosition, { label: string; tone: 'brand' | 'draft' | 'neutral' }> = {
-  MANAGER: { label: 'Trưởng phòng', tone: 'brand' },
+  MANAGER: { label: 'Leader', tone: 'brand' },
   GROUP_LEAD: { label: 'Trưởng nhóm', tone: 'draft' },
   MEMBER: { label: 'Nhân viên', tone: 'neutral' },
 };
@@ -401,7 +401,7 @@ export function CareStaffScreen() {
             }
             description={
               staff.data?.departments.length === 0
-                ? 'Màn này dành cho trưởng nhóm CSKH — nhờ quản trị gán bạn làm trưởng phòng CSKH.'
+                ? 'Màn này dành cho trưởng nhóm CSKH — nhờ quản trị gán bạn làm leader CSKH.'
                 : 'Thêm nhân viên đầu tiên để chia khách chăm sóc.'
             }
             action={

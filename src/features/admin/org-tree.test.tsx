@@ -48,7 +48,7 @@ describe('Sơ đồ nhân sự — dạng danh sách (/admin/org-tree?view=list)
       'href',
       `/admin/users/${ORG_TREE_FIXTURE.departments[0]!.members[0]!.id}`,
     );
-    expect(within(lanh.closest('li')!).getByText('Trưởng phòng')).toBeInTheDocument();
+    expect(within(lanh.closest('li')!).getByText('Leader')).toBeInTheDocument();
     // Nhóm "Chưa có phòng ban" chứa người không có departmentId.
     const unassigned = within(deptTree).getByRole('treeitem', { name: 'Chưa có phòng ban' });
     expect(within(unassigned).getByRole('link', { name: 'Đỗ Văn Kho' })).toBeInTheDocument();

@@ -392,7 +392,7 @@ function DepartmentItem({ node, depth, isOpen, onToggle }: ItemProps<OrgDepartme
               key={e.id}
               employee={e}
               depth={depth + 1}
-              badge={e.id === node.managerId ? 'Trưởng phòng' : null}
+              badge={e.id === node.managerId ? 'Leader' : null}
             />
           ))}
           {node.children.map((c) => (
