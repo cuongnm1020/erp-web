@@ -2,45 +2,19 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
+import { createBarcodeReader } from '@/lib/barcode-detector';
+import { beep } from '@/lib/beep';
+
+export { isCameraScanSupported } from '@/lib/barcode-detector';
 
 /**
- * Quét mã vạch bằng camera điện thoại (2026-10-24, kiện hoàn về) — dùng `BarcodeDetector` có sẵn
- * của trình duyệt (Chrome Android), không thêm thư viện. Trình duyệt không có API này (Safari iPhone,
- * Firefox) → {@link isCameraScanSupported} false, màn gọi chỉ để nhập tay. Không biết gì về nghiệp
- * vụ (luật 12): đọc được một mã thì rung, gọi `onDetect` rồi để màn gọi đóng.
+ * Quét mã vạch bằng camera điện thoại (2026-10-24, kiện hoàn về; sau này dùng cho tra đơn). Bộ đọc
+ * từ `lib/barcode-detector`: `BarcodeDetector` có sẵn (Chrome Android) hoặc ponyfill ZXing
+ * (WebAssembly) cho mọi trình duyệt trên iPhone — đọc CODE128, QR, EAN. Không biết gì về nghiệp vụ
+ * (luật 12): đọc được một mã thì bíp + rung, gọi `onDetect` rồi để màn gọi đóng.
  */
 
-/** Phần `BarcodeDetector` dùng tới — lib.dom của TypeScript chưa khai báo. */
-interface DetectedBarcode {
-  rawValue: string;
-}
-interface BarcodeDetectorLike {
-  detect(source: HTMLVideoElement): Promise<DetectedBarcode[]>;
-}
-interface BarcodeDetectorCtor {
-  new (opts?: { formats?: string[] }): BarcodeDetectorLike;
-  getSupportedFormats?: () => Promise<string[]>;
-}
-
-/** Mã trên tem vận đơn / bao bì: CODE128 (vận đơn, phiếu), QR, EAN, CODE39. */
-const WANTED_FORMATS = ['code_128', 'qr_code', 'ean_13', 'ean_8', 'code_39', 'itf'];
 const SCAN_INTERVAL_MS = 200;
-
-function detectorCtor(): BarcodeDetectorCtor | null {
-  if (typeof window === 'undefined') return null;
-  const ctor = (window as unknown as { BarcodeDetector?: BarcodeDetectorCtor }).BarcodeDetector;
-  return ctor ?? null;
-}
-
-/** Có camera + `BarcodeDetector` + ngữ cảnh an toàn (HTTPS / localhost). Chỉ gọi phía client. */
-export function isCameraScanSupported(): boolean {
-  return (
-    typeof window !== 'undefined' &&
-    window.isSecureContext &&
-    !!navigator.mediaDevices?.getUserMedia &&
-    detectorCtor() !== null
-  );
-}
 
 type TorchTrack = Omit<MediaStreamTrack, 'getCapabilities'> & {
   getCapabilities?: () => MediaTrackCapabilities & { torch?: boolean };
@@ -60,6 +34,7 @@ export function CameraScanner({ onDetect, onClose, title, hint }: CameraScannerP
   const track = useRef<TorchTrack | null>(null);
   const done = useRef(false);
   const [error, setError] = useState<string | null>(null);
+  const [ready, setReady] = useState(false);
   const [torch, setTorch] = useState<boolean | null>(null);
   const detectRef = useRef(onDetect);
   detectRef.current = onDetect;
@@ -70,15 +45,10 @@ export function CameraScanner({ onDetect, onClose, title, hint }: CameraScannerP
     let cancelled = false;
 
     const start = async () => {
-      const Ctor = detectorCtor();
-      if (!Ctor) {
-        setError('Trình duyệt này không quét được bằng camera — gõ mã bằng tay.');
-        return;
-      }
       try {
-        const supported = (await Ctor.getSupportedFormats?.()) ?? WANTED_FORMATS;
-        const formats = WANTED_FORMATS.filter((f) => supported.includes(f));
-        const detector = new Ctor(formats.length ? { formats } : undefined);
+        // Song song: xin camera trong lúc nạp bộ đọc (iPhone tải ~1 MB WebAssembly lần đầu).
+        const readerP = createBarcodeReader();
+        readerP.catch(() => undefined); // lỗi xử lý ở `await readerP`; tránh unhandled khi camera lỗi trước
         stream = await navigator.mediaDevices.getUserMedia({
           video: { facingMode: { ideal: 'environment' } },
           audio: false,
@@ -91,6 +61,9 @@ export function CameraScanner({ onDetect, onClose, title, hint }: CameraScannerP
         const t = stream.getVideoTracks()[0] as TorchTrack | undefined;
         track.current = t ?? null;
         if (t?.getCapabilities?.().torch) setTorch(false);
+        const detector = await readerP;
+        if (cancelled) return;
+        setReady(true);
 
         const tick = async () => {
           if (cancelled || done.current) return;
@@ -99,6 +72,7 @@ export function CameraScanner({ onDetect, onClose, title, hint }: CameraScannerP
             const code = found.map((b) => b.rawValue.trim()).find((v) => v.length > 0);
             if (code && !done.current) {
               done.current = true;
+              beep('ok');
               navigator.vibrate?.(80);
               detectRef.current(code);
               return;
@@ -110,11 +84,12 @@ export function CameraScanner({ onDetect, onClose, title, hint }: CameraScannerP
         };
         void tick();
       } catch (err) {
+        if (cancelled) return;
         const denied = err instanceof DOMException && err.name === 'NotAllowedError';
         setError(
           denied
             ? 'Chưa cho phép dùng camera — bật quyền camera cho trang này trong cài đặt trình duyệt.'
-            : 'Không mở được camera — gõ mã bằng tay.',
+            : 'Không mở được camera hoặc bộ đọc mã — gõ mã bằng tay.',
         );
       }
     };
@@ -173,7 +148,7 @@ export function CameraScanner({ onDetect, onClose, title, hint }: CameraScannerP
             {error}
           </p>
         ) : (
-          <p className="text-lg">{hint}</p>
+          <p className="text-lg">{ready ? hint : 'Đang mở camera…'}</p>
         )}
         <div className="flex justify-center gap-6">
           {torch !== null ? (
