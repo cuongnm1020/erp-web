@@ -1,7 +1,7 @@
 'use client';
 
 import { zodResolver } from '@hookform/resolvers/zod';
-import { ChevronDown, ChevronRight, Plus, Search, X } from 'lucide-react';
+import { ChevronDown, ChevronRight, Plus, Printer, Search, X } from 'lucide-react';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useMemo, useState } from 'react';
 import { useForm } from 'react-hook-form';
@@ -16,6 +16,7 @@ import {
   FormLabel,
   FormMessage,
 } from '@/components/data/form';
+import { BulkActionBar } from '@/components/data/bulk-action-bar';
 import { RowActions } from '@/components/data/row-actions';
 import { EmptyState, ListSkeleton, QueryState } from '@/components/data/states';
 import { StatusBadge } from '@/components/data/status-badge';
@@ -49,7 +50,13 @@ import { toast } from '@/components/ui/toaster';
 import { isApiError, type ApiError } from '@/lib/api/errors';
 import { formatQuantity } from '@/lib/format';
 import { messageFor } from '@/lib/error-messages';
+import { usePrint } from '@/lib/print';
 import { codeSchema } from '@/lib/shared';
+import {
+  LocationPrintSheet,
+  type LocationLabelData,
+  type LocationLabelSize,
+} from './location-label';
 import {
   useCreateLocation,
   useDeleteLocation,
@@ -377,6 +384,15 @@ function flatten(
   return out;
 }
 
+/** Mọi node của cây (kể cả nhánh đang đóng) — tra vị trí đã chọn để in tem. */
+function allNodes(nodes: LocationNode[]): LocationNode[] {
+  return nodes.flatMap((n) => [n, ...allNodes(n.children)]);
+}
+
+/** In tem được: có mã vạch và chứa hàng (không phải khu / dãy / giàn kệ khung). */
+const printable = (n: LocationNode): boolean =>
+  n.barcode !== null && n.isActive && !['ZONE', 'AISLE', 'RACK'].includes(n.type);
+
 function countNodes(
   nodes: LocationNode[],
   keep: (n: LocationNode) => boolean = () => true,
@@ -466,6 +482,35 @@ export function LocationsPanel({
 
   const toggle = (node: LocationNode, depth: number) =>
     setExpanded((e) => ({ ...e, [node.id]: !(e[node.id] ?? depth === 0) }));
+
+  // In tem vị trí (LOC-2): chọn dòng → BulkActionBar → tờ in 100×75 hoặc 50×30.
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const printer = usePrint();
+  const [labelSize, setLabelSize] = useState<LocationLabelSize>('WAYBILL_100x75');
+  const labels = useMemo<LocationLabelData[]>(
+    () =>
+      allNodes(query.data ?? [])
+        .filter((n) => selected.has(n.id) && printable(n))
+        .map((n) => ({
+          barcode: n.barcode ?? '',
+          code: n.code,
+          typeLabel: TYPE_LABEL[n.type],
+          warehouseCode: warehouse.code,
+          reserve: !n.isPickable,
+        })),
+    [query.data, selected, warehouse.code],
+  );
+  const toggleSelect = (id: string) =>
+    setSelected((s) => {
+      const next = new Set(s);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  const printAs = (size: LocationLabelSize) => {
+    setLabelSize(size);
+    printer.print();
+  };
 
   return (
     <section className="mt-3 overflow-hidden rounded-md border bg-card">
@@ -572,9 +617,43 @@ export function LocationsPanel({
             />
           ) : (
             <div className="overflow-x-auto">
+              {labels.length > 0 ? (
+                <BulkActionBar
+                  count={labels.length}
+                  noun="vị trí"
+                  onClear={() => setSelected(new Set())}
+                >
+                  <Button size="sm" variant="outline" onClick={() => printAs('SKU_50x30')}>
+                    <Printer aria-hidden />
+                    In tem 50×30
+                  </Button>
+                  <Button size="sm" onClick={() => printAs('WAYBILL_100x75')}>
+                    <Printer aria-hidden />
+                    In tem 100×75
+                  </Button>
+                </BulkActionBar>
+              ) : null}
               <Table>
                 <TableHeader>
                   <TableRow className="bg-muted hover:bg-muted">
+                    <TableHead className="w-8 px-2.5">
+                      {(() => {
+                        const rows = flatten(tree, expanded, 0, searching)
+                          .map((r) => r.node)
+                          .filter(printable);
+                        const all = rows.length > 0 && rows.every((n) => selected.has(n.id));
+                        return (
+                          <Checkbox
+                            aria-label="Chọn mọi vị trí đang hiện để in tem"
+                            checked={all}
+                            disabled={rows.length === 0}
+                            onCheckedChange={() =>
+                              setSelected(all ? new Set() : new Set(rows.map((n) => n.id)))
+                            }
+                          />
+                        );
+                      })()}
+                    </TableHead>
                     <TableHead className="px-2.5 text-xs">Mã vị trí</TableHead>
                     <TableHead className="w-24 px-2.5 text-xs">Loại</TableHead>
                     <TableHead className="px-2.5 text-xs">Sản phẩm cố định</TableHead>
@@ -589,6 +668,15 @@ export function LocationsPanel({
                 <TableBody>
                   {flatten(tree, expanded, 0, searching).map(({ node, depth }) => (
                     <TableRow key={node.id}>
+                      <TableCell className="px-2.5 py-1.5">
+                        {printable(node) ? (
+                          <Checkbox
+                            aria-label={`Chọn ${node.code} để in tem`}
+                            checked={selected.has(node.id)}
+                            onCheckedChange={() => toggleSelect(node.id)}
+                          />
+                        ) : null}
+                      </TableCell>
                       <TableCell className="px-2.5 py-1.5">
                         <div
                           className="flex items-center gap-1"
@@ -688,6 +776,8 @@ export function LocationsPanel({
           );
         }}
       </QueryState>
+
+      <LocationPrintSheet labels={labels} size={labelSize} printer={printer} />
 
       {dialog ? (
         <LocationFormDialog

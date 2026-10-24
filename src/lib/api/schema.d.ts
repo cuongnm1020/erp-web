@@ -4004,6 +4004,79 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/pda/locations/{id}/contents": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["PdaController_locationContents"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/pda/putaway/{taskId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Việc cất hàng theo nhóm SKU + lô + loại thùng: thùng chưa cất, đã cất ở đâu, DEFAULT. */
+        get: operations["PdaController_putAwayView"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/pda/putaway/{taskId}/assign": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Gán một giỏ (N thùng / pallet + hàng rời) vào MỘT vị trí do người cất chọn, hoặc DEFAULT
+         *     (`toDefault`); `allRemaining` = mọi thứ chưa cất. Việc phải đang là của tôi.
+         */
+        post: operations["PdaController_assignPutAway"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/pda/relocate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Chuyển hàng A → B (thùng nguyên / hàng rời theo số lượng / tất cả). Dòng PICK đang trỏ vào A
+         *     mà A không còn đủ được trỏ lại (tách nếu cần).
+         */
+        post: operations["PdaController_relocate"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/pda/new-orders": {
         parameters: {
             query?: never;
@@ -11434,6 +11507,153 @@ export interface components {
         MoveOrdersWarehouseResultDto: {
             moved: components["schemas"]["MovedOrderDto"][];
             failed: components["schemas"]["MoveOrderFailedDto"][];
+        };
+        PdaLocationRefDto: {
+            id: string;
+            code: string;
+            barcode: string | null;
+            type: string;
+            /** @description "Dãy 03 · Kệ 05 · Tầng 02" — giống nhãn trên dòng việc. */
+            label: string;
+            isPickable: boolean;
+            /** @description Vị trí DEFAULT của kho (chỗ dồn hàng khi hết chỗ, lấy hàng trước). */
+            isDefault: boolean;
+            warehouseId: string;
+            warehouseCode: string;
+        };
+        PdaLocationContainerDto: {
+            id: string;
+            barcode: string;
+            typeCode: string;
+            typeName: string;
+            status: string;
+            /** @description Số lượng của SKU/lô này trong thùng (ĐVT cơ sở). */
+            qty: string;
+            /** @description Thùng nằm trong pallet → mã pallet; null = thùng gốc. */
+            parentBarcode: string | null;
+        };
+        PdaLocationItemDto: {
+            skuId: string;
+            skuCode: string;
+            skuName: string;
+            baseUomCode: string;
+            lotId: string | null;
+            lotNumber: string | null;
+            onHand: string;
+            reserved: string;
+            /** @description Đã quét lấy nhưng chưa đóng gói — đã rời kệ, sổ chưa trừ. */
+            inHand: string;
+            /** @description Còn thật trên kệ, chuyển được = onHand − inHand. */
+            movable: string;
+            /** @description Hàng rời (ngoài thùng). */
+            looseQty: string;
+            containers: components["schemas"]["PdaLocationContainerDto"][];
+        };
+        PdaLocationContentsDto: {
+            location: components["schemas"]["PdaLocationRefDto"];
+            items: components["schemas"]["PdaLocationItemDto"][];
+            skuCount: number;
+            containerCount: number;
+        };
+        PdaPutAwayContainerDto: {
+            id: string;
+            barcode: string;
+            qty: string;
+            /** @description Pallet bọc thùng: số thùng con còn bên trong (quét pallet = cất cả pallet). */
+            childCount: number;
+            parentBarcode: string | null;
+        };
+        PdaPutAwayGroupDto: {
+            key: string;
+            skuId: string;
+            skuCode: string;
+            skuName: string;
+            baseUomCode: string;
+            lotId: string | null;
+            lotNumber: string | null;
+            /** @description null = hàng rời. */
+            containerTypeCode: string | null;
+            containerTypeName: string | null;
+            remainingCount: number;
+            remainingQty: string;
+            placedCount: number;
+            placedQty: string;
+            /** @description Gợi ý vị trí (P1-08) — chỉ để tham khảo, cất ở đâu do người cất chọn. */
+            suggestedLocationCode: string | null;
+            /** @description Thùng chưa cất, mã tăng dần. */
+            containers: components["schemas"]["PdaPutAwayContainerDto"][];
+        };
+        PdaPutAwayPlacedDto: {
+            locationId: string;
+            locationCode: string;
+            locationLabel: string;
+            containerCount: number;
+            qty: string;
+        };
+        PdaPutAwayViewDto: {
+            taskId: string;
+            docNumber: string;
+            status: string;
+            assignedToMe: boolean;
+            receiptDocNumber: string | null;
+            fromLocationCode: string | null;
+            defaultLocation: components["schemas"]["PdaLocationRefDto"] | null;
+            groups: components["schemas"]["PdaPutAwayGroupDto"][];
+            placed: components["schemas"]["PdaPutAwayPlacedDto"][];
+            remainingCount: number;
+        };
+        PdaLooseItemDto: {
+            /** Format: uuid */
+            skuId: string;
+            /** Format: uuid */
+            lotId?: string | null;
+            qty: string;
+        };
+        PdaPutAwayAssignDto: {
+            /** Format: uuid */
+            toLocationId?: string;
+            toDefault?: boolean;
+            allRemaining?: boolean;
+            containerIds?: string[];
+            loose?: components["schemas"]["PdaLooseItemDto"][];
+            idempotencyKey: string;
+        };
+        PdaPutAwayAssignResultDto: {
+            toLocation: components["schemas"]["PdaLocationRefDto"];
+            containersPlaced: number;
+            looseQtyPlaced: string;
+            taskCompleted: boolean;
+            view: components["schemas"]["PdaPutAwayViewDto"];
+            replayed: boolean;
+        };
+        PdaRelocateDto: {
+            /** Format: uuid */
+            fromLocationId: string;
+            /** Format: uuid */
+            toLocationId: string;
+            all?: boolean;
+            containerIds?: string[];
+            loose?: components["schemas"]["PdaLooseItemDto"][];
+            idempotencyKey: string;
+        };
+        PdaRelocateShortageDto: {
+            taskDocNumber: string;
+            skuId: string;
+            qty: string;
+        };
+        PdaRelocateResultDto: {
+            fromLocation: components["schemas"]["PdaLocationRefDto"];
+            toLocation: components["schemas"]["PdaLocationRefDto"];
+            containersMoved: number;
+            /** @description Tổng hàng (ĐVT cơ sở, mọi SKU) đã chuyển. */
+            qtyMoved: string;
+            /** @description Thùng bỏ qua vì đã được quét lấy (đang trên đường ra bàn đóng gói). */
+            skippedPicked: string[];
+            pickLinesKept: number;
+            pickLinesRepointed: number;
+            pickLinesSplit: number;
+            shortages: components["schemas"]["PdaRelocateShortageDto"][];
+            replayed: boolean;
         };
         PdaNewOrderItemDto: {
             /** @description Việc PICK của đơn — gửi lên "Lấy đơn". */
@@ -21187,6 +21407,96 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["MoveOrdersWarehouseResultDto"];
+                };
+            };
+        };
+    };
+    PdaController_locationContents: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PdaLocationContentsDto"];
+                };
+            };
+        };
+    };
+    PdaController_putAwayView: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                taskId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PdaPutAwayViewDto"];
+                };
+            };
+        };
+    };
+    PdaController_assignPutAway: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                taskId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PdaPutAwayAssignDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PdaPutAwayAssignResultDto"];
+                };
+            };
+        };
+    };
+    PdaController_relocate: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PdaRelocateDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PdaRelocateResultDto"];
                 };
             };
         };
