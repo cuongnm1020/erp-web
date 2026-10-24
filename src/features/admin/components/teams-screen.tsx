@@ -298,7 +298,7 @@ function DepartmentDetail({
             {row.original.fullName}
             {row.original.id === department.managerId ? (
               <StatusBadge tone="brand" className="ml-1.5">
-                Trưởng phòng
+                Leader
               </StatusBadge>
             ) : null}
           </span>
@@ -390,7 +390,7 @@ function DepartmentDetail({
             <dd>{parent?.name ?? '— Cấp cao nhất —'}</dd>
           </div>
           <div>
-            <dt className="text-xs text-muted-foreground">Trưởng phòng</dt>
+            <dt className="text-xs text-muted-foreground">Leader</dt>
             <dd>{managerName ?? (department.managerId ? '…' : 'Chưa có')}</dd>
           </div>
           <div>

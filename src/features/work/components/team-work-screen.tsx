@@ -202,7 +202,7 @@ export function TeamWorkScreen() {
               <EmptyState
                 icon={ClipboardCheck}
                 title="Bạn chưa phụ trách phòng nào có nhân sự"
-                description="Trưởng phòng / cấp trên thấy khối lượng việc của nhân sự trong nhánh mình ở đây."
+                description="Leader / cấp trên thấy khối lượng việc của nhân sự trong nhánh mình ở đây."
               />
             }
           >
@@ -486,7 +486,7 @@ function WorkloadTable({
                 <td className="px-3 py-2">
                   {r.user.fullName}
                   {r.isManager ? (
-                    <span className="block text-xs text-muted-foreground">Trưởng phòng</span>
+                    <span className="block text-xs text-muted-foreground">Leader</span>
                   ) : null}
                 </td>
                 <td className="px-3 py-2 text-muted-foreground">{r.departmentName ?? '—'}</td>

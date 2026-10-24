@@ -38,7 +38,7 @@ describe('Sơ đồ nhân sự (/admin/org-tree, mặc định dạng sơ đồ)
     renderApp(<OrgTreeScreen />);
     const chart = await screen.findByRole('region', { name: 'Sơ đồ nhân sự' });
     const sales = within(chart).getByRole('button', {
-      name: 'Kinh doanh: 3 người, trưởng phòng Nguyễn Văn Lãnh',
+      name: 'Kinh doanh: 3 người, leader Nguyễn Văn Lãnh',
     });
     expect(within(chart).getByRole('button', { name: 'Kinh doanh Hà Nội: 2 người' })).toBeVisible();
     fireEvent.click(sales);

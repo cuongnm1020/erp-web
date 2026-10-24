@@ -133,7 +133,7 @@ function ChartNode({
           type="button"
           onClick={() => onSelect(node)}
           aria-pressed={selected}
-          aria-label={`${node.name}: ${node.memberCount} người${node.managerName ? `, trưởng phòng ${node.managerName}` : ''}`}
+          aria-label={`${node.name}: ${node.memberCount} người${node.managerName ? `, leader ${node.managerName}` : ''}`}
           className={cn(
             'flex min-w-44 max-w-72 flex-col items-start rounded-md border px-3 py-1.5 text-left text-xs leading-tight shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2',
             tone.kind === 'trunk' && 'border-primary bg-primary text-primary-foreground',

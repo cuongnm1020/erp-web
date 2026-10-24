@@ -35,7 +35,7 @@ const SAMPLE_RULES: RuleItem[] = [
   {
     order: 2,
     name: 'Đơn giá trị lớn',
-    summary: 'Tổng ≥ 10.000.000 · Duyệt: leader → trưởng phòng KD',
+    summary: 'Tổng ≥ 10.000.000 · Duyệt: trưởng nhóm → leader KD',
     status: 'on',
   },
   {
@@ -53,7 +53,7 @@ const SAMPLE_RULES: RuleItem[] = [
   {
     order: 5,
     name: 'Giá bán thấp hơn giá vốn',
-    summary: 'Đơn giá < COGS hiện tại · Duyệt: trưởng phòng KD',
+    summary: 'Đơn giá < COGS hiện tại · Duyệt: leader KD',
     status: 'pending',
   },
   {
@@ -201,7 +201,7 @@ export function ApprovalRulesScreen() {
                 <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-muted text-xs font-semibold">
                   2
                 </span>
-                <SelectField value="Vai trò: Trưởng phòng kinh doanh" />
+                <SelectField value="Vai trò: Leader kinh doanh" />
                 <SelectField value="Chỉ khi CK > 25%" />
                 <X className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden />
               </div>
@@ -212,8 +212,7 @@ export function ApprovalRulesScreen() {
                 <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden />
                 <p>
                   <span className="font-semibold">Sale Hà Nội hiện có 1 leader.</span> Nếu leader
-                  nghỉ, đơn sẽ chờ vô hạn — bật &quot;Leo thang sau 4 giờ lên trưởng phòng&quot; bên
-                  dưới.
+                  nghỉ, đơn sẽ chờ vô hạn — bật &quot;Leo thang sau 4 giờ lên leader&quot; bên dưới.
                 </p>
               </div>
             </div>
@@ -225,7 +224,7 @@ export function ApprovalRulesScreen() {
               </div>
               <div className="space-y-1">
                 <span className="text-xs text-muted-foreground">Leo thang tới</span>
-                <SelectField value="Trưởng phòng kinh doanh" />
+                <SelectField value="Leader kinh doanh" />
               </div>
               <div className="space-y-1.5 sm:col-span-2">
                 <span className="text-xs text-muted-foreground">Thông báo</span>

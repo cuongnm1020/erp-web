@@ -120,8 +120,8 @@ function GrantForm({
         ))}
         <p className="flex gap-2 rounded-md bg-info-weak px-2.5 py-2 text-xs text-info">
           <Info className="mt-px h-4 w-4 shrink-0" aria-hidden />
-          Trưởng nhóm không cấp lại quyền cho người khác và không đụng được trưởng phòng, trưởng
-          nhóm khác.
+          Trưởng nhóm không cấp lại quyền cho người khác và không đụng được leader, trưởng nhóm
+          khác.
         </p>
       </div>
       <DialogFooter>

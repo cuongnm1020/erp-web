@@ -304,7 +304,7 @@ function WorkDetail({ w }: { w: WorkItemDetail }) {
               Đã quá hạn {formatDuration(w.deadline.minutesLeft ?? 0, task ? 1440 : 570)}.
               {task
                 ? ' Cần thêm thời gian thì bấm Xin gia hạn để người giao biết hạn mới.'
-                : ' Trưởng phòng nhận đã thấy cảnh báo trên chuông.'}
+                : ' Leader nhận đã thấy cảnh báo trên chuông.'}
             </span>
           </div>
         ) : null}

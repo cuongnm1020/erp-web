@@ -275,8 +275,8 @@ export function DepartmentDialog({
                     </SelectContent>
                   </Select>
                   <FormDescription>
-                    CSKH: cả trưởng phòng lẫn nhân viên thấy khách được chia cho phòng; nhận khách
-                    mới theo tỷ lệ ở Quản trị › Chia khách CSKH.
+                    CSKH: cả leader lẫn nhân viên thấy khách được chia cho phòng; nhận khách mới
+                    theo tỷ lệ ở Quản trị › Chia khách CSKH.
                   </FormDescription>
                   <FormMessage />
                 </FormItem>
@@ -290,7 +290,7 @@ export function DepartmentDialog({
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>
-                        Trưởng phòng{' '}
+                        Leader{' '}
                         <span className="font-normal text-muted-foreground">
                           · {field.value.length} người
                         </span>
@@ -301,13 +301,13 @@ export function DepartmentDialog({
                           onChange={field.onChange}
                           staff={members}
                           exclude={groupLeadIds}
-                          roleLabel="trưởng phòng"
-                          addPlaceholder="Thêm trưởng phòng…"
+                          roleLabel="leader"
+                          addPlaceholder="Thêm leader…"
                         />
                       </FormControl>
                       <FormDescription>
-                        Các trưởng phòng ngang hàng: cùng quản lý nhân viên và trưởng nhóm của
-                        phòng, không sửa / khóa được nhau.
+                        Các leader ngang hàng: cùng quản lý nhân viên và trưởng nhóm của phòng,
+                        không sửa / khóa được nhau.
                       </FormDescription>
                       <FormMessage />
                     </FormItem>
@@ -350,10 +350,10 @@ export function DepartmentDialog({
                 name="managerId"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Trưởng phòng</FormLabel>
+                    <FormLabel>Leader</FormLabel>
                     <FormControl>
                       <StaffSelect
-                        aria-label="Trưởng phòng"
+                        aria-label="Leader"
                         value={field.value ?? ''}
                         onChange={field.onChange}
                         staff={users}

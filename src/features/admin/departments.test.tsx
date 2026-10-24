@@ -119,7 +119,7 @@ describe('TeamsScreen — Phòng ban & team (I-05)', () => {
     expect(await screen.findByText('Nhân viên 1')).toBeInTheDocument();
     expect(screen.getByText('Nhân viên 2')).toBeInTheDocument();
     expect(screen.queryByText('Nhân viên 3')).not.toBeInTheDocument();
-    expect(screen.getByText('Trưởng phòng')).toBeInTheDocument();
+    expect(screen.getByText('Leader')).toBeInTheDocument();
     expect(userQueries.some((q) => q.get('departmentId') === SALES.id)).toBe(true);
 
     // Team chỉ đọc
