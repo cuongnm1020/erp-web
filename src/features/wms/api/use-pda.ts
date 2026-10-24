@@ -412,3 +412,62 @@ export function useHandoverToPacker() {
     },
   });
 }
+
+// ── Cất hàng tự chọn vị trí + tra / chuyển vị trí (LOC-3/6/8, docs/PLAN-putaway-relocate.md) ──
+
+export type PdaPutAwayView = components['schemas']['PdaPutAwayViewDto'];
+export type PdaPutAwayAssignBody = components['schemas']['PdaPutAwayAssignDto'];
+export type PdaPutAwayAssignResult = components['schemas']['PdaPutAwayAssignResultDto'];
+export type PdaLocationContents = components['schemas']['PdaLocationContentsDto'];
+export type PdaRelocateBody = components['schemas']['PdaRelocateDto'];
+export type PdaRelocateResult = components['schemas']['PdaRelocateResultDto'];
+
+const locationKeys = {
+  contents: (id: string) => [...pdaKeys.all, 'location', id] as const,
+};
+
+/** GET /pda/putaway/:taskId — nhóm thùng / hàng rời chưa cất + đã cất theo vị trí. */
+export function usePutAwayView() {
+  return useMutation({
+    mutationFn: (taskId: string) =>
+      unwrap(api.GET('/pda/putaway/{taskId}', { params: { path: { taskId } } })),
+  });
+}
+
+/** POST /pda/putaway/:taskId/assign — cất cả giỏ vào MỘT vị trí (hoặc DEFAULT). */
+export function useAssignPutAway() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ taskId, body }: { taskId: string; body: PdaPutAwayAssignBody }) =>
+      unwrap(api.POST('/pda/putaway/{taskId}/assign', { params: { path: { taskId } }, body })),
+    onSuccess: (r) => {
+      void qc.invalidateQueries({ queryKey: taskKeys.all });
+      void qc.invalidateQueries({ queryKey: locationKeys.contents(r.toLocation.id) });
+    },
+  });
+}
+
+/** GET /pda/locations/:id/contents — hàng đang ở vị trí (theo SKU / lô, thùng bên trong). */
+export function useLocationContents(locationId: string | null) {
+  return useQuery({
+    queryKey: locationKeys.contents(locationId ?? ''),
+    queryFn: () =>
+      unwrap(
+        api.GET('/pda/locations/{id}/contents', { params: { path: { id: locationId ?? '' } } }),
+      ),
+    enabled: locationId !== null && locationId !== '',
+  });
+}
+
+/** POST /pda/relocate — chuyển hàng A → B; server trỏ lại / tách dòng lấy hàng đang nhắm A. */
+export function useRelocate() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (body: PdaRelocateBody) => unwrap(api.POST('/pda/relocate', { body })),
+    onSuccess: (r) => {
+      void qc.invalidateQueries({ queryKey: locationKeys.contents(r.fromLocation.id) });
+      void qc.invalidateQueries({ queryKey: locationKeys.contents(r.toLocation.id) });
+      void qc.invalidateQueries({ queryKey: taskKeys.all });
+    },
+  });
+}

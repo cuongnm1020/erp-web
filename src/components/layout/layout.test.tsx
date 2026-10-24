@@ -133,6 +133,7 @@ describe('visibleModules', () => {
       'Trạm đóng gói',
       'Lấy hàng (PDA)',
       'Cất hàng (PDA)',
+      'Tra / chuyển vị trí (PDA)',
     ]);
     const all = visibleModules((a, s) => s === 'Task');
     expect(all.find((m) => m.label === 'Kho')?.children?.map((c) => c.label)).toContain(

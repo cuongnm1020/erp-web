@@ -159,6 +159,27 @@ const MESSAGES: Record<string, string> = {
     'Việc này không được giao cho bạn. Quét mã đơn để nhận việc, hoặc nhờ điều phối.',
   PDA_TASK_NOT_WORKABLE:
     'Việc này đã xong, đã hủy hoặc đang chờ xử lý sự cố — không thao tác được nữa.',
+  // Cất hàng tự chọn vị trí / chuyển vị trí (LOC-3/6/8)
+  PDA_NOT_PUT_AWAY:
+    'Mã này không phải việc cất hàng. Quét mã phiếu PUT… hoặc chạm việc trong hàng đợi.',
+  PDA_PUTAWAY_NO_TARGET: 'Chưa có vị trí đích. Quét mã vị trí cần cất vào.',
+  PDA_PUTAWAY_EMPTY: 'Giỏ trống. Quét thùng hoặc hàng rời trước rồi mới quét vị trí.',
+  PDA_PUTAWAY_ALREADY_PLACED: 'Có thùng trong giỏ đã được cất. Xoá giỏ, tải lại việc rồi quét lại.',
+  PDA_PUTAWAY_NOT_IN_TASK:
+    'Có thùng không thuộc việc này hoặc đã được cất. Xoá giỏ, tải lại việc rồi quét lại.',
+  PDA_PUTAWAY_QTY_EXCEEDS: 'Hàng rời vượt số còn phải cất. Giảm số lượng rồi thử lại.',
+  PDA_RELOCATE_SAME: 'Vị trí đích trùng vị trí đang chuyển đi. Quét vị trí khác.',
+  PDA_RELOCATE_CONTAINER_NOT_HERE:
+    'Có thùng không còn nằm ở vị trí này. Tải lại vị trí rồi chọn lại.',
+  PDA_RELOCATE_CONTAINER_PICKED:
+    'Có thùng đã được quét lấy cho đơn — không chuyển được. Bỏ chọn thùng đó.',
+  PDA_RELOCATE_QTY_EXCEEDS:
+    'Số hàng rời vượt phần chuyển được (phần còn lại đã quét lấy cho đơn hoặc nằm trong thùng). Giảm số lượng.',
+  PDA_RELOCATE_EMPTY: 'Vị trí này không còn hàng nào chuyển được.',
+  PDA_NO_DEFAULT_LOCATION: 'Kho chưa có vị trí DEFAULT đang dùng. Tạo ở màn Kho & vị trí.',
+  PDA_LOCATION_OTHER_WAREHOUSE: 'Vị trí vừa quét thuộc kho khác. Quét vị trí trong kho của việc.',
+  PDA_LOCATION_NOT_STORABLE:
+    'Mã vừa quét là khu / dãy / kệ, không cất được. Quét tem tầng hoặc ô cụ thể.',
   PDA_TASK_LINE_NOT_FOUND: 'Dòng việc không còn tồn tại. Quét lại mã đơn để tải việc mới nhất.',
   PDA_SCAN_WRONG_SKU: 'Quét sai hàng — sản phẩm này không phải dòng đang lấy. Kiểm tra lại kệ.',
   PDA_SCAN_QTY_EXCEEDS_PLANNED:

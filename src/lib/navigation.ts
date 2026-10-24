@@ -422,6 +422,13 @@ export const NAV_MODULES: NavModule[] = [
         section: 'Màn PDA',
         ability: { action: 'execute', subject: 'Task' },
       },
+      {
+        label: 'Tra / chuyển vị trí (PDA)',
+        href: '/pda/location',
+        icon: MapPin,
+        section: 'Màn PDA',
+        ability: { action: 'execute', subject: 'Task' },
+      },
     ],
   },
   {
