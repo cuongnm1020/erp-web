@@ -661,6 +661,48 @@ describe('OrderListScreen — lọc theo hãng + thời gian (2026-09-19)', () =
     expect(decodeURIComponent(String(replace.mock.calls.at(-1)![0]))).toContain('source=POS:111');
   });
 
+  it('ô Team CSKH liệt kê phòng ban CSKH → chọn → URL + API careTeamId (2026-10-24)', async () => {
+    search = '';
+    const seen: string[] = [];
+    server.use(
+      http.get('/api/sales-orders/care-team-options', () =>
+        HttpResponse.json([
+          { teamId: 't-cskh-a', name: 'CSKH A', isActive: true },
+          { teamId: 't-cskh-b', name: 'CSKH B', isActive: false },
+        ]),
+      ),
+      http.get('/api/sales-orders', ({ request }) => {
+        seen.push(new URL(request.url).searchParams.get('careTeamId') ?? '');
+        return HttpResponse.json({ items: [], total: 0 });
+      }),
+    );
+    renderApp(<OrderListScreen />);
+    fireEvent.click(await screen.findByRole('combobox', { name: 'Team CSKH' }));
+    expect(
+      await screen.findByRole('option', { name: 'CSKH B (ngừng hoạt động)' }),
+    ).toBeInTheDocument();
+    replace.mockClear();
+    fireEvent.click(screen.getByRole('option', { name: 'CSKH A' }));
+    await waitFor(() => expect(replace).toHaveBeenCalled());
+    expect(String(replace.mock.calls.at(-1)![0])).toContain('careTeamId=t-cskh-a');
+
+    search = 'careTeamId=t-cskh-a';
+    renderApp(<OrderListScreen />);
+    await waitFor(() => expect(seen).toContain('t-cskh-a'));
+  });
+
+  it('ô Nguồn: "Tạo trong ERP" đứng đầu danh sách', async () => {
+    search = '';
+    renderApp(<OrderListScreen />);
+    fireEvent.click(await screen.findByRole('combobox', { name: 'Nguồn' }));
+    const options = await screen.findAllByRole('option');
+    expect(options.map((o) => o.textContent)).toContain('Tạo trong ERP');
+    expect(
+      options.find((o) => o.textContent !== 'Tất cả' && !/^Nguồn/.test(o.textContent ?? ''))
+        ?.textContent,
+    ).toBe('Tạo trong ERP');
+  });
+
   it('chọn "Chưa gán hãng" → URL noCarrier=true và bỏ carrierId (hai key loại trừ nhau)', async () => {
     search = 'carrierId=c-ghtk';
     renderApp(<OrderListScreen />);

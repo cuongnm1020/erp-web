@@ -3336,6 +3336,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/sales-orders/care-team-options": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Team CSKH (phòng ban loại CSKH) cho ô lọc danh sách đơn — khai TRƯỚC `:id`. */
+        get: operations["SalesOrderController_careTeamOptions"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/sales-orders/shipping-quote-preview": {
         parameters: {
             query?: never;
@@ -10098,6 +10115,13 @@ export interface components {
             id: string;
             code: string;
             fullName: string;
+        };
+        OrderCareTeamOptionDto: {
+            /** @description Team phòng ban (`DEPT-<mã>`) — giá trị cho `careTeamId` của GET /sales-orders. */
+            teamId: string;
+            /** @description Tên phòng ban. */
+            name: string;
+            isActive: boolean;
         };
         ShippingQuotePreviewDto: {
             /** Format: uuid */
@@ -20143,6 +20167,25 @@ export interface operations {
             };
         };
     };
+    SalesOrderController_careTeamOptions: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OrderCareTeamOptionDto"][];
+                };
+            };
+        };
+    };
     SalesOrderController_shippingQuotePreview: {
         parameters: {
             query?: never;
@@ -20257,6 +20300,11 @@ export interface operations {
                 pancakeShopId?: string;
                 /** @description Người phụ trách (SalesOrder.ownerId). */
                 ownerId?: string;
+                /**
+                 * @description Team CSKH lên đơn (SalesOrder.teamId) — team phòng ban CSKH, gồm cả phòng ban con. Danh sách:
+                 *     GET /sales-orders/care-team-options.
+                 */
+                careTeamId?: string;
                 /**
                  * @description `true` = chỉ đơn có đơn trùng trong ngày (cùng SĐT khách, cùng ngày VN, chưa hủy, mọi nguồn —
                  *     CSKH-5). Theo from/to nếu có, không thì 7 ngày VN gần nhất.
@@ -20382,6 +20430,11 @@ export interface operations {
                 pancakeShopId?: string;
                 /** @description Người phụ trách (SalesOrder.ownerId). */
                 ownerId?: string;
+                /**
+                 * @description Team CSKH lên đơn (SalesOrder.teamId) — team phòng ban CSKH, gồm cả phòng ban con. Danh sách:
+                 *     GET /sales-orders/care-team-options.
+                 */
+                careTeamId?: string;
                 /**
                  * @description `true` = chỉ đơn có đơn trùng trong ngày (cùng SĐT khách, cùng ngày VN, chưa hủy, mọi nguồn —
                  *     CSKH-5). Theo from/to nếu có, không thì 7 ngày VN gần nhất.

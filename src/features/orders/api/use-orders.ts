@@ -47,6 +47,8 @@ export interface OrderListParams {
   to?: string;
   /** Đơn có sản phẩm không phải hàng ERP: món gõ tay Pancake / SKU Pancake tự sinh / một trong hai. */
   itemOrigin?: OrderItemOrigin;
+  /** Team CSKH lên đơn (team phòng ban CSKH, gồm phòng con) — danh sách: useCareTeamOptions. */
+  careTeamId?: string;
   /** Sắp theo cột (server); bỏ trống = ngày đặt mới nhất trước. */
   sortBy?: OrderSortField;
   sortDir?: 'asc' | 'desc';
@@ -124,6 +126,7 @@ function listQuery(params: Omit<OrderListParams, 'take' | 'skip'>) {
     from: params.from || undefined,
     to: params.to || undefined,
     itemOrigin: params.itemOrigin,
+    careTeamId: params.careTeamId || undefined,
   };
 }
 
@@ -141,6 +144,17 @@ export function usePancakeShops() {
   return useQuery({
     queryKey: [...orderKeys.all, 'pancake-shops'] as const,
     queryFn: () => unwrap(api.GET('/pancake-sync/shops')),
+    staleTime: 5 * 60_000,
+  });
+}
+
+export type OrderCareTeamOption = components['schemas']['OrderCareTeamOptionDto'];
+
+/** GET /sales-orders/care-team-options — team CSKH (= phòng ban loại CSKH) để lọc đơn. */
+export function useCareTeamOptions() {
+  return useQuery({
+    queryKey: [...orderKeys.all, 'care-team-options'] as const,
+    queryFn: () => unwrap(api.GET('/sales-orders/care-team-options')),
     staleTime: 5 * 60_000,
   });
 }
