@@ -831,8 +831,8 @@ describe('OrderCreateScreen — màn tạo đơn mới', () => {
     expect(names).toEqual([
       'Chưa chọn ĐVVC',
       'Giao thủ công (xe nhà / khách tự lấy)',
-      'Giao Hàng Tiết Kiệm',
-      'Viettel Post',
+      'GHTK Giao Hàng Tiết Kiệm',
+      'VTP Viettel Post',
     ]);
   });
 });

@@ -4582,6 +4582,38 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/waiting-stock/summary": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["WaitingStockController_summary"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/goods-receipts/{id}/waiting-match": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["WaitingStockController_match"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/return-receipts": {
         parameters: {
             query?: never;
@@ -10270,6 +10302,18 @@ export interface components {
              */
             collectedAmount: string | null;
         };
+        SalesOrderShortItemDto: {
+            skuId: string;
+            skuCode: string;
+            skuName: string;
+            /** @description SL thiếu theo đơn vị cơ sở — Decimal(18,6) chuỗi. */
+            qty: string;
+        };
+        SalesOrderShortageDto: {
+            /** @description Giờ tạo việc PICK (= lúc đơn được duyệt) — cột "Chờ từ". */
+            since: string;
+            items: components["schemas"]["SalesOrderShortItemDto"][];
+        };
         SalesOrderCustomerDto: {
             id: string;
             code: string;
@@ -10296,10 +10340,10 @@ export interface components {
         };
         SalesOrderListItemDto: {
             /**
-             * @description Tab của đơn — `flowOf(status, fulfilmentStatus)`.
+             * @description Tab của đơn — `flowOf(status, fulfilmentStatus, chờ hàng)`.
              * @enum {string}
              */
-            flow: "PENDING_APPROVAL" | "CANCELLED" | "WAREHOUSE" | "PICKING" | "PACKED" | "IN_TRANSIT" | "OUT_FOR_DELIVERY" | "DELIVERED" | "RETURNED" | "CARRIER_CANCELLED" | "PICKED_UP";
+            flow: "PENDING_APPROVAL" | "CANCELLED" | "WAREHOUSE" | "PICKING" | "PACKED" | "IN_TRANSIT" | "OUT_FOR_DELIVERY" | "DELIVERED" | "RETURNED" | "CARRIER_CANCELLED" | "PICKED_UP" | "WAITING_STOCK";
             /**
              * @description Trạng thái kho / giao hàng chi tiết (snapshot) — null = chưa tính (coi như NOT_STARTED).
              * @enum {string|null}
@@ -10324,6 +10368,8 @@ export interface components {
             ownerName: string | null;
             /** @description Ghi chú gửi hãng / ghi chú in trên đơn (shippingOptions.note). */
             note: string | null;
+            /** @description Hàng đang thiếu tồn (mọi tab); null = không thiếu. Tab Chờ hàng = thiếu ≥ 24h + chưa gửi hãng. */
+            shortage: components["schemas"]["SalesOrderShortageDto"] | null;
             id: string;
             docNumber: string;
             customer: components["schemas"]["SalesOrderCustomerDto"];
@@ -10409,6 +10455,8 @@ export interface components {
             total: number;
             PENDING_APPROVAL: number;
             WAREHOUSE: number;
+            /** @description Chờ hàng (2026-10-25) — không tính vào WAREHOUSE / PICKING. */
+            WAITING_STOCK: number;
             PICKING: number;
             PACKED: number;
             PICKED_UP: number;
@@ -11331,6 +11379,11 @@ export interface components {
             id: string;
             name: string;
             isDefault: boolean;
+            /**
+             * @description Mã tài khoản ở hãng để người dùng nhận ra (2026-10-25): mã đối tác / mã shop (`partnerCode`,
+             *     vd GHTK S23119447), không có thì `shopId`. Không phải bí mật. null = chưa nhập.
+             */
+            code: string | null;
             /** @description Đủ thông tin để gọi hãng — chưa đủ thì ô chọn hiện mờ. */
             configured: boolean;
         };
@@ -12476,6 +12529,88 @@ export interface components {
             layerCount: number;
             /** @description Đơn bán đã tiêu thụ hàng của phiếu trước khi có giá → giá vốn được tính lại (worker). */
             affectedOrderCount: number;
+        };
+        WaitingStockSkuDto: {
+            skuId: string;
+            skuCode: string;
+            skuName: string;
+            /** @description Số đơn chờ hàng đang thiếu SKU này. */
+            orders: number;
+            /** @description Tổng SL các đơn đó thiếu (đơn vị cơ sở) — Decimal(18,6) chuỗi. */
+            needQty: string;
+            /** @description Tồn khả dụng (onHand − reserved) của SKU ở kho đang xem — Decimal(18,6) chuỗi. */
+            available: string;
+            /** @description max(needQty − available, 0) — Decimal(18,6) chuỗi. */
+            shortQty: string;
+            /** @description Số đơn CHỈ thiếu SKU này — về đúng SKU này là đủ hàng. */
+            onlyThisSku: number;
+        };
+        WaitingStockSummaryDto: {
+            generatedAt: string;
+            /** @description Đơn chờ hàng (tab Chờ hàng của danh sách đơn). */
+            waitingOrders: number;
+            /** @description Đơn đã duyệt chưa Gửi sang ĐVVC (mẫu số của "trên tổng"). */
+            activeOrders: number;
+            /** @description Đơn chờ hàng từ `overdueDays` ngày trở lên. */
+            overdueOrders: number;
+            overdueDays: number;
+            /** @description Đơn chỉ thiếu đúng một SKU. */
+            singleSkuOrders: number;
+            /** @description Tổng SL thiếu mọi SKU — Decimal(18,6) chuỗi. */
+            needQty: string;
+            /** @description Số đơn nhiều nhất màn đọc; vượt thì `truncated`. */
+            truncated: boolean;
+            /** @description Sắp theo số đơn cần nhiều nhất. */
+            items: components["schemas"]["WaitingStockSkuDto"][];
+        };
+        WaitingMatchLineDto: {
+            skuId: string;
+            skuCode: string;
+            skuName: string;
+            /** @description SL về (đơn vị cơ sở, đã trừ trả NCC) — Decimal(18,6) chuỗi. */
+            qty: string;
+            needOrders: number;
+            needQty: string;
+            /** @description SL chia cho đơn chờ. */
+            given: string;
+            /** @description Đơn đủ hàng cả đơn có dùng SKU này. */
+            full: number;
+            /** @description Đơn nhận SKU này nhưng còn thiếu SP khác. */
+            partial: number;
+            /** @description Đơn cần SKU này mà hết phần chia. */
+            later: number;
+            /** @description Dư sau khi chia. */
+            left: string;
+        };
+        WaitingMatchItemDto: {
+            skuId: string;
+            skuCode: string;
+            skuName: string;
+            qty: string;
+        };
+        WaitingMatchOrderDto: {
+            orderId: string;
+            docNumber: string;
+            customerName: string;
+            waitingSince: string;
+            got: components["schemas"]["WaitingMatchItemDto"][];
+            missing: components["schemas"]["WaitingMatchItemDto"][];
+        };
+        WaitingMatchDto: {
+            receiptId: string;
+            docNumber: string;
+            warehouseId: string;
+            /** @description Đơn chờ hàng ở kho của phiếu. */
+            waitingOrders: number;
+            /** @description Đơn đủ hàng cả đơn nhờ phiếu này. */
+            fullOrders: number;
+            /** @description Đơn nhận được hàng của phiếu nhưng còn thiếu SP khác. */
+            partialOrders: number;
+            /** @description Đơn cần SP của phiếu mà hết phần chia. */
+            laterOrders: number;
+            lines: components["schemas"]["WaitingMatchLineDto"][];
+            /** @description Đơn PARTIAL, chờ lâu trước (tối đa 200). */
+            warnings: components["schemas"]["WaitingMatchOrderDto"][];
         };
         ReturnReceiptListRowDto: {
             id: string;
@@ -15696,6 +15831,8 @@ export interface operations {
                 /** @description Ngày theo giờ Việt Nam `YYYY-MM-DD` cho số đóng gói / bàn giao; bỏ trống = hôm nay. */
                 date?: string;
                 carrierId?: string;
+                /** @description Phiếu do MỘT tài khoản hãng cấp vận đơn (wms.CarrierAccount.id, 2026-10-25). */
+                carrierAccountId?: string;
                 /** @description Hãng giữ quá N ngày kể từ lúc rời kho → cảnh báo. */
                 holdDays: number;
             };
@@ -15721,6 +15858,8 @@ export interface operations {
                 /** @description Ngày theo giờ Việt Nam `YYYY-MM-DD` cho số đóng gói / bàn giao; bỏ trống = hôm nay. */
                 date?: string;
                 carrierId?: string;
+                /** @description Phiếu do MỘT tài khoản hãng cấp vận đơn (wms.CarrierAccount.id, 2026-10-25). */
+                carrierAccountId?: string;
                 /** @description Hãng giữ quá N ngày kể từ lúc rời kho → cảnh báo. */
                 holdDays: number;
                 /**
@@ -20503,10 +20642,16 @@ export interface operations {
         parameters: {
             query: {
                 /**
+                 * @description Ai gán hãng (2026-10-25): `ERP` = chọn trong ERP (sửa đơn / Gửi sang ĐVVC / tạo đơn) — đã có
+                 *     hãng, phiếu giao mới nhất không gửi ngoài ERP; `PANCAKE` = Pancake gán hãng + cấp vận đơn
+                 *     (phiếu gửi ngoài ERP).
+                 */
+                carrierSource?: "ERP" | "PANCAKE";
+                /**
                  * @description Tab của danh sách đơn (2026-10-12) — gộp trạng thái chứng từ + kho / giao hàng
                  *     (`flowOf` trong sales-order-flow.ts). Đếm từng tab: GET /sales-orders/flow-counts.
                  */
-                flow?: "PENDING_APPROVAL" | "WAREHOUSE" | "PICKING" | "PACKED" | "PICKED_UP" | "IN_TRANSIT" | "OUT_FOR_DELIVERY" | "DELIVERED" | "RETURNED" | "CARRIER_CANCELLED" | "CANCELLED";
+                flow?: "PENDING_APPROVAL" | "WAREHOUSE" | "WAITING_STOCK" | "PICKING" | "PACKED" | "PICKED_UP" | "IN_TRANSIT" | "OUT_FOR_DELIVERY" | "DELIVERED" | "RETURNED" | "CARRIER_CANCELLED" | "CANCELLED";
                 /**
                  * @description Đơn có sản phẩm KHÔNG phải hàng ERP (2026-10-22): `CUSTOM` = có món gõ tay trên Pancake
                  *     (`sales_order_external.custom_items`), `POS_SKU` = có dòng là SKU do đồng bộ Pancake tự tạo
@@ -20525,6 +20670,13 @@ export interface operations {
                 noCarrier?: string;
                 /** @description Đơn ĐÃ gán hãng này (wms.Carrier.id). Kết hợp được với from/to. */
                 carrierId?: string;
+                /**
+                 * @description Đơn gán MỘT tài khoản hãng (wms.CarrierAccount.id, 2026-10-25) — đơn chưa chọn tài khoản
+                 *     (`carrierAccountId` null) tính là tài khoản mặc định của hãng. Thay được cho `carrierId`.
+                 */
+                carrierAccountId?: string;
+                /** @description Đơn đang thiếu tồn SKU này (core.Sku.id) — "Xem đơn" từ màn Hàng chờ (2026-10-25). */
+                shortSkuId?: string;
                 /**
                  * @description Khoảng `orderDate` (ISO): `from` ≤ orderDate. `to` là NGÀY (`YYYY-MM-DD`) thì lấy hết ngày đó
                  *     (< to + 1 ngày, giờ Việt Nam); là datetime thì ≤ to.
@@ -20633,10 +20785,16 @@ export interface operations {
         parameters: {
             query: {
                 /**
+                 * @description Ai gán hãng (2026-10-25): `ERP` = chọn trong ERP (sửa đơn / Gửi sang ĐVVC / tạo đơn) — đã có
+                 *     hãng, phiếu giao mới nhất không gửi ngoài ERP; `PANCAKE` = Pancake gán hãng + cấp vận đơn
+                 *     (phiếu gửi ngoài ERP).
+                 */
+                carrierSource?: "ERP" | "PANCAKE";
+                /**
                  * @description Tab của danh sách đơn (2026-10-12) — gộp trạng thái chứng từ + kho / giao hàng
                  *     (`flowOf` trong sales-order-flow.ts). Đếm từng tab: GET /sales-orders/flow-counts.
                  */
-                flow?: "PENDING_APPROVAL" | "WAREHOUSE" | "PICKING" | "PACKED" | "PICKED_UP" | "IN_TRANSIT" | "OUT_FOR_DELIVERY" | "DELIVERED" | "RETURNED" | "CARRIER_CANCELLED" | "CANCELLED";
+                flow?: "PENDING_APPROVAL" | "WAREHOUSE" | "WAITING_STOCK" | "PICKING" | "PACKED" | "PICKED_UP" | "IN_TRANSIT" | "OUT_FOR_DELIVERY" | "DELIVERED" | "RETURNED" | "CARRIER_CANCELLED" | "CANCELLED";
                 /**
                  * @description Đơn có sản phẩm KHÔNG phải hàng ERP (2026-10-22): `CUSTOM` = có món gõ tay trên Pancake
                  *     (`sales_order_external.custom_items`), `POS_SKU` = có dòng là SKU do đồng bộ Pancake tự tạo
@@ -20655,6 +20813,13 @@ export interface operations {
                 noCarrier?: string;
                 /** @description Đơn ĐÃ gán hãng này (wms.Carrier.id). Kết hợp được với from/to. */
                 carrierId?: string;
+                /**
+                 * @description Đơn gán MỘT tài khoản hãng (wms.CarrierAccount.id, 2026-10-25) — đơn chưa chọn tài khoản
+                 *     (`carrierAccountId` null) tính là tài khoản mặc định của hãng. Thay được cho `carrierId`.
+                 */
+                carrierAccountId?: string;
+                /** @description Đơn đang thiếu tồn SKU này (core.Sku.id) — "Xem đơn" từ màn Hàng chờ (2026-10-25). */
+                shortSkuId?: string;
                 /**
                  * @description Khoảng `orderDate` (ISO): `from` ≤ orderDate. `to` là NGÀY (`YYYY-MM-DD`) thì lấy hết ngày đó
                  *     (< to + 1 ngày, giờ Việt Nam); là datetime thì ≤ to.
@@ -22198,6 +22363,51 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["SetReceiptCostsResultDto"];
+                };
+            };
+        };
+    };
+    WaitingStockController_summary: {
+        parameters: {
+            query?: {
+                /** @description Kho (wms.Warehouse.id); bỏ trống = kho đang chọn ở header, không chọn = mọi kho được phép. */
+                warehouseId?: string;
+                /** @description Lọc dòng SKU theo mã / tên (không phân biệt hoa thường) — các số tổng vẫn tính mọi SKU. */
+                q?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WaitingStockSummaryDto"];
+                };
+            };
+        };
+    };
+    WaitingStockController_match: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WaitingMatchDto"];
                 };
             };
         };

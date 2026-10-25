@@ -34,13 +34,6 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Input } from '@/components/ui/input';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
 import { cn } from '@/lib/cn';
 import {
   formatDateTime,
@@ -49,6 +42,7 @@ import {
   groupVi,
   normalizePhone,
   formatQuantity,
+  formatWaited,
   formatRelative,
   phoneCarrier,
   toDecimal,
@@ -58,6 +52,7 @@ import { useInvalidateOn } from '@/lib/realtime';
 import { useHotkey } from '@/lib/use-hotkey';
 import { useListState, type SortState } from '@/lib/url-state';
 import { useCarriers } from '@/features/wms/api/use-shipping';
+import { CarrierSelect } from '@/features/wms/components/carrier-select';
 import {
   orderKeys,
   useOrderFlowCounts,
@@ -67,6 +62,7 @@ import {
   usePancakeShops,
   useSaveOrderListPrefs,
   type OrderFlow,
+  type OrderCarrierSource,
   type OrderItemOrigin,
   type OrderSortField,
   type SalesOrderListItem,
@@ -120,6 +116,9 @@ const DEFAULTS = {
     'weightMax',
     'noCarrier',
     'carrierId',
+    // Tài khoản hãng (ô chọn hãng dùng chung) + ai gán hãng (ERP / Pancake), 2026-10-25.
+    'carrierAccountId',
+    'carrierSource',
     // Kho: ô chọn kho làm việc ở sidebar (header X-Warehouse-Id) — không còn bộ lọc kho riêng.
     'source',
     'from',
@@ -130,6 +129,8 @@ const DEFAULTS = {
     'itemOrigin',
     // Team CSKH lên đơn (phòng ban loại CSKH), 2026-10-24.
     'careTeamId',
+    // Đơn thiếu tồn một SKU (Chờ hàng, 2026-10-25) — "Xem đơn" từ màn Hàng chờ.
+    'shortSkuId',
   ] as const,
 };
 
@@ -140,6 +141,14 @@ const ITEM_ORIGIN_OPTIONS: { value: OrderItemOrigin; label: string }[] = [
 ];
 const parseItemOrigin = (v: string | undefined): OrderItemOrigin | undefined =>
   ITEM_ORIGIN_OPTIONS.find((o) => o.value === v)?.value;
+
+/** Ai gán hãng cho đơn (2026-10-25): chọn trong ERP hay Pancake gán + cấp vận đơn. */
+const CARRIER_SOURCE_OPTIONS: { value: OrderCarrierSource; label: string }[] = [
+  { value: 'ERP', label: 'Hệ thống ERP gán hãng' },
+  { value: 'PANCAKE', label: 'Pancake gán hãng' },
+];
+const parseCarrierSource = (v: string | undefined): OrderCarrierSource | undefined =>
+  CARRIER_SOURCE_OPTIONS.find((o) => o.value === v)?.value;
 
 /**
  * Cột sắp được → trường `sortBy` của API. Cột không có ở đây không sắp được (sản phẩm, vận
@@ -158,6 +167,8 @@ const SORT_FIELD: Record<string, OrderSortField> = {
  * soát → ẩn mặc định, bật lại ở "Cột".
  */
 const DEFAULT_HIDDEN = ['orderDate', 'collected'];
+/** Cột chỉ hiện ở tab Chờ hàng. */
+const WAITING_ONLY_COLUMNS = ['shortage', 'waitingSince'];
 
 type OrderFilter = (typeof DEFAULTS.filterKeys)[number];
 
@@ -321,6 +332,51 @@ const buildColumns = (
             <span className="block text-xs text-primary">+{p.moreCount} sản phẩm khác</span>
           ) : null}
         </div>
+      );
+    },
+  },
+  // Hai cột của tab Chờ hàng (màn lọc bỏ ở tab khác).
+  {
+    id: 'shortage',
+    header: 'Hàng thiếu',
+    meta: { width: 230 },
+    cell: ({ row }) => {
+      const items = row.original.shortage?.items ?? [];
+      const first = items[0];
+      if (!first) return <span className="text-muted-foreground">—</span>;
+      const name = `${first.skuName} × ${formatQuantity(first.qty)}`;
+      return (
+        <div className="space-y-1">
+          <span className="block max-w-56 truncate font-semibold text-warning" title={name}>
+            {name}
+          </span>
+          {items.length > 1 ? (
+            <span
+              className="block text-xs text-muted-foreground"
+              title={items
+                .slice(1)
+                .map((i) => `${i.skuName} × ${formatQuantity(i.qty)}`)
+                .join(', ')}
+            >
+              + {items.length - 1} SP thiếu khác
+            </span>
+          ) : null}
+        </div>
+      );
+    },
+  },
+  {
+    id: 'waitingSince',
+    header: 'Chờ từ',
+    meta: { width: 120, align: 'right' },
+    cell: ({ row }) => {
+      const since = row.original.shortage?.since;
+      return since ? (
+        <span className="whitespace-nowrap" title={formatDateTime(since)}>
+          {formatWaited(since)}
+        </span>
+      ) : (
+        <span className="text-muted-foreground">—</span>
       );
     },
   },
@@ -675,36 +731,88 @@ function WeightRangeFilter({
   );
 }
 
+/**
+ * Dải giải thích của tab Chờ hàng + chip "Đang lọc đơn thiếu <SP>" (từ màn Hàng chờ). Điều kiện
+ * ghi đúng như API tính (apps/api docs/pick-pack-flow.md §3.6).
+ */
+function WaitingStockNote({
+  shortSkuName,
+  onClearSku,
+}: {
+  shortSkuName: string | null;
+  onClearSku: () => void;
+}) {
+  return (
+    <div className="flex flex-wrap items-center gap-2 px-5 pt-3">
+      <p role="note" className="flex-1 rounded-lg bg-info-weak px-3 py-2 text-sm text-info">
+        Đơn đã duyệt từ 24 giờ, chưa <strong>Gửi sang ĐVVC</strong> và còn sản phẩm thiếu tồn tự vào
+        tab này. Gửi sang ĐVVC hoặc hàng về đủ thì đơn tự rời tab. Không đổi trạng thái trên
+        Pancake.{' '}
+        <Link href="/wms/waiting-stock" className="font-semibold text-primary hover:underline">
+          Xem tổng hàng thiếu
+        </Link>
+      </p>
+      {shortSkuName ? (
+        <Button size="sm" variant="secondary" onClick={onClearSku}>
+          Đơn thiếu: {shortSkuName}
+          <X aria-hidden />
+          <span className="sr-only">Bỏ lọc sản phẩm thiếu</span>
+        </Button>
+      ) : null}
+    </div>
+  );
+}
+
 const NO_CARRIER = '__none__';
 const ANY = '__all__';
 
-/** Ô "Hãng vận chuyển": Tất cả / Chưa gán hãng / từng hãng đang bật. */
+/**
+ * Ô "Hãng vận chuyển" của bộ lọc: Tất cả / Chưa gán hãng / từng tài khoản hãng (ô chọn dùng chung).
+ * Ba key URL loại trừ nhau: `noCarrier`, `carrierAccountId` (hãng có tài khoản), `carrierId` (hãng
+ * không tài khoản như giao thủ công — và link cũ lọc theo hãng).
+ */
 function CarrierFilter({
-  value,
-  carriers,
+  noCarrier,
+  carrierId,
+  carrierAccountId,
   onChange,
 }: {
-  value: string;
-  carriers: { id: string; code: string; name: string; isActive: boolean }[];
-  onChange: (v: string) => void;
+  noCarrier: boolean;
+  carrierId: string;
+  carrierAccountId: string;
+  onChange: (
+    patch: Partial<Record<'noCarrier' | 'carrierId' | 'carrierAccountId', string | undefined>>,
+  ) => void;
 }) {
+  const carriers = useCarriers();
+  const ofAccount = carrierAccountId
+    ? (carriers.data ?? []).find((c) => c.accounts.some((a) => a.id === carrierAccountId))
+    : undefined;
+  const value = noCarrier
+    ? NO_CARRIER
+    : ofAccount
+      ? { carrierId: ofAccount.id, accountId: carrierAccountId }
+      : carrierId
+        ? { carrierId, accountId: null }
+        : ANY;
+  const clear = { noCarrier: undefined, carrierId: undefined, carrierAccountId: undefined };
   return (
-    <Select value={value || ANY} onValueChange={(v) => onChange(v === ANY ? '' : v)}>
-      <SelectTrigger className="h-9 w-52" aria-label="Hãng vận chuyển">
-        <SelectValue placeholder="Hãng vận chuyển" />
-      </SelectTrigger>
-      <SelectContent>
-        <SelectItem value={ANY}>Hãng VC: tất cả</SelectItem>
-        <SelectItem value={NO_CARRIER}>Chưa gán hãng</SelectItem>
-        {carriers
-          .filter((c) => c.isActive)
-          .map((c) => (
-            <SelectItem key={c.id} value={c.id}>
-              {c.name}
-            </SelectItem>
-          ))}
-      </SelectContent>
-    </Select>
+    <CarrierSelect
+      className="h-9 w-64"
+      value={value}
+      specials={[
+        { value: ANY, label: 'Hãng VC: tất cả' },
+        { value: NO_CARRIER, label: 'Chưa gán hãng' },
+      ]}
+      onChange={(v, option) => {
+        if (v === NO_CARRIER) onChange({ ...clear, noCarrier: 'true' });
+        else if (typeof v === 'string' || !option) onChange(clear);
+        // Lọc theo đúng tài khoản đã chọn (id thật — server tự gộp đơn chưa chọn tài khoản vào
+        // tài khoản mặc định).
+        else if (option.accountId) onChange({ ...clear, carrierAccountId: option.accountId });
+        else onChange({ ...clear, carrierId: option.carrier.id });
+      }}
+    />
   );
 }
 
@@ -717,6 +825,9 @@ export function OrderListScreen() {
   const weightMax = state.filters.weightMax ?? '';
   const noCarrier = state.filters.noCarrier === 'true';
   const carrierId = state.filters.carrierId ?? '';
+  const carrierAccountId = state.filters.carrierAccountId ?? '';
+  const carrierSource = parseCarrierSource(state.filters.carrierSource);
+  const shortSkuId = state.filters.shortSkuId ?? '';
   // Ô "Nguồn" gộp cả POS: `POS:<mã shop>` = đơn Pancake của đúng POS đó (URL giữ một khoá).
   const posShopId = /^POS:(\d+)$/.exec(state.filters.source ?? '')?.[1] ?? '';
   const source: 'PANCAKE' | 'ERP' | undefined =
@@ -759,6 +870,9 @@ export function OrderListScreen() {
       weightMax,
       noCarrier,
       carrierId,
+      carrierAccountId,
+      carrierSource,
+      shortSkuId,
       source,
       pancakeShopId: posShopId || undefined,
       from,
@@ -775,6 +889,9 @@ export function OrderListScreen() {
       weightMax,
       noCarrier,
       carrierId,
+      carrierAccountId,
+      carrierSource,
+      shortSkuId,
       source,
       posShopId,
       from,
@@ -801,12 +918,16 @@ export function OrderListScreen() {
   const [peek, setPeek] = useState<SalesOrderListItem | null>(null);
   const columns = useMemo(() => {
     const carrierById = new Map((carriers.data ?? []).map((c) => [c.id, c]));
-    return buildColumns((id) => carrierById.get(id) ?? null, {
+    const all = buildColumns((id) => carrierById.get(id) ?? null, {
       canUpdate,
       canCreate,
       onPeek: setPeek,
     });
-  }, [carriers.data, canUpdate, canCreate]);
+    // Cột Hàng thiếu / Chờ từ chỉ có nghĩa ở tab Chờ hàng.
+    return flow === 'WAITING_STOCK'
+      ? all
+      : all.filter((c) => !WAITING_ONLY_COLUMNS.includes(c.id ?? ''));
+  }, [carriers.data, canUpdate, canCreate, flow]);
   const pickerColumns = useMemo(
     () =>
       columns
@@ -869,6 +990,9 @@ export function OrderListScreen() {
     weightMax !== '' ||
     noCarrier ||
     carrierId !== '' ||
+    carrierAccountId !== '' ||
+    carrierSource !== undefined ||
+    shortSkuId !== '' ||
     source !== undefined ||
     from !== '' ||
     to !== '' ||
@@ -913,6 +1037,19 @@ export function OrderListScreen() {
         onChange={(v) => setFilter({ flow: v })}
       />
 
+      {flow === 'WAITING_STOCK' || shortSkuId ? (
+        <WaitingStockNote
+          shortSkuName={
+            shortSkuId
+              ? (query.data?.items
+                  .flatMap((o) => o.shortage?.items ?? [])
+                  .find((i) => i.skuId === shortSkuId)?.skuName ?? 'sản phẩm đã chọn')
+              : null
+          }
+          onClearSku={() => setFilter({ shortSkuId: undefined })}
+        />
+      ) : null}
+
       {selectedRows.length > 0 ? (
         <OrderBulkBar rows={selectedRows} onClear={clearSelection} />
       ) : (
@@ -935,17 +1072,18 @@ export function OrderListScreen() {
               type: 'custom',
               render: () => (
                 <CarrierFilter
-                  value={noCarrier ? NO_CARRIER : carrierId}
-                  carriers={carriers.data ?? []}
-                  onChange={(v) =>
-                    setFilter(
-                      v === NO_CARRIER
-                        ? { noCarrier: 'true', carrierId: undefined }
-                        : { noCarrier: undefined, carrierId: v || undefined },
-                    )
-                  }
+                  noCarrier={noCarrier}
+                  carrierId={carrierId}
+                  carrierAccountId={carrierAccountId}
+                  onChange={setFilter}
                 />
               ),
+            },
+            {
+              key: 'carrierSource',
+              label: 'Gán hãng',
+              type: 'select',
+              options: CARRIER_SOURCE_OPTIONS,
             },
             {
               key: 'source',
@@ -1018,6 +1156,8 @@ export function OrderListScreen() {
             weightMax: state.filters.weightMax,
             noCarrier: state.filters.noCarrier,
             carrierId: state.filters.carrierId,
+            carrierAccountId: state.filters.carrierAccountId,
+            carrierSource: state.filters.carrierSource,
             source: state.filters.source,
             from: state.filters.from,
             to: state.filters.to,

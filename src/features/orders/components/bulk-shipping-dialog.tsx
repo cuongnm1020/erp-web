@@ -14,16 +14,10 @@ import {
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
 import { toast } from '@/components/ui/toaster';
 import { messageFor } from '@/lib/error-messages';
-import { carrierAccountOptions, useCarriers } from '@/features/wms/api/use-shipping';
+import type { CarrierAccountOption } from '@/features/wms/api/use-shipping';
+import { CarrierSelect, type CarrierValue } from '@/features/wms/components/carrier-select';
 import { useBulkUpdateOrders, type SalesOrder } from '../api/use-orders';
 import { orderEditable } from '../labels';
 import { useControlledOpen } from '../use-controlled-open';
@@ -51,20 +45,17 @@ export function BulkShippingDialog({
   onOpenChange?: (open: boolean) => void;
 }) {
   const { controlled, open, setOpen } = useControlledOpen(openProp, onOpenChange);
-  const [carrierId, setCarrierId] = useState(KEEP);
+  const [carrier, setCarrier] = useState<CarrierValue | string>(KEEP);
+  const [picked, setPicked] = useState<CarrierAccountOption | undefined>();
   const [weight, setWeight] = useState('');
   const [clearWeight, setClearWeight] = useState(false);
-  const carriers = useCarriers();
   const bulk = useBulkUpdateOrders();
 
   const editable = rows.filter((r) => orderEditable(r.status));
   const skipped = rows.length - editable.length;
   const nextWeight = normalizeWeightInput(weight);
   const weightInvalid = !clearWeight && weight.trim() !== '' && nextWeight === null;
-  const options = carrierAccountOptions(carriers.data);
-  const picked = options.find((o) => o.value === carrierId);
-  const carrierPatch =
-    carrierId === KEEP ? undefined : carrierId === NONE ? null : picked?.carrier.id;
+  const carrierPatch = carrier === KEEP ? undefined : carrier === NONE ? null : picked?.carrier.id;
   const weightPatch = clearWeight ? null : nextWeight === null ? undefined : nextWeight;
   const nothing = carrierPatch === undefined && weightPatch === undefined;
 
@@ -74,7 +65,7 @@ export function BulkShippingDialog({
       const r = await bulk.mutateAsync({
         orderIds: editable.map((o) => o.id),
         ...(carrierPatch !== undefined ? { carrierId: carrierPatch } : {}),
-        ...(picked?.accountId ? { carrierAccountId: picked.accountId } : {}),
+        ...(carrierPatch && picked?.accountId ? { carrierAccountId: picked.accountId } : {}),
         ...(weightPatch !== undefined ? { shippingWeightKg: weightPatch } : {}),
       });
       const failedDocs = r.failed.map((f) => f.docNumber ?? f.orderId.slice(0, 8)).join(', ');
@@ -88,7 +79,8 @@ export function BulkShippingDialog({
         duration: r.failed.length > 0 ? 10_000 : undefined,
       });
       setOpen(false);
-      setCarrierId(KEEP);
+      setCarrier(KEEP);
+      setPicked(undefined);
       setWeight('');
       setClearWeight(false);
       onDone();
@@ -118,20 +110,19 @@ export function BulkShippingDialog({
           <div className="grid gap-4 py-2">
             <div className="grid gap-1.5">
               <Label htmlFor="bulk-carrier">Hãng vận chuyển</Label>
-              <Select value={carrierId} onValueChange={setCarrierId} disabled={carriers.isPending}>
-                <SelectTrigger id="bulk-carrier" aria-label="Hãng vận chuyển" className="h-9">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value={KEEP}>— Giữ nguyên —</SelectItem>
-                  <SelectItem value={NONE}>— Bỏ chọn hãng —</SelectItem>
-                  {options.map((o) => (
-                    <SelectItem key={o.value} value={o.value}>
-                      {o.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <CarrierSelect
+                id="bulk-carrier"
+                className="h-9"
+                value={carrier}
+                specials={[
+                  { value: KEEP, label: '— Giữ nguyên —' },
+                  { value: NONE, label: '— Bỏ chọn hãng —' },
+                ]}
+                onChange={(v, option) => {
+                  setCarrier(v);
+                  setPicked(option);
+                }}
+              />
             </div>
             <div className="grid gap-1.5">
               <Label htmlFor="bulk-weight">Cân nặng gửi hãng (kg)</Label>

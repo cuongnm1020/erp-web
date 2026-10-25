@@ -167,6 +167,7 @@ const ORDERS: SalesOrderList = {
       shipment: null,
       ownerName: null,
       note: null,
+      shortage: null,
     },
   ],
 };
@@ -185,6 +186,7 @@ const flow = (over: Partial<OrderFlowCounts> = {}): OrderFlowCounts => ({
   total: 0,
   PENDING_APPROVAL: 0,
   WAREHOUSE: 0,
+  WAITING_STOCK: 0,
   PICKING: 0,
   PACKED: 0,
   PICKED_UP: 0,

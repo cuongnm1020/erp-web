@@ -15,6 +15,7 @@ export {
   formatDateTime,
   formatRelative,
   formatTime,
+  formatWaited,
   toDate,
   toLocalDateKey,
   TZ,

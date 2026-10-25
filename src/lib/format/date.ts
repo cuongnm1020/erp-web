@@ -68,6 +68,23 @@ export function toLocalDateKey(v: DateInput): string | null {
   return `${p.year}-${p.month}-${p.day}`;
 }
 
+/**
+ * Đã chờ bao lâu tính tới `now`: "3 ngày 2 giờ", "20 giờ", "45 phút" (cột "Chờ từ" của tab Chờ
+ * hàng). Mốc ở tương lai / không đọc được → "—".
+ */
+export function formatWaited(v: DateInput, now: Date = new Date()): string {
+  const d = toDate(v);
+  if (!d) return EMPTY;
+  const ms = now.getTime() - d.getTime();
+  if (ms < 0) return EMPTY;
+  const hours = Math.floor(ms / 3_600_000);
+  if (hours < 1) return `${Math.max(1, Math.floor(ms / 60_000))} phút`;
+  const days = Math.floor(hours / 24);
+  const rest = hours % 24;
+  if (days === 0) return `${hours} giờ`;
+  return rest === 0 ? `${days} ngày` : `${days} ngày ${rest} giờ`;
+}
+
 /** "vừa xong", "5 phút trước", "2 giờ trước", "hôm qua", ngoài 7 ngày → formatDate. */
 export function formatRelative(v: DateInput, now: Date = new Date()): string {
   const d = toDate(v);

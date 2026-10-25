@@ -28,6 +28,7 @@ import { messageFor, messageForCode } from '@/lib/error-messages';
 import { formatDate, formatDateTime, formatMoney, formatQuantity, toDecimal } from '@/lib/format';
 import { Can, useAbility } from '@/lib/permission';
 import { useCarriers } from '@/features/wms/api/use-shipping';
+import { CarrierSelect } from '@/features/wms/components/carrier-select';
 import { useCustomerBrief } from '../api/use-line-entry';
 import {
   useFulfilOrder,
@@ -919,30 +920,33 @@ function Editor({ order }: { order: SalesOrderDetail }) {
           <Card
             title="Vận chuyển"
             actions={
-              <Select
-                value={carrierId}
-                onValueChange={(v) => {
-                  setCarrierId(v);
-                  // Tài khoản thuộc hãng cũ không còn nghĩa — về mặc định của hãng mới.
-                  setAccountId(DEFAULT_ACCOUNT);
+              <CarrierSelect
+                className={cn('w-64', (carrierChanged || accountChanged) && DIRTY)}
+                value={
+                  carrierId === NO_CARRIER
+                    ? NO_CARRIER
+                    : { carrierId, accountId: accountId === DEFAULT_ACCOUNT ? null : accountId }
+                }
+                specials={[{ value: NO_CARRIER, label: '— Chưa chọn —' }]}
+                placeholder="ĐVVC"
+                disabled={!carrierEditable}
+                onChange={(v, option) => {
+                  if (typeof v === 'string' || !option) {
+                    setCarrierId(NO_CARRIER);
+                    setAccountId(DEFAULT_ACCOUNT);
+                    return;
+                  }
+                  setCarrierId(v.carrierId);
+                  // Tài khoản mặc định = null ("theo mặc định"); đơn đã ghi đích danh id tài
+                  // khoản đó thì giữ nguyên id để không báo "đã đổi" giả.
+                  setAccountId(
+                    v.accountId ??
+                      (option.accountId && option.accountId === order.carrierAccountId
+                        ? option.accountId
+                        : DEFAULT_ACCOUNT),
+                  );
                 }}
-                disabled={!carrierEditable || carriers.isPending}
-              >
-                <SelectTrigger
-                  aria-label="Hãng vận chuyển"
-                  className={cn('w-44', carrierChanged && DIRTY)}
-                >
-                  <SelectValue placeholder="ĐVVC" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value={NO_CARRIER}>— Chưa chọn —</SelectItem>
-                  {activeCarriers.map((c) => (
-                    <SelectItem key={c.id} value={c.id}>
-                      {c.name} ({c.code}){c.isActive ? '' : ' — đã tắt'}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              />
             }
           >
             <p className="text-xs text-muted-foreground">
@@ -956,28 +960,6 @@ function Editor({ order }: { order: SalesOrderDetail }) {
                 'Cần quyền sửa đơn để đổi hãng.'
               )}
             </p>
-            {carrierAccounts.length > 1 ? (
-              <Row label="Tài khoản hãng">
-                <Select value={accountId} onValueChange={setAccountId} disabled={!carrierEditable}>
-                  <SelectTrigger
-                    aria-label="Tài khoản hãng"
-                    className={cn(accountChanged && DIRTY)}
-                  >
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value={DEFAULT_ACCOUNT}>Tài khoản mặc định</SelectItem>
-                    {carrierAccounts.map((a) => (
-                      <SelectItem key={a.id} value={a.id}>
-                        {a.name}
-                        {a.isDefault ? ' (mặc định)' : ''}
-                        {a.configured ? '' : ' — chưa cấu hình'}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </Row>
-            ) : null}
             <Row label="Khối lượng (kg)" htmlFor="order-weight">
               <Input
                 id="order-weight"

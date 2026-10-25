@@ -11,6 +11,7 @@ import {
   Gift,
   GitMerge,
   Headset,
+  Hourglass,
   Inbox,
   LayoutDashboard,
   Landmark,
@@ -326,6 +327,15 @@ export const NAV_MODULES: NavModule[] = [
         icon: Truck,
         section: 'Vận hành',
         ability: { action: 'read', subject: 'Shipment' },
+      },
+      {
+        // Chờ hàng (2026-10-25): SKU thiếu cho đơn chờ hàng / tổng đơn chờ. API cần sales_order.read
+        // (sale chỉ thấy đơn mình); menu Kho hiện theo quyền xem tồn.
+        label: 'Hàng chờ',
+        href: '/wms/waiting-stock',
+        icon: Hourglass,
+        section: 'Vận hành',
+        ability: { action: 'read', subject: 'Stock' },
       },
       {
         label: 'Năng suất kho',

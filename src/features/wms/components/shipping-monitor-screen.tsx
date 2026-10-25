@@ -45,6 +45,7 @@ import {
   type ShipmentMonitorView,
 } from '../api/use-shipping';
 import { carrierOutcome, carrierSource, shipmentStatusBadge } from '../labels';
+import { CarrierSelect } from './carrier-select';
 
 const statusBadge = (s: string) => {
   const m = shipmentStatusBadge(s);
@@ -186,7 +187,7 @@ const columns: ColumnDef<ShipmentMonitorRow, unknown>[] = [
   },
 ];
 
-const FILTER_KEYS = ['date', 'carrierId', 'days', 'view'] as const;
+const FILTER_KEYS = ['date', 'carrierId', 'carrierAccountId', 'days', 'view'] as const;
 type Filter = (typeof FILTER_KEYS)[number];
 const DEFAULTS = { size: 50, sort: null, filterKeys: FILTER_KEYS };
 const DAY_OPTIONS = ['3', '5', '7', '14'] as const;
@@ -322,7 +323,11 @@ export function ShippingMonitorScreen() {
     : DEFAULT_VIEW;
   const [selected, setSelected] = useState<ShipmentMonitorRow | null>(null);
 
-  const filter = useMemo(() => ({ date, carrierId, holdDays }), [date, carrierId, holdDays]);
+  const carrierAccountId = state.filters.carrierAccountId;
+  const filter = useMemo(
+    () => ({ date, carrierId, carrierAccountId, holdDays }),
+    [date, carrierId, carrierAccountId, holdDays],
+  );
   const listParams = useMemo(
     () => ({ ...filter, view, q: state.q, ...skipTake }),
     [filter, view, state.q, skipTake],
@@ -376,22 +381,31 @@ export function ShippingMonitorScreen() {
         </label>
         <label className="flex flex-col gap-0.5 text-xs text-muted-foreground">
           Hãng vận chuyển
-          <Select
-            value={carrierId ?? ALL}
-            onValueChange={(v) => setFilters({ carrierId: v === ALL ? undefined : v })}
-          >
-            <SelectTrigger className="h-8 w-48" aria-label="Hãng vận chuyển">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value={ALL}>Mọi hãng</SelectItem>
-              {(carriers.data ?? []).map((c) => (
-                <SelectItem key={c.id} value={c.id}>
-                  {c.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <CarrierSelect
+            className="h-8 w-64"
+            value={
+              carrierAccountId
+                ? (() => {
+                    const c = carriers.data?.find((x) =>
+                      x.accounts.some((a) => a.id === carrierAccountId),
+                    );
+                    return c ? { carrierId: c.id, accountId: carrierAccountId } : ALL;
+                  })()
+                : carrierId
+                  ? { carrierId, accountId: null }
+                  : ALL
+            }
+            specials={[{ value: ALL, label: 'Mọi hãng' }]}
+            onChange={(_, o) =>
+              setFilters(
+                !o
+                  ? { carrierId: undefined, carrierAccountId: undefined }
+                  : o.accountId
+                    ? { carrierId: undefined, carrierAccountId: o.accountId }
+                    : { carrierId: o.carrier.id, carrierAccountId: undefined },
+              )
+            }
+          />
         </label>
         <label className="flex flex-col gap-0.5 text-xs text-muted-foreground">
           Cảnh báo khi hãng giữ quá
@@ -480,7 +494,7 @@ export function ShippingMonitorScreen() {
 
           <CarrierBreakdown
             data={summary.data}
-            onPick={(id) => setFilters({ carrierId: id ?? undefined })}
+            onPick={(id) => setFilters({ carrierId: id ?? undefined, carrierAccountId: undefined })}
           />
         </>
       )}

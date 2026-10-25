@@ -1,4 +1,4 @@
-import { fireEvent, screen, waitFor } from '@testing-library/react';
+import { cleanup, fireEvent, screen, waitFor } from '@testing-library/react';
 import { http, HttpResponse } from 'msw';
 import { describe, expect, it, vi } from 'vitest';
 import { WarehouseProvider } from '@/lib/warehouse';
@@ -297,6 +297,7 @@ describe('OrderListScreen — cân nặng gửi hãng + gán hãng hàng loạt'
                       id: 'acc-03',
                       name: 'Thiên Nông Nam Việt 03',
                       isDefault: false,
+                      code: 'S23166145',
                       configured: true,
                     },
                     { id: 'acc-x', name: 'Shop chưa xong', isDefault: false, configured: false },
@@ -321,12 +322,13 @@ describe('OrderListScreen — cân nặng gửi hãng + gán hãng hàng loạt'
     openMoreMenu();
     fireEvent.click(await screen.findByRole('menuitem', { name: /Gán hãng \/ cân nặng/ }));
     fireEvent.click(await screen.findByRole('combobox', { name: 'Hãng vận chuyển' }));
+    // Ô chọn hãng dùng chung: mỗi tài khoản đủ cấu hình một dòng "<MÃ HÃNG> <mã TK> <tên>".
     expect(
-      await screen.findByRole('option', { name: /Thiên Nông Nam Việt \(mặc định\)/ }),
+      await screen.findByRole('option', { name: 'GHTK Thiên Nông Nam Việt' }),
     ).toBeInTheDocument();
     expect(screen.queryByRole('option', { name: /Shop chưa xong/ })).not.toBeInTheDocument();
     expect(screen.queryByRole('option', { name: /GHN/ })).not.toBeInTheDocument();
-    fireEvent.click(screen.getByRole('option', { name: /Thiên Nông Nam Việt 03/ }));
+    fireEvent.click(screen.getByRole('option', { name: 'GHTK S23166145 Thiên Nông Nam Việt 03' }));
     fireEvent.click(screen.getByRole('button', { name: /Cập nhật 1 đơn/ }));
     await waitFor(() => expect(bodies).toHaveLength(1));
     expect(bodies[0]).toMatchObject({ carrierId: ghtk.id, carrierAccountId: 'acc-03' });
@@ -716,6 +718,53 @@ describe('OrderListScreen — lọc theo hãng + thời gian (2026-09-19)', () =
     expect(url).toContain('noCarrier=true');
     expect(url).not.toContain('carrierId=');
   });
+
+  it('ô hãng dùng chung: chọn tài khoản → URL carrierAccountId (bỏ carrierId); "Gán hãng" Pancake → gửi carrierSource cho danh sách + đếm tab (2026-10-25)', async () => {
+    search = 'carrierId=c-ghtk';
+    renderApp(<OrderListScreen />);
+    const box = await screen.findByRole('combobox', { name: 'Hãng vận chuyển' });
+    await waitFor(() => expect(box).toHaveTextContent('GHTK Giao Hàng Tiết Kiệm'));
+    replace.mockClear();
+    fireEvent.click(box);
+    fireEvent.click(await screen.findByRole('option', { name: 'VTP Viettel Post' }));
+    await waitFor(() => expect(replace).toHaveBeenCalled());
+    let url = String(replace.mock.calls.at(-1)![0]);
+    expect(url).toContain('carrierAccountId=acc-vtp-default');
+    expect(url).not.toContain('carrierId=');
+
+    search = 'carrierAccountId=acc-vtp-default&carrierSource=PANCAKE';
+    const seen: string[] = [];
+    const onRequest = ({ request }: { request: Request }) => {
+      if (new URL(request.url).pathname.startsWith('/api/sales-orders')) seen.push(request.url);
+    };
+    server.events.on('request:start', onRequest);
+    try {
+      cleanup();
+      renderApp(<OrderListScreen />);
+      const source = await screen.findByRole('combobox', { name: 'Gán hãng' });
+      expect(source).toHaveTextContent('Pancake gán hãng');
+      await waitFor(() =>
+        expect(screen.getByRole('combobox', { name: 'Hãng vận chuyển' })).toHaveTextContent(
+          'VTP Viettel Post',
+        ),
+      );
+      await waitFor(() => {
+        const list = seen.find((u) => new URL(u).pathname === '/api/sales-orders');
+        const counts = seen.find((u) => new URL(u).pathname === '/api/sales-orders/flow-counts');
+        expect(list).toContain('carrierSource=PANCAKE');
+        expect(list).toContain('carrierAccountId=acc-vtp-default');
+        expect(counts).toContain('carrierSource=PANCAKE');
+      });
+      replace.mockClear();
+      fireEvent.click(source);
+      fireEvent.click(await screen.findByRole('option', { name: 'Hệ thống ERP gán hãng' }));
+      await waitFor(() => expect(replace).toHaveBeenCalled());
+      url = String(replace.mock.calls.at(-1)![0]);
+      expect(url).toContain('carrierSource=ERP');
+    } finally {
+      server.events.removeListener('request:start', onRequest);
+    }
+  });
 });
 
 describe('OrderListScreen — sao chép SĐT / mã vận đơn, cột kho (2026-10-13)', () => {
@@ -970,5 +1019,51 @@ describe('OrderListScreen — redesign Bán hàng (2026-10-22)', () => {
       key: 'orders.views',
       value: { views: [{ name: 'Kho chưa gán hãng', query: 'flow=WAREHOUSE&noCarrier=true' }] },
     });
+  });
+});
+
+describe('OrderListScreen — tab Chờ hàng (2026-10-25)', () => {
+  const waiting = {
+    ...FIRST,
+    flow: 'WAITING_STOCK' as const,
+    shortage: {
+      since: new Date(Date.now() - 30 * 3_600_000).toISOString(),
+      items: [
+        { skuId: 'sku-a', skuCode: 'AMINO', skuName: 'Amino GA3 500ml', qty: '3' },
+        { skuId: 'sku-b', skuCode: 'KALI', skuName: 'Kali trắng 1kg', qty: '1' },
+      ],
+    },
+  };
+
+  it('tab Chờ hàng: dải giải thích, cột Hàng thiếu + Chờ từ, chip lọc SKU (bỏ được); tab khác không có cột đó', async () => {
+    search = 'flow=WAITING_STOCK&shortSkuId=sku-a';
+    const asked: string[] = [];
+    server.use(
+      http.get('/api/sales-orders', ({ request }) => {
+        asked.push(request.url);
+        return HttpResponse.json({ items: [waiting], total: 1 });
+      }),
+    );
+    renderApp(<OrderListScreen />);
+    expect(await screen.findByText('Amino GA3 500ml × 3')).toBeInTheDocument();
+    expect(screen.getByText('+ 1 SP thiếu khác')).toBeInTheDocument();
+    expect(screen.getByText('1 ngày 6 giờ')).toBeInTheDocument();
+    expect(screen.getByRole('note')).toHaveTextContent('Đơn đã duyệt từ 24 giờ');
+    expect(screen.getByRole('columnheader', { name: /Hàng thiếu/ })).toBeInTheDocument();
+    const url = new URL(asked.at(-1)!);
+    expect(url.searchParams.get('flow')).toBe('WAITING_STOCK');
+    expect(url.searchParams.get('shortSkuId')).toBe('sku-a');
+
+    replace.mockClear();
+    fireEvent.click(screen.getByRole('button', { name: /Đơn thiếu: Amino GA3 500ml/ }));
+    await waitFor(() => expect(replace).toHaveBeenCalled());
+    expect(String(replace.mock.calls.at(-1)![0])).not.toContain('shortSkuId');
+
+    cleanup();
+    search = 'flow=WAREHOUSE';
+    renderApp(<OrderListScreen />);
+    await screen.findByText(FIRST.docNumber);
+    expect(screen.queryByRole('columnheader', { name: /Hàng thiếu/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole('note')).not.toBeInTheDocument();
   });
 });

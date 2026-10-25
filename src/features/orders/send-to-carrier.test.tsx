@@ -42,7 +42,8 @@ const openMenu = () =>
 
 const openFor = async (code: string) => {
   openMenu();
-  fireEvent.click(await screen.findByRole('menuitem', { name: `Sang ${code}` }));
+  // Nhãn dùng chung "<MÃ HÃNG> <tên tài khoản / tên hãng>" — khớp theo mã hãng ở đầu.
+  fireEvent.click(await screen.findByRole('menuitem', { name: new RegExp(`^Sang ${code} `) }));
   return screen.findByRole('dialog');
 };
 
@@ -54,7 +55,10 @@ describe('Gửi sang ĐVVC — SendToCarrierMenu + SendToCarrierDialog', () => {
     openMenu();
     const menu = await screen.findByRole('menu');
     const items = within(menu).getAllByRole('menuitem');
-    expect(items.map((i) => i.getAttribute('aria-label'))).toEqual(['Sang GHTK', 'Sang VTP']);
+    expect(items.map((i) => i.getAttribute('aria-label'))).toEqual([
+      'Sang GHTK Giao Hàng Tiết Kiệm',
+      'Sang VTP Viettel Post',
+    ]);
     expect(within(menu).queryByText(/GHN|MANUAL|OLD|chưa cấu hình/)).not.toBeInTheDocument();
   });
 
@@ -325,8 +329,9 @@ describe('Gửi sang ĐVVC — SendToCarrierMenu + SendToCarrierDialog', () => {
                     { id: 'acc-ghtk-default', name: 'Mặc định', isDefault: true, configured: true },
                     {
                       id: 'acc-ghtk-shop2',
-                      name: 'GHTK cửa hàng 2',
+                      name: 'Nam Việt - Hàng Lòng',
                       isDefault: false,
+                      code: 'S23119447',
                       configured: true,
                     },
                     { id: 'acc-ghtk-new', name: 'GHTK mới', isDefault: false, configured: false },
@@ -375,17 +380,22 @@ describe('Gửi sang ĐVVC — SendToCarrierMenu + SendToCarrierDialog', () => {
         .getAllByRole('menuitem')
         .map((i) => i.getAttribute('aria-label')),
     ).toEqual([
-      'Sang GHN',
-      'Sang GHTK · Mặc định (mặc định)',
-      'Sang GHTK · GHTK cửa hàng 2',
-      'Sang VTP',
+      // Không dòng cấp hãng: mỗi tài khoản đủ cấu hình một dòng "<MÃ HÃNG> <mã TK> <tên>";
+      // tài khoản "Mặc định" chưa đặt tên hiện tên hãng.
+      'Sang GHN GHN kho 2',
+      'Sang GHTK Giao Hàng Tiết Kiệm',
+      'Sang GHTK S23119447 Nam Việt - Hàng Lòng',
+      'Sang VTP Viettel Post',
     ]);
     expect(within(menu).queryByText(/GHTK mới/)).not.toBeInTheDocument();
-    fireEvent.click(within(menu).getByRole('menuitem', { name: 'Sang GHTK · GHTK cửa hàng 2' }));
+    fireEvent.click(
+      within(menu).getByRole('menuitem', { name: 'Sang GHTK S23119447 Nam Việt - Hàng Lòng' }),
+    );
     const dialog = await screen.findByRole('dialog');
-    const group = within(dialog).getByRole('radiogroup', { name: 'Tài khoản GHTK' });
-    expect(within(group).getByRole('radio', { name: /GHTK cửa hàng 2/ })).toBeChecked();
-    expect(within(group).queryByRole('radio', { name: /GHTK mới/ })).not.toBeInTheDocument();
+    // Ô chọn hãng dùng chung, chỉ tài khoản của GHTK — chọn sẵn tài khoản bấm từ menu.
+    expect(within(dialog).getByRole('combobox', { name: 'Tài khoản GHTK' })).toHaveTextContent(
+      'GHTK S23119447 Nam Việt - Hàng Lòng',
+    );
     fireEvent.click(within(dialog).getByRole('button', { name: 'Cập nhật 2 đơn' }));
     await waitFor(() => expect(bodies).toHaveLength(1));
     expect(bodies[0]).toMatchObject({ carrierId: 'c-ghtk', carrierAccountId: 'acc-ghtk-shop2' });

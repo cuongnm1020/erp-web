@@ -245,6 +245,8 @@ export const ORDER_FLOW_TABS: ReadonlyArray<{
 }> = [
   { flow: 'PENDING_APPROVAL', label: 'Chờ duyệt', family: 'wait' },
   { flow: 'WAREHOUSE', label: 'Chờ xử lý kho', family: 'fulfil' },
+  // Chờ hàng (2026-10-25): thiếu tồn ≥ 24h, chưa Gửi sang ĐVVC — cần người xử lý → họ "chờ".
+  { flow: 'WAITING_STOCK', label: 'Chờ hàng', family: 'wait' },
   { flow: 'PICKING', label: 'Đang lấy hàng', family: 'fulfil' },
   { flow: 'PACKED', label: 'Đã đóng gói', family: 'fulfil' },
   { flow: 'PICKED_UP', label: 'Đã lấy hàng', family: 'ship' },
@@ -311,6 +313,7 @@ export const FLOW_FAMILY_DOT: Record<OrderFlowFamily, string> = {
 const FLOW_CLASS: Record<OrderFlow, string> = {
   PENDING_APPROVAL: 'bg-flow-pending-weak text-flow-pending',
   WAREHOUSE: 'bg-flow-warehouse-weak text-flow-warehouse',
+  WAITING_STOCK: 'bg-flow-wait-weak text-flow-wait',
   PICKING: 'bg-flow-picking-weak text-flow-picking',
   PACKED: 'bg-flow-packed-weak text-flow-packed',
   PICKED_UP: 'bg-flow-picked-up-weak text-flow-picked-up',
