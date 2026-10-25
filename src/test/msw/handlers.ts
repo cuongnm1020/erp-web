@@ -1436,7 +1436,20 @@ export const WAITING_MATCH_EMPTY = {
   warnings: [],
 };
 
+/** Đúng shape `ReceiptContainersDto` — mặc định phiếu không có thùng. */
+export const RECEIPT_CONTAINERS_EMPTY = {
+  total: 0,
+  stored: 0,
+  pending: 0,
+  storedQty: '0',
+  pendingQty: '0',
+  byLocation: [],
+  itemsTotal: 0,
+  items: [],
+};
+
 export const handlers = [
+  http.get('/api/goods-receipts/:id/containers', () => HttpResponse.json(RECEIPT_CONTAINERS_EMPTY)),
   http.get('/api/waiting-stock/summary', () => HttpResponse.json(WAITING_SUMMARY)),
   http.get('/api/goods-receipts/:id/waiting-match', () => HttpResponse.json(WAITING_MATCH_EMPTY)),
   // Module Công việc (2026-10-22): thẻ "Yêu cầu hỗ trợ" ở hồ sơ khách + dải nhắc ở chi tiết đơn —

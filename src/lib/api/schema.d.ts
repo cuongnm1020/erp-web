@@ -4522,6 +4522,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/goods-receipts/{id}/containers": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Thùng chứa hàng của phiếu (2026-10-25): đã cất / chưa cất (còn ở khu nhận), gom theo vị trí,
+         *     một trang danh sách theo `view` / `q`.
+         */
+        get: operations["ReceivingController_listContainers"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/goods-receipts/{id}/movements": {
         parameters: {
             query?: never;
@@ -12411,6 +12431,42 @@ export interface components {
              */
             totalValue: string | null;
             lines: components["schemas"]["ReceiptLineDto"][];
+        };
+        ReceiptContainerLocationDto: {
+            locationId: string;
+            locationCode: string;
+            /** @description false = còn ở khu nhận (DOCK / STAGING) — chưa cất. */
+            stored: boolean;
+            count: number;
+            /** @description Tổng tồn đang trong các thùng (đơn vị cơ sở) — Decimal(18,6) chuỗi. */
+            qty: string;
+            /** @description Mã thùng nhỏ nhất / lớn nhất (dải hiển thị). */
+            firstBarcode: string;
+            lastBarcode: string;
+        };
+        ReceiptContainerDto: {
+            id: string;
+            barcode: string;
+            typeCode: string;
+            locationCode: string;
+            stored: boolean;
+            /** @enum {string} */
+            status: "OPEN" | "CLOSED" | "PICKED" | "EMPTY";
+            /** @description Tồn đang trong thùng — Decimal(18,6) chuỗi (0 khi đã lấy / xuất hết). */
+            qty: string;
+            /** @description Lần cuối thùng đổi (cất / chuyển vị trí) — null với thùng chưa cất. */
+            storedAt: string | null;
+        };
+        ReceiptContainersDto: {
+            total: number;
+            stored: number;
+            pending: number;
+            storedQty: string;
+            pendingQty: string;
+            byLocation: components["schemas"]["ReceiptContainerLocationDto"][];
+            /** @description Số dòng khớp `view` + `q` (phân trang). */
+            itemsTotal: number;
+            items: components["schemas"]["ReceiptContainerDto"][];
         };
         ReceiptMovementDto: {
             /** @description BigInt → string (JSON không mang BigInt). */
@@ -22293,6 +22349,34 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+        };
+    };
+    ReceivingController_listContainers: {
+        parameters: {
+            query: {
+                /** @description `PENDING` = chưa cất (còn ở khu nhận DOCK / STAGING), `STORED` = đã cất, bỏ trống = tất cả. */
+                view?: "PENDING" | "STORED";
+                /** @description Tìm theo mã thùng (contains, không phân biệt hoa thường) — quét tem. */
+                q?: string;
+                take: number;
+                skip: number;
+            };
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReceiptContainersDto"];
+                };
             };
         };
     };

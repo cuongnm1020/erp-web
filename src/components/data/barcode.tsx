@@ -22,6 +22,20 @@ export interface BarcodeProps {
   className?: string;
   /** Nhãn cho screen reader; mặc định "Mã vạch <value>". */
   label?: string;
+  /**
+   * Giãn vạch kín hộp chứa (rộng × cao do hộp quyết định, không giữ tỉ lệ) — tem khổ nhỏ cố định
+   * như tem thùng 35×22 (2026-10-25). Chỉ hợp với mã 1D: QR luôn giữ tỉ lệ.
+   */
+  fill?: boolean;
+}
+
+/** SVG giãn theo hộp: bỏ kích thước gốc, rộng / cao 100%, không giữ tỉ lệ. */
+export function fillSvg(svg: string): string {
+  return svg.replace(
+    /<svg\b([^>]*?)\sviewBox="([^"]+)"/,
+    (_m, attrs: string, vb: string) =>
+      `<svg${attrs.replace(/\s(width|height)="[^"]*"/g, '')} width="100%" height="100%" preserveAspectRatio="none" viewBox="${vb}"`,
+  );
 }
 
 /**
@@ -54,23 +68,23 @@ export function Barcode({
   showText = true,
   className,
   label,
+  fill = false,
 }: BarcodeProps) {
   const bcid = symbology ?? symbologyFor(apiType, value);
   const svg = useMemo(() => {
     if (!value) return null;
     try {
-      return withIntrinsicSize(
-        bwipjs.toSVG({
-          bcid,
-          text: value,
-          scale,
-          ...(bcid === 'qrcode' ? {} : { height, includetext: showText, textxalign: 'center' }),
-        }),
-      );
+      const raw = bwipjs.toSVG({
+        bcid,
+        text: value,
+        scale,
+        ...(bcid === 'qrcode' ? {} : { height, includetext: showText, textxalign: 'center' }),
+      });
+      return fill && bcid !== 'qrcode' ? fillSvg(raw) : withIntrinsicSize(raw);
     } catch {
       return null;
     }
-  }, [bcid, value, scale, height, showText]);
+  }, [bcid, value, scale, height, showText, fill]);
 
   if (!svg) {
     return (
@@ -84,7 +98,10 @@ export function Barcode({
       role="img"
       aria-label={label ?? `Mã vạch ${value}`}
       data-barcode={bcid}
-      className={cn('inline-block [&>svg]:h-auto [&>svg]:max-w-full', className)}
+      className={cn(
+        fill ? 'block h-full w-full' : 'inline-block [&>svg]:h-auto [&>svg]:max-w-full',
+        className,
+      )}
       // SVG do bwip-js sinh từ chuỗi của chính mình — không có HTML người dùng.
       dangerouslySetInnerHTML={{ __html: svg }}
     />

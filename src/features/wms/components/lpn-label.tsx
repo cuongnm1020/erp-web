@@ -55,26 +55,62 @@ export function LpnLabel({ data }: { data: LpnLabelData }) {
   );
 }
 
-/** Tờ in tem LPN — 2 tem một hàng (khổ cuộn 2 cột). */
+const SMALL = LABEL_SIZES.LPN_35x22;
+/** Khe giữa 2 tem trên cuộn 35×22 (khổ cuộn 72 mm = 35 + 2 + 35). */
+const SMALL_GAP_MM = 2;
+const SMALL_STYLE: CSSProperties = {
+  width: `${SMALL.labelWidthMm}mm`,
+  height: `${SMALL.labelHeightMm}mm`,
+  // Lề trắng hai bên mã vạch (quiet zone) — máy quét cần ≥ 10 lần module.
+  padding: '3.5mm 2mm',
+  boxSizing: 'border-box',
+};
+
+/**
+ * Tem thùng 35×22 mm (2026-10-25, user chốt): CHỈ mã vạch CODE128 của mã thùng, không chữ, vạch
+ * giãn kín vùng in (~31 × 15 mm). Quét tem này ở cất hàng / lấy hàng là nhận cả thùng.
+ */
+export function LpnBarcodeLabel({ barcode }: { barcode: string }) {
+  return (
+    <div className="overflow-hidden bg-card" style={SMALL_STYLE} data-lpn-label={barcode}>
+      <Barcode value={barcode} symbology="code128" height={10} scale={3} showText={false} fill />
+    </div>
+  );
+}
+
+/**
+ * Tờ in tem LPN — 2 tem một hàng (khổ cuộn 2 cột). `size`: `SKU_50x30` (mặc định — tem có loại
+ * thùng, SKU, mã chữ) hoặc `LPN_35x22` (tem thùng phiếu nhập, chỉ mã vạch).
+ */
 export function LpnPrintSheet({
   labels,
   printer,
+  size = 'SKU_50x30',
 }: {
   labels: LpnLabelData[];
   printer: PrintController;
+  size?: 'SKU_50x30' | 'LPN_35x22';
 }) {
+  const columns = LABEL_SIZES[size].columns;
   const pages: LpnLabelData[][] = [];
-  for (let i = 0; i < labels.length; i += SIZE.columns)
-    pages.push(labels.slice(i, i + SIZE.columns));
+  for (let i = 0; i < labels.length; i += columns) pages.push(labels.slice(i, i + columns));
   return (
-    <PrintSheet open={printer.open} onDone={printer.done} size="SKU_50x30">
-      {pages.map((page, i) => (
-        <div key={i} data-print-page className="flex" style={{ gap: '4mm', padding: '1mm 2mm' }}>
-          {page.map((l) => (
-            <LpnLabel key={l.barcode} data={l} />
-          ))}
-        </div>
-      ))}
+    <PrintSheet open={printer.open} onDone={printer.done} size={size}>
+      {pages.map((page, i) =>
+        size === 'LPN_35x22' ? (
+          <div key={i} data-print-page className="flex" style={{ gap: `${SMALL_GAP_MM}mm` }}>
+            {page.map((l) => (
+              <LpnBarcodeLabel key={l.barcode} barcode={l.barcode} />
+            ))}
+          </div>
+        ) : (
+          <div key={i} data-print-page className="flex" style={{ gap: '4mm', padding: '1mm 2mm' }}>
+            {page.map((l) => (
+              <LpnLabel key={l.barcode} data={l} />
+            ))}
+          </div>
+        ),
+      )}
     </PrintSheet>
   );
 }
