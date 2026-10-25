@@ -42,6 +42,7 @@ import {
   groupVi,
   normalizePhone,
   formatQuantity,
+  formatWaited,
   formatRelative,
   phoneCarrier,
   toDecimal,
@@ -128,6 +129,8 @@ const DEFAULTS = {
     'itemOrigin',
     // Team CSKH lên đơn (phòng ban loại CSKH), 2026-10-24.
     'careTeamId',
+    // Đơn thiếu tồn một SKU (Chờ hàng, 2026-10-25) — "Xem đơn" từ màn Hàng chờ.
+    'shortSkuId',
   ] as const,
 };
 
@@ -164,6 +167,8 @@ const SORT_FIELD: Record<string, OrderSortField> = {
  * soát → ẩn mặc định, bật lại ở "Cột".
  */
 const DEFAULT_HIDDEN = ['orderDate', 'collected'];
+/** Cột chỉ hiện ở tab Chờ hàng. */
+const WAITING_ONLY_COLUMNS = ['shortage', 'waitingSince'];
 
 type OrderFilter = (typeof DEFAULTS.filterKeys)[number];
 
@@ -327,6 +332,51 @@ const buildColumns = (
             <span className="block text-xs text-primary">+{p.moreCount} sản phẩm khác</span>
           ) : null}
         </div>
+      );
+    },
+  },
+  // Hai cột của tab Chờ hàng (màn lọc bỏ ở tab khác).
+  {
+    id: 'shortage',
+    header: 'Hàng thiếu',
+    meta: { width: 230 },
+    cell: ({ row }) => {
+      const items = row.original.shortage?.items ?? [];
+      const first = items[0];
+      if (!first) return <span className="text-muted-foreground">—</span>;
+      const name = `${first.skuName} × ${formatQuantity(first.qty)}`;
+      return (
+        <div className="space-y-1">
+          <span className="block max-w-56 truncate font-semibold text-warning" title={name}>
+            {name}
+          </span>
+          {items.length > 1 ? (
+            <span
+              className="block text-xs text-muted-foreground"
+              title={items
+                .slice(1)
+                .map((i) => `${i.skuName} × ${formatQuantity(i.qty)}`)
+                .join(', ')}
+            >
+              + {items.length - 1} SP thiếu khác
+            </span>
+          ) : null}
+        </div>
+      );
+    },
+  },
+  {
+    id: 'waitingSince',
+    header: 'Chờ từ',
+    meta: { width: 120, align: 'right' },
+    cell: ({ row }) => {
+      const since = row.original.shortage?.since;
+      return since ? (
+        <span className="whitespace-nowrap" title={formatDateTime(since)}>
+          {formatWaited(since)}
+        </span>
+      ) : (
+        <span className="text-muted-foreground">—</span>
       );
     },
   },
@@ -681,6 +731,38 @@ function WeightRangeFilter({
   );
 }
 
+/**
+ * Dải giải thích của tab Chờ hàng + chip "Đang lọc đơn thiếu <SP>" (từ màn Hàng chờ). Điều kiện
+ * ghi đúng như API tính (apps/api docs/pick-pack-flow.md §3.6).
+ */
+function WaitingStockNote({
+  shortSkuName,
+  onClearSku,
+}: {
+  shortSkuName: string | null;
+  onClearSku: () => void;
+}) {
+  return (
+    <div className="flex flex-wrap items-center gap-2 px-5 pt-3">
+      <p role="note" className="flex-1 rounded-lg bg-info-weak px-3 py-2 text-sm text-info">
+        Đơn đã duyệt từ 24 giờ, chưa <strong>Gửi sang ĐVVC</strong> và còn sản phẩm thiếu tồn tự vào
+        tab này. Gửi sang ĐVVC hoặc hàng về đủ thì đơn tự rời tab. Không đổi trạng thái trên
+        Pancake.{' '}
+        <Link href="/wms/waiting-stock" className="font-semibold text-primary hover:underline">
+          Xem tổng hàng thiếu
+        </Link>
+      </p>
+      {shortSkuName ? (
+        <Button size="sm" variant="secondary" onClick={onClearSku}>
+          Đơn thiếu: {shortSkuName}
+          <X aria-hidden />
+          <span className="sr-only">Bỏ lọc sản phẩm thiếu</span>
+        </Button>
+      ) : null}
+    </div>
+  );
+}
+
 const NO_CARRIER = '__none__';
 const ANY = '__all__';
 
@@ -745,6 +827,7 @@ export function OrderListScreen() {
   const carrierId = state.filters.carrierId ?? '';
   const carrierAccountId = state.filters.carrierAccountId ?? '';
   const carrierSource = parseCarrierSource(state.filters.carrierSource);
+  const shortSkuId = state.filters.shortSkuId ?? '';
   // Ô "Nguồn" gộp cả POS: `POS:<mã shop>` = đơn Pancake của đúng POS đó (URL giữ một khoá).
   const posShopId = /^POS:(\d+)$/.exec(state.filters.source ?? '')?.[1] ?? '';
   const source: 'PANCAKE' | 'ERP' | undefined =
@@ -789,6 +872,7 @@ export function OrderListScreen() {
       carrierId,
       carrierAccountId,
       carrierSource,
+      shortSkuId,
       source,
       pancakeShopId: posShopId || undefined,
       from,
@@ -807,6 +891,7 @@ export function OrderListScreen() {
       carrierId,
       carrierAccountId,
       carrierSource,
+      shortSkuId,
       source,
       posShopId,
       from,
@@ -833,12 +918,16 @@ export function OrderListScreen() {
   const [peek, setPeek] = useState<SalesOrderListItem | null>(null);
   const columns = useMemo(() => {
     const carrierById = new Map((carriers.data ?? []).map((c) => [c.id, c]));
-    return buildColumns((id) => carrierById.get(id) ?? null, {
+    const all = buildColumns((id) => carrierById.get(id) ?? null, {
       canUpdate,
       canCreate,
       onPeek: setPeek,
     });
-  }, [carriers.data, canUpdate, canCreate]);
+    // Cột Hàng thiếu / Chờ từ chỉ có nghĩa ở tab Chờ hàng.
+    return flow === 'WAITING_STOCK'
+      ? all
+      : all.filter((c) => !WAITING_ONLY_COLUMNS.includes(c.id ?? ''));
+  }, [carriers.data, canUpdate, canCreate, flow]);
   const pickerColumns = useMemo(
     () =>
       columns
@@ -903,6 +992,7 @@ export function OrderListScreen() {
     carrierId !== '' ||
     carrierAccountId !== '' ||
     carrierSource !== undefined ||
+    shortSkuId !== '' ||
     source !== undefined ||
     from !== '' ||
     to !== '' ||
@@ -946,6 +1036,19 @@ export function OrderListScreen() {
         counts={counts.data as Record<string, number> | undefined}
         onChange={(v) => setFilter({ flow: v })}
       />
+
+      {flow === 'WAITING_STOCK' || shortSkuId ? (
+        <WaitingStockNote
+          shortSkuName={
+            shortSkuId
+              ? (query.data?.items
+                  .flatMap((o) => o.shortage?.items ?? [])
+                  .find((i) => i.skuId === shortSkuId)?.skuName ?? 'sản phẩm đã chọn')
+              : null
+          }
+          onClearSku={() => setFilter({ shortSkuId: undefined })}
+        />
+      ) : null}
 
       {selectedRows.length > 0 ? (
         <OrderBulkBar rows={selectedRows} onClear={clearSelection} />

@@ -545,6 +545,7 @@ function orderListExtras(i: number, status: (typeof ORDER_STATUSES)[number]) {
       : null,
     ownerName: i % 3 === 0 ? null : 'Nguyễn Văn Sale',
     note: i % 6 === 0 ? 'Gọi trước khi giao' : null,
+    shortage: null,
   };
 }
 
@@ -1388,7 +1389,56 @@ export const PUBLIC_UNSUBSCRIBE = {
   currentlyGranted: true,
 };
 
+/** Đúng shape `WaitingStockSummaryDto` (GET /waiting-stock/summary) — màn Hàng chờ. */
+export const WAITING_SUMMARY = {
+  generatedAt: '2026-10-25T00:42:00.000Z',
+  waitingOrders: 312,
+  activeOrders: 1027,
+  overdueOrders: 27,
+  overdueDays: 3,
+  singleSkuOrders: 241,
+  needQty: '1146',
+  truncated: false,
+  items: [
+    {
+      skuId: uuid('00000077', 1),
+      skuCode: 'AMINO-GA3-500',
+      skuName: 'Amino GA3 500ml',
+      orders: 146,
+      needQty: '388',
+      available: '12',
+      shortQty: '376',
+      onlyThisSku: 109,
+    },
+    {
+      skuId: uuid('00000077', 2),
+      skuCode: 'KALI-TRANG-1KG',
+      skuName: 'Kali trắng 1kg',
+      orders: 72,
+      needQty: '310',
+      available: '0',
+      shortQty: '310',
+      onlyThisSku: 58,
+    },
+  ],
+};
+
+/** Đúng shape `WaitingMatchDto` — phiếu không khớp đơn chờ nào (mặc định). */
+export const WAITING_MATCH_EMPTY = {
+  receiptId: 'r-1',
+  docNumber: 'GRN-2608-00001',
+  warehouseId: 'wh-hcm',
+  waitingOrders: 0,
+  fullOrders: 0,
+  partialOrders: 0,
+  laterOrders: 0,
+  lines: [],
+  warnings: [],
+};
+
 export const handlers = [
+  http.get('/api/waiting-stock/summary', () => HttpResponse.json(WAITING_SUMMARY)),
+  http.get('/api/goods-receipts/:id/waiting-match', () => HttpResponse.json(WAITING_MATCH_EMPTY)),
   // Module Công việc (2026-10-22): thẻ "Yêu cầu hỗ trợ" ở hồ sơ khách + dải nhắc ở chi tiết đơn —
   // mặc định không có việc nào; test của module work tự khai handler riêng.
   http.get('/api/work-items', () => HttpResponse.json({ items: [], total: 0 })),
@@ -1540,6 +1590,7 @@ export const handlers = [
       total: all.length,
       PENDING_APPROVAL: count('PENDING_APPROVAL'),
       WAREHOUSE: count('WAREHOUSE'),
+      WAITING_STOCK: count('WAITING_STOCK'),
       PICKING: count('PICKING'),
       PACKED: count('PACKED'),
       PICKED_UP: count('PICKED_UP'),

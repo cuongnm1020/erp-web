@@ -147,6 +147,7 @@ describe('visibleModules', () => {
     // Thứ tự theo nhóm con (redesign 2026-10-17): Vận hành → Chứng từ → Danh mục kho.
     expect(wms?.children?.map((c) => c.label)).toEqual([
       'Tồn kho',
+      'Hàng chờ',
       'Phiếu nhập kho',
       'Phiếu bán hàng',
       'Nhập hàng hoàn',

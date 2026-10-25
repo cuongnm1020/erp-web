@@ -8,6 +8,7 @@ import {
   formatQuantity,
   formatRelative,
   formatTime,
+  formatWaited,
   normalizePhone,
   parseMoneyInput,
   phoneCarrier,
@@ -107,6 +108,14 @@ describe('date (Asia/Ho_Chi_Minh)', () => {
     expect(formatRelative('2026-08-24T12:00:00Z', now)).toBe('ngày mai');
     expect(formatRelative('2026-08-20T09:00:00Z', now)).toBe('3 ngày trước');
     expect(formatRelative('2026-08-01T09:00:00Z', now)).toBe('01/08/2026');
+  });
+  it('formatWaited', () => {
+    const now = new Date('2026-08-23T10:00:00Z');
+    expect(formatWaited('2026-08-23T09:15:00Z', now)).toBe('45 phút');
+    expect(formatWaited('2026-08-22T14:00:00Z', now)).toBe('20 giờ');
+    expect(formatWaited('2026-08-22T10:00:00Z', now)).toBe('1 ngày');
+    expect(formatWaited('2026-08-20T08:00:00Z', now)).toBe('3 ngày 2 giờ');
+    expect(formatWaited('2026-08-24T10:00:00Z', now)).toBe('—');
   });
 });
 

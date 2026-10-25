@@ -44,6 +44,8 @@ export interface OrderListParams {
   carrierAccountId?: string;
   /** Ai gán hãng: ERP = chọn trong ERP, PANCAKE = Pancake gán + cấp vận đơn (gửi ngoài ERP). */
   carrierSource?: OrderCarrierSource;
+  /** Đơn đang thiếu tồn SKU này (Chờ hàng — "Xem đơn" từ màn Hàng chờ). */
+  shortSkuId?: string;
   /** true = chỉ đơn có đơn trùng trong ngày (cùng SĐT, cùng ngày VN, chưa hủy — CSKH-5). */
   duplicate?: boolean;
   /** Khoảng orderDate — ngày `YYYY-MM-DD` (server lấy trọn ngày VN) hoặc ISO datetime. */
@@ -129,6 +131,7 @@ function listQuery(params: Omit<OrderListParams, 'take' | 'skip'>) {
     carrierId: params.carrierId || undefined,
     carrierAccountId: params.carrierAccountId || undefined,
     carrierSource: params.carrierSource,
+    shortSkuId: params.shortSkuId || undefined,
     duplicate: params.duplicate ? ('true' as const) : undefined,
     from: params.from || undefined,
     to: params.to || undefined,

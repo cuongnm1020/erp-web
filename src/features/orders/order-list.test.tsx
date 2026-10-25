@@ -1021,3 +1021,49 @@ describe('OrderListScreen — redesign Bán hàng (2026-10-22)', () => {
     });
   });
 });
+
+describe('OrderListScreen — tab Chờ hàng (2026-10-25)', () => {
+  const waiting = {
+    ...FIRST,
+    flow: 'WAITING_STOCK' as const,
+    shortage: {
+      since: new Date(Date.now() - 30 * 3_600_000).toISOString(),
+      items: [
+        { skuId: 'sku-a', skuCode: 'AMINO', skuName: 'Amino GA3 500ml', qty: '3' },
+        { skuId: 'sku-b', skuCode: 'KALI', skuName: 'Kali trắng 1kg', qty: '1' },
+      ],
+    },
+  };
+
+  it('tab Chờ hàng: dải giải thích, cột Hàng thiếu + Chờ từ, chip lọc SKU (bỏ được); tab khác không có cột đó', async () => {
+    search = 'flow=WAITING_STOCK&shortSkuId=sku-a';
+    const asked: string[] = [];
+    server.use(
+      http.get('/api/sales-orders', ({ request }) => {
+        asked.push(request.url);
+        return HttpResponse.json({ items: [waiting], total: 1 });
+      }),
+    );
+    renderApp(<OrderListScreen />);
+    expect(await screen.findByText('Amino GA3 500ml × 3')).toBeInTheDocument();
+    expect(screen.getByText('+ 1 SP thiếu khác')).toBeInTheDocument();
+    expect(screen.getByText('1 ngày 6 giờ')).toBeInTheDocument();
+    expect(screen.getByRole('note')).toHaveTextContent('Đơn đã duyệt từ 24 giờ');
+    expect(screen.getByRole('columnheader', { name: /Hàng thiếu/ })).toBeInTheDocument();
+    const url = new URL(asked.at(-1)!);
+    expect(url.searchParams.get('flow')).toBe('WAITING_STOCK');
+    expect(url.searchParams.get('shortSkuId')).toBe('sku-a');
+
+    replace.mockClear();
+    fireEvent.click(screen.getByRole('button', { name: /Đơn thiếu: Amino GA3 500ml/ }));
+    await waitFor(() => expect(replace).toHaveBeenCalled());
+    expect(String(replace.mock.calls.at(-1)![0])).not.toContain('shortSkuId');
+
+    cleanup();
+    search = 'flow=WAREHOUSE';
+    renderApp(<OrderListScreen />);
+    await screen.findByText(FIRST.docNumber);
+    expect(screen.queryByRole('columnheader', { name: /Hàng thiếu/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole('note')).not.toBeInTheDocument();
+  });
+});

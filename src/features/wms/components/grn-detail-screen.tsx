@@ -25,6 +25,7 @@ import { useAbility } from '@/lib/permission';
 import { usePrint } from '@/lib/print';
 import { LpnPrintSheet, type LpnLabelData } from './lpn-label';
 import { GRN_STAGE } from './grn-stage';
+import { GrnWaitingMatch } from './grn-waiting-match';
 import {
   useCancelReceipt,
   usePostReceipt,
@@ -295,6 +296,8 @@ function DetailBody({
         ) : null}
         <Field label="Ghi chú">{receipt.note ?? '—'}</Field>
       </div>
+
+      {receipt.status !== 'CANCELLED' ? <GrnWaitingMatch receiptId={receipt.id} /> : null}
 
       <section className="overflow-hidden rounded-md border bg-card">
         <header className="flex items-center justify-between border-b px-3 py-2 text-sm font-semibold">
