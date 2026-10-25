@@ -14,6 +14,13 @@ export const MODULE_LABELS: Record<string, string> = {
   user: 'Nhân viên',
   role: 'Vai trò & quyền',
   period: 'Kỳ kế toán',
+  sync: 'Đồng bộ Pancake',
+  carrier: 'Hãng vận chuyển',
+  report: 'Báo cáo',
+  promotion: 'Khuyến mãi',
+  warehouse: 'Kho',
+  work: 'Công việc',
+  tax_rate: 'Thuế suất',
 };
 
 export const ACTION_LABELS: Record<string, string> = {
@@ -36,8 +43,49 @@ export const ACTION_LABELS: Record<string, string> = {
   close: 'Khóa kỳ',
 };
 
+/** Nhãn riêng theo mã quyền — khi tên hành động chung ("read", "config"…) không đủ nghĩa. */
+const PERMISSION_LABELS: Record<string, string> = {
+  'customer.assign': 'Phân công khách',
+  'customer.merge': 'Gộp khách trùng',
+  'customer.care': 'Chăm sóc khách (CSKH)',
+  'customer.distribution_config': 'Cấu hình chia khách CSKH',
+  'customer.consent_view': 'Xem đồng ý marketing',
+  'product.categories': 'Danh mục · thương hiệu',
+  'product.barcode_print': 'In tem barcode',
+  'sales_order.read_all': 'Xem mọi đơn (kho in phiếu)',
+  'sales_order.fulfil_manual': 'Đóng pick / gói tay',
+  'task.read': 'Xem việc của mình',
+  'task.read_all': 'Xem mọi việc (điều phối)',
+  'stock.cost': 'Nhập giá vốn',
+  'user.manage_managers': 'Tạo quản lý kho cấp dưới',
+  'user.manage_department': 'Quản lý nhân sự phòng ban',
+  'user.group_add': 'Thêm nhân viên trong nhóm',
+  'user.group_edit': 'Sửa nhân viên trong nhóm',
+  'user.group_lock': 'Khóa nhân viên trong nhóm',
+  'sync.read': 'Xem tình trạng',
+  'sync.map': 'Khai báo mapping',
+  'sync.config': 'Cấu hình kết nối',
+  'sync.staff_read': 'Xem nhân viên Pancake',
+  'sync.staff_map': 'Gán nhân viên Pancake',
+  'carrier.config': 'Cấu hình tài khoản hãng',
+  'report.profit': 'Lợi nhuận',
+  'report.sales': 'Bán hàng (phạm vi của mình)',
+  'report.sales_all': 'Bán hàng (toàn công ty)',
+  'report.sales_group': 'Doanh thu nhóm',
+  'report.work': 'Công việc (SLA, hiệu suất)',
+  'promotion.manage': 'Tạo / sửa',
+  'warehouse.all': 'Làm việc ở mọi kho',
+  'work.read_all': 'Xem mọi công việc',
+  'work.create_customer': 'Tạo yêu cầu của khách',
+  'work.handle': 'Xử lý',
+  'work.config': 'Cấu hình',
+  'tax_rate.manage': 'Thêm / sửa thuế suất',
+};
+
 export const moduleLabel = (m: string): string => MODULE_LABELS[m] ?? m;
 export const actionLabel = (a: string): string => ACTION_LABELS[a] ?? a;
+export const permissionLabel = (p: { code: string; action: string }): string =>
+  PERMISSION_LABELS[p.code] ?? actionLabel(p.action);
 
 /** Nhãn ngắn các quyền trưởng phòng CSKH cấp cho trưởng nhóm (danh mục GROUP_GRANTABLE của api). */
 export const CARE_GRANT_LABELS: Record<string, string> = {

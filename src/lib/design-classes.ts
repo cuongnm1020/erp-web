@@ -64,6 +64,8 @@ export const DIALOG_MAX_WIDTH: Record<string, string> = {
 };
 export const DIALOG_MAX_HEIGHT: Record<string, string> = {
   dialog: 'var(--dialog-max-height)',
+  // Bảng cuộn trong màn (ma trận phân quyền): màn − thanh trên − đầu trang − thanh lọc
+  matrix: 'calc(100vh - 13rem)',
 };
 
 /** `radius-md` → `md` (bỏ tiền tố nhóm); token tên đúng bằng tiền tố thành khoá rỗng. */
