@@ -55,8 +55,9 @@ export function useWarehouseOptions(enabled = true) {
   });
 }
 
-export function useUsers(params: UserListParams) {
+export function useUsers(params: UserListParams, enabled = true) {
   return useQuery({
+    enabled,
     queryKey: userKeys.list(params),
     queryFn: () =>
       unwrap(
