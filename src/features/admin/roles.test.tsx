@@ -17,104 +17,244 @@ vi.mock('next/navigation', () => ({
   useSearchParams: () => new URLSearchParams(''),
 }));
 
-describe('RolesScreen — ma trận vai trò × quyền (I-03)', () => {
-  it('cột theo role thật (kèm số người), ô tick theo permissions của role', async () => {
+/** Ghi lại PUT /roles/:code (body) — trả role với quyền mới. */
+function capturePuts() {
+  const sent: Record<string, { permissions?: string[]; name?: string }> = {};
+  server.use(
+    http.put('/api/roles/:code', async ({ params, request }) => {
+      const body = (await request.json()) as { permissions?: string[]; name?: string };
+      sent[String(params.code)] = body;
+      const role = ROLES_FIXTURE.find((r) => r.code === params.code)!;
+      return HttpResponse.json({ ...role, ...body });
+    }),
+  );
+  return sent;
+}
+
+/** Mặc định mọi nhóm đóng — mở hết để thấy từng dòng quyền. */
+async function expandAll() {
+  fireEvent.click(await screen.findByRole('button', { name: /Mở rộng tất cả/ }));
+}
+
+async function openRoleMenu(roleName: string) {
+  const trigger = await screen.findByRole('button', { name: `Thao tác vai trò ${roleName}` });
+  fireEvent.keyDown(trigger, { key: 'Enter' });
+}
+
+describe('RolesScreen — ma trận vai trò × quyền (I-03, mockup Cấu hình phân quyền)', () => {
+  it('cột theo role thật (tên + mã), ô tick theo permissions, không hiện số thống kê', async () => {
     renderApp(<RolesScreen />);
     expect(await screen.findByText('Nhân viên kinh doanh')).toBeInTheDocument();
-    expect(screen.getByText('4 người')).toBeInTheDocument();
+    expect(screen.getByText('SALES_MEMBER')).toBeInTheDocument();
+    await expandAll();
 
-    // SALES_MEMBER có customer.read, không có role.update
-    const cell = screen.getByRole('checkbox', { name: 'Nhân viên kinh doanh · Xem Khách hàng' });
+    const cell = screen.getByRole('checkbox', { name: 'Nhân viên kinh doanh · Khách hàng: Xem' });
     expect(cell).toHaveAttribute('data-state', 'checked');
     const off = screen.getByRole('checkbox', {
-      name: 'Nhân viên kinh doanh · Sửa Vai trò & quyền',
+      name: 'Nhân viên kinh doanh · Vai trò & quyền: Sửa',
     });
     expect(off).toHaveAttribute('data-state', 'unchecked');
+    // ô "tất cả quyền" của cột: có một phần → gạch
+    expect(
+      screen.getByRole('checkbox', { name: 'Nhân viên kinh doanh · tất cả quyền' }),
+    ).toHaveAttribute('data-state', 'indeterminate');
+
+    // ẩn số người, n/tổng, "n quyền", "n vai trò"
+    expect(screen.queryByText(/\d+ người/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/^\d+\/\d+$/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/\d+ quyền/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/\d+ vai trò/)).not.toBeInTheDocument();
   });
 
-  it('tick ô → badge chưa lưu; Lưu gửi PUT /roles/:code với danh sách đầy đủ', async () => {
-    const sent: Record<string, string[]> = {};
-    server.use(
-      http.put('/api/roles/:code', async ({ params, request }) => {
-        const body = (await request.json()) as { permissions: string[] };
-        sent[String(params.code)] = body.permissions;
-        const role = ROLES_FIXTURE.find((r) => r.code === params.code)!;
-        return HttpResponse.json({ ...role, permissions: body.permissions });
-      }),
-    );
+  it('tick ô → chip chưa lưu; Lưu gửi PUT /roles/:code với danh sách đầy đủ, chỉ cho role đổi', async () => {
+    const sent = capturePuts();
     renderApp(<RolesScreen />);
-    const cell = await screen.findByRole('checkbox', {
-      name: 'Nhân viên kinh doanh · Sửa Vai trò & quyền',
-    });
-    fireEvent.click(cell);
-    expect(screen.getByText('1 thay đổi chưa lưu')).toBeInTheDocument();
+    await expandAll();
+    fireEvent.click(
+      await screen.findByRole('checkbox', { name: 'Nhân viên kinh doanh · Vai trò & quyền: Sửa' }),
+    );
+    expect(screen.getByText('Có thay đổi chưa lưu')).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole('button', { name: 'Lưu thay đổi' }));
+    fireEvent.click(screen.getByRole('button', { name: /^Lưu thay đổi/ }));
     await waitFor(() => expect(sent.SALES_MEMBER).toBeDefined());
-    // danh sách đầy đủ = quyền cũ + quyền vừa tick (thứ tự theo catalog)
-    expect([...sent.SALES_MEMBER!].sort()).toEqual(
+    expect([...sent.SALES_MEMBER!.permissions!].sort()).toEqual(
       [...ROLES_FIXTURE[1]!.permissions, 'role.update'].sort(),
     );
-    // ADMIN không đổi → không gọi PUT cho ADMIN
     expect(sent.ADMIN).toBeUndefined();
+    await waitFor(() => expect(screen.queryByText('Có thay đổi chưa lưu')).not.toBeInTheDocument());
   });
 
-  it('không có role.update → checkbox khóa, không có nút lưu', async () => {
+  it('ô "cả nhóm" bật mọi quyền của nhóm cho một vai trò; ô cuối dòng bật cho mọi vai trò', async () => {
+    const sent = capturePuts();
+    renderApp(<RolesScreen />);
+    fireEvent.click(
+      await screen.findByRole('checkbox', {
+        name: 'Nhân viên kinh doanh · cả nhóm Vai trò & quyền',
+      }),
+    );
+    await expandAll();
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Tồn kho: Điều chỉnh · mọi vai trò' }));
+    fireEvent.click(screen.getByRole('button', { name: /^Lưu thay đổi/ }));
+    await waitFor(() => expect(sent.ADMIN).toBeDefined());
+    await waitFor(() => expect(sent.SALES_MEMBER).toBeDefined());
+    expect(sent.SALES_MEMBER!.permissions).toEqual(
+      expect.arrayContaining(['role.read', 'role.update', 'stock.adjust']),
+    );
+    expect(sent.ADMIN!.permissions).toContain('stock.adjust');
+  });
+
+  it('lưu lỗi một vai trò → vai trò đó giữ trong nháp, báo tên vai trò lỗi', async () => {
+    server.use(
+      http.put('/api/roles/:code', () =>
+        HttpResponse.json(
+          { code: 'FORBIDDEN', message: 'raw', details: {}, traceId: 't' },
+          { status: 403 },
+        ),
+      ),
+    );
+    renderApp(<RolesScreen />);
+    await expandAll();
+    fireEvent.click(
+      await screen.findByRole('checkbox', { name: 'Nhân viên kinh doanh · Vai trò & quyền: Sửa' }),
+    );
+    fireEvent.click(screen.getByRole('button', { name: /^Lưu thay đổi/ }));
+    await waitFor(() =>
+      expect(toastError).toHaveBeenCalledWith(
+        'Chưa lưu được: Nhân viên kinh doanh',
+        expect.anything(),
+      ),
+    );
+    expect(screen.getByText('Có thay đổi chưa lưu')).toBeInTheDocument();
+  });
+
+  it('mặc định mọi nhóm đóng; bấm tên nhóm mở / gọn; Mở rộng / Thu gọn tất cả; lọc theo tên quyền', async () => {
+    renderApp(<RolesScreen />);
+    const group = await screen.findByRole('button', { name: 'Khách hàng' });
+    expect(group).toHaveAttribute('aria-expanded', 'false');
+    expect(screen.getByRole('button', { name: 'Tồn kho' })).toHaveAttribute(
+      'aria-expanded',
+      'false',
+    );
+    expect(
+      screen.queryByRole('checkbox', { name: 'Nhân viên kinh doanh · Khách hàng: Xem' }),
+    ).not.toBeInTheDocument();
+    // ô "cả nhóm" vẫn có khi nhóm đóng
+    expect(
+      screen.getByRole('checkbox', { name: 'Nhân viên kinh doanh · cả nhóm Khách hàng' }),
+    ).toBeInTheDocument();
+
+    fireEvent.click(group);
+    expect(group).toHaveAttribute('aria-expanded', 'true');
+    expect(
+      screen.getByRole('checkbox', { name: 'Nhân viên kinh doanh · Khách hàng: Xem' }),
+    ).toBeInTheDocument();
+    fireEvent.click(group);
+    expect(group).toHaveAttribute('aria-expanded', 'false');
+
+    await expandAll();
+    expect(screen.getByRole('button', { name: 'Tồn kho' })).toHaveAttribute(
+      'aria-expanded',
+      'true',
+    );
+    fireEvent.click(screen.getByRole('button', { name: /Thu gọn tất cả/ }));
+    expect(screen.getByRole('button', { name: 'Tồn kho' })).toHaveAttribute(
+      'aria-expanded',
+      'false',
+    );
+
+    fireEvent.change(screen.getByRole('searchbox', { name: 'Lọc quyền' }), {
+      target: { value: 'điều chỉnh' },
+    });
+    expect(screen.queryByRole('button', { name: 'Khách hàng' })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Tồn kho' })).toBeInTheDocument();
+
+    fireEvent.change(screen.getByRole('searchbox', { name: 'Lọc quyền' }), {
+      target: { value: 'zzz' },
+    });
+    expect(screen.getByText('Không có quyền khớp')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Xóa lọc' }));
+    expect(screen.getByRole('button', { name: 'Khách hàng' })).toBeInTheDocument();
+  });
+
+  it('"Chỉ chỗ đã đổi" chỉ hiện dòng có thay đổi', async () => {
+    renderApp(<RolesScreen />);
+    await expandAll();
+    fireEvent.click(
+      await screen.findByRole('checkbox', { name: 'Nhân viên kinh doanh · Vai trò & quyền: Sửa' }),
+    );
+    fireEvent.click(screen.getByRole('radio', { name: 'Chỉ chỗ đã đổi' }));
+    expect(screen.queryByRole('button', { name: 'Khách hàng' })).not.toBeInTheDocument();
+    expect(
+      screen.getByRole('checkbox', { name: 'Nhân viên kinh doanh · Vai trò & quyền: Sửa' }),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole('checkbox', { name: 'Nhân viên kinh doanh · Vai trò & quyền: Xem' }),
+    ).not.toBeInTheDocument();
+  });
+
+  it('không có role.update → checkbox khóa, không có nút lưu / thêm', async () => {
     renderApp(<RolesScreen />, { me: { ...ME_SALE, permissions: ['role.read'] } });
+    await expandAll();
     const cell = await screen.findByRole('checkbox', {
-      name: 'Nhân viên kinh doanh · Xem Khách hàng',
+      name: 'Nhân viên kinh doanh · Khách hàng: Xem',
     });
     expect(cell).toBeDisabled();
-    expect(screen.queryByRole('button', { name: 'Lưu thay đổi' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /^Lưu thay đổi/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Thêm vai trò/ })).not.toBeInTheDocument();
   });
 
-  it('menu đầu cột: sửa tên / mô tả (PUT không kèm permissions) và xóa vai trò (409 ROLE_IN_USE → câu hướng dẫn)', async () => {
-    const puts: unknown[] = [];
+  it('menu đầu cột: sửa tên (PUT không kèm permissions); xóa vai trò còn người giữ → hộp chặn, không gọi DELETE', async () => {
+    const sent = capturePuts();
     let deleted = '';
     server.use(
-      http.put('/api/roles/:code', async ({ params, request }) => {
-        puts.push(await request.json());
-        return HttpResponse.json(ROLES_FIXTURE.find((r) => r.code === params.code)!);
-      }),
       http.delete('/api/roles/:code', ({ params }) => {
         deleted = String(params.code);
-        return HttpResponse.json(
-          { code: 'ROLE_IN_USE', message: 'raw', details: {}, traceId: 't' },
-          { status: 409 },
-        );
+        return new HttpResponse(null, { status: 204 });
       }),
     );
     renderApp(<RolesScreen />);
-    const trigger = await screen.findByRole('button', {
-      name: 'Thao tác vai trò Nhân viên kinh doanh',
-    });
-    fireEvent.keyDown(trigger, { key: 'Enter' });
-    fireEvent.click(await screen.findByRole('menuitem', { name: 'Sửa vai trò' }));
+    await openRoleMenu('Nhân viên kinh doanh');
+    fireEvent.click(await screen.findByRole('menuitem', { name: 'Sửa tên & mô tả' }));
     const dialog = await screen.findByRole('dialog');
-    fireEvent.change(within(dialog).getByLabelText('Tên hiển thị'), {
-      target: { value: 'Sale' },
-    });
+    fireEvent.change(within(dialog).getByLabelText('Tên hiển thị'), { target: { value: 'Sale' } });
     fireEvent.click(within(dialog).getByRole('button', { name: 'Lưu thay đổi' }));
-    await waitFor(() => expect(puts).toHaveLength(1));
-    expect(puts[0]).toEqual({ name: 'Sale' });
+    await waitFor(() => expect(sent.SALES_MEMBER).toEqual({ name: 'Sale' }));
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
 
-    fireEvent.keyDown(trigger, { key: 'Enter' });
-    fireEvent.click(await screen.findByRole('menuitem', { name: 'Xóa vai trò' }));
-    const confirm = await screen.findByRole('dialog');
-    expect(within(confirm).getByText(/đang gán cho 4 người/)).toBeInTheDocument();
-    fireEvent.click(within(confirm).getByRole('button', { name: 'Xóa vai trò' }));
-    await waitFor(() => expect(deleted).toBe('SALES_MEMBER'));
-    await waitFor(() =>
-      expect(toastError).toHaveBeenCalledWith(expect.stringMatching(/Gỡ vai trò khỏi họ/)),
+    await openRoleMenu('Nhân viên kinh doanh');
+    expect(await screen.findByRole('menuitem', { name: 'Xem nhân viên đang giữ' })).toHaveAttribute(
+      'href',
+      '/admin/users?role=SALES_MEMBER',
     );
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Xóa vai trò…' }));
+    const blocked = await screen.findByRole('alertdialog');
+    expect(within(blocked).getByText(/Chưa xóa được vai trò/)).toBeInTheDocument();
+    expect(deleted).toBe('');
+  });
+
+  it('Thêm vai trò: bắt đầu với quyền của vai trò có sẵn → POST kèm permissions', async () => {
+    let body: { code?: string; permissions?: string[] } = {};
+    server.use(
+      http.post('/api/roles', async ({ request }) => {
+        body = (await request.json()) as typeof body;
+        return HttpResponse.json({ ...ROLES_FIXTURE[1]!, ...body, memberCount: 0 });
+      }),
+    );
+    renderApp(<RolesScreen />);
+    await openRoleMenu('Nhân viên kinh doanh');
+    fireEvent.click(await screen.findByRole('menuitem', { name: 'Nhân bản thành vai trò mới' }));
+    const dialog = await screen.findByRole('dialog');
+    fireEvent.change(within(dialog).getByLabelText('Mã vai trò'), { target: { value: 'cskh' } });
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Tạo vai trò' }));
+    await waitFor(() => expect(body.code).toBe('CSKH'));
+    expect(body.permissions).toEqual(ROLES_FIXTURE[1]!.permissions);
   });
 
   it('catalog đủ nhóm module thật', async () => {
     renderApp(<RolesScreen />);
     await screen.findByText('Nhân viên kinh doanh');
-    expect(screen.getByText('Khách hàng')).toBeInTheDocument();
-    expect(screen.getByText('Tồn kho')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Khách hàng' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Tồn kho' })).toBeInTheDocument();
     expect(PERMISSIONS_FIXTURE.length).toBeGreaterThan(0);
   });
 });

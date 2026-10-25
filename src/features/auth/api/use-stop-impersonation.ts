@@ -4,8 +4,8 @@ import { forgetWarehouseSelection } from '@/lib/warehouse';
 /**
  * Thôi "đăng nhập với tư cách" — POST /api/auth/impersonate/stop (route BFF, không có trong
  * OpenAPI: đổi refresh đã cất của superadmin lấy phiên mới, thu hồi phiên đăng nhập thay). Thành
- * công → về Sơ đồ nhân sự dưới tài khoản superadmin; phiên cất đã hết hạn → route trả 401 và xoá
- * cookie → về /login.
+ * công → về màn Nhân viên (/admin/users, 2026-10-25) dưới tài khoản superadmin; phiên cất đã hết
+ * hạn → route trả 401 và xoá cookie → về /login.
  */
 export function useStopImpersonation() {
   const qc = useQueryClient();
@@ -20,7 +20,7 @@ export function useStopImpersonation() {
     onSettled: (ok) => {
       forgetWarehouseSelection();
       qc.clear();
-      window.location.assign(ok ? '/admin/org-tree' : '/login');
+      window.location.assign(ok ? '/admin/users' : '/login');
     },
   });
 }
