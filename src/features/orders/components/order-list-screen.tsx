@@ -34,13 +34,6 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Input } from '@/components/ui/input';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
 import { cn } from '@/lib/cn';
 import {
   formatDateTime,
@@ -58,6 +51,7 @@ import { useInvalidateOn } from '@/lib/realtime';
 import { useHotkey } from '@/lib/use-hotkey';
 import { useListState, type SortState } from '@/lib/url-state';
 import { useCarriers } from '@/features/wms/api/use-shipping';
+import { CarrierSelect } from '@/features/wms/components/carrier-select';
 import {
   orderKeys,
   useOrderFlowCounts,
@@ -67,6 +61,7 @@ import {
   usePancakeShops,
   useSaveOrderListPrefs,
   type OrderFlow,
+  type OrderCarrierSource,
   type OrderItemOrigin,
   type OrderSortField,
   type SalesOrderListItem,
@@ -120,6 +115,9 @@ const DEFAULTS = {
     'weightMax',
     'noCarrier',
     'carrierId',
+    // Tài khoản hãng (ô chọn hãng dùng chung) + ai gán hãng (ERP / Pancake), 2026-10-25.
+    'carrierAccountId',
+    'carrierSource',
     // Kho: ô chọn kho làm việc ở sidebar (header X-Warehouse-Id) — không còn bộ lọc kho riêng.
     'source',
     'from',
@@ -140,6 +138,14 @@ const ITEM_ORIGIN_OPTIONS: { value: OrderItemOrigin; label: string }[] = [
 ];
 const parseItemOrigin = (v: string | undefined): OrderItemOrigin | undefined =>
   ITEM_ORIGIN_OPTIONS.find((o) => o.value === v)?.value;
+
+/** Ai gán hãng cho đơn (2026-10-25): chọn trong ERP hay Pancake gán + cấp vận đơn. */
+const CARRIER_SOURCE_OPTIONS: { value: OrderCarrierSource; label: string }[] = [
+  { value: 'ERP', label: 'Hệ thống ERP gán hãng' },
+  { value: 'PANCAKE', label: 'Pancake gán hãng' },
+];
+const parseCarrierSource = (v: string | undefined): OrderCarrierSource | undefined =>
+  CARRIER_SOURCE_OPTIONS.find((o) => o.value === v)?.value;
 
 /**
  * Cột sắp được → trường `sortBy` của API. Cột không có ở đây không sắp được (sản phẩm, vận
@@ -678,33 +684,53 @@ function WeightRangeFilter({
 const NO_CARRIER = '__none__';
 const ANY = '__all__';
 
-/** Ô "Hãng vận chuyển": Tất cả / Chưa gán hãng / từng hãng đang bật. */
+/**
+ * Ô "Hãng vận chuyển" của bộ lọc: Tất cả / Chưa gán hãng / từng tài khoản hãng (ô chọn dùng chung).
+ * Ba key URL loại trừ nhau: `noCarrier`, `carrierAccountId` (hãng có tài khoản), `carrierId` (hãng
+ * không tài khoản như giao thủ công — và link cũ lọc theo hãng).
+ */
 function CarrierFilter({
-  value,
-  carriers,
+  noCarrier,
+  carrierId,
+  carrierAccountId,
   onChange,
 }: {
-  value: string;
-  carriers: { id: string; code: string; name: string; isActive: boolean }[];
-  onChange: (v: string) => void;
+  noCarrier: boolean;
+  carrierId: string;
+  carrierAccountId: string;
+  onChange: (
+    patch: Partial<Record<'noCarrier' | 'carrierId' | 'carrierAccountId', string | undefined>>,
+  ) => void;
 }) {
+  const carriers = useCarriers();
+  const ofAccount = carrierAccountId
+    ? (carriers.data ?? []).find((c) => c.accounts.some((a) => a.id === carrierAccountId))
+    : undefined;
+  const value = noCarrier
+    ? NO_CARRIER
+    : ofAccount
+      ? { carrierId: ofAccount.id, accountId: carrierAccountId }
+      : carrierId
+        ? { carrierId, accountId: null }
+        : ANY;
+  const clear = { noCarrier: undefined, carrierId: undefined, carrierAccountId: undefined };
   return (
-    <Select value={value || ANY} onValueChange={(v) => onChange(v === ANY ? '' : v)}>
-      <SelectTrigger className="h-9 w-52" aria-label="Hãng vận chuyển">
-        <SelectValue placeholder="Hãng vận chuyển" />
-      </SelectTrigger>
-      <SelectContent>
-        <SelectItem value={ANY}>Hãng VC: tất cả</SelectItem>
-        <SelectItem value={NO_CARRIER}>Chưa gán hãng</SelectItem>
-        {carriers
-          .filter((c) => c.isActive)
-          .map((c) => (
-            <SelectItem key={c.id} value={c.id}>
-              {c.name}
-            </SelectItem>
-          ))}
-      </SelectContent>
-    </Select>
+    <CarrierSelect
+      className="h-9 w-64"
+      value={value}
+      specials={[
+        { value: ANY, label: 'Hãng VC: tất cả' },
+        { value: NO_CARRIER, label: 'Chưa gán hãng' },
+      ]}
+      onChange={(v, option) => {
+        if (v === NO_CARRIER) onChange({ ...clear, noCarrier: 'true' });
+        else if (typeof v === 'string' || !option) onChange(clear);
+        // Lọc theo đúng tài khoản đã chọn (id thật — server tự gộp đơn chưa chọn tài khoản vào
+        // tài khoản mặc định).
+        else if (option.accountId) onChange({ ...clear, carrierAccountId: option.accountId });
+        else onChange({ ...clear, carrierId: option.carrier.id });
+      }}
+    />
   );
 }
 
@@ -717,6 +743,8 @@ export function OrderListScreen() {
   const weightMax = state.filters.weightMax ?? '';
   const noCarrier = state.filters.noCarrier === 'true';
   const carrierId = state.filters.carrierId ?? '';
+  const carrierAccountId = state.filters.carrierAccountId ?? '';
+  const carrierSource = parseCarrierSource(state.filters.carrierSource);
   // Ô "Nguồn" gộp cả POS: `POS:<mã shop>` = đơn Pancake của đúng POS đó (URL giữ một khoá).
   const posShopId = /^POS:(\d+)$/.exec(state.filters.source ?? '')?.[1] ?? '';
   const source: 'PANCAKE' | 'ERP' | undefined =
@@ -759,6 +787,8 @@ export function OrderListScreen() {
       weightMax,
       noCarrier,
       carrierId,
+      carrierAccountId,
+      carrierSource,
       source,
       pancakeShopId: posShopId || undefined,
       from,
@@ -775,6 +805,8 @@ export function OrderListScreen() {
       weightMax,
       noCarrier,
       carrierId,
+      carrierAccountId,
+      carrierSource,
       source,
       posShopId,
       from,
@@ -869,6 +901,8 @@ export function OrderListScreen() {
     weightMax !== '' ||
     noCarrier ||
     carrierId !== '' ||
+    carrierAccountId !== '' ||
+    carrierSource !== undefined ||
     source !== undefined ||
     from !== '' ||
     to !== '' ||
@@ -935,17 +969,18 @@ export function OrderListScreen() {
               type: 'custom',
               render: () => (
                 <CarrierFilter
-                  value={noCarrier ? NO_CARRIER : carrierId}
-                  carriers={carriers.data ?? []}
-                  onChange={(v) =>
-                    setFilter(
-                      v === NO_CARRIER
-                        ? { noCarrier: 'true', carrierId: undefined }
-                        : { noCarrier: undefined, carrierId: v || undefined },
-                    )
-                  }
+                  noCarrier={noCarrier}
+                  carrierId={carrierId}
+                  carrierAccountId={carrierAccountId}
+                  onChange={setFilter}
                 />
               ),
+            },
+            {
+              key: 'carrierSource',
+              label: 'Gán hãng',
+              type: 'select',
+              options: CARRIER_SOURCE_OPTIONS,
             },
             {
               key: 'source',
@@ -1018,6 +1053,8 @@ export function OrderListScreen() {
             weightMax: state.filters.weightMax,
             noCarrier: state.filters.noCarrier,
             carrierId: state.filters.carrierId,
+            carrierAccountId: state.filters.carrierAccountId,
+            carrierSource: state.filters.carrierSource,
             source: state.filters.source,
             from: state.filters.from,
             to: state.filters.to,

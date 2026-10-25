@@ -11331,6 +11331,11 @@ export interface components {
             id: string;
             name: string;
             isDefault: boolean;
+            /**
+             * @description Mã tài khoản ở hãng để người dùng nhận ra (2026-10-25): mã đối tác / mã shop (`partnerCode`,
+             *     vd GHTK S23119447), không có thì `shopId`. Không phải bí mật. null = chưa nhập.
+             */
+            code: string | null;
             /** @description Đủ thông tin để gọi hãng — chưa đủ thì ô chọn hiện mờ. */
             configured: boolean;
         };
@@ -15696,6 +15701,8 @@ export interface operations {
                 /** @description Ngày theo giờ Việt Nam `YYYY-MM-DD` cho số đóng gói / bàn giao; bỏ trống = hôm nay. */
                 date?: string;
                 carrierId?: string;
+                /** @description Phiếu do MỘT tài khoản hãng cấp vận đơn (wms.CarrierAccount.id, 2026-10-25). */
+                carrierAccountId?: string;
                 /** @description Hãng giữ quá N ngày kể từ lúc rời kho → cảnh báo. */
                 holdDays: number;
             };
@@ -15721,6 +15728,8 @@ export interface operations {
                 /** @description Ngày theo giờ Việt Nam `YYYY-MM-DD` cho số đóng gói / bàn giao; bỏ trống = hôm nay. */
                 date?: string;
                 carrierId?: string;
+                /** @description Phiếu do MỘT tài khoản hãng cấp vận đơn (wms.CarrierAccount.id, 2026-10-25). */
+                carrierAccountId?: string;
                 /** @description Hãng giữ quá N ngày kể từ lúc rời kho → cảnh báo. */
                 holdDays: number;
                 /**
@@ -20503,6 +20512,12 @@ export interface operations {
         parameters: {
             query: {
                 /**
+                 * @description Ai gán hãng (2026-10-25): `ERP` = chọn trong ERP (sửa đơn / Gửi sang ĐVVC / tạo đơn) — đã có
+                 *     hãng, phiếu giao mới nhất không gửi ngoài ERP; `PANCAKE` = Pancake gán hãng + cấp vận đơn
+                 *     (phiếu gửi ngoài ERP).
+                 */
+                carrierSource?: "ERP" | "PANCAKE";
+                /**
                  * @description Tab của danh sách đơn (2026-10-12) — gộp trạng thái chứng từ + kho / giao hàng
                  *     (`flowOf` trong sales-order-flow.ts). Đếm từng tab: GET /sales-orders/flow-counts.
                  */
@@ -20525,6 +20540,11 @@ export interface operations {
                 noCarrier?: string;
                 /** @description Đơn ĐÃ gán hãng này (wms.Carrier.id). Kết hợp được với from/to. */
                 carrierId?: string;
+                /**
+                 * @description Đơn gán MỘT tài khoản hãng (wms.CarrierAccount.id, 2026-10-25) — đơn chưa chọn tài khoản
+                 *     (`carrierAccountId` null) tính là tài khoản mặc định của hãng. Thay được cho `carrierId`.
+                 */
+                carrierAccountId?: string;
                 /**
                  * @description Khoảng `orderDate` (ISO): `from` ≤ orderDate. `to` là NGÀY (`YYYY-MM-DD`) thì lấy hết ngày đó
                  *     (< to + 1 ngày, giờ Việt Nam); là datetime thì ≤ to.
@@ -20633,6 +20653,12 @@ export interface operations {
         parameters: {
             query: {
                 /**
+                 * @description Ai gán hãng (2026-10-25): `ERP` = chọn trong ERP (sửa đơn / Gửi sang ĐVVC / tạo đơn) — đã có
+                 *     hãng, phiếu giao mới nhất không gửi ngoài ERP; `PANCAKE` = Pancake gán hãng + cấp vận đơn
+                 *     (phiếu gửi ngoài ERP).
+                 */
+                carrierSource?: "ERP" | "PANCAKE";
+                /**
                  * @description Tab của danh sách đơn (2026-10-12) — gộp trạng thái chứng từ + kho / giao hàng
                  *     (`flowOf` trong sales-order-flow.ts). Đếm từng tab: GET /sales-orders/flow-counts.
                  */
@@ -20655,6 +20681,11 @@ export interface operations {
                 noCarrier?: string;
                 /** @description Đơn ĐÃ gán hãng này (wms.Carrier.id). Kết hợp được với from/to. */
                 carrierId?: string;
+                /**
+                 * @description Đơn gán MỘT tài khoản hãng (wms.CarrierAccount.id, 2026-10-25) — đơn chưa chọn tài khoản
+                 *     (`carrierAccountId` null) tính là tài khoản mặc định của hãng. Thay được cho `carrierId`.
+                 */
+                carrierAccountId?: string;
                 /**
                  * @description Khoảng `orderDate` (ISO): `from` ≤ orderDate. `to` là NGÀY (`YYYY-MM-DD`) thì lấy hết ngày đó
                  *     (< to + 1 ngày, giờ Việt Nam); là datetime thì ≤ to.

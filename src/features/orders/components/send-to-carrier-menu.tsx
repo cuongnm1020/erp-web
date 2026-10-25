@@ -22,8 +22,9 @@ import { SendToCarrierDialog } from './send-to-carrier-dialog';
 
 /**
  * Nút "Gửi sang ĐVVC" trên thanh hành động hàng loạt: menu "Sang <hãng>" dựng từ GET /carriers
- * (hãng đang bật và có adapter thật — MANUAL / xe nhà không có cấu hình để gửi). Hãng nhiều tài
- * khoản hiện từng tài khoản đủ cấu hình (2026-10-22); hãng / tài khoản chưa cấu hình thì ẩn.
+ * (hãng đang bật và có adapter thật — MANUAL / xe nhà không có cấu hình để gửi). Mỗi tài khoản đủ
+ * cấu hình một dòng, cùng nhãn với ô chọn hãng dùng chung ("GHTK S23119447 Nam Việt"); hãng / tài
+ * khoản chưa cấu hình thì ẩn.
  * Chọn một dòng → SendToCarrierDialog cho lô đã chọn, chọn sẵn tài khoản đó.
  */
 export function SendToCarrierMenu({ rows, onDone }: { rows: SalesOrder[]; onDone: () => void }) {
@@ -50,7 +51,7 @@ export function SendToCarrierMenu({ rows, onDone }: { rows: SalesOrder[]; onDone
               <DropdownMenuItem
                 key={o.value}
                 onSelect={() => setPicked(o)}
-                aria-label={`Sang ${o.carrier.code}${o.accountLabel ? ` · ${o.accountLabel}` : ''}`}
+                aria-label={`Sang ${o.label}`}
               >
                 Sang
                 <StatusBadge tone="brand" className="ml-1.5">

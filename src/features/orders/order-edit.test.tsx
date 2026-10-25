@@ -62,7 +62,7 @@ describe('OrderEditScreen — trang sửa đơn (D-05, PATCH /sales-orders/{id})
     );
   });
 
-  it('DRAFT + admin: chỉ đích Đã duyệt / Đã hủy; chọn Đã duyệt + hãng GHN → PATCH 2 trường → về chi tiết', async () => {
+  it('DRAFT + admin: chỉ đích Đã duyệt / Đã hủy; chọn Đã duyệt + giao thủ công → PATCH 2 trường → về chi tiết', async () => {
     push.mockClear();
     const calls: Array<{ id: string; body: Record<string, unknown> }> = [];
     server.use(
@@ -91,17 +91,20 @@ describe('OrderEditScreen — trang sửa đơn (D-05, PATCH /sales-orders/{id})
 
     fireEvent.click(screen.getByRole('combobox', { name: 'Hãng vận chuyển' }));
     expect((await screen.findAllByRole('option')).map((o) => o.textContent)).toEqual([
+      // Ô chọn hãng dùng chung: chỉ hãng đã cấu hình (GHN chưa cấu hình ẩn), mỗi tài khoản một
+      // dòng "<MÃ HÃNG> <tên>"; hãng không tài khoản (giao thủ công) hiện tên hãng.
       '— Chưa chọn —',
-      `${CARRIERS[0]!.name} (MANUAL)`,
-      `${CARRIERS[1]!.name} (GHN)`,
-      `${CARRIERS[3]!.name} (GHTK)`,
-      `${CARRIERS[4]!.name} (VTP)`,
+      CARRIERS[0]!.name,
+      `GHTK ${CARRIERS[3]!.name}`,
+      `VTP ${CARRIERS[4]!.name}`,
     ]);
-    fireEvent.click(screen.getByRole('option', { name: `${CARRIERS[1]!.name} (GHN)` }));
+    fireEvent.click(screen.getByRole('option', { name: CARRIERS[0]!.name }));
 
     fireEvent.click(screen.getByRole('button', { name: /Lưu thay đổi/ }));
     await waitFor(() =>
-      expect(calls).toEqual([{ id: ORDER.id, body: { status: 'APPROVED', carrierId: 'c-ghn' } }]),
+      expect(calls).toEqual([
+        { id: ORDER.id, body: { status: 'APPROVED', carrierId: 'c-manual' } },
+      ]),
     );
     await waitFor(() => expect(push).toHaveBeenCalledWith(`/crm/orders/${ORDER.id}`));
   });
@@ -155,7 +158,7 @@ describe('OrderEditScreen — trang sửa đơn (D-05, PATCH /sales-orders/{id})
     const picker = screen.getByRole('combobox', { name: 'Hãng vận chuyển' });
     await waitFor(() => expect(picker).toBeEnabled());
     fireEvent.click(picker);
-    fireEvent.click(await screen.findByRole('option', { name: `${CARRIERS[3]!.name} (GHTK)` }));
+    fireEvent.click(await screen.findByRole('option', { name: `GHTK ${CARRIERS[3]!.name}` }));
     expect(await screen.findByText('Cước hãng báo')).toBeInTheDocument();
     await waitFor(() =>
       expect(
@@ -165,9 +168,9 @@ describe('OrderEditScreen — trang sửa đơn (D-05, PATCH /sales-orders/{id})
     expect(screen.getByText('Cước hãng báo').nextElementSibling).toHaveTextContent('28.000');
     expect(asked).toEqual([`${ORDER.id}?c-ghtk`]);
 
-    // GHN trong mock không có `quote` → dòng cước biến mất, không gọi thêm.
+    // Giao thủ công không có `quote` → dòng cước biến mất, không gọi thêm.
     fireEvent.click(screen.getByRole('combobox', { name: 'Hãng vận chuyển' }));
-    fireEvent.click(await screen.findByRole('option', { name: `${CARRIERS[1]!.name} (GHN)` }));
+    fireEvent.click(await screen.findByRole('option', { name: CARRIERS[0]!.name }));
     await waitFor(() => expect(screen.queryByText('Cước hãng báo')).not.toBeInTheDocument());
     expect(asked).toEqual([`${ORDER.id}?c-ghtk`]);
   });
@@ -232,7 +235,7 @@ describe('OrderEditScreen — trang sửa đơn (D-05, PATCH /sales-orders/{id})
     const carrierPicker = screen.getByRole('combobox', { name: 'Hãng vận chuyển' });
     await waitFor(() => expect(carrierPicker).toBeEnabled());
     fireEvent.click(carrierPicker);
-    fireEvent.click(await screen.findByRole('option', { name: `${CARRIERS[3]!.name} (GHTK)` }));
+    fireEvent.click(await screen.findByRole('option', { name: `GHTK ${CARRIERS[3]!.name}` }));
     await waitFor(() => expect(asked).toEqual(['c-ghtk@wh-hcm']));
 
     fireEvent.click(screen.getByRole('button', { name: /Lưu thay đổi/ }));
@@ -290,7 +293,7 @@ describe('OrderEditScreen — trang sửa đơn (D-05, PATCH /sales-orders/{id})
     const carrierPicker = screen.getByRole('combobox', { name: 'Hãng vận chuyển' });
     await waitFor(() => expect(carrierPicker).toBeEnabled());
     fireEvent.click(carrierPicker);
-    fireEvent.click(await screen.findByRole('option', { name: `${CARRIERS[3]!.name} (GHTK)` }));
+    fireEvent.click(await screen.findByRole('option', { name: `GHTK ${CARRIERS[3]!.name}` }));
     await waitFor(() => expect(asked).toEqual([`c-ghtk@${addrs[1]!.id}`]));
 
     fireEvent.click(screen.getByRole('button', { name: /Lưu thay đổi/ }));
@@ -339,7 +342,7 @@ describe('OrderEditScreen — trang sửa đơn (D-05, PATCH /sales-orders/{id})
     const picker = screen.getByRole('combobox', { name: 'Hãng vận chuyển' });
     await waitFor(() => expect(picker).toBeEnabled());
     fireEvent.click(picker);
-    fireEvent.click(await screen.findByRole('option', { name: `${CARRIERS[3]!.name} (GHTK)` }));
+    fireEvent.click(await screen.findByRole('option', { name: `GHTK ${CARRIERS[3]!.name}` }));
     // Luật 6: không render message thô của server — câu từ bộ dịch lỗi theo `code`.
     await waitFor(() =>
       expect(screen.getByText(/Đơn chưa có địa chỉ giao đủ tỉnh\/thành/)).toBeInTheDocument(),
@@ -521,7 +524,7 @@ describe('OrderEditScreen — "Trạng thái kho" đặt tay (POST /sales-orders
     const carrierPicker = screen.getByRole('combobox', { name: 'Hãng vận chuyển' });
     await waitFor(() => expect(carrierPicker).toBeEnabled());
     fireEvent.click(carrierPicker);
-    fireEvent.click(await screen.findByRole('option', { name: `${CARRIERS[3]!.name} (GHTK)` }));
+    fireEvent.click(await screen.findByRole('option', { name: `GHTK ${CARRIERS[3]!.name}` }));
     fireEvent.click(screen.getByRole('button', { name: /Lưu thay đổi/ }));
     await waitFor(() => expect(fulfilled).toEqual([{ target: 'PACKED' }]));
     expect(patched).toEqual([{ carrierId: 'c-ghtk' }]);

@@ -14,6 +14,8 @@ export interface ShipmentMonitorFilter {
   /** YYYY-MM-DD giờ VN. */
   date: string;
   carrierId?: string;
+  /** Tài khoản hãng đã cấp vận đơn (ô chọn hãng dùng chung). */
+  carrierAccountId?: string;
   holdDays: number;
 }
 
@@ -46,24 +48,19 @@ export function useCarriers() {
   });
 }
 
-/** Một lựa chọn "hãng + tài khoản" trong ô chọn hãng (hãng nhiều tài khoản = nhiều dòng). */
+/** Một lựa chọn "hãng + tài khoản" trong ô chọn hãng (mỗi tài khoản đủ cấu hình một dòng). */
 export interface CarrierAccountOption {
   /** `${carrier.id}|${accountId ?? ''}` — dùng làm value của Select. */
   value: string;
   carrier: Carrier;
-  /** null = hãng không có tài khoản (không adapter) — server dùng mặc định. */
+  /** null = hãng không có tài khoản (không adapter, vd giao thủ công) — server dùng mặc định. */
   accountId: string | null;
-  /** Tên tài khoản khi hãng có ≥ 2 tài khoản đủ cấu hình (kèm "(mặc định)"); còn lại null. */
+  /** Phần riêng của tài khoản ("S23119447 Nam Việt - Hàng Lòng"); null = hãng không tài khoản. */
   accountLabel: string | null;
+  /** Nhãn đầy đủ, dùng chung mọi ô chọn: "GHTK S23119447 Nam Việt - Hàng Lòng". */
   label: string;
 }
 
-/**
- * Mọi hãng đang bật × mọi tài khoản ĐỦ CẤU HÌNH của hãng (2026-10-22): hãng có ≥ 2 tài khoản hiện
- * "Hãng · Tài khoản" từng dòng, tài khoản mặc định lên đầu; hãng một tài khoản / không adapter
- * hiện một dòng như cũ. Tài khoản / hãng có adapter mà chưa cấu hình thì ẩn hẳn — chọn vào chỉ để
- * hãng báo lỗi.
- */
 /** Tài khoản đủ cấu hình (token / mã shop) — gửi được đơn sang hãng. */
 export function readyCarrierAccounts(c: Carrier): Carrier['accounts'] {
   return c.accounts.filter((a) => a.configured);
@@ -79,32 +76,66 @@ export function isCarrierReady(c: Carrier): boolean {
   return readyCarrierAccounts(c).length > 0;
 }
 
+/** Tên tài khoản tạo tự động khi chưa nhập gì (carrier-config `ensureDefaultAccount`). */
+const AUTO_ACCOUNT_NAME = 'Mặc định';
+
+/**
+ * Phần nhãn của một tài khoản: mã ở hãng (mã shop / đối tác) + tên. Tài khoản "Mặc định" chưa đặt
+ * tên thì lấy tên hãng ("VTP Viettel Post" thay cho "VTP Mặc định"); tên đã chứa mã thì không lặp.
+ */
+export function carrierAccountLabel(c: Carrier, a: Carrier['accounts'][number]): string {
+  const name = a.name.trim() === AUTO_ACCOUNT_NAME ? c.name : a.name.trim();
+  const code = a.code?.trim();
+  return code && !name.includes(code) ? `${code} ${name}` : name;
+}
+
+/**
+ * Lựa chọn của ô chọn hãng dùng chung (2026-10-25): KHÔNG có dòng cấp hãng — mỗi tài khoản ĐỦ
+ * CẤU HÌNH của hãng đang bật là một dòng "<MÃ HÃNG> <mã tài khoản> <tên>", tài khoản mặc định lên
+ * đầu. Hãng không tài khoản (không adapter, vd giao thủ công) hiện một dòng tên hãng. Hãng có
+ * adapter mà chưa cấu hình thì ẩn hẳn — chọn vào chỉ để hãng báo lỗi.
+ */
 export function carrierAccountOptions(carriers: Carrier[] | undefined): CarrierAccountOption[] {
   return (carriers ?? [])
     .filter((c) => c.isActive)
     .flatMap((c): CarrierAccountOption[] => {
-      const base = `${c.name} (${c.code})`;
       if (c.accounts.length === 0) {
         if (c.hasAdapter && !c.configured) return [];
         return [
-          { value: `${c.id}|`, carrier: c, accountId: null, accountLabel: null, label: base },
+          { value: `${c.id}|`, carrier: c, accountId: null, accountLabel: null, label: c.name },
         ];
       }
-      const ready = readyCarrierAccounts(c);
-      const many = ready.length > 1;
-      return ready
+      return [...readyCarrierAccounts(c)]
         .sort((a, b) => Number(b.isDefault) - Number(a.isDefault))
         .map((a) => {
-          const accountLabel = many ? `${a.name}${a.isDefault ? ' (mặc định)' : ''}` : null;
+          const accountLabel = carrierAccountLabel(c, a);
           return {
             value: `${c.id}|${a.id}`,
             carrier: c,
             accountId: a.id,
             accountLabel,
-            label: accountLabel ? `${c.name} · ${accountLabel}` : base,
+            label: `${c.code} ${accountLabel}`,
           };
         });
     });
+}
+
+/**
+ * Dòng ứng với (hãng, tài khoản) đã lưu: tài khoản null = mặc định của hãng → dòng tài khoản mặc
+ * định (hoặc dòng đầu của hãng). Không khớp → undefined.
+ */
+export function findCarrierOption(
+  options: CarrierAccountOption[],
+  carrierId: string | null | undefined,
+  accountId: string | null | undefined,
+): CarrierAccountOption | undefined {
+  if (!carrierId) return undefined;
+  const ofCarrier = options.filter((o) => o.carrier.id === carrierId);
+  if (accountId) return ofCarrier.find((o) => o.accountId === accountId);
+  return (
+    ofCarrier.find((o) => o.carrier.accounts.find((a) => a.id === o.accountId)?.isDefault) ??
+    ofCarrier[0]
+  );
 }
 
 /** GET /shipments/:id/status-log — timeline tín hiệu hãng (webhook + poll). */
@@ -131,6 +162,7 @@ export function useShipmentMonitorSummary(params: ShipmentMonitorFilter) {
             query: {
               date: params.date,
               carrierId: params.carrierId,
+              carrierAccountId: params.carrierAccountId,
               holdDays: params.holdDays,
             },
           },
@@ -153,6 +185,7 @@ export function useShipmentMonitorList(params: ShipmentMonitorListParams) {
               view: params.view,
               date: params.date,
               carrierId: params.carrierId,
+              carrierAccountId: params.carrierAccountId,
               holdDays: params.holdDays,
               q: params.q || undefined,
               take: params.take,

@@ -53,6 +53,7 @@ import {
   toShippingOptions,
   type ShippingOptionsFormValues,
 } from '../shipping-options';
+import { CarrierSelect } from '@/features/wms/components/carrier-select';
 
 const NO_SERVICE = '__default__';
 
@@ -323,35 +324,22 @@ export function SendToCarrierDialog({
                 <div className="min-h-0 flex-1 space-y-5 overflow-y-auto bg-muted/20 px-5 py-4">
                   <h3 className="text-base font-semibold">Cấu hình</h3>
 
-                  {accounts.length > 1 ? (
-                    <fieldset className="space-y-1">
-                      <legend className="mb-1 text-sm text-muted-foreground">
-                        Tài khoản {carrier.code}
-                      </legend>
-                      <div
-                        className="flex flex-wrap gap-x-5 gap-y-2"
-                        role="radiogroup"
-                        aria-label={`Tài khoản ${carrier.code}`}
-                      >
-                        {accounts.map((a) => (
-                          <label key={a.id} className="flex items-center gap-1.5 text-sm">
-                            <input
-                              type="radio"
-                              name="carrierAccount"
-                              value={a.id}
-                              checked={accountId === a.id}
-                              onChange={() => setAccountId(a.id)}
-                              className="h-4 w-4 accent-primary"
-                            />
-                            {a.name}
-                            {a.isDefault ? (
-                              <span className="text-xs text-muted-foreground">(mặc định)</span>
-                            ) : null}
-                          </label>
-                        ))}
-                      </div>
-                    </fieldset>
-                  ) : null}
+                  <div className="space-y-1">
+                    <label htmlFor="send-carrier-account" className="text-sm text-muted-foreground">
+                      Tài khoản {carrier.code}
+                    </label>
+                    {/* Ô chọn hãng dùng chung, chỉ tài khoản của hãng này (trường cấu hình bên dưới
+                        theo hãng). Một tài khoản thì chỉ hiện, không cần chọn. */}
+                    <CarrierSelect
+                      id="send-carrier-account"
+                      aria-label={`Tài khoản ${carrier.code}`}
+                      className="h-9 w-full sm:w-80"
+                      filter={(o) => o.carrier.id === carrier.id}
+                      value={{ carrierId: carrier.id, accountId }}
+                      disabled={accounts.length <= 1}
+                      onChange={(_, o) => setAccountId(o?.accountId ?? null)}
+                    />
+                  </div>
 
                   <fieldset className="space-y-2">
                     <legend className="mb-1 text-sm text-muted-foreground">Tùy chọn</legend>

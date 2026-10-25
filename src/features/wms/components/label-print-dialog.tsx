@@ -29,7 +29,8 @@ import {
   useShipmentLabelData,
   type PdaWaybill,
 } from '../api/use-pda';
-import { carrierAccountOptions, useCarriers } from '../api/use-shipping';
+import { useCarriers, type CarrierAccountOption } from '../api/use-shipping';
+import { CarrierSelect, type CarrierValue } from './carrier-select';
 import { WaybillLabel, WaybillLabelPrintSheet, type WaybillOrientation } from './waybill-label';
 
 /** A6 / A5 = PDF của hãng; `ERP_100x75` = nhãn ERP tự vẽ cho máy in nhiệt 3 inch (2026-10-13). */
@@ -432,13 +433,16 @@ function CarrierPicker({
 }) {
   const carriers = useCarriers();
   const request = useRequestWaybill();
-  const options = carrierAccountOptions(carriers.data);
-  // Mặc định: tài khoản đầu (mặc định) của hãng đang gán; chưa tải xong hãng thì chưa chọn.
-  const [picked, setPicked] = useState('');
-  const value = picked || options.find((o) => o.carrier.code === currentCarrier)?.value || '';
-  const option = options.find((o) => o.value === value);
+  // Mặc định: tài khoản mặc định của hãng đang gán; chưa tải xong hãng thì chưa chọn.
+  const [picked, setPicked] = useState<CarrierAccountOption | null>(null);
+  const current = carriers.data?.find((c) => c.code === currentCarrier);
+  const value: CarrierValue | null = picked
+    ? { carrierId: picked.carrier.id, accountId: picked.accountId }
+    : current
+      ? { carrierId: current.id, accountId: null }
+      : null;
   // Danh mục hãng chưa tải xong vẫn xin lại được theo hãng đang gán.
-  const carrierCode = option?.carrier.code ?? (picked ? '' : (currentCarrier ?? ''));
+  const carrierCode = picked?.carrier.code ?? currentCarrier ?? '';
 
   return (
     <div className="flex flex-col gap-3">
@@ -448,19 +452,14 @@ function CarrierPicker({
           : 'Đơn chưa gán hãng vận chuyển. Chọn hãng để xin vận đơn ngay cho kiện này.'}
       </p>
       <div className="flex flex-wrap items-center gap-2">
-        <Select value={value} onValueChange={setPicked}>
-          <SelectTrigger className="h-9 w-64" aria-label="Hãng vận chuyển">
-            <SelectValue placeholder={carriers.isPending ? 'Đang tải hãng…' : 'Chọn hãng…'} />
-          </SelectTrigger>
-          <SelectContent>
-            {options.map((o) => (
-              <SelectItem key={o.value} value={o.value}>
-                {o.label}
-                {o.carrier.operations.includes('printLabel') ? '' : ' (không in nhãn được)'}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        <CarrierSelect
+          className="h-9 w-64"
+          value={value}
+          onChange={(_, o) => setPicked(o ?? null)}
+          suffix={(o) =>
+            o.carrier.operations.includes('printLabel') ? '' : ' (không in nhãn được)'
+          }
+        />
         <Button
           disabled={!carrierCode || request.isPending}
           onClick={() =>
@@ -470,8 +469,8 @@ function CarrierPicker({
                 carrierCode,
                 // Chỉ gửi tài khoản khi người dùng tự chọn một trong nhiều tài khoản — chọn sẵn
                 // thì để server dùng tài khoản đã gán trên đơn (không ghi đè về mặc định).
-                ...(picked && option?.accountId && option.carrier.accounts.length > 1
-                  ? { carrierAccountId: option.accountId }
+                ...(picked?.accountId && picked.carrier.accounts.length > 1
+                  ? { carrierAccountId: picked.accountId }
                   : {}),
               },
               {

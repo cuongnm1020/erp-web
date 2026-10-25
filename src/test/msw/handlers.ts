@@ -879,6 +879,7 @@ export const CARRIERS = CARRIERS_BASE.map((c) => ({
           id: `acc-${c.code.toLowerCase()}-default`,
           name: 'Mặc định',
           isDefault: true,
+          code: null,
           configured: c.configured,
         },
       ]

@@ -1,4 +1,4 @@
-import { fireEvent, screen, waitFor } from '@testing-library/react';
+import { cleanup, fireEvent, screen, waitFor } from '@testing-library/react';
 import { http, HttpResponse } from 'msw';
 import { describe, expect, it, vi } from 'vitest';
 import { WarehouseProvider } from '@/lib/warehouse';
@@ -297,6 +297,7 @@ describe('OrderListScreen — cân nặng gửi hãng + gán hãng hàng loạt'
                       id: 'acc-03',
                       name: 'Thiên Nông Nam Việt 03',
                       isDefault: false,
+                      code: 'S23166145',
                       configured: true,
                     },
                     { id: 'acc-x', name: 'Shop chưa xong', isDefault: false, configured: false },
@@ -321,12 +322,13 @@ describe('OrderListScreen — cân nặng gửi hãng + gán hãng hàng loạt'
     openMoreMenu();
     fireEvent.click(await screen.findByRole('menuitem', { name: /Gán hãng \/ cân nặng/ }));
     fireEvent.click(await screen.findByRole('combobox', { name: 'Hãng vận chuyển' }));
+    // Ô chọn hãng dùng chung: mỗi tài khoản đủ cấu hình một dòng "<MÃ HÃNG> <mã TK> <tên>".
     expect(
-      await screen.findByRole('option', { name: /Thiên Nông Nam Việt \(mặc định\)/ }),
+      await screen.findByRole('option', { name: 'GHTK Thiên Nông Nam Việt' }),
     ).toBeInTheDocument();
     expect(screen.queryByRole('option', { name: /Shop chưa xong/ })).not.toBeInTheDocument();
     expect(screen.queryByRole('option', { name: /GHN/ })).not.toBeInTheDocument();
-    fireEvent.click(screen.getByRole('option', { name: /Thiên Nông Nam Việt 03/ }));
+    fireEvent.click(screen.getByRole('option', { name: 'GHTK S23166145 Thiên Nông Nam Việt 03' }));
     fireEvent.click(screen.getByRole('button', { name: /Cập nhật 1 đơn/ }));
     await waitFor(() => expect(bodies).toHaveLength(1));
     expect(bodies[0]).toMatchObject({ carrierId: ghtk.id, carrierAccountId: 'acc-03' });
@@ -715,6 +717,53 @@ describe('OrderListScreen — lọc theo hãng + thời gian (2026-09-19)', () =
     const url = String(replace.mock.calls.at(-1)![0]);
     expect(url).toContain('noCarrier=true');
     expect(url).not.toContain('carrierId=');
+  });
+
+  it('ô hãng dùng chung: chọn tài khoản → URL carrierAccountId (bỏ carrierId); "Gán hãng" Pancake → gửi carrierSource cho danh sách + đếm tab (2026-10-25)', async () => {
+    search = 'carrierId=c-ghtk';
+    renderApp(<OrderListScreen />);
+    const box = await screen.findByRole('combobox', { name: 'Hãng vận chuyển' });
+    await waitFor(() => expect(box).toHaveTextContent('GHTK Giao Hàng Tiết Kiệm'));
+    replace.mockClear();
+    fireEvent.click(box);
+    fireEvent.click(await screen.findByRole('option', { name: 'VTP Viettel Post' }));
+    await waitFor(() => expect(replace).toHaveBeenCalled());
+    let url = String(replace.mock.calls.at(-1)![0]);
+    expect(url).toContain('carrierAccountId=acc-vtp-default');
+    expect(url).not.toContain('carrierId=');
+
+    search = 'carrierAccountId=acc-vtp-default&carrierSource=PANCAKE';
+    const seen: string[] = [];
+    const onRequest = ({ request }: { request: Request }) => {
+      if (new URL(request.url).pathname.startsWith('/api/sales-orders')) seen.push(request.url);
+    };
+    server.events.on('request:start', onRequest);
+    try {
+      cleanup();
+      renderApp(<OrderListScreen />);
+      const source = await screen.findByRole('combobox', { name: 'Gán hãng' });
+      expect(source).toHaveTextContent('Pancake gán hãng');
+      await waitFor(() =>
+        expect(screen.getByRole('combobox', { name: 'Hãng vận chuyển' })).toHaveTextContent(
+          'VTP Viettel Post',
+        ),
+      );
+      await waitFor(() => {
+        const list = seen.find((u) => new URL(u).pathname === '/api/sales-orders');
+        const counts = seen.find((u) => new URL(u).pathname === '/api/sales-orders/flow-counts');
+        expect(list).toContain('carrierSource=PANCAKE');
+        expect(list).toContain('carrierAccountId=acc-vtp-default');
+        expect(counts).toContain('carrierSource=PANCAKE');
+      });
+      replace.mockClear();
+      fireEvent.click(source);
+      fireEvent.click(await screen.findByRole('option', { name: 'Hệ thống ERP gán hãng' }));
+      await waitFor(() => expect(replace).toHaveBeenCalled());
+      url = String(replace.mock.calls.at(-1)![0]);
+      expect(url).toContain('carrierSource=ERP');
+    } finally {
+      server.events.removeListener('request:start', onRequest);
+    }
   });
 });
 

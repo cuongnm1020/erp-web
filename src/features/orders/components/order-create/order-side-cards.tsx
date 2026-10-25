@@ -39,7 +39,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { isCarrierReady, readyCarrierAccounts, useCarriers } from '@/features/wms/api/use-shipping';
+import { isCarrierReady, useCarriers } from '@/features/wms/api/use-shipping';
+import { CarrierSelect } from '@/features/wms/components/carrier-select';
 import { cn } from '@/lib/cn';
 import { messageFor } from '@/lib/error-messages';
 import { formatMoney, formatQuantity } from '@/lib/format';
@@ -829,7 +830,6 @@ export function ShippingCard({
   // Chỉ hãng đã cấu hình — hãng chưa có token / tài khoản chọn vào chỉ để hãng báo lỗi.
   const active = (carriers.data ?? []).filter(isCarrierReady);
   const carrier = active.find((c) => c.id === carrierId);
-  const accounts = carrier ? readyCarrierAccounts(carrier) : [];
   const canQuote = carrier?.operations.includes('quote') ?? false;
   const weightKg = weight && !new Decimal(weight).isZero() ? weight : estimatedWeightKg;
 
@@ -858,59 +858,28 @@ export function ShippingCard({
           control={form.control}
           name="carrierId"
           render={({ field }) => (
-            <FormItem>
+            <FormItem className="sm:col-span-2">
               <FormLabel className={FIELD_LABEL}>ĐVVC</FormLabel>
-              <Select
-                value={field.value || NONE}
-                onValueChange={(v) => {
-                  field.onChange(v === NONE ? '' : v);
-                  form.setValue('carrierAccountId', '', { shouldDirty: true });
-                }}
-                disabled={carriers.isPending}
-              >
-                <FormControl>
-                  <SelectTrigger aria-label="Đơn vị vận chuyển">
-                    <SelectValue placeholder="Chưa chọn ĐVVC" />
-                  </SelectTrigger>
-                </FormControl>
-                <SelectContent>
-                  <SelectItem value={NONE}>Chưa chọn ĐVVC</SelectItem>
-                  {active.map((c) => (
-                    <SelectItem key={c.id} value={c.id}>
-                      {c.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </FormItem>
-          )}
-        />
-        <FormField
-          control={form.control}
-          name="carrierAccountId"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel className={FIELD_LABEL}>Tài khoản hãng</FormLabel>
-              <Select
-                value={field.value || NONE}
-                onValueChange={(v) => field.onChange(v === NONE ? '' : v)}
-                disabled={accounts.length <= 1}
-              >
-                <FormControl>
-                  <SelectTrigger aria-label="Tài khoản hãng">
-                    <SelectValue />
-                  </SelectTrigger>
-                </FormControl>
-                <SelectContent>
-                  <SelectItem value={NONE}>Mặc định</SelectItem>
-                  {accounts.map((a) => (
-                    <SelectItem key={a.id} value={a.id}>
-                      {a.name}
-                      {a.isDefault ? ' (mặc định)' : ''}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <FormControl>
+                <CarrierSelect
+                  aria-label="Đơn vị vận chuyển"
+                  value={
+                    field.value
+                      ? { carrierId: field.value, accountId: carrierAccountId || null }
+                      : NONE
+                  }
+                  specials={[{ value: NONE, label: 'Chưa chọn ĐVVC' }]}
+                  placeholder="Chưa chọn ĐVVC"
+                  onChange={(v) => {
+                    field.onChange(typeof v === 'string' ? '' : v.carrierId);
+                    form.setValue(
+                      'carrierAccountId',
+                      typeof v === 'string' ? '' : (v.accountId ?? ''),
+                      { shouldDirty: true },
+                    );
+                  }}
+                />
+              </FormControl>
               <FormMessage />
             </FormItem>
           )}
