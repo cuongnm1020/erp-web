@@ -36,7 +36,7 @@ import {
 import { toast } from '@/components/ui/toaster';
 import type { ApiError } from '@/lib/api/errors';
 import { useCreateDepartment, useUpdateDepartment, type Department } from '../api/use-departments';
-import type { UserListItem } from '../api/use-users';
+import { useUsers, type UserListItem } from '../api/use-users';
 import { createDepartmentSchema, departmentFormSchema, type DepartmentFormValues } from '../schema';
 
 const NONE = '__none__';
@@ -101,15 +101,25 @@ export function DepartmentDialog({
   const careLeaders = editing && department.kind === 'CSKH' && kind === 'CSKH';
   // Người trong phòng + trưởng phòng đang ghi trên phòng mà thuộc phòng khác (dữ liệu cũ — server
   // cho giữ, không cho thêm mới người ngoài phòng).
+  // `users` là danh bạ cắt ở 200 người (take tối đa) — công ty > 200 người thì người của phòng có
+  // thể rơi ngoài (ô chọn hiện UUID, không thêm được ai). Nạp riêng nhân sự của phòng rồi gộp vào.
+  const deptUsers = useUsers(
+    { departmentId: department?.id, isActive: true, take: 200, skip: 0 },
+    editing,
+  );
+  const staff = useMemo(() => {
+    const extra = (deptUsers.data?.items ?? []).filter((m) => !users.some((u) => u.id === m.id));
+    return extra.length ? [...users, ...extra] : users;
+  }, [users, deptUsers.data]);
   const members = useMemo(
     () =>
       editing
-        ? users.filter(
+        ? staff.filter(
             (u) =>
               (u.departmentId === department.id && u.isActive) || u.id === department.managerId,
           )
         : [],
-    [users, editing, department],
+    [staff, editing, department],
   );
   const managerIds = form.watch('managerIds');
   const groupLeadIds = form.watch('groupLeadIds');
@@ -356,7 +366,7 @@ export function DepartmentDialog({
                         aria-label="Leader"
                         value={field.value ?? ''}
                         onChange={field.onChange}
-                        staff={users}
+                        staff={staff}
                         noneLabel="— Chưa có —"
                       />
                     </FormControl>
