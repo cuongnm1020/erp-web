@@ -210,6 +210,10 @@ Màn hình trống là lời mời hành động, không phải lời than.
 - Trước khi code hoặc sửa issue giao diện: đọc design system (mục "Design system" ở đầu file).
 - Sau khi xong: `pnpm typecheck && pnpm lint && pnpm test` phải sạch. Không commit khi còn `any`,
   còn `@ts-expect-error` không kèm lý do, hoặc còn `console.log`.
+- **BẮT BUỘC trước MỌI push (develop hay main)**: chạy ĐỦ mọi bước `run:` của
+  `.github/workflows/deploy.yml` (hiện: `pnpm lint`, `pnpm test`, `pnpm typecheck`) trên TOÀN repo, tất cả
+  sạch, rồi mới push. Không chọn lọc file, không bỏ bước nào "vì chỉ đổi ít". Workflow thêm bước thì làm
+  theo workflow. API đổi `openapi.json` thì chạy `pnpm gen:api` và commit `schema.d.ts` cùng đợt.
 
 ## Lệnh
 

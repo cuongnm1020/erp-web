@@ -9787,7 +9787,7 @@ export interface components {
             name: string;
             isActive: boolean;
             managerId: string | null;
-            /** @description Tên trưởng phòng (kể cả khi trưởng phòng đã khóa / thuộc phòng ban khác). */
+            /** @description Tên trưởng phòng (kể cả khi trưởng phòng đã khóa / thuộc phòng ban khác); phòng CSKH: mọi leader, nối bằng ", ". */
             managerName: string | null;
             /** @description Thứ tự giữa các phòng ban cùng cha (nhỏ đứng trước). */
             sortOrder: number;
