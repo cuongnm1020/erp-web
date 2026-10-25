@@ -74,7 +74,8 @@ export function RolesScreen() {
   const canEdit = ability.can('update', 'Role');
 
   const [draft, setDraft] = useState<Record<string, boolean>>({});
-  const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
+  // Nhóm đang mở — mặc định đóng hết, chỉ thấy tên nhóm + ô "cả nhóm".
+  const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [q, setQ] = useState('');
   const [scope, setScope] = useState<Scope>('all');
   const [create, setCreate] = useState<{ from: Role | null } | null>(null);
@@ -275,14 +276,14 @@ export function RolesScreen() {
                   </button>
                 ))}
               </div>
-              <Button variant="outline" onClick={() => setCollapsed(new Set())}>
+              <Button
+                variant="outline"
+                onClick={() => setExpanded(new Set(modules.map(([m]) => m)))}
+              >
                 <ChevronsUpDown aria-hidden />
                 Mở rộng tất cả
               </Button>
-              <Button
-                variant="outline"
-                onClick={() => setCollapsed(new Set(modules.map(([m]) => m)))}
-              >
+              <Button variant="outline" onClick={() => setExpanded(new Set())}>
                 <ChevronsDownUp aria-hidden />
                 Thu gọn tất cả
               </Button>
@@ -377,7 +378,7 @@ export function RolesScreen() {
                 </thead>
                 <tbody>
                   {visible.map(({ module, all, rows }) => {
-                    const open = filtering || !collapsed.has(module);
+                    const open = filtering || expanded.has(module);
                     const label = moduleLabel(module);
                     return (
                       <Fragment key={module}>
@@ -390,10 +391,10 @@ export function RolesScreen() {
                               type="button"
                               aria-expanded={open}
                               onClick={() =>
-                                setCollapsed((c) => {
+                                setExpanded((c) => {
                                   const next = new Set(c);
-                                  if (open) next.add(module);
-                                  else next.delete(module);
+                                  if (open) next.delete(module);
+                                  else next.add(module);
                                   return next;
                                 })
                               }

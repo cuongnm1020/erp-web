@@ -31,6 +31,11 @@ function capturePuts() {
   return sent;
 }
 
+/** Mặc định mọi nhóm đóng — mở hết để thấy từng dòng quyền. */
+async function expandAll() {
+  fireEvent.click(await screen.findByRole('button', { name: /Mở rộng tất cả/ }));
+}
+
 async function openRoleMenu(roleName: string) {
   const trigger = await screen.findByRole('button', { name: `Thao tác vai trò ${roleName}` });
   fireEvent.keyDown(trigger, { key: 'Enter' });
@@ -41,6 +46,7 @@ describe('RolesScreen — ma trận vai trò × quyền (I-03, mockup Cấu hìn
     renderApp(<RolesScreen />);
     expect(await screen.findByText('Nhân viên kinh doanh')).toBeInTheDocument();
     expect(screen.getByText('SALES_MEMBER')).toBeInTheDocument();
+    await expandAll();
 
     const cell = screen.getByRole('checkbox', { name: 'Nhân viên kinh doanh · Khách hàng: Xem' });
     expect(cell).toHaveAttribute('data-state', 'checked');
@@ -63,6 +69,7 @@ describe('RolesScreen — ma trận vai trò × quyền (I-03, mockup Cấu hìn
   it('tick ô → chip chưa lưu; Lưu gửi PUT /roles/:code với danh sách đầy đủ, chỉ cho role đổi', async () => {
     const sent = capturePuts();
     renderApp(<RolesScreen />);
+    await expandAll();
     fireEvent.click(
       await screen.findByRole('checkbox', { name: 'Nhân viên kinh doanh · Vai trò & quyền: Sửa' }),
     );
@@ -85,6 +92,7 @@ describe('RolesScreen — ma trận vai trò × quyền (I-03, mockup Cấu hìn
         name: 'Nhân viên kinh doanh · cả nhóm Vai trò & quyền',
       }),
     );
+    await expandAll();
     fireEvent.click(screen.getByRole('checkbox', { name: 'Tồn kho: Điều chỉnh · mọi vai trò' }));
     fireEvent.click(screen.getByRole('button', { name: /^Lưu thay đổi/ }));
     await waitFor(() => expect(sent.ADMIN).toBeDefined());
@@ -105,6 +113,7 @@ describe('RolesScreen — ma trận vai trò × quyền (I-03, mockup Cấu hìn
       ),
     );
     renderApp(<RolesScreen />);
+    await expandAll();
     fireEvent.click(
       await screen.findByRole('checkbox', { name: 'Nhân viên kinh doanh · Vai trò & quyền: Sửa' }),
     );
@@ -118,20 +127,39 @@ describe('RolesScreen — ma trận vai trò × quyền (I-03, mockup Cấu hìn
     expect(screen.getByText('Có thay đổi chưa lưu')).toBeInTheDocument();
   });
 
-  it('nhóm thu gọn / mở rộng; lọc theo tên quyền; không khớp → Xóa lọc', async () => {
+  it('mặc định mọi nhóm đóng; bấm tên nhóm mở / gọn; Mở rộng / Thu gọn tất cả; lọc theo tên quyền', async () => {
     renderApp(<RolesScreen />);
     const group = await screen.findByRole('button', { name: 'Khách hàng' });
-    expect(group).toHaveAttribute('aria-expanded', 'true');
-    fireEvent.click(group);
     expect(group).toHaveAttribute('aria-expanded', 'false');
+    expect(screen.getByRole('button', { name: 'Tồn kho' })).toHaveAttribute(
+      'aria-expanded',
+      'false',
+    );
     expect(
       screen.queryByRole('checkbox', { name: 'Nhân viên kinh doanh · Khách hàng: Xem' }),
     ).not.toBeInTheDocument();
+    // ô "cả nhóm" vẫn có khi nhóm đóng
+    expect(
+      screen.getByRole('checkbox', { name: 'Nhân viên kinh doanh · cả nhóm Khách hàng' }),
+    ).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole('button', { name: /Mở rộng tất cả/ }));
-    expect(screen.getByRole('button', { name: 'Khách hàng' })).toHaveAttribute(
+    fireEvent.click(group);
+    expect(group).toHaveAttribute('aria-expanded', 'true');
+    expect(
+      screen.getByRole('checkbox', { name: 'Nhân viên kinh doanh · Khách hàng: Xem' }),
+    ).toBeInTheDocument();
+    fireEvent.click(group);
+    expect(group).toHaveAttribute('aria-expanded', 'false');
+
+    await expandAll();
+    expect(screen.getByRole('button', { name: 'Tồn kho' })).toHaveAttribute(
       'aria-expanded',
       'true',
+    );
+    fireEvent.click(screen.getByRole('button', { name: /Thu gọn tất cả/ }));
+    expect(screen.getByRole('button', { name: 'Tồn kho' })).toHaveAttribute(
+      'aria-expanded',
+      'false',
     );
 
     fireEvent.change(screen.getByRole('searchbox', { name: 'Lọc quyền' }), {
@@ -150,6 +178,7 @@ describe('RolesScreen — ma trận vai trò × quyền (I-03, mockup Cấu hìn
 
   it('"Chỉ chỗ đã đổi" chỉ hiện dòng có thay đổi', async () => {
     renderApp(<RolesScreen />);
+    await expandAll();
     fireEvent.click(
       await screen.findByRole('checkbox', { name: 'Nhân viên kinh doanh · Vai trò & quyền: Sửa' }),
     );
@@ -165,6 +194,7 @@ describe('RolesScreen — ma trận vai trò × quyền (I-03, mockup Cấu hìn
 
   it('không có role.update → checkbox khóa, không có nút lưu / thêm', async () => {
     renderApp(<RolesScreen />, { me: { ...ME_SALE, permissions: ['role.read'] } });
+    await expandAll();
     const cell = await screen.findByRole('checkbox', {
       name: 'Nhân viên kinh doanh · Khách hàng: Xem',
     });
