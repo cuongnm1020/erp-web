@@ -6,6 +6,11 @@ export type ReceiptListRow = components['schemas']['ReceiptListRowDto'];
 export type ReceiptListResponse = components['schemas']['ReceiptListResponseDto'];
 export type ReceiptDetail = components['schemas']['ReceiptDetailDto'];
 export type ReceiptMovement = components['schemas']['ReceiptMovementDto'];
+export type ReceiptContainers = components['schemas']['ReceiptContainersDto'];
+export type ReceiptContainer = components['schemas']['ReceiptContainerDto'];
+export type ReceiptContainersParams = NonNullable<
+  operations['ReceivingController_listContainers']['parameters']['query']
+>;
 export type ReceiptStatus = ReceiptDetail['status'];
 /** Tiến độ nghiệp vụ (2026-10-20): NEW · PUTTING_AWAY · AWAITING_COST · COMPLETED · CANCELLED. */
 export type ReceiptStage = ReceiptDetail['stage'];
@@ -23,6 +28,8 @@ export const receiptKeys = {
   list: (params: ReceiptListParams) => [...receiptKeys.lists(), params] as const,
   detail: (id: string) => [...receiptKeys.all, 'detail', id] as const,
   movements: (id: string) => [...receiptKeys.all, 'detail', id, 'movements'] as const,
+  containers: (id: string, p: ReceiptContainersParams) =>
+    [...receiptKeys.all, 'detail', id, 'containers', p] as const,
 };
 
 /** GET /goods-receipts — danh sách + statusCounts cho dải tab; cần stock.read. */
@@ -39,6 +46,22 @@ export function useReceipt(id: string) {
     queryKey: receiptKeys.detail(id),
     queryFn: () => unwrap(api.GET('/goods-receipts/{id}', { params: { path: { id } } })),
     enabled: id !== '',
+  });
+}
+
+/**
+ * GET /goods-receipts/:id/containers — thùng chứa hàng của phiếu (2026-10-25): đã cất / chưa cất,
+ * gom theo vị trí, một trang danh sách theo `view` / `q` (lọc ở server, luật 8).
+ */
+export function useReceiptContainers(id: string, params: ReceiptContainersParams) {
+  return useQuery({
+    queryKey: receiptKeys.containers(id, params),
+    queryFn: () =>
+      unwrap(
+        api.GET('/goods-receipts/{id}/containers', { params: { path: { id }, query: params } }),
+      ),
+    enabled: id !== '',
+    placeholderData: (prev) => prev,
   });
 }
 

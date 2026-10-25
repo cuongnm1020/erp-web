@@ -7,9 +7,11 @@
  * - `A5_LANDSCAPE`: một mã QR / barcode sản phẩm cỡ lớn trên A5 ngang.
  * - `WAYBILL_100x75` / `WAYBILL_75x100`: nhãn vận đơn ERP tự in cho máy in nhiệt 3 inch
  *   (tem 100×75 mm), ngang / dọc (2026-10-13).
+ * - `LPN_35x22`: tem thùng của phiếu nhập (2026-10-25) — cuộn 2 tem nằm ngang, mỗi tem 35×22 mm,
+ *   khe 2 mm (khổ cuộn 72 mm); một "trang" = một hàng 2 tem; tem CHỈ có mã vạch.
  */
 export type LabelSizeId =
-  'SKU_50x30' | 'A6' | 'A5' | 'A5_LANDSCAPE' | 'WAYBILL_100x75' | 'WAYBILL_75x100';
+  'SKU_50x30' | 'LPN_35x22' | 'A6' | 'A5' | 'A5_LANDSCAPE' | 'WAYBILL_100x75' | 'WAYBILL_75x100';
 
 export interface LabelSize {
   id: LabelSizeId;
@@ -31,6 +33,14 @@ export const LABEL_SIZES: Record<LabelSizeId, LabelSize> = {
     columns: 2,
     labelWidthMm: 50,
     labelHeightMm: 30,
+  },
+  LPN_35x22: {
+    id: 'LPN_35x22',
+    label: 'Tem thùng 35×22 mm · 2 tem / hàng',
+    pageSize: '72mm 22mm',
+    columns: 2,
+    labelWidthMm: 35,
+    labelHeightMm: 22,
   },
   A6: { id: 'A6', label: 'A6 dọc', pageSize: 'A6 portrait', columns: 1 },
   A5: { id: 'A5', label: 'A5 dọc', pageSize: 'A5 portrait', columns: 1 },

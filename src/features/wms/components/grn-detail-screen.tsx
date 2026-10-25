@@ -1,7 +1,16 @@
 'use client';
 
 import Decimal from 'decimal.js';
-import { AlertCircle, Box, Coins, CopyPlus, Lock, Printer } from 'lucide-react';
+import {
+  AlertCircle,
+  Box,
+  ChevronDown,
+  ChevronRight,
+  Coins,
+  CopyPlus,
+  Lock,
+  Printer,
+} from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { MoneyInput } from '@/components/data/form';
@@ -25,6 +34,7 @@ import { useAbility } from '@/lib/permission';
 import { usePrint } from '@/lib/print';
 import { LpnPrintSheet, type LpnLabelData } from './lpn-label';
 import { GRN_STAGE } from './grn-stage';
+import { GrnContainers } from './grn-containers';
 import { GrnWaitingMatch } from './grn-waiting-match';
 import {
   useCancelReceipt,
@@ -33,6 +43,7 @@ import {
   useReceiptMovements,
   useSetReceiptCosts,
   type ReceiptDetail,
+  type ReceiptMovement,
 } from '../api/use-receipts';
 
 /**
@@ -79,12 +90,129 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
   );
 }
 
+/** Một lần ghi: các movement cùng loại / SKU / lô / vị trí / chiều / người / thời điểm. */
+interface MovementGroup {
+  key: string;
+  first: ReceiptMovement;
+  rows: ReceiptMovement[];
+  qty: Decimal;
+}
+
+/**
+ * Gom các dòng sổ cái của CÙNG một lần ghi (2026-10-25): phiếu nhập theo thùng ghi mỗi thùng một
+ * movement — 225 dòng "+20" giống hệt nhau thành một dòng "225 thùng · +4.500". Chỉ gom lúc hiển
+ * thị; sổ cái không đổi (append-only). Giữ thứ tự thời gian của dòng đầu mỗi nhóm.
+ */
+export function groupMovements(rows: readonly ReceiptMovement[]): MovementGroup[] {
+  const out = new Map<string, MovementGroup>();
+  for (const m of rows) {
+    const key = [
+      m.createdAt.slice(0, 19),
+      m.movementType,
+      m.skuCode,
+      m.lotNumber ?? '',
+      m.locationCode,
+      m.qtyDelta.startsWith('-') ? '-' : '+',
+      m.actorName ?? '',
+    ].join('|');
+    const g = out.get(key);
+    if (g) {
+      g.rows.push(m);
+      g.qty = g.qty.plus(m.qtyDelta);
+    } else out.set(key, { key, first: m, rows: [m], qty: new Decimal(m.qtyDelta) });
+  }
+  return [...out.values()];
+}
+
+const GROUP_PAGE = 50;
+
+function MovementGroupRows({ g }: { g: MovementGroup }) {
+  const [open, setOpen] = useState(false);
+  const [shown, setShown] = useState(GROUP_PAGE);
+  const m = g.first;
+  const many = g.rows.length > 1;
+  const boxes = g.rows.filter((r) => r.containerBarcode).length;
+  const signed = (q: string) => `${q.startsWith('-') ? '' : '+'}${formatQuantity(q)}`;
+  return (
+    <>
+      <TableRow className={cn(open && 'bg-muted')}>
+        <TableCell className="w-8 px-1.5 py-1.5">
+          {many ? (
+            <Button
+              variant="ghost"
+              size="icon-sm"
+              aria-expanded={open}
+              aria-label={open ? `Thu gọn ${g.rows.length} dòng` : `Mở ${g.rows.length} dòng`}
+              onClick={() => setOpen((o) => !o)}
+            >
+              {open ? <ChevronDown aria-hidden /> : <ChevronRight aria-hidden />}
+            </Button>
+          ) : null}
+        </TableCell>
+        <TableCell className="px-2.5 py-1.5 text-muted-foreground">
+          {formatDateTime(m.createdAt, { seconds: true })}
+        </TableCell>
+        <TableCell className="px-2.5 py-1.5">
+          <StatusBadge tone={m.qtyDelta.startsWith('-') ? 'warn' : 'ok'}>
+            {MOVEMENT_LABEL[m.movementType] ?? m.movementType}
+          </StatusBadge>
+        </TableCell>
+        <TableCell className="px-2.5 py-1.5 font-mono text-xs">{m.skuCode}</TableCell>
+        <TableCell className="px-2.5 py-1.5 font-mono text-xs">{m.lotNumber ?? '—'}</TableCell>
+        <TableCell className="px-2.5 py-1.5 font-mono text-xs">{m.locationCode}</TableCell>
+        <TableCell className="px-2.5 py-1.5 text-xs">
+          {many ? (
+            <span className="font-semibold">
+              {boxes || g.rows.length} {boxes ? 'thùng' : 'dòng'}
+            </span>
+          ) : (
+            <span className="font-mono">{m.containerBarcode ?? '—'}</span>
+          )}
+        </TableCell>
+        <TableCell className="px-2.5 py-1.5 text-right font-semibold tabular-nums">
+          {signed(g.qty.toFixed())}
+        </TableCell>
+        <TableCell className="px-2.5 py-1.5 text-muted-foreground">{m.actorName ?? '—'}</TableCell>
+      </TableRow>
+      {open
+        ? g.rows.slice(0, shown).map((r) => (
+            <TableRow key={r.id} className="text-muted-foreground">
+              <TableCell />
+              <TableCell colSpan={5} className="py-1 pl-6 pr-2.5" />
+              <TableCell className="px-2.5 py-1 font-mono text-xs text-foreground">
+                {r.containerBarcode ?? '—'}
+              </TableCell>
+              <TableCell className="px-2.5 py-1 text-right tabular-nums">
+                {signed(r.qtyDelta)}
+              </TableCell>
+              <TableCell />
+            </TableRow>
+          ))
+        : null}
+      {open && shown < g.rows.length ? (
+        <TableRow>
+          <TableCell />
+          <TableCell colSpan={8} className="py-1.5 pl-6">
+            <Button size="sm" variant="outline" onClick={() => setShown((n) => n + GROUP_PAGE)}>
+              Hiện thêm {Math.min(GROUP_PAGE, g.rows.length - shown)} dòng (còn{' '}
+              {g.rows.length - shown})
+            </Button>
+          </TableCell>
+        </TableRow>
+      ) : null}
+    </>
+  );
+}
+
 function Movements({ id }: { id: string }) {
   const query = useReceiptMovements(id, true);
   return (
     <section className="overflow-hidden rounded-md border bg-card">
       <header className="border-b px-3 py-2 text-sm font-semibold">
         Chuyển động tồn đã ghi (sổ cái · chỉ đọc · append-only)
+        <span className="ml-2 text-xs font-normal text-muted-foreground">
+          gom các dòng cùng lần ghi — mở một nhóm để xem từng thùng
+        </span>
       </header>
       <QueryState
         query={query}
@@ -97,6 +225,9 @@ function Movements({ id }: { id: string }) {
             <Table>
               <TableHeader>
                 <TableRow className="bg-muted hover:bg-muted">
+                  <TableHead className="w-8 px-1.5 text-xs">
+                    <span className="sr-only">Mở rộng</span>
+                  </TableHead>
                   <TableHead className="px-2.5 text-xs">Thời gian</TableHead>
                   <TableHead className="px-2.5 text-xs">Loại</TableHead>
                   <TableHead className="px-2.5 text-xs">SKU</TableHead>
@@ -108,35 +239,8 @@ function Movements({ id }: { id: string }) {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {rows.map((m) => (
-                  <TableRow key={m.id}>
-                    <TableCell className="px-2.5 py-1.5 text-muted-foreground">
-                      {formatDateTime(m.createdAt, { seconds: true })}
-                    </TableCell>
-                    <TableCell className="px-2.5 py-1.5">
-                      <StatusBadge tone={m.qtyDelta.startsWith('-') ? 'warn' : 'ok'}>
-                        {MOVEMENT_LABEL[m.movementType] ?? m.movementType}
-                      </StatusBadge>
-                    </TableCell>
-                    <TableCell className="px-2.5 py-1.5 font-mono text-xs">{m.skuCode}</TableCell>
-                    <TableCell className="px-2.5 py-1.5 font-mono text-xs">
-                      {m.lotNumber ?? '—'}
-                    </TableCell>
-                    <TableCell className="px-2.5 py-1.5 font-mono text-xs">
-                      {m.locationCode}
-                    </TableCell>
-                    {/* Dòng đóng gói: mỗi thùng một movement — mã LPN để phân biệt các dòng cùng SL. */}
-                    <TableCell className="px-2.5 py-1.5 font-mono text-xs">
-                      {m.containerBarcode ?? '—'}
-                    </TableCell>
-                    <TableCell className="px-2.5 py-1.5 text-right tabular-nums">
-                      {m.qtyDelta.startsWith('-') ? '' : '+'}
-                      {formatQuantity(m.qtyDelta)}
-                    </TableCell>
-                    <TableCell className="px-2.5 py-1.5 text-muted-foreground">
-                      {m.actorName ?? '—'}
-                    </TableCell>
-                  </TableRow>
+                {groupMovements(rows).map((g) => (
+                  <MovementGroupRows key={g.key} g={g} />
                 ))}
               </TableBody>
             </Table>
@@ -235,6 +339,8 @@ function DetailBody({
     printer.print();
   };
   const packed = receipt.lines.filter((l) => l.packaging);
+  // "In tất cả tem thùng" luôn in đủ mọi thùng + vỏ pallet của mọi dòng đóng gói (user chốt).
+  const allLabels = packed.flatMap(labelsOf);
   const editing = canCost && cost.editing;
 
   /** Thành tiền theo ô đang nhập (hiển thị tức thì) hoặc theo giá đã lưu. */
@@ -258,7 +364,7 @@ function DetailBody({
 
   return (
     <div className="flex flex-col gap-3">
-      {labels.length ? <LpnPrintSheet labels={labels} printer={printer} /> : null}
+      {labels.length ? <LpnPrintSheet labels={labels} printer={printer} size="LPN_35x22" /> : null}
       <StageBanner receipt={receipt} />
 
       <div className="grid gap-3 rounded-md border bg-card p-3 sm:grid-cols-4">
@@ -297,6 +403,21 @@ function DetailBody({
         <Field label="Ghi chú">{receipt.note ?? '—'}</Field>
       </div>
 
+      {packed.length && receipt.status !== 'CANCELLED' ? (
+        <GrnContainers
+          receiptId={receipt.id}
+          labelCount={allLabels.length}
+          onPrintAll={() => {
+            setLabels(allLabels);
+            printer.print();
+          }}
+          onPrintOne={(barcode) => {
+            setLabels([{ barcode, typeCode: '', line1: '' }]);
+            printer.print();
+          }}
+        />
+      ) : null}
+
       {receipt.status !== 'CANCELLED' ? <GrnWaitingMatch receiptId={receipt.id} /> : null}
 
       <section className="overflow-hidden rounded-md border bg-card">
@@ -304,19 +425,6 @@ function DetailBody({
           <span>
             Dòng nhập · {receipt.lineCount} dòng · {formatQuantity(receipt.totalQty)} đơn vị cơ bản
           </span>
-          {packed.length ? (
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => {
-                setLabels(packed.flatMap(labelsOf));
-                printer.print();
-              }}
-            >
-              <Printer aria-hidden />
-              In tất cả tem thùng
-            </Button>
-          ) : null}
         </header>
         <div className="overflow-x-auto">
           <Table>

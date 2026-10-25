@@ -622,8 +622,13 @@ describe('GrnDetailScreen — GET /goods-receipts/:id', () => {
     renderApp(<GrnDetailScreen id="r-1" />);
     expect(await screen.findByText(/Chứng từ bất biến/)).toBeInTheDocument();
     expect(await screen.findByText('B-01-01-A')).toBeInTheDocument();
-    expect(screen.getAllByText('+ Nhập')).toHaveLength(3);
+    // 2 thùng cùng lần ghi ở NHAN gom một dòng "2 thùng · +60"; mở ra mới thấy từng thùng.
+    expect(screen.getAllByText('+ Nhập')).toHaveLength(2);
     expect(screen.getByRole('columnheader', { name: 'Thùng' })).toBeInTheDocument();
+    expect(screen.getByText('2 thùng')).toBeInTheDocument();
+    expect(screen.getByText('+60')).toBeInTheDocument();
+    expect(screen.queryByText('LPN2608-00001')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Mở 2 dòng' }));
     expect(screen.getByText('LPN2608-00001')).toBeInTheDocument();
     expect(screen.getByText('LPN2608-00002')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Post phiếu' })).not.toBeInTheDocument();
@@ -952,12 +957,129 @@ describe('GrnDetailScreen — đóng gói (PLAN-packaging-hierarchy D)', () => {
     expect(await screen.findByText(/2 CARTON ×/)).toBeInTheDocument();
     expect(screen.getByText('SUPPLIER-PLT-1')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'In tem thùng dòng 1' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'In tất cả tem thùng' })).toBeInTheDocument();
+    // Nút in tất cả nằm ở khối "Thùng của phiếu", nêu số tem (2 thùng + 1 vỏ pallet).
+    expect(
+      await screen.findByRole('button', { name: 'In tất cả tem thùng (3)' }),
+    ).toBeInTheDocument();
   });
   it('dòng hàng rời → "Hàng rời", không có nút in', async () => {
     server.use(http.get('/api/goods-receipts/:id', () => HttpResponse.json(DETAIL_DRAFT)));
     renderApp(<GrnDetailScreen id="r-1" />);
     expect(await screen.findByText('Hàng rời')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /In tem/ })).toBeNull();
+  });
+});
+
+describe('Thùng của phiếu + tem 35×22 (2026-10-25)', () => {
+  const CONTAINERS = {
+    total: 225,
+    stored: 1,
+    pending: 224,
+    storedQty: '20',
+    pendingQty: '4480',
+    byLocation: [
+      {
+        locationId: 'loc-nhan',
+        locationCode: 'NHAN',
+        stored: false,
+        count: 224,
+        qty: '4480',
+        firstBarcode: 'LPN2610-00037',
+        lastBarcode: 'LPN2610-00260',
+      },
+      {
+        locationId: 'loc-a021',
+        locationCode: 'A-02-1',
+        stored: true,
+        count: 1,
+        qty: '20',
+        firstBarcode: 'LPN2610-00036',
+        lastBarcode: 'LPN2610-00036',
+      },
+    ],
+    itemsTotal: 224,
+    items: [
+      {
+        id: 'c-37',
+        barcode: 'LPN2610-00037',
+        typeCode: 'CARTON',
+        locationCode: 'NHAN',
+        stored: false,
+        status: 'OPEN',
+        qty: '20',
+        storedAt: null,
+      },
+    ],
+  };
+
+  it('3 ô đã cất / chưa cất / tiến độ, bảng theo vị trí, tab lọc gửi view lên server, in lại 1 tem chỉ có mã vạch', async () => {
+    const asked: string[] = [];
+    server.use(
+      http.get('/api/goods-receipts/:id', () => HttpResponse.json(DETAIL_PACKED)),
+      http.get('/api/goods-receipts/:id/containers', ({ request }) => {
+        asked.push(new URL(request.url).search);
+        return HttpResponse.json(CONTAINERS);
+      }),
+    );
+    renderApp(<GrnDetailScreen id="r-1" />);
+    expect(await screen.findByText('224 thùng')).toBeInTheDocument();
+    expect(screen.getByText('1 / 225')).toBeInTheDocument();
+    expect(screen.getByText('LPN2610-00037 → LPN2610-00260')).toBeInTheDocument();
+    expect(asked[0]).toContain('view=PENDING');
+
+    fireEvent.click(screen.getByRole('tab', { name: 'Tất cả 225' }));
+    await waitFor(() => expect(asked.at(-1)).not.toContain('view='));
+
+    fireEvent.click(screen.getByRole('button', { name: 'In lại tem thùng LPN2610-00037' }));
+    const label = await waitFor(() => {
+      const el = document.querySelector('[data-lpn-label="LPN2610-00037"]');
+      if (!el) throw new Error('chưa có tem');
+      return el;
+    });
+    // Tem 35×22 chỉ có mã vạch: không chữ mã, không SKU.
+    expect(label.textContent?.trim()).toBe('');
+    expect(label.querySelector('text')).toBeNull();
+    expect(label.querySelector('[role="img"]')).toHaveAttribute(
+      'aria-label',
+      'Mã vạch LPN2610-00037',
+    );
+    expect(document.querySelector('[data-print-size="LPN_35x22"]')).not.toBeNull();
+  });
+});
+
+describe('groupMovements — gom sổ cái theo lần ghi', () => {
+  it('cùng thời điểm / loại / SKU / vị trí / chiều / người → một nhóm, cộng SL; khác vị trí tách nhóm', async () => {
+    const { groupMovements } = await import('./components/grn-detail-screen');
+    const base = {
+      createdAt: '2026-10-24T00:00:00.123Z',
+      movementType: 'RECEIPT',
+      skuCode: 'SP-0310',
+      lotNumber: null,
+      locationCode: 'NHAN',
+      qtyDelta: '20',
+      actorName: 'Quản trị hệ thống',
+    };
+    const rows = [
+      ...Array.from({ length: 225 }, (_, i) => ({
+        ...base,
+        id: String(i),
+        containerBarcode: `LPN-${i}`,
+      })),
+      { ...base, id: 'p1', movementType: 'PUT_AWAY', qtyDelta: '-20', containerBarcode: 'LPN-0' },
+      {
+        ...base,
+        id: 'p2',
+        movementType: 'PUT_AWAY',
+        locationCode: 'A-02-1',
+        containerBarcode: 'LPN-0',
+      },
+    ];
+    const g = groupMovements(rows);
+    expect(g.map((x) => [x.first.movementType, x.first.locationCode, x.rows.length])).toEqual([
+      ['RECEIPT', 'NHAN', 225],
+      ['PUT_AWAY', 'NHAN', 1],
+      ['PUT_AWAY', 'A-02-1', 1],
+    ]);
+    expect(g[0]!.qty.toFixed()).toBe('4500');
   });
 });
