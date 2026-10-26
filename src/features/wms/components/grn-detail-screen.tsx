@@ -402,24 +402,6 @@ function DetailBody({
         ) : null}
         <Field label="Ghi chú">{receipt.note ?? '—'}</Field>
       </div>
-
-      {packed.length && receipt.status !== 'CANCELLED' ? (
-        <GrnContainers
-          receiptId={receipt.id}
-          labelCount={allLabels.length}
-          onPrintAll={() => {
-            setLabels(allLabels);
-            printer.print();
-          }}
-          onPrintOne={(barcode) => {
-            setLabels([{ barcode, typeCode: '', line1: '' }]);
-            printer.print();
-          }}
-        />
-      ) : null}
-
-      {receipt.status !== 'CANCELLED' ? <GrnWaitingMatch receiptId={receipt.id} /> : null}
-
       <section className="overflow-hidden rounded-md border bg-card">
         <header className="flex items-center justify-between border-b px-3 py-2 text-sm font-semibold">
           <span>
@@ -549,6 +531,23 @@ function DetailBody({
           </Table>
         </div>
       </section>
+
+      {packed.length && receipt.status !== 'CANCELLED' ? (
+        <GrnContainers
+          receiptId={receipt.id}
+          labelCount={allLabels.length}
+          onPrintAll={() => {
+            setLabels(allLabels);
+            printer.print();
+          }}
+          onPrintOne={(barcode) => {
+            setLabels([{ barcode, typeCode: '', line1: '' }]);
+            printer.print();
+          }}
+        />
+      ) : null}
+
+      {receipt.status !== 'CANCELLED' ? <GrnWaitingMatch receiptId={receipt.id} /> : null}
 
       {receipt.status === 'POSTED' ? <Movements id={receipt.id} /> : null}
     </div>
