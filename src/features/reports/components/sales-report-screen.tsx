@@ -3,6 +3,7 @@
 import { RefreshCw, X } from 'lucide-react';
 import { DateRangePicker } from '@/components/data/date-range-picker';
 import { StaffSelect } from '@/components/data/form';
+import { PancakeShopSelect } from '@/components/data/pancake-shop-select';
 import { ForbiddenState } from '@/components/data/states';
 import { PageHeader } from '@/components/layout/page-header';
 import { Button } from '@/components/ui/button';
@@ -152,15 +153,15 @@ export function SalesReportScreen() {
           </label>
         ) : null}
         {shopOptions.length > 0 ? (
-          <FilterSelect
-            label="POS Pancake"
-            value={shopId}
-            options={shopOptions.map((s) => ({
-              value: s.shopId,
-              label: s.shopName ?? `POS ${s.shopId}`,
-            }))}
-            onChange={(v) => setFilters({ pancakeShopId: v })}
-          />
+          <label className="flex flex-col gap-0.5 text-xs text-muted-foreground">
+            POS Pancake
+            <PancakeShopSelect
+              shops={shopOptions}
+              value={shopId}
+              allLabel="Tất cả"
+              onChange={(v) => setFilters({ pancakeShopId: v })}
+            />
+          </label>
         ) : null}
         {showTeamChip ? (
           <FilterChip

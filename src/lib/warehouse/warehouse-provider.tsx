@@ -11,6 +11,7 @@ import {
 } from 'react';
 import type { AuthMe } from '@/lib/permission';
 import {
+  ALL_WAREHOUSES,
   canSelectAll,
   getSelectedWarehouse,
   restoreWarehouse,
@@ -27,6 +28,12 @@ export interface WarehouseContextValue {
   /** uuid kho, `ALL_WAREHOUSES`, hoặc null = chưa được cấp kho nào. */
   selected: string | null;
   allowAll: boolean;
+  /**
+   * Kho điền sẵn cho form cần MỘT kho (tạo đơn, phiếu nhập, kiểm kê): kho đang chọn; đang "Tất cả
+   * kho" (mặc định sau đăng nhập từ 2026-10-26) → kho mặc định của tài khoản nếu được phép; '' = để
+   * người dùng chọn.
+   */
+  formWarehouseId: string;
   /** false khi /auth/me chưa về — chưa biết kho được phép. */
   ready: boolean;
   select: (value: string) => void;
@@ -36,6 +43,7 @@ const WarehouseContext = createContext<WarehouseContextValue>({
   options: [],
   selected: null,
   allowAll: false,
+  formWarehouseId: '',
   ready: false,
   select: () => undefined,
 });
@@ -84,6 +92,12 @@ export function WarehouseProvider({
       options,
       selected,
       allowAll: canSelectAll({ optionIds: options.map((o) => o.id) }),
+      formWarehouseId:
+        selected && selected !== ALL_WAREHOUSES
+          ? selected
+          : access?.defaultWarehouseId && access.optionIds.includes(access.defaultWarehouseId)
+            ? access.defaultWarehouseId
+            : '',
       ready: access !== null,
       select,
     }),

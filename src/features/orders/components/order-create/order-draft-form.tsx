@@ -24,6 +24,7 @@ import {
   FormLabel,
   FormMessage,
   MoneyInput,
+  type EntitySearchResult,
 } from '@/components/data/form';
 import { Button } from '@/components/ui/button';
 import {
@@ -42,7 +43,12 @@ import { messageFor } from '@/lib/error-messages';
 import { formatMoney } from '@/lib/format';
 import { useWarehouse } from '@/lib/warehouse';
 import { useSameDayOrders, type SkuQuickRow } from '../../api/use-order-create';
-import { useCreateOrder, usePosShopSearch } from '../../api/use-orders';
+import {
+  useCreateOrder,
+  useFacebookPageSearch,
+  usePancakeShops,
+  usePosShopSearch,
+} from '../../api/use-orders';
 import { orderChannelLabel, orderSourceLabel } from '../../labels';
 import {
   createOrderSchema,
@@ -547,8 +553,25 @@ function HeaderField({ label, children }: { label: string; children: ReactNode }
 }
 
 /**
- * Dải "Thông tin đơn" đầu màn (redesign 2026-10-22): Kênh · Nguồn (+ POS khi Facebook) · Kho xuất ·
- * NV xử lý · Thẻ trên một hàng, nhãn trên ô — trước nằm rải ở đầu card Sản phẩm + card Thông tin.
+ * Hook tìm page cho EntityPicker theo POS đang chọn — một hàm cố định cho mỗi POS (EntityPicker gọi
+ * `useSearch` như hook, đổi hàm giữa các lần render là đổi hook).
+ */
+const pageSearchByPos = new Map<string, (q: string) => EntitySearchResult>();
+function pageSearchFor(posShopId: string): (q: string) => EntitySearchResult {
+  let fn = pageSearchByPos.get(posShopId);
+  if (!fn) {
+    fn = function usePageSearch(q: string) {
+      return useFacebookPageSearch(q, posShopId);
+    };
+    pageSearchByPos.set(posShopId, fn);
+  }
+  return fn;
+}
+
+/**
+ * Dải "Thông tin đơn" đầu màn (redesign 2026-10-22): Kênh · Nguồn · POS · Page · Kho xuất · NV xử lý ·
+ * Thẻ trên một hàng, nhãn trên ô. POS và Page tách khỏi Nguồn (2026-10-26, mockup
+ * 3r3H9T9rT1URgjzyQuuUwV màn 3): ba ô độc lập, đều không bắt buộc.
  */
 function HeaderSelects({
   form,
@@ -557,10 +580,14 @@ function HeaderSelects({
   form: UseFormReturn<CreateOrderValues>;
   warehouseOptions: { id: string; name: string }[];
 }) {
-  // Nguồn Facebook → chọn POS (shop Pancake đã liên kết) của đơn (2026-10-21).
-  const source = useWatch({ control: form.control, name: 'source' });
+  const posShopId = useWatch({ control: form.control, name: 'posShopId' }) ?? '';
+  // Ô Page: page của POS đang chọn lên trước.
+  const usePageSearch = pageSearchFor(posShopId);
+  // POS tự điền từ page (không qua ô chọn) vẫn hiện tên, không hiện mã trần.
+  const shops = usePancakeShops();
+  const posLabel = shops.data?.find((s) => s.shopId === posShopId)?.shopName ?? undefined;
   return (
-    <div className="grid grid-cols-2 gap-x-2.5 gap-y-2 sm:grid-cols-3 xl:grid-cols-5">
+    <div className="grid grid-cols-2 gap-x-2.5 gap-y-2 sm:grid-cols-4 xl:grid-cols-7">
       <HeaderField label="Kênh">
         <FormField
           control={form.control}
@@ -612,28 +639,58 @@ function HeaderSelects({
             </FormItem>
           )}
         />
-        {source === 'FACEBOOK' ? (
-          <FormField
-            control={form.control}
-            name="posShopId"
-            render={({ field }) => (
-              <FormItem>
-                <FormControl>
-                  <EntityPicker
-                    value={field.value ?? ''}
-                    onChange={(id) => field.onChange(id)}
-                    useSearch={usePosShopSearch}
-                    placeholder="Chọn POS"
-                    searchPlaceholder="Tìm POS theo tên, mã…"
-                    emptyText="Không có POS đã liên kết"
-                    clearable
-                    aria-label="POS"
-                  />
-                </FormControl>
-              </FormItem>
-            )}
-          />
-        ) : null}
+      </HeaderField>
+      <HeaderField label="POS">
+        <FormField
+          control={form.control}
+          name="posShopId"
+          render={({ field }) => (
+            <FormItem>
+              <FormControl>
+                <EntityPicker
+                  value={field.value ?? ''}
+                  onChange={(id) => field.onChange(id)}
+                  useSearch={usePosShopSearch}
+                  selectedLabel={posLabel}
+                  placeholder="Không chọn POS"
+                  searchPlaceholder="Tìm POS theo tên, mã…"
+                  emptyText="Không có POS đã liên kết"
+                  clearable
+                  aria-label="POS"
+                />
+              </FormControl>
+            </FormItem>
+          )}
+        />
+      </HeaderField>
+      <HeaderField label="Page">
+        <FormField
+          control={form.control}
+          name="facebookPageId"
+          render={({ field }) => (
+            <FormItem>
+              <FormControl>
+                <EntityPicker
+                  value={field.value ?? ''}
+                  onChange={(id, option) => {
+                    field.onChange(id);
+                    // Page chỉ thuộc một POS và ô POS đang trống → tự điền POS (bỏ được bằng ×).
+                    const shops = option?.meta?.shopIds?.split(',').filter(Boolean) ?? [];
+                    if (id && !form.getValues('posShopId') && shops.length === 1) {
+                      form.setValue('posShopId', shops[0], { shouldDirty: true });
+                    }
+                  }}
+                  useSearch={usePageSearch}
+                  placeholder="Không chọn page"
+                  searchPlaceholder="Tìm page…"
+                  emptyText="Không có page khớp"
+                  clearable
+                  aria-label="Page Facebook"
+                />
+              </FormControl>
+            </FormItem>
+          )}
+        />
       </HeaderField>
       <HeaderField label="Kho xuất">
         <FormField

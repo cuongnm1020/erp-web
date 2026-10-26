@@ -612,6 +612,29 @@ describe('Tab Nhân viên × POS Pancake', () => {
     expect(lastUrl().get('pancakeShopId')).toBeNull();
   });
 
+  it('ô POS Pancake có ô tìm theo tên shop, không phân biệt dấu — cùng ô với danh sách đơn (2026-10-26)', async () => {
+    search = `from=${RANGE.from}&to=${RANGE.to}`;
+    server.use(
+      http.get('/api/pancake-sync/shops', () =>
+        HttpResponse.json([
+          { shopId: '111', shopName: 'TNNV - T1 - Lân Đỏ B1', isActive: true },
+          { shopId: '222', shopName: 'TNNV - T1 - Rooting 500ml', isActive: true },
+          { shopId: '333', shopName: 'Shop cũ', isActive: false },
+        ]),
+      ),
+    );
+    renderApp(<SalesReportScreen />, { me: ME_POS });
+    fireEvent.click(await screen.findByRole('combobox', { name: 'POS Pancake' }));
+    const input = await screen.findByPlaceholderText('Tìm pos pancake…');
+    expect(await screen.findByRole('option', { name: 'Shop cũ (đã ngắt)' })).toBeInTheDocument();
+    fireEvent.change(input, { target: { value: 'lan do' } });
+    await waitFor(() =>
+      expect(screen.queryByRole('option', { name: 'TNNV - T1 - Rooting 500ml' })).toBeNull(),
+    );
+    fireEvent.click(screen.getByRole('option', { name: 'TNNV - T1 - Lân Đỏ B1' }));
+    await waitFor(() => expect(lastUrl().get('pancakeShopId')).toBe('111'));
+  });
+
   it('không có quyền xem đơn / API POS lỗi → không có ô chọn POS; pancakeShopId sai định dạng bị bỏ', async () => {
     search = `from=${RANGE.from}&to=${RANGE.to}&pancakeShopId=abc`;
     const calls: URLSearchParams[] = [];

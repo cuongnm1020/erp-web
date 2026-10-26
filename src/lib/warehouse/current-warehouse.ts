@@ -5,7 +5,8 @@
  * - ô chọn kho ở sidebar đọc / đổi giá trị này qua `WarehouseProvider`.
  *
  * Giữ ở module (không phải React state) vì client API đọc nó ngoài cây React. Lưu localStorage theo
- * user để F5 giữ nguyên; đăng nhập / đăng xuất xoá → mỗi lần đăng nhập về kho mặc định (user chốt).
+ * user để F5 giữ nguyên; đăng nhập / đăng xuất xoá → mỗi lần đăng nhập về "Tất cả kho" (user chốt
+ * 2026-10-26; trước đó là kho mặc định của tài khoản). Chỉ được một kho thì về kho đó.
  */
 export const ALL_WAREHOUSES = 'all';
 export const WAREHOUSE_HEADER = 'X-Warehouse-Id';
@@ -53,7 +54,8 @@ function isValid(access: WarehouseAccess, value: string | null): value is string
 }
 
 /**
- * Chốt kho khi phiên vừa tải: lựa chọn đã lưu (nếu còn được phép) → kho mặc định → kho đầu tiên.
+ * Chốt kho khi phiên vừa tải: lựa chọn đã lưu (nếu còn được phép) → "Tất cả kho" (được nhiều kho)
+ * → kho mặc định → kho đầu tiên.
  * Đồng bộ, KHÔNG phát sự kiện — gọi lúc render để query đầu tiên của màn đã mang đúng header.
  */
 export function restoreWarehouse(access: WarehouseAccess): string | null {
@@ -63,9 +65,11 @@ export function restoreWarehouse(access: WarehouseAccess): string | null {
   } catch {
     // localStorage bị chặn — dùng kho mặc định
   }
-  const fallback = isValid(access, access.defaultWarehouseId)
-    ? access.defaultWarehouseId
-    : (access.optionIds[0] ?? null);
+  const fallback = canSelectAll(access)
+    ? ALL_WAREHOUSES
+    : isValid(access, access.defaultWarehouseId)
+      ? access.defaultWarehouseId
+      : (access.optionIds[0] ?? null);
   selected = isValid(access, stored) ? stored : fallback;
   return selected;
 }

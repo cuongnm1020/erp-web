@@ -21,6 +21,24 @@ export interface EntityOption {
   hint?: string;
   /** Dữ liệu kèm theo cho form dùng lúc chọn (component không đọc). */
   meta?: Record<string, string>;
+  /**
+   * Tiêu đề nhóm — các mục liền nhau cùng `group` hiện dưới một tiêu đề (vd "Page của POS này" /
+   * "Page khác"). Không mục nào có `group` thì danh sách không tiêu đề như cũ.
+   */
+  group?: string;
+}
+
+/** Gom các mục LIỀN NHAU cùng `group` — giữ nguyên thứ tự hook trả về. */
+function groupOptions(
+  options: readonly EntityOption[],
+): { heading?: string; items: EntityOption[] }[] {
+  const out: { heading?: string; items: EntityOption[] }[] = [];
+  for (const o of options) {
+    const last = out[out.length - 1];
+    if (last && last.heading === o.group) last.items.push(o);
+    else out.push({ heading: o.group, items: [o] });
+  }
+  return out;
 }
 
 export interface EntitySearchResult {
@@ -131,38 +149,40 @@ export const EntityPicker = React.forwardRef<HTMLButtonElement, EntityPickerProp
               ) : (
                 <CommandEmpty>{emptyText}</CommandEmpty>
               )}
-              <CommandGroup>
-                {(options ?? []).map((o) => (
-                  <CommandItem
-                    key={o.id}
-                    value={o.id}
-                    onSelect={() => {
-                      setPicked(o);
-                      onChange(o.id, o);
-                      setOpen(false);
-                    }}
-                  >
-                    <Check
-                      className={cn(
-                        'h-4 w-4 shrink-0 self-start text-primary',
-                        o.hint && 'mt-0.5',
-                        o.id === value ? 'opacity-100' : 'opacity-0',
-                      )}
-                      aria-hidden
-                    />
-                    <span className="flex min-w-0 flex-1 flex-col">
-                      <span className="truncate" title={o.label}>
-                        {o.label}
-                      </span>
-                      {o.hint ? (
-                        <span className="truncate font-mono text-xs text-muted-foreground">
-                          {o.hint}
+              {groupOptions(options ?? []).map((g, gi) => (
+                <CommandGroup key={g.heading ?? gi} heading={g.heading}>
+                  {g.items.map((o) => (
+                    <CommandItem
+                      key={o.id}
+                      value={o.id}
+                      onSelect={() => {
+                        setPicked(o);
+                        onChange(o.id, o);
+                        setOpen(false);
+                      }}
+                    >
+                      <Check
+                        className={cn(
+                          'h-4 w-4 shrink-0 self-start text-primary',
+                          o.hint && 'mt-0.5',
+                          o.id === value ? 'opacity-100' : 'opacity-0',
+                        )}
+                        aria-hidden
+                      />
+                      <span className="flex min-w-0 flex-1 flex-col">
+                        <span className="truncate" title={o.label}>
+                          {o.label}
                         </span>
-                      ) : null}
-                    </span>
-                  </CommandItem>
-                ))}
-              </CommandGroup>
+                        {o.hint ? (
+                          <span className="truncate font-mono text-xs text-muted-foreground">
+                            {o.hint}
+                          </span>
+                        ) : null}
+                      </span>
+                    </CommandItem>
+                  ))}
+                </CommandGroup>
+              ))}
             </CommandList>
           </Command>
         </PopoverContent>

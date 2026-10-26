@@ -166,6 +166,7 @@ const ORDERS: SalesOrderList = {
       product: null,
       shipment: null,
       ownerName: null,
+      facebookPageName: null,
       note: null,
       shortage: null,
     },

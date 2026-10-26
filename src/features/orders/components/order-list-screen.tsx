@@ -19,6 +19,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { BulkActionBar } from '@/components/data/bulk-action-bar';
 import { CopyButton } from '@/components/data/copy-button';
 import { CopyText } from '@/components/data/copy-text';
+import { pancakeShopLabel } from '@/components/data/pancake-shop-select';
 import { ColumnPicker, DataTable, FilterBar, type ColumnDef } from '@/components/data/data-table';
 import { RowActions, type RowActionItem } from '@/components/data/row-actions';
 import { EmptyState, ListSkeleton, QueryState } from '@/components/data/states';
@@ -59,6 +60,7 @@ import {
   useOrderListPrefs,
   useOrders,
   useCareTeamOptions,
+  useFacebookPageOptions,
   usePancakeShops,
   useSaveOrderListPrefs,
   type OrderFlow,
@@ -129,6 +131,8 @@ const DEFAULTS = {
     'itemOrigin',
     // Team CSKH lên đơn (phòng ban loại CSKH), 2026-10-24.
     'careTeamId',
+    // Page Facebook (id nối dấu phẩy, chọn nhiều), 2026-10-26 — khoá `fbPage` vì `page` là số trang.
+    'fbPage',
     // Đơn thiếu tồn một SKU (Chờ hàng, 2026-10-25) — "Xem đơn" từ màn Hàng chờ.
     'shortSkuId',
   ] as const,
@@ -232,8 +236,7 @@ const buildColumns = (
     meta: { width: 170, sortable: true },
     cell: ({ row }) => {
       const o = row.original;
-      // Nguồn (Pancake # / ERP) + sale trên MỘT dòng phụ, cắt gọn — tên đầy đủ ở title.
-      const meta = [o.pancakeOrderId ? null : 'Tạo trong ERP', o.ownerName].filter(Boolean);
+      // Dòng phụ 1: nguồn (Pancake # / ERP). Dòng phụ 2: tên sale đầy đủ, xuống dòng khi dài.
       return (
         <div className="space-y-0.5">
           <div className="flex items-center gap-1.5">
@@ -251,18 +254,23 @@ const buildColumns = (
               </span>
             ) : null}
           </div>
-          <div
-            className="max-w-40 truncate text-xs text-muted-foreground"
-            title={[o.pancakeOrderId ? `Pancake #${o.pancakeOrderId}` : null, ...meta]
-              .filter(Boolean)
-              .join(' · ')}
-          >
+          <div className="text-xs text-muted-foreground">
             {o.pancakeOrderId ? (
               <PancakeOrderLink orderId={o.pancakeOrderId} link={o.pancakeOrderLink} />
-            ) : null}
-            {o.pancakeOrderId && meta.length > 0 ? ' · ' : null}
-            {meta.join(' · ')}
+            ) : (
+              'Tạo trong ERP'
+            )}
           </div>
+          {o.ownerName ? (
+            <div className="break-words text-xs text-foreground" data-testid="order-owner">
+              {o.ownerName}
+            </div>
+          ) : null}
+          {o.facebookPageName ? (
+            <div className="break-words text-xs text-muted-foreground" data-testid="order-page">
+              {o.facebookPageName}
+            </div>
+          ) : null}
         </div>
       );
     },
@@ -842,7 +850,9 @@ export function OrderListScreen() {
   const duplicate = state.filters.duplicate === 'true';
   const itemOrigin = parseItemOrigin(state.filters.itemOrigin);
   const careTeamId = state.filters.careTeamId ?? '';
+  const fbPage = state.filters.fbPage ?? '';
   const careTeams = useCareTeamOptions();
+  const facebookPages = useFacebookPageOptions();
   // Cột ẩn + sắp xếp lưu theo người dùng ở server (đăng xuất / đổi máy vẫn giữ). Sắp xếp trên URL
   // (link dán cho đồng nghiệp) thắng; URL không có thì lấy lần sắp gần nhất của người dùng.
   const prefs = useOrderListPrefs();
@@ -879,6 +889,7 @@ export function OrderListScreen() {
       to,
       itemOrigin,
       careTeamId,
+      facebookPageIds: fbPage || undefined,
     }),
     [
       state.q,
@@ -898,6 +909,7 @@ export function OrderListScreen() {
       to,
       itemOrigin,
       careTeamId,
+      fbPage,
     ],
   );
   const params = useMemo(
@@ -1096,9 +1108,20 @@ export function OrderListScreen() {
                 { value: 'PANCAKE', label: 'Pancake (mọi POS)' },
                 ...(pancakeShops.data ?? []).map((s) => ({
                   value: `POS:${s.shopId}`,
-                  label: `Pancake · ${s.shopName ?? `POS ${s.shopId}`}${s.isActive ? '' : ' (đã ngắt)'}`,
+                  label: `Pancake · ${pancakeShopLabel(s)}`,
                 })),
               ],
+            },
+            {
+              key: 'fbPage',
+              label: 'Page',
+              type: 'multiSelect',
+              unit: 'page',
+              options: (facebookPages.data ?? []).map((p) => ({
+                value: p.id,
+                label: p.isActive ? p.name : `${p.name} (ngưng)`,
+                hint: p.shopIds.length ? `${p.shopIds.length} POS` : undefined,
+              })),
             },
             {
               key: 'careTeamId',
@@ -1164,6 +1187,7 @@ export function OrderListScreen() {
             duplicate: state.filters.duplicate,
             itemOrigin: state.filters.itemOrigin,
             careTeamId: state.filters.careTeamId,
+            fbPage: state.filters.fbPage,
           }}
           onFilterChange={setFilter}
           searchPlaceholder="Mã đơn, mã Pancake, SĐT, tên khách, mã vận đơn"

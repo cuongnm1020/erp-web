@@ -2526,6 +2526,54 @@ export interface paths {
         patch: operations["TaxRateController_update"];
         trace?: never;
     };
+    "/facebook-pages": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["FacebookPageController_list"];
+        put?: never;
+        post: operations["FacebookPageController_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/facebook-pages/options": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["FacebookPageController_options"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/facebook-pages/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["FacebookPageController_get"];
+        put?: never;
+        post?: never;
+        delete: operations["FacebookPageController_remove"];
+        options?: never;
+        head?: never;
+        patch: operations["FacebookPageController_update"];
+        trace?: never;
+    };
     "/teams": {
         parameters: {
             query?: never;
@@ -6704,7 +6752,7 @@ export interface components {
              * @description PANCAKE = có hồ sơ / định danh Pancake hoặc mã do sync tạo (PC…-C-…); MANUAL = tạo trên ERP.
              * @enum {string}
              */
-            source: "MANUAL" | "PANCAKE";
+            source: "PANCAKE" | "MANUAL";
         };
         DuplicateGroupDto: {
             /** @description SĐT chuẩn hoá (core.normalize_phone) chung của nhóm. */
@@ -6790,7 +6838,7 @@ export interface components {
             owners: components["schemas"]["NamedRefDto"][];
             teams: components["schemas"]["NamedRefDto"][];
             /** @enum {string} */
-            source: "MANUAL" | "PANCAKE";
+            source: "PANCAKE" | "MANUAL";
             pancake: components["schemas"]["PancakeLinkDto"] | null;
             consents: components["schemas"]["ConsentSummaryDto"][];
             orders: components["schemas"]["CustomerOrderSummaryDto"];
@@ -9615,6 +9663,63 @@ export interface components {
             /** @description false = ngừng dùng (không chọn được cho sản phẩm nữa; sản phẩm đang gán giữ nguyên). */
             isActive?: boolean;
         };
+        FacebookPageDto: {
+            id: string;
+            /** @description Page ID Facebook; null = page thêm tay chưa có mã. */
+            externalId: string | null;
+            name: string;
+            /** @description Tên Pancake gửi về gần nhất (null với page thêm tay chưa có đơn). */
+            sourceName: string | null;
+            note: string | null;
+            /**
+             * @description PANCAKE = tự thêm từ đơn đồng bộ, MANUAL = admin thêm tay.
+             * @enum {string}
+             */
+            origin: "PANCAKE" | "MANUAL";
+            isActive: boolean;
+            /** @description Mã shop Pancake (POS) gắn với page — tên POS: GET /pancake-sync/shops. */
+            shopIds: string[];
+            /** @description Số đơn của page (đơn Pancake theo Page ID + đơn ERP chọn page). */
+            orderCount: number;
+            /** @description Ngày đặt của đơn gần nhất (ISO); null = chưa có đơn. */
+            lastOrderAt: string | null;
+            version: number;
+            createdAt: string;
+            updatedAt: string;
+        };
+        FacebookPageListResponseDto: {
+            items: components["schemas"]["FacebookPageDto"][];
+            total: number;
+        };
+        FacebookPageOptionDto: {
+            id: string;
+            name: string;
+            externalId: string | null;
+            shopIds: string[];
+            isActive: boolean;
+            /** @description Số đơn 90 ngày gần nhất — xếp page hay dùng lên trước. */
+            recentOrderCount: number;
+        };
+        CreateFacebookPageDto: {
+            name: string;
+            /** @description Page ID Facebook — không bắt buộc; có thì đơn Pancake từ page này tự khớp vào page. */
+            externalId?: string | null;
+            /** @description POS bán qua page này (mã shop Pancake đã liên kết). */
+            shopIds?: string[];
+            note?: string | null;
+            isActive?: boolean;
+        };
+        UpdateFacebookPageDto: {
+            /** @description `version` đọc lúc mở form — người khác sửa xen giữa thì 409. */
+            version: number;
+            name?: string;
+            /** @description Chỉ đặt được khi page chưa có Page ID (page tự thêm từ Pancake khoá mã). */
+            externalId?: string | null;
+            /** @description Thay toàn bộ danh sách POS của page. */
+            shopIds?: string[];
+            note?: string | null;
+            isActive?: boolean;
+        };
         TeamDto: {
             id: string;
             code: string;
@@ -10386,6 +10491,11 @@ export interface components {
             shipment: components["schemas"]["SalesOrderListShipmentDto"] | null;
             /** @description Tên người phụ trách (core.User.fullName của ownerId). */
             ownerName: string | null;
+            /**
+             * @description Tên page Facebook của đơn (core.FacebookPage.name) — đơn Pancake theo Page ID, đơn ERP theo
+             *     page chọn lúc tạo. null = đơn không gắn page (2026-10-26).
+             */
+            facebookPageName: string | null;
             /** @description Ghi chú gửi hãng / ghi chú in trên đơn (shippingOptions.note). */
             note: string | null;
             /** @description Hàng đang thiếu tồn (mọi tab); null = không thiếu. Tab Chờ hàng = thiếu ≥ 24h + chưa gửi hãng. */
@@ -10460,7 +10570,7 @@ export interface components {
             total: string;
             ownerName: string | null;
             /** @enum {string} */
-            source: "ERP" | "PANCAKE";
+            source: "PANCAKE" | "ERP";
         };
         SameDayOrdersDto: {
             /** @description Ngày VN đã kiểm (`YYYY-MM-DD`). */
@@ -10926,6 +11036,12 @@ export interface components {
              *     Dùng làm người gửi trên vận đơn (tên + SĐT POS) và lọc đơn theo POS.
              */
             posShopId?: string;
+            /**
+             * Format: uuid
+             * @description Page Facebook của đơn (GET /facebook-pages/options) — độc lập với `source` và `posShopId`,
+             *     không bắt buộc (2026-10-26).
+             */
+            facebookPageId?: string;
             /** @description Phụ thu, Decimal(18,4) chuỗi ≥ 0 — cộng vào tổng. */
             surcharge?: string;
             /** @description Khách chuyển khoản trước, Decimal(18,4) chuỗi — ≤ tổng đơn; COD = tổng − khoản này. */
@@ -11275,7 +11391,7 @@ export interface components {
         };
         CarrierSettingFieldDto: {
             /** @enum {string} */
-            key: "baseUrl" | "shopId" | "partnerCode" | "username" | "password" | "token" | "apiKey" | "webhookSecret";
+            key: "shopId" | "baseUrl" | "partnerCode" | "username" | "password" | "token" | "apiKey" | "webhookSecret";
             label: string;
             /** @description Bí mật: không bao giờ trả giá trị, chỉ `hint`. */
             secret: boolean;
@@ -19316,6 +19432,143 @@ export interface operations {
             };
         };
     };
+    FacebookPageController_list: {
+        parameters: {
+            query?: {
+                /** @description Tìm theo tên page / Page ID (không phân biệt hoa thường, dấu). */
+                q?: string;
+                /** @description Chỉ page gắn với POS này. */
+                shopId?: string;
+                /** @description PANCAKE = tự thêm từ đơn đồng bộ, MANUAL = admin thêm tay. */
+                origin?: "PANCAKE" | "MANUAL";
+                /** @description true = đang dùng, false = ngưng. Bỏ trống = cả hai. */
+                isActive?: boolean;
+                skip?: number;
+                take?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FacebookPageListResponseDto"];
+                };
+            };
+        };
+    };
+    FacebookPageController_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateFacebookPageDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FacebookPageDto"];
+                };
+            };
+        };
+    };
+    FacebookPageController_options: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FacebookPageOptionDto"][];
+                };
+            };
+        };
+    };
+    FacebookPageController_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FacebookPageDto"];
+                };
+            };
+        };
+    };
+    FacebookPageController_remove: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    FacebookPageController_update: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateFacebookPageDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FacebookPageDto"];
+                };
+            };
+        };
+    };
     TeamController_list: {
         parameters: {
             query?: never;
@@ -20748,6 +21001,11 @@ export interface operations {
                  *     sách POS: GET /pancake-sync/shops. Kèm `source=ERP` thì không đơn nào khớp.
                  */
                 pancakeShopId?: string;
+                /**
+                 * @description Chỉ đơn của các page Facebook này (id core.FacebookPage, cách nhau dấu phẩy, tối đa 100) — đơn
+                 *     Pancake theo Page ID + đơn ERP chọn page (2026-10-26). Danh sách: GET /facebook-pages/options.
+                 */
+                facebookPageIds?: string;
                 /** @description Người phụ trách (SalesOrder.ownerId). */
                 ownerId?: string;
                 /**
@@ -20891,6 +21149,11 @@ export interface operations {
                  *     sách POS: GET /pancake-sync/shops. Kèm `source=ERP` thì không đơn nào khớp.
                  */
                 pancakeShopId?: string;
+                /**
+                 * @description Chỉ đơn của các page Facebook này (id core.FacebookPage, cách nhau dấu phẩy, tối đa 100) — đơn
+                 *     Pancake theo Page ID + đơn ERP chọn page (2026-10-26). Danh sách: GET /facebook-pages/options.
+                 */
+                facebookPageIds?: string;
                 /** @description Người phụ trách (SalesOrder.ownerId). */
                 ownerId?: string;
                 /**

@@ -100,6 +100,10 @@ const MESSAGES: Record<string, string> = {
     'Đã có đơn hàng dùng mức này nên không đổi được %. Thêm mức mới rồi gán cho sản phẩm.',
   TAX_RATE_DEFAULT_REQUIRED: 'Phải luôn có một mức mặc định — đặt mức khác làm mặc định trước.',
   TAX_RATE_CODE_TAKEN: 'Mã này đã có trong danh mục thuế suất — chọn mã khác.',
+  // Page Facebook (2026-10-26)
+  FACEBOOK_PAGE_ID_TAKEN:
+    'Page ID này đã có trong danh mục ở page khác — tìm page đó để sửa thay vì thêm mới.',
+  FACEBOOK_PAGE_ID_LOCKED: 'Page ID đã gắn với đơn Pancake nên không đổi được.',
   STOCK_EXCEL_WAREHOUSE_MISMATCH:
     'File này là tồn của kho khác — chọn đúng kho đã xuất file, hoặc xuất lại file của kho này.',
   /** Hồ sơ Pancake — fb_id thuộc tài khoản thật khác (messageFor ghép thêm người đang giữ). */

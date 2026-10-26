@@ -1,4 +1,4 @@
-import type { EntitySearchResult } from '@/components/data/form';
+import { matchesVi, type EntitySearchResult } from '@/components/data/form';
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api, idempotency, unwrap } from '@/lib/api/client';
 import type { components, paths } from '@/lib/api/schema';
@@ -55,6 +55,8 @@ export interface OrderListParams {
   itemOrigin?: OrderItemOrigin;
   /** Team CSKH lên đơn (team phòng ban CSKH, gồm phòng con) — danh sách: useCareTeamOptions. */
   careTeamId?: string;
+  /** Page Facebook (id, nối dấu phẩy) — đơn ERP chọn page + đơn Pancake theo Page ID. */
+  facebookPageIds?: string;
   /** Sắp theo cột (server); bỏ trống = ngày đặt mới nhất trước. */
   sortBy?: OrderSortField;
   sortDir?: 'asc' | 'desc';
@@ -137,6 +139,7 @@ function listQuery(params: Omit<OrderListParams, 'take' | 'skip'>) {
     to: params.to || undefined,
     itemOrigin: params.itemOrigin,
     careTeamId: params.careTeamId || undefined,
+    facebookPageIds: params.facebookPageIds || undefined,
   };
 }
 
@@ -156,6 +159,52 @@ export function usePancakeShops() {
     queryFn: () => unwrap(api.GET('/pancake-sync/shops')),
     staleTime: 5 * 60_000,
   });
+}
+
+export type FacebookPageOption = components['schemas']['FacebookPageOptionDto'];
+
+/**
+ * GET /facebook-pages/options — page Facebook (chưa xóa) cho ô chọn page lúc tạo đơn + bộ lọc đơn,
+ * page nhiều đơn 90 ngày lên trước. Key dùng chung prefix `['facebook-pages']` với màn quản trị page
+ * (sửa page ở đó là ô chọn tải lại).
+ */
+export function useFacebookPageOptions() {
+  return useQuery({
+    queryKey: ['facebook-pages', 'options'] as const,
+    queryFn: () => unwrap(api.GET('/facebook-pages/options')),
+    staleTime: 5 * 60_000,
+  });
+}
+
+/**
+ * Tìm page cho ô Page ở màn tạo đơn (lọc trên danh sách options đã cache, không phân biệt dấu). Chỉ
+ * page đang dùng. Đã chọn POS → "Page của POS này" lên trước rồi "Page khác"; trong nhóm theo số đơn
+ * 90 ngày. `meta.shopIds` = POS của page (tự điền POS khi page chỉ thuộc một POS).
+ */
+export function useFacebookPageSearch(q: string, posShopId: string): EntitySearchResult {
+  const pages = useFacebookPageOptions();
+  const hits = pages.data
+    ?.filter((p) => p.isActive)
+    .filter((p) => !q.trim() || matchesVi(`${p.name} ${p.externalId ?? ''}`, q));
+  const toOption = (p: FacebookPageOption, group: string | undefined) => ({
+    id: p.id,
+    label: p.name,
+    hint: p.recentOrderCount ? `${p.recentOrderCount} đơn 90 ngày` : undefined,
+    meta: { shopIds: p.shopIds.join(',') },
+    group,
+  });
+  const mine = posShopId ? (hits ?? []).filter((p) => p.shopIds.includes(posShopId)) : [];
+  const others = posShopId ? (hits ?? []).filter((p) => !p.shopIds.includes(posShopId)) : hits;
+  return {
+    options: hits
+      ? [
+          ...mine.map((p) => toOption(p, 'Page của POS này')),
+          ...(others ?? []).map((p) => toOption(p, mine.length ? 'Page khác' : undefined)),
+        ]
+      : undefined,
+    isPending: pages.isPending,
+    error: pages.error,
+  };
 }
 
 export type OrderCareTeamOption = components['schemas']['OrderCareTeamOptionDto'];
