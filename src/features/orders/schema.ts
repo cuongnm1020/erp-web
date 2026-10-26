@@ -127,6 +127,10 @@ export const createOrderSchema = z
     careStaffId: optionalId,
     marketerId: optionalId,
     tagIds: z.array(idSchema).max(20, 'Tối đa 20 thẻ'),
+    /** Mục đích sử dụng gắn THÊM cho khách khi chốt (biên bản CSKH 2026-10-26). */
+    purposeTagIds: z.array(idSchema).max(20, 'Tối đa 20 mục đích'),
+    /** Ghi chú chăm sóc lần này — vào lịch sử chăm sóc của khách, gắn đơn. */
+    careNote: z.string().max(2000, 'Tối đa 2.000 ký tự'),
     internalNote: z.string().max(2000, 'Tối đa 2.000 ký tự'),
     printNote: z.string().max(500, 'Tối đa 500 ký tự'),
     carrierId: optionalId,
@@ -221,6 +225,8 @@ export function emptyOrderValues(warehouseId = ''): CreateOrderValues {
     careStaffId: '',
     marketerId: '',
     tagIds: [],
+    purposeTagIds: [],
+    careNote: '',
     internalNote: '',
     printNote: '',
     carrierId: '',
@@ -304,6 +310,8 @@ export function toCreateOrderBody(v: CreateOrderValues) {
     ...(v.careStaffId ? { careStaffId: v.careStaffId } : {}),
     ...(v.marketerId ? { marketerId: v.marketerId } : {}),
     ...(v.tagIds.length > 0 ? { tagIds: v.tagIds } : {}),
+    ...(v.purposeTagIds.length > 0 ? { purposeTagIds: v.purposeTagIds } : {}),
+    ...(v.careNote.trim() ? { careNote: v.careNote.trim() } : {}),
     ...(v.internalNote.trim() ? { internalNote: v.internalNote.trim() } : {}),
     ...(v.printNote.trim() ? { printNote: v.printNote.trim() } : {}),
     ...(v.expectedDeliveryDate ? { expectedDeliveryDate: v.expectedDeliveryDate } : {}),

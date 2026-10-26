@@ -50,6 +50,7 @@ import {
   Truck,
   Undo2,
   UserCog,
+  Sprout,
   UserRound,
   Users,
   UsersRound,
@@ -199,6 +200,14 @@ export const NAV_MODULES: NavModule[] = [
         // Trưởng nhóm CSKH (2026-10-22): thêm / sửa / khóa nhân viên phòng CSKH mình phụ trách +
         // doanh thu từng người — thay Sơ đồ nhân sự (ẩn với CSKH).
         ability: { action: 'manage', subject: 'CareStaff' },
+      },
+      {
+        label: 'Mục đích sử dụng',
+        href: '/crm/care/purposes',
+        icon: Sprout,
+        // Biên bản CSKH 2026-10-26: đổi tên / gộp / xóa mục đích (Sầu riêng, Cà phê…) — Admin +
+        // Trưởng phòng CSKH; tạo + gắn mục đích thì ai lên đơn cũng làm ở màn tạo đơn / hồ sơ khách.
+        ability: { action: 'purpose_manage', subject: 'Customer' },
       },
       {
         label: 'Phân công',

@@ -5,7 +5,7 @@ import { errorEnvelope } from '@/test/msw/handlers';
 import { server } from '@/test/msw/server';
 import { renderApp } from '@/test/render';
 import { toLocalDateKey } from '@/lib/format';
-import { careRangePresets, TeamCustomersScreen } from './components/team-customers-screen';
+import { TeamCustomersScreen } from './components/team-customers-screen';
 
 const replace = vi.fn();
 let search = '';
@@ -17,24 +17,33 @@ vi.mock('next/navigation', () => ({
 }));
 
 const TODAY = toLocalDateKey(new Date())!;
+const DURIAN = '00000000-0000-4000-8000-0000000000d1';
 
-const row = (i: number, assignedBy: 'AUTO' | 'ORDER' | 'OTHER') => ({
+const row = (i: number) => ({
   id: `00000000-0000-4000-8000-00000000000${i}`,
   code: `KH02480${i}`,
   name: `Khách CSKH ${i}`,
   phone: `091234567${i}`,
   assignedAt: '2026-10-21T17:05:00.000Z',
-  assignedBy,
+  assignedBy: 'AUTO' as const,
   createdAt: '2026-10-20T03:00:00.000Z',
+  rank: i,
+  revenue: i === 3 ? '0.0000' : `${4 - i}00000.0000`,
+  orderCount: i === 3 ? 0 : 1,
   lastOrderAt: i === 3 ? null : '2026-10-20T08:00:00.000Z',
-  orderCount: i === 3 ? 0 : i,
+  lastOrderOwnerName: i === 3 ? null : 'Ngọc',
+  purposes: i === 1 ? [{ id: DURIAN, name: 'Sầu riêng' }] : [],
+  latestNote:
+    i === 1
+      ? { body: 'Vườn 3ha, hẹn gọi lại', authorName: 'Ngọc', createdAt: '2026-10-25T09:20:00.000Z' }
+      : null,
 });
 
 const LIST = {
   teamId: 't-ca',
-  teamName: 'Phòng ban · CSKH Miền Bắc',
+  teamName: 'CSKH LA',
   total: 3,
-  items: [row(1, 'AUTO'), row(2, 'ORDER'), row(3, 'OTHER')],
+  items: [row(1), row(2), row(3)],
 };
 
 function capture() {
@@ -44,6 +53,9 @@ function capture() {
       seen.push(new URL(request.url).searchParams);
       return HttpResponse.json(LIST);
     }),
+    http.get('/api/customer-purposes', () =>
+      HttpResponse.json([{ id: DURIAN, name: 'Sầu riêng', color: null, customerCount: 12 }]),
+    ),
   );
   return seen;
 }
@@ -53,85 +65,88 @@ beforeEach(() => {
   replace.mockClear();
 });
 
-describe('TeamCustomersScreen — GET /customer-care/customers (CSKH)', () => {
-  it('mặc định "1 ngày" = khách gán hôm nay; bảng: nguồn gán, số đơn, nút Lên đơn mở đơn mới cho khách', async () => {
+describe('TeamCustomersScreen — GET /customer-care/customers (CSKH, biên bản 2026-10-26)', () => {
+  it('mặc định: đơn gần nhất, doanh thu tháng này; bảng hiện mục đích, doanh thu, ghi chú, nút Lên đơn', async () => {
     const seen = capture();
     renderApp(<TeamCustomersScreen />);
     expect(screen.getByRole('status', { name: 'Đang tải danh sách' })).toBeInTheDocument();
-    expect(
-      await screen.findByText('Khách của team · Phòng ban · CSKH Miền Bắc'),
-    ).toBeInTheDocument();
-    expect(seen[0]!.get('assignedFrom')).toBe(TODAY);
-    expect(seen[0]!.get('assignedTo')).toBe(TODAY);
-    expect(screen.getByRole('button', { name: /^Ngày gán: 1 ngày/ })).toBeInTheDocument();
+    expect(await screen.findByText('Khách của team · CSKH LA')).toBeInTheDocument();
+    expect(seen[0]!.get('sort')).toBe('lastOrder');
+    expect(seen[0]!.get('from')).toBe(`${TODAY.slice(0, 8)}01`);
+    expect(seen[0]!.get('to')).toBe(TODAY);
+    expect(seen[0]!.has('assignedFrom')).toBe(false);
+    expect(seen[0]!.has('top')).toBe(false);
 
     const r1 = screen.getByRole('row', { name: /KH024801/ });
-    expect(within(r1).getByText('Chia tự động')).toBeInTheDocument();
+    expect(within(r1).getByText('Sầu riêng')).toBeInTheDocument();
+    expect(within(r1).getByText(/300\.000/)).toBeInTheDocument();
+    expect(within(r1).getByText(/Vườn 3ha, hẹn gọi lại/)).toBeInTheDocument();
+    expect(within(r1).getByText(/· Ngọc/)).toBeInTheDocument();
     expect(
-      within(screen.getByRole('row', { name: /KH024802/ })).getByText('CSKH lên đơn'),
+      within(screen.getByRole('row', { name: /KH024803/ })).getByText('Chưa có đơn'),
     ).toBeInTheDocument();
-    const r3 = screen.getByRole('row', { name: /KH024803/ });
-    expect(within(r3).getByText('Gán tay')).toBeInTheDocument();
-    expect(within(r3).getByText('Chưa có đơn')).toBeInTheDocument();
     expect(within(r1).getByRole('link', { name: 'Lên đơn' })).toHaveAttribute(
       'href',
-      `/crm/orders/new?customerId=${row(1, 'AUTO').id}`,
+      `/crm/orders/new?customerId=${row(1).id}`,
     );
   });
 
-  it('khoảng ngày trên URL → assignedFrom/To; "Tất cả" (all=1) → không gửi khoảng', async () => {
-    search = 'from=2026-10-15&to=2026-10-21&q=hung&page=2';
+  it('URL → sort=revenue, top, mục đích, sản phẩm, ngày gán, kỳ doanh thu, trang', async () => {
+    search = `from=2026-10-01&to=2026-10-15&top=50&purposes=${DURIAN}&sku=sku-1&skuLabel=Phân%20bón&assigned=7&q=hung&page=2`;
     const seen = capture();
     renderApp(<TeamCustomersScreen />);
     await waitFor(() => expect(seen.length).toBeGreaterThan(0));
-    expect(seen.at(-1)!.get('assignedFrom')).toBe('2026-10-15');
-    expect(seen.at(-1)!.get('assignedTo')).toBe('2026-10-21');
-    expect(seen.at(-1)!.get('q')).toBe('hung');
-    expect(seen.at(-1)!.get('skip')).toBe('50');
-
-    search = 'all=1';
-    const seenAll = capture();
-    renderApp(<TeamCustomersScreen />);
-    await waitFor(() => expect(seenAll.length).toBeGreaterThan(0));
-    expect(seenAll.at(-1)!.has('assignedFrom')).toBe(false);
+    const p = seen.at(-1)!;
+    expect(p.get('sort')).toBe('revenue');
+    expect(p.get('top')).toBe('50');
+    expect(p.get('purposeIds')).toBe(DURIAN);
+    expect(p.get('skuIds')).toBe('sku-1');
+    expect(p.get('from')).toBe('2026-10-01');
+    expect(p.get('to')).toBe('2026-10-15');
+    expect(p.get('assignedTo')).toBe(TODAY);
+    expect(p.get('q')).toBe('hung');
+    expect(p.get('skip')).toBe('50');
   });
 
-  it('bấm preset "7 ngày" / "Tất cả" → ghi khoảng lên URL', async () => {
+  it('bấm "Top 10" → ghi top lên URL; "Tất cả" bỏ top', async () => {
     capture();
     renderApp(<TeamCustomersScreen />);
     await screen.findByText(/Khách của team ·/);
-    // Bộ lọc khoảng ngày dùng chung (2026-10-22): mở hộp → chọn sẵn → Áp dụng.
-    fireEvent.click(screen.getByRole('button', { name: /^Ngày gán: 1 ngày/ }));
-    fireEvent.click(await screen.findByRole('button', { name: '7 ngày' }));
-    fireEvent.click(screen.getByRole('button', { name: /^Áp dụng/ }));
-    const seven = careRangePresets(TODAY)[2]!;
+    fireEvent.click(screen.getByRole('button', { name: 'Top 10' }));
+    expect(replace).toHaveBeenLastCalledWith(expect.stringContaining('top=10'), expect.anything());
+    fireEvent.click(screen.getByRole('button', { name: 'Tất cả' }));
     expect(replace).toHaveBeenLastCalledWith(
-      expect.stringContaining(`from=${seven.from}`),
+      expect.not.stringContaining('top='),
       expect.anything(),
     );
-    fireEvent.click(screen.getByRole('button', { name: 'Tất cả' }));
-    expect(replace).toHaveBeenLastCalledWith(expect.stringContaining('all=1'), expect.anything());
   });
 
-  it('trống → lời mời xem tất cả khách của team', async () => {
+  it('lọc ra 0 khách → "Xóa lọc" bỏ mục đích / Top', async () => {
+    search = `purposes=${DURIAN}&top=10`;
+    capture();
     server.use(
       http.get('/api/customer-care/customers', () =>
         HttpResponse.json({ ...LIST, total: 0, items: [] }),
       ),
     );
     renderApp(<TeamCustomersScreen />);
-    expect(await screen.findByText(/Chưa có khách nào được gán/)).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: 'Xem tất cả khách của team' }));
-    expect(replace).toHaveBeenLastCalledWith(expect.stringContaining('all=1'), expect.anything());
+    expect(await screen.findByText('Không có khách khớp')).toBeInTheDocument();
+    fireEvent.click(screen.getAllByRole('button', { name: 'Xóa lọc' }).at(-1)!);
+    expect(replace).toHaveBeenLastCalledWith(
+      expect.not.stringContaining('purposes='),
+      expect.anything(),
+    );
   });
 
   it('403 (không thuộc team CSKH) → màn không có quyền', async () => {
+    capture();
     server.use(http.get('/api/customer-care/customers', () => errorEnvelope(403, 'FORBIDDEN')));
     renderApp(<TeamCustomersScreen />);
     expect(await screen.findByText('Bạn không có quyền xem mục này')).toBeInTheDocument();
   });
 
   it('lỗi 500 → ErrorState có traceId', async () => {
+    capture();
     server.use(http.get('/api/customer-care/customers', () => errorEnvelope(500, 'DB_ERROR')));
     renderApp(<TeamCustomersScreen />);
     expect(await screen.findByRole('alert')).toBeInTheDocument();

@@ -230,6 +230,17 @@ describe('toCreateOrderBody — form → body POST /sales-orders', () => {
     expect(body.shippingOptions).not.toHaveProperty('widthCm');
   });
 
+  it('mục đích sử dụng + ghi chú chăm sóc (CSKH 2026-10-26): gửi khi có, bỏ khi rỗng', () => {
+    expect(
+      toCreateOrderBody(
+        values({ customerId: C1, purposeTagIds: ['p1'], careNote: '  hẹn 05/11 ' }),
+      ),
+    ).toMatchObject({ purposeTagIds: ['p1'], careNote: 'hẹn 05/11' });
+    const none = toCreateOrderBody(values({ customerId: C1, careNote: '   ' }));
+    expect(none).not.toHaveProperty('purposeTagIds');
+    expect(none).not.toHaveProperty('careNote');
+  });
+
   it('miễn phí giao hàng → không gửi shippingFee; phụ thu / chuyển khoản 0 → bỏ field', () => {
     const body = toCreateOrderBody(
       values({
@@ -527,6 +538,53 @@ describe('OrderCreateScreen — màn tạo đơn mới', () => {
     expect(bare).not.toHaveProperty('facebookPageId');
   });
 
+  it('gõ đủ địa chỉ → gợi ý "Đắk Nông, Huyện Tuy Đức, Xã Quảng Tân"; bấm điền Xã / Huyện / Tỉnh, dòng địa chỉ còn phần còn lại (2026-10-26)', async () => {
+    const asked: string[] = [];
+    server.use(
+      ...skuHandlers(),
+      http.get('/api/geo/suggest', ({ request }) => {
+        asked.push(new URL(request.url).searchParams.get('q') ?? '');
+        const q = new URL(request.url).searchParams.get('q') ?? '';
+        return HttpResponse.json({
+          ready: true,
+          items: q.includes('Quảng Tân')
+            ? [
+                {
+                  generation: 'OLD',
+                  province: 'Đắk Nông',
+                  district: 'Huyện Tuy Đức',
+                  ward: 'Xã Quảng Tân',
+                  label: 'Đắk Nông, Huyện Tuy Đức, Xã Quảng Tân',
+                  line1: '0332119579',
+                },
+              ]
+            : [],
+        });
+      }),
+    );
+    renderApp(<OrderCreateScreen />);
+    const line1 = await screen.findByLabelText('Địa chỉ chi tiết (số nhà, đường, thôn/xóm)');
+    fireEvent.change(line1, {
+      target: { value: '0332119579, Xã Quảng Tân, Huyện Tuy Đức, Đắk Nông' },
+    });
+    const pick = await screen.findByRole('button', {
+      name: /Đắk Nông, Huyện Tuy Đức, Xã Quảng Tân/,
+    });
+    expect(pick).toHaveTextContent('Địa giới cũ');
+    fireEvent.click(pick);
+    expect(screen.getByLabelText('Phường / Xã')).toHaveValue('Xã Quảng Tân');
+    expect(screen.getByLabelText('Quận / Huyện (cũ)')).toHaveValue('Huyện Tuy Đức');
+    expect(screen.getByLabelText('Tỉnh / Thành phố')).toHaveValue('Đắk Nông');
+    expect(line1).toHaveValue('0332119579');
+    // Đã điền khớp → gợi ý ẩn.
+    await waitFor(() =>
+      expect(
+        screen.queryByRole('button', { name: /Đắk Nông, Huyện Tuy Đức, Xã Quảng Tân/ }),
+      ).not.toBeInTheDocument(),
+    );
+    expect(asked.every((q) => q.length >= 6)).toBe(true);
+  });
+
   it('ô Page: page ngưng ẩn; chọn page một POS khi ô POS trống → tự điền POS; có POS thì "Page của POS này" lên trước', async () => {
     server.use(...skuHandlers());
     renderApp(<OrderCreateScreen />);
@@ -582,6 +640,79 @@ describe('OrderCreateScreen — màn tạo đơn mới', () => {
     fireEvent.click(screen.getByRole('button', { name: /^Chốt đơn F10/ }));
     await waitFor(() => expect(bodies).toHaveLength(1));
     expect(bodies[0]).toMatchObject({ customerId: CUST.id });
+  });
+
+  it('thẻ Chăm sóc khách: mục đích khách đã có bật sẵn (khóa), bấm thêm mục đích + ghi chú → chốt gửi purposeTagIds + careNote', async () => {
+    const CUST = makeCustomers(1)[0]!;
+    const DURIAN = '00000000-0000-4000-8000-0000000000d1';
+    const COFFEE = '00000000-0000-4000-8000-0000000000d2';
+    const bodies: Record<string, unknown>[] = [];
+    server.use(
+      ...skuHandlers(),
+      http.get('/api/customer-purposes', () =>
+        HttpResponse.json([
+          { id: DURIAN, name: 'Sầu riêng', color: null, customerCount: 3 },
+          { id: COFFEE, name: 'Cà phê', color: null, customerCount: 1 },
+        ]),
+      ),
+      http.get(`/api/customer-care/customers/${CUST.id}/purposes`, () =>
+        HttpResponse.json([
+          {
+            id: DURIAN,
+            name: 'Sầu riêng',
+            taggedAt: '2026-10-25T09:20:00.000Z',
+            taggedById: 'u1',
+            taggedByName: 'Ngọc',
+          },
+        ]),
+      ),
+      http.get(`/api/customer-care/customers/${CUST.id}/notes`, () =>
+        HttpResponse.json({
+          total: 1,
+          items: [
+            {
+              id: 'n1',
+              customerId: CUST.id,
+              orderId: null,
+              orderCode: null,
+              body: 'Vườn 3ha sầu riêng Ri6',
+              authorId: 'u1',
+              authorName: 'Ngọc',
+              authorDepartment: 'CSKH LA',
+              mine: false,
+              createdAt: '2026-10-25T09:20:00.000Z',
+              editedAt: null,
+            },
+          ],
+        }),
+      ),
+      http.post('/api/sales-orders', async ({ request }) => {
+        bodies.push((await request.json()) as Record<string, unknown>);
+        return HttpResponse.json(CREATED, { status: 201 });
+      }),
+    );
+    renderApp(<OrderCreateScreen />);
+    fireEvent.change(await screen.findByLabelText('Số điện thoại khách'), {
+      target: { value: CUST.phone },
+    });
+    expect(await screen.findByText('Vườn 3ha sầu riêng Ri6')).toBeInTheDocument();
+    expect(await screen.findByRole('button', { name: 'Sầu riêng', pressed: true })).toBeDisabled();
+    fireEvent.click(screen.getByRole('button', { name: 'Cà phê' }));
+    fireEvent.change(screen.getByLabelText('Ghi chú chăm sóc lần này'), {
+      target: { value: 'Hẹn gọi lại 05/11' },
+    });
+
+    const box = screen.getByRole('combobox', { name: 'Tìm sản phẩm' });
+    fireEvent.change(box, { target: { value: 'amino' } });
+    fireEvent.click(await screen.findByRole('option', { name: /Amino GA3 500ml/ }));
+    await waitFor(() => expect(screen.getAllByLabelText('Số lượng')).toHaveLength(1));
+    fireEvent.click(screen.getByRole('button', { name: /^Chốt đơn F10/ }));
+    await waitFor(() => expect(bodies).toHaveLength(1));
+    expect(bodies[0]).toMatchObject({
+      customerId: CUST.id,
+      purposeTagIds: [COFFEE],
+      careNote: 'Hẹn gọi lại 05/11',
+    });
   });
 
   it('đơn trùng trong ngày: thẻ khách nhắc; Chốt đơn mở hộp cảnh báo — Quay lại sửa không gửi, Vẫn tạo đơn mới gửi', async () => {

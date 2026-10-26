@@ -207,6 +207,22 @@ export function useFacebookPageSearch(q: string, posShopId: string): EntitySearc
   };
 }
 
+export type GeoSuggestion = components['schemas']['GeoSuggestionDto'];
+
+/**
+ * GET /geo/suggest — gợi ý Xã / Huyện / Tỉnh từ dòng địa chỉ gõ tự do (2026-10-26, kiểu Pancake).
+ * Chỉ gọi khi đủ 6 ký tự; danh mục tĩnh nên giữ kết quả theo chuỗi 10 phút.
+ */
+export function useGeoSuggest(q: string) {
+  const text = q.trim();
+  return useQuery({
+    queryKey: ['geo', 'suggest', text] as const,
+    queryFn: () => unwrap(api.GET('/geo/suggest', { params: { query: { q: text, limit: 3 } } })),
+    enabled: text.length >= 6,
+    staleTime: 10 * 60_000,
+  });
+}
+
 export type OrderCareTeamOption = components['schemas']['OrderCareTeamOptionDto'];
 
 /** GET /sales-orders/care-team-options — team CSKH (= phòng ban loại CSKH) để lọc đơn. */
