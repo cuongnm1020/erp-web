@@ -60,6 +60,7 @@ import {
   type CreateOrderValues,
 } from '../../schema';
 import { CART_GRID, CartLine, type LineMetrics } from './cart-line';
+import { CareCard } from './care-card';
 import {
   Card,
   CustomerCard,
@@ -107,6 +108,10 @@ const SERVER_PATHS: Record<string, { field: Path<CreateOrderValues>; message: st
   careStaffId: { field: 'careStaffId', message: 'Nhân viên không tồn tại hoặc đã nghỉ' },
   marketerId: { field: 'marketerId', message: 'Nhân viên không tồn tại hoặc đã nghỉ' },
   tagIds: { field: 'tagIds', message: 'Thẻ đã bị xóa — bỏ thẻ rồi chốt lại' },
+  purposeTagIds: {
+    field: 'purposeTagIds',
+    message: 'Mục đích sử dụng đã bị xóa hoặc gộp — bỏ chọn rồi chốt lại',
+  },
   manualDiscountValue: {
     field: 'manualDiscountValue',
     message: 'Giảm giá vượt số tiền còn lại của đơn',
@@ -433,6 +438,7 @@ export const OrderDraftForm = forwardRef<
           {/* ── Cột phải ── */}
           <div className="flex min-w-0 max-w-full flex-[1_1_380px] flex-col gap-3 xl:max-w-md">
             <CustomerCard form={form} />
+            <CareCard form={form} />
             <ReceiverCard form={form} />
             <ShippingCard form={form} estimatedWeightKg={estimatedWeightKg} codAmount={cod} />
             <InfoCard form={form} />
