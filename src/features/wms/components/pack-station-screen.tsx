@@ -10,6 +10,7 @@ import {
   Printer,
   WifiOff,
 } from 'lucide-react';
+import Decimal from 'decimal.js';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
 import { ScanInput, type ScanInputHandle } from '@/components/data/scan-input';
@@ -23,7 +24,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { cn } from '@/lib/cn';
-import { formatDateTime, formatQuantity } from '@/lib/format';
+import { formatDateTime, formatQuantity, toDecimal } from '@/lib/format';
 import { useAbility } from '@/lib/permission';
 import { usePdaQueue, usePdaStats } from '../api/use-pda';
 import { useScanSession } from '../scan-session';
@@ -31,6 +32,7 @@ import { useScanQty } from '../use-scan-qty';
 import { LabelPrintDialog } from './label-print-dialog';
 import { PackedOrderDialog } from './packed-order-dialog';
 import { PdaListColumn } from './pda-list-column';
+import { ScanCounter } from './scan-counter';
 import { ScanQtyBar } from './scan-qty-bar';
 import { SkuBarcodes } from './sku-barcodes';
 import { SkuIdentity, SkuThumb } from './sku-identity';
@@ -160,6 +162,22 @@ export function PackStationScreen() {
   const progress = task
     ? `${task.lines.filter((l) => l.status === 'COMPLETED').length}/${task.lines.length} dòng`
     : null;
+  // Tiến độ cả đơn theo đơn vị (thanh ở đầu màn) — dòng hủy không tính.
+  const unitLines = task?.lines.filter((l) => l.status !== 'CANCELLED') ?? [];
+  const unitsPlanned = unitLines.reduce(
+    (sum, l) => sum.plus(toDecimal(l.qtyPlanned) ?? 0),
+    new Decimal(0),
+  );
+  const unitsDone = unitLines.reduce(
+    (sum, l) => sum.plus(toDecimal(l.qtyDone) ?? 0),
+    new Decimal(0),
+  );
+  const unitsPct = unitsPlanned.gt(0)
+    ? unitsDone.div(unitsPlanned).times(100).toDecimalPlaces(0).toNumber()
+    : 0;
+  // Đơn vị cơ bản của dòng đang đóng = gợi ý không phải thùng / kiện ("5 CHAI").
+  const currentUnit = current?.suggested?.find((x) => !x.containerTypeCode)?.uomCode ?? null;
+  const working = phase === 'ready' && current !== null;
 
   return (
     // -m-4 + min-h trừ header 3.5rem của shell: màn choán hết vùng nội dung để chân trang dính đáy.
@@ -188,6 +206,28 @@ export function PackStationScreen() {
         </div>
       </header>
 
+      {phase === 'ready' && unitsPlanned.gt(0) ? (
+        <div className="flex flex-col gap-1 border-b px-4 py-2">
+          <div className="text-sm text-muted-foreground">
+            Cả đơn ·{' '}
+            <b className="font-semibold text-foreground tabular-nums">
+              {formatQuantity(unitsDone.toFixed(6))}/{formatQuantity(unitsPlanned.toFixed(6))}
+            </b>{' '}
+            sản phẩm
+          </div>
+          <div
+            className="h-1.5 overflow-hidden rounded-full bg-border"
+            role="progressbar"
+            aria-label="Tiến độ đóng gói"
+            aria-valuemin={0}
+            aria-valuemax={100}
+            aria-valuenow={unitsPct}
+          >
+            <div className="h-full bg-primary" style={{ width: `${unitsPct}%` }} />
+          </div>
+        </div>
+      ) : null}
+
       {s.offline ? (
         <p role="status" className="flex items-center gap-2 bg-warning-weak px-4 py-2 text-sm">
           <WifiOff className="h-4 w-4 text-warning" aria-hidden />
@@ -196,7 +236,8 @@ export function PackStationScreen() {
       ) : null}
 
       <main className="flex flex-1 flex-col gap-3 px-4 py-3">
-        {feedback ? (
+        {/* Đang đóng: phản hồi lần quét nằm trong khung đếm (ScanCounter), không lặp ở đây. */}
+        {feedback && !working ? (
           <p
             role={feedback.kind === 'error' ? 'alert' : 'status'}
             className={cn(
@@ -324,14 +365,13 @@ export function PackStationScreen() {
             </div>
             <SkuIdentity sku={current} className="mt-2" />
             <SkuBarcodes barcodes={current.barcodes} />
-            <div className="mt-3 flex items-baseline gap-2">
-              <span className="text-5xl font-bold tabular-nums">
-                {formatQuantity(current.qtyRemaining)}
-              </span>
-              <span className="text-muted-foreground">
-                còn đóng · đã {formatQuantity(current.qtyDone)}/{formatQuantity(current.qtyPlanned)}
-              </span>
-            </div>
+            <ScanCounter
+              className="mt-3"
+              done={current.qtyDone}
+              planned={current.qtyPlanned}
+              unit={currentUnit}
+              feedback={feedback}
+            />
           </section>
         ) : null}
 
