@@ -256,7 +256,7 @@ describe('Trạm đóng gói — quét đơn → quét SKU → tự đóng dòng
     // Vị trí đã lấy hàng hiện trên thẻ để đối chiếu (2026-09-22)
     expect(card).toHaveTextContent('Đã lấy từ');
     expect(card).toHaveTextContent('PACK-01');
-    expect(screen.getByRole('img', { name: 'Mã vạch BC-A' })).toBeInTheDocument();
+    expect(screen.queryByRole('img', { name: 'Mã vạch BC-A' })).not.toBeInTheDocument();
     expect(screen.getByText('Công ty Mai Linh', { exact: false })).toBeInTheDocument();
     expect(screen.getByText('0/2 dòng')).toBeInTheDocument();
     // URL giữ đơn đang mở (luật 8)

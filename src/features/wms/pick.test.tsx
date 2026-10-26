@@ -186,8 +186,8 @@ describe('Màn pick trên PDA — quét đơn → dòng theo lối đi → quét
       'https://s3.local/erp-images/sku-x.jpg?sig=x',
     );
     expect(screen.getByText('Trên kệ còn', { exact: false })).toHaveTextContent('35');
-    // Mã vạch SKU đang lấy hiện để đối chiếu với tem trên hàng
-    expect(screen.getByRole('img', { name: 'Mã vạch BC-X' })).toBeInTheDocument();
+    // Hình mã vạch SKU đã ẩn trên màn pick (2026-10-26)
+    expect(screen.queryByRole('img', { name: 'Mã vạch BC-X' })).not.toBeInTheDocument();
 
     // Quét SKU → gửi ngay 1 → gõ tổng 2 → Enter = gửi thêm 1 (2026-10-12)
     scan('BC-X');
