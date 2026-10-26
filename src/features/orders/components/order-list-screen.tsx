@@ -19,6 +19,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { BulkActionBar } from '@/components/data/bulk-action-bar';
 import { CopyButton } from '@/components/data/copy-button';
 import { CopyText } from '@/components/data/copy-text';
+import { pancakeShopLabel } from '@/components/data/pancake-shop-select';
 import { ColumnPicker, DataTable, FilterBar, type ColumnDef } from '@/components/data/data-table';
 import { RowActions, type RowActionItem } from '@/components/data/row-actions';
 import { EmptyState, ListSkeleton, QueryState } from '@/components/data/states';
@@ -1096,7 +1097,7 @@ export function OrderListScreen() {
                 { value: 'PANCAKE', label: 'Pancake (mọi POS)' },
                 ...(pancakeShops.data ?? []).map((s) => ({
                   value: `POS:${s.shopId}`,
-                  label: `Pancake · ${s.shopName ?? `POS ${s.shopId}`}${s.isActive ? '' : ' (đã ngắt)'}`,
+                  label: `Pancake · ${pancakeShopLabel(s)}`,
                 })),
               ],
             },

@@ -1,20 +1,12 @@
 'use client';
 
-import { Check, ChevronDown, Search, X } from 'lucide-react';
-import { useId, useState, type ReactNode } from 'react';
+import { Search, X } from 'lucide-react';
+import { type ReactNode } from 'react';
 import { DateRangeFilter } from '@/components/data/date-range-filter';
 import { DraftInput } from '@/components/data/draft-input';
+import { SearchableSelect } from '@/components/data/searchable-select';
 import { Button } from '@/components/ui/button';
-import {
-  Command,
-  CommandEmpty,
-  CommandGroup,
-  CommandInput,
-  CommandItem,
-  CommandList,
-} from '@/components/ui/command';
 import { Input } from '@/components/ui/input';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import {
   Select,
   SelectContent,
@@ -22,8 +14,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { cn } from '@/lib/cn';
-import { matchesVi } from '../form/search-select';
 
 export type FilterDef<F extends string = string> =
   | {
@@ -208,77 +198,5 @@ export function FilterBar<F extends string = string>({
       ) : null}
       {right ? <div className="ml-auto flex items-center gap-2">{right}</div> : null}
     </div>
-  );
-}
-
-/** Chữ thường, bỏ dấu tiếng Việt (đ → d) — để gõ "duong noi" vẫn ra "DƯƠNG NỘI". */
-/**
- * Ô chọn một giá trị có ô tìm (Popover + Command) — cùng kích thước / nhãn "<label>: tất cả" như
- * filter select thường. Khớp khi mọi từ gõ vào đều có trong nhãn (không phân biệt hoa thường / dấu).
- */
-function SearchableSelect({
-  label,
-  value,
-  options,
-  onChange,
-}: {
-  label: string;
-  value: string | undefined;
-  options: Array<{ value: string; label: string }>;
-  onChange: (v: string | undefined) => void;
-}) {
-  const [open, setOpen] = useState(false);
-  const listId = useId();
-  const current = options.find((o) => o.value === value);
-  const pick = (v: string | undefined) => {
-    onChange(v);
-    setOpen(false);
-  };
-  return (
-    <Popover open={open} onOpenChange={setOpen}>
-      <PopoverTrigger asChild>
-        <button
-          type="button"
-          role="combobox"
-          aria-expanded={open}
-          aria-controls={listId}
-          aria-label={label}
-          className="flex h-8 w-44 items-center justify-between whitespace-nowrap rounded-md border border-control-border bg-card px-2.5 py-1 text-sm focus-visible:border-control-border-focus"
-        >
-          <span className="truncate">{current ? current.label : `${label}: tất cả`}</span>
-          <ChevronDown className="h-4 w-4 shrink-0 opacity-50" aria-hidden />
-        </button>
-      </PopoverTrigger>
-      <PopoverContent id={listId} className="w-80 p-0" align="start">
-        <Command filter={(itemValue, search) => (matchesVi(itemValue, search) ? 1 : 0)}>
-          <CommandInput placeholder={`Tìm ${label.toLowerCase()}…`} />
-          <CommandList>
-            <CommandEmpty>Không có mục nào khớp</CommandEmpty>
-            <CommandGroup>
-              <CommandItem value={`${label}: tất cả`} onSelect={() => pick(undefined)}>
-                <Check
-                  className={cn('h-4 w-4', value === undefined ? 'opacity-100' : 'opacity-0')}
-                  aria-hidden
-                />
-                {label}: tất cả
-              </CommandItem>
-              {options.map((o) => (
-                <CommandItem
-                  key={o.value}
-                  value={`${o.label} ${o.value}`}
-                  onSelect={() => pick(o.value)}
-                >
-                  <Check
-                    className={cn('h-4 w-4', value === o.value ? 'opacity-100' : 'opacity-0')}
-                    aria-hidden
-                  />
-                  {o.label}
-                </CommandItem>
-              ))}
-            </CommandGroup>
-          </CommandList>
-        </Command>
-      </PopoverContent>
-    </Popover>
   );
 }
