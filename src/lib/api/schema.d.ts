@@ -10788,6 +10788,11 @@ export interface components {
             source: "OTHER" | "WEBSITE" | "FACEBOOK" | "ZALO" | "TIKTOK" | "PHONE" | "WALK_IN" | "REFERRAL" | null;
             /** @description Phụ thu, Decimal(18,4) chuỗi — đã nằm trong `total`. */
             surcharge: string;
+            /**
+             * @description Làm tròn lên 1.000 ₫ của đơn Pancake có tổng lẻ, Decimal(18,4) chuỗi — đã nằm trong `total` và
+             *     trong COD gửi hãng; "0.0000" = không làm tròn (2026-10-26).
+             */
+            roundingAmount: string;
             /** @description Khách chuyển khoản trước, Decimal(18,4) chuỗi. */
             prepaidAmount: string;
             freeShipping: boolean;

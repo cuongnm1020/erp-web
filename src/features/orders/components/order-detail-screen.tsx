@@ -729,6 +729,9 @@ function OrderTotals({ order }: { order: SalesOrderDetail }) {
           hint={order.shipFeeOnReturnOnly ? 'chỉ thu nếu hoàn' : undefined}
         />
         {nonZero(order.surcharge) ? <Row label="Phụ thu" value={money(order.surcharge)} /> : null}
+        {nonZero(order.roundingAmount) ? (
+          <Row label="Làm tròn" value={money(order.roundingAmount)} />
+        ) : null}
         <dt className="border-t pt-1.5 font-semibold">Tổng cộng</dt>
         <dd className="border-t pt-1.5 font-semibold tabular-nums">{money(order.total)}</dd>
         {!prepaid.isZero() ? (
