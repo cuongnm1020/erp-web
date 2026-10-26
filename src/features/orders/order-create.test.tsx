@@ -527,6 +527,53 @@ describe('OrderCreateScreen — màn tạo đơn mới', () => {
     expect(bare).not.toHaveProperty('facebookPageId');
   });
 
+  it('gõ đủ địa chỉ → gợi ý "Đắk Nông, Huyện Tuy Đức, Xã Quảng Tân"; bấm điền Xã / Huyện / Tỉnh, dòng địa chỉ còn phần còn lại (2026-10-26)', async () => {
+    const asked: string[] = [];
+    server.use(
+      ...skuHandlers(),
+      http.get('/api/geo/suggest', ({ request }) => {
+        asked.push(new URL(request.url).searchParams.get('q') ?? '');
+        const q = new URL(request.url).searchParams.get('q') ?? '';
+        return HttpResponse.json({
+          ready: true,
+          items: q.includes('Quảng Tân')
+            ? [
+                {
+                  generation: 'OLD',
+                  province: 'Đắk Nông',
+                  district: 'Huyện Tuy Đức',
+                  ward: 'Xã Quảng Tân',
+                  label: 'Đắk Nông, Huyện Tuy Đức, Xã Quảng Tân',
+                  line1: '0332119579',
+                },
+              ]
+            : [],
+        });
+      }),
+    );
+    renderApp(<OrderCreateScreen />);
+    const line1 = await screen.findByLabelText('Địa chỉ chi tiết (số nhà, đường, thôn/xóm)');
+    fireEvent.change(line1, {
+      target: { value: '0332119579, Xã Quảng Tân, Huyện Tuy Đức, Đắk Nông' },
+    });
+    const pick = await screen.findByRole('button', {
+      name: /Đắk Nông, Huyện Tuy Đức, Xã Quảng Tân/,
+    });
+    expect(pick).toHaveTextContent('Địa giới cũ');
+    fireEvent.click(pick);
+    expect(screen.getByLabelText('Phường / Xã')).toHaveValue('Xã Quảng Tân');
+    expect(screen.getByLabelText('Quận / Huyện (cũ)')).toHaveValue('Huyện Tuy Đức');
+    expect(screen.getByLabelText('Tỉnh / Thành phố')).toHaveValue('Đắk Nông');
+    expect(line1).toHaveValue('0332119579');
+    // Đã điền khớp → gợi ý ẩn.
+    await waitFor(() =>
+      expect(
+        screen.queryByRole('button', { name: /Đắk Nông, Huyện Tuy Đức, Xã Quảng Tân/ }),
+      ).not.toBeInTheDocument(),
+    );
+    expect(asked.every((q) => q.length >= 6)).toBe(true);
+  });
+
   it('ô Page: page ngưng ẩn; chọn page một POS khi ô POS trống → tự điền POS; có POS thì "Page của POS này" lên trước', async () => {
     server.use(...skuHandlers());
     renderApp(<OrderCreateScreen />);

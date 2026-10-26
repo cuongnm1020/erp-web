@@ -1660,6 +1660,8 @@ export const handlers = [
       { shopId: '407957969', shopName: null, isActive: false },
     ]),
   ),
+  // Gợi ý Xã / Huyện / Tỉnh (2026-10-26) — mặc định không gợi ý; test cần thì server.use đè.
+  http.get('/api/geo/suggest', () => HttpResponse.json({ items: [], ready: true })),
   // Page Facebook cho ô chọn page (tạo đơn) + bộ lọc đơn — đúng shape FacebookPageOptionDto.
   http.get('/api/facebook-pages/options', () => HttpResponse.json(FACEBOOK_PAGE_OPTIONS)),
   // Đồng bộ lại đơn Pancake theo POS — mặc định chưa chạy lần nào (PancakeOrderResyncStatusDto).

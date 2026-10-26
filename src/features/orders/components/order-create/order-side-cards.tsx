@@ -1,7 +1,7 @@
 'use client';
 
 import Decimal from 'decimal.js';
-import { Check, ChevronDown, ChevronUp, MoreHorizontal, Plus, X } from 'lucide-react';
+import { Check, ChevronDown, ChevronUp, MapPin, MoreHorizontal, Plus, X } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useWatch, type UseFormReturn } from 'react-hook-form';
 import {
@@ -56,6 +56,7 @@ import {
   useShippingQuotePreview,
   type ShippingQuotePreviewBody,
 } from '../../api/use-order-create';
+import { useGeoSuggest, type GeoSuggestion } from '../../api/use-orders';
 import { GENDER_LABEL } from '../../labels';
 import { GENDERS, normalizePhoneInput, type CreateOrderValues } from '../../schema';
 
@@ -761,6 +762,7 @@ export function ReceiverCard({ form }: { form: Form }) {
           className: 'sm:col-span-2',
         })}
       </div>
+      <AddressSuggestions form={form} onApply={onTyped} />
       <div className="grid gap-2.5 sm:grid-cols-3">
         {textField('ward', 'Xã / Phường', 'Phường / Xã')}
         {textField('district', 'Quận / Huyện', 'Quận / Huyện (cũ)')}
@@ -787,6 +789,62 @@ export function ReceiverCard({ form }: { form: Form }) {
         )}
       />
     </Card>
+  );
+}
+
+/**
+ * Gợi ý Xã / Huyện / Tỉnh từ dòng Địa chỉ (2026-10-26, kiểu Pancake): gõ "0332119579, Xã Quảng Tân,
+ * Huyện Tuy Đức, Đắk Nông" → hiện "Đắk Nông, Huyện Tuy Đức, Xã Quảng Tân"; bấm thì điền ba ô (tên
+ * đúng danh mục, địa giới cũ giữ tên cũ) và dòng Địa chỉ chỉ còn phần không phải địa giới. Gợi ý
+ * trùng với ba ô đang có thì ẩn.
+ */
+function AddressSuggestions({
+  form,
+  onApply,
+}: {
+  form: Form;
+  onApply: (name: (typeof ADDRESS_FIELDS)[number], value: string) => void;
+}) {
+  const [line1, ward, district, province] = useWatch({
+    control: form.control,
+    name: ['line1', 'ward', 'district', 'province'],
+  });
+  const q = useDebounced(line1 ?? '', 300);
+  const suggest = useGeoSuggest(q);
+  const items = (suggest.data?.items ?? []).filter(
+    (s) =>
+      !(
+        s.province === province &&
+        (s.district ?? '') === (district ?? '') &&
+        (s.ward ?? '') === (ward ?? '')
+      ),
+  );
+  if (!items.length) return null;
+  const apply = (s: GeoSuggestion) => {
+    onApply('ward', s.ward ?? '');
+    onApply('district', s.district ?? '');
+    onApply('province', s.province);
+    if (s.line1 && s.line1 !== line1) onApply('line1', s.line1);
+  };
+  return (
+    <div className="flex flex-col gap-1" role="group" aria-label="Gợi ý xã, huyện, tỉnh">
+      {items.map((s) => (
+        <button
+          key={`${s.generation}|${s.label}`}
+          type="button"
+          onClick={() => apply(s)}
+          className="flex items-center gap-2 rounded-md border border-dashed border-input bg-card px-2.5 py-1.5 text-left text-sm hover:bg-muted"
+        >
+          <MapPin className="h-4 w-4 shrink-0 text-primary" aria-hidden />
+          <span className="min-w-0 flex-1 truncate" title={s.label}>
+            {s.label}
+          </span>
+          <span className="shrink-0 text-xs text-muted-foreground">
+            {s.generation === 'OLD' ? 'Địa giới cũ' : 'Địa giới mới'}
+          </span>
+        </button>
+      ))}
+    </div>
   );
 }
 

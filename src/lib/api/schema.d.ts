@@ -2574,6 +2574,22 @@ export interface paths {
         patch: operations["FacebookPageController_update"];
         trace?: never;
     };
+    "/geo/suggest": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["GeoController_suggest"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/teams": {
         parameters: {
             query?: never;
@@ -9720,6 +9736,26 @@ export interface components {
             note?: string | null;
             isActive?: boolean;
         };
+        GeoSuggestionDto: {
+            /**
+             * @description OLD = địa giới cũ 3 cấp (trước 7/2025), NEW = địa giới mới 2 cấp.
+             * @enum {string}
+             */
+            generation: "OLD" | "NEW";
+            province: string;
+            /** @description null với địa giới mới (không còn cấp huyện) hoặc chưa khớp huyện. */
+            district: string | null;
+            ward: string | null;
+            /** @description "Đắk Nông, Huyện Tuy Đức, Xã Quảng Tân" — thứ tự như Pancake. */
+            label: string;
+            /** @description Dòng địa chỉ sau khi bỏ các đoạn trùng tên đơn vị đã khớp ("0332119579"). */
+            line1: string;
+        };
+        GeoSuggestResponseDto: {
+            items: components["schemas"]["GeoSuggestionDto"][];
+            /** @description false = danh mục địa giới chưa nạp (worker đang nạp lần đầu). */
+            ready: boolean;
+        };
         TeamDto: {
             id: string;
             code: string;
@@ -12453,7 +12489,7 @@ export interface components {
              * @description Tiến độ nghiệp vụ — xem {@link ReceiptStageValue}.
              * @enum {string}
              */
-            stage: "CANCELLED" | "COMPLETED" | "NEW" | "PUTTING_AWAY" | "AWAITING_COST";
+            stage: "CANCELLED" | "NEW" | "COMPLETED" | "PUTTING_AWAY" | "AWAITING_COST";
             lineCount: number;
             totalQty: string;
         };
@@ -12535,7 +12571,7 @@ export interface components {
              * @description Tiến độ nghiệp vụ — xem {@link ReceiptStageValue}.
              * @enum {string}
              */
-            stage: "CANCELLED" | "COMPLETED" | "NEW" | "PUTTING_AWAY" | "AWAITING_COST";
+            stage: "CANCELLED" | "NEW" | "COMPLETED" | "PUTTING_AWAY" | "AWAITING_COST";
             /** @description Task cất hàng đóng xong lúc nào; null = chưa cất xong. */
             putAwayDoneAt: string | null;
             /** @description Kế toán nhập giá lần cuối (null = chưa nhập qua màn giá). */
@@ -12697,7 +12733,7 @@ export interface components {
              * @description Tiến độ sau khi nhập giá — COMPLETED khi đã cất xong và mọi dòng có giá.
              * @enum {string}
              */
-            stage: "CANCELLED" | "COMPLETED" | "NEW" | "PUTTING_AWAY" | "AWAITING_COST";
+            stage: "CANCELLED" | "NEW" | "COMPLETED" | "PUTTING_AWAY" | "AWAITING_COST";
             /** @description Số dòng vừa nhận giá. */
             costedLineCount: number;
             /** @description Số dòng của phiếu còn thiếu giá sau lần này. */
@@ -19574,6 +19610,29 @@ export interface operations {
             };
         };
     };
+    GeoController_suggest: {
+        parameters: {
+            query: {
+                /** @description Dòng địa chỉ gõ tự do: "0332119579, Xã Quảng Tân, Huyện Tuy Đức, Đắk Nông". */
+                q: string;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GeoSuggestResponseDto"];
+                };
+            };
+        };
+    };
     TeamController_list: {
         parameters: {
             query?: never;
@@ -22530,7 +22589,7 @@ export interface operations {
                 warehouseId?: string;
                 status?: "DRAFT" | "PENDING_APPROVAL" | "APPROVED" | "POSTED" | "CANCELLED";
                 /** @description Lọc theo tiến độ nghiệp vụ (tab màn Phiếu nhập) — xem `GoodsReceipt.stage`. */
-                stage?: "CANCELLED" | "COMPLETED" | "NEW" | "PUTTING_AWAY" | "AWAITING_COST";
+                stage?: "CANCELLED" | "NEW" | "COMPLETED" | "PUTTING_AWAY" | "AWAITING_COST";
                 /** @description Tìm theo số phiếu (contains, không phân biệt hoa thường). */
                 q?: string;
                 /** @description Lọc theo receivedAt — ISO date, from ≤ receivedAt < to+1d. */
