@@ -233,8 +233,7 @@ const buildColumns = (
     meta: { width: 170, sortable: true },
     cell: ({ row }) => {
       const o = row.original;
-      // Nguồn (Pancake # / ERP) + sale trên MỘT dòng phụ, cắt gọn — tên đầy đủ ở title.
-      const meta = [o.pancakeOrderId ? null : 'Tạo trong ERP', o.ownerName].filter(Boolean);
+      // Dòng phụ 1: nguồn (Pancake # / ERP). Dòng phụ 2: tên sale đầy đủ, xuống dòng khi dài.
       return (
         <div className="space-y-0.5">
           <div className="flex items-center gap-1.5">
@@ -252,18 +251,18 @@ const buildColumns = (
               </span>
             ) : null}
           </div>
-          <div
-            className="max-w-40 truncate text-xs text-muted-foreground"
-            title={[o.pancakeOrderId ? `Pancake #${o.pancakeOrderId}` : null, ...meta]
-              .filter(Boolean)
-              .join(' · ')}
-          >
+          <div className="text-xs text-muted-foreground">
             {o.pancakeOrderId ? (
               <PancakeOrderLink orderId={o.pancakeOrderId} link={o.pancakeOrderLink} />
-            ) : null}
-            {o.pancakeOrderId && meta.length > 0 ? ' · ' : null}
-            {meta.join(' · ')}
+            ) : (
+              'Tạo trong ERP'
+            )}
           </div>
+          {o.ownerName ? (
+            <div className="break-words text-xs text-foreground" data-testid="order-owner">
+              {o.ownerName}
+            </div>
+          ) : null}
         </div>
       );
     },
