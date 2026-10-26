@@ -4,7 +4,9 @@ import {
   AlertTriangle,
   Archive,
   CheckCircle2,
+  Circle,
   CircleAlert,
+  CircleDot,
   Layers,
   MapPin,
   PackageX,
@@ -12,6 +14,7 @@ import {
   Warehouse,
   WifiOff,
 } from 'lucide-react';
+import Decimal from 'decimal.js';
 import { useRouter } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
 import { ScanInput, type ScanInputHandle } from '@/components/data/scan-input';
@@ -22,7 +25,7 @@ import { newIdempotencyKey } from '@/lib/api/client';
 import { beep } from '@/lib/beep';
 import { cn } from '@/lib/cn';
 import { messageFor } from '@/lib/error-messages';
-import { formatDateTime, formatQuantity } from '@/lib/format';
+import { formatDateTime, formatQuantity, toDecimal } from '@/lib/format';
 import { useAbility } from '@/lib/permission';
 import {
   usePdaHandoverState,
@@ -42,6 +45,7 @@ import { PdaListColumn } from './pda-list-column';
 import { ScanQtyBar } from './scan-qty-bar';
 import { ShortPickDialog } from './short-pick-dialog';
 import { ContainerHint } from './container-hint';
+import { ScanCounter } from './scan-counter';
 import { SkuBarcodes } from './sku-barcodes';
 import { SkuIdentity, SkuThumb } from './sku-identity';
 
@@ -189,6 +193,25 @@ export function PickScreen() {
       : task.task
         ? `${task.task.lines.filter((l) => l.status === 'COMPLETED' || l.status === 'EXCEPTION').length}/${task.task.lines.length} dòng`
         : null;
+  // Tiến độ cả đơn / lượt theo đơn vị (thanh ở đầu màn) — dòng hủy không tính.
+  const unitLines =
+    mode === 'wave'
+      ? (wave.wave?.lines ?? [])
+      : (task.task?.lines.filter((l) => l.status !== 'CANCELLED') ?? []);
+  const unitsPlanned = unitLines.reduce(
+    (sum, l) => sum.plus(toDecimal(l.qtyPlanned) ?? 0),
+    new Decimal(0),
+  );
+  const unitsDone = unitLines.reduce(
+    (sum, l) => sum.plus(toDecimal(l.qtyDone) ?? 0),
+    new Decimal(0),
+  );
+  const unitsPct = unitsPlanned.gt(0)
+    ? unitsDone.div(unitsPlanned).times(100).toDecimalPlaces(0).toNumber()
+    : 0;
+  const current = currentWave ?? currentTask;
+  // Đơn vị cơ bản của dòng đang lấy = gợi ý không phải thùng / kiện ("5 CHAI").
+  const currentUnit = current?.suggested?.find((x) => !x.containerTypeCode)?.uomCode ?? null;
   const shortWhat = currentWave
     ? `${currentWave.skuCode} · ${currentWave.skuName} tại ${currentWave.locationCode ?? '—'} (${currentWave.shares.length} đơn)`
     : currentTask
@@ -242,29 +265,125 @@ export function PickScreen() {
   // Xong việc mà không còn việc được giao → bắt buộc giao người đóng gói.
   const noMoreWork = assignedCount === 0;
 
+  const working = phase === 'ready';
+  // Danh sách dòng (task) / nhóm (lượt) — một hình cho cả hai, cột phải trên desktop.
+  const rows = (
+    mode === 'wave'
+      ? (wave.wave?.lines ?? []).map((g) => ({
+          key: g.key,
+          productName: g.productName,
+          skuName: g.skuName,
+          imageUrl: g.imageUrl,
+          locationCode: g.locationCode,
+          qtyDone: g.qtyDone,
+          qtyPlanned: g.qtyPlanned,
+          extra: `${g.shares.length} đơn`,
+          state: g.complete ? 'done' : g.key === currentWave?.key ? 'current' : 'pending',
+        }))
+      : (task.task?.lines ?? []).map((l) => ({
+          key: l.taskLineId,
+          productName: l.productName,
+          skuName: l.skuName,
+          imageUrl: l.imageUrl,
+          locationCode: l.locationCode,
+          qtyDone: l.qtyDone,
+          qtyPlanned: l.qtyPlanned,
+          extra: null as string | null,
+          state:
+            l.status === 'COMPLETED'
+              ? 'done'
+              : l.status === 'EXCEPTION'
+                ? 'short'
+                : l.taskLineId === currentTask?.taskLineId
+                  ? 'current'
+                  : 'pending',
+        }))
+  ).map((r) => {
+    const planned = toDecimal(r.qtyPlanned);
+    const pct =
+      planned && planned.gt(0)
+        ? Decimal.min(100, (toDecimal(r.qtyDone) ?? new Decimal(0)).div(planned).times(100))
+            .toDecimalPlaces(0)
+            .toNumber()
+        : 0;
+    return { ...r, pct };
+  });
+  const actions = (
+    <>
+      <Button
+        variant="outline"
+        className="h-14 border-warning-line text-warning lg:h-control"
+        disabled={!current || s.busy}
+        onClick={() => setShortOpen(true)}
+      >
+        <PackageX aria-hidden />
+        Thiếu hàng
+      </Button>
+      <Button variant="outline" className="h-14 lg:h-control" onClick={clear}>
+        Bỏ việc đang mở
+      </Button>
+    </>
+  );
+
+  // Desktop (lg): lưới 3 cột — khu đang lấy + ô quét chiếm 2 cột, danh sách dòng cột phải.
+  // PDA: một cột, ô quét dính đáy. Thiết kế 2026-10-26 canvas 74cSn4eQquHQ56iaAxHmL3.
   return (
-    <div className="flex min-h-dvh flex-col bg-background text-base">
-      <header className="flex items-center justify-between border-b px-4 py-3">
-        <div>
-          <div className="flex items-center gap-1 text-xs uppercase tracking-wide text-muted-foreground">
-            {mode === 'wave' ? <Layers className="h-3 w-3" aria-hidden /> : null}
-            {mode === 'wave' ? 'Lượt lấy gộp' : 'Lấy hàng'}
+    <div className="flex min-h-dvh flex-col bg-background text-base lg:grid lg:grid-cols-3 lg:content-start lg:gap-x-5">
+      <header className="flex flex-col gap-2 border-b bg-card px-4 py-3 lg:col-span-3 lg:flex-row lg:flex-wrap lg:items-center lg:gap-x-8 lg:px-6">
+        <div className="flex items-end justify-between gap-3">
+          <div>
+            <div className="flex items-center gap-1 text-xs uppercase tracking-wide text-muted-foreground">
+              {mode === 'wave' ? <Layers className="h-3 w-3" aria-hidden /> : null}
+              {mode === 'wave' ? 'Lượt lấy gộp' : 'Lấy hàng'}
+            </div>
+            <div className="font-mono text-lg font-semibold lg:text-xl">{heading}</div>
           </div>
-          <div className="font-mono text-lg font-semibold">{heading}</div>
+          {progress ? (
+            <div className="text-right text-sm text-muted-foreground lg:hidden">{progress}</div>
+          ) : null}
         </div>
-        {progress ? (
-          <div className="text-right text-sm text-muted-foreground">{progress}</div>
+        {unitsPlanned.gt(0) ? (
+          <div className="flex flex-col gap-1 lg:max-w-lg lg:flex-1">
+            <div className="flex justify-between gap-2 text-sm text-muted-foreground">
+              <span>
+                {mode === 'wave' ? 'Cả lượt' : 'Cả đơn'} ·{' '}
+                <b className="font-semibold text-foreground tabular-nums">
+                  {formatQuantity(unitsDone.toFixed(6))}/{formatQuantity(unitsPlanned.toFixed(6))}
+                </b>{' '}
+                sản phẩm
+              </span>
+              {progress ? <span className="hidden lg:inline">{progress}</span> : null}
+            </div>
+            <div
+              className="h-1.5 overflow-hidden rounded-full bg-border lg:h-2"
+              role="progressbar"
+              aria-label="Tiến độ lấy hàng"
+              aria-valuemin={0}
+              aria-valuemax={100}
+              aria-valuenow={unitsPct}
+            >
+              <div className="h-full bg-primary" style={{ width: `${unitsPct}%` }} />
+            </div>
+          </div>
         ) : null}
       </header>
 
       {offline ? (
-        <p role="status" className="flex items-center gap-2 bg-warning-weak px-4 py-2 text-sm">
+        <p
+          role="status"
+          className="flex items-center gap-2 bg-warning-weak px-4 py-2 text-sm lg:col-span-3"
+        >
           <WifiOff className="h-4 w-4 text-warning" aria-hidden />
           Mất kết nối — quét lại khi có mạng.
         </p>
       ) : null}
 
-      <main className="flex flex-1 flex-col gap-3 px-4 py-3">
+      <main
+        className={cn(
+          'flex flex-1 flex-col gap-3 px-4 py-3 lg:py-5 lg:pl-6 lg:pr-0',
+          working ? 'lg:col-span-2' : 'lg:col-span-3 lg:pr-6',
+        )}
+      >
         {shortages.length > 0 ? (
           <aside
             role="status"
@@ -289,7 +408,8 @@ export function PickScreen() {
           </aside>
         ) : null}
 
-        {feedback ? (
+        {/* Đang lấy: phản hồi lần quét nằm trong khung đếm (ScanCounter), không lặp ở đây. */}
+        {feedback && !(working && current) ? (
           <p
             role={feedback.kind === 'error' ? 'alert' : 'status'}
             className={cn(
@@ -518,45 +638,46 @@ export function PickScreen() {
           </p>
         ) : null}
 
-        {phase === 'ready' && (currentTask || currentWave) ? (
-          <section className="rounded-lg border bg-card p-4">
-            <div className="flex items-center gap-2 text-sm text-muted-foreground">
-              <MapPin className="h-4 w-4" aria-hidden />
-              Vị trí
-            </div>
-            <div className="font-mono text-4xl font-bold leading-tight">
-              {(currentWave ?? currentTask)!.locationCode ?? '—'}
-            </div>
-            <SkuIdentity sku={(currentWave ?? currentTask)!} className="mt-3" />
-            <SkuBarcodes barcodes={(currentWave ?? currentTask)!.barcodes} />
-            <ContainerHint
-              containerBarcode={(currentWave ?? currentTask)!.containerBarcode}
-              suggested={(currentWave ?? currentTask)!.suggested}
-            />
-            <div className="mt-3 flex items-baseline gap-2">
-              <span className="text-5xl font-bold tabular-nums">
-                {formatQuantity((currentWave ?? currentTask)!.qtyRemaining)}
-              </span>
-              <span className="text-muted-foreground">
-                còn lấy · đã {formatQuantity((currentWave ?? currentTask)!.qtyDone)}/
-                {formatQuantity((currentWave ?? currentTask)!.qtyPlanned)}
-              </span>
-            </div>
-            {(currentWave ?? currentTask)!.binRemaining !== null ? (
-              <p
-                className="mt-2 flex items-center gap-2 rounded-md bg-muted px-3 py-2 text-base"
-                aria-live="polite"
-              >
-                <Archive className="h-5 w-5 shrink-0 text-muted-foreground" aria-hidden />
-                <span>
-                  Trên kệ còn{' '}
-                  <b className="text-xl font-bold tabular-nums">
-                    {formatQuantity((currentWave ?? currentTask)!.binRemaining)}
-                  </b>{' '}
-                  <span className="text-muted-foreground">· đã trừ phần lấy chưa đóng gói</span>
+        {working && current ? (
+          <section className="flex flex-col gap-3 rounded-lg border bg-card p-3.5 lg:gap-4 lg:p-5">
+            <div className="flex flex-col gap-2 lg:flex-row lg:items-center lg:gap-5">
+              <SkuIdentity sku={current} className="lg:flex-1" />
+              <div className="flex items-center gap-x-3 gap-y-0.5 rounded-md bg-muted px-3 py-2 lg:flex-col lg:items-end lg:px-4">
+                <span className="flex items-center gap-1 text-sm text-muted-foreground">
+                  <MapPin className="h-4 w-4" aria-hidden />
+                  Vị trí
                 </span>
-              </p>
-            ) : null}
+                <span className="font-mono text-2xl font-bold leading-tight lg:text-3xl">
+                  {current.locationCode ?? '—'}
+                </span>
+                {current.binRemaining !== null ? (
+                  <span
+                    className="ml-auto flex items-center gap-1 text-sm text-muted-foreground lg:ml-0"
+                    aria-live="polite"
+                    title="Đã trừ phần lấy chưa đóng gói"
+                  >
+                    <Archive className="h-4 w-4 shrink-0" aria-hidden />
+                    <span>
+                      Trên kệ còn{' '}
+                      <b className="font-semibold text-foreground tabular-nums">
+                        {formatQuantity(current.binRemaining)}
+                      </b>
+                    </span>
+                  </span>
+                ) : null}
+              </div>
+            </div>
+            <SkuBarcodes barcodes={current.barcodes} />
+            <ContainerHint
+              containerBarcode={current.containerBarcode}
+              suggested={current.suggested}
+            />
+            <ScanCounter
+              done={current.qtyDone}
+              planned={current.qtyPlanned}
+              unit={currentUnit}
+              feedback={feedback}
+            />
             {currentWave ? (
               <ul className="mt-2 flex flex-wrap gap-1 text-xs">
                 {currentWave.shares.map((sh) => (
@@ -575,76 +696,6 @@ export function PickScreen() {
               </ul>
             ) : null}
           </section>
-        ) : null}
-
-        {phase === 'ready' && mode === 'task' && task.task ? (
-          <ol className="flex flex-col gap-1 text-sm">
-            {task.task.lines.map((l) => (
-              <li
-                key={l.taskLineId}
-                className={cn(
-                  'flex items-center justify-between rounded-md border px-3 py-2',
-                  l.status === 'COMPLETED' &&
-                    'border-success-line bg-success-weak text-muted-foreground',
-                  l.status === 'EXCEPTION' && 'border-warning-line bg-warning-weak',
-                  l.taskLineId === currentTask?.taskLineId && 'border-primary',
-                )}
-              >
-                <span className="flex min-w-0 items-center gap-2">
-                  <SkuThumb src={l.imageUrl} alt={l.productName} />
-                  <span className="flex min-w-0 flex-col">
-                    <span className="truncate">
-                      <span className="font-mono font-semibold">{l.locationCode ?? '—'}</span>{' '}
-                      {l.productName}
-                      {l.status === 'EXCEPTION' ? (
-                        <span className="ml-1 text-xs text-warning">· thiếu</span>
-                      ) : null}
-                    </span>
-                    {l.skuName !== l.productName ? (
-                      <span className="truncate text-xs text-muted-foreground">{l.skuName}</span>
-                    ) : null}
-                  </span>
-                </span>
-                <span className="shrink-0 tabular-nums">
-                  {formatQuantity(l.qtyDone)}/{formatQuantity(l.qtyPlanned)}
-                </span>
-              </li>
-            ))}
-          </ol>
-        ) : null}
-
-        {phase === 'ready' && mode === 'wave' && wave.wave ? (
-          <ol className="flex flex-col gap-1 text-sm">
-            {wave.wave.lines.map((g) => (
-              <li
-                key={g.key}
-                className={cn(
-                  'flex items-center justify-between rounded-md border px-3 py-2',
-                  g.complete && 'border-success-line bg-success-weak text-muted-foreground',
-                  g.key === currentWave?.key && 'border-primary',
-                )}
-              >
-                <span className="flex min-w-0 items-center gap-2">
-                  <SkuThumb src={g.imageUrl} alt={g.productName} />
-                  <span className="flex min-w-0 flex-col">
-                    <span className="truncate">
-                      <span className="font-mono font-semibold">{g.locationCode ?? '—'}</span>{' '}
-                      {g.productName}
-                      <span className="ml-1 text-xs text-muted-foreground">
-                        · {g.shares.length} đơn
-                      </span>
-                    </span>
-                    {g.skuName !== g.productName ? (
-                      <span className="truncate text-xs text-muted-foreground">{g.skuName}</span>
-                    ) : null}
-                  </span>
-                </span>
-                <span className="shrink-0 tabular-nums">
-                  {formatQuantity(g.qtyDone)}/{formatQuantity(g.qtyPlanned)}
-                </span>
-              </li>
-            ))}
-          </ol>
         ) : null}
 
         {phase === 'done' ? (
@@ -668,11 +719,88 @@ export function PickScreen() {
         ) : null}
       </main>
 
-      <footer className="sticky bottom-0 flex flex-col gap-3 border-t bg-background px-4 pb-4 pt-3">
-        {phase === 'ready' ? <ScanQtyBar ctl={scanQty} verb="Lấy" /> : null}
+      {working && rows.length > 0 ? (
+        <aside className="flex flex-col gap-1.5 px-4 pb-3 lg:row-span-2 lg:mr-6 lg:mt-5 lg:self-start lg:overflow-hidden lg:rounded-lg lg:border lg:bg-card lg:p-0">
+          <div className="flex items-center justify-between text-xs font-semibold uppercase text-muted-foreground lg:min-h-card-header lg:border-b lg:px-4 lg:text-sm lg:normal-case lg:text-foreground">
+            <span>{mode === 'wave' ? 'Các nhóm của lượt' : 'Các dòng của đơn'}</span>
+            <span className="font-normal text-muted-foreground tabular-nums">
+              {rows.filter((r) => r.state === 'done').length}/{rows.length} xong
+            </span>
+          </div>
+          <ol className="flex flex-col gap-1.5 text-sm lg:p-2.5">
+            {rows.map((r) => (
+              <li
+                key={r.key}
+                className={cn(
+                  'flex items-center gap-2.5 rounded-md border bg-card px-3 py-2',
+                  r.state === 'done' && 'border-success-line bg-success-weak',
+                  r.state === 'short' && 'border-warning-line bg-warning-weak',
+                  r.state === 'current' && 'border-2 border-primary',
+                )}
+              >
+                {r.state === 'done' ? (
+                  <CheckCircle2 className="h-5 w-5 shrink-0 text-success" aria-label="Xong" />
+                ) : r.state === 'current' ? (
+                  <CircleDot className="h-5 w-5 shrink-0 text-primary" aria-label="Đang lấy" />
+                ) : r.state === 'short' ? (
+                  <AlertTriangle className="h-5 w-5 shrink-0 text-warning" aria-label="Thiếu" />
+                ) : (
+                  <Circle
+                    className="h-5 w-5 shrink-0 text-muted-foreground"
+                    aria-label="Chưa lấy"
+                  />
+                )}
+                <SkuThumb src={r.imageUrl} alt={r.productName} />
+                <span className="flex min-w-0 flex-1 flex-col">
+                  <span className="truncate font-semibold">
+                    {r.productName}
+                    {r.state === 'short' ? (
+                      <span className="ml-1 text-xs font-normal text-warning">· thiếu</span>
+                    ) : null}
+                  </span>
+                  <span className="truncate text-xs text-muted-foreground">
+                    <span className="font-mono">{r.locationCode ?? '—'}</span>
+                    {r.skuName !== r.productName ? ` · ${r.skuName}` : ''}
+                    {r.extra ? ` · ${r.extra}` : ''}
+                  </span>
+                </span>
+                <span className="flex shrink-0 flex-col items-end gap-1">
+                  <span className="text-base font-bold tabular-nums">
+                    {formatQuantity(r.qtyDone)}
+                    <span className="font-normal text-muted-foreground">
+                      /{formatQuantity(r.qtyPlanned)}
+                    </span>
+                  </span>
+                  <span className="h-1 w-14 overflow-hidden rounded-full bg-border">
+                    <span
+                      className={cn(
+                        'block h-full',
+                        r.state === 'done' ? 'bg-success' : 'bg-primary',
+                      )}
+                      style={{ width: `${r.pct}%` }}
+                    />
+                  </span>
+                </span>
+              </li>
+            ))}
+          </ol>
+        </aside>
+      ) : null}
+
+      <footer
+        className={cn(
+          'sticky bottom-0 flex flex-col gap-3 border-t bg-background px-4 pb-4 pt-3',
+          'lg:static lg:border-0 lg:pb-6 lg:pl-6 lg:pr-0 lg:pt-0',
+          working ? 'lg:col-span-2 lg:flex-row lg:flex-wrap lg:items-end' : 'lg:col-span-3 lg:pr-6',
+        )}
+      >
+        {phase === 'ready' ? (
+          <ScanQtyBar ctl={scanQty} verb="Lấy" className="lg:w-80 lg:shrink-0" />
+        ) : null}
         <ScanInput
           ref={scanRef}
           size="lg"
+          className={working ? 'lg:order-first lg:flex-1' : undefined}
           label={phase === 'ready' ? 'Quét sản phẩm' : 'Quét mã đơn'}
           placeholder={
             phase === 'ready'
@@ -700,20 +828,7 @@ export function PickScreen() {
             </Button>
           )
         ) : phase === 'ready' ? (
-          <div className="grid grid-cols-2 gap-2">
-            <Button
-              variant="outline"
-              className="h-14 border-warning-line text-warning"
-              disabled={!(currentTask || currentWave) || s.busy}
-              onClick={() => setShortOpen(true)}
-            >
-              <PackageX aria-hidden />
-              Thiếu hàng
-            </Button>
-            <Button variant="outline" className="h-14" onClick={clear}>
-              Bỏ việc đang mở
-            </Button>
-          </div>
+          <div className="grid grid-cols-2 gap-2 lg:flex lg:w-full lg:justify-end">{actions}</div>
         ) : (
           <Button className="h-pda-primary text-lg" onClick={() => scanRef.current?.focus()}>
             Quét mã vạch

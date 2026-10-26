@@ -9000,7 +9000,7 @@ export interface components {
             orderNote?: string;
             /** @description Ghi chú nội bộ — không đưa ra kênh bán/khách. */
             internalNote?: string;
-            /** @description Cờ master data — reserve/pick CHƯA đọc (chờ chốt vận hành). */
+            /** @description Bán âm (2026-10-25): thiếu tồn vẫn lên được đơn — phần thiếu giữ vượt tồn ở DEFAULT, đơn chờ hàng (onHand không âm). */
             allowNegativeStock?: boolean;
             /** @description Tên in trên hóa đơn — bỏ trống / null = dùng tên thương mại (`name`). */
             invoiceName?: string | null;
@@ -9044,7 +9044,7 @@ export interface components {
             orderNote: string | null;
             /** @description Ghi chú nội bộ — không đưa ra kênh bán/khách. */
             internalNote: string | null;
-            /** @description Cờ master data — reserve/pick CHƯA đọc (chờ chốt vận hành). */
+            /** @description Bán âm (2026-10-25): thiếu tồn vẫn lên được đơn — phần thiếu giữ vượt tồn ở DEFAULT, đơn chờ hàng (onHand không âm). */
             allowNegativeStock: boolean;
             /** @description Tên dân dã / viết tắt / tên cũ — ô tìm sản phẩm ăn cả các alias này. */
             searchAliases: string[];
