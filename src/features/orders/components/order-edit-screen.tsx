@@ -805,6 +805,9 @@ function Editor({ order }: { order: SalesOrderDetail }) {
                 {nonZero(order.surcharge) ? (
                   <SumRow label="Phụ thu" value={formatMoney(order.surcharge)} />
                 ) : null}
+                {nonZero(order.roundingAmount) ? (
+                  <SumRow label="Làm tròn" value={formatMoney(order.roundingAmount)} />
+                ) : null}
                 {nonZero(order.taxAmount) ? (
                   <SumRow label="Thuế" value={formatMoney(order.taxAmount)} />
                 ) : null}

@@ -612,6 +612,7 @@ export function makeOrderDetail(id: string) {
     lines,
     source: null,
     surcharge: '0.0000',
+    roundingAmount: '0.0000',
     prepaidAmount: '0.0000',
     freeShipping: false,
     shipFeeOnReturnOnly: false,

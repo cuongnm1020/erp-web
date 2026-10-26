@@ -116,7 +116,28 @@ describe('visibleModules', () => {
       action: 'assign',
       subject: 'Customer',
     });
-    expect(requiredAbilityFor('/fin/invoices')).toEqual({ action: 'read', subject: 'Invoice' });
+    expect(requiredAbilityFor('/fin/invoices')).toEqual({ action: 'create', subject: 'Invoice' });
+  });
+
+  it('Tài chính chỉ kế toán + Admin (invoice.create, 2026-10-26); trưởng nhóm KD có invoice.read + report.work vẫn thấy Công việc & SLA ở Báo cáo', () => {
+    const leaderPerms = new Set(['read:Invoice', 'read:Payment', 'work:Report', 'sales:Report']);
+    const leader = visibleModules((a, s) => leaderPerms.has(`${a}:${s}`));
+    expect(leader.map((m) => m.label)).not.toContain('Tài chính');
+    expect(leader.find((m) => m.label === 'Báo cáo')?.children?.map((c) => c.label)).toEqual([
+      'Doanh thu bán hàng',
+      'Công việc & SLA',
+    ]);
+    for (const path of ['/fin/invoices', '/fin/receivables', '/fin/payables']) {
+      expect(requiredAbilityFor(path)).toEqual({ action: 'create', subject: 'Invoice' });
+    }
+    expect(requiredAbilityFor('/reports/work')).toEqual({ action: 'work', subject: 'Report' });
+
+    const accountant = visibleModules((a, s) => a === 'create' && s === 'Invoice');
+    expect(accountant.find((m) => m.label === 'Tài chính')?.children?.map((c) => c.label)).toEqual([
+      'Hóa đơn',
+      'Phải thu (tuổi nợ)',
+      'Phải trả NCC',
+    ]);
   });
 
   it('chỉ có shipment.read → module Kho chỉ hiện Theo dõi giao hàng (bật lại 2026-10-05)', () => {

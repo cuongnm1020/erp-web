@@ -463,7 +463,9 @@ export const NAV_MODULES: NavModule[] = [
     href: '/fin/invoices',
     icon: Landmark,
     tone: 'rpt',
-    ability: { action: 'read', subject: 'Invoice' },
+    // Chỉ kế toán + Admin (2026-10-26): invoice.create chỉ hai vai trò này có — trưởng nhóm kinh
+    // doanh có invoice.read (xem hóa đơn của đơn) nhưng không thấy menu Tài chính. Gate cả URL.
+    ability: { action: 'create', subject: 'Invoice' },
     shortcut: 'g h',
     // Ẩn cả nhóm Tài chính 2026-10-04; mở lại 2026-10-23 để kiểm các màn phần xuất hóa đơn.
     children: [
@@ -471,23 +473,26 @@ export const NAV_MODULES: NavModule[] = [
         label: 'Hóa đơn',
         href: '/fin/invoices',
         icon: ReceiptText,
-        ability: { action: 'read', subject: 'Invoice' },
+        ability: { action: 'create', subject: 'Invoice' },
       },
       //{ label: 'Thanh toán & cấn trừ', href: '/fin/payments', icon: CreditCard },
-      { label: 'Phải thu (tuổi nợ)', href: '/fin/receivables', icon: TrendingUp },
-      { label: 'Phải trả NCC', href: '/fin/payables', icon: TrendingDown },
+      {
+        label: 'Phải thu (tuổi nợ)',
+        href: '/fin/receivables',
+        icon: TrendingUp,
+        ability: { action: 'create', subject: 'Invoice' },
+      },
+      {
+        label: 'Phải trả NCC',
+        href: '/fin/payables',
+        icon: TrendingDown,
+        ability: { action: 'create', subject: 'Invoice' },
+      },
       {
         label: 'Lợi nhuận',
         href: '/fin/profit',
         icon: Percent,
         ability: { action: 'profit', subject: 'Report' },
-      },
-      {
-        label: 'Công việc & SLA',
-        href: '/reports/work',
-        icon: ClipboardList,
-        // report.work: quản lý (trưởng phòng / quản lý kho) — số liệu chỉ nhánh mình phụ trách.
-        ability: { action: 'work', subject: 'Report' },
       },
       //{ label: 'Giá vốn & giá trị tồn', href: '/fin/valuation', icon: Coins },
     ],
@@ -513,6 +518,14 @@ export const NAV_MODULES: NavModule[] = [
         href: '/fin/profit',
         icon: Percent,
         ability: { action: 'profit', subject: 'Report' },
+      },
+      {
+        // Chuyển từ nhóm Tài chính sang (2026-10-26, Tài chính chỉ còn kế toán + Admin).
+        label: 'Công việc & SLA',
+        href: '/reports/work',
+        icon: ClipboardList,
+        // report.work: quản lý (trưởng phòng / quản lý kho) — số liệu chỉ nhánh mình phụ trách.
+        ability: { action: 'work', subject: 'Report' },
       },
     ],
   },

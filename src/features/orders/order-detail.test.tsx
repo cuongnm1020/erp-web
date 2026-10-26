@@ -267,6 +267,24 @@ describe('OrderDetailScreen — GET /sales-orders/{id} (P1-12)', () => {
   });
 });
 
+describe('OrderDetailScreen — làm tròn đơn Pancake lẻ (2026-10-26)', () => {
+  it('roundingAmount > 0 → dòng "Làm tròn"; = 0 → không có dòng', async () => {
+    server.use(
+      http.get('/api/sales-orders/:id', ({ params }) =>
+        HttpResponse.json({ ...makeOrderDetail(String(params.id))!, roundingAmount: '2.0000' }),
+      ),
+    );
+    renderApp(<OrderDetailScreen orderId={ORDER.id} />);
+    expect(await screen.findByText('Làm tròn')).toBeInTheDocument();
+  });
+
+  it('không làm tròn → không hiện dòng', async () => {
+    renderApp(<OrderDetailScreen orderId={ORDER.id} />);
+    await screen.findByRole('heading', { level: 1 });
+    expect(screen.queryByText('Làm tròn')).not.toBeInTheDocument();
+  });
+});
+
 describe('OrderDetailScreen — đơn Pancake: tên gốc trên Pancake + món gõ tay (2026-10-22)', () => {
   it('dòng có tên Pancake khác tên ERP hiện "Trên Pancake: …"; món gõ tay hiện thành dòng riêng, không cột kho', async () => {
     const lines = DETAIL.lines.map((l, i) =>
