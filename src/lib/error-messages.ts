@@ -118,6 +118,9 @@ const MESSAGES: Record<string, string> = {
   // CSKH (2026-10-21)
   CARE_DISTRIBUTION_INVALID:
     'Tỷ lệ chia khách chưa hợp lệ — tổng các team phải đúng 100% và chỉ chia cho team CSKH đang hoạt động.',
+  // Mục đích sử dụng (biên bản CSKH 2026-10-26)
+  PURPOSE_NAME_TAKEN:
+    'Đã có mục đích cùng tên. Gộp mục đích này vào mục đích đó thay vì đổi tên trùng.',
   CARE_JOB_ACTOR_NOT_FOUND:
     'Không có tài khoản quản trị nào đang hoạt động để đứng tên lượt chia khách. Báo quản trị hệ thống.',
   CARRIER_ACCOUNT_NOT_FOUND:

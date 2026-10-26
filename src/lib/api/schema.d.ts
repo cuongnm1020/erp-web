@@ -5550,8 +5550,9 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * Màn "Khách của team" (leader + member CSKH): khách được gán cho team, mới gán trước, lọc theo
-         *     ngày gán (hôm qua / 3 / 7 ngày / khoảng tùy chọn — web tính ngày).
+         * Màn "Khách của team" (leader + member CSKH, biên bản 2026-10-26): mặc định đơn gần nhất trước,
+         *     `sort=revenue` doanh thu kỳ cao → thấp (chỉ đơn team này lên) + `top`; lọc mục đích sử dụng,
+         *     SKU đã mua, ngày gán, tìm. Kèm mục đích + ghi chú chăm sóc mới nhất của từng khách.
          */
         get: operations["CustomerCareController_teamCustomers"];
         put?: never;
@@ -5598,6 +5599,125 @@ export interface paths {
         options?: never;
         head?: never;
         patch?: never;
+        trace?: never;
+    };
+    "/customer-purposes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["CustomerPurposeController_list"];
+        put?: never;
+        post: operations["CustomerPurposeController_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/customer-purposes/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete: operations["CustomerPurposeController_remove"];
+        options?: never;
+        head?: never;
+        patch: operations["CustomerPurposeController_update"];
+        trace?: never;
+    };
+    "/customer-purposes/{id}/merge": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Gộp mục đích trùng / gõ sai vào mục đích giữ lại; mục đích cũ bị xóa. */
+        post: operations["CustomerPurposeController_merge"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/customer-care/customers/{customerId}/purposes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Ai lên đơn cũng xem được (khách tra SĐT có thể ngoài tầm nhìn). Mới gắn trước. */
+        get: operations["CustomerPurposeAssignController_list"];
+        put?: never;
+        /** Gắn thêm (không gỡ cái đang có); đã gắn thì giữ người / ngày gắn cũ. */
+        post: operations["CustomerPurposeAssignController_add"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/customer-care/customers/{customerId}/purposes/{tagId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Gỡ — chỉ khách trong tầm nhìn (khách của team mình / của mình). */
+        delete: operations["CustomerPurposeAssignController_remove"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/customer-care/customers/{customerId}/notes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Mới nhất lên đầu. */
+        get: operations["CustomerNoteController_list"];
+        put?: never;
+        post: operations["CustomerNoteController_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/customer-care/notes/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Chỉ người viết; xóa hẳn. */
+        delete: operations["CustomerNoteController_remove"];
+        options?: never;
+        head?: never;
+        /** Chỉ người viết (403 với người khác). */
+        patch: operations["CustomerNoteController_update"];
         trace?: never;
     };
     "/work-config": {
@@ -11106,6 +11226,13 @@ export interface components {
             orderDate?: string;
             /** @description Thẻ đơn (core.Tag.id). */
             tagIds?: string[];
+            /**
+             * @description Mục đích sử dụng gắn THÊM cho khách khi chốt đơn (`/customer-purposes`, biên bản CSKH
+             *     2026-10-26) — không gỡ mục đích khách đang có; đã gắn thì giữ người / ngày gắn cũ.
+             */
+            purposeTagIds?: string[];
+            /** @description Ghi chú chăm sóc lần này — lưu vào lịch sử chăm sóc của khách, gắn đơn (CSKH 2026-10-26). */
+            careNote?: string;
             internalNote?: string;
             /** @description Ghi chú in lên vận đơn. */
             printNote?: string;
@@ -13862,6 +13989,16 @@ export interface components {
              */
             careTeam: "OTHER" | "NONE" | "MINE" | null;
         };
+        TeamCustomerPurposeDto: {
+            id: string;
+            name: string;
+        };
+        TeamCustomerNoteDto: {
+            body: string;
+            authorName: string;
+            /** @description ISO. */
+            createdAt: string;
+        };
         TeamCustomerDto: {
             id: string;
             code: string;
@@ -13876,12 +14013,26 @@ export interface components {
             assignedBy: "OTHER" | "ORDER" | "AUTO";
             /** @description ISO — ngày khách được tạo trên hệ thống. */
             createdAt: string;
-            /** @description ISO — đơn gần nhất (mọi người lên, trong tầm nhìn); null = chưa có đơn. */
-            lastOrderAt: string | null;
+            /** @description Thứ hạng doanh thu kỳ trong danh sách đã lọc (1 = cao nhất; cùng doanh thu xếp theo id). */
+            rank: number;
+            /**
+             * @description Doanh thu kỳ, Decimal(18,4) — đơn đã duyệt do nhân viên TEAM NÀY lên (SalesOrder.teamId), trừ
+             *     hoàn, như báo cáo bán hàng.
+             */
+            revenue: string;
+            /** @description Số đơn đã duyệt team này lên trong kỳ. */
             orderCount: number;
+            /** @description ISO — đơn gần nhất team này lên (mọi thời điểm, trừ đơn hủy); null = chưa có. */
+            lastOrderAt: string | null;
+            /** @description Người lên đơn gần nhất; null = chưa có đơn. */
+            lastOrderOwnerName: string | null;
+            purposes: components["schemas"]["TeamCustomerPurposeDto"][];
+            /** @description Ghi chú chăm sóc mới nhất; null = chưa có. */
+            latestNote: components["schemas"]["TeamCustomerNoteDto"] | null;
         };
         TeamCustomerListDto: {
             items: components["schemas"]["TeamCustomerDto"][];
+            /** @description Số khách khớp lọc (đã cắt theo `top` nếu có). */
             total: number;
             teamId: string;
             teamName: string;
@@ -13935,6 +14086,92 @@ export interface components {
         RunCareDistributionDto: {
             /** @description `YYYY-MM-DD` (ngày VN khách được tạo); bỏ trống = hôm qua. */
             day?: string;
+        };
+        PurposeDto: {
+            id: string;
+            name: string;
+            /** @description Mã màu hex `#RRGGBB`; null = mặc định. */
+            color: string | null;
+            /** @description Số khách đang gắn mục đích này (toàn công ty). */
+            customerCount: number;
+        };
+        CreatePurposeDto: {
+            /** @description Tên mục đích, ví dụ "Sầu riêng". Trùng không dấu / hoa thường với mục đích đã có → trả bản đã có. */
+            name: string;
+        };
+        PurposeBriefDto: {
+            id: string;
+            name: string;
+            color: string | null;
+        };
+        CreatePurposeResultDto: {
+            purpose: components["schemas"]["PurposeBriefDto"];
+            /** @description false = đã có mục đích cùng tên (không dấu), không tạo thêm. */
+            created: boolean;
+        };
+        UpdatePurposeDto: {
+            name?: string;
+            /** @description `#RRGGBB`; null = bỏ màu. */
+            color?: string | null;
+        };
+        MergePurposeDto: {
+            /**
+             * Format: uuid
+             * @description Mục đích giữ lại — khách của mục đích đang gộp chuyển sang đây.
+             */
+            intoId: string;
+        };
+        MergePurposeResultDto: {
+            /** @description Số khách được chuyển sang (khách đã có cả hai không tính). */
+            moved: number;
+        };
+        DeletePurposeResultDto: {
+            id: string;
+            /** @description Số khách bị gỡ mục đích này. */
+            unassigned: number;
+        };
+        CustomerPurposeDto: {
+            id: string;
+            name: string;
+            /** @description ISO. */
+            taggedAt: string;
+            taggedById: string | null;
+            taggedByName: string | null;
+        };
+        AddCustomerPurposesDto: {
+            tagIds: string[];
+        };
+        CustomerNoteDto: {
+            id: string;
+            customerId: string;
+            /** @description Đơn chốt kèm ghi chú này (ghi ở màn Tạo đơn); null = ghi ở hồ sơ khách. */
+            orderId: string | null;
+            /** @description Số đơn của `orderId`; null khi không gắn đơn. */
+            orderCode: string | null;
+            body: string;
+            authorId: string;
+            authorName: string;
+            /** @description Phòng ban của người viết (CSKH LA, Phòng Arisyn…); null = chưa thuộc phòng nào. */
+            authorDepartment: string | null;
+            /** @description true = người đang xem là người viết → được sửa / xóa. */
+            mine: boolean;
+            /** @description ISO. */
+            createdAt: string;
+            /** @description ISO lần sửa cuối; null = chưa sửa. */
+            editedAt: string | null;
+        };
+        CustomerNoteListDto: {
+            items: components["schemas"]["CustomerNoteDto"][];
+            total: number;
+        };
+        CreateCustomerNoteDto: {
+            body: string;
+        };
+        UpdateCustomerNoteDto: {
+            body: string;
+        };
+        DeleteCustomerNoteResultDto: {
+            id: string;
         };
         WorkSlaPolicyDto: {
             /**
@@ -24370,6 +24607,20 @@ export interface operations {
                 assignedTo?: string;
                 /** @description Tìm theo mã / tên / SĐT khách. */
                 q?: string;
+                /**
+                 * @description `YYYY-MM-DD` — khoảng ngày tính doanh thu / số đơn (giờ VN, tối đa 366 ngày, đi cùng `to`).
+                 *     Bỏ trống = mọi thời điểm.
+                 */
+                from?: string;
+                to?: string;
+                /** @description `lastOrder` (mặc định) = đơn gần nhất trước; `revenue` = doanh thu kỳ cao → thấp. */
+                sort?: "lastOrder" | "revenue";
+                /** @description Chỉ N khách doanh thu kỳ cao nhất (có doanh thu > 0), sau các bộ lọc. */
+                top?: number;
+                /** @description Mục đích sử dụng (id, cách nhau dấu phẩy) — khách có ÍT NHẤT một mục đích trong danh sách. */
+                purposeIds?: string;
+                /** @description SKU (id, cách nhau dấu phẩy) — khách từng mua (đơn đã duyệt, trong kỳ nếu có `from`/`to`). */
+                skuIds?: string;
                 take: number;
                 skip: number;
             };
@@ -24450,6 +24701,282 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["CareDistributionRunDto"];
+                };
+            };
+        };
+    };
+    CustomerPurposeController_list: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PurposeDto"][];
+                };
+            };
+        };
+    };
+    CustomerPurposeController_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreatePurposeDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CreatePurposeResultDto"];
+                };
+            };
+        };
+    };
+    CustomerPurposeController_remove: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeletePurposeResultDto"];
+                };
+            };
+        };
+    };
+    CustomerPurposeController_update: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdatePurposeDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PurposeDto"];
+                };
+            };
+        };
+    };
+    CustomerPurposeController_merge: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MergePurposeDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MergePurposeResultDto"];
+                };
+            };
+        };
+    };
+    CustomerPurposeAssignController_list: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                customerId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CustomerPurposeDto"][];
+                };
+            };
+        };
+    };
+    CustomerPurposeAssignController_add: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                customerId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AddCustomerPurposesDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CustomerPurposeDto"][];
+                };
+            };
+        };
+    };
+    CustomerPurposeAssignController_remove: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                customerId: string;
+                tagId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CustomerPurposeDto"][];
+                };
+            };
+        };
+    };
+    CustomerNoteController_list: {
+        parameters: {
+            query: {
+                take: number;
+                skip: number;
+            };
+            header?: never;
+            path: {
+                customerId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CustomerNoteListDto"];
+                };
+            };
+        };
+    };
+    CustomerNoteController_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                customerId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateCustomerNoteDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CustomerNoteDto"];
+                };
+            };
+        };
+    };
+    CustomerNoteController_remove: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeleteCustomerNoteResultDto"];
+                };
+            };
+        };
+    };
+    CustomerNoteController_update: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateCustomerNoteDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CustomerNoteDto"];
                 };
             };
         };

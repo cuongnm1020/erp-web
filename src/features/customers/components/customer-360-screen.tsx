@@ -16,6 +16,7 @@ import { useInvalidateOn } from '@/lib/realtime';
 import { customerKeys, useCustomer, type CustomerDetail } from '../api/use-customers';
 import { customerTypeLabel, customerTypeTone } from '../labels';
 import { formatAddress } from './customer-address-section';
+import { CustomerNotesCard, CustomerPurposeCard } from './customer-care-cards';
 import { CustomerConsentCard } from './customer-consent-card';
 import { CustomerWorkCard } from './customer-work-card';
 import { CustomerPurchaseHistory } from './customer-purchase-history';
@@ -282,6 +283,13 @@ function Profile({ c }: { c: CustomerDetail }) {
               các endpoint trên thì các thẻ này nối được ngay, không cần sửa gì ở màn hình.
             </p>
           </Card>
+        </div>
+      </div>
+
+      <div className="grid gap-3 lg:grid-cols-3">
+        <CustomerPurposeCard customerId={c.id} />
+        <div className="lg:col-span-2">
+          <CustomerNotesCard customerId={c.id} />
         </div>
       </div>
 
