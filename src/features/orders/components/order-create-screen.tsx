@@ -10,7 +10,7 @@ import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { toast } from '@/components/ui/toaster';
 import { cn } from '@/lib/cn';
-import { ALL_WAREHOUSES, useWarehouse } from '@/lib/warehouse';
+import { useWarehouse } from '@/lib/warehouse';
 import { useUploadOrderAttachment } from '../api/use-order-create';
 import { useOrder, type SalesOrderDetail } from '../api/use-orders';
 import { collapseComboLines } from '../combo-lines';
@@ -95,9 +95,8 @@ export function OrderCreateScreen() {
   const search = useSearchParams();
   const fromId = search.get('from') ?? '';
   const presetCustomerId = search.get('customerId') ?? '';
-  const { selected: workingWarehouse } = useWarehouse();
-  // Kho đang làm việc (ô chọn kho ở sidebar); "Tất cả kho" → để server lấy kho mặc định.
-  const defaultWh = workingWarehouse && workingWarehouse !== ALL_WAREHOUSES ? workingWarehouse : '';
+  // Kho đang làm việc (ô chọn kho ở sidebar); "Tất cả kho" → kho mặc định của tài khoản.
+  const { formWarehouseId: defaultWh } = useWarehouse();
   const drafts = useOrderDrafts(defaultWh);
   const { openDraft, closeDraft, activate, updateValues } = drafts;
   const source = useOrder(fromId);

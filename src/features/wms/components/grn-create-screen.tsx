@@ -44,7 +44,7 @@ import { messageFor } from '@/lib/error-messages';
 import { formatMoney, formatQuantity } from '@/lib/format';
 import { useAbility } from '@/lib/permission';
 import { dateKeySchema, moneySchema, quantitySchema } from '@/lib/shared';
-import { ALL_WAREHOUSES, useWarehouse } from '@/lib/warehouse';
+import { useWarehouse } from '@/lib/warehouse';
 import { useContainerTypes } from '../api/use-containers';
 import { AssignBarcodeDialog } from './assign-barcode-dialog';
 import {
@@ -262,7 +262,7 @@ export function GrnCreateScreen({ copyFromId }: { copyFromId?: string }) {
 function GrnCreateForm({ copyOf }: { copyOf?: ReceiptDetail }) {
   const router = useRouter();
   // Kho nhận: kho được phép (server lọc trong /auth/me); mặc định kho đang làm việc.
-  const { options: myWarehouses, selected: workingWarehouse } = useWarehouse();
+  const { options: myWarehouses, formWarehouseId } = useWarehouse();
   // Đơn giá / Thành tiền / Tổng giá trị chỉ cho người có stock.cost (kế toán) — kho nhập không giá
   // (2026-10-20, docs/screens/FE-GRN-2-grn-stage-cost.md).
   const canCost = useAbility().can('cost', 'Stock');
@@ -278,8 +278,7 @@ function GrnCreateForm({ copyOf }: { copyOf?: ReceiptDetail }) {
     defaultValues: copyOf
       ? receiptToFormValues(copyOf, canCost)
       : {
-          warehouseId:
-            workingWarehouse && workingWarehouse !== ALL_WAREHOUSES ? workingWarehouse : '',
+          warehouseId: formWarehouseId,
           receivedAt: todayKey(),
           note: '',
           lines: [EMPTY_LINE],

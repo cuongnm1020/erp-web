@@ -790,7 +790,7 @@ describe('OrderCreateScreen — màn tạo đơn mới', () => {
     await waitFor(() => expect(push).toHaveBeenCalledWith('/crm/orders/new-order-1'));
   });
 
-  it('ô Kho xuất mặc định là kho đang làm việc (ô chọn kho ở sidebar)', async () => {
+  it('ô Kho xuất: đang "Tất cả kho" (mặc định sau đăng nhập) → kho mặc định của tài khoản', async () => {
     renderApp(
       <WarehouseProvider
         me={{

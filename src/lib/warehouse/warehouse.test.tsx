@@ -44,9 +44,13 @@ const me = (over: Partial<AuthMe> = {}): AuthMe => ({
 afterEach(() => forgetWarehouseSelection());
 
 describe('current-warehouse store', () => {
-  it('đăng nhập (chưa lưu gì) → kho mặc định; header gửi đúng kho', () => {
-    expect(restoreWarehouse(ACCESS)).toBe('wh-tt');
-    expect(warehouseHeaders()).toEqual({ 'X-Warehouse-Id': 'wh-tt' });
+  it('đăng nhập (chưa lưu gì) → "Tất cả kho" khi được nhiều kho (2026-10-26); một kho → kho đó', () => {
+    expect(restoreWarehouse(ACCESS)).toBe(ALL_WAREHOUSES);
+    expect(warehouseHeaders()).toEqual({ 'X-Warehouse-Id': ALL_WAREHOUSES });
+    forgetWarehouseSelection();
+    expect(restoreWarehouse({ ...ACCESS, optionIds: ['wh-la'], defaultWarehouseId: 'wh-tt' })).toBe(
+      'wh-la',
+    );
   });
 
   it('đã chọn trong phiên → F5 giữ nguyên; kho không còn được phép → về kho mặc định', () => {
@@ -73,7 +77,7 @@ describe('current-warehouse store', () => {
     selectWarehouse(ACCESS, 'wh-la');
     forgetWarehouseSelection();
     expect(warehouseHeaders()).toEqual({});
-    expect(restoreWarehouse(ACCESS)).toBe('wh-tt');
+    expect(restoreWarehouse(ACCESS)).toBe(ALL_WAREHOUSES);
   });
 
   it('chưa được cấp kho nào → không có kho, không header', () => {
@@ -92,7 +96,7 @@ describe('Ô chọn kho', () => {
     expect(screen.getByRole('button', { name: 'Kho đang làm việc: Đang tải…' })).toBeDisabled();
   });
 
-  it('hiện kho mặc định; chọn "Kho Long An" → request sau mang X-Warehouse-Id của kho đó', async () => {
+  it('mặc định "Tất cả kho"; chọn "Kho Long An" → request sau mang X-Warehouse-Id của kho đó', async () => {
     const seen: (string | null)[] = [];
     server.use(
       http.get('/api/warehouses', ({ request }) => {
@@ -105,9 +109,9 @@ describe('Ô chọn kho', () => {
         <WarehouseSwitcher />
       </WarehouseProvider>,
     );
-    const trigger = screen.getByRole('button', { name: 'Kho đang làm việc: Kho Thạch Thất' });
+    const trigger = screen.getByRole('button', { name: 'Kho đang làm việc: Tất cả kho' });
     await unwrap(api.GET('/warehouses'));
-    expect(seen).toEqual(['wh-tt']);
+    expect(seen).toEqual([ALL_WAREHOUSES]);
 
     fireEvent.keyDown(trigger, { key: 'ArrowDown' });
     fireEvent.click(await screen.findByRole('menuitem', { name: /Kho Long An/ }));
@@ -117,7 +121,7 @@ describe('Ô chọn kho', () => {
       ).toBeInTheDocument(),
     );
     await unwrap(api.GET('/warehouses'));
-    expect(seen).toEqual(['wh-tt', 'wh-la']);
+    expect(seen).toEqual([ALL_WAREHOUSES, 'wh-la']);
   });
 
   it('có "Tất cả kho" khi được phép nhiều kho; chỉ một kho → ô bị khoá', async () => {
