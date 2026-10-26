@@ -7,6 +7,7 @@ import {
   ChartLine,
   ClipboardList,
   Columns3,
+  Flag,
   Gauge,
   Gift,
   GitMerge,
@@ -567,6 +568,13 @@ export const NAV_MODULES: NavModule[] = [
         ability: { action: 'config', subject: 'Sync' },
       },
       {
+        label: 'Page Facebook',
+        href: '/admin/facebook-pages',
+        icon: Flag,
+        // Page Facebook gắn POS (2026-10-26): thêm / sửa / xóa — facebook_page.manage (ADMIN).
+        ability: { action: 'manage', subject: 'FacebookPage' },
+      },
+      {
         label: 'Chia khách CSKH',
         href: '/admin/care-distribution',
         icon: Shuffle,
@@ -697,6 +705,7 @@ export const SEGMENT_LABELS: Record<string, string> = {
   teams: 'Phòng ban & team',
   roles: 'Vai trò & quyền',
   'pda-devices': 'Thiết bị PDA',
+  'facebook-pages': 'Page Facebook',
   audit: 'Nhật ký audit',
   settings: 'Cấu hình hệ thống',
   'approval-rules': 'Quy tắc duyệt',

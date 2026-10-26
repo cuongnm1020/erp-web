@@ -544,6 +544,7 @@ function orderListExtras(i: number, status: (typeof ORDER_STATUSES)[number]) {
         }
       : null,
     ownerName: i % 3 === 0 ? null : 'Nguyễn Văn Sale',
+    facebookPageName: i % 4 === 1 ? 'Đất Phương Nam - CS4' : null,
     note: i % 6 === 0 ? 'Gọi trước khi giao' : null,
     shortage: null,
   };
@@ -1448,6 +1449,42 @@ export const RECEIPT_CONTAINERS_EMPTY = {
   items: [],
 };
 
+/** Page Facebook mẫu (2026-10-26): 2 page của POS 715130909, 1 page POS khác, 1 page ngưng. */
+export const FACEBOOK_PAGE_OPTIONS = [
+  {
+    id: '7a000000-0000-4000-8000-000000000001',
+    name: 'Đất Phương Nam - CS4',
+    externalId: '423097117553962',
+    shopIds: ['715130909'],
+    isActive: true,
+    recentOrderCount: 2862,
+  },
+  {
+    id: '7a000000-0000-4000-8000-000000000002',
+    name: 'Shop Chính Hãng Cô Hai',
+    externalId: '127886220212970',
+    shopIds: ['407957969', '715130909'],
+    isActive: true,
+    recentOrderCount: 1662,
+  },
+  {
+    id: '7a000000-0000-4000-8000-000000000003',
+    name: 'Nông Lâm Phương Nam',
+    externalId: '115545584852144',
+    shopIds: ['407957969'],
+    isActive: true,
+    recentOrderCount: 407,
+  },
+  {
+    id: '7a000000-0000-4000-8000-000000000004',
+    name: 'Vật Tư Nông Nghiệp CS3',
+    externalId: '594026677118889',
+    shopIds: ['715130909'],
+    isActive: false,
+    recentOrderCount: 0,
+  },
+];
+
 export const handlers = [
   http.get('/api/goods-receipts/:id/containers', () => HttpResponse.json(RECEIPT_CONTAINERS_EMPTY)),
   http.get('/api/waiting-stock/summary', () => HttpResponse.json(WAITING_SUMMARY)),
@@ -1622,6 +1659,8 @@ export const handlers = [
       { shopId: '407957969', shopName: null, isActive: false },
     ]),
   ),
+  // Page Facebook cho ô chọn page (tạo đơn) + bộ lọc đơn — đúng shape FacebookPageOptionDto.
+  http.get('/api/facebook-pages/options', () => HttpResponse.json(FACEBOOK_PAGE_OPTIONS)),
   // Đồng bộ lại đơn Pancake theo POS — mặc định chưa chạy lần nào (PancakeOrderResyncStatusDto).
   http.get('/api/pancake-sync/transform/orders/resync', ({ request }) =>
     HttpResponse.json({

@@ -103,8 +103,10 @@ export const createOrderSchema = z
     warehouseId: optionalId,
     channel: z.enum(ORDER_CHANNELS),
     source: z.enum(ORDER_SOURCES).or(z.literal('')),
-    /** POS (mã shop Pancake đã liên kết) — chỉ gửi khi nguồn Facebook. */
+    /** POS (mã shop Pancake đã liên kết) — độc lập với nguồn đơn, không bắt buộc (2026-10-26). */
     posShopId: z.string().optional(),
+    /** Page Facebook (core.FacebookPage.id) — độc lập với nguồn / POS, không bắt buộc. */
+    facebookPageId: z.string().optional(),
     shippingFee: optionalMoney,
     freeShipping: z.boolean(),
     shipFeeOnReturnOnly: z.boolean(),
@@ -204,6 +206,7 @@ export function emptyOrderValues(warehouseId = ''): CreateOrderValues {
     channel: 'DIRECT',
     source: '',
     posShopId: '',
+    facebookPageId: '',
     shippingFee: '',
     freeShipping: false,
     shipFeeOnReturnOnly: false,
@@ -284,7 +287,8 @@ export function toCreateOrderBody(v: CreateOrderValues) {
     ...(v.warehouseId ? { warehouseId: v.warehouseId } : {}),
     channel: v.channel,
     ...(v.source ? { source: v.source } : {}),
-    ...(v.source === 'FACEBOOK' && v.posShopId ? { posShopId: v.posShopId } : {}),
+    ...(v.posShopId ? { posShopId: v.posShopId } : {}),
+    ...(v.facebookPageId ? { facebookPageId: v.facebookPageId } : {}),
     ...(v.shippingFee && !v.freeShipping && !v.shipFeeOnReturnOnly
       ? { shippingFee: v.shippingFee }
       : {}),

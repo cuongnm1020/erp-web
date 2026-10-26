@@ -4,6 +4,7 @@ import { Search, X } from 'lucide-react';
 import { type ReactNode } from 'react';
 import { DateRangeFilter } from '@/components/data/date-range-filter';
 import { DraftInput } from '@/components/data/draft-input';
+import { SearchableMultiSelect } from '@/components/data/searchable-multi-select';
 import { SearchableSelect } from '@/components/data/searchable-select';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -23,6 +24,15 @@ export type FilterDef<F extends string = string> =
       options: Array<{ value: string; label: string }>;
       /** Danh sách dài (vd mọi POS Pancake) → ô chọn có ô gõ tìm theo tên, không phân biệt dấu. */
       searchable?: boolean;
+    }
+  | {
+      /** Chọn nhiều + ô tìm; URL giữ các giá trị nối bằng dấu phẩy (2026-10-26, lọc page). */
+      key: F;
+      label: string;
+      type: 'multiSelect';
+      options: Array<{ value: string; label: string; hint?: string }>;
+      /** Đơn vị trên nút khi chọn từ 2 mục ("Page: 2 page"). */
+      unit?: string;
     }
   | { key: F; label: string; type: 'text'; placeholder?: string }
   | { key: F; label: string; type: 'date'; placeholder?: string }
@@ -110,6 +120,18 @@ export function FilterBar<F extends string = string>({
               value={value}
               options={f.options}
               onChange={set}
+            />
+          );
+        }
+        if (f.type === 'multiSelect') {
+          return (
+            <SearchableMultiSelect
+              key={f.key}
+              label={f.label}
+              unit={f.unit}
+              values={value ? value.split(',') : []}
+              options={f.options}
+              onChange={(vs) => set(vs.length ? vs.join(',') : undefined)}
             />
           );
         }

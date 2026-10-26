@@ -3,6 +3,7 @@ import { http, HttpResponse } from 'msw';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { forgetWarehouseSelection, WarehouseProvider } from '@/lib/warehouse';
 import {
+  FACEBOOK_PAGE_OPTIONS,
   ME_ADMIN,
   ME_SALE,
   makeCustomerAddresses,
@@ -490,32 +491,71 @@ describe('OrderCreateScreen — màn tạo đơn mới', () => {
     ]);
   }, 15_000);
 
-  it('nguồn Facebook → body gửi posShopId, nguồn khác thì không; chưa chọn nguồn không có ô POS; NV đóng hàng / NV chăm sóc / Marketer ẩn', async () => {
+  it('Nguồn · POS · Page là ba ô độc lập, không bắt buộc (2026-10-26); NV đóng hàng / NV chăm sóc / Marketer ẩn', async () => {
     server.use(...skuHandlers());
     renderApp(<OrderCreateScreen />);
     await screen.findByLabelText('Số điện thoại khách');
     expect(screen.queryByText('NV đóng hàng')).not.toBeInTheDocument();
     expect(screen.queryByText('NV chăm sóc')).not.toBeInTheDocument();
     expect(screen.queryByText('Marketer')).not.toBeInTheDocument();
-    expect(screen.queryByText('Chọn POS')).not.toBeInTheDocument();
+    // Chưa chọn nguồn vẫn có ô POS + Page.
+    expect(screen.getByRole('combobox', { name: 'POS' })).toHaveTextContent('Không chọn POS');
+    expect(screen.getByRole('combobox', { name: 'Page Facebook' })).toHaveTextContent(
+      'Không chọn page',
+    );
+    const base = {
+      ...emptyOrderValues(),
+      customerId: '61000000-0000-4000-8000-000000000001',
+      lines: [{ skuId: S1, uomId: U1, qty: '1' }],
+    };
+    // Nguồn khác Facebook vẫn gửi POS / page; không chọn thì không gửi.
     expect(
       toCreateOrderBody({
-        ...emptyOrderValues(),
-        customerId: '61000000-0000-4000-8000-000000000001',
-        source: 'FACEBOOK',
-        posShopId: '715130909',
-        lines: [{ skuId: S1, uomId: U1, qty: '1' }],
-      }),
-    ).toMatchObject({ source: 'FACEBOOK', posShopId: '715130909' });
-    expect(
-      toCreateOrderBody({
-        ...emptyOrderValues(),
-        customerId: '61000000-0000-4000-8000-000000000001',
+        ...base,
         source: 'ZALO',
         posShopId: '715130909',
-        lines: [{ skuId: S1, uomId: U1, qty: '1' }],
+        facebookPageId: FACEBOOK_PAGE_OPTIONS[0]!.id,
       }),
-    ).not.toHaveProperty('posShopId');
+    ).toMatchObject({
+      source: 'ZALO',
+      posShopId: '715130909',
+      facebookPageId: FACEBOOK_PAGE_OPTIONS[0]!.id,
+    });
+    const bare = toCreateOrderBody(base);
+    expect(bare).not.toHaveProperty('source');
+    expect(bare).not.toHaveProperty('posShopId');
+    expect(bare).not.toHaveProperty('facebookPageId');
+  });
+
+  it('ô Page: page ngưng ẩn; chọn page một POS khi ô POS trống → tự điền POS; có POS thì "Page của POS này" lên trước', async () => {
+    server.use(...skuHandlers());
+    renderApp(<OrderCreateScreen />);
+    await screen.findByLabelText('Số điện thoại khách');
+    const pageBox = screen.getByRole('combobox', { name: 'Page Facebook' });
+    fireEvent.click(pageBox);
+    await screen.findByRole('option', { name: /Đất Phương Nam - CS4/ });
+    expect(
+      screen.queryByRole('option', { name: /Vật Tư Nông Nghiệp CS3/ }),
+    ).not.toBeInTheDocument();
+    expect(screen.queryByText('Page của POS này')).not.toBeInTheDocument();
+    // Page 2 POS → không tự điền POS.
+    fireEvent.click(screen.getByRole('option', { name: /Shop Chính Hãng Cô Hai/ }));
+    expect(pageBox).toHaveTextContent('Shop Chính Hãng Cô Hai');
+    expect(screen.getByRole('combobox', { name: 'POS' })).toHaveTextContent('Không chọn POS');
+    // Page 1 POS → POS tự điền, hiện tên POS.
+    fireEvent.click(pageBox);
+    fireEvent.click(await screen.findByRole('option', { name: /Đất Phương Nam - CS4/ }));
+    await waitFor(() =>
+      expect(screen.getByRole('combobox', { name: 'POS' })).toHaveTextContent('Thiên Nông chính'),
+    );
+    // Đã có POS → nhóm page của POS lên trước.
+    fireEvent.click(pageBox);
+    expect(await screen.findByText('Page của POS này')).toBeInTheDocument();
+    expect(screen.getByText('Page khác')).toBeInTheDocument();
+    const names = screen.getAllByRole('option').map((o) => o.textContent ?? '');
+    expect(names.findIndex((n) => n.includes('Đất Phương Nam'))).toBeLessThan(
+      names.findIndex((n) => n.includes('Nông Lâm Phương Nam')),
+    );
   });
 
   it('gõ SĐT trùng khách cũ → gắn khách đó (hiện "Khách cũ"), chốt gửi customerId', async () => {

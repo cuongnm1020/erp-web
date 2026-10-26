@@ -2,7 +2,13 @@ import { cleanup, fireEvent, screen, waitFor, within } from '@testing-library/re
 import { http, HttpResponse } from 'msw';
 import { describe, expect, it, vi } from 'vitest';
 import { WarehouseProvider } from '@/lib/warehouse';
-import { CARRIERS, ME_SALE, makeOrders, scenario } from '@/test/msw/handlers';
+import {
+  CARRIERS,
+  FACEBOOK_PAGE_OPTIONS,
+  ME_SALE,
+  makeOrders,
+  scenario,
+} from '@/test/msw/handlers';
 import { server } from '@/test/msw/server';
 import { renderApp } from '@/test/render';
 import { OrderListScreen } from './components/order-list-screen';
@@ -707,6 +713,41 @@ describe('OrderListScreen — lọc theo hãng + thời gian (2026-09-19)', () =
     search = 'careTeamId=t-cskh-a';
     renderApp(<OrderListScreen />);
     await waitFor(() => expect(seen).toContain('t-cskh-a'));
+  });
+
+  it('ô Page chọn nhiều có ô tìm → URL fbPage + API facebookPageIds; tên page hiện dưới tên sale (2026-10-26)', async () => {
+    search = '';
+    const seen: string[] = [];
+    server.use(
+      http.get('/api/sales-orders', ({ request }) => {
+        seen.push(new URL(request.url).searchParams.get('facebookPageIds') ?? '');
+        const o = makeOrders(60).find((x) => x.facebookPageName)!;
+        return HttpResponse.json({ items: [o], total: 1 });
+      }),
+    );
+    renderApp(<OrderListScreen />);
+    expect(await screen.findByTestId('order-page')).toHaveTextContent('Đất Phương Nam - CS4');
+
+    fireEvent.click(screen.getByRole('combobox', { name: 'Page' }));
+    const input = await screen.findByPlaceholderText('Tìm page…');
+    expect(
+      await screen.findByRole('option', { name: /Vật Tư Nông Nghiệp CS3 \(ngưng\)/ }),
+    ).toBeInTheDocument();
+    fireEvent.change(input, { target: { value: 'phuong nam' } });
+    await waitFor(() =>
+      expect(screen.queryByRole('option', { name: /Shop Chính Hãng Cô Hai/ })).toBeNull(),
+    );
+    replace.mockClear();
+    fireEvent.click(screen.getByRole('option', { name: /Đất Phương Nam - CS4/ }));
+    await waitFor(() => expect(replace).toHaveBeenCalled());
+    const [a, , c] = FACEBOOK_PAGE_OPTIONS;
+    expect(String(replace.mock.calls.at(-1)![0])).toContain(`fbPage=${a!.id}`);
+
+    cleanup();
+    search = `fbPage=${a!.id}%2C${c!.id}`;
+    renderApp(<OrderListScreen />);
+    await waitFor(() => expect(seen).toContain(`${a!.id},${c!.id}`));
+    expect(screen.getByRole('combobox', { name: 'Page' })).toHaveTextContent('Page: 2 page');
   });
 
   it('ô Nguồn: "Tạo trong ERP" đứng đầu danh sách', async () => {

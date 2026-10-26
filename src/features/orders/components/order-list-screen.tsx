@@ -60,6 +60,7 @@ import {
   useOrderListPrefs,
   useOrders,
   useCareTeamOptions,
+  useFacebookPageOptions,
   usePancakeShops,
   useSaveOrderListPrefs,
   type OrderFlow,
@@ -130,6 +131,8 @@ const DEFAULTS = {
     'itemOrigin',
     // Team CSKH lên đơn (phòng ban loại CSKH), 2026-10-24.
     'careTeamId',
+    // Page Facebook (id nối dấu phẩy, chọn nhiều), 2026-10-26 — khoá `fbPage` vì `page` là số trang.
+    'fbPage',
     // Đơn thiếu tồn một SKU (Chờ hàng, 2026-10-25) — "Xem đơn" từ màn Hàng chờ.
     'shortSkuId',
   ] as const,
@@ -261,6 +264,11 @@ const buildColumns = (
           {o.ownerName ? (
             <div className="break-words text-xs text-foreground" data-testid="order-owner">
               {o.ownerName}
+            </div>
+          ) : null}
+          {o.facebookPageName ? (
+            <div className="break-words text-xs text-muted-foreground" data-testid="order-page">
+              {o.facebookPageName}
             </div>
           ) : null}
         </div>
@@ -842,7 +850,9 @@ export function OrderListScreen() {
   const duplicate = state.filters.duplicate === 'true';
   const itemOrigin = parseItemOrigin(state.filters.itemOrigin);
   const careTeamId = state.filters.careTeamId ?? '';
+  const fbPage = state.filters.fbPage ?? '';
   const careTeams = useCareTeamOptions();
+  const facebookPages = useFacebookPageOptions();
   // Cột ẩn + sắp xếp lưu theo người dùng ở server (đăng xuất / đổi máy vẫn giữ). Sắp xếp trên URL
   // (link dán cho đồng nghiệp) thắng; URL không có thì lấy lần sắp gần nhất của người dùng.
   const prefs = useOrderListPrefs();
@@ -879,6 +889,7 @@ export function OrderListScreen() {
       to,
       itemOrigin,
       careTeamId,
+      facebookPageIds: fbPage || undefined,
     }),
     [
       state.q,
@@ -898,6 +909,7 @@ export function OrderListScreen() {
       to,
       itemOrigin,
       careTeamId,
+      fbPage,
     ],
   );
   const params = useMemo(
@@ -1101,6 +1113,17 @@ export function OrderListScreen() {
               ],
             },
             {
+              key: 'fbPage',
+              label: 'Page',
+              type: 'multiSelect',
+              unit: 'page',
+              options: (facebookPages.data ?? []).map((p) => ({
+                value: p.id,
+                label: p.isActive ? p.name : `${p.name} (ngưng)`,
+                hint: p.shopIds.length ? `${p.shopIds.length} POS` : undefined,
+              })),
+            },
+            {
               key: 'careTeamId',
               label: 'Team CSKH',
               type: 'select',
@@ -1164,6 +1187,7 @@ export function OrderListScreen() {
             duplicate: state.filters.duplicate,
             itemOrigin: state.filters.itemOrigin,
             careTeamId: state.filters.careTeamId,
+            fbPage: state.filters.fbPage,
           }}
           onFilterChange={setFilter}
           searchPlaceholder="Mã đơn, mã Pancake, SĐT, tên khách, mã vận đơn"
