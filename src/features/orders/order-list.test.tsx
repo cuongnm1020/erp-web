@@ -750,6 +750,38 @@ describe('OrderListScreen — lọc theo hãng + thời gian (2026-09-19)', () =
     expect(screen.getByRole('combobox', { name: 'Page' })).toHaveTextContent('Page: 2 page');
   });
 
+  it('ô Trạng thái hãng chọn nhiều → URL carrierStatus (chữ có dấu phẩy vẫn nguyên) + API carrierStatusText lặp tham số (2026-10-28)', async () => {
+    search = '';
+    const seen: string[][] = [];
+    const tồn = 'Tồn - Khách hàng nghỉ, không có nhà';
+    server.use(
+      http.get('/api/sales-orders/carrier-status-options', () =>
+        HttpResponse.json([
+          { statusText: 'Giao bưu tá đi phát', carrierId: 'c-vtp', carrierCode: 'VTP' },
+          { statusText: tồn, carrierId: 'c-vtp', carrierCode: 'VTP' },
+          { statusText: 'Đã lấy hàng / đã nhập kho', carrierId: 'c-ghtk', carrierCode: 'GHTK' },
+        ]),
+      ),
+      http.get('/api/sales-orders', ({ request }) => {
+        seen.push(new URL(request.url).searchParams.getAll('carrierStatusText'));
+        return HttpResponse.json({ items: [], total: 0 });
+      }),
+    );
+    renderApp(<OrderListScreen />);
+    fireEvent.click(await screen.findByRole('combobox', { name: 'Trạng thái hãng' }));
+    replace.mockClear();
+    fireEvent.click(await screen.findByRole('option', { name: new RegExp(tồn) }));
+    await waitFor(() => expect(replace).toHaveBeenCalled());
+    expect(String(replace.mock.calls.at(-1)![0])).toContain('carrierStatus=');
+
+    cleanup();
+    search = `carrierStatus=${encodeURIComponent(
+      [encodeURIComponent(tồn), encodeURIComponent('Giao bưu tá đi phát')].join(','),
+    )}`;
+    renderApp(<OrderListScreen />);
+    await waitFor(() => expect(seen).toContainEqual([tồn, 'Giao bưu tá đi phát']));
+  });
+
   it('ô Nguồn: "Tạo trong ERP" đứng đầu danh sách', async () => {
     search = '';
     renderApp(<OrderListScreen />);

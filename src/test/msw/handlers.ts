@@ -713,6 +713,30 @@ export const ORDER_SHIPMENT_FIXTURE = {
   trackingNo: 'S12345678.SG.A1.B2',
   labelPrintedAt: null,
   labelPrintCount: 0,
+  serviceCode: null as string | null,
+  serviceName: 'Lấy hàng ca chiều\nGiao hàng bằng đường bộ' as string | null,
+  declaredValue: '350000.0000' as string | null,
+  codAmount: '350000.0000' as string | null,
+  carrierFeeTotal: '20000.0000' as string | null,
+  feeReconciledAt: null as string | null,
+  // "Cập nhật cuối" — đúng shape ShipmentLastCarrierEventDto (2026-10-28).
+  lastCarrierEvent: {
+    statusText: 'Không giao được hàng' as string | null,
+    location: null as string | null,
+    remark: 'Không liên lạc được với KH 3 lần' as string | null,
+    occurredAt: '2026-08-22T03:00:00.000Z' as string | null,
+    receivedAt: '2026-08-22T03:00:05.000Z',
+    source: 'WEBHOOK' as 'WEBHOOK' | 'POLL',
+    carrierStatusCode: '9',
+  } as {
+    statusText: string | null;
+    location: string | null;
+    remark: string | null;
+    occurredAt: string | null;
+    receivedAt: string;
+    source: 'WEBHOOK' | 'POLL';
+    carrierStatusCode: string;
+  } | null,
 };
 
 /** Đúng shape `TaskDetailDto` (GET /tasks/:id) — task PICK 2 dòng đã sắp theo pickSequence. */
@@ -1302,6 +1326,8 @@ export const STATUS_LOG_FIXTURE = {
       mappedStatus: 'IN_TRANSIT',
       outcome: 'APPLIED',
       note: null,
+      statusText: 'Đã điều phối giao hàng / đang giao hàng',
+      location: 'Bưu cục Gia Lâm',
       occurredAt: new Date(Date.UTC(2026, 7, 21, 3)).toISOString(),
       createdAt: new Date(Date.UTC(2026, 7, 21, 3, 1)).toISOString(),
     },
@@ -1315,6 +1341,8 @@ export const STATUS_LOG_FIXTURE = {
       mappedStatus: null,
       outcome: 'REJECTED_UNMAPPED',
       note: 'mã trạng thái 45 chưa được ánh xạ',
+      statusText: null,
+      location: null,
       occurredAt: null,
       createdAt: new Date(Date.UTC(2026, 7, 22, 3)).toISOString(),
     },

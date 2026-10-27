@@ -118,6 +118,12 @@
   --telco-gmobile-weak: 254 248 231;
   --telco-itel: 134 57 172;
   --telco-itel-weak: 244 236 249;
+  --carrier-vtp: 0 114 122;
+  --carrier-ghtk: 43 122 11;
+  --carrier-vnpost: 46 26 107;
+  --carrier-ghn: 194 65 12;
+  --carrier-jt: 200 30 43;
+  --carrier-other: 31 95 168;
   --branch-1: 48 126 74;
   --branch-1-weak: 236 249 240;
   --branch-2: 151 102 16;

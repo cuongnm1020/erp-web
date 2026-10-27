@@ -55,6 +55,7 @@ import {
   type FulfilTarget,
   manualDiscountNote,
 } from '../labels';
+import { CarrierStatusCard } from './carrier-status-card';
 import { CART_GRID } from './order-create/cart-line';
 import { DENSE } from './order-create/order-draft-form';
 import { Card } from './order-create/order-side-cards';
@@ -1012,6 +1013,8 @@ function Editor({ order }: { order: SalesOrderDetail }) {
                 Lấy hàng tại {quote.data.pickupSummary}
               </p>
             ) : null}
+            {/* Thẻ hãng: Đối soát + Dịch vụ + Cập nhật cuối (mockup KDfmt8dqg3ztLcfbsGZ229). */}
+            <CarrierStatusCard order={order} />
           </Card>
 
           <Card title="Giờ tạo đơn">

@@ -44,6 +44,8 @@ export interface OrderListParams {
   carrierAccountId?: string;
   /** Ai gán hãng: ERP = chọn trong ERP, PANCAKE = Pancake gán + cấp vận đơn (gửi ngoài ERP). */
   carrierSource?: OrderCarrierSource;
+  /** Chữ "Trạng thái VC" gần nhất hãng gửi — nhiều giá trị (khớp một trong số đó). */
+  carrierStatusText?: string[];
   /** Đơn đang thiếu tồn SKU này (Chờ hàng — "Xem đơn" từ màn Hàng chờ). */
   shortSkuId?: string;
   /** true = chỉ đơn có đơn trùng trong ngày (cùng SĐT, cùng ngày VN, chưa hủy — CSKH-5). */
@@ -133,6 +135,7 @@ function listQuery(params: Omit<OrderListParams, 'take' | 'skip'>) {
     carrierId: params.carrierId || undefined,
     carrierAccountId: params.carrierAccountId || undefined,
     carrierSource: params.carrierSource,
+    carrierStatusText: params.carrierStatusText?.length ? params.carrierStatusText : undefined,
     shortSkuId: params.shortSkuId || undefined,
     duplicate: params.duplicate ? ('true' as const) : undefined,
     from: params.from || undefined,
@@ -220,6 +223,17 @@ export function useGeoSuggest(q: string) {
     queryFn: () => unwrap(api.GET('/geo/suggest', { params: { query: { q: text, limit: 3 } } })),
     enabled: text.length >= 6,
     staleTime: 10 * 60_000,
+  });
+}
+
+export type OrderCarrierStatusOption = components['schemas']['OrderCarrierStatusOptionDto'];
+
+/** GET /sales-orders/carrier-status-options — chữ "Trạng thái VC" các hãng đã gửi, cho ô lọc. */
+export function useCarrierStatusOptions() {
+  return useQuery({
+    queryKey: [...orderKeys.all, 'carrier-status-options'] as const,
+    queryFn: () => unwrap(api.GET('/sales-orders/carrier-status-options')),
+    staleTime: 60_000,
   });
 }
 

@@ -3417,6 +3417,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/sales-orders/carrier-status-options": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Chữ "Trạng thái VC" các hãng đã gửi cho ô lọc danh sách đơn (2026-10-28) — khai TRƯỚC `:id`. */
+        get: operations["SalesOrderController_carrierStatusOptions"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/sales-orders/shipping-quote-preview": {
         parameters: {
             query?: never;
@@ -10512,6 +10529,13 @@ export interface components {
             name: string;
             isActive: boolean;
         };
+        OrderCarrierStatusOptionDto: {
+            /** @description Giá trị cho `carrierStatusText` của GET /sales-orders (nguyên văn chữ hãng). */
+            statusText: string;
+            /** @description Hãng chọn trên đơn (wms.Carrier.id); null = đơn chưa chọn hãng. */
+            carrierId: string | null;
+            carrierCode: string | null;
+        };
         ShippingQuotePreviewDto: {
             /** Format: uuid */
             carrierId: string;
@@ -10825,6 +10849,22 @@ export interface components {
             code: string;
             name: string;
         };
+        ShipmentLastCarrierEventDto: {
+            /** @description "Trạng thái VC" — nguyên văn tên trạng thái của hãng. */
+            statusText: string | null;
+            /** @description "Tại" — bưu cục / vị trí (VTP, VNPost). */
+            location: string | null;
+            /** @description "Với ghi chú" — ghi chú, lý do, bưu tá. */
+            remark: string | null;
+            /** @description ISO — mốc theo hãng; null = hãng không trả. */
+            occurredAt: string | null;
+            /** @description ISO — lúc ERP nhận. */
+            receivedAt: string;
+            /** @enum {string} */
+            source: "WEBHOOK" | "POLL";
+            /** @description Mã thô của hãng. */
+            carrierStatusCode: string;
+        };
         SalesOrderShipmentDto: {
             id: string;
             docNumber: string;
@@ -10839,6 +10879,20 @@ export interface components {
             /** @description ISO — lần in nhãn gần nhất; null = chưa in. */
             labelPrintedAt: string | null;
             labelPrintCount: number;
+            /** @description Dịch vụ hãng đã gửi lúc cấp vận đơn (VTP `ECOD`…); null = chưa cấp / vận đơn cũ. */
+            serviceCode: string | null;
+            /** @description Tên dịch vụ (mỗi ý một dòng, GHTK: ca lấy + đường bộ / bay); null = hãng không trả tên. */
+            serviceName: string | null;
+            /** @description Khai giá đã gửi hãng, Decimal(18,4) chuỗi; null = không biết (vận đơn cấp trước 2026-10-28). */
+            declaredValue: string | null;
+            /** @description Tiền thu hộ trên phiếu, Decimal(18,4) chuỗi. */
+            codAmount: string | null;
+            /** @description Tổng phí hãng (cước + phụ phí + phí COD), Decimal(18,4) chuỗi; null = chưa có cước. */
+            carrierFeeTotal: string | null;
+            /** @description ISO — đối soát phí với hãng; null = chưa đối soát. */
+            feeReconciledAt: string | null;
+            /** @description "Cập nhật cuối" — tín hiệu mới nhất hãng gửi; null = chưa nhận gì. */
+            lastCarrierEvent: components["schemas"]["ShipmentLastCarrierEventDto"] | null;
         };
         SalesOrderLineComboDto: {
             /** @description core.Sku.id của combo. */
@@ -11802,6 +11856,10 @@ export interface components {
             /** @enum {string} */
             outcome: "APPLIED" | "DUPLICATE" | "REJECTED_UNMAPPED" | "REJECTED_TRANSITION" | "NOT_FOUND";
             note: string | null;
+            /** @description Chữ trạng thái hãng gửi cho mốc này (2026-10-28); null = mốc ghi trước khi có cột. */
+            statusText: string | null;
+            /** @description Bưu cục / vị trí hãng gửi kèm (VTP, VNPost); null = hãng không gửi. */
+            location: string | null;
             /** @description Mốc theo hãng (null = hãng không trả). */
             occurredAt: string | null;
             createdAt: string;
@@ -21177,6 +21235,25 @@ export interface operations {
             };
         };
     };
+    SalesOrderController_carrierStatusOptions: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OrderCarrierStatusOptionDto"][];
+                };
+            };
+        };
+    };
     SalesOrderController_shippingQuotePreview: {
         parameters: {
             query?: never;
@@ -21257,6 +21334,12 @@ export interface operations {
                  *     (phiếu gửi ngoài ERP).
                  */
                 carrierSource?: "ERP" | "PANCAKE";
+                /**
+                 * @description Chữ "Trạng thái VC" gần nhất hãng gửi (2026-10-28) — khớp ĐÚNG một trong các giá trị (lặp
+                 *     tham số cho nhiều giá trị: `?carrierStatusText=a&carrierStatusText=b`). Giá trị chọn được:
+                 *     GET /sales-orders/carrier-status-options.
+                 */
+                carrierStatusText?: string[];
                 /**
                  * @description Tab của danh sách đơn (2026-10-12) — gộp trạng thái chứng từ + kho / giao hàng
                  *     (`flowOf` trong sales-order-flow.ts). Đếm từng tab: GET /sales-orders/flow-counts.
@@ -21405,6 +21488,12 @@ export interface operations {
                  *     (phiếu gửi ngoài ERP).
                  */
                 carrierSource?: "ERP" | "PANCAKE";
+                /**
+                 * @description Chữ "Trạng thái VC" gần nhất hãng gửi (2026-10-28) — khớp ĐÚNG một trong các giá trị (lặp
+                 *     tham số cho nhiều giá trị: `?carrierStatusText=a&carrierStatusText=b`). Giá trị chọn được:
+                 *     GET /sales-orders/carrier-status-options.
+                 */
+                carrierStatusText?: string[];
                 /**
                  * @description Tab của danh sách đơn (2026-10-12) — gộp trạng thái chứng từ + kho / giao hàng
                  *     (`flowOf` trong sales-order-flow.ts). Đếm từng tab: GET /sales-orders/flow-counts.

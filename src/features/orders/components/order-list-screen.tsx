@@ -60,11 +60,13 @@ import {
   useOrderListPrefs,
   useOrders,
   useCareTeamOptions,
+  useCarrierStatusOptions,
   useFacebookPageOptions,
   usePancakeShops,
   useSaveOrderListPrefs,
   type OrderFlow,
   type OrderCarrierSource,
+  type OrderCarrierStatusOption,
   type OrderItemOrigin,
   type OrderSortField,
   type SalesOrderListItem,
@@ -133,6 +135,9 @@ const DEFAULTS = {
     'careTeamId',
     // Page Facebook (id nối dấu phẩy, chọn nhiều), 2026-10-26 — khoá `fbPage` vì `page` là số trang.
     'fbPage',
+    // Chữ "Trạng thái VC" hãng gửi (chọn nhiều, 2026-10-28) — mỗi giá trị encodeURIComponent rồi nối
+    // dấu phẩy: chữ hãng có dấu phẩy ("Tồn - Khách hàng nghỉ, không có nhà").
+    'carrierStatus',
     // Đơn thiếu tồn một SKU (Chờ hàng, 2026-10-25) — "Xem đơn" từ màn Hàng chờ.
     'shortSkuId',
   ] as const,
@@ -153,6 +158,34 @@ const CARRIER_SOURCE_OPTIONS: { value: OrderCarrierSource; label: string }[] = [
 ];
 const parseCarrierSource = (v: string | undefined): OrderCarrierSource | undefined =>
   CARRIER_SOURCE_OPTIONS.find((o) => o.value === v)?.value;
+
+/** Ô "Trạng thái hãng": giá trị URL = từng chữ encodeURIComponent nối dấu phẩy (chữ hãng có dấu phẩy). */
+const decodeList = (v: string): string[] =>
+  v
+    .split(',')
+    .filter(Boolean)
+    .flatMap((x) => {
+      try {
+        return [decodeURIComponent(x)];
+      } catch {
+        return [];
+      }
+    });
+
+/** Mỗi chữ một lựa chọn; cùng chữ ở nhiều hãng gộp một dòng, gợi ý ghi tên các hãng. */
+const carrierStatusOptions = (rows: OrderCarrierStatusOption[]) => {
+  const byText = new Map<string, Set<string>>();
+  for (const r of rows) {
+    const set = byText.get(r.statusText) ?? new Set<string>();
+    if (r.carrierCode) set.add(r.carrierCode);
+    byText.set(r.statusText, set);
+  }
+  return [...byText].map(([text, codes]) => ({
+    value: encodeURIComponent(text),
+    label: text,
+    hint: [...codes].join(', ') || undefined,
+  }));
+};
 
 /**
  * Cột sắp được → trường `sortBy` của API. Cột không có ở đây không sắp được (sản phẩm, vận
@@ -851,6 +884,9 @@ export function OrderListScreen() {
   const itemOrigin = parseItemOrigin(state.filters.itemOrigin);
   const careTeamId = state.filters.careTeamId ?? '';
   const fbPage = state.filters.fbPage ?? '';
+  const carrierStatus = state.filters.carrierStatus ?? '';
+  const carrierStatusText = useMemo(() => decodeList(carrierStatus), [carrierStatus]);
+  const carrierStatuses = useCarrierStatusOptions();
   const careTeams = useCareTeamOptions();
   const facebookPages = useFacebookPageOptions();
   // Cột ẩn + sắp xếp lưu theo người dùng ở server (đăng xuất / đổi máy vẫn giữ). Sắp xếp trên URL
@@ -890,6 +926,7 @@ export function OrderListScreen() {
       itemOrigin,
       careTeamId,
       facebookPageIds: fbPage || undefined,
+      carrierStatusText,
     }),
     [
       state.q,
@@ -910,6 +947,7 @@ export function OrderListScreen() {
       itemOrigin,
       careTeamId,
       fbPage,
+      carrierStatusText,
     ],
   );
   const params = useMemo(
@@ -1004,6 +1042,7 @@ export function OrderListScreen() {
     carrierId !== '' ||
     carrierAccountId !== '' ||
     carrierSource !== undefined ||
+    carrierStatus !== '' ||
     shortSkuId !== '' ||
     source !== undefined ||
     from !== '' ||
@@ -1124,6 +1163,13 @@ export function OrderListScreen() {
               })),
             },
             {
+              key: 'carrierStatus',
+              label: 'Trạng thái hãng',
+              type: 'multiSelect',
+              unit: 'trạng thái',
+              options: carrierStatusOptions(carrierStatuses.data ?? []),
+            },
+            {
               key: 'careTeamId',
               label: 'Team CSKH',
               type: 'select',
@@ -1188,6 +1234,7 @@ export function OrderListScreen() {
             itemOrigin: state.filters.itemOrigin,
             careTeamId: state.filters.careTeamId,
             fbPage: state.filters.fbPage,
+            carrierStatus: state.filters.carrierStatus,
           }}
           onFilterChange={setFilter}
           searchPlaceholder="Mã đơn, mã Pancake, SĐT, tên khách, mã vận đơn"
