@@ -438,8 +438,8 @@ export const OrderDraftForm = forwardRef<
           {/* ── Cột phải ── */}
           <div className="flex min-w-0 max-w-full flex-[1_1_380px] flex-col gap-3 xl:max-w-md">
             <CustomerCard form={form} />
-            <CareCard form={form} />
             <ReceiverCard form={form} />
+            <CareCard form={form} />
             <ShippingCard form={form} estimatedWeightKg={estimatedWeightKg} codAmount={cod} />
             <InfoCard form={form} />
             {/* Khối chốt đơn dính đáy màn khi cuộn (thay thanh dưới cùng cũ — redesign 2026-10-22,

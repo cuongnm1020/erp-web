@@ -362,33 +362,57 @@ export function CustomerCard({ form }: { form: Form }) {
       form.getValues('customerGender') !== '',
   );
 
-  // Khách tra được (ngoài tầm nhìn) → điền tên + địa chỉ mặc định vào các ô còn trống.
-  useEffect(() => {
-    if (!careCustomer) return;
-    const fillEmpty = (k: keyof CreateOrderValues, v: string | null | undefined) => {
-      if (v && form.getValues(k) === '') form.setValue(k, v, { shouldDirty: true });
-    };
-    fillEmpty('customerName', careCustomer.name);
-    const a = careCustomer.address;
-    if (a && form.getValues('addressId') === '' && form.getValues('line1') === '') {
-      fillEmpty('recipient', a.recipient);
-      fillEmpty('recipientPhone', a.phone);
-      fillEmpty('line1', [a.line1, a.hamlet].filter(Boolean).join(', '));
-      fillEmpty('ward', a.ward);
-      fillEmpty('district', a.district);
-      fillEmpty('province', a.province);
-    }
-  }, [careCustomer, form]);
+  const [careChosenId, setCareChosenId] = useState('');
+  const setValue = (k: keyof CreateOrderValues, v: string) =>
+    form.setValue(k, v, { shouldDirty: true });
+  const clearReceiver = () => {
+    setValue('addressId', '');
+    for (const k of ADDRESS_FIELDS) setValue(k, '');
+  };
 
-  // SĐT gõ trùng khách đã có (trong tầm nhìn) → gắn khách đó vào đơn: giá theo bảng giá của khách,
-  // chọn được địa chỉ đã lưu. Server cũng tự khớp theo SĐT khi chốt.
+  // SĐT gõ trùng khách đã có (2026-10-28): KHÔNG tự gắn — hiện khách để người lên đơn bấm "Chọn
+  // khách này", rồi mới điền tên + phần Nhận hàng (ghi đè cái đang gõ). Server vẫn tự khớp theo SĐT
+  // khi chốt.
+  /** Khách trong tầm nhìn → gắn vào đơn (giá theo bảng giá khách, địa chỉ đã lưu do ReceiverCard điền). */
+  const pickMatch = () => {
+    if (!match.data) return;
+    clearReceiver();
+    setValue('customerId', match.data.id);
+    setValue('customerName', match.data.name);
+  };
+  /** Khách ngoài tầm nhìn → chỉ điền tên + địa chỉ mặc định (hồ sơ không mở được, không gắn id). */
+  const pickCare = () => {
+    if (!careCustomer) return;
+    setCareChosenId(careCustomer.id);
+    clearReceiver();
+    setValue('customerName', careCustomer.name);
+    const a = careCustomer.address;
+    setValue('recipient', a?.recipient || careCustomer.name);
+    setValue('recipientPhone', a?.phone || careCustomer.phone || normalizePhoneInput(phone));
+    if (!a) return;
+    setValue('line1', [a.line1, a.hamlet].filter(Boolean).join(', '));
+    setValue('ward', a.ward ?? '');
+    setValue('district', a.district ?? '');
+    setValue('province', a.province);
+  };
+
+  // Khách mới (SĐT chưa có trên hệ thống) → chép SĐT xuống SĐT người nhận, trừ khi người nhận đã
+  // được gõ số khác.
+  const normalizedPhone = normalizePhoneInput(phone);
+  const isNewCustomer =
+    !customerId &&
+    /^0\d{9,10}$/.test(normalizedPhone) &&
+    match.data === null &&
+    care.isSuccess &&
+    !care.data.customer;
+  const autoRecipientPhone = useRef('');
   useEffect(() => {
-    if (customerId || !match.data) return;
-    form.setValue('customerId', match.data.id, { shouldDirty: true });
-    if (form.getValues('customerName') === '') {
-      form.setValue('customerName', match.data.name, { shouldDirty: true });
-    }
-  }, [match.data, customerId, form]);
+    if (!isNewCustomer) return;
+    const cur = form.getValues('recipientPhone');
+    if (cur !== '' && cur !== autoRecipientPhone.current) return;
+    autoRecipientPhone.current = normalizedPhone;
+    form.setValue('recipientPhone', normalizedPhone, { shouldDirty: true });
+  }, [isNewCustomer, normalizedPhone, form]);
 
   // Khách vừa gắn (chọn từ danh sách / khớp SĐT / tạo lại đơn) → điền các ô còn trống.
   useEffect(() => {
@@ -464,11 +488,11 @@ export function CustomerCard({ form }: { form: Form }) {
               onChange={(id, opt) => {
                 setPickOpen(false);
                 if (!id) return;
+                clearReceiver();
                 form.setValue('customerId', id, { shouldDirty: true });
                 form.setValue('customerName', opt?.label ?? '', { shouldDirty: true });
                 form.setValue('customerPhone', '', { shouldDirty: true });
                 form.setValue('customerEmail', '', { shouldDirty: true });
-                form.setValue('addressId', '', { shouldDirty: true });
               }}
               useSearch={useCustomerSearch}
               placeholder="Tìm theo tên, mã, SĐT…"
@@ -604,27 +628,49 @@ export function CustomerCard({ form }: { form: Form }) {
             Xem hồ sơ
           </a>
         </p>
+      ) : !customerId && match.data ? (
+        <div
+          role="status"
+          className="flex items-start gap-2 rounded-md border border-info-line bg-info-weak px-3 py-2 text-sm"
+        >
+          <div className="min-w-0 flex-1">
+            <b className="font-semibold">{match.data.name}</b>{' '}
+            <span className="font-mono text-xs text-muted-foreground">{match.data.code}</span>{' '}
+            <StatusBadge tone="ok">Khách đã có</StatusBadge>
+            <p className="text-muted-foreground">Chọn để điền tên và địa chỉ nhận hàng.</p>
+          </div>
+          <Button type="button" size="sm" onClick={pickMatch}>
+            Chọn khách này
+          </Button>
+        </div>
       ) : careCustomer ? (
         <div
           role="status"
-          className="rounded-md border border-info-line bg-info-weak px-3 py-2 text-sm"
+          className="flex items-start gap-2 rounded-md border border-info-line bg-info-weak px-3 py-2 text-sm"
         >
-          <b className="font-semibold">{careCustomer.name}</b>{' '}
-          <span className="font-mono text-xs text-muted-foreground">{careCustomer.code}</span>{' '}
-          <StatusBadge tone="neutral">
-            {!canCare
-              ? 'Khách đã có'
-              : care.data?.careTeam === 'OTHER'
-                ? 'Khách team khác'
-                : 'Chưa thuộc team CSKH'}
-          </StatusBadge>
-          <p className="text-muted-foreground">
-            {!canCare || care.data?.careTeam === 'OTHER'
-              ? 'Đơn này tính doanh thu cho bạn và team bạn. Khách vẫn do người / team đang quản lý chăm.'
-              : 'Chốt đơn sẽ đưa khách về team bạn.'}
-          </p>
+          <div className="min-w-0 flex-1">
+            <b className="font-semibold">{careCustomer.name}</b>{' '}
+            <span className="font-mono text-xs text-muted-foreground">{careCustomer.code}</span>{' '}
+            <StatusBadge tone="neutral">
+              {!canCare
+                ? 'Khách đã có'
+                : care.data?.careTeam === 'OTHER'
+                  ? 'Khách team khác'
+                  : 'Chưa thuộc team CSKH'}
+            </StatusBadge>
+            <p className="text-muted-foreground">
+              {!canCare || care.data?.careTeam === 'OTHER'
+                ? 'Đơn này tính doanh thu cho bạn và team bạn. Khách vẫn do người / team đang quản lý chăm.'
+                : 'Chốt đơn sẽ đưa khách về team bạn.'}
+            </p>
+          </div>
+          {careChosenId !== careCustomer.id ? (
+            <Button type="button" size="sm" onClick={pickCare}>
+              Chọn khách này
+            </Button>
+          ) : null}
         </div>
-      ) : !customerId && /^0\d{9,10}$/.test(normalizePhoneInput(phone)) && match.data === null ? (
+      ) : !customerId && /^0\d{9,10}$/.test(normalizedPhone) && match.data === null ? (
         <p className="text-xs text-muted-foreground">
           Khách mới — sẽ tạo hồ sơ khách khi chốt đơn.
         </p>
@@ -672,14 +718,23 @@ export function ReceiverCard({ form }: { form: Form }) {
   };
 
   // Khách vừa gắn vào đơn mà phần nhận hàng còn trống → điền sẵn địa chỉ mặc định của khách.
+  // Không có địa chỉ để chọn sẵn → điền ít nhất tên + SĐT khách làm người nhận.
   useEffect(() => {
-    if (!brief.data || filledFor.current === brief.data.id) return;
+    if (!brief.data) {
+      if (!customerId) filledFor.current = '';
+      return;
+    }
+    if (filledFor.current === brief.data.id) return;
     filledFor.current = brief.data.id;
     const typed = ADDRESS_FIELDS.some((k) => form.getValues(k) !== '');
     if (typed || form.getValues('addressId')) return;
     const preferred =
       addresses.find((a) => a.isDefault) ?? (addresses.length === 1 ? addresses[0] : undefined);
     if (preferred) fill(preferred.id);
+    else {
+      form.setValue('recipient', brief.data.name, { shouldDirty: true });
+      form.setValue('recipientPhone', brief.data.phone ?? '', { shouldDirty: true });
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps -- chỉ khi đổi khách
   }, [brief.data]);
 

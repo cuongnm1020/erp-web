@@ -616,7 +616,7 @@ describe('OrderCreateScreen — màn tạo đơn mới', () => {
     );
   });
 
-  it('gõ SĐT trùng khách cũ → gắn khách đó (hiện "Khách cũ"), chốt gửi customerId', async () => {
+  it('gõ SĐT trùng khách cũ → chưa tự gắn; bấm "Chọn khách này" → gắn khách + điền địa chỉ mặc định xuống Nhận hàng, chốt gửi customerId', async () => {
     const CUST = makeCustomers(1)[0]!;
     const bodies: Record<string, unknown>[] = [];
     server.use(
@@ -630,8 +630,21 @@ describe('OrderCreateScreen — màn tạo đơn mới', () => {
     fireEvent.change(await screen.findByLabelText('Số điện thoại khách'), {
       target: { value: CUST.phone },
     });
+    // Người nhận đã gõ dở — chọn khách thì ghi đè bằng địa chỉ của khách.
+    fireEvent.change(screen.getByLabelText('Tên người nhận'), { target: { value: 'Gõ tay' } });
+    const pick = await screen.findByRole('button', { name: 'Chọn khách này' });
+    expect(screen.queryByText('Khách cũ')).not.toBeInTheDocument();
+    expect(screen.getByLabelText('Tên khách hàng')).toHaveValue('');
+    fireEvent.click(pick);
     expect(await screen.findByText('Khách cũ')).toBeInTheDocument();
     await waitFor(() => expect(screen.getByLabelText('Tên khách hàng')).toHaveValue(CUST.name));
+    await waitFor(() =>
+      expect(screen.getByLabelText('Tên người nhận')).toHaveValue('Nguyễn Thị Thu Hà'),
+    );
+    expect(screen.getByRole('textbox', { name: 'Số điện thoại' })).toHaveValue('0903112233');
+    expect(screen.getByLabelText('Địa chỉ chi tiết (số nhà, đường, thôn/xóm)')).toHaveValue(
+      '12 Lê Thanh Nghị',
+    );
 
     const box = screen.getByRole('combobox', { name: 'Tìm sản phẩm' });
     fireEvent.change(box, { target: { value: 'amino' } });
@@ -695,6 +708,7 @@ describe('OrderCreateScreen — màn tạo đơn mới', () => {
     fireEvent.change(await screen.findByLabelText('Số điện thoại khách'), {
       target: { value: CUST.phone },
     });
+    fireEvent.click(await screen.findByRole('button', { name: 'Chọn khách này' }));
     expect(await screen.findByText('Vườn 3ha sầu riêng Ri6')).toBeInTheDocument();
     expect(await screen.findByRole('button', { name: 'Sầu riêng', pressed: true })).toBeDisabled();
     fireEvent.click(screen.getByRole('button', { name: 'Cà phê' }));
@@ -818,6 +832,8 @@ describe('OrderCreateScreen — màn tạo đơn mới', () => {
     expect(await screen.findByText('Khách team khác')).toBeInTheDocument();
     expect(screen.getByText(/Đơn này tính doanh thu cho bạn và team bạn/)).toBeInTheDocument();
     expect(lookups).toContain('0909888777');
+    expect(screen.getByLabelText('Tên khách hàng')).toHaveValue('');
+    fireEvent.click(screen.getByRole('button', { name: 'Chọn khách này' }));
     await waitFor(() =>
       expect(screen.getByLabelText('Tên khách hàng')).toHaveValue('Trần Văn Hùng'),
     );
@@ -873,6 +889,35 @@ describe('OrderCreateScreen — màn tạo đơn mới', () => {
       target: { value: '0909888777' },
     });
     expect(await screen.findByText(/Khách mới — sẽ tạo hồ sơ khách/)).toBeInTheDocument();
+    // SĐT khách mới chép xuống SĐT người nhận; sửa SĐT khách thì người nhận đi theo.
+    await waitFor(() =>
+      expect(screen.getByRole('textbox', { name: 'Số điện thoại' })).toHaveValue('0909888777'),
+    );
+    fireEvent.change(screen.getByLabelText('Số điện thoại khách'), {
+      target: { value: '0909888666' },
+    });
+    await waitFor(() =>
+      expect(screen.getByRole('textbox', { name: 'Số điện thoại' })).toHaveValue('0909888666'),
+    );
+  });
+
+  it('khách mới: người nhận đã gõ SĐT khác thì không bị ghi đè', async () => {
+    renderApp(<OrderCreateScreen />, { me: ME_SALE });
+    fireEvent.change(await screen.findByRole('textbox', { name: 'Số điện thoại' }), {
+      target: { value: '0911222333' },
+    });
+    fireEvent.change(screen.getByLabelText('Số điện thoại khách'), {
+      target: { value: '0909888777' },
+    });
+    expect(await screen.findByText(/Khách mới — sẽ tạo hồ sơ khách/)).toBeInTheDocument();
+    expect(screen.getByRole('textbox', { name: 'Số điện thoại' })).toHaveValue('0911222333');
+  });
+
+  it('thẻ Nhận hàng nằm trên thẻ Chăm sóc khách', async () => {
+    renderApp(<OrderCreateScreen />, { me: ME_SALE });
+    const receiver = await screen.findByText('Nhận hàng');
+    const care = screen.getByText('Chăm sóc khách');
+    expect(receiver.compareDocumentPosition(care) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 
   it('server báo chuyển khoản vượt tổng (422 path prepaidAmount) → lỗi gắn đúng ô', async () => {

@@ -59,7 +59,7 @@ describe('Lịch sử chăm sóc (hồ sơ khách)', () => {
 });
 
 describe('Mục đích sử dụng (hồ sơ khách)', () => {
-  it('hiện người gắn; bấm chip mục đích chưa có → POST gắn; gõ trùng không dấu → nhắc, không tạo', async () => {
+  it('hiện người gắn; bấm chip mục đích chưa có → POST gắn; gõ trùng không dấu → gợi ý mục đích có sẵn, không tạo', async () => {
     const added: unknown[] = [];
     server.use(
       http.get('/api/customer-purposes', () =>
@@ -92,8 +92,14 @@ describe('Mục đích sử dụng (hồ sơ khách)', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Cà phê' }));
     await waitFor(() => expect(added).toEqual([{ tagIds: [COFFEE] }]));
 
-    fireEvent.change(screen.getByLabelText('Tạo mục đích mới'), { target: { value: 'sau RIENG' } });
-    expect(screen.getByText(/Đã có “Sầu riêng”/)).toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText('Tìm hoặc tạo mục đích'), {
+      target: { value: 'sau RIENG' },
+    });
+    expect(
+      within(screen.getByRole('group', { name: 'Gợi ý mục đích' })).getByRole('button', {
+        name: 'Sầu riêng',
+      }),
+    ).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Tạo & gắn/ })).toBeDisabled();
   });
 });
