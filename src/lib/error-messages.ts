@@ -100,6 +100,18 @@ const MESSAGES: Record<string, string> = {
     'Đã có đơn hàng dùng mức này nên không đổi được %. Thêm mức mới rồi gán cho sản phẩm.',
   TAX_RATE_DEFAULT_REQUIRED: 'Phải luôn có một mức mặc định — đặt mức khác làm mặc định trước.',
   TAX_RATE_CODE_TAKEN: 'Mã này đã có trong danh mục thuế suất — chọn mã khác.',
+  // Hóa đơn điện tử MISA (2026-10-28)
+  EINVOICE_NOT_CONFIGURED:
+    'Chưa cấu hình đủ kết nối MISA — vào Hóa đơn điện tử › Cài đặt kết nối để nhập và chọn mẫu hóa đơn.',
+  MISA_API_ERROR: 'MISA không nhận yêu cầu. Kiểm tra kết nối ở Cài đặt rồi thử lại.',
+  EINVOICE_STATE: 'Hóa đơn đã đổi trạng thái — tải lại rồi làm tiếp.',
+  EINVOICE_BLOCKED:
+    'Có hóa đơn còn vấn đề phải xử lý (thiếu thuế suất, lệch tiền, giao thiếu chưa sửa) — bỏ chọn hoặc sửa trước khi duyệt.',
+  EINVOICE_SAME_REVIEWER:
+    'Bạn đã duyệt hóa đơn này nên không tự đẩy lên MISA được — nhờ người thứ hai đẩy.',
+  EINVOICE_VERSION_CONFLICT: 'Hóa đơn vừa được người khác sửa — tải lại để xem bản mới.',
+  CARRIER_RECON_FILE:
+    'File đối soát không đọc được: cần file Excel có cột mã vận đơn ("Mã ĐH" / "Số hiệu bưu gửi") và cột tiền ("Thu hộ" / "Số tiền trả").',
   // Page Facebook (2026-10-26)
   FACEBOOK_PAGE_ID_TAKEN:
     'Page ID này đã có trong danh mục ở page khác — tìm page đó để sửa thay vì thêm mới.',

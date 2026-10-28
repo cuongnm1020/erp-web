@@ -80,6 +80,10 @@ const PERMISSION_LABELS: Record<string, string> = {
   'work.handle': 'Xử lý',
   'work.config': 'Cấu hình',
   'tax_rate.manage': 'Thêm / sửa thuế suất',
+  'einvoice.read': 'Xem hóa đơn điện tử',
+  'einvoice.review': 'Duyệt hóa đơn điện tử (bước 1)',
+  'einvoice.issue': 'Đẩy hóa đơn lên MISA (bước 2)',
+  'einvoice.config': 'Cài đặt kết nối MISA',
 };
 
 export const moduleLabel = (m: string): string => MODULE_LABELS[m] ?? m;
