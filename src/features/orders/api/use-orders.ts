@@ -20,6 +20,10 @@ export type SalesOrderChannel = SalesOrder['channel'];
 export type SalesOrderListItem = SalesOrder;
 export type OrderFlow = SalesOrderListItem['flow'];
 export type OrderFlowCounts = components['schemas']['SalesOrderFlowCountsDto'];
+/** Trường ngày của bộ lọc from/to trên danh sách đơn. */
+export type OrderDateField = NonNullable<
+  NonNullable<paths['/sales-orders']['get']['parameters']['query']>['dateField']
+>;
 
 export interface OrderListParams {
   q?: string;
@@ -36,6 +40,8 @@ export interface OrderListParams {
   /** Cân nặng gửi hãng hiệu lực (kg, chuỗi decimal) — cận dưới / cận trên. */
   weightMin?: string;
   weightMax?: string;
+  /** Trường ngày của from/to — bỏ trống = ngày đặt (2026-10-28). */
+  dateField?: OrderDateField;
   /** true = chỉ đơn chưa chọn hãng. */
   noCarrier?: boolean;
   /** Đơn đã gán hãng này (wms.Carrier.id). */
@@ -140,6 +146,7 @@ function listQuery(params: Omit<OrderListParams, 'take' | 'skip'>) {
     duplicate: params.duplicate ? ('true' as const) : undefined,
     from: params.from || undefined,
     to: params.to || undefined,
+    dateField: params.from || params.to ? params.dateField : undefined,
     itemOrigin: params.itemOrigin,
     careTeamId: params.careTeamId || undefined,
     facebookPageIds: params.facebookPageIds || undefined,

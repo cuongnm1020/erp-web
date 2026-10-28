@@ -45,6 +45,12 @@ export type FilterDef<F extends string = string> =
       /** Lưu "Ghi nhớ khoảng ngày" theo tài khoản dưới khoá này. */
       rememberKey?: string;
       maxDays?: number;
+      /**
+       * Lọc theo trường ngày nào (ô "Theo" trong popover, ≥ 2 trường mới hiện): khoá URL giữ
+       * trường đang chọn + danh sách; khoá trống = trường đầu danh sách.
+       */
+      fieldKey?: F;
+      fields?: Array<{ value: string; label: string }>;
     }
   | {
       key: F;
@@ -164,6 +170,16 @@ export function FilterBar<F extends string = string>({
               label={f.label}
               rememberKey={f.rememberKey}
               maxDays={f.maxDays}
+              {...(f.fieldKey && f.fields
+                ? {
+                    fields: f.fields,
+                    field: values[f.fieldKey] ?? f.fields[0]?.value,
+                    onFieldChange: (v: string) =>
+                      onFilterChange({
+                        [f.fieldKey as F]: v === f.fields?.[0]?.value ? undefined : v,
+                      } as Partial<Record<F, string | undefined>>),
+                  }
+                : {})}
               value={{ from: value, to: values[f.toKey] }}
               onChange={(r) =>
                 onFilterChange({ [f.key]: r.from, [f.toKey]: r.to } as Partial<
