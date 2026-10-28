@@ -31,6 +31,7 @@ const WAYBILL = (carrierCode: string) => ({
 });
 
 const LABEL_DATA = {
+  facebookPageName: 'Thiên Nông Official',
   shipmentId: SHIPMENT_ID,
   shipmentDocNumber: 'DN2610-00001',
   orderDocNumber: 'SO2610-00042',
@@ -109,7 +110,10 @@ describe('Popup nhãn — tem ERP 100×75 mm (2026-10-13)', () => {
     // 2026-10-15: SĐT người nhận giữ 4 số cuối, thêm hàng người gửi
     expect(label.getByText('******4567')).toBeTruthy();
     expect(label.queryByText(/0901/)).toBeNull();
-    expect(label.getByText(/\/ 0339 213 208 · Đ\/c: \*\*\*, Xã Thạch Thất, Hà Nội/)).toBeTruthy();
+    // 2026-10-28: người gửi chỉ còn tên page Facebook
+    expect(label.getByText('Thiên Nông Official')).toBeTruthy();
+    expect(label.queryByText(/0339/)).toBeNull();
+    expect(label.queryByText(/Mạnh/)).toBeNull();
     expect(label.getByText(/Thiện Mỹ, Huyện Trà Ôn, Vĩnh Long/)).toBeTruthy();
     // Bố cục theo nhãn Pancake (2026-10-14): mã hãng + số kiện, COD, bảng Sản phẩm / SL
     expect(label.getByText('VTP')).toBeTruthy();
@@ -153,10 +157,11 @@ describe('Popup nhãn — tem ERP 100×75 mm (2026-10-13)', () => {
     await waitFor(() => expect(print).toHaveBeenCalledTimes(1));
     const label = within(lastPrinted());
     expect(label.queryByText(/Mã đơn hàng/)).toBeNull();
-    // 2026-10-16: "Người gửi: SĐT / xã → tỉnh", tên POS dòng dưới
+    // 2026-10-28: người gửi chỉ còn tên page Facebook — ẩn tên POS, SĐT, địa chỉ
     expect(label.getByText('Người gửi:')).toBeTruthy();
-    expect(label.getByText('0339213208 / Xã Thạch Thất, Hà Nội')).toBeTruthy();
-    expect(label.getByText('Mạnh')).toBeTruthy();
+    expect(label.getByText('Thiên Nông Official')).toBeTruthy();
+    expect(label.queryByText(/0339/)).toBeNull();
+    expect(label.queryByText('Mạnh')).toBeNull();
     expect(label.queryByText(/Số nhà 59/)).toBeNull();
     expect(label.getByText('******4567')).toBeTruthy();
     expect(label.queryByText(/0901/)).toBeNull();
@@ -197,7 +202,7 @@ describe('Popup nhãn — tem ERP 100×75 mm (2026-10-13)', () => {
     expect(label.getByText(code)).toBeTruthy();
     expect(label.getByText('1/1')).toBeTruthy();
     expect(label.getByText('Người gửi:')).toBeTruthy();
-    expect(label.getByText('0339213208 / Xã Thạch Thất, Hà Nội')).toBeTruthy();
+    expect(label.getByText('Thiên Nông Official')).toBeTruthy();
     expect(label.getByText('******4567')).toBeTruthy();
     expect(label.getByText('***, Huyện Trà Ôn, Vĩnh Long')).toBeTruthy();
     expect(label.queryByText(/Thiện Mỹ/)).toBeNull();
@@ -246,8 +251,10 @@ describe('Popup nhãn — tem ERP 100×75 mm (2026-10-13)', () => {
     expect(label.getByText('MN13')).toBeTruthy();
     expect(label.getByText('LIÊN MIỀN')).toBeTruthy();
     expect(label.queryByText(/SO2610-00042/)).toBeNull();
-    expect(label.getByText('S23119447')).toBeTruthy();
-    expect(label.getByText(/Mạnh \/ 0339 213 208/)).toBeTruthy();
+    // 2026-10-28: người gửi chỉ còn tên page — ẩn mã shop, tên, SĐT
+    expect(label.getByText('Thiên Nông Official')).toBeTruthy();
+    expect(label.queryByText('S23119447')).toBeNull();
+    expect(label.queryByText(/0339/)).toBeNull();
     // 2026-10-15: SĐT người nhận giữ 4 số cuối, bỏ khối lượng
     expect(label.getByText(/Nguyễn Công Quân \/ \*{6}4567/)).toBeTruthy();
     expect(label.queryByText(/Khối lượng/)).toBeNull();
@@ -292,7 +299,7 @@ describe('Popup nhãn — tem ERP 100×75 mm (2026-10-13)', () => {
     // Tuyến cạnh COD: Hà Nội → Hải Phòng cùng miền Bắc
     expect(label.getByText('NỘI MIỀN')).toBeTruthy();
     expect(label.getByText('Người gửi:')).toBeTruthy();
-    expect(label.getByText('0339213208 / Xã Thạch Thất, Hà Nội')).toBeTruthy();
+    expect(label.getByText('Thiên Nông Official')).toBeTruthy();
     expect(label.getByText('******4567')).toBeTruthy();
     expect(label.getByText('***, Huyện Trà Ôn, Vĩnh Long')).toBeTruthy();
     expect(label.queryByText(/Thiện Mỹ/)).toBeNull();

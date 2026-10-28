@@ -3,12 +3,12 @@
 import type { CSSProperties, ReactNode } from 'react';
 import { Barcode } from '@/components/data/barcode';
 import { cn } from '@/lib/cn';
-import { formatDate, formatMoney, formatPhone, formatQuantity, formatTime } from '@/lib/format';
+import { formatDate, formatMoney, formatQuantity, formatTime } from '@/lib/format';
 import { LABEL_SIZES } from '@/lib/print';
 import type { ShipmentLabelData } from '../api/use-pda';
 import { type GhtkTracking, hidePhone, maskedAddress, printNote, routeLabel } from '../ghtk-label';
 // Dựng ×2 rồi thu về — chống cài đặt "cỡ chữ tối thiểu" của Chrome (xem label-scale.ts).
-import { f, labelInner, labelOuter, u } from '../label-scale';
+import { f, labelInner, labelOuter, u, WAYBILL_EDGE } from '../label-scale';
 
 /** Ô mã vạch: SVG của bwip-js giãn theo ô (giữ tỉ lệ), không theo kích thước gốc. */
 const FILL_SVG = '[&>svg]:!h-full [&>svg]:!w-full [&>svg]:!max-w-none';
@@ -71,7 +71,10 @@ export function GhtkWaybillLabel({
     >
       <div
         className="flex flex-col overflow-hidden"
-        style={{ ...labelInner(W, H), padding: `${u(1.8)} ${u(2.5)} ${u(1.5)}` }}
+        style={{
+          ...labelInner(W, H),
+          padding: `${u(1.8 + WAYBILL_EDGE.top)} ${u(2.5 + WAYBILL_EDGE.right)} ${u(1.5)} ${u(2.5)}`,
+        }}
       >
         {/* Đầu tem: GHTK | mã đơn KH | tuyến + giờ in */}
         <div
@@ -178,14 +181,12 @@ export function GhtkWaybillLabel({
             }}
           >
             <div className="min-w-0" style={clamp(3)}>
-              <Caption>Người gửi / </Caption>
-              <b>{ghtk.shopCode}</b>
-              {data.sender ? (
-                <b>
-                  {' · '}
-                  {data.sender.name} / {formatPhone(data.sender.phone)} · Đ/c:{' '}
-                  {maskedAddress(data.sender.street, data.sender.locality)}
-                </b>
+              {/* 2026-10-28: người gửi chỉ in tên page Facebook — ẩn mã shop, tên, SĐT, địa chỉ. */}
+              {data.facebookPageName ? (
+                <>
+                  <Caption>Người gửi: </Caption>
+                  <b>{data.facebookPageName}</b>
+                </>
               ) : null}
             </div>
             <div className="min-w-0">

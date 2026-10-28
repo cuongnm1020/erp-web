@@ -7456,6 +7456,8 @@ export interface components {
             qty: string;
         };
         ShipmentLabelDataDto: {
+            /** @description Tên page Facebook của đơn — tem in ở chỗ người gửi; null = đơn không có page. */
+            facebookPageName: string | null;
             shipmentId: string;
             shipmentDocNumber: string;
             orderDocNumber: string | null;

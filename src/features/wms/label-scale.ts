@@ -29,3 +29,10 @@ export const labelInner = (widthMm: number, heightMm: number): CSSProperties => 
   transformOrigin: '0 0',
   fontFamily: 'Arial, Helvetica, sans-serif',
 });
+
+/**
+ * Lề bù thêm ở cạnh trên và cạnh phải tem vận đơn (mm, 2026-10-28): in thật trên máy HiLabel,
+ * nội dung sát mép trên / mép phải hơn hẳn mép trái — user muốn hai cạnh này cách lề như cạnh
+ * trái. Chỉnh số này sau khi in thử, không sửa từng tem.
+ */
+export const WAYBILL_EDGE = { top: 2, right: 2 } as const;
