@@ -819,8 +819,8 @@ function WaitingStockNote({
     <div className="flex flex-wrap items-center gap-2 px-5 pt-3">
       <p role="note" className="flex-1 rounded-lg bg-info-weak px-3 py-2 text-sm text-info">
         Đơn đã duyệt từ 24 giờ, chưa <strong>Gửi sang ĐVVC</strong> và còn sản phẩm thiếu tồn tự vào
-        tab này. Gửi sang ĐVVC hoặc hàng về đủ thì đơn tự rời tab. Không đổi trạng thái trên
-        Pancake.{' '}
+        tab này, cùng đơn sale để <strong>Chờ hàng</strong> trên Pancake. Gửi sang ĐVVC, hàng về đủ
+        hoặc sale xác nhận lại trên Pancake thì đơn tự rời tab.{' '}
         <Link href="/wms/waiting-stock" className="font-semibold text-primary hover:underline">
           Xem tổng hàng thiếu
         </Link>
