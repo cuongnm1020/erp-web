@@ -28,6 +28,9 @@ const MESSAGES: Record<string, string> = {
   UOM_CONVERSION_MISSING: 'Đơn vị tính chưa có quy đổi về đơn vị cơ sở. Chọn đơn vị khác.',
   EMPTY_ORDER: 'Đơn chưa có dòng hàng nào. Thêm ít nhất một sản phẩm.',
   INVALID_ORDER_INPUT: 'Một số trường của đơn chưa hợp lệ. Kiểm tra các ô được đánh dấu.',
+  // Danh sách đơn (GET /sales-orders?weightMin/weightMax)
+  ORDER_WEIGHT_FILTER_TOO_BROAD:
+    'Lọc cân nặng trên quá nhiều đơn. Chọn thêm Ngày đặt hoặc tab trạng thái để thu hẹp rồi lọc lại.',
   PRICE_NOT_FOUND:
     'Chưa có giá cho sản phẩm này với khách đang chọn. Báo quản lý cập nhật bảng giá.',
   INVALID_STATUS_TRANSITION:
