@@ -479,6 +479,7 @@ export function makeOrders(n: number) {
     carrierId: i % 5 === 1 ? 'c-ghtk' : null,
     carrierAccountId: null,
     senderPhone: null,
+    recipientPhone: null,
     warehouseId: null,
     addressId: null,
     // Cân nặng: đặt tay 1 kg ở mỗi đơn thứ 4; còn lại tính từ dòng 0,3 → 1,5 kg.
@@ -521,6 +522,11 @@ function orderListExtras(i: number, status: (typeof ORDER_STATUSES)[number]) {
           : flow,
     statusChangedAt: shipped ? new Date(Date.UTC(2026, 7, 24) - i * 600_000).toISOString() : null,
     sameDayCount: 0,
+    phoneMasked: false,
+    marketplace: null,
+    waybillError: null,
+    waybillErrorCode: null,
+    waybillErrorAt: null,
     phone: FIXTURE_PHONES[i % FIXTURE_PHONES.length]!,
     recipientName: null,
     addressLine: `Thôn ${(i % 9) + 1}, X. Ea Kar`,
@@ -596,6 +602,8 @@ export function makeOrderDetail(id: string) {
       deliveredAt: null as string | null,
     },
     shippingAddress: null,
+    marketplace: null as 'TIKTOK' | 'SHOPEE' | 'LAZADA' | null,
+    recipientPhoneMasked: false,
     approval: null as { requestId: string; ruleName: string | null; canAct: boolean } | null,
     customItems: [] as { name: string; qty: string; unitPrice: string | null; discount: string }[],
     fulfilment: {
@@ -737,6 +745,9 @@ export const ORDER_SHIPMENT_FIXTURE = {
     source: 'WEBHOOK' | 'POLL';
     carrierStatusCode: string;
   } | null,
+  waybillError: null as string | null,
+  waybillErrorCode: null as string | null,
+  waybillErrorAt: null as string | null,
 };
 
 /** Đúng shape `TaskDetailDto` (GET /tasks/:id) — task PICK 2 dòng đã sắp theo pickSequence. */

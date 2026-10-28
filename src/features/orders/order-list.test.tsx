@@ -1156,3 +1156,94 @@ describe('OrderListScreen — tab Chờ hàng (2026-10-25)', () => {
     expect(screen.queryByRole('note')).not.toBeInTheDocument();
   });
 });
+
+describe('OrderListScreen — Lỗi vận đơn + đơn TikTok (2026-10-28)', () => {
+  const errorRow = () => ({
+    ...FIRST,
+    flow: 'WAYBILL_ERROR' as const,
+    fulfilmentStatus: 'PACKED' as const,
+    phone: '+84387****30',
+    phoneMasked: true,
+    marketplace: 'TIKTOK' as const,
+    waybillError: 'Số điện thoại khách hàng không hợp lệ.',
+    waybillErrorCode: 'CARRIER_REJECTED',
+    waybillErrorAt: '2026-10-27T21:47:00.946Z',
+    shipment: {
+      id: 'ship-err-1',
+      status: 'PENDING' as const,
+      carrierCode: 'GHTK',
+      carrierName: 'Giao Hàng Tiết Kiệm',
+      trackingNo: null,
+      shipFee: null,
+      codAmount: '290000.0000',
+      collectedAmount: null,
+    },
+  });
+
+  it('tab Lỗi vận đơn: dòng có chip TikTok + SĐT bị che + lý do hãng; "⋯ › Xin lại vận đơn" → POST /shipments/:id/waybill với hãng của phiếu', async () => {
+    search = 'flow=WAYBILL_ERROR';
+    const seenFlow: (string | null)[] = [];
+    const waybillBodies: unknown[] = [];
+    server.use(
+      http.get('/api/sales-orders', ({ request }) => {
+        seenFlow.push(new URL(request.url).searchParams.get('flow'));
+        return HttpResponse.json({ items: [errorRow()], total: 1 });
+      }),
+      http.post('/api/shipments/:id/waybill', async ({ request, params }) => {
+        waybillBodies.push({ id: params.id, body: await request.json() });
+        return HttpResponse.json(
+          {
+            shipmentId: params.id,
+            shipmentDocNumber: 'DN2610-68638',
+            carrierCode: 'GHTK',
+            outcome: 'ISSUED',
+            trackingNo: 'S23119447.BO.1',
+            reason: null,
+            jobId: null,
+          },
+          { status: 201 },
+        );
+      }),
+    );
+    renderApp(<OrderListScreen />);
+    await screen.findByText(FIRST.docNumber);
+    expect(seenFlow).toContain('WAYBILL_ERROR');
+    expect(screen.getByRole('tab', { name: /Lỗi vận đơn/ })).toBeInTheDocument();
+    expect(screen.getByText('TikTok')).toBeInTheDocument();
+    expect(screen.getByText('SĐT bị che')).toBeInTheDocument();
+    expect(screen.getByTestId('waybill-error')).toHaveTextContent(
+      'Số điện thoại khách hàng không hợp lệ.',
+    );
+
+    fireEvent.keyDown(
+      screen.getByRole('button', { name: `Thao tác khác cho đơn ${FIRST.docNumber}` }),
+      { key: 'ArrowDown' },
+    );
+    fireEvent.click(await screen.findByRole('menuitem', { name: /Xin lại vận đơn/ }));
+    await waitFor(() =>
+      expect(waybillBodies).toEqual([{ id: 'ship-err-1', body: { carrierCode: 'GHTK' } }]),
+    );
+    await waitFor(() =>
+      expect(toastSuccess).toHaveBeenCalledWith(
+        `Đã cấp vận đơn S23119447.BO.1 cho đơn ${FIRST.docNumber}`,
+      ),
+    );
+  });
+
+  it('không có quyền shipment.pack → menu dòng không có "Xin lại vận đơn" (luật 7)', async () => {
+    search = 'flow=WAYBILL_ERROR';
+    server.use(
+      http.get('/api/sales-orders', () => HttpResponse.json({ items: [errorRow()], total: 1 })),
+    );
+    renderApp(<OrderListScreen />, {
+      me: { ...ME_SALE, permissions: ['sales_order.read', 'sales_order.update'] },
+    });
+    await screen.findByText(FIRST.docNumber);
+    fireEvent.keyDown(
+      screen.getByRole('button', { name: `Thao tác khác cho đơn ${FIRST.docNumber}` }),
+      { key: 'ArrowDown' },
+    );
+    await screen.findByRole('menuitem', { name: /Mở chi tiết/ });
+    expect(screen.queryByRole('menuitem', { name: /Xin lại vận đơn/ })).not.toBeInTheDocument();
+  });
+});

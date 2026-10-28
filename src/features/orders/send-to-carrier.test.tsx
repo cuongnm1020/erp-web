@@ -274,10 +274,73 @@ describe('Gửi sang ĐVVC — SendToCarrierMenu + SendToCarrierDialog', () => {
     // (toolbar nằm sau modal → aria-hidden, phải tìm với hidden: true)
     expect(screen.getByRole('toolbar', { hidden: true })).toBeInTheDocument();
     // Nút "Đóng" ở chân danh sách đơn lỗi (dialog còn nút × cùng tên ở góc).
-    const panel = within(dialog).getByRole('region', { name: 'Đơn không gửi được' });
+    const panel = within(dialog).getByRole('region', { name: 'Kết quả từng đơn' });
+    // Đơn đã có mã nằm ở nhóm "Có mã vận đơn" (2026-10-28).
+    fireEvent.click(within(panel).getByRole('button', { name: 'Có mã vận đơn 1' }));
+    expect(
+      within(within(panel).getByRole('list', { name: 'Danh sách kết quả' })).getByText(
+        'Có mã S1.SG',
+      ),
+    ).toBeInTheDocument();
     fireEvent.click(within(panel).getByRole('button', { name: 'Đóng' }));
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
     await waitFor(() => expect(screen.queryByRole('toolbar')).not.toBeInTheDocument());
+  });
+
+  it('lô nhiều đơn (2026-10-28): kết quả TỪNG đơn — có mã / chờ đóng gói / cần sửa; SĐT bị che (TikTok) → nhóm Cần sửa với việc phải làm', async () => {
+    search = '';
+    const rows = makeOrders(2);
+    const base = { carrierId: 'c-ghtk', carrierCode: 'GHTK', carrierAccountId: null, reason: null };
+    server.use(
+      http.post('/api/sales-orders/send-to-carrier', () =>
+        HttpResponse.json(
+          {
+            sent: [
+              {
+                ...base,
+                orderId: rows[0]!.id,
+                docNumber: rows[0]!.docNumber,
+                outcome: 'SAVED',
+                shipmentId: null,
+                shipmentDocNumber: null,
+                trackingNo: null,
+                warning: 'RECIPIENT_PHONE_MASKED',
+              },
+              {
+                ...base,
+                orderId: rows[1]!.id,
+                docNumber: rows[1]!.docNumber,
+                outcome: 'SAVED',
+                shipmentId: null,
+                shipmentDocNumber: null,
+                trackingNo: null,
+                warning: null,
+              },
+            ],
+            failed: [],
+          },
+          { status: 201 },
+        ),
+      ),
+    );
+    await selectTwoRows();
+    const dialog = await openFor('GHTK');
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Cập nhật 2 đơn' }));
+
+    const panel = await within(dialog).findByRole('region', { name: 'Kết quả từng đơn' });
+    expect(within(panel).getByText('Đã gửi 2 đơn sang GHTK')).toBeInTheDocument();
+    // Mở sẵn nhóm Cần sửa: chỉ đơn SĐT bị che.
+    const fix = within(panel).getByRole('list', { name: 'Danh sách đơn lỗi' });
+    const item = within(fix).getByRole('listitem');
+    expect(item).toHaveTextContent(rows[0]!.docNumber);
+    expect(item).toHaveTextContent('Cần sửa trước khi đóng gói');
+    expect(item).toHaveTextContent(/SĐT người nhận bị sàn che — GHTK sẽ từ chối/);
+    fireEvent.click(within(panel).getByRole('button', { name: 'Chờ 1' }));
+    expect(within(panel).getByRole('list', { name: 'Danh sách kết quả' })).toHaveTextContent(
+      rows[1]!.docNumber,
+    );
+    fireEvent.click(within(panel).getByRole('button', { name: 'Đóng' }));
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
   });
 
   it('kho xuất không có sản phẩm (ORDER_SKU_NOT_IN_WAREHOUSE) → cảnh báo nêu tên kho + từng sản phẩm, không gửi', async () => {

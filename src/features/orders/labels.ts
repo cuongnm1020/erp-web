@@ -249,6 +249,8 @@ export const ORDER_FLOW_TABS: ReadonlyArray<{
   { flow: 'WAITING_STOCK', label: 'Chờ hàng', family: 'wait' },
   { flow: 'PICKING', label: 'Đang lấy hàng', family: 'fulfil' },
   { flow: 'PACKED', label: 'Đã đóng gói', family: 'fulfil' },
+  // Lỗi vận đơn (2026-10-28): đã đóng gói mà hãng không cấp được mã — kho phải xử lý.
+  { flow: 'WAYBILL_ERROR', label: 'Lỗi vận đơn', family: 'issue' },
   { flow: 'PICKED_UP', label: 'Đã lấy hàng', family: 'ship' },
   { flow: 'IN_TRANSIT', label: 'Đang vận chuyển', family: 'ship' },
   { flow: 'OUT_FOR_DELIVERY', label: 'Đang giao hàng', family: 'ship' },
@@ -316,6 +318,7 @@ const FLOW_CLASS: Record<OrderFlow, string> = {
   WAITING_STOCK: 'bg-flow-wait-weak text-flow-wait',
   PICKING: 'bg-flow-picking-weak text-flow-picking',
   PACKED: 'bg-flow-packed-weak text-flow-packed',
+  WAYBILL_ERROR: 'bg-destructive-weak text-destructive',
   PICKED_UP: 'bg-flow-picked-up-weak text-flow-picked-up',
   IN_TRANSIT: 'bg-flow-in-transit-weak text-flow-in-transit',
   OUT_FOR_DELIVERY: 'bg-flow-out-for-delivery-weak text-flow-out-for-delivery',

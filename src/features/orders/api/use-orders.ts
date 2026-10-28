@@ -376,6 +376,30 @@ export function useBulkFulfilOrders() {
   });
 }
 
+export type WaybillRequestResult = components['schemas']['WaybillRequestResultDto'];
+
+/**
+ * POST /shipments/:id/waybill — xin lại vận đơn cho phiếu đã đóng gói mà hãng từ chối (tab "Lỗi vận
+ * đơn", 2026-10-28). Quyền `shipment.pack`. Hãng chưa phản hồi → `QUEUED` (thử lại nền), hãng vẫn
+ * từ chối → lỗi CARRIER_REJECTED kèm câu của hãng.
+ */
+export function useRequestWaybill() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ shipmentId, carrierCode }: { shipmentId: string; carrierCode: string }) =>
+      unwrap(
+        api.POST('/shipments/{id}/waybill', {
+          params: { path: { id: shipmentId } },
+          body: { carrierCode },
+        }),
+      ),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: orderKeys.lists() });
+      void qc.invalidateQueries({ queryKey: orderKeys.details() });
+    },
+  });
+}
+
 export type MoveOrdersWarehouseBody = components['schemas']['MoveOrdersWarehouseDto'];
 export type MoveOrdersWarehouseResult = components['schemas']['MoveOrdersWarehouseResultDto'];
 

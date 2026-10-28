@@ -8,6 +8,7 @@ import {
   makeOrderDetail,
   makeOrders,
   makeShippingQuote,
+  ORDER_SHIPMENT_FIXTURE,
   PICKUP_WAREHOUSES,
   scenario,
 } from '@/test/msw/handlers';
@@ -574,5 +575,91 @@ describe('OrderEditScreen — "Trạng thái kho" đặt tay (POST /sales-orders
     await screen.findByRole('heading', { level: 1 });
     expect(screen.queryByRole('combobox', { name: 'Trạng thái kho' })).not.toBeInTheDocument();
     expect(screen.getAllByText('Chờ pick').length).toBeGreaterThan(0);
+  });
+});
+
+describe('OrderEditScreen — Lỗi vận đơn + SĐT người nhận riêng cho đơn (2026-10-28)', () => {
+  const WAYBILL_ERROR = {
+    ...DETAIL,
+    status: 'APPROVED' as const,
+    marketplace: 'TIKTOK' as const,
+    recipientPhoneMasked: true,
+    shipment: {
+      ...ORDER_SHIPMENT_FIXTURE,
+      docNumber: 'DN2610-68638',
+      trackingNo: null,
+      lastCarrierEvent: null,
+      waybillError: 'Số điện thoại khách hàng không hợp lệ.',
+      waybillErrorCode: 'CARRIER_REJECTED',
+      waybillErrorAt: '2026-10-27T21:47:00.946Z',
+    },
+  };
+
+  it('hộp đỏ nêu lời hãng; ô SĐT tô đỏ khi số bị che; nhập số thật → "Lưu và xin lại vận đơn" PATCH recipientPhone rồi POST /shipments/:id/waybill → về chi tiết in tem', async () => {
+    push.mockClear();
+    const patched: Record<string, unknown>[] = [];
+    const waybill: unknown[] = [];
+    server.use(
+      http.get('/api/sales-orders/:id', () => HttpResponse.json(WAYBILL_ERROR)),
+      http.patch('/api/sales-orders/:id', async ({ params, request }) => {
+        const body = (await request.json()) as Record<string, unknown>;
+        patched.push(body);
+        return HttpResponse.json({
+          orderId: params.id,
+          docNumber: ORDER.docNumber,
+          status: 'APPROVED',
+          carrierId: null,
+          carrierAccountId: null,
+          warehouseId: null,
+          addressId: null,
+          shippingWeightKg: null,
+          shippingOptions: null,
+          changed: ['recipientPhone'],
+        });
+      }),
+      http.post('/api/shipments/:id/waybill', async ({ params, request }) => {
+        waybill.push({ id: params.id, body: await request.json() });
+        return HttpResponse.json(
+          {
+            shipmentId: params.id,
+            shipmentDocNumber: 'DN2610-68638',
+            carrierCode: 'GHTK',
+            outcome: 'ISSUED',
+            trackingNo: 'S23119447.BO.1',
+            reason: null,
+            jobId: null,
+          },
+          { status: 201 },
+        );
+      }),
+    );
+    renderApp(<OrderEditScreen orderId={ORDER.id} />);
+    const alert = await screen.findByText('GHTK không cấp được vận đơn');
+    expect(alert.closest('[role="alert"]')).toHaveTextContent(
+      'Hãng báo: “Số điện thoại khách hàng không hợp lệ.”',
+    );
+    expect(screen.getByText('TikTok')).toBeInTheDocument();
+    const phone = screen.getByLabelText('SĐT người nhận cho đơn này');
+    expect(phone).toHaveAttribute('aria-invalid', 'true');
+    expect(screen.getByText(/SĐT đang bị che — hãng sẽ từ chối/)).toBeInTheDocument();
+
+    fireEvent.change(phone, { target: { value: '0387123430' } });
+    expect(phone).not.toHaveAttribute('aria-invalid');
+    fireEvent.click(screen.getByRole('button', { name: 'Lưu và xin lại vận đơn' }));
+
+    await waitFor(() => expect(patched).toEqual([{ recipientPhone: '0387123430' }]));
+    await waitFor(() =>
+      expect(waybill).toEqual([{ id: ORDER_SHIPMENT_FIXTURE.id, body: { carrierCode: 'GHTK' } }]),
+    );
+    await waitFor(() => expect(push).toHaveBeenCalledWith(`/crm/orders/${ORDER.id}?printLabel=1`));
+  });
+
+  it('không quyền shipment.pack → vẫn thấy lỗi, không có nút xin lại vận đơn', async () => {
+    server.use(http.get('/api/sales-orders/:id', () => HttpResponse.json(WAYBILL_ERROR)));
+    renderApp(<OrderEditScreen orderId={ORDER.id} />, {
+      me: { ...ME_SALE, permissions: ['sales_order.read', 'sales_order.update'] },
+    });
+    await screen.findByText('GHTK không cấp được vận đơn');
+    expect(screen.queryByRole('button', { name: /xin lại vận đơn/i })).not.toBeInTheDocument();
   });
 });

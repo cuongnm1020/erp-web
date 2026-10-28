@@ -78,6 +78,7 @@ import {
 } from '../labels';
 import { groupOrderLines } from '../combo-lines';
 import { CarrierStatusCard } from './carrier-status-card';
+import { waybillErrorText } from './waybill-error';
 import { OrderPrintSheet } from './order-print-sheet';
 import { OrderProgress } from './order-progress';
 import { TelcoBadge } from './order-quick-view';
@@ -210,7 +211,15 @@ function ShipmentCard({ order, autoPrint }: { order: SalesOrderDetail; autoPrint
             {/* Có mã thì mã nằm trên thẻ hãng bên dưới (nhãn màu hãng + sao chép). */}
             {s.trackingNo ? null : (
               <Field label="Mã vận đơn">
-                <span className="text-muted-foreground">chưa cấp — cấp khi đóng gói xong</span>
+                {s.waybillErrorCode ? (
+                  // Lỗi vận đơn (2026-10-28): hãng từ chối / hết lượt thử — sửa ở màn sửa đơn.
+                  <span className="text-destructive" role="alert">
+                    <span className="font-semibold">Lỗi vận đơn</span> ·{' '}
+                    {waybillErrorText(s.waybillErrorCode, s.waybillError)}
+                  </span>
+                ) : (
+                  <span className="text-muted-foreground">chưa cấp — cấp khi đóng gói xong</span>
+                )}
               </Field>
             )}
             <Field label="Nhãn đã in">

@@ -11,6 +11,7 @@ import {
   MessageSquareText,
   Pencil,
   Plus,
+  RefreshCw,
   X,
 } from 'lucide-react';
 import Link from 'next/link';
@@ -35,7 +36,9 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Input } from '@/components/ui/input';
+import { toast } from '@/components/ui/toaster';
 import { cn } from '@/lib/cn';
+import { messageFor } from '@/lib/error-messages';
 import {
   formatDateTime,
   formatMoney,
@@ -59,6 +62,7 @@ import {
   useOrderFlowCounts,
   useOrderListPrefs,
   useOrders,
+  useRequestWaybill,
   useCareTeamOptions,
   useCarrierStatusOptions,
   useFacebookPageOptions,
@@ -89,6 +93,7 @@ import { OrderScanButton } from './order-scan-button';
 import { PancakeOrderResyncButton } from './pancake-order-resync-button';
 import { SendToCarrierMenu } from './send-to-carrier-menu';
 import { PancakeOrderLink } from './pancake-order-link';
+import { MarketplaceBadge, MaskedPhoneBadge, waybillErrorText } from './waybill-error';
 
 /**
  * D-03 Quản lý đơn hàng — GET /sales-orders + GET /sales-orders/flow-counts (thiết kế lại
@@ -221,7 +226,10 @@ type ExtraFilter = (typeof EXTRA_FILTERS)[number]['key'];
 interface RowActionContext {
   canUpdate: boolean;
   canCreate: boolean;
+  /** `shipment.pack` — xin lại vận đơn cho đơn lỗi vận đơn. */
+  canPack: boolean;
   onPeek: (row: SalesOrderListItem) => void;
+  onRetryWaybill: (row: SalesOrderListItem) => void;
 }
 
 /** Menu "⋯" của một dòng đơn: mở / sửa / nhân bản (redesign 2026-10-22). */
@@ -232,6 +240,16 @@ function orderRowItems(o: SalesOrderListItem, ctx: RowActionContext): RowActionI
       icon: <ExternalLink aria-hidden />,
       href: `/crm/orders/${o.id}`,
     },
+    ...(ctx.canPack && o.flow === 'WAYBILL_ERROR' && o.shipment?.carrierCode
+      ? [
+          {
+            // Lỗi vận đơn (2026-10-28): sửa đơn xong thì xin lại — thành công là rời tab.
+            label: 'Xin lại vận đơn',
+            icon: <RefreshCw aria-hidden />,
+            onSelect: () => ctx.onRetryWaybill(o),
+          },
+        ]
+      : []),
     ...(ctx.canUpdate
       ? [
           {
@@ -294,6 +312,7 @@ const buildColumns = (
               'Tạo trong ERP'
             )}
           </div>
+          {o.marketplace ? <MarketplaceBadge marketplace={o.marketplace} /> : null}
           {o.ownerName ? (
             <div className="break-words text-xs text-foreground" data-testid="order-owner">
               {o.ownerName}
@@ -339,6 +358,7 @@ const buildColumns = (
               <CopyButton value={normalizePhone(o.phone) ?? o.phone} label="số điện thoại" />
             ) : null}
           </span>
+          <MaskedPhoneBadge masked={o.phoneMasked} />
         </div>
       );
     },
@@ -571,6 +591,18 @@ function ShippingCell({
       ) : (
         <WeightNote order={order} />
       )}
+      {order.waybillErrorCode ? (
+        // Lỗi vận đơn (2026-10-28): lý do hãng từ chối, đủ câu ở tooltip.
+        <span
+          className="block max-w-48 truncate font-semibold text-destructive"
+          title={waybillErrorText(order.waybillErrorCode, order.waybillError)}
+          data-testid="waybill-error"
+        >
+          {order.waybillErrorCode === 'CARRIER_REJECTED' && order.waybillError
+            ? order.waybillError
+            : 'Lỗi vận đơn'}
+        </span>
+      ) : null}
     </div>
   );
 }
@@ -965,19 +997,37 @@ export function OrderListScreen() {
   const ability = useAbility();
   const canUpdate = ability.can('update', 'SalesOrder');
   const canCreate = ability.can('create', 'SalesOrder');
+  const canPack = ability.can('pack', 'Shipment');
   const [peek, setPeek] = useState<SalesOrderListItem | null>(null);
+  const requestWaybill = useRequestWaybill();
   const columns = useMemo(() => {
     const carrierById = new Map((carriers.data ?? []).map((c) => [c.id, c]));
     const all = buildColumns((id) => carrierById.get(id) ?? null, {
       canUpdate,
       canCreate,
+      canPack,
       onPeek: setPeek,
+      onRetryWaybill: (o) => {
+        if (!o.shipment?.carrierCode) return;
+        requestWaybill.mutate(
+          { shipmentId: o.shipment.id, carrierCode: o.shipment.carrierCode },
+          {
+            onSuccess: (r) =>
+              r.outcome === 'QUEUED'
+                ? toast.warning(`Hãng chưa phản hồi — đơn ${o.docNumber} sẽ được xin lại tự động.`)
+                : toast.success(`Đã cấp vận đơn ${r.trackingNo ?? ''} cho đơn ${o.docNumber}`),
+            onError: (err) => toast.error(`Đơn ${o.docNumber}: ${messageFor(err)}`),
+          },
+        );
+      },
     });
     // Cột Hàng thiếu / Chờ từ chỉ có nghĩa ở tab Chờ hàng.
     return flow === 'WAITING_STOCK'
       ? all
       : all.filter((c) => !WAITING_ONLY_COLUMNS.includes(c.id ?? ''));
-  }, [carriers.data, canUpdate, canCreate, flow]);
+    // requestWaybill.mutate ổn định giữa các lần render (TanStack Query).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [carriers.data, canUpdate, canCreate, canPack, flow]);
   const pickerColumns = useMemo(
     () =>
       columns
