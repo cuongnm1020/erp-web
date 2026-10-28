@@ -5,17 +5,11 @@ import { Barcode } from '@/components/data/barcode';
 import { PrintSheet } from '@/components/data/print-sheet';
 import { cn } from '@/lib/cn';
 import { MapPin, Phone, Store, User } from 'lucide-react';
-import { formatDate, formatMoney, formatPhone, formatQuantity, formatTime } from '@/lib/format';
+import { formatDate, formatMoney, formatQuantity, formatTime } from '@/lib/format';
 import { LABEL_SIZES, type PrintController } from '@/lib/print';
 import type { ShipmentLabelData } from '../api/use-pda';
-import {
-  DEFAULT_PRINT_NOTE,
-  hidePhone,
-  maskedAddress,
-  parseGhtkTracking,
-  routeLabel,
-} from '../ghtk-label';
-import { f, labelInner, labelOuter, u } from '../label-scale';
+import { DEFAULT_PRINT_NOTE, hidePhone, parseGhtkTracking, routeLabel } from '../ghtk-label';
+import { f, labelInner, labelOuter, u, WAYBILL_EDGE } from '../label-scale';
 import { GhtkWaybillLabel } from './ghtk-waybill-label';
 
 export type WaybillOrientation = 'landscape' | 'portrait';
@@ -80,6 +74,7 @@ const SENDER_PT = 7.5;
  * ghi chú xuống hàng cuối tem (đơn không ghi chú → câu mặc định).
  * 2026-10-16 (dọc): địa chỉ người nhận chỉ in từ xã/phường trở đi; địa chỉ + bảng sản phẩm cùng
  * cỡ chữ với hàng người gửi (`SENDER_PT`).
+ * 2026-10-28: người gửi chỉ còn tên page Facebook; lề trên / phải bù `WAYBILL_EDGE`.
  * Kích thước thiết kế tính bằng mm/pt qua `u()` / `f()` (dựng ×2 — xem `label-scale.ts`).
  */
 export function WaybillLabel({
@@ -237,43 +232,21 @@ export function WaybillLabel({
     </div>
   );
 
-  // Dọc (2026-10-16): "Người gửi: SĐT / xã → tỉnh", tên POS xuống dòng dưới, thẳng hàng với SĐT.
-  // Ngang giữ kiểu tem GHTK (tên POS / SĐT đầy đủ · địa chỉ che số nhà), tối đa 2 dòng.
-  const sender = !data.sender ? null : !land ? (
-    <div
-      className="flex min-w-0 shrink-0"
-      style={{
-        border: BORDER,
-        padding: `${u(0.8)} ${u(1.2)}`,
-        fontSize: f(SENDER_PT),
-        lineHeight: 1.3,
-        gap: '0.3em',
-      }}
-    >
-      <span className="shrink-0">Người gửi:</span>
-      <div className="min-w-0 flex-1">
-        <div style={clamp(1)}>
-          {data.sender.phone} / {data.sender.fromWard}
-        </div>
-        <div className="font-bold" style={clamp(1)}>
-          {data.sender.name}
-        </div>
-      </div>
-    </div>
-  ) : (
+  // Người gửi (2026-10-28): chỉ in tên page Facebook của đơn — ẩn tên POS, SĐT, địa chỉ kho.
+  // Đơn không có page → bỏ hẳn hàng người gửi.
+  const sender = data.facebookPageName ? (
     <div
       className="min-w-0 shrink-0"
       style={{
         border: BORDER,
         padding: `${u(0.8)} ${u(1.2)}`,
         fontSize: f(SENDER_PT),
-        ...clamp(2),
+        ...clamp(1),
       }}
     >
-      Người gửi: <b>{data.sender.name}</b> / {formatPhone(data.sender.phone)} · Đ/c:{' '}
-      {maskedAddress(data.sender.street, data.sender.locality)}
+      Người gửi: <b>{data.facebookPageName}</b>
     </div>
-  );
+  ) : null;
 
   // Ghi chú ở hàng cuối tem.
   const bottomNote = (
@@ -359,7 +332,12 @@ export function WaybillLabel({
       className="overflow-hidden bg-card text-foreground"
       style={labelOuter(size.w, size.h)}
     >
-      <div style={{ ...labelInner(size.w, size.h), padding: u(1.5) }}>
+      <div
+        style={{
+          ...labelInner(size.w, size.h),
+          padding: `${u(1.5 + WAYBILL_EDGE.top)} ${u(1.5 + WAYBILL_EDGE.right)} ${u(1.5)} ${u(1.5)}`,
+        }}
+      >
         <div
           className="flex h-full flex-col overflow-hidden"
           style={{ border: `${u(0.3)} dashed currentColor`, padding: u(1.5), gap: u(1.5) }}

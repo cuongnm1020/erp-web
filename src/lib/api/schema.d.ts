@@ -5223,6 +5223,249 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/einvoices/settings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["EInvoiceController_getSettings"];
+        put: operations["EInvoiceController_updateSettings"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/einvoices/settings/verify": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Lấy token + danh sách mẫu hóa đơn — lỗi MISA trả trong body (ok = false), không ném. */
+        post: operations["EInvoiceController_verify"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/einvoices/reconciliations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["EInvoiceController_listRecon"];
+        put?: never;
+        post: operations["EInvoiceController_importRecon"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/einvoices/reconciliations/{id}/lines": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["EInvoiceController_reconLines"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/einvoices/collect-delivered": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Thêm đơn hãng báo giao thành công trong khoảng ngày (chưa có đối soát → cảnh báo). */
+        post: operations["EInvoiceController_collect"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/einvoices": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["EInvoiceController_list"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/einvoices/approve": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["EInvoiceController_approve"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/einvoices/unapprove": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["EInvoiceController_unapprove"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/einvoices/skip": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["EInvoiceController_skip"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/einvoices/unskip": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["EInvoiceController_unskip"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/einvoices/push": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["EInvoiceController_push"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/einvoices/withdraw": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["EInvoiceController_withdraw"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/einvoices/sync": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Lấy số hóa đơn từ MISA cho mọi hóa đơn đã đẩy chưa có số. */
+        post: operations["EInvoiceController_sync"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/einvoices/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["EInvoiceController_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch: operations["EInvoiceController_update"];
+        trace?: never;
+    };
+    "/einvoices/{id}/rebuild": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["EInvoiceController_rebuild"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/payment-gateways": {
         parameters: {
             query?: never;
@@ -7213,6 +7456,8 @@ export interface components {
             qty: string;
         };
         ShipmentLabelDataDto: {
+            /** @description Tên page Facebook của đơn — tem in ở chỗ người gửi; null = đơn không có page. */
+            facebookPageName: string | null;
             shipmentId: string;
             shipmentDocNumber: string;
             orderDocNumber: string | null;
@@ -11129,7 +11374,7 @@ export interface components {
              * @description ISSUED = hãng cấp mã ngay; ALREADY_ISSUED = đã có mã; QUEUED = hãng lỗi, worker thử lại.
              * @enum {string}
              */
-            outcome: "QUEUED" | "ISSUED" | "ALREADY_ISSUED";
+            outcome: "ISSUED" | "QUEUED" | "ALREADY_ISSUED";
             trackingNo: string | null;
             reason: string | null;
         };
@@ -11162,7 +11407,7 @@ export interface components {
              * @description ISSUED = hãng cấp mã ngay; ALREADY_ISSUED = đã có mã; QUEUED = hãng lỗi, worker thử lại.
              * @enum {string}
              */
-            outcome: "QUEUED" | "ISSUED" | "ALREADY_ISSUED";
+            outcome: "ISSUED" | "QUEUED" | "ALREADY_ISSUED";
             trackingNo: string | null;
         };
         BulkFulfilFailedItemDto: {
@@ -11584,7 +11829,7 @@ export interface components {
              *     đúng hãng này; `QUEUED` hãng lỗi → đã xếp hàng thử lại.
              * @enum {string}
              */
-            outcome: "QUEUED" | "ISSUED" | "ALREADY_ISSUED" | "SAVED";
+            outcome: "ISSUED" | "QUEUED" | "ALREADY_ISSUED" | "SAVED";
             shipmentId: string | null;
             shipmentDocNumber: string | null;
             trackingNo: string | null;
@@ -11885,7 +12130,7 @@ export interface components {
              * @description ISSUED hãng cấp ngay; ALREADY_ISSUED đã có từ trước; QUEUED hãng lỗi, đã xếp hàng thử lại.
              * @enum {string}
              */
-            outcome: "QUEUED" | "ISSUED" | "ALREADY_ISSUED";
+            outcome: "ISSUED" | "QUEUED" | "ALREADY_ISSUED";
             trackingNo: string | null;
             /** @description Lý do hãng lỗi (chỉ khi QUEUED). */
             reason: string | null;
@@ -12679,7 +12924,7 @@ export interface components {
             shipmentDocNumber: string;
             carrierCode: string | null;
             /** @enum {string} */
-            outcome: "FAILED" | "QUEUED" | "ISSUED" | "ALREADY_ISSUED" | "NO_CARRIER";
+            outcome: "FAILED" | "ISSUED" | "QUEUED" | "ALREADY_ISSUED" | "NO_CARRIER";
             trackingNo: string | null;
             /** @description Lý do khi QUEUED / FAILED (thông điệp nghiệp vụ, đã qua bộ dịch lỗi của server). */
             reason: string | null;
@@ -13880,6 +14125,277 @@ export interface components {
             docNumbers: string[];
             /** @description Mọi dòng có SKU trong file, theo thứ tự file. */
             rows: components["schemas"]["StockExcelImportRowDto"][];
+        };
+        EInvoiceSettingDto: {
+            baseUrl: string;
+            clientId: string | null;
+            /** @description Đã nhập ClientSecret (không bao giờ trả bản rõ). */
+            hasClientSecret: boolean;
+            taxCode: string | null;
+            username: string | null;
+            hasPassword: boolean;
+            /** @description Bí mật đã lưu không giải mã được (khoá server đổi) — nhập lại. */
+            secretsUnreadable: boolean;
+            templateId: string | null;
+            invSeries: string | null;
+            invoiceWithCode: boolean;
+            isCashRegister: boolean;
+            requireTwoPeople: boolean;
+            lastVerifiedAt: string | null;
+            lastVerifyError: string | null;
+            updatedAt: string;
+        };
+        UpdateEInvoiceSettingDto: {
+            /** Format: uri */
+            baseUrl?: string;
+            clientId?: string | null;
+            clientSecret?: string;
+            taxCode?: string | null;
+            username?: string | null;
+            password?: string;
+            templateId?: string | null;
+            invSeries?: string | null;
+            invoiceWithCode?: boolean;
+            isCashRegister?: boolean;
+            requireTwoPeople?: boolean;
+        };
+        MisaTemplateDto: {
+            templateId: string;
+            templateName: string | null;
+            invTemplateNo: string | null;
+            invSeries: string;
+            inactive: boolean;
+            isMoreVatRate: boolean;
+        };
+        EInvoiceVerifyResultDto: {
+            ok: boolean;
+            /** @description Lỗi MISA trả về (ok = false). */
+            error: string | null;
+            templates: components["schemas"]["MisaTemplateDto"][];
+            setting: components["schemas"]["EInvoiceSettingDto"];
+        };
+        CarrierReconImportResultDto: {
+            /** @description Đếm dòng theo kết quả khớp: { MATCHED, SHORT, OVER, ZERO, SUBSIDIARY, NOT_DELIVERED, NOT_FOUND }. */
+            summary: {
+                [key: string]: number;
+            };
+            id: string;
+            fileName: string;
+            rowCount: number;
+            /** @description Sheet không đúng mẫu nào (bỏ qua). */
+            skippedSheets: string[];
+            /** @description Đơn vào / làm mới ở hàng chờ hóa đơn. */
+            queued: number;
+            /** @description Đơn hãng thu 0 ₫ → "Không xuất". */
+            skipped: number;
+            /** @description Đơn đã duyệt / đẩy / phát hành từ trước — không đổi. */
+            untouched: number;
+        };
+        CarrierReconBatchDto: {
+            summary: {
+                [key: string]: number;
+            };
+            id: string;
+            fileName: string;
+            rowCount: number;
+            createdBy: string;
+            createdAt: string;
+        };
+        CarrierReconListDto: {
+            items: components["schemas"]["CarrierReconBatchDto"][];
+        };
+        /** @enum {string} */
+        CarrierReconOutcome: "MATCHED" | "SHORT" | "OVER" | "ZERO" | "SUBSIDIARY" | "NOT_DELIVERED" | "NOT_FOUND";
+        CarrierReconLineDto: {
+            outcome: components["schemas"]["CarrierReconOutcome"];
+            id: string;
+            carrierCode: string;
+            sheetName: string;
+            rowNo: number;
+            trackingNo: string;
+            statusText: string | null;
+            delivered: boolean;
+            /** @description Đồng, chuỗi số nguyên. */
+            collectedAmount: string;
+            expectedAmount: string | null;
+            itemsText: string | null;
+            reason: string | null;
+            orderId: string | null;
+            orderDocNumber: string | null;
+        };
+        CarrierReconLineListDto: {
+            total: number;
+            items: components["schemas"]["CarrierReconLineDto"][];
+        };
+        CollectDeliveredDto: {
+            /** @description YYYY-MM-DD, giờ Việt Nam. */
+            from: string;
+            to: string;
+        };
+        CollectDeliveredResultDto: {
+            added: number;
+        };
+        /** @enum {string} */
+        EInvoiceStatus: "PENDING_REVIEW" | "APPROVED" | "PUSHED" | "ISSUED" | "FAILED" | "SKIPPED";
+        EInvoiceListItemDto: {
+            status: components["schemas"]["EInvoiceStatus"];
+            id: string;
+            salesOrderId: string;
+            orderDocNumber: string;
+            carrierCode: string | null;
+            trackingNo: string | null;
+            source: string;
+            deliveredAt: string | null;
+            reconciledAt: string | null;
+            expectedAmount: string;
+            collectedAmount: string | null;
+            targetAmount: string;
+            subtotal: string;
+            vatAmount: string;
+            total: string;
+            /** @description Phần trăm các mức thuế trên hóa đơn ("5", "8"; "?" = dòng chưa gán). */
+            ratePercents: string[];
+            buyerName: string | null;
+            buyerTaxCode: string | null;
+            issues: string[];
+            /** @description Còn vấn đề chặn duyệt. */
+            blocked: boolean;
+            skipReason: string | null;
+            invSeries: string | null;
+            invNo: string | null;
+            errorMessage: string | null;
+            version: number;
+        };
+        EInvoiceListResponseDto: {
+            /** @description Đếm theo trạng thái (cả danh sách, không theo bộ lọc trạng thái). */
+            counts: {
+                [key: string]: number;
+            };
+            items: components["schemas"]["EInvoiceListItemDto"][];
+            total: number;
+        };
+        EInvoiceIdsDto: {
+            ids: string[];
+        };
+        EInvoiceActionFailureDto: {
+            id: string;
+            orderDocNumber: string;
+            message: string;
+        };
+        EInvoiceActionResultDto: {
+            /** @description Số hóa đơn đã chuyển trạng thái. */
+            done: number;
+            /** @description Hóa đơn không làm được + lý do. */
+            failed: components["schemas"]["EInvoiceActionFailureDto"][];
+        };
+        SkipEInvoiceDto: {
+            ids: string[];
+            reason: string;
+        };
+        EInvoiceSyncResultDto: {
+            checked: number;
+            issued: number;
+        };
+        EInvoiceLineDto: {
+            /** @description core.SalesOrderLine.id */
+            key: string;
+            skuId: string;
+            skuCode: string;
+            name: string;
+            unitName: string;
+            orderQuantity: string;
+            quantity: string;
+            /** @description Tiền khách trả cho dòng, đã gồm VAT (đồng). */
+            amount: string;
+            taxRateId: string | null;
+            taxCode: string | null;
+            taxKind: string | null;
+            ratePercent: string | null;
+            unitPrice: string;
+            netAmount: string;
+            vatAmount: string;
+            /** @description 0 hàng hóa · 2 khuyến mại (0 ₫). */
+            itemType: number;
+        };
+        EInvoiceBuyerDto: {
+            legalName: string | null;
+            fullName: string | null;
+            taxCode: string | null;
+            idNumber: string | null;
+            address: string | null;
+            phone: string | null;
+            email: string | null;
+            customerCode: string | null;
+        };
+        EInvoiceDetailDto: {
+            status: components["schemas"]["EInvoiceStatus"];
+            id: string;
+            salesOrderId: string;
+            orderDocNumber: string;
+            carrierCode: string | null;
+            trackingNo: string | null;
+            source: string;
+            deliveredAt: string | null;
+            reconciledAt: string | null;
+            expectedAmount: string;
+            collectedAmount: string | null;
+            targetAmount: string;
+            subtotal: string;
+            vatAmount: string;
+            total: string;
+            /** @description Phần trăm các mức thuế trên hóa đơn ("5", "8"; "?" = dòng chưa gán). */
+            ratePercents: string[];
+            buyerName: string | null;
+            buyerTaxCode: string | null;
+            issues: string[];
+            /** @description Còn vấn đề chặn duyệt. */
+            blocked: boolean;
+            skipReason: string | null;
+            invSeries: string | null;
+            invNo: string | null;
+            errorMessage: string | null;
+            version: number;
+            customerId: string | null;
+            reconLineId: string | null;
+            lines: components["schemas"]["EInvoiceLineDto"][];
+            buyer: components["schemas"]["EInvoiceBuyerDto"];
+            linesEdited: boolean;
+            reviewedBy: string | null;
+            reviewedByName: string | null;
+            reviewedAt: string | null;
+            pushedBy: string | null;
+            pushedByName: string | null;
+            pushedAt: string | null;
+            invDate: string | null;
+            transactionId: string | null;
+            invCode: string | null;
+            publishStatus: number | null;
+            errorCode: string | null;
+            lastSyncedAt: string | null;
+            createdAt: string;
+            updatedAt: string;
+        };
+        EditEInvoiceLineDto: {
+            /** Format: uuid */
+            key: string;
+            quantity: string;
+            amount: string;
+        };
+        EditEInvoiceBuyerDto: {
+            legalName?: string | null;
+            fullName?: string | null;
+            taxCode?: string | null;
+            idNumber?: string | null;
+            address?: string | null;
+            phone?: string | null;
+            email?: string | null;
+        };
+        UpdateEInvoiceDto: {
+            version: number;
+            lines?: components["schemas"]["EditEInvoiceLineDto"][];
+            /** @description Tiền hàng phải lên hóa đơn (đồng) — đổi khi tiền hãng thu chưa phản ánh đúng. */
+            targetAmount?: string;
+            buyer?: components["schemas"]["EditEInvoiceBuyerDto"];
         };
         CreatePaymentLinkDto: {
             /**
@@ -24075,6 +24591,414 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["StockExcelImportResultDto"];
+                };
+            };
+        };
+    };
+    EInvoiceController_getSettings: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EInvoiceSettingDto"];
+                };
+            };
+        };
+    };
+    EInvoiceController_updateSettings: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateEInvoiceSettingDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EInvoiceSettingDto"];
+                };
+            };
+        };
+    };
+    EInvoiceController_verify: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EInvoiceVerifyResultDto"];
+                };
+            };
+        };
+    };
+    EInvoiceController_listRecon: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CarrierReconListDto"];
+                };
+            };
+        };
+    };
+    EInvoiceController_importRecon: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": {
+                    /** Format: binary */
+                    file: string;
+                };
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CarrierReconImportResultDto"];
+                };
+            };
+        };
+    };
+    EInvoiceController_reconLines: {
+        parameters: {
+            query?: {
+                outcome?: "NOT_FOUND" | "MATCHED" | "SHORT" | "OVER" | "ZERO" | "SUBSIDIARY" | "NOT_DELIVERED";
+                skip?: number;
+                take?: number;
+            };
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CarrierReconLineListDto"];
+                };
+            };
+        };
+    };
+    EInvoiceController_collect: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CollectDeliveredDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CollectDeliveredResultDto"];
+                };
+            };
+        };
+    };
+    EInvoiceController_list: {
+        parameters: {
+            query?: {
+                status?: "APPROVED" | "SKIPPED" | "FAILED" | "PENDING_REVIEW" | "PUSHED" | "ISSUED";
+                /** @description Mã đơn / mã vận đơn / số hóa đơn. */
+                q?: string;
+                /** @description Ngày giao thành công từ / đến (YYYY-MM-DD, giờ Việt Nam). */
+                from?: string;
+                to?: string;
+                /** @description Lọc theo vấn đề (vd PARTIAL_DELIVERY). */
+                issue?: string;
+                skip?: number;
+                take?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EInvoiceListResponseDto"];
+                };
+            };
+        };
+    };
+    EInvoiceController_approve: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["EInvoiceIdsDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EInvoiceActionResultDto"];
+                };
+            };
+        };
+    };
+    EInvoiceController_unapprove: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["EInvoiceIdsDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EInvoiceActionResultDto"];
+                };
+            };
+        };
+    };
+    EInvoiceController_skip: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SkipEInvoiceDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EInvoiceActionResultDto"];
+                };
+            };
+        };
+    };
+    EInvoiceController_unskip: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["EInvoiceIdsDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EInvoiceActionResultDto"];
+                };
+            };
+        };
+    };
+    EInvoiceController_push: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["EInvoiceIdsDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EInvoiceActionResultDto"];
+                };
+            };
+        };
+    };
+    EInvoiceController_withdraw: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["EInvoiceIdsDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EInvoiceActionResultDto"];
+                };
+            };
+        };
+    };
+    EInvoiceController_sync: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EInvoiceSyncResultDto"];
+                };
+            };
+        };
+    };
+    EInvoiceController_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EInvoiceDetailDto"];
+                };
+            };
+        };
+    };
+    EInvoiceController_update: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateEInvoiceDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EInvoiceDetailDto"];
+                };
+            };
+        };
+    };
+    EInvoiceController_rebuild: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EInvoiceDetailDto"];
                 };
             };
         };

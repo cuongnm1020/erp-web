@@ -6,6 +6,7 @@ import {
   CalendarClock,
   ChartLine,
   ClipboardList,
+  FileCheck2,
   Columns3,
   Flag,
   Gauge,
@@ -483,6 +484,13 @@ export const NAV_MODULES: NavModule[] = [
         href: '/fin/invoices',
         icon: ReceiptText,
         ability: { action: 'create', subject: 'Invoice' },
+      },
+      {
+        // MISA meInvoice (2026-10-28): hàng chờ từ đối soát hãng, duyệt 2 bước, đẩy nháp.
+        label: 'Hóa đơn điện tử',
+        href: '/fin/einvoices',
+        icon: FileCheck2,
+        ability: { action: 'read', subject: 'Einvoice' },
       },
       //{ label: 'Thanh toán & cấn trừ', href: '/fin/payments', icon: CreditCard },
       {

@@ -28,6 +28,9 @@ const MESSAGES: Record<string, string> = {
   UOM_CONVERSION_MISSING: 'Đơn vị tính chưa có quy đổi về đơn vị cơ sở. Chọn đơn vị khác.',
   EMPTY_ORDER: 'Đơn chưa có dòng hàng nào. Thêm ít nhất một sản phẩm.',
   INVALID_ORDER_INPUT: 'Một số trường của đơn chưa hợp lệ. Kiểm tra các ô được đánh dấu.',
+  // Danh sách đơn (GET /sales-orders?weightMin/weightMax)
+  ORDER_WEIGHT_FILTER_TOO_BROAD:
+    'Lọc cân nặng trên quá nhiều đơn. Chọn thêm Ngày đặt hoặc tab trạng thái để thu hẹp rồi lọc lại.',
   PRICE_NOT_FOUND:
     'Chưa có giá cho sản phẩm này với khách đang chọn. Báo quản lý cập nhật bảng giá.',
   INVALID_STATUS_TRANSITION:
@@ -100,6 +103,18 @@ const MESSAGES: Record<string, string> = {
     'Đã có đơn hàng dùng mức này nên không đổi được %. Thêm mức mới rồi gán cho sản phẩm.',
   TAX_RATE_DEFAULT_REQUIRED: 'Phải luôn có một mức mặc định — đặt mức khác làm mặc định trước.',
   TAX_RATE_CODE_TAKEN: 'Mã này đã có trong danh mục thuế suất — chọn mã khác.',
+  // Hóa đơn điện tử MISA (2026-10-28)
+  EINVOICE_NOT_CONFIGURED:
+    'Chưa cấu hình đủ kết nối MISA — vào Hóa đơn điện tử › Cài đặt kết nối để nhập và chọn mẫu hóa đơn.',
+  MISA_API_ERROR: 'MISA không nhận yêu cầu. Kiểm tra kết nối ở Cài đặt rồi thử lại.',
+  EINVOICE_STATE: 'Hóa đơn đã đổi trạng thái — tải lại rồi làm tiếp.',
+  EINVOICE_BLOCKED:
+    'Có hóa đơn còn vấn đề phải xử lý (thiếu thuế suất, lệch tiền, giao thiếu chưa sửa) — bỏ chọn hoặc sửa trước khi duyệt.',
+  EINVOICE_SAME_REVIEWER:
+    'Bạn đã duyệt hóa đơn này nên không tự đẩy lên MISA được — nhờ người thứ hai đẩy.',
+  EINVOICE_VERSION_CONFLICT: 'Hóa đơn vừa được người khác sửa — tải lại để xem bản mới.',
+  CARRIER_RECON_FILE:
+    'File đối soát không đọc được: cần file Excel có cột mã vận đơn ("Mã ĐH" / "Số hiệu bưu gửi") và cột tiền ("Thu hộ" / "Số tiền trả").',
   // Page Facebook (2026-10-26)
   FACEBOOK_PAGE_ID_TAKEN:
     'Page ID này đã có trong danh mục ở page khác — tìm page đó để sửa thay vì thêm mới.',
