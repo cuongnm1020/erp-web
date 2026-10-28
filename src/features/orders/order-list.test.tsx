@@ -624,6 +624,32 @@ describe('OrderListScreen — lọc theo hãng + thời gian (2026-09-19)', () =
     ).toBeInTheDocument();
   });
 
+  it('dateField trên URL (2026-10-28): nút ngày mang tên trường đang lọc, gửi dateField lên danh sách + đếm tab', async () => {
+    search = 'from=2026-08-20&to=2026-08-22&dateField=sentToCarrierAt';
+    const seen: string[] = [];
+    const onRequest = ({ request }: { request: Request }) => {
+      if (new URL(request.url).pathname.startsWith('/api/sales-orders')) seen.push(request.url);
+    };
+    server.events.on('request:start', onRequest);
+    try {
+      renderApp(<OrderListScreen />);
+      expect(
+        await screen.findByRole('button', { name: 'Ngày gán ĐVVC: 20/08 – 22/08/2026' }),
+      ).toBeInTheDocument();
+      await waitFor(() => expect(seen.length).toBeGreaterThanOrEqual(2));
+      for (const path of ['/api/sales-orders', '/api/sales-orders/flow-counts']) {
+        const url = new URL(seen.find((u) => new URL(u).pathname === path)!);
+        expect(url.searchParams.get('dateField')).toBe('sentToCarrierAt');
+        expect(url.searchParams.get('from')).toBe('2026-08-20');
+      }
+      expect(
+        screen.getByPlaceholderText('Mã đơn, mã Pancake, SĐT, tên khách, tên sản phẩm, mã vận đơn'),
+      ).toBeInTheDocument();
+    } finally {
+      server.events.removeListener('request:start', onRequest);
+    }
+  });
+
   it('lọc theo POS Pancake: ô Nguồn liệt kê từng POS; source=POS:<mã> → gửi source=PANCAKE + pancakeShopId cho danh sách và đếm tab', async () => {
     search = 'source=POS:715130909';
     const seen: string[] = [];

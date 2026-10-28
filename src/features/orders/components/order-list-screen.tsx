@@ -71,6 +71,7 @@ import {
   type OrderFlow,
   type OrderCarrierSource,
   type OrderCarrierStatusOption,
+  type OrderDateField,
   type OrderItemOrigin,
   type OrderSortField,
   type SalesOrderListItem,
@@ -132,6 +133,8 @@ const DEFAULTS = {
     'source',
     'from',
     'to',
+    // Lọc from/to theo trường ngày nào (2026-10-28) — trống = ngày đặt.
+    'dateField',
     // CSKH-5: chỉ đơn trùng trong ngày (cùng SĐT, cùng ngày VN, chưa hủy).
     'duplicate',
     // Đơn có sản phẩm không phải hàng ERP (món gõ tay / SKU Pancake tự sinh), 2026-10-22.
@@ -213,6 +216,14 @@ const DEFAULT_HIDDEN = ['orderDate', 'collected'];
 const WAITING_ONLY_COLUMNS = ['shortage', 'waitingSince'];
 
 type OrderFilter = (typeof DEFAULTS.filterKeys)[number];
+
+/** Ô "Theo" của bộ lọc ngày (2026-10-28) — phần tử đầu là mặc định (không ghi lên URL). */
+const DATE_FIELDS: Array<{ value: OrderDateField; label: string }> = [
+  { value: 'orderDate', label: 'Ngày đặt' },
+  { value: 'createdAt', label: 'Ngày tạo đơn' },
+  { value: 'updatedAt', label: 'Ngày cập nhật' },
+  { value: 'sentToCarrierAt', label: 'Ngày gán ĐVVC' },
+];
 
 /** Lọc ít dùng — nằm sau nút "Thêm lọc", tự hiện trên thanh khi đang có giá trị. */
 const EXTRA_FILTERS = [
@@ -912,6 +923,9 @@ export function OrderListScreen() {
   const pancakeShops = usePancakeShops();
   const from = state.filters.from ?? '';
   const to = state.filters.to ?? '';
+  const dateField = DATE_FIELDS.some((f) => f.value === state.filters.dateField)
+    ? (state.filters.dateField as OrderDateField)
+    : undefined;
   const duplicate = state.filters.duplicate === 'true';
   const itemOrigin = parseItemOrigin(state.filters.itemOrigin);
   const careTeamId = state.filters.careTeamId ?? '';
@@ -955,6 +969,7 @@ export function OrderListScreen() {
       pancakeShopId: posShopId || undefined,
       from,
       to,
+      dateField,
       itemOrigin,
       careTeamId,
       facebookPageIds: fbPage || undefined,
@@ -976,6 +991,7 @@ export function OrderListScreen() {
       posShopId,
       from,
       to,
+      dateField,
       itemOrigin,
       careTeamId,
       fbPage,
@@ -1164,6 +1180,8 @@ export function OrderListScreen() {
               label: 'Ngày đặt',
               type: 'dateRange',
               rememberKey: 'date.orders',
+              fieldKey: 'dateField',
+              fields: DATE_FIELDS,
             },
             {
               // Một ô cho cả "chưa gán hãng" lẫn "đã gán hãng X" — hai key URL (noCarrier / carrierId)
@@ -1280,6 +1298,7 @@ export function OrderListScreen() {
             source: state.filters.source,
             from: state.filters.from,
             to: state.filters.to,
+            dateField: state.filters.dateField,
             duplicate: state.filters.duplicate,
             itemOrigin: state.filters.itemOrigin,
             careTeamId: state.filters.careTeamId,
@@ -1287,7 +1306,7 @@ export function OrderListScreen() {
             carrierStatus: state.filters.carrierStatus,
           }}
           onFilterChange={setFilter}
-          searchPlaceholder="Mã đơn, mã Pancake, SĐT, tên khách, mã vận đơn"
+          searchPlaceholder="Mã đơn, mã Pancake, SĐT, tên khách, tên sản phẩm, mã vận đơn"
           right={
             <>
               {customerId ? (

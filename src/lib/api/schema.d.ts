@@ -21908,6 +21908,8 @@ export interface operations {
                  *     GET /sales-orders/carrier-status-options.
                  */
                 carrierStatusText?: string[];
+                /** @description Trường ngày mà from/to lọc — xem ORDER_DATE_FIELDS. Bỏ trống = `orderDate`. */
+                dateField?: "orderDate" | "createdAt" | "updatedAt" | "sentToCarrierAt";
                 /**
                  * @description Tab của danh sách đơn (2026-10-12) — gộp trạng thái chứng từ + kho / giao hàng
                  *     (`flowOf` trong sales-order-flow.ts). Đếm từng tab: GET /sales-orders/flow-counts.
@@ -21939,8 +21941,8 @@ export interface operations {
                 /** @description Đơn đang thiếu tồn SKU này (core.Sku.id) — "Xem đơn" từ màn Hàng chờ (2026-10-25). */
                 shortSkuId?: string;
                 /**
-                 * @description Khoảng `orderDate` (ISO): `from` ≤ orderDate. `to` là NGÀY (`YYYY-MM-DD`) thì lấy hết ngày đó
-                 *     (< to + 1 ngày, giờ Việt Nam); là datetime thì ≤ to.
+                 * @description Khoảng ngày (ISO) trên trường `dateField` (mặc định `orderDate`): `from` ≤ ngày. `to` là NGÀY
+                 *     (`YYYY-MM-DD`) thì lấy hết ngày đó (< to + 1 ngày, giờ Việt Nam); là datetime thì ≤ to.
                  */
                 from?: string;
                 to?: string;
@@ -21972,8 +21974,8 @@ export interface operations {
                 duplicate?: string;
                 sortDir?: "asc" | "desc";
                 /**
-                 * @description Tìm theo số chứng từ, mã hoặc tên khách (không phân biệt hoa thường), SĐT khách, mã vận đơn —
-                 *     hoặc id đơn Pancake (id theo shop hoặc id hệ thống trong link đơn, khớp tuyệt đối, cho phép
+                 * @description Tìm theo số chứng từ, mã hoặc tên khách (không phân biệt hoa thường), SĐT khách, mã vận đơn,
+                 *     tên sản phẩm trong đơn (tên SKU / combo, có chữ cái, ≥ 2 ký tự) — hoặc id đơn Pancake (id theo shop hoặc id hệ thống trong link đơn, khớp tuyệt đối, cho phép
                  *     tiền tố `#`).
                  */
                 q?: string;
@@ -22062,6 +22064,8 @@ export interface operations {
                  *     GET /sales-orders/carrier-status-options.
                  */
                 carrierStatusText?: string[];
+                /** @description Trường ngày mà from/to lọc — xem ORDER_DATE_FIELDS. Bỏ trống = `orderDate`. */
+                dateField?: "orderDate" | "createdAt" | "updatedAt" | "sentToCarrierAt";
                 /**
                  * @description Tab của danh sách đơn (2026-10-12) — gộp trạng thái chứng từ + kho / giao hàng
                  *     (`flowOf` trong sales-order-flow.ts). Đếm từng tab: GET /sales-orders/flow-counts.
@@ -22093,8 +22097,8 @@ export interface operations {
                 /** @description Đơn đang thiếu tồn SKU này (core.Sku.id) — "Xem đơn" từ màn Hàng chờ (2026-10-25). */
                 shortSkuId?: string;
                 /**
-                 * @description Khoảng `orderDate` (ISO): `from` ≤ orderDate. `to` là NGÀY (`YYYY-MM-DD`) thì lấy hết ngày đó
-                 *     (< to + 1 ngày, giờ Việt Nam); là datetime thì ≤ to.
+                 * @description Khoảng ngày (ISO) trên trường `dateField` (mặc định `orderDate`): `from` ≤ ngày. `to` là NGÀY
+                 *     (`YYYY-MM-DD`) thì lấy hết ngày đó (< to + 1 ngày, giờ Việt Nam); là datetime thì ≤ to.
                  */
                 from?: string;
                 to?: string;
@@ -22126,8 +22130,8 @@ export interface operations {
                 duplicate?: string;
                 sortDir?: "asc" | "desc";
                 /**
-                 * @description Tìm theo số chứng từ, mã hoặc tên khách (không phân biệt hoa thường), SĐT khách, mã vận đơn —
-                 *     hoặc id đơn Pancake (id theo shop hoặc id hệ thống trong link đơn, khớp tuyệt đối, cho phép
+                 * @description Tìm theo số chứng từ, mã hoặc tên khách (không phân biệt hoa thường), SĐT khách, mã vận đơn,
+                 *     tên sản phẩm trong đơn (tên SKU / combo, có chữ cái, ≥ 2 ký tự) — hoặc id đơn Pancake (id theo shop hoặc id hệ thống trong link đơn, khớp tuyệt đối, cho phép
                  *     tiền tố `#`).
                  */
                 q?: string;

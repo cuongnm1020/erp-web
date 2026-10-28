@@ -10,6 +10,7 @@ import { LABEL_SIZES, type PrintController } from '@/lib/print';
 import type { ShipmentLabelData } from '../api/use-pda';
 import { DEFAULT_PRINT_NOTE, hidePhone, parseGhtkTracking, routeLabel } from '../ghtk-label';
 import { f, labelInner, labelOuter, u, WAYBILL_EDGE } from '../label-scale';
+import { sortLabelsForPrint } from '../waybill-sort';
 import { GhtkWaybillLabel } from './ghtk-waybill-label';
 
 export type WaybillOrientation = 'landscape' | 'portrait';
@@ -393,7 +394,10 @@ export function WaybillLabelPrintSheet({
   );
 }
 
-/** Tờ in nhiều nhãn vận đơn 100×75 (in lại hàng loạt) — mỗi nhãn một trang. */
+/**
+ * Tờ in nhiều nhãn vận đơn 100×75 (in lại hàng loạt) — mỗi nhãn một trang, xếp theo
+ * `sortLabelsForPrint` (abc tên sản phẩm, đơn ít sản phẩm trước — 2026-10-28).
+ */
 export function WaybillLabelBatchPrintSheet({
   labels,
   orientation,
@@ -411,7 +415,7 @@ export function WaybillLabelBatchPrintSheet({
       onDone={printer.done}
       size={orientation === 'landscape' ? 'WAYBILL_100x75' : 'WAYBILL_75x100'}
     >
-      {labels.map((data) => (
+      {sortLabelsForPrint(labels).map((data) => (
         <div key={data.shipmentId} data-print-page>
           <WaybillLabel data={data} orientation={orientation} printedAt={printedAt} />
         </div>
