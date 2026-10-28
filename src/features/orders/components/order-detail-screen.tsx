@@ -56,8 +56,6 @@ import { Can, useAbility } from '@/lib/permission';
 import { usePrint } from '@/lib/print';
 import { useInvalidateOn } from '@/lib/realtime';
 import { useHotkey } from '@/lib/use-hotkey';
-import { useShipmentStatusLog } from '@/features/wms/api/use-shipping';
-import { carrierOutcome, carrierSource, shipmentStatusBadge } from '@/features/wms/labels';
 import {
   orderKeys,
   useCancelOrder,
@@ -79,6 +77,8 @@ import {
   manualDiscountNote,
 } from '../labels';
 import { groupOrderLines } from '../combo-lines';
+import { CarrierStatusCard } from './carrier-status-card';
+import { waybillErrorText } from './waybill-error';
 import { OrderPrintSheet } from './order-print-sheet';
 import { OrderProgress } from './order-progress';
 import { TelcoBadge } from './order-quick-view';
@@ -137,51 +137,6 @@ const SHIPMENT_STATUS_LABEL: Record<
   CARRIER_CANCELLED: 'Hãng hủy',
   CANCELLED: 'Đã hủy theo đơn',
 };
-
-/**
- * Hành trình từ hãng — mọi tín hiệu (webhook + đối soát) ghi ở `wms.CarrierStatusLog`, kể cả
- * mã không đổi trạng thái (shipper báo) và mã lệch pha: người chạy thử đơn thật nhìn thấy GHTK
- * gửi gì, lúc nào, hệ thống áp hay không. Nguồn: GET /shipments/:id/status-log (quyền
- * shipment.read — sale có sẵn theo seed).
- */
-function CarrierTimeline({ shipmentId }: { shipmentId: string }) {
-  const query = useShipmentStatusLog(shipmentId);
-  return (
-    <div className="border-t px-3 py-2">
-      <p className="mb-1 text-xs font-semibold text-muted-foreground">Hành trình từ hãng</p>
-      {query.isPending ? (
-        <p className="text-xs text-muted-foreground">Đang tải…</p>
-      ) : query.isError ? (
-        <p className="text-xs text-destructive">{messageFor(query.error)}</p>
-      ) : query.data.items.length === 0 ? (
-        <p className="text-xs text-muted-foreground">
-          Chưa nhận tín hiệu nào từ hãng cho phiếu này — webhook về sẽ hiện ở đây.
-        </p>
-      ) : (
-        <ol className="max-h-64 space-y-1.5 overflow-y-auto" aria-label="Hành trình từ hãng">
-          {query.data.items.map((e) => {
-            const o = carrierOutcome(e.outcome);
-            const mapped = e.mappedStatus ? shipmentStatusBadge(e.mappedStatus) : null;
-            return (
-              <li key={e.id} className="rounded-md border p-1.5 text-xs">
-                <div className="flex flex-wrap items-center gap-1.5">
-                  <span className="tabular-nums text-muted-foreground">
-                    {formatDateTime(e.occurredAt ?? e.createdAt)}
-                  </span>
-                  <StatusBadge tone="neutral">{carrierSource(e.source)}</StatusBadge>
-                  <span className="font-mono">{e.carrierStatusCode}</span>
-                  {mapped ? <StatusBadge tone={mapped.tone}>{mapped.label}</StatusBadge> : null}
-                  <StatusBadge tone={o.tone}>{o.label}</StatusBadge>
-                </div>
-                {e.note ? <p className="mt-0.5 text-muted-foreground">{e.note}</p> : null}
-              </li>
-            );
-          })}
-        </ol>
-      )}
-    </div>
-  );
-}
 
 /** Thẻ vận đơn — dữ liệu từ `order.shipment`; "In nhãn" nhúng PDF của hãng qua proxy /api. */
 function ShipmentCard({ order, autoPrint }: { order: SalesOrderDetail; autoPrint?: boolean }) {
@@ -253,20 +208,31 @@ function ShipmentCard({ order, autoPrint }: { order: SalesOrderDetail; autoPrint
                 <span className="text-muted-foreground">chưa gán — chọn khi đóng gói xong</span>
               )}
             </Field>
-            <Field label="Mã vận đơn">
-              {s.trackingNo ? (
-                <span className="font-mono">{s.trackingNo}</span>
-              ) : (
-                <span className="text-muted-foreground">chưa cấp — cấp khi đóng gói xong</span>
-              )}
-            </Field>
+            {/* Có mã thì mã nằm trên thẻ hãng bên dưới (nhãn màu hãng + sao chép). */}
+            {s.trackingNo ? null : (
+              <Field label="Mã vận đơn">
+                {s.waybillErrorCode ? (
+                  // Lỗi vận đơn (2026-10-28): hãng từ chối / hết lượt thử — sửa ở màn sửa đơn.
+                  <span className="text-destructive" role="alert">
+                    <span className="font-semibold">Lỗi vận đơn</span> ·{' '}
+                    {waybillErrorText(s.waybillErrorCode, s.waybillError)}
+                  </span>
+                ) : (
+                  <span className="text-muted-foreground">chưa cấp — cấp khi đóng gói xong</span>
+                )}
+              </Field>
+            )}
             <Field label="Nhãn đã in">
               {s.labelPrintedAt
                 ? `${s.labelPrintCount} lần · gần nhất ${formatDateTime(s.labelPrintedAt)}`
                 : 'chưa in'}
             </Field>
           </dl>
-          <CarrierTimeline shipmentId={s.id} />
+          {s.trackingNo ? (
+            <div className="border-t px-3 py-3">
+              <CarrierStatusCard order={order} />
+            </div>
+          ) : null}
         </>
       ) : (
         <p className="px-3 py-3 text-sm text-muted-foreground">

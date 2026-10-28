@@ -1,4 +1,5 @@
-import { fireEvent, screen, waitFor } from '@testing-library/react';
+import { fireEvent, screen, waitFor, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
 import { describe, expect, it, vi } from 'vitest';
 import {
@@ -384,15 +385,25 @@ describe('OrderDetailScreen — trạng thái kho + tự mở nhãn (?printLabel
   });
 });
 
-describe('OrderDetailScreen — hành trình từ hãng trên thẻ Vận đơn', () => {
-  it('liệt kê GET /shipments/:id/status-log: mã hãng, nguồn, kết cục, ghi chú', async () => {
+describe('OrderDetailScreen — thẻ hãng trên thẻ Vận đơn (2026-10-28)', () => {
+  it('Dịch vụ + Cập nhật cuối từ order.shipment; "Xem hành trình" chỉ liệt kê mốc đổi trạng thái kèm chữ + vị trí của hãng', async () => {
     search = '';
     server.use(scenario.orderWithShipment);
+    const user = userEvent.setup();
     renderApp(<OrderDetailScreen orderId={ORDER.id} />);
-    await screen.findByRole('heading', { level: 1 });
-    const list = await screen.findByRole('list', { name: 'Hành trình từ hãng' });
-    expect(list).toHaveTextContent('Webhook');
-    expect(list).toHaveTextContent('Đã áp');
-    expect(list).toHaveTextContent('45');
+    const card = await screen.findByRole('region', { name: 'Hãng vận chuyển GHTK' });
+    expect(card).toHaveTextContent('Shop trả phí ship cho GHTK');
+    expect(card).toHaveTextContent('Lấy hàng ca chiều');
+    expect(card).toHaveTextContent('Khai giá: 350.000');
+    expect(card).toHaveTextContent('Trạng thái VC:Không giao được hàng');
+    expect(card).toHaveTextContent('Với ghi chú:Không liên lạc được với KH 3 lần');
+    expect(screen.getByText('Chưa đối soát')).toBeInTheDocument();
+
+    await user.click(within(card).getByRole('button', { name: 'Xem hành trình' }));
+    const list = await within(card).findByRole('list', { name: 'Hành trình từ hãng' });
+    expect(list).toHaveTextContent('Đã điều phối giao hàng / đang giao hàng');
+    expect(list).toHaveTextContent('Bưu cục Gia Lâm');
+    // Mốc không đổi trạng thái (REJECTED_UNMAPPED) không vào hành trình.
+    expect(list).not.toHaveTextContent('45');
   });
 });

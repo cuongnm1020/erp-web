@@ -11,6 +11,7 @@ import {
   MessageSquareText,
   Pencil,
   Plus,
+  RefreshCw,
   X,
 } from 'lucide-react';
 import Link from 'next/link';
@@ -35,7 +36,9 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Input } from '@/components/ui/input';
+import { toast } from '@/components/ui/toaster';
 import { cn } from '@/lib/cn';
+import { messageFor } from '@/lib/error-messages';
 import {
   formatDateTime,
   formatMoney,
@@ -59,12 +62,15 @@ import {
   useOrderFlowCounts,
   useOrderListPrefs,
   useOrders,
+  useRequestWaybill,
   useCareTeamOptions,
+  useCarrierStatusOptions,
   useFacebookPageOptions,
   usePancakeShops,
   useSaveOrderListPrefs,
   type OrderFlow,
   type OrderCarrierSource,
+  type OrderCarrierStatusOption,
   type OrderItemOrigin,
   type OrderSortField,
   type SalesOrderListItem,
@@ -87,6 +93,7 @@ import { OrderScanButton } from './order-scan-button';
 import { PancakeOrderResyncButton } from './pancake-order-resync-button';
 import { SendToCarrierMenu } from './send-to-carrier-menu';
 import { PancakeOrderLink } from './pancake-order-link';
+import { MarketplaceBadge, MaskedPhoneBadge, waybillErrorText } from './waybill-error';
 
 /**
  * D-03 Quản lý đơn hàng — GET /sales-orders + GET /sales-orders/flow-counts (thiết kế lại
@@ -133,6 +140,9 @@ const DEFAULTS = {
     'careTeamId',
     // Page Facebook (id nối dấu phẩy, chọn nhiều), 2026-10-26 — khoá `fbPage` vì `page` là số trang.
     'fbPage',
+    // Chữ "Trạng thái VC" hãng gửi (chọn nhiều, 2026-10-28) — mỗi giá trị encodeURIComponent rồi nối
+    // dấu phẩy: chữ hãng có dấu phẩy ("Tồn - Khách hàng nghỉ, không có nhà").
+    'carrierStatus',
     // Đơn thiếu tồn một SKU (Chờ hàng, 2026-10-25) — "Xem đơn" từ màn Hàng chờ.
     'shortSkuId',
   ] as const,
@@ -153,6 +163,34 @@ const CARRIER_SOURCE_OPTIONS: { value: OrderCarrierSource; label: string }[] = [
 ];
 const parseCarrierSource = (v: string | undefined): OrderCarrierSource | undefined =>
   CARRIER_SOURCE_OPTIONS.find((o) => o.value === v)?.value;
+
+/** Ô "Trạng thái hãng": giá trị URL = từng chữ encodeURIComponent nối dấu phẩy (chữ hãng có dấu phẩy). */
+const decodeList = (v: string): string[] =>
+  v
+    .split(',')
+    .filter(Boolean)
+    .flatMap((x) => {
+      try {
+        return [decodeURIComponent(x)];
+      } catch {
+        return [];
+      }
+    });
+
+/** Mỗi chữ một lựa chọn; cùng chữ ở nhiều hãng gộp một dòng, gợi ý ghi tên các hãng. */
+const carrierStatusOptions = (rows: OrderCarrierStatusOption[]) => {
+  const byText = new Map<string, Set<string>>();
+  for (const r of rows) {
+    const set = byText.get(r.statusText) ?? new Set<string>();
+    if (r.carrierCode) set.add(r.carrierCode);
+    byText.set(r.statusText, set);
+  }
+  return [...byText].map(([text, codes]) => ({
+    value: encodeURIComponent(text),
+    label: text,
+    hint: [...codes].join(', ') || undefined,
+  }));
+};
 
 /**
  * Cột sắp được → trường `sortBy` của API. Cột không có ở đây không sắp được (sản phẩm, vận
@@ -188,7 +226,10 @@ type ExtraFilter = (typeof EXTRA_FILTERS)[number]['key'];
 interface RowActionContext {
   canUpdate: boolean;
   canCreate: boolean;
+  /** `shipment.pack` — xin lại vận đơn cho đơn lỗi vận đơn. */
+  canPack: boolean;
   onPeek: (row: SalesOrderListItem) => void;
+  onRetryWaybill: (row: SalesOrderListItem) => void;
 }
 
 /** Menu "⋯" của một dòng đơn: mở / sửa / nhân bản (redesign 2026-10-22). */
@@ -199,6 +240,16 @@ function orderRowItems(o: SalesOrderListItem, ctx: RowActionContext): RowActionI
       icon: <ExternalLink aria-hidden />,
       href: `/crm/orders/${o.id}`,
     },
+    ...(ctx.canPack && o.flow === 'WAYBILL_ERROR' && o.shipment?.carrierCode
+      ? [
+          {
+            // Lỗi vận đơn (2026-10-28): sửa đơn xong thì xin lại — thành công là rời tab.
+            label: 'Xin lại vận đơn',
+            icon: <RefreshCw aria-hidden />,
+            onSelect: () => ctx.onRetryWaybill(o),
+          },
+        ]
+      : []),
     ...(ctx.canUpdate
       ? [
           {
@@ -261,6 +312,7 @@ const buildColumns = (
               'Tạo trong ERP'
             )}
           </div>
+          {o.marketplace ? <MarketplaceBadge marketplace={o.marketplace} /> : null}
           {o.ownerName ? (
             <div className="break-words text-xs text-foreground" data-testid="order-owner">
               {o.ownerName}
@@ -306,6 +358,7 @@ const buildColumns = (
               <CopyButton value={normalizePhone(o.phone) ?? o.phone} label="số điện thoại" />
             ) : null}
           </span>
+          <MaskedPhoneBadge masked={o.phoneMasked} />
         </div>
       );
     },
@@ -538,6 +591,18 @@ function ShippingCell({
       ) : (
         <WeightNote order={order} />
       )}
+      {order.waybillErrorCode ? (
+        // Lỗi vận đơn (2026-10-28): lý do hãng từ chối, đủ câu ở tooltip.
+        <span
+          className="block max-w-48 truncate font-semibold text-destructive"
+          title={waybillErrorText(order.waybillErrorCode, order.waybillError)}
+          data-testid="waybill-error"
+        >
+          {order.waybillErrorCode === 'CARRIER_REJECTED' && order.waybillError
+            ? order.waybillError
+            : 'Lỗi vận đơn'}
+        </span>
+      ) : null}
     </div>
   );
 }
@@ -851,6 +916,9 @@ export function OrderListScreen() {
   const itemOrigin = parseItemOrigin(state.filters.itemOrigin);
   const careTeamId = state.filters.careTeamId ?? '';
   const fbPage = state.filters.fbPage ?? '';
+  const carrierStatus = state.filters.carrierStatus ?? '';
+  const carrierStatusText = useMemo(() => decodeList(carrierStatus), [carrierStatus]);
+  const carrierStatuses = useCarrierStatusOptions();
   const careTeams = useCareTeamOptions();
   const facebookPages = useFacebookPageOptions();
   // Cột ẩn + sắp xếp lưu theo người dùng ở server (đăng xuất / đổi máy vẫn giữ). Sắp xếp trên URL
@@ -890,6 +958,7 @@ export function OrderListScreen() {
       itemOrigin,
       careTeamId,
       facebookPageIds: fbPage || undefined,
+      carrierStatusText,
     }),
     [
       state.q,
@@ -910,6 +979,7 @@ export function OrderListScreen() {
       itemOrigin,
       careTeamId,
       fbPage,
+      carrierStatusText,
     ],
   );
   const params = useMemo(
@@ -927,19 +997,37 @@ export function OrderListScreen() {
   const ability = useAbility();
   const canUpdate = ability.can('update', 'SalesOrder');
   const canCreate = ability.can('create', 'SalesOrder');
+  const canPack = ability.can('pack', 'Shipment');
   const [peek, setPeek] = useState<SalesOrderListItem | null>(null);
+  const requestWaybill = useRequestWaybill();
   const columns = useMemo(() => {
     const carrierById = new Map((carriers.data ?? []).map((c) => [c.id, c]));
     const all = buildColumns((id) => carrierById.get(id) ?? null, {
       canUpdate,
       canCreate,
+      canPack,
       onPeek: setPeek,
+      onRetryWaybill: (o) => {
+        if (!o.shipment?.carrierCode) return;
+        requestWaybill.mutate(
+          { shipmentId: o.shipment.id, carrierCode: o.shipment.carrierCode },
+          {
+            onSuccess: (r) =>
+              r.outcome === 'QUEUED'
+                ? toast.warning(`Hãng chưa phản hồi — đơn ${o.docNumber} sẽ được xin lại tự động.`)
+                : toast.success(`Đã cấp vận đơn ${r.trackingNo ?? ''} cho đơn ${o.docNumber}`),
+            onError: (err) => toast.error(`Đơn ${o.docNumber}: ${messageFor(err)}`),
+          },
+        );
+      },
     });
     // Cột Hàng thiếu / Chờ từ chỉ có nghĩa ở tab Chờ hàng.
     return flow === 'WAITING_STOCK'
       ? all
       : all.filter((c) => !WAITING_ONLY_COLUMNS.includes(c.id ?? ''));
-  }, [carriers.data, canUpdate, canCreate, flow]);
+    // requestWaybill.mutate ổn định giữa các lần render (TanStack Query).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [carriers.data, canUpdate, canCreate, canPack, flow]);
   const pickerColumns = useMemo(
     () =>
       columns
@@ -1004,6 +1092,7 @@ export function OrderListScreen() {
     carrierId !== '' ||
     carrierAccountId !== '' ||
     carrierSource !== undefined ||
+    carrierStatus !== '' ||
     shortSkuId !== '' ||
     source !== undefined ||
     from !== '' ||
@@ -1124,6 +1213,13 @@ export function OrderListScreen() {
               })),
             },
             {
+              key: 'carrierStatus',
+              label: 'Trạng thái hãng',
+              type: 'multiSelect',
+              unit: 'trạng thái',
+              options: carrierStatusOptions(carrierStatuses.data ?? []),
+            },
+            {
               key: 'careTeamId',
               label: 'Team CSKH',
               type: 'select',
@@ -1188,6 +1284,7 @@ export function OrderListScreen() {
             itemOrigin: state.filters.itemOrigin,
             careTeamId: state.filters.careTeamId,
             fbPage: state.filters.fbPage,
+            carrierStatus: state.filters.carrierStatus,
           }}
           onFilterChange={setFilter}
           searchPlaceholder="Mã đơn, mã Pancake, SĐT, tên khách, mã vận đơn"

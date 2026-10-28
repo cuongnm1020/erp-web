@@ -479,6 +479,7 @@ export function makeOrders(n: number) {
     carrierId: i % 5 === 1 ? 'c-ghtk' : null,
     carrierAccountId: null,
     senderPhone: null,
+    recipientPhone: null,
     warehouseId: null,
     addressId: null,
     // Cân nặng: đặt tay 1 kg ở mỗi đơn thứ 4; còn lại tính từ dòng 0,3 → 1,5 kg.
@@ -521,6 +522,11 @@ function orderListExtras(i: number, status: (typeof ORDER_STATUSES)[number]) {
           : flow,
     statusChangedAt: shipped ? new Date(Date.UTC(2026, 7, 24) - i * 600_000).toISOString() : null,
     sameDayCount: 0,
+    phoneMasked: false,
+    marketplace: null,
+    waybillError: null,
+    waybillErrorCode: null,
+    waybillErrorAt: null,
     phone: FIXTURE_PHONES[i % FIXTURE_PHONES.length]!,
     recipientName: null,
     addressLine: `Thôn ${(i % 9) + 1}, X. Ea Kar`,
@@ -596,6 +602,8 @@ export function makeOrderDetail(id: string) {
       deliveredAt: null as string | null,
     },
     shippingAddress: null,
+    marketplace: null as 'TIKTOK' | 'SHOPEE' | 'LAZADA' | null,
+    recipientPhoneMasked: false,
     approval: null as { requestId: string; ruleName: string | null; canAct: boolean } | null,
     customItems: [] as { name: string; qty: string; unitPrice: string | null; discount: string }[],
     fulfilment: {
@@ -713,6 +721,33 @@ export const ORDER_SHIPMENT_FIXTURE = {
   trackingNo: 'S12345678.SG.A1.B2',
   labelPrintedAt: null,
   labelPrintCount: 0,
+  serviceCode: null as string | null,
+  serviceName: 'Lấy hàng ca chiều\nGiao hàng bằng đường bộ' as string | null,
+  declaredValue: '350000.0000' as string | null,
+  codAmount: '350000.0000' as string | null,
+  carrierFeeTotal: '20000.0000' as string | null,
+  feeReconciledAt: null as string | null,
+  // "Cập nhật cuối" — đúng shape ShipmentLastCarrierEventDto (2026-10-28).
+  lastCarrierEvent: {
+    statusText: 'Không giao được hàng' as string | null,
+    location: null as string | null,
+    remark: 'Không liên lạc được với KH 3 lần' as string | null,
+    occurredAt: '2026-08-22T03:00:00.000Z' as string | null,
+    receivedAt: '2026-08-22T03:00:05.000Z',
+    source: 'WEBHOOK' as 'WEBHOOK' | 'POLL',
+    carrierStatusCode: '9',
+  } as {
+    statusText: string | null;
+    location: string | null;
+    remark: string | null;
+    occurredAt: string | null;
+    receivedAt: string;
+    source: 'WEBHOOK' | 'POLL';
+    carrierStatusCode: string;
+  } | null,
+  waybillError: null as string | null,
+  waybillErrorCode: null as string | null,
+  waybillErrorAt: null as string | null,
 };
 
 /** Đúng shape `TaskDetailDto` (GET /tasks/:id) — task PICK 2 dòng đã sắp theo pickSequence. */
@@ -1302,6 +1337,8 @@ export const STATUS_LOG_FIXTURE = {
       mappedStatus: 'IN_TRANSIT',
       outcome: 'APPLIED',
       note: null,
+      statusText: 'Đã điều phối giao hàng / đang giao hàng',
+      location: 'Bưu cục Gia Lâm',
       occurredAt: new Date(Date.UTC(2026, 7, 21, 3)).toISOString(),
       createdAt: new Date(Date.UTC(2026, 7, 21, 3, 1)).toISOString(),
     },
@@ -1315,6 +1352,8 @@ export const STATUS_LOG_FIXTURE = {
       mappedStatus: null,
       outcome: 'REJECTED_UNMAPPED',
       note: 'mã trạng thái 45 chưa được ánh xạ',
+      statusText: null,
+      location: null,
       occurredAt: null,
       createdAt: new Date(Date.UTC(2026, 7, 22, 3)).toISOString(),
     },

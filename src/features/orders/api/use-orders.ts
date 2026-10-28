@@ -44,6 +44,8 @@ export interface OrderListParams {
   carrierAccountId?: string;
   /** Ai gán hãng: ERP = chọn trong ERP, PANCAKE = Pancake gán + cấp vận đơn (gửi ngoài ERP). */
   carrierSource?: OrderCarrierSource;
+  /** Chữ "Trạng thái VC" gần nhất hãng gửi — nhiều giá trị (khớp một trong số đó). */
+  carrierStatusText?: string[];
   /** Đơn đang thiếu tồn SKU này (Chờ hàng — "Xem đơn" từ màn Hàng chờ). */
   shortSkuId?: string;
   /** true = chỉ đơn có đơn trùng trong ngày (cùng SĐT, cùng ngày VN, chưa hủy — CSKH-5). */
@@ -133,6 +135,7 @@ function listQuery(params: Omit<OrderListParams, 'take' | 'skip'>) {
     carrierId: params.carrierId || undefined,
     carrierAccountId: params.carrierAccountId || undefined,
     carrierSource: params.carrierSource,
+    carrierStatusText: params.carrierStatusText?.length ? params.carrierStatusText : undefined,
     shortSkuId: params.shortSkuId || undefined,
     duplicate: params.duplicate ? ('true' as const) : undefined,
     from: params.from || undefined,
@@ -220,6 +223,17 @@ export function useGeoSuggest(q: string) {
     queryFn: () => unwrap(api.GET('/geo/suggest', { params: { query: { q: text, limit: 3 } } })),
     enabled: text.length >= 6,
     staleTime: 10 * 60_000,
+  });
+}
+
+export type OrderCarrierStatusOption = components['schemas']['OrderCarrierStatusOptionDto'];
+
+/** GET /sales-orders/carrier-status-options — chữ "Trạng thái VC" các hãng đã gửi, cho ô lọc. */
+export function useCarrierStatusOptions() {
+  return useQuery({
+    queryKey: [...orderKeys.all, 'carrier-status-options'] as const,
+    queryFn: () => unwrap(api.GET('/sales-orders/carrier-status-options')),
+    staleTime: 60_000,
   });
 }
 
@@ -355,6 +369,30 @@ export function useBulkFulfilOrders() {
   return useMutation({
     mutationFn: (orderIds: string[]) =>
       unwrap(api.POST('/sales-orders/bulk-fulfil', { body: { orderIds } })),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: orderKeys.lists() });
+      void qc.invalidateQueries({ queryKey: orderKeys.details() });
+    },
+  });
+}
+
+export type WaybillRequestResult = components['schemas']['WaybillRequestResultDto'];
+
+/**
+ * POST /shipments/:id/waybill — xin lại vận đơn cho phiếu đã đóng gói mà hãng từ chối (tab "Lỗi vận
+ * đơn", 2026-10-28). Quyền `shipment.pack`. Hãng chưa phản hồi → `QUEUED` (thử lại nền), hãng vẫn
+ * từ chối → lỗi CARRIER_REJECTED kèm câu của hãng.
+ */
+export function useRequestWaybill() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ shipmentId, carrierCode }: { shipmentId: string; carrierCode: string }) =>
+      unwrap(
+        api.POST('/shipments/{id}/waybill', {
+          params: { path: { id: shipmentId } },
+          body: { carrierCode },
+        }),
+      ),
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: orderKeys.lists() });
       void qc.invalidateQueries({ queryKey: orderKeys.details() });

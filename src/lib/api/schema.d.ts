@@ -3417,6 +3417,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/sales-orders/carrier-status-options": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Chữ "Trạng thái VC" các hãng đã gửi cho ô lọc danh sách đơn (2026-10-28) — khai TRƯỚC `:id`. */
+        get: operations["SalesOrderController_carrierStatusOptions"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/sales-orders/shipping-quote-preview": {
         parameters: {
             query?: never;
@@ -10512,6 +10529,13 @@ export interface components {
             name: string;
             isActive: boolean;
         };
+        OrderCarrierStatusOptionDto: {
+            /** @description Giá trị cho `carrierStatusText` của GET /sales-orders (nguyên văn chữ hãng). */
+            statusText: string;
+            /** @description Hãng chọn trên đơn (wms.Carrier.id); null = đơn chưa chọn hãng. */
+            carrierId: string | null;
+            carrierCode: string | null;
+        };
         ShippingQuotePreviewDto: {
             /** Format: uuid */
             carrierId: string;
@@ -10621,10 +10645,10 @@ export interface components {
         };
         SalesOrderListItemDto: {
             /**
-             * @description Tab của đơn — `flowOf(status, fulfilmentStatus, chờ hàng)`.
+             * @description Tab của đơn — `flowOf(status, fulfilmentStatus, chờ hàng, lỗi vận đơn)`.
              * @enum {string}
              */
-            flow: "PENDING_APPROVAL" | "CANCELLED" | "WAREHOUSE" | "PICKING" | "PACKED" | "IN_TRANSIT" | "OUT_FOR_DELIVERY" | "DELIVERED" | "RETURNED" | "CARRIER_CANCELLED" | "PICKED_UP" | "WAITING_STOCK";
+            flow: "PENDING_APPROVAL" | "CANCELLED" | "WAREHOUSE" | "PICKING" | "PACKED" | "IN_TRANSIT" | "OUT_FOR_DELIVERY" | "DELIVERED" | "RETURNED" | "CARRIER_CANCELLED" | "PICKED_UP" | "WAITING_STOCK" | "WAYBILL_ERROR";
             /**
              * @description Trạng thái kho / giao hàng chi tiết (snapshot) — null = chưa tính (coi như NOT_STARTED).
              * @enum {string|null}
@@ -10632,8 +10656,21 @@ export interface components {
             fulfilmentStatus: "CANCELLED" | "NOT_STARTED" | "PICKING" | "PICKED" | "PACKING" | "PACKED" | "SHIPPED" | "IN_TRANSIT" | "OUT_FOR_DELIVERY" | "DELIVERED" | "FAILED" | "RETURNED" | "CARRIER_CANCELLED" | null;
             /** @description Lần cuối trạng thái kho đổi (cột "Cập nhật TT"); null = chưa có snapshot → dùng updatedAt. */
             statusChangedAt: string | null;
-            /** @description SĐT người nhận (địa chỉ giao hiệu lực), không có thì SĐT khách. */
+            /** @description SĐT người nhận (sửa riêng trên đơn → địa chỉ giao hiệu lực), không có thì SĐT khách. */
             phone: string | null;
+            /** @description SĐT người nhận đang bị che (`+84387****30` — sàn TikTok qua Pancake): hãng sẽ từ chối. */
+            phoneMasked: boolean;
+            /**
+             * @description Sàn của đơn Pancake theo nguồn đơn (`TIKTOK`…); null = không phải đơn sàn / đơn ERP.
+             * @enum {string|null}
+             */
+            marketplace: "TIKTOK" | "SHOPEE" | "LAZADA" | null;
+            /** @description Lỗi vận đơn cuối (tab Lỗi vận đơn): câu của hãng khi `waybillErrorCode` = CARRIER_REJECTED. */
+            waybillError: string | null;
+            /** @description Mã lỗi vận đơn (CARRIER_REJECTED, …) — web dịch theo mã; null = không lỗi. */
+            waybillErrorCode: string | null;
+            /** @description ISO — lúc ghi lỗi vận đơn. */
+            waybillErrorAt: string | null;
             /**
              * @description Số đơn KHÁC chưa hủy cùng SĐT khách, cùng ngày VN, mọi nguồn / mọi team (CSKH-5) — > 0 = nhãn
              *     "Trùng trong ngày".
@@ -10690,6 +10727,11 @@ export interface components {
             carrierAccountId: string | null;
             /** @description Số người gửi chia cho đơn lúc gán hãng (POS nhiều số); null = số của kho / số đầu của POS. */
             senderPhone: string | null;
+            /**
+             * @description SĐT người nhận sửa riêng cho đơn (2026-10-28) — thay SĐT của địa chỉ giao khi xin vận đơn / in
+             *     tem; null = dùng SĐT của địa chỉ giao.
+             */
+            recipientPhone: string | null;
             /** @description Kho lấy hàng chọn khi sửa đơn (wms.Warehouse.id) — điểm lấy khi tra cước hãng. */
             warehouseId: string | null;
             /** @description Địa chỉ giao GHI TRÊN ĐƠN (core.CustomerAddress.id) — null = chưa chọn; địa chỉ hiệu lực xem `shippingAddress` ở chi tiết. */
@@ -10825,6 +10867,22 @@ export interface components {
             code: string;
             name: string;
         };
+        ShipmentLastCarrierEventDto: {
+            /** @description "Trạng thái VC" — nguyên văn tên trạng thái của hãng. */
+            statusText: string | null;
+            /** @description "Tại" — bưu cục / vị trí (VTP, VNPost). */
+            location: string | null;
+            /** @description "Với ghi chú" — ghi chú, lý do, bưu tá. */
+            remark: string | null;
+            /** @description ISO — mốc theo hãng; null = hãng không trả. */
+            occurredAt: string | null;
+            /** @description ISO — lúc ERP nhận. */
+            receivedAt: string;
+            /** @enum {string} */
+            source: "WEBHOOK" | "POLL";
+            /** @description Mã thô của hãng. */
+            carrierStatusCode: string;
+        };
         SalesOrderShipmentDto: {
             id: string;
             docNumber: string;
@@ -10839,6 +10897,28 @@ export interface components {
             /** @description ISO — lần in nhãn gần nhất; null = chưa in. */
             labelPrintedAt: string | null;
             labelPrintCount: number;
+            /** @description Dịch vụ hãng đã gửi lúc cấp vận đơn (VTP `ECOD`…); null = chưa cấp / vận đơn cũ. */
+            serviceCode: string | null;
+            /** @description Tên dịch vụ (mỗi ý một dòng, GHTK: ca lấy + đường bộ / bay); null = hãng không trả tên. */
+            serviceName: string | null;
+            /** @description Khai giá đã gửi hãng, Decimal(18,4) chuỗi; null = không biết (vận đơn cấp trước 2026-10-28). */
+            declaredValue: string | null;
+            /** @description Tiền thu hộ trên phiếu, Decimal(18,4) chuỗi. */
+            codAmount: string | null;
+            /** @description Tổng phí hãng (cước + phụ phí + phí COD), Decimal(18,4) chuỗi; null = chưa có cước. */
+            carrierFeeTotal: string | null;
+            /** @description ISO — đối soát phí với hãng; null = chưa đối soát. */
+            feeReconciledAt: string | null;
+            /** @description "Cập nhật cuối" — tín hiệu mới nhất hãng gửi; null = chưa nhận gì. */
+            lastCarrierEvent: components["schemas"]["ShipmentLastCarrierEventDto"] | null;
+            /**
+             * @description Lỗi vận đơn cuối khi phiếu còn ở kho, chưa có mã (2026-10-28): câu của hãng khi
+             *     `waybillErrorCode` = CARRIER_REJECTED; null = không lỗi.
+             */
+            waybillError: string | null;
+            waybillErrorCode: string | null;
+            /** @description ISO — lúc ghi lỗi vận đơn. */
+            waybillErrorAt: string | null;
         };
         SalesOrderLineComboDto: {
             /** @description core.Sku.id của combo. */
@@ -10920,6 +11000,16 @@ export interface components {
             /** @description Địa chỉ giao hiệu lực — null = khách chưa có địa chỉ dùng được (tra cước / cấp vận đơn sẽ 422). */
             shippingAddress: components["schemas"]["SalesOrderAddressDto"] | null;
             /**
+             * @description Sàn của đơn Pancake theo nguồn đơn (`TIKTOK`…); null = không phải đơn sàn.
+             * @enum {string|null}
+             */
+            marketplace: "TIKTOK" | "SHOPEE" | "LAZADA" | null;
+            /**
+             * @description SĐT người nhận HIỆU LỰC (`recipientPhone` → địa chỉ giao) đang bị che — hãng sẽ từ chối, cần
+             *     nhập SĐT thật cho đơn.
+             */
+            recipientPhoneMasked: boolean;
+            /**
              * @description Món gõ tay trên Pancake (2026-10-22) — không có SKU nên không nằm ở `lines`, không giữ chỗ /
              *     trừ tồn; người đóng hàng tự lấy theo tên. [] = không có.
              */
@@ -10996,6 +11086,11 @@ export interface components {
             carrierAccountId: string | null;
             /** @description Số người gửi chia cho đơn lúc gán hãng (POS nhiều số); null = số của kho / số đầu của POS. */
             senderPhone: string | null;
+            /**
+             * @description SĐT người nhận sửa riêng cho đơn (2026-10-28) — thay SĐT của địa chỉ giao khi xin vận đơn / in
+             *     tem; null = dùng SĐT của địa chỉ giao.
+             */
+            recipientPhone: string | null;
             /** @description Kho lấy hàng chọn khi sửa đơn (wms.Warehouse.id) — điểm lấy khi tra cước hãng. */
             warehouseId: string | null;
             /** @description Địa chỉ giao GHI TRÊN ĐƠN (core.CustomerAddress.id) — null = chưa chọn; địa chỉ hiệu lực xem `shippingAddress` ở chi tiết. */
@@ -11386,6 +11481,12 @@ export interface components {
             internalNote?: string | null;
             /** @description Ghi chú in lên vận đơn. */
             printNote?: string | null;
+            /**
+             * @description SĐT người nhận cho riêng đơn này (đơn sàn SĐT bị che) — thay SĐT của địa chỉ giao khi xin vận
+             *     đơn / in tem; server chuẩn hoá (`+84…` → `0…`), sai → 422 path `recipientPhone`. `null` / `""` =
+             *     bỏ, về SĐT của địa chỉ.
+             */
+            recipientPhone?: string | null;
             /** @description Thẻ đơn (core.Tag.id) — THAY toàn bộ danh sách; `[]` = bỏ hết thẻ. */
             tagIds?: string[];
             /**
@@ -11416,7 +11517,7 @@ export interface components {
             shippingOptions: components["schemas"]["ShippingOptionsViewDto"] | null;
             /**
              * @description Trường đã đổi thật ('status' | 'carrierId' | 'carrierAccountId' | 'warehouseId' | 'addressId' |
-             *     'shippingWeightKg' | 'shippingOptions' | 'internalNote' | 'printNote' | 'tagIds' | 'careStaffId' |
+             *     'shippingWeightKg' | 'shippingOptions' | 'internalNote' | 'printNote' | 'recipientPhone' | 'tagIds' | 'careStaffId' |
              *     'packerId' | 'marketerId' | 'expectedDeliveryDate'); rỗng = không có gì thay đổi.
              */
             changed: string[];
@@ -11489,6 +11590,11 @@ export interface components {
             trackingNo: string | null;
             /** @description Lý do khi QUEUED (thông điệp lỗi của hãng) hoặc SAVED có phiếu đã rời kho. */
             reason: string | null;
+            /**
+             * @description Gửi được nhưng biết trước hãng sẽ từ chối khi cấp vận đơn — đơn vào nhóm "Cần sửa":
+             *     `RECIPIENT_PHONE_MASKED` = SĐT người nhận bị sàn che (TikTok), nhập SĐT thật cho đơn.
+             */
+            warning: string | null;
         };
         SendToCarrierMissingSkuDto: {
             code: string;
@@ -11802,6 +11908,10 @@ export interface components {
             /** @enum {string} */
             outcome: "APPLIED" | "DUPLICATE" | "REJECTED_UNMAPPED" | "REJECTED_TRANSITION" | "NOT_FOUND";
             note: string | null;
+            /** @description Chữ trạng thái hãng gửi cho mốc này (2026-10-28); null = mốc ghi trước khi có cột. */
+            statusText: string | null;
+            /** @description Bưu cục / vị trí hãng gửi kèm (VTP, VNPost); null = hãng không gửi. */
+            location: string | null;
             /** @description Mốc theo hãng (null = hãng không trả). */
             occurredAt: string | null;
             createdAt: string;
@@ -21177,6 +21287,25 @@ export interface operations {
             };
         };
     };
+    SalesOrderController_carrierStatusOptions: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OrderCarrierStatusOptionDto"][];
+                };
+            };
+        };
+    };
     SalesOrderController_shippingQuotePreview: {
         parameters: {
             query?: never;
@@ -21258,10 +21387,16 @@ export interface operations {
                  */
                 carrierSource?: "ERP" | "PANCAKE";
                 /**
+                 * @description Chữ "Trạng thái VC" gần nhất hãng gửi (2026-10-28) — khớp ĐÚNG một trong các giá trị (lặp
+                 *     tham số cho nhiều giá trị: `?carrierStatusText=a&carrierStatusText=b`). Giá trị chọn được:
+                 *     GET /sales-orders/carrier-status-options.
+                 */
+                carrierStatusText?: string[];
+                /**
                  * @description Tab của danh sách đơn (2026-10-12) — gộp trạng thái chứng từ + kho / giao hàng
                  *     (`flowOf` trong sales-order-flow.ts). Đếm từng tab: GET /sales-orders/flow-counts.
                  */
-                flow?: "PENDING_APPROVAL" | "WAREHOUSE" | "WAITING_STOCK" | "PICKING" | "PACKED" | "PICKED_UP" | "IN_TRANSIT" | "OUT_FOR_DELIVERY" | "DELIVERED" | "RETURNED" | "CARRIER_CANCELLED" | "CANCELLED";
+                flow?: "PENDING_APPROVAL" | "WAREHOUSE" | "WAITING_STOCK" | "PICKING" | "PACKED" | "WAYBILL_ERROR" | "PICKED_UP" | "IN_TRANSIT" | "OUT_FOR_DELIVERY" | "DELIVERED" | "RETURNED" | "CARRIER_CANCELLED" | "CANCELLED";
                 /**
                  * @description Đơn có sản phẩm KHÔNG phải hàng ERP (2026-10-22): `CUSTOM` = có món gõ tay trên Pancake
                  *     (`sales_order_external.custom_items`), `POS_SKU` = có dòng là SKU do đồng bộ Pancake tự tạo
@@ -21406,10 +21541,16 @@ export interface operations {
                  */
                 carrierSource?: "ERP" | "PANCAKE";
                 /**
+                 * @description Chữ "Trạng thái VC" gần nhất hãng gửi (2026-10-28) — khớp ĐÚNG một trong các giá trị (lặp
+                 *     tham số cho nhiều giá trị: `?carrierStatusText=a&carrierStatusText=b`). Giá trị chọn được:
+                 *     GET /sales-orders/carrier-status-options.
+                 */
+                carrierStatusText?: string[];
+                /**
                  * @description Tab của danh sách đơn (2026-10-12) — gộp trạng thái chứng từ + kho / giao hàng
                  *     (`flowOf` trong sales-order-flow.ts). Đếm từng tab: GET /sales-orders/flow-counts.
                  */
-                flow?: "PENDING_APPROVAL" | "WAREHOUSE" | "WAITING_STOCK" | "PICKING" | "PACKED" | "PICKED_UP" | "IN_TRANSIT" | "OUT_FOR_DELIVERY" | "DELIVERED" | "RETURNED" | "CARRIER_CANCELLED" | "CANCELLED";
+                flow?: "PENDING_APPROVAL" | "WAREHOUSE" | "WAITING_STOCK" | "PICKING" | "PACKED" | "WAYBILL_ERROR" | "PICKED_UP" | "IN_TRANSIT" | "OUT_FOR_DELIVERY" | "DELIVERED" | "RETURNED" | "CARRIER_CANCELLED" | "CANCELLED";
                 /**
                  * @description Đơn có sản phẩm KHÔNG phải hàng ERP (2026-10-22): `CUSTOM` = có món gõ tay trên Pancake
                  *     (`sales_order_external.custom_items`), `POS_SKU` = có dòng là SKU do đồng bộ Pancake tự tạo

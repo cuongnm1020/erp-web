@@ -34,6 +34,7 @@ import {
   type BulkFulfilOrdersResult,
   type SalesOrder,
 } from '../api/use-orders';
+import { OrderResultsPanel, type OrderResultRow } from './order-results-panel';
 
 type Failed = BulkFulfilOrdersResult['failed'][number];
 
@@ -66,6 +67,8 @@ export function BulkFulfilPrintDialog({
   const [labels, setLabels] = useState<ShipmentLabelData[]>([]);
   const [printedAt, setPrintedAt] = useState(() => new Date());
   const [failed, setFailed] = useState<Failed[]>([]);
+  /** Kết quả từng đơn của lần bấm vừa rồi (2026-10-28) — null = chưa bấm / không cần xem. */
+  const [results, setResults] = useState<OrderResultRow[] | null>(null);
   const printer = usePrint();
   const bulk = useBulkFulfilOrders();
   const fetchLabels = useShipmentLabelDataMany();
@@ -78,17 +81,22 @@ export function BulkFulfilPrintDialog({
   // hộp thoại đã đóng.
   const [finished, setFinished] = useState(false);
   useEffect(() => {
-    if (finished && !printer.open && failed.length === 0) {
+    if (finished && !printer.open && results === null) {
       setFinished(false);
       onDone();
     }
-  }, [finished, printer.open, failed.length, onDone]);
+  }, [finished, printer.open, results, onDone]);
 
   const close = (o: boolean) => {
     if (pending) return;
     setOpen(o);
-    if (!o) setFailed([]);
+    if (!o) {
+      setFailed([]);
+      setResults(null);
+    }
   };
+
+  const byId = new Map(rows.map((o) => [o.id, o]));
 
   const submit = async () => {
     if (ready.length === 0 || pending) return;
@@ -119,15 +127,17 @@ export function BulkFulfilPrintDialog({
           notes.length > 0 ? { description: notes.join(' ') } : undefined,
         );
       }
-      if (r.failed.length > 0) setFailed(r.failed);
-      else setOpen(false);
+      const rows = resultRows(r, byId);
+      // Nhiều đơn / có lỗi / hãng chưa phản hồi → giữ hộp thoại với kết quả TỪNG đơn (2026-10-28).
+      if (r.failed.length > 0 || rows.length > 1 || queued > 0) {
+        setFailed(r.failed);
+        setResults(rows);
+      } else setOpen(false);
       setFinished(true);
     } catch (err) {
       toast.error(messageFor(err));
     }
   };
-
-  const byId = new Map(rows.map((o) => [o.id, o]));
 
   return (
     <>
@@ -142,44 +152,49 @@ export function BulkFulfilPrintDialog({
       </Button>
       <Dialog open={open} onOpenChange={close}>
         <DialogContent>
-          {failed.length > 0 ? (
+          {results ? (
             <>
-              <DialogHeader>
-                <DialogTitle className="text-destructive">
-                  {failed.length} đơn không đóng gói / in được
-                </DialogTitle>
-                <DialogDescription>
-                  Các đơn còn lại đã xong. Sửa từng đơn theo lý do bên dưới rồi làm lại.
-                </DialogDescription>
-              </DialogHeader>
-              <ul className="max-h-80 space-y-2 overflow-y-auto" aria-label="Danh sách đơn lỗi">
-                {failed.map((f) => (
-                  <li
-                    key={f.orderId}
-                    className="rounded-md border border-destructive-line px-3 py-2 text-sm"
-                  >
-                    <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+              <DialogTitle className="sr-only">Kết quả đóng gói và in vận đơn</DialogTitle>
+              <OrderResultsPanel
+                title={
+                  failed.length > 0 ? (
+                    <span className="text-destructive">
+                      {failed.length} đơn không đóng gói / in được
+                    </span>
+                  ) : (
+                    `Đã xử lý ${results.length} đơn`
+                  )
+                }
+                description={
+                  failed.some((f) => f.packed)
+                    ? 'Đơn đã đóng gói (đã trừ tồn) mà chưa có mã nằm ở tab Lỗi vận đơn — sửa đơn rồi xin lại vận đơn, không đóng gói lại.'
+                    : 'Các đơn có mã đã gửi lệnh in tem. Sửa từng đơn lỗi theo lý do bên dưới rồi làm lại.'
+                }
+                rows={results}
+                hints={{
+                  ok: 'Có mã vận đơn — đã gửi lệnh in',
+                  wait: 'Hãng chưa phản hồi — đang thử lại',
+                  fix: 'Lỗi — cần sửa',
+                }}
+                footer={
+                  <DialogFooter className="items-center border-t pt-3 sm:justify-between">
+                    {failed.some((f) => f.packed) ? (
                       <Link
-                        href={`/crm/orders/${f.orderId}/edit`}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="font-semibold tabular-nums text-primary hover:underline"
+                        href="/crm/orders?flow=WAYBILL_ERROR"
+                        className="text-sm font-semibold text-primary hover:underline"
+                        onClick={() => close(false)}
                       >
-                        {f.docNumber ?? byId.get(f.orderId)?.docNumber ?? f.orderId.slice(0, 8)}
+                        Xem ở tab Lỗi vận đơn
                       </Link>
-                      <span className="text-muted-foreground">
-                        {byId.get(f.orderId)?.customer.name}
-                      </span>
-                    </div>
-                    <p className="mt-1 text-foreground">{failedReason(f)}</p>
-                  </li>
-                ))}
-              </ul>
-              <DialogFooter>
-                <Button variant="outline" onClick={() => close(false)}>
-                  Đóng
-                </Button>
-              </DialogFooter>
+                    ) : (
+                      <span />
+                    )}
+                    <Button variant="outline" onClick={() => close(false)}>
+                      Đóng
+                    </Button>
+                  </DialogFooter>
+                }
+              />
             </>
           ) : (
             <>
@@ -239,4 +254,31 @@ export function BulkFulfilPrintDialog({
       ) : null}
     </>
   );
+}
+
+/** Kết quả từng đơn: có mã → in được; chưa có mã (hãng chưa phản hồi) → chờ; lỗi → cần sửa. */
+function resultRows(
+  r: { done: BulkFulfilOrdersResult['done']; failed: Failed[] },
+  byId: Map<string, SalesOrder>,
+): OrderResultRow[] {
+  return [
+    ...r.failed.map((f): OrderResultRow => ({
+      orderId: f.orderId,
+      docNumber: f.docNumber ?? byId.get(f.orderId)?.docNumber ?? f.orderId.slice(0, 8),
+      customerName: byId.get(f.orderId)?.customer.name,
+      marketplace: byId.get(f.orderId)?.marketplace,
+      group: 'fix',
+      status: f.packed ? 'Đã đóng gói, chưa có mã' : 'Không đóng gói được',
+      reason: failedReason(f),
+    })),
+    ...r.done.map((d): OrderResultRow => ({
+      orderId: d.orderId,
+      docNumber: d.docNumber ?? byId.get(d.orderId)?.docNumber ?? d.orderId.slice(0, 8),
+      customerName: byId.get(d.orderId)?.customer.name,
+      marketplace: byId.get(d.orderId)?.marketplace,
+      group: d.trackingNo ? 'ok' : 'wait',
+      status: d.trackingNo ? `Có mã ${d.trackingNo}` : 'Hãng chưa phản hồi',
+      reason: d.outcome === 'ALREADY_ISSUED' ? 'Đã có vận đơn từ trước — chỉ in lại tem.' : null,
+    })),
+  ];
 }

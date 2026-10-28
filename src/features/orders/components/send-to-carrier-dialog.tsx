@@ -2,7 +2,6 @@
 
 import { zodResolver } from '@hookform/resolvers/zod';
 import { ScanBarcode, Search, X } from 'lucide-react';
-import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import {
@@ -44,6 +43,7 @@ import {
   type SendOrdersToCarrierResult,
 } from '../api/use-orders';
 import { orderEditable, orderStatusLabel, orderStatusTone } from '../labels';
+import { OrderResultsPanel, type OrderResultRow } from './order-results-panel';
 import {
   CARRIER_SERVICES,
   DEFAULT_SHIPPING_OPTIONS_FORM,
@@ -172,9 +172,10 @@ export function SendToCarrierDialog({
         ...(v.customPickup && v.warehouseId ? { warehouseId: v.warehouseId } : {}),
       });
       announce(carrier.code, r, orders.length - sendable.length);
-      // Có đơn lỗi: giữ dialog mở, hiện danh sách đơn lỗi + lý do để sửa từng đơn. `onDone` (bỏ
-      // chọn trên danh sách) đợi tới lúc đóng — bỏ chọn sớm sẽ gỡ luôn dialog này.
-      if (r.failed.length > 0) {
+      // Nhiều đơn / có đơn lỗi / cần sửa / hãng chưa phản hồi: giữ dialog mở, hiện kết quả TỪNG đơn
+      // (2026-10-28). `onDone` (bỏ chọn trên danh sách) đợi tới lúc đóng — bỏ chọn sớm sẽ gỡ luôn
+      // dialog này.
+      if (needsReview(r)) {
         setFailedResult(r);
         return;
       }
@@ -209,7 +210,7 @@ export function SendToCarrierDialog({
         </div>
 
         {failedResult ? (
-          <FailedOrders
+          <SendResults
             carrierCode={carrier.code}
             result={failedResult}
             orders={orders}
@@ -637,11 +638,20 @@ function failedReason(f: SendOrdersToCarrierResult['failed'][number]): string {
   return f.carrierMessage ? `${base} ${carrierSaid(f.carrierMessage)}` : base;
 }
 
+/** Có gì người gửi cần xem từng đơn: nhiều đơn, đơn lỗi, đơn cần sửa, hãng chưa phản hồi. */
+function needsReview(r: SendOrdersToCarrierResult): boolean {
+  return (
+    r.sent.length + r.failed.length > 1 ||
+    r.failed.length > 0 ||
+    r.sent.some((s) => s.warning || s.outcome === 'QUEUED')
+  );
+}
+
 /**
- * Lô vừa gửi có đơn lỗi: liệt kê TỪNG đơn lỗi kèm khách + lý do (đơn khác trong lô đã gửi xong —
- * một đơn lỗi không chặn cả lô). Người dùng sửa từng đơn (thường là địa chỉ giao) rồi gửi lại.
+ * Kết quả từng đơn của lô vừa gửi (2026-10-28): có mã vận đơn / chờ đóng gói / cần sửa (đơn lỗi +
+ * đơn biết trước hãng sẽ từ chối vì SĐT bị che). Người dùng sửa từng đơn rồi gửi lại.
  */
-function FailedOrders({
+function SendResults({
   carrierCode,
   result,
   orders,
@@ -653,50 +663,72 @@ function FailedOrders({
   onClose: () => void;
 }) {
   const byId = new Map(orders.map((o) => [o.id, o]));
+  const rows: OrderResultRow[] = [
+    ...result.failed.map((f): OrderResultRow => ({
+      orderId: f.orderId,
+      docNumber: f.docNumber ?? byId.get(f.orderId)?.docNumber ?? f.orderId.slice(0, 8),
+      customerName: byId.get(f.orderId)?.customer.name,
+      marketplace: byId.get(f.orderId)?.marketplace,
+      group: 'fix',
+      status: 'Không gửi được',
+      reason: failedReason(f),
+    })),
+    ...result.sent.map((s): OrderResultRow => {
+      const o = byId.get(s.orderId);
+      const base = {
+        orderId: s.orderId,
+        docNumber: s.docNumber,
+        customerName: o?.customer.name,
+        marketplace: o?.marketplace,
+      };
+      if (s.trackingNo) return { ...base, group: 'ok', status: `Có mã ${s.trackingNo}` };
+      if (s.warning === 'RECIPIENT_PHONE_MASKED') {
+        return {
+          ...base,
+          group: 'fix',
+          status: 'Cần sửa trước khi đóng gói',
+          reason: `SĐT người nhận bị sàn che — ${carrierCode} sẽ từ chối khi cấp vận đơn. Nhập SĐT thật ở màn sửa đơn rồi mới đóng gói.`,
+        };
+      }
+      return {
+        ...base,
+        group: 'wait',
+        status: s.outcome === 'QUEUED' ? 'Hãng chưa phản hồi' : 'Chờ đóng gói',
+        reason: s.outcome === 'QUEUED' ? 'Hệ thống tự xin lại vận đơn.' : OUTCOME_LABEL[s.outcome],
+      };
+    }),
+  ];
+  const failed = result.failed.length;
   return (
-    <section aria-label="Đơn không gửi được" className="flex min-h-0 flex-1 flex-col">
-      <div className="space-y-1 px-5 pt-4">
-        <h3 className="text-base font-semibold text-destructive">
-          {result.failed.length} đơn không gửi được sang {carrierCode}
-        </h3>
-        <p className="text-sm text-muted-foreground">
-          {result.sent.length > 0 ? `${result.sent.length} đơn còn lại đã gửi xong. ` : ''}
-          Sửa từng đơn theo lý do bên dưới (địa chỉ giao, kho xuất…) rồi gửi lại.
-        </p>
-      </div>
-      <ul
-        className="min-h-0 flex-1 space-y-2 overflow-y-auto px-5 py-3"
-        aria-label="Danh sách đơn lỗi"
-      >
-        {result.failed.map((f) => {
-          const o = byId.get(f.orderId);
-          return (
-            <li
-              key={f.orderId}
-              className="rounded-md border border-destructive-line px-3 py-2 text-sm"
-            >
-              <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-                <Link
-                  href={`/crm/orders/${f.orderId}/edit`}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="font-semibold tabular-nums text-primary hover:underline"
-                >
-                  {f.docNumber ?? o?.docNumber ?? f.orderId.slice(0, 8)}
-                </Link>
-                {o ? <span className="text-muted-foreground">{o.customer.name}</span> : null}
-              </div>
-              <p className="mt-1 text-foreground">{failedReason(f)}</p>
-            </li>
-          );
-        })}
-      </ul>
-      <DialogFooter className="border-t px-5 py-3">
-        <Button type="button" onClick={onClose}>
-          Đóng
-        </Button>
-      </DialogFooter>
-    </section>
+    <OrderResultsPanel
+      title={
+        failed > 0 ? (
+          <span className="text-destructive">
+            {failed} đơn không gửi được sang {carrierCode}
+          </span>
+        ) : (
+          `Đã gửi ${result.sent.length} đơn sang ${carrierCode}`
+        )
+      }
+      description={
+        failed > 0 && result.sent.length > 0
+          ? `${result.sent.length} đơn còn lại đã gửi xong. Sửa từng đơn theo lý do bên dưới rồi gửi lại.`
+          : 'Đơn chưa đóng gói chưa có mã — vận đơn cấp lúc đóng gói. Đơn lỗi sau khi đóng gói nằm ở tab Lỗi vận đơn.'
+      }
+      rows={rows}
+      hints={{
+        ok: 'Có mã vận đơn — in được tem',
+        wait: 'Đã gán hãng — cấp mã khi đóng gói',
+        fix: 'Cần sửa',
+      }}
+      footer={
+        <DialogFooter className="border-t px-5 py-3">
+          <Button type="button" onClick={onClose}>
+            Đóng
+          </Button>
+        </DialogFooter>
+      }
+    />
   );
 }
 

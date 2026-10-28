@@ -36,6 +36,7 @@ import {
   usePickupWarehouses,
   useShippingQuote,
   useMoveOrdersWarehouse,
+  useRequestWaybill,
   useUpdateOrder,
   type SalesOrderDetail,
   type SalesOrderStatus,
@@ -55,6 +56,8 @@ import {
   type FulfilTarget,
   manualDiscountNote,
 } from '../labels';
+import { CarrierStatusCard } from './carrier-status-card';
+import { MarketplaceBadge, waybillErrorText } from './waybill-error';
 import { CART_GRID } from './order-create/cart-line';
 import { DENSE } from './order-create/order-draft-form';
 import { Card } from './order-create/order-side-cards';
@@ -109,6 +112,8 @@ function changedLabel(c: string): string {
       return 'ngày hẹn nhận';
     case 'warehouseId':
       return 'kho lấy hàng';
+    case 'recipientPhone':
+      return 'SĐT người nhận';
     default:
       return 'hãng vận chuyển';
   }
@@ -152,6 +157,13 @@ function Editor({ order }: { order: SalesOrderDetail }) {
   const [tagIds, setTagIds] = useState<string[]>(() => order.tags.map((t) => t.id));
   const [expectedDate, setExpectedDate] = useState(order.expectedDeliveryDate ?? '');
   const [accountId, setAccountId] = useState<string>(order.carrierAccountId ?? DEFAULT_ACCOUNT);
+  // SĐT người nhận riêng cho đơn (2026-10-28) — đơn sàn SĐT bị che: nhập số thật rồi xin lại vận đơn.
+  const [recipientPhone, setRecipientPhone] = useState(order.recipientPhone ?? '');
+  const canPack = ability.can('pack', 'Shipment');
+  const requestWaybill = useRequestWaybill();
+  /** Bấm "Lưu và xin lại vận đơn": lưu xong thì xin lại vận đơn trước khi rời màn. */
+  const retryAfterSave = useRef(false);
+  const waybillError = order.shipment?.waybillErrorCode ? order.shipment : null;
   // "Trạng thái kho" đặt tay (2026-09-15): đóng pick / đóng gói KHÔNG quét — quyền riêng
   // sales_order.fulfil_manual (kho + admin), chỉ đơn ĐÃ DUYỆT; đích chép từ bảng của server.
   const fulfil = useFulfilOrder(order.id);
@@ -208,6 +220,7 @@ function Editor({ order }: { order: SalesOrderDetail }) {
   const trimOrNull = (v: string) => (v.trim() === '' ? null : v.trim());
   const internalChanged = trimOrNull(internalNote) !== (order.internalNote ?? null);
   const printChanged = trimOrNull(printNote) !== (order.printNote ?? null);
+  const recipientPhoneChanged = trimOrNull(recipientPhone) !== (order.recipientPhone ?? null);
   const originalTags = order.tags.map((t) => t.id);
   const tagsChanged =
     tagIds.length !== originalTags.length || tagIds.some((t) => !originalTags.includes(t));
@@ -218,7 +231,12 @@ function Editor({ order }: { order: SalesOrderDetail }) {
     ? nextAccount !== null
     : nextAccount !== (order.carrierAccountId ?? null);
   const extrasChanged =
-    internalChanged || printChanged || tagsChanged || dateChanged || accountChanged;
+    internalChanged ||
+    printChanged ||
+    tagsChanged ||
+    dateChanged ||
+    accountChanged ||
+    recipientPhoneChanged;
   const patchFieldsDirty =
     statusChanged || carrierChanged || addressChanged || weightChanged || extrasChanged;
   const patchDirty = patchFieldsDirty || moveTo !== null;
@@ -256,8 +274,31 @@ function Editor({ order }: { order: SalesOrderDetail }) {
     );
   };
 
+  /** Xin lại vận đơn cho phiếu lỗi (tab Lỗi vận đơn) rồi về chi tiết đơn. */
+  const runRetryWaybill = () => {
+    retryAfterSave.current = false;
+    if (!waybillError?.carrierCode) return;
+    requestWaybill.mutate(
+      { shipmentId: waybillError.id, carrierCode: waybillError.carrierCode },
+      {
+        onSuccess: (r) => {
+          if (r.outcome === 'QUEUED') {
+            toast.warning('Hãng chưa phản hồi — hệ thống tự xin lại vận đơn.');
+          } else {
+            toast.success(`Đã cấp vận đơn ${r.trackingNo ?? ''}`, {
+              description: `${order.docNumber} · rời tab Lỗi vận đơn`,
+            });
+          }
+          router.push(r.trackingNo ? `${detailHref}?printLabel=1` : detailHref);
+        },
+        onError: (err) => toast.error(messageFor(err)),
+      },
+    );
+  };
+
   const save = () => {
     if (update.isPending || fulfil.isPending || moveWarehouse.isPending) return;
+    if (requestWaybill.isPending) return;
     if (weightInvalid) {
       toast.error('Cân nặng gửi hãng phải là số kg lớn hơn 0, tối đa 4 số lẻ');
       return;
@@ -269,6 +310,10 @@ function Editor({ order }: { order: SalesOrderDetail }) {
       return;
     }
     if (!patchDirty) {
+      if (retryAfterSave.current) {
+        runRetryWaybill();
+        return;
+      }
       if (fulfilTarget) {
         runFulfil(fulfilTarget);
         return;
@@ -316,6 +361,7 @@ function Editor({ order }: { order: SalesOrderDetail }) {
         ...(accountChanged ? { carrierAccountId: nextAccount } : {}),
         ...(internalChanged ? { internalNote: trimOrNull(internalNote) } : {}),
         ...(printChanged ? { printNote: trimOrNull(printNote) } : {}),
+        ...(recipientPhoneChanged ? { recipientPhone: trimOrNull(recipientPhone) } : {}),
         ...(tagsChanged ? { tagIds } : {}),
         ...(dateChanged ? { expectedDeliveryDate: expectedDate || null } : {}),
         ...(statusChanged && status === 'CANCELLED' && reason.trim()
@@ -331,10 +377,23 @@ function Editor({ order }: { order: SalesOrderDetail }) {
               )
               .join(', ')}`,
           });
-          if (fulfilTarget) runFulfil(fulfilTarget);
+          if (retryAfterSave.current) runRetryWaybill();
+          else if (fulfilTarget) runFulfil(fulfilTarget);
           else router.push(detailHref);
         },
-        onError: (err) => toast.error(messageFor(err)),
+        onError: (err) => {
+          retryAfterSave.current = false;
+          // 422 path recipientPhone: màn không có form để tô ô → nói thẳng ô nào sai.
+          if (
+            isApiError(err) &&
+            err.status === 422 &&
+            JSON.stringify(err.details ?? '').includes('recipientPhone')
+          ) {
+            toast.error('SĐT người nhận không hợp lệ — nhập đủ 10 số, không có dấu *.');
+            return;
+          }
+          toast.error(messageFor(err));
+        },
       },
     );
   };
@@ -444,6 +503,15 @@ function Editor({ order }: { order: SalesOrderDetail }) {
       : []),
     ...(internalChanged ? [{ label: 'Ghi chú nội bộ', from: 'cũ', to: 'mới' }] : []),
     ...(printChanged ? [{ label: 'Ghi chú in vận đơn', from: 'cũ', to: 'mới' }] : []),
+    ...(recipientPhoneChanged
+      ? [
+          {
+            label: 'SĐT người nhận',
+            from: order.recipientPhone ?? 'theo địa chỉ',
+            to: trimOrNull(recipientPhone) ?? 'theo địa chỉ',
+          },
+        ]
+      : []),
     ...(tagsChanged
       ? [
           {
@@ -454,7 +522,10 @@ function Editor({ order }: { order: SalesOrderDetail }) {
         ]
       : []),
   ];
-  const saving = update.isPending || fulfil.isPending || moveWarehouse.isPending;
+  const saving =
+    update.isPending || fulfil.isPending || moveWarehouse.isPending || requestWaybill.isPending;
+  // Ô SĐT riêng còn trống mà SĐT hiệu lực bị che → tô đỏ, hãng sẽ từ chối.
+  const phoneStillMasked = order.recipientPhoneMasked && trimOrNull(recipientPhone) === null;
   const prepaid = new Decimal(order.prepaidAmount || 0);
   const cod = Decimal.max(new Decimal(order.total).minus(prepaid), 0).toFixed(4);
   const nonZero = (v: string) => !(toDecimal(v)?.isZero() ?? true);
@@ -858,7 +929,10 @@ function Editor({ order }: { order: SalesOrderDetail }) {
             }
           >
             <div className="flex flex-wrap items-center justify-between gap-2 text-sm">
-              <span className="font-semibold">{order.customer.name}</span>
+              <span className="flex items-center gap-1.5 font-semibold">
+                {order.customer.name}
+                <MarketplaceBadge marketplace={order.marketplace} />
+              </span>
               <span className="font-mono text-xs text-muted-foreground">{order.customer.code}</span>
             </div>
           </Card>
@@ -907,6 +981,35 @@ function Editor({ order }: { order: SalesOrderDetail }) {
             <p className="text-xs text-muted-foreground">
               Thêm hay sửa nội dung địa chỉ ở hồ sơ khách — đơn chỉ chọn địa chỉ có sẵn.
             </p>
+            {order.recipientPhoneMasked && order.marketplace ? (
+              <p role="note" className="rounded-md bg-warning-weak px-3 py-2 text-xs text-warning">
+                Đơn sàn: sàn che SĐT người mua. Gọi khách hoặc xem đơn trên trang người bán của sàn
+                để lấy số thật, nhập vào ô bên dưới.
+              </p>
+            ) : null}
+            <Row label="SĐT người nhận cho đơn này" htmlFor="order-recipient-phone">
+              <Input
+                id="order-recipient-phone"
+                inputMode="tel"
+                autoComplete="off"
+                placeholder="Trống = SĐT của địa chỉ"
+                value={recipientPhone}
+                onChange={(e) => setRecipientPhone(e.target.value)}
+                disabled={!carrierEditable}
+                aria-invalid={phoneStillMasked || undefined}
+                aria-describedby={phoneStillMasked ? 'order-recipient-phone-hint' : undefined}
+                className={cn(
+                  'tabular-nums',
+                  recipientPhoneChanged && DIRTY,
+                  phoneStillMasked && 'border-destructive',
+                )}
+              />
+            </Row>
+            {phoneStillMasked ? (
+              <p id="order-recipient-phone-hint" className="text-xs text-destructive">
+                SĐT đang bị che — hãng sẽ từ chối. Nhập đủ 10 số.
+              </p>
+            ) : null}
             <Row label="Hẹn nhận hàng" htmlFor="order-expected-date">
               <Input
                 id="order-expected-date"
@@ -952,6 +1055,41 @@ function Editor({ order }: { order: SalesOrderDetail }) {
               />
             }
           >
+            {waybillError ? (
+              <div
+                role="alert"
+                className="space-y-2 rounded-md bg-destructive-weak px-3 py-2 text-sm text-destructive"
+              >
+                <p>
+                  <span className="font-semibold">
+                    {waybillError.carrierCode ?? 'Hãng'} không cấp được vận đơn
+                  </span>
+                  {waybillError.waybillErrorAt
+                    ? ` · ${formatDateTime(waybillError.waybillErrorAt)}`
+                    : ''}
+                </p>
+                <p>{waybillErrorText(waybillError.waybillErrorCode, waybillError.waybillError)}</p>
+                <p className="text-xs">
+                  Phiếu {waybillError.docNumber} đã đóng gói (đã trừ tồn), chưa có mã — sửa đơn rồi
+                  xin lại vận đơn, không đóng gói lại.
+                </p>
+                {canPack && waybillError.carrierCode ? (
+                  <div className="flex justify-end">
+                    <Button
+                      type="button"
+                      size="sm"
+                      loading={saving}
+                      onClick={() => {
+                        retryAfterSave.current = true;
+                        save();
+                      }}
+                    >
+                      {patchDirty ? 'Lưu và xin lại vận đơn' : 'Xin lại vận đơn'}
+                    </Button>
+                  </div>
+                ) : null}
+              </div>
+            ) : null}
             <p className="text-xs text-muted-foreground">
               {carrierChanged && order.carrierId ? (
                 <span className="text-warning">Đã đổi từ {carrierLabel(order.carrierId)}</span>
@@ -1012,6 +1150,8 @@ function Editor({ order }: { order: SalesOrderDetail }) {
                 Lấy hàng tại {quote.data.pickupSummary}
               </p>
             ) : null}
+            {/* Thẻ hãng: Đối soát + Dịch vụ + Cập nhật cuối (mockup KDfmt8dqg3ztLcfbsGZ229). */}
+            <CarrierStatusCard order={order} />
           </Card>
 
           <Card title="Giờ tạo đơn">
