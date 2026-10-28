@@ -26,13 +26,42 @@ function setup(props: Partial<Parameters<typeof PurposePicker>[0]> = {}) {
 
 const chipNames = () =>
   within(screen.getByRole('group', { name: 'Mục đích sử dụng' }))
-    .getAllByRole('button')
+    .getAllByRole('button', { hidden: true })
     .map((b) => b.textContent);
 
 describe('PurposePicker (2026-10-28: 2 dòng dùng nhiều nhất + gợi ý khi gõ)', () => {
-  it('chip xếp: đang bật / khách đã có trước, rồi dùng nhiều nhất', () => {
-    setup({ selected: ['c'], locked: ['a'] });
-    expect(chipNames()).toEqual(['Cà phê', 'Thanh long', 'Sầu riêng', 'Măng cụt']);
+  it('chip xếp: khách đã có trước, rồi dùng nhiều nhất; bật / tắt không đổi thứ tự', () => {
+    const props = { options: OPTIONS, locked: ['a'], onToggle: vi.fn(), onCreate: vi.fn() };
+    const { rerender } = render(<PurposePicker {...props} selected={[]} />);
+    const order = ['Cà phê', 'Sầu riêng', 'Măng cụt', 'Thanh long'];
+    expect(chipNames()).toEqual(order);
+    rerender(<PurposePicker {...props} selected={['d']} />);
+    expect(chipNames()).toEqual(order);
+    rerender(<PurposePicker {...props} selected={[]} />);
+    expect(chipNames()).toEqual(order);
+  });
+
+  it('mục đích bật nằm ở dòng bị cắt → kéo lên sau nhóm khách đã có, tắt đi vẫn giữ chỗ', () => {
+    // Giả lập bố cục: mỗi dòng 1 chip → chip thứ 3 trở đi bị cắt.
+    const spy = vi.spyOn(HTMLElement.prototype, 'offsetTop', 'get').mockImplementation(function (
+      this: HTMLElement,
+    ) {
+      const p = this.parentElement;
+      return p?.getAttribute('aria-label') === 'Mục đích sử dụng'
+        ? Array.from(p.children).indexOf(this) * 34
+        : 0;
+    });
+    try {
+      const props = { options: OPTIONS, onToggle: vi.fn(), onCreate: vi.fn() };
+      const { rerender } = render(<PurposePicker {...props} selected={[]} />);
+      expect(chipNames()).toEqual(['Sầu riêng', 'Măng cụt', 'Cà phê', 'Thanh long']);
+      rerender(<PurposePicker {...props} selected={['c']} />);
+      expect(chipNames()).toEqual(['Thanh long', 'Sầu riêng', 'Măng cụt', 'Cà phê']);
+      rerender(<PurposePicker {...props} selected={[]} />);
+      expect(chipNames()).toEqual(['Thanh long', 'Sầu riêng', 'Măng cụt', 'Cà phê']);
+    } finally {
+      spy.mockRestore();
+    }
   });
 
   it('gõ tên (không dấu) → gợi ý mục đích có sẵn; bấm gợi ý → bật, không tạo', () => {
