@@ -383,6 +383,51 @@ describe('OrderCreateScreen — màn tạo đơn mới', () => {
     await waitFor(() => expect(push).toHaveBeenCalledWith('/crm/orders/new-order-1'));
   });
 
+  it('leader kiêm nhiệm (2 phòng CSKH của mình) → ô Phòng ghi doanh thu, chọn phòng → body careTeamId; một phòng → ẩn (2026-10-29)', async () => {
+    search = `from=${ORDER.id}`;
+    const bodies: Record<string, unknown>[] = [];
+    server.use(
+      ...skuHandlers(),
+      http.get('/api/sales-orders/care-team-options', () =>
+        HttpResponse.json([
+          { teamId: 't-la', name: 'CSKH LA', isActive: true, mine: true },
+          { teamId: 't-hero', name: 'CSKH HERO', isActive: true, mine: true },
+          { teamId: 't-khac', name: 'CSKH khác', isActive: true, mine: false },
+        ]),
+      ),
+      http.post('/api/sales-orders', async ({ request }) => {
+        bodies.push((await request.json()) as Record<string, unknown>);
+        return HttpResponse.json(CREATED, { status: 201 });
+      }),
+    );
+    const { unmount } = renderApp(<OrderCreateScreen />);
+    await waitFor(
+      () => expect(screen.getAllByLabelText('Số lượng')).toHaveLength(REAL_LINES.length),
+      { timeout: 3000 },
+    );
+    const box = await screen.findByRole('combobox', { name: 'Phòng ghi doanh thu' });
+    expect(box).toHaveTextContent('Phòng gốc của bạn');
+    fireEvent.click(box);
+    expect(screen.queryByRole('option', { name: 'CSKH khác' })).not.toBeInTheDocument();
+    fireEvent.click(await screen.findByRole('option', { name: 'CSKH HERO' }));
+    fireEvent.click(screen.getByRole('button', { name: /^Chốt đơn F10/ }));
+    await waitFor(() => expect(bodies).toHaveLength(1));
+    expect(bodies[0]).toMatchObject({ careTeamId: 't-hero' });
+    unmount();
+
+    server.use(
+      http.get('/api/sales-orders/care-team-options', () =>
+        HttpResponse.json([{ teamId: 't-la', name: 'CSKH LA', isActive: true, mine: true }]),
+      ),
+    );
+    renderApp(<OrderCreateScreen />);
+    await waitFor(
+      () => expect(screen.getAllByLabelText('Số lượng')).toHaveLength(REAL_LINES.length),
+      { timeout: 3000 },
+    );
+    expect(screen.queryByRole('combobox', { name: 'Phòng ghi doanh thu' })).not.toBeInTheDocument();
+  });
+
   it('?from=: địa chỉ mặc định của khách tự điền vào phần Nhận hàng và gửi addressId', async () => {
     search = `from=${ORDER.id}`;
     const addrs = makeCustomerAddresses(ORDER.customer.id);

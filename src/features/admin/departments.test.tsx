@@ -252,6 +252,54 @@ describe('TeamsScreen — Phòng ban & team (I-05)', () => {
     expect(calls[0]!.body).toMatchObject({ kind: 'CSKH', defaultPosShopId: null });
   });
 
+  it('Sửa phòng CSKH: ô Leader chọn được leader phòng CSKH khác (kiêm nhiệm · phòng gốc) → PATCH managerIds (2026-10-29)', async () => {
+    const { calls } = wire();
+    const careLa = {
+      ...SALES_HN,
+      id: '00000000-0000-4000-8000-00000000d0a1',
+      code: 'CSKH-LA',
+      name: 'CSKH LA',
+      kind: 'CSKH',
+      isActive: true,
+      managerIds: [],
+      concurrentLeaderIds: [],
+      groupLeadIds: [],
+      defaultPosShopId: null,
+    };
+    const careHero = {
+      ...careLa,
+      id: '00000000-0000-4000-8000-00000000d0a2',
+      code: 'CSKH-HERO',
+      name: 'CSKH HERO',
+    };
+    const leader = {
+      ...USERS[3]!,
+      fullName: 'Đặng Thị Lan Anh',
+      departmentId: careLa.id,
+      departmentName: careLa.name,
+    };
+    server.use(
+      http.get('/api/departments', () => HttpResponse.json([SALES, careLa, careHero])),
+      http.get('/api/users', ({ request }) => {
+        const q = new URL(request.url).searchParams;
+        const items = q.get('roleCode') === 'CSKH_LEADER' ? [leader] : [];
+        return HttpResponse.json({ items, total: items.length });
+      }),
+    );
+    search = `dept=${careHero.id}`;
+    renderApp(<TeamsScreen />);
+    expect(await screen.findByText('Chưa có nhân viên trong phòng ban')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Sửa' }));
+    const dialog = await screen.findByRole('dialog');
+    fireEvent.click(await within(dialog).findByRole('combobox', { name: /Thêm leader/ }));
+    const option = await screen.findByRole('option', { name: /Đặng Thị Lan Anh/ });
+    expect(option).toHaveTextContent('kiêm nhiệm · CSKH LA');
+    fireEvent.click(option);
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Lưu thay đổi' }));
+    await waitFor(() => expect(calls).toHaveLength(1));
+    expect(calls[0]!.body).toMatchObject({ managerIds: [leader.id] });
+  });
+
   it('Thêm thành viên: panel tìm nhân viên ngoài phòng ban, cảnh báo đang ở phòng khác, PUT từng người', async () => {
     const { calls } = wire();
     renderApp(<TeamsScreen />);

@@ -126,6 +126,33 @@ export function DepartmentDialog({
         : [],
     [staff, editing, department],
   );
+  // Leader kiêm nhiệm (2026-10-29): leader CSKH của phòng CSKH KHÁC lead thêm phòng này mà không
+  // rời phòng gốc — chỉ chọn được ở ô Leader, kèm chú thích phòng gốc.
+  const careLeaderUsers = useUsers(
+    { roleCode: 'CSKH_LEADER', isActive: true, take: 200, skip: 0 },
+    careLeaders,
+  );
+  const deptName = useMemo(() => new Map(departments.map((d) => [d.id, d.name])), [departments]);
+  const concurrentCandidates = useMemo(
+    () =>
+      careLeaders
+        ? (careLeaderUsers.data?.items ?? []).filter(
+            (u) =>
+              u.departmentId !== null &&
+              u.departmentId !== department.id &&
+              departments.some((d) => d.id === u.departmentId && d.kind === 'CSKH'),
+          )
+        : [],
+    [careLeaders, careLeaderUsers.data, department, departments],
+  );
+  const leaderOptions = useMemo(
+    () => [...members, ...concurrentCandidates.filter((c) => !members.some((m) => m.id === c.id))],
+    [members, concurrentCandidates],
+  );
+  const leaderHint = (id: string) => {
+    const c = concurrentCandidates.find((u) => u.id === id);
+    return c?.departmentId ? `kiêm nhiệm · ${deptName.get(c.departmentId) ?? ''}` : undefined;
+  };
   const managerIds = form.watch('managerIds');
   const groupLeadIds = form.watch('groupLeadIds');
 
@@ -346,7 +373,13 @@ export function DepartmentDialog({
                         <StaffMultiSelect
                           value={field.value}
                           onChange={field.onChange}
-                          staff={members}
+                          staff={leaderOptions.map((u) => ({
+                            id: u.id,
+                            fullName: u.fullName,
+                            code: u.code,
+                            hint: leaderHint(u.id),
+                          }))}
+                          hintOf={leaderHint}
                           exclude={groupLeadIds}
                           roleLabel="leader"
                           addPlaceholder="Thêm leader…"
@@ -354,7 +387,8 @@ export function DepartmentDialog({
                       </FormControl>
                       <FormDescription>
                         Các leader ngang hàng: cùng quản lý nhân viên và trưởng nhóm của phòng,
-                        không sửa / khóa được nhau.
+                        không sửa / khóa được nhau. Chọn được leader của phòng CSKH khác làm leader
+                        kiêm nhiệm — người đó vẫn ở phòng gốc.
                       </FormDescription>
                       <FormMessage />
                     </FormItem>
