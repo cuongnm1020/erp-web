@@ -7,15 +7,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { cn } from '@/lib/cn';
 import { formatQuantity } from '@/lib/format';
 import { useSkuQuickSearch, type SkuQuickRow } from '../../api/use-order-create';
-
-function useDebounced<T>(v: T, ms: number): T {
-  const [d, setD] = useState(v);
-  useEffect(() => {
-    const t = setTimeout(() => setD(v), ms);
-    return () => clearTimeout(t);
-  }, [v, ms]);
-  return d;
-}
+import { useDebounced } from './use-debounced';
 
 /** Khả dụng của SKU ở kho đang chọn; chưa chọn kho = tổng mọi kho. */
 function availableIn(row: SkuQuickRow, warehouseId: string): string {

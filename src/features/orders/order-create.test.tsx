@@ -655,6 +655,53 @@ describe('OrderCreateScreen — màn tạo đơn mới', () => {
     expect(bodies[0]).toMatchObject({ customerId: CUST.id });
   });
 
+  it('gõ dở SĐT → gợi ý khách mình thấy (2026-10-29); chọn → gắn khách + Nhận hàng = địa chỉ đơn mua gần nhất (không phải mặc định)', async () => {
+    const CUST = makeCustomers(1)[0]!;
+    const queries: string[] = [];
+    server.use(
+      http.get('/api/customers', ({ request }) => {
+        queries.push(new URL(request.url).searchParams.get('q') ?? '');
+        return HttpResponse.json({ items: [CUST], total: 1 });
+      }),
+      http.get(`/api/customers/${CUST.id}`, () =>
+        HttpResponse.json({
+          ...CUST,
+          addresses: makeCustomerAddresses(CUST.id),
+          mergedInto: null,
+          // Đơn gần nhất giao về địa chỉ thứ hai (không mặc định).
+          lastOrderAddressId: '00000077-0000-4000-8000-000000000002',
+        }),
+      ),
+    );
+    renderApp(<OrderCreateScreen />);
+    const phoneBox = await screen.findByLabelText('Số điện thoại khách');
+    // 3 số: chưa gợi ý.
+    fireEvent.change(phoneBox, { target: { value: CUST.phone!.slice(0, 3) } });
+    await new Promise((r) => setTimeout(r, 350));
+    expect(screen.queryByRole('listbox', { name: 'Khách có SĐT khớp' })).not.toBeInTheDocument();
+
+    const typed = CUST.phone!.slice(0, 6);
+    fireEvent.change(phoneBox, { target: { value: typed } });
+    const list = await screen.findByRole('listbox', { name: 'Khách có SĐT khớp' });
+    expect(queries).toContain(typed);
+    const option = within(list).getByRole('option', { name: new RegExp(CUST.name) });
+    // Bàn phím: ↓ chọn dòng đầu, Enter gắn.
+    fireEvent.keyDown(phoneBox, { key: 'ArrowDown' });
+    expect(option).toHaveAttribute('aria-selected', 'true');
+    fireEvent.keyDown(phoneBox, { key: 'Enter' });
+
+    expect(await screen.findByText('Khách cũ')).toBeInTheDocument();
+    expect(screen.getByLabelText('Tên khách hàng')).toHaveValue(CUST.name);
+    expect(phoneBox).toHaveValue(CUST.phone);
+    expect(screen.queryByRole('listbox', { name: 'Khách có SĐT khớp' })).not.toBeInTheDocument();
+    await waitFor(() =>
+      expect(screen.getByLabelText('Tên người nhận')).toHaveValue('Trần Văn Bình'),
+    );
+    expect(screen.getByLabelText('Địa chỉ chi tiết (số nhà, đường, thôn/xóm)')).toHaveValue(
+      'Thôn 3, Xóm Đông',
+    );
+  });
+
   it('thẻ Chăm sóc khách: mục đích khách đã có bật sẵn (khóa), bấm thêm mục đích + ghi chú → chốt gửi purposeTagIds + careNote', async () => {
     const CUST = makeCustomers(1)[0]!;
     const DURIAN = '00000000-0000-4000-8000-0000000000d1';

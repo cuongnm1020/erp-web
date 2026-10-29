@@ -47,8 +47,10 @@ import { formatMoney, formatQuantity } from '@/lib/format';
 import { useAbility } from '@/lib/permission';
 import { useCustomerBrief, useCustomerSearch } from '../../api/use-line-entry';
 import {
+  PHONE_SUGGEST_MIN_DIGITS,
   useCareLookup,
   useCustomerPhoneMatch,
+  useCustomerPhoneSuggest,
   useSameDayOrders,
   useOrderOwnerOptions,
   useOrderStaffOptions,
@@ -59,6 +61,7 @@ import {
 import { useGeoSuggest, type GeoSuggestion } from '../../api/use-orders';
 import { GENDER_LABEL } from '../../labels';
 import { GENDERS, normalizePhoneInput, type CreateOrderValues } from '../../schema';
+import { useDebounced } from './use-debounced';
 
 type Form = UseFormReturn<CreateOrderValues>;
 /** Radix Select không nhận value rỗng. */
@@ -354,6 +357,14 @@ export function CustomerCard({ form }: { form: Form }) {
   const careCustomer = !customerId && match.data === null ? care.data?.customer : undefined;
   const sameDay = useSameDayOrders(phone);
   const [pickOpen, setPickOpen] = useState(false);
+  // Gợi ý khách khi gõ dở SĐT (2026-10-29) — chỉ khách người lên đơn được xem.
+  const [suggestOpen, setSuggestOpen] = useState(false);
+  const [suggestActive, setSuggestActive] = useState(0);
+  const suggestDigits = useDebounced(customerId ? '' : normalizePhoneInput(phone), 250);
+  const suggest = useCustomerPhoneSuggest(suggestDigits);
+  const suggestions = suggestDigits.length >= PHONE_SUGGEST_MIN_DIGITS ? (suggest.data ?? []) : [];
+  const showSuggest = suggestOpen && !customerId && suggestions.length > 0;
+  useEffect(() => setSuggestActive(0), [suggestDigits]);
   // Email / ngày sinh / giới tính không có trên thiết kế — gập sau menu ⋯, tự mở khi đã có giá trị.
   const [extraOpen, setExtraOpen] = useState(
     () =>
@@ -379,6 +390,29 @@ export function CustomerCard({ form }: { form: Form }) {
     clearReceiver();
     setValue('customerId', match.data.id);
     setValue('customerName', match.data.name);
+  };
+  /** Chọn từ gợi ý SĐT → gắn khách như "Chọn khách này" (ReceiverCard điền địa chỉ đơn gần nhất). */
+  const pickSuggestion = (c: { id: string; name: string; phone: string | null }) => {
+    setSuggestOpen(false);
+    clearReceiver();
+    setValue('customerId', c.id);
+    setValue('customerName', c.name);
+    setValue('customerPhone', normalizePhoneInput(c.phone ?? ''));
+  };
+  const onPhoneKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (!showSuggest) return;
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      setSuggestActive((i) => Math.min(i + 1, suggestions.length - 1));
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      setSuggestActive((i) => Math.max(i - 1, 0));
+    } else if (e.key === 'Enter' && suggestions[suggestActive]) {
+      e.preventDefault();
+      pickSuggestion(suggestions[suggestActive]);
+    } else if (e.key === 'Escape') {
+      setSuggestOpen(false);
+    }
   };
   /** Khách ngoài tầm nhìn → chỉ điền tên + địa chỉ mặc định (hồ sơ không mở được, không gắn id). */
   const pickCare = () => {
@@ -513,16 +547,63 @@ export function CustomerCard({ form }: { form: Form }) {
           render={({ field }) => (
             <FormItem>
               <FormLabel className={FIELD_LABEL}>Số điện thoại</FormLabel>
-              <FormControl>
-                <Input
-                  aria-label="Số điện thoại khách"
-                  placeholder="SĐT — tìm khách đã có"
-                  inputMode="tel"
-                  autoComplete="off"
-                  className="tabular-nums"
-                  {...field}
-                />
-              </FormControl>
+              <div className="relative">
+                <FormControl>
+                  <Input
+                    aria-label="Số điện thoại khách"
+                    placeholder="SĐT — tìm khách đã có"
+                    inputMode="tel"
+                    autoComplete="off"
+                    className="tabular-nums"
+                    role="combobox"
+                    aria-expanded={showSuggest}
+                    aria-controls="customer-phone-suggest"
+                    aria-autocomplete="list"
+                    {...field}
+                    onChange={(e) => {
+                      field.onChange(e);
+                      setSuggestOpen(true);
+                    }}
+                    onFocus={() => setSuggestOpen(true)}
+                    onBlur={() => {
+                      field.onBlur();
+                      setTimeout(() => setSuggestOpen(false), 150);
+                    }}
+                    onKeyDown={onPhoneKeyDown}
+                  />
+                </FormControl>
+                {showSuggest ? (
+                  <ul
+                    id="customer-phone-suggest"
+                    role="listbox"
+                    aria-label="Khách có SĐT khớp"
+                    className="absolute left-0 top-full z-30 mt-1 max-h-72 w-full overflow-y-auto sm:w-80 rounded-md border bg-popover p-1 shadow-md"
+                  >
+                    {suggestions.map((c, i) => (
+                      <li
+                        key={c.id}
+                        role="option"
+                        aria-selected={i === suggestActive}
+                        onMouseDown={(e) => e.preventDefault()}
+                        onMouseEnter={() => setSuggestActive(i)}
+                        onClick={() => pickSuggestion(c)}
+                        className={cn(
+                          'cursor-pointer rounded px-2 py-1.5 text-sm',
+                          i === suggestActive && 'bg-accent',
+                        )}
+                      >
+                        <span className="block truncate font-medium">{c.name}</span>
+                        <span className="block truncate text-xs text-muted-foreground">
+                          <span className="font-mono tabular-nums">
+                            {normalizePhoneInput(c.phone ?? '')}
+                          </span>{' '}
+                          · {c.code}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                ) : null}
+              </div>
               <FormMessage />
             </FormItem>
           )}
@@ -717,8 +798,9 @@ export function ReceiverCard({ form }: { form: Form }) {
     form.setValue('province', a.province, { shouldDirty: true });
   };
 
-  // Khách vừa gắn vào đơn mà phần nhận hàng còn trống → điền sẵn địa chỉ mặc định của khách.
-  // Không có địa chỉ để chọn sẵn → điền ít nhất tên + SĐT khách làm người nhận.
+  // Khách vừa gắn vào đơn mà phần nhận hàng còn trống → điền sẵn địa chỉ của đơn mua gần nhất
+  // (2026-10-29), chưa có thì địa chỉ mặc định. Không có địa chỉ để chọn sẵn → điền ít nhất tên +
+  // SĐT khách làm người nhận.
   useEffect(() => {
     if (!brief.data) {
       if (!customerId) filledFor.current = '';
@@ -729,7 +811,9 @@ export function ReceiverCard({ form }: { form: Form }) {
     const typed = ADDRESS_FIELDS.some((k) => form.getValues(k) !== '');
     if (typed || form.getValues('addressId')) return;
     const preferred =
-      addresses.find((a) => a.isDefault) ?? (addresses.length === 1 ? addresses[0] : undefined);
+      addresses.find((a) => a.id === brief.data.lastOrderAddressId) ??
+      addresses.find((a) => a.isDefault) ??
+      (addresses.length === 1 ? addresses[0] : undefined);
     if (preferred) fill(preferred.id);
     else {
       form.setValue('recipient', brief.data.name, { shouldDirty: true });
@@ -904,15 +988,6 @@ function AddressSuggestions({
 }
 
 // ── Vận chuyển ─────────────────────────────────────────────
-
-function useDebounced<T>(v: T, ms: number): T {
-  const [d, setD] = useState(v);
-  useEffect(() => {
-    const t = setTimeout(() => setD(v), ms);
-    return () => clearTimeout(t);
-  }, [v, ms]);
-  return d;
-}
 
 export function ShippingCard({
   form,

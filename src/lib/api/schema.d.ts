@@ -9005,6 +9005,11 @@ export interface components {
             addresses: components["schemas"]["CustomerAddressDto"][];
             /** @description CRM-09 — khách đã bị gộp: khách đích để web chuyển hướng; null = chưa bị gộp. */
             mergedInto: components["schemas"]["CustomerMergeTargetDto"] | null;
+            /**
+             * @description Địa chỉ giao của đơn mua gần nhất (đơn chưa hủy) — màn Tạo đơn điền sẵn phần Nhận hàng bằng
+             *     địa chỉ này (2026-10-29). null = chưa có đơn gắn địa chỉ còn trên hồ sơ → dùng mặc định.
+             */
+            lastOrderAddressId: string | null;
         };
         CreateCustomerDto: {
             code: string;
@@ -14635,7 +14640,7 @@ export interface components {
             code: string;
             name: string;
             phone: string | null;
-            /** @description Địa chỉ mặc định (hoặc duy nhất) của khách; null = chưa có. */
+            /** @description Địa chỉ đơn mua gần nhất (2026-10-29), không có thì mặc định / duy nhất; null = chưa có. */
             address: components["schemas"]["CareLookupAddressDto"] | null;
         };
         CareLookupResultDto: {
