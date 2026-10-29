@@ -6860,6 +6860,11 @@ export interface components {
             warehouses: components["schemas"]["AuthWarehouseDto"][];
             /** @description Kho mặc định lúc đăng nhập; null = chưa được cấp kho nào. */
             defaultWarehouseId: string | null;
+            /**
+             * @description POS lên đơn mặc định (shop_id Pancake, chuỗi số — 2026-10-29): màn Tạo đơn tự điền ô POS; leader
+             *     / trưởng nhóm CSKH chọn cho nhân viên. null = không tự điền.
+             */
+            defaultPosShopId: string | null;
             /** @description Kho đang chọn theo header `X-Warehouse-Id` nếu được phép; null = tất cả kho / kho chọn không còn được phép. */
             selectedWarehouseId: string | null;
             deviceId?: string;
@@ -10307,6 +10312,11 @@ export interface components {
             grantedPermissions: string[];
             /** @description Người xem sửa được thông tin người này. */
             canEdit: boolean;
+            /**
+             * @description Người xem sửa được hồ sơ Pancake (fb_id + POS) của người này (2026-10-29): như `canEdit`, thêm
+             *     leader phòng (mọi nhân viên) và trưởng nhóm (nhóm mình, không cần được tick quyền).
+             */
+            canEditPancake: boolean;
             /** @description Người xem khóa / mở khóa được người này. */
             canLock: boolean;
             /** @description Người xem đổi chức vụ (nhân viên ↔ trưởng nhóm) / nhóm / cấp quyền trưởng nhóm được. */
@@ -15693,6 +15703,8 @@ export interface components {
             userId: string;
             fbId: string | null;
             pancakeName: string | null;
+            /** @description POS lên đơn mặc định (shop_id, chuỗi số) — màn Tạo đơn tự điền; null = không tự điền. */
+            defaultPosShopId: string | null;
             /** @description Mọi POS đã kết nối + POS user đang gắn (kể cả đã gỡ kết nối). */
             shops: components["schemas"]["PancakeProfileShopDto"][];
             /**
@@ -15710,6 +15722,11 @@ export interface components {
             fbId: string | null;
             /** @description Tên hiển thị trên Pancake (vd "Thanh Vân Sale - NLPN"). */
             pancakeName?: string | null;
+            /**
+             * @description POS lên đơn mặc định (shop_id Pancake, 2026-10-29) — màn Tạo đơn tự điền. Không phụ thuộc fb_id /
+             *     POS làm việc. null = bỏ; bỏ trống = giữ nguyên.
+             */
+            defaultPosShopId?: string | null;
             /** @description POS (shop_id Pancake, chuỗi số) user làm việc. Rỗng = không làm việc trên POS nào. */
             shopIds: string[];
         };
@@ -15717,6 +15734,8 @@ export interface components {
             userId: string;
             fbId: string | null;
             pancakeName: string | null;
+            /** @description POS lên đơn mặc định (shop_id, chuỗi số) — màn Tạo đơn tự điền; null = không tự điền. */
+            defaultPosShopId: string | null;
             /** @description Mọi POS đã kết nối + POS user đang gắn (kể cả đã gỡ kết nối). */
             shops: components["schemas"]["PancakeProfileShopDto"][];
             /**

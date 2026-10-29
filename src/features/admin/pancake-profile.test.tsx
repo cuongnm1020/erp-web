@@ -37,6 +37,7 @@ const ME_ADMIN = {
   warehouseIds: null,
   warehouses: [],
   defaultWarehouseId: null,
+  defaultPosShopId: null,
   selectedWarehouseId: null,
   mustChangePassword: false,
 };
@@ -99,6 +100,7 @@ describe('Hồ sơ Pancake — chi tiết nhân viên', () => {
       fbId: '154057992263134',
       pancakeName: 'Thanh Vân Sale - NLPN',
       shopIds: ['407957969'],
+      defaultPosShopId: null,
     });
     await waitFor(() => expect(toastSuccess).toHaveBeenCalledWith('Đã lưu thay đổi'));
     expect(toastSuccess).toHaveBeenCalledWith(
@@ -182,6 +184,11 @@ describe('Hồ sơ Pancake — Tài khoản của tôi', () => {
     fireEvent.click(s.getByRole('checkbox', { name: 'POS Real Agri' }));
     fireEvent.click(s.getByRole('button', { name: 'Lưu thay đổi' }));
     await waitFor(() => expect(puts).toHaveLength(1));
-    expect(puts[0]).toEqual({ fbId: '42', pancakeName: null, shopIds: ['715130909'] });
+    expect(puts[0]).toEqual({
+      fbId: '42',
+      pancakeName: null,
+      shopIds: ['715130909'],
+      defaultPosShopId: null,
+    });
   });
 });

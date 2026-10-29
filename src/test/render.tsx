@@ -40,6 +40,7 @@ export function renderApp(ui: ReactElement, opts: AppRenderOptions = {}) {
         warehouseIds: opts.warehouses.map((w) => w.id),
         warehouses: opts.warehouses,
         defaultWarehouseId: opts.warehouses[0]?.id ?? null,
+        defaultPosShopId: null,
         selectedWarehouseId: null,
       }
     : undefined;

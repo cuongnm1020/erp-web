@@ -25,6 +25,7 @@ const ME = {
     { id: 'wh-la', code: 'KHO-LA-01', name: 'Kho Long An' },
   ],
   defaultWarehouseId: 'wh-tt',
+  defaultPosShopId: null,
   selectedWarehouseId: null,
   mustChangePassword: false,
 };

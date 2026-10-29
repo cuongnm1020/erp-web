@@ -920,6 +920,7 @@ describe('OrderListScreen — sao chép SĐT / mã vận đơn, cột kho (2026-
           warehouseIds: null,
           warehouses: [{ id: 'wh-tt', code: 'KHO-TT-01', name: 'Kho Thạch Thất' }],
           defaultWarehouseId: 'wh-tt',
+          defaultPosShopId: null,
           selectedWarehouseId: null,
         }}
       >

@@ -1065,6 +1065,7 @@ describe('OrderCreateScreen — màn tạo đơn mới', () => {
             { id: 'wh-la', code: 'KHO-LA-01', name: 'Kho Long An' },
           ],
           defaultWarehouseId: 'wh-la',
+          defaultPosShopId: null,
           selectedWarehouseId: null,
         }}
       >
@@ -1135,6 +1136,7 @@ describe('OrderCreateScreen — màn tạo đơn mới', () => {
             { id: 'wh-la', code: 'KHO-LA-01', name: 'Kho Long An' },
           ],
           defaultWarehouseId: 'wh-la',
+          defaultPosShopId: null,
           selectedWarehouseId: null,
         }}
       >

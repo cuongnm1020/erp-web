@@ -29,6 +29,7 @@ const staff = (id: string, over: Record<string, unknown> = {}) => ({
   createdById: null,
   canManage: true,
   canEdit: true,
+  canEditPancake: true,
   canLock: true,
   canLead: true,
   createdAt: '2026-10-21T01:00:00.000Z',
@@ -115,6 +116,25 @@ describe('CareStaffScreen — Nhân viên của team (trưởng nhóm CSKH, 2026
     fireEvent.click(await screen.findByRole('button', { name: 'Khóa' }));
     await waitFor(() => expect(patches).toEqual([{ id: 'a', body: { isActive: false } }]));
     expect(toastSuccess).toHaveBeenCalledWith('Đã khóa', { description: 'cs.a · Nhân viên a' });
+  });
+
+  it('trưởng nhóm chưa được tick sửa nhân viên (canEdit=false, canEditPancake) → Sửa mở hộp chỉ Hồ sơ Pancake', async () => {
+    server.use(
+      http.get('/api/org/care-staff', () =>
+        HttpResponse.json({
+          ...LIST,
+          staff: [staff('a', { canEdit: false, canLock: false, canLead: false })],
+          viewer: { position: 'GROUP_LEAD', canAdd: false, canSetManager: false },
+        }),
+      ),
+    );
+    renderApp(<CareStaffScreen />, { me: ME_CSKH_LEAD });
+    const rowA = (await screen.findByText('Nhân viên a')).closest('tr')!;
+    fireEvent.click(within(rowA).getByRole('button', { name: 'Sửa cs.a' }));
+    expect(await screen.findByText('Hồ sơ Pancake cs.a')).toBeInTheDocument();
+    expect(screen.queryByLabelText('Họ tên')).toBeNull();
+    expect(await screen.findByLabelText('Facebook ID trên Pancake')).toBeEnabled();
+    expect(screen.getByRole('combobox', { name: 'POS lên đơn' })).toBeInTheDocument();
   });
 
   it('"Thêm nhân viên" mở hộp tạo tài khoản đã gắn sẵn phòng CSKH', async () => {

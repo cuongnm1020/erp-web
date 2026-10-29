@@ -241,7 +241,7 @@ export function CareStaffScreen() {
                   <ShieldCheck aria-hidden /> Phân quyền
                 </Button>
               ) : null}
-              {r.canEdit ? (
+              {r.canEdit || r.canEditPancake ? (
                 <Button
                   variant="ghost"
                   size="sm"
@@ -444,10 +444,11 @@ export function CareStaffScreen() {
           employee={editing}
           departments={departments.map((d) => ({ id: d.id, name: d.name, path: '' }))}
           allowUnassign={false}
-          roles={editing.roles}
+          roles={editing.canEdit ? editing.roles : undefined}
+          pancakeOnly={!editing.canEdit}
           onOpenChange={(o) => !o && setEditing(null)}
           care={
-            editing.canLead
+            editing.canEdit && editing.canLead
               ? {
                   position: editing.position,
                   groupLeaderId: editing.groupLeaderId,

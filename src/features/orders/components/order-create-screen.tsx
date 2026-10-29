@@ -11,7 +11,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { toast } from '@/components/ui/toaster';
 import { cn } from '@/lib/cn';
 import { useWarehouse } from '@/lib/warehouse';
-import { useUploadOrderAttachment } from '../api/use-order-create';
+import { useDefaultPosShopId, useUploadOrderAttachment } from '../api/use-order-create';
 import { useOrder, type SalesOrderDetail } from '../api/use-orders';
 import { collapseComboLines } from '../combo-lines';
 import { emptyOrderValues, type CreateOrderValues } from '../schema';
@@ -97,7 +97,8 @@ export function OrderCreateScreen() {
   const presetCustomerId = search.get('customerId') ?? '';
   // Kho đang làm việc (ô chọn kho ở sidebar); "Tất cả kho" → kho mặc định của tài khoản.
   const { formWarehouseId: defaultWh } = useWarehouse();
-  const drafts = useOrderDrafts(defaultWh);
+  const defaultPos = useDefaultPosShopId();
+  const drafts = useOrderDrafts(defaultWh, defaultPos);
   const { openDraft, closeDraft, activate, updateValues } = drafts;
   const source = useOrder(fromId);
   const upload = useUploadOrderAttachment();
@@ -115,13 +116,13 @@ export function OrderCreateScreen() {
     } else if (presetCustomerId) {
       seeded.current = true;
       openDraft(
-        { ...emptyOrderValues(defaultWh), customerId: presetCustomerId },
+        { ...emptyOrderValues(defaultWh, defaultPos), customerId: presetCustomerId },
         `customer:${presetCustomerId}`,
       );
     } else {
       seeded.current = true;
     }
-  }, [drafts.ready, fromId, presetCustomerId, source.data, defaultWh, openDraft]);
+  }, [drafts.ready, fromId, presetCustomerId, source.data, defaultWh, defaultPos, openDraft]);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {

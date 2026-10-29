@@ -61,14 +61,17 @@ function save(state: DraftState) {
   }
 }
 
-export function useOrderDrafts(defaultWarehouseId: string) {
+export function useOrderDrafts(defaultWarehouseId: string, defaultPosShopId = '') {
   const [state, setState] = useState<DraftState>(() => {
-    const first = makeDraft(1, emptyOrderValues(defaultWarehouseId));
+    const first = makeDraft(1, emptyOrderValues(defaultWarehouseId, defaultPosShopId));
     return { drafts: [first], activeId: first.id };
   });
   const [ready, setReady] = useState(false);
   const defaultWh = useRef(defaultWarehouseId);
   defaultWh.current = defaultWarehouseId;
+  // POS lên đơn mặc định của tài khoản (2026-10-29) — tab nháp mới tự điền.
+  const defaultPos = useRef(defaultPosShopId);
+  defaultPos.current = defaultPosShopId;
 
   // Đọc storage SAU khi mount — render server và lần render đầu ở client phải giống nhau.
   useEffect(() => {
@@ -90,7 +93,11 @@ export function useOrderDrafts(defaultWarehouseId: string) {
       if (existing) return { ...s, activeId: existing.id };
       // Quá số tab: bỏ tab cũ nhất (đầu danh sách) để không phình storage.
       const kept = s.drafts.length >= MAX_DRAFTS ? s.drafts.slice(1) : s.drafts;
-      const d = makeDraft(nextNo(s.drafts), values ?? emptyOrderValues(defaultWh.current), origin);
+      const d = makeDraft(
+        nextNo(s.drafts),
+        values ?? emptyOrderValues(defaultWh.current, defaultPos.current),
+        origin,
+      );
       return { drafts: [...kept, d], activeId: d.id };
     });
   }, []);
@@ -102,7 +109,7 @@ export function useOrderDrafts(defaultWarehouseId: string) {
       if (idx < 0) return s;
       const rest = s.drafts.filter((d) => d.id !== id);
       if (rest.length === 0) {
-        const d = makeDraft(1, emptyOrderValues(defaultWh.current));
+        const d = makeDraft(1, emptyOrderValues(defaultWh.current, defaultPos.current));
         return { drafts: [d], activeId: d.id };
       }
       const activeId = s.activeId === id ? rest[Math.min(idx, rest.length - 1)]!.id : s.activeId;

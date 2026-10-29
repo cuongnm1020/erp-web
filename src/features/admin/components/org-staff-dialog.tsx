@@ -85,8 +85,14 @@ export function OrgStaffDialog({
   onOpenChange,
   care,
   roles,
+  pancakeOnly = false,
 }: {
   employee: OrgEmployee;
+  /**
+   * Chỉ hồ sơ Pancake (fb_id + POS) — trưởng nhóm CSKH chưa được tick quyền sửa nhân viên vẫn khai
+   * fb_id / POS cho nhóm mình (2026-10-29).
+   */
+  pancakeOnly?: boolean;
   /**
    * Vai trò hiện tại — có = hiện mục Vai trò (2026-10-29: trưởng phòng đổi vai trò nhân viên).
    * Tick được vai trò người sửa cấp được (GET /roles/assignable); vai trò ngoài tầm hiện khóa.
@@ -180,174 +186,182 @@ export function OrgStaffDialog({
     <Dialog open onOpenChange={(o) => !busy && onOpenChange(o)}>
       <DialogContent wide>
         <DialogHeader>
-          <DialogTitle>Sửa nhân sự {employee.code}</DialogTitle>
+          <DialogTitle>
+            {pancakeOnly ? 'Hồ sơ Pancake' : 'Sửa nhân sự'} {employee.code}
+          </DialogTitle>
           <DialogDescription>
-            Mã nhân viên không đổi được. Để trống mật khẩu nếu không đặt lại.
+            {pancakeOnly
+              ? `${employee.fullName} — Facebook ID, POS làm việc và POS lên đơn.`
+              : 'Mã nhân viên không đổi được. Để trống mật khẩu nếu không đặt lại.'}
           </DialogDescription>
         </DialogHeader>
-        <Form {...form}>
-          <form onSubmit={onSubmit} noValidate className="space-y-3">
-            {rootError ? (
-              <p role="alert" className="text-sm text-destructive">
-                {rootError}
-              </p>
-            ) : null}
-            <FormField
-              control={form.control}
-              name="fullName"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel required>Họ tên</FormLabel>
-                  <FormControl>
-                    <Input {...field} autoFocus />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            <FormField
-              control={form.control}
-              name="email"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel required>Email</FormLabel>
-                  <FormControl>
-                    <Input {...field} type="email" />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            <FormField
-              control={form.control}
-              name="departmentId"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Phòng ban</FormLabel>
-                  <Select
-                    value={field.value || NONE}
-                    onValueChange={(v) => field.onChange(v === NONE ? '' : v)}
-                  >
+        {pancakeOnly ? null : (
+          <Form {...form}>
+            <form onSubmit={onSubmit} noValidate className="space-y-3">
+              {rootError ? (
+                <p role="alert" className="text-sm text-destructive">
+                  {rootError}
+                </p>
+              ) : null}
+              <FormField
+                control={form.control}
+                name="fullName"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel required>Họ tên</FormLabel>
                     <FormControl>
-                      <SelectTrigger aria-label="Phòng ban">
-                        <SelectValue />
-                      </SelectTrigger>
+                      <Input {...field} autoFocus />
                     </FormControl>
-                    <SelectContent>
-                      {allowUnassign || !current ? (
-                        <SelectItem value={NONE}>— Không thuộc phòng ban —</SelectItem>
-                      ) : null}
-                      {options.map((d) => (
-                        <SelectItem key={d.id} value={d.id}>
-                          {d.path ? `${d.path} › ${d.name}` : d.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            {roles !== undefined && roleOptions.length > 0 ? (
-              <fieldset className="space-y-1.5">
-                <legend className="text-sm font-medium">Vai trò</legend>
-                <div className="grid grid-cols-2 gap-1.5">
-                  {roleOptions.map((r) => (
-                    <label key={r.code} className="flex items-center gap-2 text-sm">
-                      <Checkbox
-                        checked={roleCodes.includes(r.code)}
-                        disabled={busy || !canAssign(r.code)}
-                        onCheckedChange={(v) =>
-                          setRoleCodes((cur) =>
-                            v === true ? [...cur, r.code] : cur.filter((c) => c !== r.code),
-                          )
-                        }
-                        aria-label={r.name}
-                      />
-                      {r.name}
-                    </label>
-                  ))}
-                </div>
-                {roleOptions.some((r) => !canAssign(r.code)) ? (
-                  <p className="text-xs text-muted-foreground">
-                    Vai trò bị khóa nằm ngoài quyền của bạn — chỉ quản trị đổi được.
-                  </p>
-                ) : null}
-              </fieldset>
-            ) : null}
-            {care ? (
-              <div className="grid gap-3 sm:grid-cols-2">
-                <div className="space-y-1.5">
-                  <Label htmlFor="care-position">Chức vụ</Label>
-                  <Select
-                    value={position}
-                    onValueChange={(v) => setPositionValue(v as CarePosition)}
-                    disabled={busy || (care.position === 'MANAGER' && !care.canSetManager)}
-                  >
-                    <SelectTrigger id="care-position">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {(['MEMBER', 'GROUP_LEAD', 'MANAGER'] as const)
-                        .filter((p) => p !== 'MANAGER' || care.canSetManager || care.position === p)
-                        .map((p) => (
-                          <SelectItem key={p} value={p}>
-                            {POSITION_LABEL[p]}
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="email"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel required>Email</FormLabel>
+                    <FormControl>
+                      <Input {...field} type="email" />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="departmentId"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Phòng ban</FormLabel>
+                    <Select
+                      value={field.value || NONE}
+                      onValueChange={(v) => field.onChange(v === NONE ? '' : v)}
+                    >
+                      <FormControl>
+                        <SelectTrigger aria-label="Phòng ban">
+                          <SelectValue />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {allowUnassign || !current ? (
+                          <SelectItem value={NONE}>— Không thuộc phòng ban —</SelectItem>
+                        ) : null}
+                        {options.map((d) => (
+                          <SelectItem key={d.id} value={d.id}>
+                            {d.path ? `${d.path} › ${d.name}` : d.name}
                           </SelectItem>
                         ))}
-                    </SelectContent>
-                  </Select>
-                  <p className="text-xs text-muted-foreground">
-                    {care.canSetManager
-                      ? 'Đổi chức vụ thay vai trò CSKH của người này.'
-                      : 'Chỉ quản trị đặt / bỏ leader.'}
-                  </p>
-                </div>
-                {position === 'MEMBER' ? (
-                  <div className="space-y-1.5">
-                    <Label htmlFor="care-group">Trưởng nhóm</Label>
-                    <StaffSelect
-                      id="care-group"
-                      aria-label="Trưởng nhóm"
-                      value={groupLeaderId}
-                      onChange={setGroupLeaderId}
-                      staff={care.groupLeads}
-                      noneLabel="— Chưa có nhóm —"
-                      disabled={busy}
-                    />
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              {roles !== undefined && roleOptions.length > 0 ? (
+                <fieldset className="space-y-1.5">
+                  <legend className="text-sm font-medium">Vai trò</legend>
+                  <div className="grid grid-cols-2 gap-1.5">
+                    {roleOptions.map((r) => (
+                      <label key={r.code} className="flex items-center gap-2 text-sm">
+                        <Checkbox
+                          checked={roleCodes.includes(r.code)}
+                          disabled={busy || !canAssign(r.code)}
+                          onCheckedChange={(v) =>
+                            setRoleCodes((cur) =>
+                              v === true ? [...cur, r.code] : cur.filter((c) => c !== r.code),
+                            )
+                          }
+                          aria-label={r.name}
+                        />
+                        {r.name}
+                      </label>
+                    ))}
                   </div>
-                ) : null}
-              </div>
-            ) : null}
-            <FormField
-              control={form.control}
-              name="password"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Mật khẩu mới</FormLabel>
-                  <FormControl>
-                    <PasswordInput {...field} autoComplete="new-password" />
-                  </FormControl>
-                  <FormDescription>Tối thiểu 8 ký tự; để trống = giữ nguyên</FormDescription>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            <DialogFooter>
-              <Button
-                type="button"
-                variant="outline"
-                disabled={busy}
-                onClick={() => onOpenChange(false)}
-              >
-                Hủy bỏ
-              </Button>
-              <Button type="submit" loading={busy}>
-                Lưu thay đổi
-              </Button>
-            </DialogFooter>
-          </form>
-        </Form>
+                  {roleOptions.some((r) => !canAssign(r.code)) ? (
+                    <p className="text-xs text-muted-foreground">
+                      Vai trò bị khóa nằm ngoài quyền của bạn — chỉ quản trị đổi được.
+                    </p>
+                  ) : null}
+                </fieldset>
+              ) : null}
+              {care ? (
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <div className="space-y-1.5">
+                    <Label htmlFor="care-position">Chức vụ</Label>
+                    <Select
+                      value={position}
+                      onValueChange={(v) => setPositionValue(v as CarePosition)}
+                      disabled={busy || (care.position === 'MANAGER' && !care.canSetManager)}
+                    >
+                      <SelectTrigger id="care-position">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {(['MEMBER', 'GROUP_LEAD', 'MANAGER'] as const)
+                          .filter(
+                            (p) => p !== 'MANAGER' || care.canSetManager || care.position === p,
+                          )
+                          .map((p) => (
+                            <SelectItem key={p} value={p}>
+                              {POSITION_LABEL[p]}
+                            </SelectItem>
+                          ))}
+                      </SelectContent>
+                    </Select>
+                    <p className="text-xs text-muted-foreground">
+                      {care.canSetManager
+                        ? 'Đổi chức vụ thay vai trò CSKH của người này.'
+                        : 'Chỉ quản trị đặt / bỏ leader.'}
+                    </p>
+                  </div>
+                  {position === 'MEMBER' ? (
+                    <div className="space-y-1.5">
+                      <Label htmlFor="care-group">Trưởng nhóm</Label>
+                      <StaffSelect
+                        id="care-group"
+                        aria-label="Trưởng nhóm"
+                        value={groupLeaderId}
+                        onChange={setGroupLeaderId}
+                        staff={care.groupLeads}
+                        noneLabel="— Chưa có nhóm —"
+                        disabled={busy}
+                      />
+                    </div>
+                  ) : null}
+                </div>
+              ) : null}
+              <FormField
+                control={form.control}
+                name="password"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Mật khẩu mới</FormLabel>
+                    <FormControl>
+                      <PasswordInput {...field} autoComplete="new-password" />
+                    </FormControl>
+                    <FormDescription>Tối thiểu 8 ký tự; để trống = giữ nguyên</FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <DialogFooter>
+                <Button
+                  type="button"
+                  variant="outline"
+                  disabled={busy}
+                  onClick={() => onOpenChange(false)}
+                >
+                  Hủy bỏ
+                </Button>
+                <Button type="submit" loading={busy}>
+                  Lưu thay đổi
+                </Button>
+              </DialogFooter>
+            </form>
+          </Form>
+        )}
         <PancakeProfileSection query={pancakeProfile} mutation={updatePancakeProfile} canEdit />
       </DialogContent>
     </Dialog>
