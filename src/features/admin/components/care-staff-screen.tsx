@@ -444,6 +444,7 @@ export function CareStaffScreen() {
           employee={editing}
           departments={departments.map((d) => ({ id: d.id, name: d.name, path: '' }))}
           allowUnassign={false}
+          roles={editing.roles}
           onOpenChange={(o) => !o && setEditing(null)}
           care={
             editing.canLead

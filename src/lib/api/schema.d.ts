@@ -6986,6 +6986,12 @@ export interface components {
             isActive?: boolean;
             /** @description Admin đặt lại mật khẩu. */
             password?: string;
+            /**
+             * @description Thay vai trò (2026-10-29: trưởng phòng đổi vai trò nhân viên ngay ở popup Sửa nhân sự). Chỉ
+             *     thêm / bỏ được vai trò người sửa được cấp; vai trò CSKH (trưởng phòng / trưởng nhóm / nhân
+             *     viên) đổi qua Chức vụ nên giữ nguyên dù có hay không trong danh sách.
+             */
+            roleCodes?: string[];
         };
         UserPermissionEntryDto: {
             code: string;

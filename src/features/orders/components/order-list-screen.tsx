@@ -32,7 +32,6 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuLabel,
-  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Input } from '@/components/ui/input';
@@ -1382,13 +1381,15 @@ export function OrderListScreen() {
   );
 }
 
-type BulkDialog = 'shipping' | 'reprint' | 'cancel' | null;
+type BulkDialog = 'shipping' | 'reprint' | null;
 
 /**
  * Thanh chọn nhiều (design system BulkActionBar, thay chỗ thanh lọc): tổng tiền / COD của các đơn
- * đã chọn; nút phụ Chuyển kho · Đóng gói + in vận đơn; "Khác" gom Gán hãng / cân nặng · In lại vận
- * đơn · Hủy đơn (cuối); nút chính "Gửi sang ĐVVC" ở mép phải. Hộp thoại mở từ "Khác" sống ngoài
- * menu (menu đóng là gỡ nội dung).
+ * đã chọn; nút phụ Hủy đơn · Chuyển kho · Đóng gói + in vận đơn; "Khác" gom Gán hãng / cân nặng ·
+ * In lại vận đơn; nút chính "Gửi sang ĐVVC" ở mép phải. Hộp thoại mở từ "Khác" sống ngoài menu
+ * (menu đóng là gỡ nội dung). Hủy đơn (2026-10-29) hiện cho cả người lên đơn — người lên đơn hủy
+ * đơn mình, trưởng phòng / trưởng nhóm CSKH hủy đơn nhân viên; server kiểm từng đơn, đơn không
+ * được hủy vào `failed`.
  */
 function OrderBulkBar({ rows, onClear }: { rows: SalesOrderListItem[]; onClear: () => void }) {
   const ability = useAbility();
@@ -1398,7 +1399,7 @@ function OrderBulkBar({ rows, onClear }: { rows: SalesOrderListItem[]; onClear: 
   const cod = rows.reduce((s, r) => s.plus(r.shipment?.codAmount ?? r.total), new Decimal(0));
   const canUpdate = ability.can('update', 'SalesOrder');
   const canReprint = ability.can('pack', 'Shipment');
-  const canCancel = ability.can('cancel', 'SalesOrder');
+  const canCancel = ability.can('cancel', 'SalesOrder') || ability.can('create', 'SalesOrder');
 
   return (
     <div className="mb-3">
@@ -1416,13 +1417,14 @@ function OrderBulkBar({ rows, onClear }: { rows: SalesOrderListItem[]; onClear: 
         }
       >
         <span className="ml-auto" />
+        {canCancel ? <BulkCancelDialog rows={rows} onDone={onClear} /> : null}
         <Can I="update" a="SalesOrder">
           <BulkMoveWarehouseDialog rows={rows} onDone={onClear} />
         </Can>
         <Can I="fulfil_manual" a="SalesOrder">
           <BulkFulfilPrintDialog rows={rows} onDone={onClear} />
         </Can>
-        {canUpdate || canReprint || canCancel ? (
+        {canUpdate || canReprint ? (
           <DropdownMenu modal={false}>
             <DropdownMenuTrigger asChild>
               <Button variant="outline" size="sm">
@@ -1440,15 +1442,6 @@ function OrderBulkBar({ rows, onClear }: { rows: SalesOrderListItem[]; onClear: 
                 <DropdownMenuItem onSelect={() => setDialog('reprint')}>
                   In lại vận đơn
                 </DropdownMenuItem>
-              ) : null}
-              {canCancel ? (
-                <>
-                  {canUpdate || canReprint ? <DropdownMenuSeparator /> : null}
-                  <DropdownMenuItem danger onSelect={() => setDialog('cancel')}>
-                    <X aria-hidden />
-                    Hủy đơn…
-                  </DropdownMenuItem>
-                </>
               ) : null}
             </DropdownMenuContent>
           </DropdownMenu>
@@ -1470,14 +1463,6 @@ function OrderBulkBar({ rows, onClear }: { rows: SalesOrderListItem[]; onClear: 
           rows={rows}
           open={dialog === 'reprint'}
           onOpenChange={openChange('reprint')}
-        />
-      ) : null}
-      {canCancel ? (
-        <BulkCancelDialog
-          rows={rows}
-          onDone={onClear}
-          open={dialog === 'cancel'}
-          onOpenChange={openChange('cancel')}
         />
       ) : null}
     </div>

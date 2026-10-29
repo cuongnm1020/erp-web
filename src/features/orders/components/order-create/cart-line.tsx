@@ -120,13 +120,8 @@ export function CartLine({
     onMetrics(fieldId, { total: lineTotal, weightKg });
   }, [fieldId, lineTotal, weightKg, onMetrics]);
 
-  // Giá sửa tay dưới trần CK của bảng giá → server đưa đơn vào duyệt; báo ngay lúc gõ.
-  const floor =
-    listPrice !== null
-      ? new Decimal(listPrice).mul(new Decimal(1).minus(price.data?.maxDiscount ?? 0))
-      : null;
-  const belowFloor =
-    manualPrice !== '' && floor !== null ? new Decimal(manualPrice).lessThan(floor) : false;
+  // Giá sửa tay thấp (kể cả 0, dưới trần CK) không còn vào duyệt — 2026-10-29 tắt quy tắc
+  // "Đơn giá dưới trần chiết khấu" phía server.
 
   // Chưa chọn khách: giữ giá sản phẩm đang hiện để chốt đúng giá sale thấy (schema.linePriceBody).
   useEffect(() => {
@@ -286,18 +281,12 @@ export function CartLine({
                 value={unitPrice ?? ''}
                 placeholder={price.isFetching ? '…' : 'Nhập giá'}
                 onChange={(v) => field.onChange(v === listPrice ? '' : v)}
-                className={belowFloor ? 'border-warning' : undefined}
               />
             </FormControl>
             <FormLabel className="sr-only">Đơn giá</FormLabel>
             {manualPrice !== '' && listPrice !== null ? (
               <p className="text-right text-xs text-muted-foreground">
                 Niêm yết {formatMoney(listPrice, { unit: '' })}
-              </p>
-            ) : null}
-            {belowFloor ? (
-              <p className="text-right text-xs font-medium text-warning">
-                Dưới trần chiết khấu — đơn cần duyệt
               </p>
             ) : null}
             <FormMessage />

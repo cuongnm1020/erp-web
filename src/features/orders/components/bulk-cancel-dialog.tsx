@@ -74,7 +74,7 @@ export function BulkCancelDialog({
         <Button
           size="sm"
           variant="outline"
-          className="h-7 border-destructive-line px-2 text-xs text-destructive hover:bg-destructive-weak hover:text-destructive"
+          className="border-destructive-line text-destructive hover:bg-destructive-weak hover:text-destructive"
           onClick={() => setOpen(true)}
         >
           <Ban aria-hidden />

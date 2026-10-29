@@ -742,7 +742,10 @@ function Detail({ order }: { order: SalesOrderDetail }) {
   const live = order.status !== 'CANCELLED';
   const canEdit = live && ability.can('update', 'SalesOrder');
   const canCreate = ability.can('create', 'SalesOrder');
-  const canCancel = live && ability.can('cancel', 'SalesOrder');
+  // Người lên đơn / trưởng phòng, trưởng nhóm CSKH hủy được không cần quyền hủy (2026-10-29) —
+  // server kiểm từng đơn, không được thì báo lỗi.
+  const canCancel =
+    live && (ability.can('cancel', 'SalesOrder') || ability.can('create', 'SalesOrder'));
   const canRecreate = canCancel && canCreate;
   const canReturn =
     RETURNABLE_FULFILMENT.has(order.fulfilment.status) && ability.can('receive', 'Stock');

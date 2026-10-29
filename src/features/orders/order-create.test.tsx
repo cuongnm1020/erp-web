@@ -480,16 +480,15 @@ describe('OrderCreateScreen — màn tạo đơn mới', () => {
     expect(screen.queryByLabelText('Chiết khấu %')).not.toBeInTheDocument();
     expect(screen.queryByText('chọn khách')).not.toBeInTheDocument();
 
-    // SL 2, gõ thành tiền 170.000 → đơn giá 85.000 (dưới trần 90.000 → cần duyệt).
+    // SL 2, gõ thành tiền 170.000 → đơn giá 85.000 (dưới trần 90.000 — 2026-10-29 không còn duyệt).
     fireEvent.change(screen.getByLabelText('Số lượng'), { target: { value: '2' } });
     const total = screen.getByLabelText('Thành tiền');
     fireEvent.focus(total);
     fireEvent.change(total, { target: { value: '170000' } });
     fireEvent.blur(total);
     await waitFor(() => expect(screen.getByLabelText('Đơn giá')).toHaveValue('85.000'));
-    // CI chậm: dòng cảnh báo render sau ô Đơn giá một nhịp → chờ thay vì getBy.
-    expect(await screen.findByText('Dưới trần chiết khấu — đơn cần duyệt')).toBeInTheDocument();
     expect(await screen.findByText(/Niêm yết 100\.000/)).toBeInTheDocument();
+    expect(screen.queryByText(/đơn cần duyệt/)).not.toBeInTheDocument();
 
     fireEvent.change(screen.getByLabelText('Số điện thoại khách'), {
       target: { value: '0912000111' },
