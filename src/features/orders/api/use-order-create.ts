@@ -66,7 +66,8 @@ export function useSkuQuickSearch(q: string, isCombo: boolean) {
     queryFn: () =>
       unwrap(
         api.GET('/skus', {
-          params: { query: { q, isCombo, status: 'active', take: 30, skip: 0 } },
+          // Chỉ sản phẩm / combo tạo trong ERP (2026-10-29): bỏ SKU đồng bộ Pancake tự sinh từ đơn.
+          params: { query: { q, isCombo, status: 'active', erpOnly: true, take: 30, skip: 0 } },
         }),
       ),
     enabled: q.trim() !== '',

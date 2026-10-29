@@ -1078,6 +1078,24 @@ describe('OrderCreateScreen — màn tạo đơn mới', () => {
     forgetWarehouseSelection(); // store kho là module-level — không để rò sang test sau
   });
 
+  it('ô tìm sản phẩm / combo chỉ xin hàng tạo trong ERP (erpOnly=true, 2026-10-29) — bỏ SKU đồng bộ Pancake tự sinh', async () => {
+    const urls: URL[] = [];
+    server.use(
+      http.get('/api/skus', ({ request }) => {
+        urls.push(new URL(request.url));
+        return HttpResponse.json({ items: [], total: 0 });
+      }),
+    );
+    renderApp(<OrderCreateScreen />);
+    const box = await screen.findByRole('combobox', { name: 'Tìm sản phẩm' });
+    fireEvent.change(box, { target: { value: 'amino' } });
+    await waitFor(() => expect(urls).toHaveLength(1));
+    fireEvent.click(screen.getByRole('tab', { name: 'Combo' }));
+    await waitFor(() => expect(urls).toHaveLength(2));
+    expect(urls.map((u) => u.searchParams.get('erpOnly'))).toEqual(['true', 'true']);
+    expect(urls.map((u) => u.searchParams.get('isCombo'))).toEqual(['false', 'true']);
+  });
+
   it('khả dụng trên dòng giỏ tính theo Kho xuất (2026-10-29): GET /stock kèm warehouseId; kho không có hàng → báo đỏ', async () => {
     const stockCalls: (string | null)[] = [];
     server.use(
