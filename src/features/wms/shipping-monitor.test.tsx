@@ -106,6 +106,31 @@ describe('ShippingMonitorScreen — đóng gói / bàn giao / hãng giữ + cả
     expect(screen.queryByRole('alert')).not.toBeInTheDocument();
   });
 
+  it('ô Phòng ban CSKH (2026-10-29): có danh sách → chọn ghi URL, careTeamId vào API; rỗng → ẩn', async () => {
+    const seen: string[] = [];
+    server.use(
+      http.get('/api/sales-orders/care-team-options', () =>
+        HttpResponse.json([{ teamId: 't-cskh-a', name: 'CSKH A', isActive: true }]),
+      ),
+      http.get('/api/shipment-monitor/summary', ({ request }) => {
+        seen.push(new URL(request.url).searchParams.get('careTeamId') ?? '');
+        return HttpResponse.json(makeMonitorSummary());
+      }),
+    );
+    search = 'careTeamId=t-cskh-a';
+    const { unmount } = renderApp(<ShippingMonitorScreen />);
+    const box = await screen.findByRole('combobox', { name: 'Phòng ban CSKH' });
+    expect(box).toHaveTextContent('CSKH A');
+    expect(seen).toContain('t-cskh-a');
+    unmount();
+
+    server.use(http.get('/api/sales-orders/care-team-options', () => HttpResponse.json([])));
+    search = '';
+    renderApp(<ShippingMonitorScreen />);
+    await screen.findByRole('button', { name: /Hãng đang giữ/ });
+    expect(screen.queryByRole('combobox', { name: 'Phòng ban CSKH' })).not.toBeInTheDocument();
+  });
+
   it('lỗi server → màn lỗi có nút thử lại', async () => {
     server.use(
       http.get('/api/shipment-monitor/summary', () =>

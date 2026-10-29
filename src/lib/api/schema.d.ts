@@ -3407,7 +3407,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Team CSKH (phòng ban loại CSKH) cho ô lọc danh sách đơn — khai TRƯỚC `:id`. */
+        /**
+         * Phòng ban CSKH cho ô lọc theo người xem: toàn quyền → mọi phòng, leader CSKH → phòng mình làm
+         *     leader, người khác → rỗng — khai TRƯỚC `:id`.
+         */
         get: operations["SalesOrderController_careTeamOptions"];
         put?: never;
         post?: never;
@@ -17116,6 +17119,11 @@ export interface operations {
                 carrierId?: string;
                 /** @description Phiếu do MỘT tài khoản hãng cấp vận đơn (wms.CarrierAccount.id, 2026-10-25). */
                 carrierAccountId?: string;
+                /**
+                 * @description Phiếu giao của đơn do MỘT phòng ban CSKH lên (team `DEPT-<mã>`, `SalesOrder.teamId`) — ô lọc
+                 *     "Phòng ban CSKH" (2026-10-29). Giao với phạm vi người xem, không nới.
+                 */
+                careTeamId?: string;
                 /** @description Hãng giữ quá N ngày kể từ lúc rời kho → cảnh báo. */
                 holdDays: number;
             };
@@ -17143,6 +17151,11 @@ export interface operations {
                 carrierId?: string;
                 /** @description Phiếu do MỘT tài khoản hãng cấp vận đơn (wms.CarrierAccount.id, 2026-10-25). */
                 carrierAccountId?: string;
+                /**
+                 * @description Phiếu giao của đơn do MỘT phòng ban CSKH lên (team `DEPT-<mã>`, `SalesOrder.teamId`) — ô lọc
+                 *     "Phòng ban CSKH" (2026-10-29). Giao với phạm vi người xem, không nới.
+                 */
+                careTeamId?: string;
                 /** @description Hãng giữ quá N ngày kể từ lúc rời kho → cảnh báo. */
                 holdDays: number;
                 /**

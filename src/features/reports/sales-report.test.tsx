@@ -263,6 +263,38 @@ describe('SalesReportScreen — quyền + bộ lọc chung', () => {
     expect(lastUrl().get('channel')).toBe('MARKETPLACE');
   });
 
+  it('leader CSKH: ô Phòng ban CSKH (danh sách API theo người xem) → teamId vào query; danh sách rỗng → ẩn ô (2026-10-29)', async () => {
+    search = `from=${RANGE.from}&to=${RANGE.to}&teamId=t-cskh-a`;
+    const calls: URLSearchParams[] = [];
+    server.use(
+      http.get('/api/sales-orders/care-team-options', () =>
+        HttpResponse.json([
+          { teamId: 't-cskh-a', name: 'CSKH A', isActive: true },
+          { teamId: 't-cskh-b', name: 'CSKH B', isActive: true },
+        ]),
+      ),
+      http.get('/api/reports/sales/summary', ({ request }) => {
+        calls.push(new URL(request.url).searchParams);
+        return HttpResponse.json(SUMMARY);
+      }),
+      http.get('/api/reports/sales/timeseries', () => HttpResponse.json(SERIES)),
+    );
+    const me = { ...ME_LEADER, permissions: [...ME_LEADER.permissions, 'sales_order.read'] };
+    const { unmount } = renderApp(<SalesReportScreen />, { me });
+    const box = await screen.findByRole('combobox', { name: 'Phòng ban CSKH' });
+    expect(box).toHaveTextContent('CSKH A');
+    expect(calls[0]!.get('teamId')).toBe('t-cskh-a');
+    // Phòng CSKH đang chọn không hiện thành chip "Team: đã chọn".
+    expect(screen.queryByRole('button', { name: /Bỏ lọc Team/ })).not.toBeInTheDocument();
+    unmount();
+
+    server.use(http.get('/api/sales-orders/care-team-options', () => HttpResponse.json([])));
+    search = `from=${RANGE.from}&to=${RANGE.to}`;
+    renderApp(<SalesReportScreen />, { me });
+    await screen.findByText('Doanh thu theo thời gian');
+    expect(screen.queryByRole('combobox', { name: 'Phòng ban CSKH' })).not.toBeInTheDocument();
+  });
+
   it('"Tính lại số liệu" chỉ cho report.sales_all: POST khoảng đang xem → toast', async () => {
     search = `from=${RANGE.from}&to=${RANGE.to}`;
     let body: unknown = null;

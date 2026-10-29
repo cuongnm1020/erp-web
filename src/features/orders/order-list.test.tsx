@@ -766,7 +766,7 @@ describe('OrderListScreen — lọc theo hãng + thời gian (2026-09-19)', () =
     expect(decodeURIComponent(String(replace.mock.calls.at(-1)![0]))).toContain('source=POS:111');
   });
 
-  it('ô Team CSKH liệt kê phòng ban CSKH → chọn → URL + API careTeamId (2026-10-24)', async () => {
+  it('ô Phòng ban CSKH liệt kê phòng API trả theo người xem → chọn → URL + API careTeamId (2026-10-29)', async () => {
     search = '';
     const seen: string[] = [];
     server.use(
@@ -782,7 +782,7 @@ describe('OrderListScreen — lọc theo hãng + thời gian (2026-09-19)', () =
       }),
     );
     renderApp(<OrderListScreen />);
-    fireEvent.click(await screen.findByRole('combobox', { name: 'Team CSKH' }));
+    fireEvent.click(await screen.findByRole('combobox', { name: 'Phòng ban CSKH' }));
     expect(
       await screen.findByRole('option', { name: 'CSKH B (ngừng hoạt động)' }),
     ).toBeInTheDocument();
@@ -794,6 +794,14 @@ describe('OrderListScreen — lọc theo hãng + thời gian (2026-09-19)', () =
     search = 'careTeamId=t-cskh-a';
     renderApp(<OrderListScreen />);
     await waitFor(() => expect(seen).toContain('t-cskh-a'));
+  });
+
+  it('API trả danh sách phòng rỗng (nhân viên CSKH / sale) → ẩn ô Phòng ban CSKH', async () => {
+    search = '';
+    server.use(http.get('/api/sales-orders/care-team-options', () => HttpResponse.json([])));
+    renderApp(<OrderListScreen />);
+    await screen.findByText(FIRST.docNumber);
+    expect(screen.queryByRole('combobox', { name: 'Phòng ban CSKH' })).not.toBeInTheDocument();
   });
 
   it('ô Page chọn nhiều có ô tìm → URL fbPage + API facebookPageIds; tên page hiện dưới tên sale (2026-10-26)', async () => {

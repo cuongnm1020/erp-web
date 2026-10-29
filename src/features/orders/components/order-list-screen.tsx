@@ -1241,16 +1241,22 @@ export function OrderListScreen() {
               unit: 'trạng thái',
               options: carrierStatusOptions(carrierStatuses.data ?? []),
             },
-            {
-              key: 'careTeamId',
-              label: 'Team CSKH',
-              type: 'select',
-              searchable: true,
-              options: (careTeams.data ?? []).map((t) => ({
-                value: t.teamId,
-                label: t.isActive ? t.name : `${t.name} (ngừng hoạt động)`,
-              })),
-            },
+            // Phòng ban CSKH (2026-10-29): API trả danh sách theo người xem — toàn quyền mọi phòng,
+            // leader CSKH phòng mình làm leader, người khác rỗng → ẩn ô.
+            ...((careTeams.data ?? []).length > 0
+              ? [
+                  {
+                    key: 'careTeamId' as const,
+                    label: 'Phòng ban CSKH',
+                    type: 'select' as const,
+                    searchable: true,
+                    options: (careTeams.data ?? []).map((t) => ({
+                      value: t.teamId,
+                      label: t.isActive ? t.name : `${t.name} (ngừng hoạt động)`,
+                    })),
+                  },
+                ]
+              : []),
             // Hiện hết bộ lọc, bỏ nút "Thêm lọc" (mockup 2026-10-29).
             ...(canCreate
               ? [
