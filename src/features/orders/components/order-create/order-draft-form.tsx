@@ -44,6 +44,7 @@ import { formatMoney } from '@/lib/format';
 import { useWarehouse } from '@/lib/warehouse';
 import { useSameDayOrders, type SkuQuickRow } from '../../api/use-order-create';
 import {
+  useCareTeamOptions,
   useCreateOrder,
   useFacebookPageSearch,
   usePancakeShops,
@@ -550,6 +551,9 @@ function PayRow({ label, children }: { label: string; children: ReactNode }) {
 }
 
 /** Nhãn `caption` trên một ô của dải "Thông tin đơn". */
+/** Giá trị "Phòng gốc của bạn" của ô Phòng ghi doanh thu (Radix Select không nhận value rỗng). */
+const HOME_CARE_TEAM = '__home__';
+
 function HeaderField({ label, children }: { label: string; children: ReactNode }) {
   return (
     <div className="flex min-w-0 flex-col gap-1">
@@ -593,6 +597,10 @@ function HeaderSelects({
   // POS tự điền từ page (không qua ô chọn) vẫn hiện tên, không hiện mã trần.
   const shops = usePancakeShops();
   const posLabel = shops.data?.find((s) => s.shopId === posShopId)?.shopName ?? undefined;
+  // Leader kiêm nhiệm (2026-10-29): thuộc từ 2 phòng CSKH → chọn phòng ghi doanh thu; mặc định
+  // (để trống) = phòng gốc. Một phòng / không phải CSKH → ẩn ô.
+  const careTeams = useCareTeamOptions();
+  const myCareTeams = (careTeams.data ?? []).filter((t) => t.mine);
   return (
     <div className="grid grid-cols-2 gap-x-2.5 gap-y-2 sm:grid-cols-4 xl:grid-cols-7">
       <HeaderField label="Kênh">
@@ -733,6 +741,37 @@ function HeaderSelects({
           )}
         />
       </HeaderField>
+      {myCareTeams.length > 1 ? (
+        <HeaderField label="Ghi doanh thu">
+          <FormField
+            control={form.control}
+            name="careTeamId"
+            render={({ field }) => (
+              <FormItem>
+                <Select
+                  value={field.value || HOME_CARE_TEAM}
+                  onValueChange={(v) => field.onChange(v === HOME_CARE_TEAM ? '' : v)}
+                >
+                  <FormControl>
+                    <SelectTrigger aria-label="Phòng ghi doanh thu">
+                      <SelectValue />
+                    </SelectTrigger>
+                  </FormControl>
+                  <SelectContent>
+                    <SelectItem value={HOME_CARE_TEAM}>Phòng gốc của bạn</SelectItem>
+                    {myCareTeams.map((t) => (
+                      <SelectItem key={t.teamId} value={t.teamId}>
+                        {t.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+        </HeaderField>
+      ) : null}
       <HeaderField label="NV xử lý">
         <StaffField
           form={form}

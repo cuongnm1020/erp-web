@@ -107,6 +107,8 @@ export const createOrderSchema = z
     posShopId: z.string().optional(),
     /** Page Facebook (core.FacebookPage.id) — độc lập với nguồn / POS, không bắt buộc. */
     facebookPageId: z.string().optional(),
+    /** Phòng CSKH ghi doanh thu (leader kiêm nhiệm, 2026-10-29); '' = phòng gốc. */
+    careTeamId: z.string().optional(),
     shippingFee: optionalMoney,
     freeShipping: z.boolean(),
     shipFeeOnReturnOnly: z.boolean(),
@@ -211,6 +213,7 @@ export function emptyOrderValues(warehouseId = '', posShopId = ''): CreateOrderV
     source: '',
     posShopId,
     facebookPageId: '',
+    careTeamId: '',
     shippingFee: '',
     freeShipping: false,
     shipFeeOnReturnOnly: false,
@@ -295,6 +298,7 @@ export function toCreateOrderBody(v: CreateOrderValues) {
     ...(v.source ? { source: v.source } : {}),
     ...(v.posShopId ? { posShopId: v.posShopId } : {}),
     ...(v.facebookPageId ? { facebookPageId: v.facebookPageId } : {}),
+    ...(v.careTeamId ? { careTeamId: v.careTeamId } : {}),
     ...(v.shippingFee && !v.freeShipping && !v.shipFeeOnReturnOnly
       ? { shippingFee: v.shippingFee }
       : {}),

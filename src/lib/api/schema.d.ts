@@ -10250,6 +10250,11 @@ export interface components {
              *     phòng khác = [managerId] (2026-10-24).
              */
             managerIds: string[];
+            /**
+             * @description Leader kiêm nhiệm (2026-10-29, chỉ phòng CSKH): leader CSKH phòng khác lead thêm phòng này mà
+             *     không đổi phòng — cũng có mặt trong `managerIds`.
+             */
+            concurrentLeaderIds: string[];
             /** @description Trưởng nhóm (chỉ phòng CSKH; phòng khác []). */
             groupLeadIds: string[];
             _count: components["schemas"]["DepartmentCountDto"];
@@ -10871,6 +10876,11 @@ export interface components {
             /** @description Tên phòng ban. */
             name: string;
             isActive: boolean;
+            /**
+             * @description Người xem đang thuộc phòng này (`careTeamIds`, gồm phòng kiêm nhiệm — 2026-10-29) → chọn được
+             *     làm `careTeamId` khi tạo đơn (phòng ghi doanh thu).
+             */
+            mine: boolean;
         };
         OrderCarrierStatusOptionDto: {
             /** @description Giá trị cho `carrierStatusText` của GET /sales-orders (nguyên văn chữ hãng). */
@@ -11661,6 +11671,12 @@ export interface components {
              *     không bắt buộc (2026-10-26).
              */
             facebookPageId?: string;
+            /**
+             * Format: uuid
+             * @description Phòng CSKH ghi doanh thu đơn (team `DEPT-<mã>`, 2026-10-29) — chỉ người thuộc nhiều phòng CSKH
+             *     (leader kiêm nhiệm) cần chọn; bỏ trống = phòng gốc. Phải là phòng mình thuộc (`careTeamIds`).
+             */
+            careTeamId?: string;
             /** @description Phụ thu, Decimal(18,4) chuỗi ≥ 0 — cộng vào tổng. */
             surcharge?: string;
             /** @description Khách chuyển khoản trước, Decimal(18,4) chuỗi — ≤ tổng đơn; COD = tổng − khoản này. */
