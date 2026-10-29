@@ -28,7 +28,7 @@ export const orderLineSchema = z.object({
     .or(z.literal('')),
   /**
    * Đơn giá sửa tay (2026-10-21) — string decimal ≥ 0; rỗng = theo bảng giá. Gửi API `unitPrice`
-   * (thắng CK%); giá dưới trần chiết khấu thì đơn vào duyệt.
+   * (thắng CK%). Giá thấp / 0 không còn vào duyệt (2026-10-29).
    */
   unitPrice: moneySchema
     .refine((v) => !v.startsWith('-'), 'Không được âm')
