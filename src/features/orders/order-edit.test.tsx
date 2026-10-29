@@ -663,3 +663,118 @@ describe('OrderEditScreen — Lỗi vận đơn + SĐT người nhận riêng ch
     expect(screen.queryByRole('button', { name: /xin lại vận đơn/i })).not.toBeInTheDocument();
   });
 });
+
+describe('OrderEditScreen — sửa sản phẩm / người nhận, quyền sửa, lịch sử (2026-10-29)', () => {
+  const withDetail = (patch: Record<string, unknown>) =>
+    server.use(
+      http.get('/api/sales-orders/:id', ({ params }) =>
+        HttpResponse.json({ ...makeOrderDetail(params.id as string)!, ...patch }),
+      ),
+    );
+
+  it('đơn người khác (canEdit=false) → banner, ô ghi chú khóa, nút Sửa người nhận ẩn', async () => {
+    withDetail({ canEdit: false, linesLockedReason: 'Chỉ người tạo đơn được sửa' });
+    renderApp(<OrderEditScreen orderId={ORDER.id} />);
+    expect(await screen.findByText(/Đơn của người khác/)).toBeInTheDocument();
+    expect(screen.getByLabelText('Ghi chú nội bộ')).toBeDisabled();
+    expect(screen.queryByRole('button', { name: /Sửa người nhận/ })).not.toBeInTheDocument();
+  });
+
+  it('Sửa người nhận → PATCH gửi address (tên, SĐT chuẩn hoá, địa chỉ), không gửi addressId', async () => {
+    push.mockClear();
+    const calls: Array<Record<string, unknown>> = [];
+    server.use(
+      http.patch('/api/sales-orders/:id', async ({ params, request }) => {
+        const body = (await request.json()) as Record<string, unknown>;
+        calls.push(body);
+        return HttpResponse.json({
+          orderId: params.id,
+          docNumber: ORDER.docNumber,
+          status: ORDER.status,
+          carrierId: null,
+          changed: ['addressId'],
+        });
+      }),
+    );
+    renderApp(<OrderEditScreen orderId={ORDER.id} />);
+    fireEvent.click(await screen.findByRole('button', { name: /Sửa người nhận/ }));
+    const set = (label: string, value: string) =>
+      fireEvent.change(screen.getByLabelText(label), { target: { value } });
+    set('Tên người nhận', 'Chị Mai');
+    set('SĐT', '0912 345 678');
+    set('Địa chỉ (số nhà, đường, thôn)', '12 Lê Lợi');
+    set('Phường / xã', '');
+    set('Quận / huyện', '');
+    set('Tỉnh / thành', 'Hà Nội');
+    fireEvent.click(screen.getByRole('button', { name: /Lưu thay đổi/ }));
+    await waitFor(() =>
+      expect(calls).toEqual([
+        {
+          address: {
+            recipient: 'Chị Mai',
+            phone: '0912345678',
+            line1: '12 Lê Lợi',
+            province: 'Hà Nội',
+          },
+        },
+      ]),
+    );
+  });
+
+  it('lịch sử sửa đơn: người sửa, giờ, từng thay đổi cũ → mới', async () => {
+    server.use(
+      http.get('/api/sales-orders/:id/edit-history', () =>
+        HttpResponse.json([
+          {
+            id: 'log-1',
+            at: '2026-10-29T03:00:00.000Z',
+            userId: 'u1',
+            userName: 'Nguyễn Thị Thu Hương',
+            changes: [
+              { field: 'lines', label: 'Thêm sản phẩm', from: null, to: 'SP-0112 ×2' },
+              { field: 'total', label: 'Tổng tiền', from: '295.000', to: '595.000' },
+            ],
+          },
+        ]),
+      ),
+    );
+    renderApp(<OrderEditScreen orderId={ORDER.id} />);
+    expect(
+      await screen.findByRole('heading', { level: 2, name: 'Lịch sử sửa đơn' }),
+    ).toBeInTheDocument();
+    expect(await screen.findByText('Nguyễn Thị Thu Hương')).toBeInTheDocument();
+    expect(screen.getByText('SP-0112 ×2')).toBeInTheDocument();
+    expect(screen.getByText('295.000')).toBeInTheDocument();
+  });
+
+  it('giỏ sửa được: tăng SL dòng đầu → PUT /lines (giữ đơn giá cũ) rồi về chi tiết', async () => {
+    push.mockClear();
+    withDetail({ linesLockedReason: null });
+    const puts: Array<Record<string, unknown>> = [];
+    server.use(
+      http.put('/api/sales-orders/:id/lines', async ({ params, request }) => {
+        puts.push((await request.json()) as Record<string, unknown>);
+        return HttpResponse.json({
+          orderId: params.id,
+          docNumber: ORDER.docNumber,
+          subtotal: '0.0000',
+          discount: '0.0000',
+          total: '100000.0000',
+          awaitingStock: false,
+          pick: 'replanned',
+        });
+      }),
+    );
+    renderApp(<OrderEditScreen orderId={ORDER.id} />);
+    await screen.findByRole('heading', { level: 1 });
+    fireEvent.click((await screen.findAllByRole('button', { name: 'Tăng số lượng' }))[0]!);
+    expect(screen.getAllByText(/thay đổi chưa lưu/).length).toBeGreaterThan(0);
+    fireEvent.click(screen.getByRole('button', { name: /Lưu thay đổi/ }));
+    await waitFor(() => expect(puts).toHaveLength(1));
+    const first = DETAIL.lines.find((l) => !l.combo)!;
+    const sent = (puts[0]!.lines as Array<Record<string, string>>)[0]!;
+    expect(sent.skuId).toBe(first.skuId);
+    expect(sent.unitPrice).toBeDefined();
+    await waitFor(() => expect(push).toHaveBeenCalledWith(`/crm/orders/${ORDER.id}`));
+  });
+});

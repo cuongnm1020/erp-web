@@ -3573,9 +3573,11 @@ export interface paths {
         options?: never;
         head?: never;
         /**
-         * Sửa đơn: trạng thái + hãng vận chuyển. `sales_order.update` (ADMIN, SALES_LEADER,
-         *     SALES_MEMBER theo seed; superadmin luôn qua). Chuyển trạng thái cần thêm quyền
-         *     approve/post/cancel tương ứng — kiểm trong service vì tuỳ giá trị gửi lên.
+         * Sửa đơn: trạng thái + hãng vận chuyển + người nhận + ghi chú… `sales_order.update` (ADMIN,
+         *     SALES_LEADER, SALES_MEMBER theo seed; superadmin luôn qua). Chuyển trạng thái cần thêm quyền
+         *     approve/post/cancel tương ứng — kiểm trong service vì tuỳ giá trị gửi lên. Đổi gì ngoài trạng
+         *     thái (2026-10-29): chỉ người tạo đơn / NV xử lý / trưởng nhóm của họ / `sales_order.edit_all`
+         *     → không thì 403 FORBIDDEN. Mỗi lần lưu có thay đổi ghi một dòng lịch sử sửa đơn.
          */
         patch: operations["SalesOrderController_update"];
         trace?: never;
@@ -3629,6 +3631,44 @@ export interface paths {
             cookie?: never;
         };
         get: operations["SalesOrderController_shippingQuote"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/sales-orders/{id}/lines": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Sửa sản phẩm (2026-10-29): THAY toàn bộ dòng — thêm / bỏ / đổi số lượng, định giá lại, giữ
+         *     chỗ lại, lập lại PICK chờ. Chỉ người được sửa đơn (403 FORBIDDEN), đơn ERP không khuyến mãi,
+         *     kho chưa bắt đầu lấy hàng (409 ORDER_LINES_LOCKED). Ghi lịch sử sửa đơn.
+         */
+        put: operations["SalesOrderController_replaceLines"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/sales-orders/{id}/edit-history": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Lịch sử sửa đơn — ai sửa, lúc nào, đổi gì (mới nhất trước). */
+        get: operations["SalesOrderController_editHistory"];
         put?: never;
         post?: never;
         delete?: never;
@@ -11273,6 +11313,17 @@ export interface components {
             marketerName: string | null;
             /** @description Người tạo đơn (SalesOrder.createdBy); null = hệ thống / đồng bộ Pancake. */
             createdByName: string | null;
+            /**
+             * @description Người đang xem sửa được đơn (2026-10-29): người tạo / NV xử lý / trưởng nhóm của họ /
+             *     `sales_order.edit_all`, và đơn chưa kết thúc. false → màn Sửa đơn chỉ xem.
+             */
+            canEdit: boolean;
+            /**
+             * @description Vì sao KHÔNG sửa được sản phẩm (thêm / bỏ / đổi số lượng); null = sửa được (PUT
+             *     /sales-orders/:id/lines). Khóa khi: không có quyền sửa, đơn Pancake, đơn có khuyến mãi, kho đã
+             *     bắt đầu lấy hàng / đã có phiếu giao.
+             */
+            linesLockedReason: string | null;
             timeline: components["schemas"]["OrderTimelineDto"];
             /** @description Địa chỉ giao hiệu lực — null = khách chưa có địa chỉ dùng được (tra cước / cấp vận đơn sẽ 422). */
             shippingAddress: components["schemas"]["SalesOrderAddressDto"] | null;
@@ -11746,6 +11797,11 @@ export interface components {
              * @description core.CustomerAddress.id của ĐÚNG khách trên đơn (địa chỉ giao); `null` = bỏ chọn (rơi về địa chỉ mặc định của khách lúc tra cước / cấp vận đơn).
              */
             addressId?: string | null;
+            /**
+             * @description Người nhận gõ tay (2026-10-29): lưu thành địa chỉ mới của khách (trùng y hệt địa chỉ đã có thì
+             *     dùng lại) rồi gắn vào đơn — thắng `addressId`. Địa chỉ cũ của khách không bị sửa.
+             */
+            address?: components["schemas"]["InlineAddressDto"];
             /** @description Cân nặng gửi hãng (kg, chuỗi decimal > 0, tối đa 4 số lẻ); `null` = về cân nặng tính từ dòng. */
             shippingWeightKg?: string | null;
             /** @description Tuỳ chọn gửi hãng; `null` = xoá (về mặc định hãng); bỏ trống = giữ nguyên. */
@@ -11798,6 +11854,61 @@ export interface components {
              *     'packerId' | 'marketerId' | 'expectedDeliveryDate'); rỗng = không có gì thay đổi.
              */
             changed: string[];
+        };
+        EditOrderLineDto: {
+            /**
+             * Format: uuid
+             * @description SKU thường hoặc SKU combo (bung thành phần như lúc tạo đơn).
+             */
+            skuId: string;
+            /**
+             * Format: uuid
+             * @description ĐVT bán; bỏ trống = ĐVT cơ sở của SKU (dòng combo).
+             */
+            uomId?: string;
+            /** @description Decimal(18,6) dạng chuỗi > 0. */
+            qty: string;
+            /**
+             * @description Đơn giá theo `uomId` — Decimal(18,4) chuỗi ≥ 0. Gửi đơn giá đang có của dòng cũ để GIỮ giá;
+             *     bỏ trống = giá bảng hiện tại (core.resolve_price).
+             */
+            unitPrice?: string;
+        };
+        ReplaceOrderLinesDto: {
+            lines: components["schemas"]["EditOrderLineDto"][];
+        };
+        ReplaceOrderLinesResultDto: {
+            orderId: string;
+            docNumber: string;
+            subtotal: string;
+            discount: string;
+            total: string;
+            /** @description Sau khi sửa có SKU bán âm thiếu hàng → đơn chờ hàng. */
+            awaitingStock: boolean;
+            /**
+             * @description PICK: none = chưa có việc lấy hàng; replanned = đã hủy PICK chờ, sinh PICK mới theo dòng mới.
+             * @enum {string}
+             */
+            pick: "none" | "unchanged" | "replanned";
+        };
+        OrderEditChangeDto: {
+            /** @description Trường đã đổi (`lines`, `total`, `addressId`, `carrierId`, `internalNote`…). */
+            field: string;
+            /** @description Nhãn tiếng Việt ("Người nhận", "Thêm sản phẩm", "Sửa SP-0112"…). */
+            label: string;
+            /** @description Giá trị trước; null = trống. */
+            from: string | null;
+            /** @description Giá trị sau; null = trống / đã bỏ. */
+            to: string | null;
+        };
+        OrderEditLogDto: {
+            id: string;
+            /** @description ISO datetime. */
+            at: string;
+            userId: string;
+            /** @description Tên người sửa; null = tài khoản đã xóa. */
+            userName: string | null;
+            changes: components["schemas"]["OrderEditChangeDto"][];
         };
         BulkUpdateOrdersDto: {
             orderIds: string[];
@@ -22319,6 +22430,52 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ShippingQuoteResultDto"];
+                };
+            };
+        };
+    };
+    SalesOrderController_replaceLines: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReplaceOrderLinesDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReplaceOrderLinesResultDto"];
+                };
+            };
+        };
+    };
+    SalesOrderController_editHistory: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OrderEditLogDto"][];
                 };
             };
         };

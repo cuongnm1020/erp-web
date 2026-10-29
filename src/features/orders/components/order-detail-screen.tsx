@@ -78,6 +78,7 @@ import {
 } from '../labels';
 import { groupOrderLines } from '../combo-lines';
 import { CarrierStatusCard } from './carrier-status-card';
+import { OrderEditHistory } from './order-edit-history';
 import { waybillErrorText } from './waybill-error';
 import { OrderPrintSheet } from './order-print-sheet';
 import { OrderProgress } from './order-progress';
@@ -1063,6 +1064,7 @@ function Detail({ order }: { order: SalesOrderDetail }) {
         <div className="flex w-full min-w-0 flex-1 flex-col gap-3">
           <Lines order={order} />
           <ShipmentCard order={order} autoPrint={autoPrint} />
+          <OrderEditHistory orderId={order.id} />
         </div>
       </div>
     </>

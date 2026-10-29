@@ -1,10 +1,18 @@
 'use client';
 
-import { Boxes, CornerDownRight, Gift, Lock, Warehouse as WarehouseIcon } from 'lucide-react';
+import {
+  Boxes,
+  CornerDownRight,
+  Gift,
+  Lock,
+  Pencil,
+  Warehouse as WarehouseIcon,
+} from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import Decimal from 'decimal.js';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { useWatch } from 'react-hook-form';
 import { CopyButton } from '@/components/data/copy-button';
 import { DetailSkeleton, QueryState } from '@/components/data/states';
 import { StatusBadge } from '@/components/data/status-badge';
@@ -36,6 +44,7 @@ import {
   usePickupWarehouses,
   useShippingQuote,
   useMoveOrdersWarehouse,
+  useReplaceOrderLines,
   useRequestWaybill,
   useUpdateOrder,
   type SalesOrderDetail,
@@ -62,6 +71,9 @@ import { CART_GRID } from './order-create/cart-line';
 import { DENSE } from './order-create/order-draft-form';
 import { Card } from './order-create/order-side-cards';
 import { OrderTagsField } from './order-tags-field';
+import { OrderEditHistory } from './order-edit-history';
+import { linesChange, OrderEditLines, useOrderLinesForm } from './order-edit-lines';
+import { normalizePhoneInput } from '../schema';
 
 /**
  * D-05 Sửa đơn — trang riêng (không popup), bố cục chép màn tạo đơn (user yêu cầu 2026-10-22):
@@ -71,8 +83,11 @@ import { OrderTagsField } from './order-tags-field';
  *   - Trạng thái: chỉ các đích server cho phép sửa tay VÀ người dùng có quyền tương ứng
  *     (`manualStatusTargets` chép đúng state machine backend — ghi chú D-05).
  *   - Hãng vận chuyển: tới khi đơn kết thúc (POSTED / CANCELLED).
- * Phần còn lại (dòng hàng, giá, khách, địa chỉ) thuộc chứng từ đã chốt → chỉ đọc, đường sửa vẫn là
- * "hủy & tạo lại" ở màn chi tiết. Không bịa ô nhập cho thứ API chưa có (ghi chú, thanh toán).
+ *   - Sản phẩm (2026-10-29): thêm / bỏ / đổi SL, đơn giá — PUT /sales-orders/{id}/lines, tới khi
+ *     kho bắt đầu lấy hàng (`linesLockedReason` của server). Người nhận gõ tay → địa chỉ mới của khách.
+ *   - Chỉ người tạo đơn / NV xử lý / trưởng nhóm của họ sửa được (`order.canEdit`); người khác chỉ
+ *     đổi trạng thái theo quyền duyệt / hủy. Mỗi lần lưu ghi "Lịch sử sửa đơn".
+ * Khách, thanh toán vẫn chỉ đọc.
  *
  * Bốn trạng thái (luật 13): skeleton / 404 / lỗi / thành công; thiếu quyền update → chỉ đọc có banner.
  * Phím: Ctrl+S lưu, Esc quay về chi tiết.
@@ -114,6 +129,8 @@ function changedLabel(c: string): string {
       return 'kho lấy hàng';
     case 'recipientPhone':
       return 'SĐT người nhận';
+    case 'lines':
+      return 'sản phẩm';
     default:
       return 'hãng vận chuyển';
   }
@@ -136,6 +153,13 @@ function Editor({ order }: { order: SalesOrderDetail }) {
   const ability = useAbility();
   const canUpdate = ability.can('update', 'SalesOrder');
   const update = useUpdateOrder(order.id);
+  const replaceLines = useReplaceOrderLines(order.id);
+  const linesForm = useOrderLinesForm(order);
+  const watchedLines = useWatch({ control: linesForm.control, name: 'lines' });
+  const lineEdit = order.linesLockedReason
+    ? { body: null, invalid: false }
+    : linesChange(order, watchedLines ?? []);
+  const linesChanged = lineEdit.body !== null;
   const moveWarehouse = useMoveOrdersWarehouse();
   const carriers = useCarriers();
   const warehouses = usePickupWarehouses();
@@ -144,6 +168,8 @@ function Editor({ order }: { order: SalesOrderDetail }) {
   const [carrierId, setCarrierId] = useState<string>(order.carrierId ?? NO_CARRIER);
   const [warehouseId, setWarehouseId] = useState<string>(order.warehouseId ?? NO_WAREHOUSE);
   const [addressId, setAddressId] = useState<string>(order.addressId ?? NO_ADDRESS);
+  // Sửa người nhận gõ tay (2026-10-29) → server lưu thành địa chỉ mới của khách rồi gắn đơn.
+  const [receiver, setReceiver] = useState<ReceiverDraft | null>(null);
   // Danh sách địa chỉ của khách chỉ tải được khi có customer.read (kho mở đơn bằng read_all
   // thì không) — khi đó chỉ hiện địa chỉ hiệu lực server trả, không có ô chọn.
   const canReadCustomer = ability.can('read', 'Customer');
@@ -174,7 +200,8 @@ function Editor({ order }: { order: SalesOrderDetail }) {
   const [reason, setReason] = useState('');
 
   const targets = manualStatusTargets(order.status, (a) => ability.can(a, 'SalesOrder'));
-  const carrierEditable = canUpdate && orderEditable(order.status);
+  // Chỉ người tạo đơn / NV xử lý / trưởng nhóm của họ sửa được các ô (server: order.canEdit).
+  const carrierEditable = canUpdate && orderEditable(order.status) && order.canEdit;
   const statusEditable = canUpdate && targets.length > 0;
   const activeCarriers = (carriers.data ?? []).filter(
     (c) => c.isActive || c.id === order.carrierId,
@@ -206,7 +233,11 @@ function Editor({ order }: { order: SalesOrderDetail }) {
   const statusChanged = status !== order.status;
   const carrierChanged = nextCarrier !== (order.carrierId ?? null);
   const warehouseChanged = nextWarehouse !== (order.warehouseId ?? null);
-  const addressChanged = nextAddress !== (order.addressId ?? null);
+  const receiverBody = receiver ? receiverAddress(receiver) : null;
+  const receiverInvalid = receiver !== null && receiverBody === null;
+  const receiverChanged =
+    receiverBody !== null && !sameReceiver(receiverBody, order.shippingAddress);
+  const addressChanged = !receiver && nextAddress !== (order.addressId ?? null);
   const nextWeight = normalizeWeightInput(weightKg);
   const weightInvalid = weightKg.trim() !== '' && nextWeight === null;
   const weightChanged =
@@ -239,7 +270,8 @@ function Editor({ order }: { order: SalesOrderDetail }) {
     recipientPhoneChanged;
   const patchFieldsDirty =
     statusChanged || carrierChanged || addressChanged || weightChanged || extrasChanged;
-  const patchDirty = patchFieldsDirty || moveTo !== null;
+  const patchFieldsDirtyAll = patchFieldsDirty || receiverChanged;
+  const patchDirty = patchFieldsDirtyAll || moveTo !== null || linesChanged;
   const carrierAccounts = selectedCarrier?.accounts ?? [];
 
   const detailHref = `/crm/orders/${order.id}`;
@@ -298,7 +330,15 @@ function Editor({ order }: { order: SalesOrderDetail }) {
 
   const save = () => {
     if (update.isPending || fulfil.isPending || moveWarehouse.isPending) return;
-    if (requestWaybill.isPending) return;
+    if (requestWaybill.isPending || replaceLines.isPending) return;
+    if (lineEdit.invalid) {
+      toast.error('Kiểm tra lại sản phẩm: đơn cần ít nhất một dòng, số lượng lớn hơn 0');
+      return;
+    }
+    if (receiverInvalid) {
+      toast.error('Người nhận cần đủ tên, SĐT (10 số), địa chỉ và tỉnh/thành');
+      return;
+    }
     if (weightInvalid) {
       toast.error('Cân nặng gửi hãng phải là số kg lớn hơn 0, tối đa 4 số lẻ');
       return;
@@ -323,6 +363,27 @@ function Editor({ order }: { order: SalesOrderDetail }) {
       return;
     }
     if (!canUpdate) return;
+    // Sản phẩm lưu TRƯỚC (giữ chỗ + PICK lại), rồi mới chuyển kho / PATCH các ô còn lại.
+    if (lineEdit.body) {
+      replaceLines.mutate(lineEdit.body, {
+        onSuccess: (r) => {
+          if (moveTo || patchFieldsDirtyAll) saveRest();
+          else {
+            toast.success('Đã lưu thay đổi', {
+              description: `${order.docNumber} · sản phẩm, tổng tiền ${formatMoney(r.total)}`,
+            });
+            if (fulfilTarget) runFulfil(fulfilTarget);
+            else router.push(detailHref);
+          }
+        },
+        onError: (err) => toast.error(messageFor(err)),
+      });
+      return;
+    }
+    saveRest();
+  };
+
+  const saveRest = () => {
     if (moveTo) {
       moveWarehouse.mutate(
         { orderIds: [order.id], warehouseId: moveTo },
@@ -334,7 +395,7 @@ function Editor({ order }: { order: SalesOrderDetail }) {
               setWarehouseId(order.warehouseId ?? NO_WAREHOUSE);
               return;
             }
-            if (patchFieldsDirty) patch();
+            if (patchFieldsDirtyAll) patch();
             else {
               toast.success('Đã lưu thay đổi', {
                 description: `${order.docNumber} · kho lấy hàng`,
@@ -357,6 +418,7 @@ function Editor({ order }: { order: SalesOrderDetail }) {
         ...(statusChanged ? { status } : {}),
         ...(carrierChanged ? { carrierId: nextCarrier } : {}),
         ...(addressChanged ? { addressId: nextAddress } : {}),
+        ...(receiverChanged && receiverBody ? { address: receiverBody } : {}),
         ...(weightChanged ? { shippingWeightKg: nextWeight } : {}),
         ...(accountChanged ? { carrierAccountId: nextAccount } : {}),
         ...(internalChanged ? { internalNote: trimOrNull(internalNote) } : {}),
@@ -422,9 +484,11 @@ function Editor({ order }: { order: SalesOrderDetail }) {
   const readOnlyReason =
     !canUpdate && !(canFulfil && fulfilTargets.length > 0)
       ? 'Bạn chỉ có quyền xem đơn này — cần quyền sửa đơn (sales_order.update) để lưu thay đổi.'
-      : order.status === 'CANCELLED'
-        ? 'Đơn đã hủy — trạng thái cuối, không sửa được gì nữa.'
-        : null;
+      : !order.canEdit && orderEditable(order.status) && !statusEditable
+        ? 'Đơn của người khác — chỉ người tạo đơn, NV xử lý hoặc trưởng nhóm / leader của họ được sửa.'
+        : order.status === 'CANCELLED'
+          ? 'Đơn đã hủy — trạng thái cuối, không sửa được gì nữa.'
+          : null;
 
   const carrierLabel = (id: string | null) =>
     id ? (activeCarriers.find((c) => c.id === id)?.name ?? 'hãng khác') : 'Chưa chọn';
@@ -455,7 +519,25 @@ function Editor({ order }: { order: SalesOrderDetail }) {
           },
         ]
       : []),
+    ...(linesChanged
+      ? [
+          {
+            label: 'Sản phẩm',
+            from: `${collapsedCount(order)} dòng`,
+            to: `${watchedLines.length} dòng`,
+          },
+        ]
+      : []),
     ...(addressChanged ? [{ label: 'Địa chỉ giao', from: 'địa chỉ cũ', to: 'địa chỉ mới' }] : []),
+    ...(receiverChanged && receiverBody
+      ? [
+          {
+            label: 'Người nhận',
+            from: order.shippingAddress?.recipient ?? 'chưa có',
+            to: `${receiverBody.recipient} · ${receiverBody.phone}`,
+          },
+        ]
+      : []),
     ...(warehouseChanged
       ? [
           {
@@ -523,7 +605,11 @@ function Editor({ order }: { order: SalesOrderDetail }) {
       : []),
   ];
   const saving =
-    update.isPending || fulfil.isPending || moveWarehouse.isPending || requestWaybill.isPending;
+    update.isPending ||
+    fulfil.isPending ||
+    moveWarehouse.isPending ||
+    requestWaybill.isPending ||
+    replaceLines.isPending;
   // Ô SĐT riêng còn trống mà SĐT hiệu lực bị che → tô đỏ, hãng sẽ từ chối.
   const phoneStillMasked = order.recipientPhoneMasked && trimOrNull(recipientPhone) === null;
   const prepaid = new Decimal(order.prepaidAmount || 0);
@@ -560,6 +646,15 @@ function Editor({ order }: { order: SalesOrderDetail }) {
         >
           <Lock className="h-3.5 w-3.5 text-warning" aria-hidden />
           {readOnlyReason}
+        </div>
+      ) : canUpdate && !order.canEdit && orderEditable(order.status) ? (
+        <div
+          role="status"
+          className="flex items-center gap-2 rounded-md border border-warning-line bg-warning-weak px-3 py-2 text-sm"
+        >
+          <Lock className="h-3.5 w-3.5 text-warning" aria-hidden />
+          Đơn của người khác — chỉ đổi được trạng thái. Sản phẩm, người nhận, vận chuyển, ghi chú do
+          người tạo đơn, NV xử lý hoặc trưởng nhóm / leader của họ sửa.
         </div>
       ) : null}
 
@@ -733,126 +828,128 @@ function Editor({ order }: { order: SalesOrderDetail }) {
             </section>
           </Card>
 
-          <Card
-            title="Sản phẩm"
-            actions={
-              <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                <Lock className="h-3.5 w-3.5" aria-hidden />
-                Đã chốt — chỉ đọc
-              </span>
-            }
-          >
-            <p className="text-sm text-muted-foreground">
-              Đổi sản phẩm, số lượng, giá hay khách:{' '}
-              <Can I="create" a="SalesOrder">
-                <Link
-                  href={`/crm/orders/new?from=${order.id}`}
-                  className="font-semibold text-primary hover:underline"
-                >
-                  Nhân bản đơn
-                </Link>{' '}
-                (giữ đơn này) hoặc{' '}
-              </Can>
-              <Link href={detailHref} className="font-semibold text-primary hover:underline">
-                Hủy &amp; tạo lại
-              </Link>{' '}
-              ở màn chi tiết.
-            </p>
-            <div className="overflow-x-auto rounded-md border">
-              <div className="min-w-[680px]">
-                <div
-                  className={cn(
-                    CART_GRID,
-                    'hidden border-b bg-muted/40 text-xs font-semibold uppercase text-muted-foreground sm:grid',
-                  )}
-                >
-                  <span>#</span>
-                  <span>Sản phẩm</span>
-                  <span className="text-center">SL</span>
-                  <span className="text-right">Đơn giá</span>
-                  <span className="text-right">Thành tiền</span>
-                  <span />
-                </div>
-                <ul className="divide-y">
-                  {groupOrderLines(order.lines).map((g, i) =>
-                    g.kind === 'line' ? (
-                      <li key={g.line.id} className={cn(CART_GRID, 'text-sm')}>
-                        <span className="text-muted-foreground">{i + 1}</span>
-                        <span className="min-w-0">
-                          <span className="font-semibold">{g.line.skuName}</span>
-                          {g.line.isGift ? (
-                            <StatusBadge tone="brand" className="ml-1.5">
-                              <Gift className="h-3 w-3" aria-hidden />
-                              Tặng
-                            </StatusBadge>
-                          ) : null}
-                          <span className="block text-xs text-muted-foreground">
-                            <span className="font-mono">{g.line.skuCode}</span>
-                            {g.line.nonStock ? ' · gõ tay, không quản lý tồn' : ''}
-                          </span>
-                        </span>
-                        <span className="text-center tabular-nums">
-                          {formatQuantity(g.line.qty)} {g.line.uomCode}
-                        </span>
-                        <span className="text-right tabular-nums">{money(g.line.unitPrice)}</span>
-                        <span className="text-right font-semibold tabular-nums">
-                          {money(g.line.lineTotal)}
-                        </span>
-                        <span />
-                      </li>
-                    ) : (
-                      <li key={`combo-${g.groupNo}`} className={cn(CART_GRID, 'text-sm')}>
-                        <span className="text-muted-foreground">{i + 1}</span>
-                        <span className="min-w-0">
-                          <span className="flex items-center gap-1.5 font-semibold">
-                            {g.skuName}
-                            <StatusBadge tone="brand">
-                              <Boxes className="h-3 w-3" aria-hidden />
-                              Combo
-                            </StatusBadge>
-                          </span>
-                          <span className="block font-mono text-xs text-muted-foreground">
-                            {g.skuCode}
-                          </span>
-                          {g.lines.map((l) => (
-                            <span
-                              key={l.id}
-                              className="flex items-center gap-1 text-xs text-muted-foreground"
-                            >
-                              <CornerDownRight className="h-3 w-3" aria-hidden />
-                              {l.skuName} × {formatQuantity(l.qty)} {l.uomCode}
+          <OrderEditLines
+            form={linesForm}
+            order={order}
+            lockedReason={order.linesLockedReason}
+            dirty={linesChanged}
+            readOnly={
+              <>
+                <p className="text-sm text-muted-foreground">
+                  Đổi sản phẩm, số lượng, giá hay khách:{' '}
+                  <Can I="create" a="SalesOrder">
+                    <Link
+                      href={`/crm/orders/new?from=${order.id}`}
+                      className="font-semibold text-primary hover:underline"
+                    >
+                      Nhân bản đơn
+                    </Link>{' '}
+                    (giữ đơn này) hoặc{' '}
+                  </Can>
+                  <Link href={detailHref} className="font-semibold text-primary hover:underline">
+                    Hủy &amp; tạo lại
+                  </Link>{' '}
+                  ở màn chi tiết.
+                </p>
+                <div className="overflow-x-auto rounded-md border">
+                  <div className="min-w-[680px]">
+                    <div
+                      className={cn(
+                        CART_GRID,
+                        'hidden border-b bg-muted/40 text-xs font-semibold uppercase text-muted-foreground sm:grid',
+                      )}
+                    >
+                      <span>#</span>
+                      <span>Sản phẩm</span>
+                      <span className="text-center">SL</span>
+                      <span className="text-right">Đơn giá</span>
+                      <span className="text-right">Thành tiền</span>
+                      <span />
+                    </div>
+                    <ul className="divide-y">
+                      {groupOrderLines(order.lines).map((g, i) =>
+                        g.kind === 'line' ? (
+                          <li key={g.line.id} className={cn(CART_GRID, 'text-sm')}>
+                            <span className="text-muted-foreground">{i + 1}</span>
+                            <span className="min-w-0">
+                              <span className="font-semibold">{g.line.skuName}</span>
+                              {g.line.isGift ? (
+                                <StatusBadge tone="brand" className="ml-1.5">
+                                  <Gift className="h-3 w-3" aria-hidden />
+                                  Tặng
+                                </StatusBadge>
+                              ) : null}
+                              <span className="block text-xs text-muted-foreground">
+                                <span className="font-mono">{g.line.skuCode}</span>
+                                {g.line.nonStock ? ' · gõ tay, không quản lý tồn' : ''}
+                              </span>
                             </span>
-                          ))}
-                        </span>
-                        <span className="text-center tabular-nums">
-                          {formatQuantity(g.qty)} combo
-                        </span>
-                        <span className="text-right tabular-nums">{money(g.unitPrice)}</span>
-                        <span className="text-right font-semibold tabular-nums">
-                          {money(g.lineTotal)}
-                        </span>
-                        <span />
-                      </li>
-                    ),
-                  )}
-                </ul>
-                <div className="flex flex-wrap items-center justify-between gap-2 border-t px-3 py-2 text-sm text-muted-foreground">
-                  <span>
-                    {order.lines.length} dòng · {totalQty} SP
-                    {lineWeight && !lineWeight.isZero()
-                      ? ` · KL ${lineWeight.toDecimalPlaces(2).toString()} kg`
-                      : ''}
-                  </span>
-                  <span>
-                    Tạm tính{' '}
-                    <b className="ml-1 text-base tabular-nums text-foreground">
-                      {formatMoney(order.subtotal)}
-                    </b>
-                  </span>
+                            <span className="text-center tabular-nums">
+                              {formatQuantity(g.line.qty)} {g.line.uomCode}
+                            </span>
+                            <span className="text-right tabular-nums">
+                              {money(g.line.unitPrice)}
+                            </span>
+                            <span className="text-right font-semibold tabular-nums">
+                              {money(g.line.lineTotal)}
+                            </span>
+                            <span />
+                          </li>
+                        ) : (
+                          <li key={`combo-${g.groupNo}`} className={cn(CART_GRID, 'text-sm')}>
+                            <span className="text-muted-foreground">{i + 1}</span>
+                            <span className="min-w-0">
+                              <span className="flex items-center gap-1.5 font-semibold">
+                                {g.skuName}
+                                <StatusBadge tone="brand">
+                                  <Boxes className="h-3 w-3" aria-hidden />
+                                  Combo
+                                </StatusBadge>
+                              </span>
+                              <span className="block font-mono text-xs text-muted-foreground">
+                                {g.skuCode}
+                              </span>
+                              {g.lines.map((l) => (
+                                <span
+                                  key={l.id}
+                                  className="flex items-center gap-1 text-xs text-muted-foreground"
+                                >
+                                  <CornerDownRight className="h-3 w-3" aria-hidden />
+                                  {l.skuName} × {formatQuantity(l.qty)} {l.uomCode}
+                                </span>
+                              ))}
+                            </span>
+                            <span className="text-center tabular-nums">
+                              {formatQuantity(g.qty)} combo
+                            </span>
+                            <span className="text-right tabular-nums">{money(g.unitPrice)}</span>
+                            <span className="text-right font-semibold tabular-nums">
+                              {money(g.lineTotal)}
+                            </span>
+                            <span />
+                          </li>
+                        ),
+                      )}
+                    </ul>
+                    <div className="flex flex-wrap items-center justify-between gap-2 border-t px-3 py-2 text-sm text-muted-foreground">
+                      <span>
+                        {order.lines.length} dòng · {totalQty} SP
+                        {lineWeight && !lineWeight.isZero()
+                          ? ` · KL ${lineWeight.toDecimalPlaces(2).toString()} kg`
+                          : ''}
+                      </span>
+                      <span>
+                        Tạm tính{' '}
+                        <b className="ml-1 text-base tabular-nums text-foreground">
+                          {formatMoney(order.subtotal)}
+                        </b>
+                      </span>
+                    </div>
+                  </div>
                 </div>
-              </div>
-            </div>
-          </Card>
+              </>
+            }
+          />
 
           <div className="flex flex-wrap items-start gap-3">
             <Card className="min-w-0 flex-[1_1_320px]" title="Giá trị đơn hàng">
@@ -937,8 +1034,32 @@ function Editor({ order }: { order: SalesOrderDetail }) {
             </div>
           </Card>
 
-          <Card title="Nhận hàng">
-            {canReadCustomer ? (
+          <Card
+            title="Nhận hàng"
+            actions={
+              carrierEditable ? (
+                receiver ? (
+                  <Button type="button" variant="ghost" size="sm" onClick={() => setReceiver(null)}>
+                    Bỏ sửa
+                  </Button>
+                ) : (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setReceiver(receiverDraftOf(effectiveAddress ?? null))}
+                  >
+                    <Pencil className="h-3.5 w-3.5" aria-hidden />
+                    Sửa người nhận
+                  </Button>
+                )
+              ) : null
+            }
+          >
+            {receiver ? (
+              <ReceiverFields value={receiver} onChange={setReceiver} dirty={receiverChanged} />
+            ) : null}
+            {!receiver && canReadCustomer ? (
               <Select
                 value={addressId}
                 onValueChange={setAddressId}
@@ -959,7 +1080,7 @@ function Editor({ order }: { order: SalesOrderDetail }) {
                 </SelectContent>
               </Select>
             ) : null}
-            {effectiveAddress ? (
+            {receiver ? null : effectiveAddress ? (
               <div className="rounded-md border bg-muted/40 px-3 py-2 text-sm">
                 <div className="flex flex-wrap items-center gap-x-2">
                   <span className="font-semibold tabular-nums">
@@ -979,7 +1100,9 @@ function Editor({ order }: { order: SalesOrderDetail }) {
               </p>
             )}
             <p className="text-xs text-muted-foreground">
-              Thêm hay sửa nội dung địa chỉ ở hồ sơ khách — đơn chỉ chọn địa chỉ có sẵn.
+              {receiver
+                ? 'Lưu thành địa chỉ mới của khách và dùng cho đơn này — địa chỉ cũ giữ nguyên.'
+                : 'Chọn địa chỉ có sẵn của khách, hoặc bấm "Sửa người nhận" để nhập người nhận khác.'}
             </p>
             {order.recipientPhoneMasked && order.marketplace ? (
               <p role="note" className="rounded-md bg-warning-weak px-3 py-2 text-xs text-warning">
@@ -1165,6 +1288,8 @@ function Editor({ order }: { order: SalesOrderDetail }) {
             ) : null}
           </Card>
 
+          <OrderEditHistory orderId={order.id} />
+
           {/* Khối Lưu dính đáy màn khi cuộn — như khối Chốt đơn của màn tạo đơn. */}
           <section
             aria-label="Lưu thay đổi"
@@ -1224,6 +1349,127 @@ function Editor({ order }: { order: SalesOrderDetail }) {
           </section>
         </div>
       </div>
+    </div>
+  );
+}
+
+/** Người nhận đang gõ trên màn sửa (chuỗi thô, chưa chuẩn hoá). */
+interface ReceiverDraft {
+  recipient: string;
+  phone: string;
+  line1: string;
+  ward: string;
+  district: string;
+  province: string;
+}
+
+/** Địa chỉ đơn / địa chỉ của khách — cùng các trường người nhận. */
+interface AddressLike {
+  recipient: string;
+  phone: string;
+  line1: string;
+  ward: string | null;
+  district?: string | null;
+  province: string;
+}
+
+function receiverDraftOf(a: AddressLike | null): ReceiverDraft {
+  return {
+    recipient: a?.recipient ?? '',
+    phone: a?.phone ?? '',
+    line1: a?.line1 ?? '',
+    ward: a?.ward ?? '',
+    district: a?.district ?? '',
+    province: a?.province ?? '',
+  };
+}
+
+/** Body `address` của PATCH; null = thiếu ô bắt buộc / SĐT sai. */
+function receiverAddress(d: ReceiverDraft) {
+  const phone = normalizePhoneInput(d.phone);
+  if (!d.recipient.trim() || !d.line1.trim() || !d.province.trim() || !/^0\d{9,10}$/.test(phone)) {
+    return null;
+  }
+  return {
+    recipient: d.recipient.trim(),
+    phone,
+    line1: d.line1.trim(),
+    ...(d.ward.trim() ? { ward: d.ward.trim() } : {}),
+    ...(d.district.trim() ? { district: d.district.trim() } : {}),
+    province: d.province.trim(),
+  };
+}
+
+function sameReceiver(
+  b: NonNullable<ReturnType<typeof receiverAddress>>,
+  a: AddressLike | null,
+): boolean {
+  if (!a) return false;
+  return (
+    b.recipient === a.recipient &&
+    b.phone === normalizePhoneInput(a.phone) &&
+    b.line1 === a.line1 &&
+    (b.ward ?? null) === (a.ward ?? null) &&
+    (b.district ?? null) === (a.district ?? null) &&
+    b.province === a.province
+  );
+}
+
+/** Số dòng giỏ ban đầu (combo tính một dòng) — cho "n dòng → m dòng" ở khối thay đổi. */
+function collapsedCount(order: SalesOrderDetail): number {
+  const groups = new Set<number>();
+  let n = 0;
+  for (const l of order.lines) {
+    if (l.nonStock) continue;
+    if (!l.combo) n += 1;
+    else if (!groups.has(l.combo.groupNo)) {
+      groups.add(l.combo.groupNo);
+      n += 1;
+    }
+  }
+  return n;
+}
+
+/** Ô người nhận gõ tay — tên, SĐT, địa chỉ, phường / quận / tỉnh. */
+function ReceiverFields({
+  value,
+  onChange,
+  dirty,
+}: {
+  value: ReceiverDraft;
+  onChange: (v: ReceiverDraft) => void;
+  dirty: boolean;
+}) {
+  const field = (
+    key: keyof ReceiverDraft,
+    label: string,
+    opts: { required?: boolean; tel?: boolean } = {},
+  ) => (
+    <label className="flex min-w-0 flex-col gap-1 text-xs font-semibold text-muted-foreground">
+      <span>
+        {label}
+        {opts.required ? <span className="text-destructive"> *</span> : null}
+      </span>
+      <Input
+        aria-label={label}
+        value={value[key]}
+        inputMode={opts.tel ? 'tel' : undefined}
+        autoComplete="off"
+        onChange={(e) => onChange({ ...value, [key]: e.target.value })}
+        className={cn(opts.tel && 'tabular-nums', dirty && DIRTY)}
+      />
+    </label>
+  );
+  return (
+    <div className="grid gap-2 sm:grid-cols-2">
+      {field('recipient', 'Tên người nhận', { required: true })}
+      {field('phone', 'SĐT', { required: true, tel: true })}
+      <div className="sm:col-span-2">
+        {field('line1', 'Địa chỉ (số nhà, đường, thôn)', { required: true })}
+      </div>
+      {field('ward', 'Phường / xã')}
+      {field('district', 'Quận / huyện')}
+      <div className="sm:col-span-2">{field('province', 'Tỉnh / thành', { required: true })}</div>
     </div>
   );
 }
