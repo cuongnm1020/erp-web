@@ -542,6 +542,34 @@ export function useUpdateOrder(id: string) {
   });
 }
 
+export type ReplaceOrderLinesBody = components['schemas']['ReplaceOrderLinesDto'];
+export type OrderEditLog = components['schemas']['OrderEditLogDto'];
+
+/**
+ * PUT /sales-orders/{id}/lines — thay toàn bộ dòng sản phẩm (2026-10-29): server định giá lại,
+ * giữ chỗ lại, lập lại PICK chờ. Chỉ khi `linesLockedReason` của chi tiết đơn là null. Không
+ * optimistic (luật 5) — chờ server trả rồi tải lại chi tiết.
+ */
+export function useReplaceOrderLines(id: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (body: ReplaceOrderLinesBody) =>
+      unwrap(api.PUT('/sales-orders/{id}/lines', { params: { path: { id } }, body })),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: orderKeys.detail(id) });
+      void qc.invalidateQueries({ queryKey: orderKeys.lists() });
+    },
+  });
+}
+
+/** GET /sales-orders/{id}/edit-history — ai sửa, lúc nào, đổi gì (mới nhất trước). */
+export function useOrderEditHistory(id: string) {
+  return useQuery({
+    queryKey: [...orderKeys.detail(id), 'edit-history'] as const,
+    queryFn: () => unwrap(api.GET('/sales-orders/{id}/edit-history', { params: { path: { id } } })),
+  });
+}
+
 /**
  * GET /sales-orders/{id}/shipping-quote?carrierId= — cước hãng báo cho đơn này với hãng đang
  * chọn trên màn sửa (gọi hãng thật, chỉ đọc). `carrierId` null = chưa chọn → không gọi.

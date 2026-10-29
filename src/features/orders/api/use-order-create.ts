@@ -1,10 +1,26 @@
 import { keepPreviousData, useMutation, useQuery } from '@tanstack/react-query';
 import { api, unwrap } from '@/lib/api/client';
+import { meKeys } from '@/lib/auth/me-keys';
 import type { components } from '@/lib/api/schema';
 import { normalizePhoneInput } from '../schema';
 import { lineEntryKeys } from './use-line-entry';
 
 export type SkuQuickRow = components['schemas']['SkuListRowDto'];
+
+/**
+ * POS lên đơn mặc định của người đang đăng nhập (`/auth/me.defaultPosShopId`, 2026-10-29) — leader /
+ * trưởng nhóm CSKH chọn cho nhân viên; màn Tạo đơn tự điền ô POS. Cùng key + fetcher với phiên
+ * (`meKeys.me`) nên không gọi thêm. '' = không tự điền.
+ */
+export function useDefaultPosShopId(): string {
+  const me = useQuery({
+    queryKey: meKeys.me,
+    queryFn: () => unwrap(api.GET('/auth/me')),
+    staleTime: 5 * 60_000,
+    retry: false,
+  });
+  return me.data?.defaultPosShopId ?? '';
+}
 export type OrderStaffOption = components['schemas']['OrderStaffOptionDto'];
 export type OrderTagOption = components['schemas']['TagDto'];
 export type ShippingQuotePreviewBody = components['schemas']['ShippingQuotePreviewDto'];

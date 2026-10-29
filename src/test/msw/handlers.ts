@@ -591,6 +591,9 @@ export function makeOrderDetail(id: string) {
     packerName: null as string | null,
     marketerName: null as string | null,
     createdByName: 'Quản trị hệ thống' as string | null,
+    canEdit: header.status !== 'POSTED' && header.status !== 'CANCELLED',
+    // Mặc định khóa sửa sản phẩm — test giỏ sửa được tự ghi đè (tránh tải chi tiết SKU ở mọi test).
+    linesLockedReason: 'Kho đã bắt đầu lấy hàng' as string | null,
     timeline: {
       approvedAt:
         header.status === 'APPROVED' || header.status === 'POSTED' ? header.createdAt : null,
@@ -1841,6 +1844,7 @@ export const handlers = [
       { status: 201 },
     );
   }),
+  http.get('/api/sales-orders/:id/edit-history', () => HttpResponse.json([])),
   http.get('/api/sales-orders/:id', async ({ params }) => {
     await delay(50);
     const found = makeOrderDetail(String(params.id));

@@ -7,6 +7,13 @@ import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { toast } from '@/components/ui/toaster';
 import { messageFor } from '@/lib/error-messages';
 import type {
@@ -16,6 +23,8 @@ import type {
 } from '../api/use-pancake-profile';
 
 const shopLabel = (s: PancakeProfile['shops'][number]) => s.shopName ?? `POS ${s.shopId}`;
+/** "Không tự điền" (Radix Select không nhận value rỗng). */
+const NO_POS = '__none__';
 
 /** fb_id Pancake là chuỗi số; khớp ràng buộc DTO phía API (chữ, số, -, _). */
 const FB_ID = /^[A-Za-z0-9_-]{1,100}$/;
@@ -49,7 +58,7 @@ export function PancakeProfileSection({
         {(profile) => (
           // key: dữ liệu server đổi (lưu xong / người khác sửa) → form nạp lại giá trị mới.
           <ProfileForm
-            key={`${profile.fbId ?? ''}|${profile.pancakeName ?? ''}|${selectedOf(profile).join(',')}`}
+            key={`${profile.fbId ?? ''}|${profile.pancakeName ?? ''}|${profile.defaultPosShopId ?? ''}|${selectedOf(profile).join(',')}`}
             profile={profile}
             mutation={mutation}
             canEdit={canEdit}
@@ -78,17 +87,24 @@ function ProfileForm({
   const [fbId, setFbId] = useState(profile.fbId ?? '');
   const [name, setName] = useState(profile.pancakeName ?? '');
   const [shopIds, setShopIds] = useState<string[]>(selectedOf(profile));
+  const [defaultPos, setDefaultPos] = useState(profile.defaultPosShopId ?? '');
 
   const fb = fbId.trim();
   const fbInvalid = fb !== '' && !FB_ID.test(fb);
   const dirty =
     fb !== (profile.fbId ?? '') ||
     name.trim() !== (profile.pancakeName ?? '') ||
-    [...shopIds].sort().join(',') !== selectedOf(profile).join(',');
+    [...shopIds].sort().join(',') !== selectedOf(profile).join(',') ||
+    defaultPos !== (profile.defaultPosShopId ?? '');
 
   const save = () =>
     mutation.mutate(
-      { fbId: fb || null, pancakeName: name.trim() || null, shopIds: fb ? shopIds : [] },
+      {
+        fbId: fb || null,
+        pancakeName: name.trim() || null,
+        shopIds: fb ? shopIds : [],
+        defaultPosShopId: defaultPos || null,
+      },
       {
         onSuccess: (r) => {
           toast.success('Đã lưu thay đổi');
@@ -139,6 +155,33 @@ function ProfileForm({
             onChange={(e) => setName(e.target.value)}
           />
         </div>
+      </div>
+
+      <div className="space-y-1 sm:max-w-sm">
+        <Label htmlFor="pancake-default-pos" className="text-xs text-muted-foreground">
+          POS lên đơn
+        </Label>
+        <Select
+          value={defaultPos || NO_POS}
+          onValueChange={(v) => setDefaultPos(v === NO_POS ? '' : v)}
+          disabled={!canEdit}
+        >
+          <SelectTrigger id="pancake-default-pos" aria-label="POS lên đơn">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value={NO_POS}>— Không tự điền —</SelectItem>
+            {profile.shops.map((s) => (
+              <SelectItem key={s.shopId} value={s.shopId}>
+                {shopLabel(s)}
+                {s.isActive ? '' : ' (đã ngắt kết nối)'}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <p className="text-xs text-muted-foreground">
+          Màn Tạo đơn tự điền POS này (vẫn đổi được trên từng đơn).
+        </p>
       </div>
 
       <fieldset className="space-y-1.5">
@@ -201,6 +244,7 @@ function ProfileForm({
                 setFbId(profile.fbId ?? '');
                 setName(profile.pancakeName ?? '');
                 setShopIds(selectedOf(profile));
+                setDefaultPos(profile.defaultPosShopId ?? '');
                 mutation.reset();
               }}
             >

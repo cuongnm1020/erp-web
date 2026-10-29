@@ -1,4 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { meKeys } from '@/lib/auth/me-keys';
 import { api, unwrap } from '@/lib/api/client';
 import type { components } from '@/lib/api/schema';
 import { userKeys } from './use-users';
@@ -51,6 +52,8 @@ export function useUpdateMyPancakeProfile() {
       unwrap(api.PUT('/me/pancake-profile', { body: input })),
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: pancakeProfileKeys.me });
+      // POS lên đơn mặc định đi qua /auth/me (màn Tạo đơn tự điền).
+      void qc.invalidateQueries({ queryKey: meKeys.me });
     },
   });
 }

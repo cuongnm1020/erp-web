@@ -74,7 +74,7 @@ describe('OrderListScreen — GET /sales-orders (P1-12)', () => {
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
   });
 
-  it('tên sale hiện đủ trên dòng riêng dưới link Pancake, không cắt "Ngu…" (2026-10-26)', async () => {
+  it('bảng gọn (2026-10-29): link Pancake · tên sale cùng MỘT dòng, tên dài cắt + di chuột xem đủ', async () => {
     const pancake = makeOrders(60).find((o) => o.pancakeOrderId === '110')!;
     search = 'q=%23110';
     renderApp(<OrderListScreen />);
@@ -82,9 +82,12 @@ describe('OrderListScreen — GET /sales-orders (P1-12)', () => {
     const row = screen.getByRole('link', { name: pancake.docNumber }).closest('tr')!;
     const owner = within(row).getByTestId('order-owner');
     expect(owner).toHaveTextContent('Nguyễn Văn Sale');
-    expect(owner).not.toHaveClass('truncate');
-    expect(owner.previousElementSibling).toContainElement(
+    expect(owner.parentElement).toContainElement(
       within(row).getByRole('link', { name: 'Pancake #110' }),
+    );
+    expect(owner.parentElement).toHaveAttribute(
+      'title',
+      expect.stringContaining('Nguyễn Văn Sale'),
     );
   });
 
@@ -920,6 +923,7 @@ describe('OrderListScreen — sao chép SĐT / mã vận đơn, cột kho (2026-
           warehouseIds: null,
           warehouses: [{ id: 'wh-tt', code: 'KHO-TT-01', name: 'Kho Thạch Thất' }],
           defaultWarehouseId: 'wh-tt',
+          defaultPosShopId: null,
           selectedWarehouseId: null,
         }}
       >
@@ -1060,34 +1064,31 @@ describe('OrderListScreen — chọn cột, sắp xếp theo cột, lọc SP ngo
 });
 
 describe('OrderListScreen — redesign Bán hàng (2026-10-22)', () => {
-  it('menu "⋯" của dòng có "Nhân bản đơn" → /crm/orders/new?from=<id>', async () => {
+  it('dòng có nút Xem nhanh · Sửa đơn · Nhân bản đơn ngay trên dòng, không còn "⋯" (2026-10-29)', async () => {
     search = '';
     renderApp(<OrderListScreen />);
     await screen.findByText(FIRST.docNumber);
-    fireEvent.keyDown(
-      screen.getByRole('button', { name: `Thao tác khác cho đơn ${FIRST.docNumber}` }),
-      { key: 'ArrowDown' },
-    );
-    const item = await screen.findByRole('menuitem', { name: /Nhân bản đơn/ });
-    expect(item).toHaveAttribute('href', `/crm/orders/new?from=${FIRST.id}`);
-    expect(screen.getByRole('menuitem', { name: /Mở chi tiết/ })).toHaveAttribute(
+    const row = screen.getByRole('link', { name: FIRST.docNumber }).closest('tr')!;
+    expect(within(row).getByRole('button', { name: 'Xem nhanh' })).toBeInTheDocument();
+    expect(within(row).getByRole('link', { name: 'Sửa đơn' })).toHaveAttribute(
       'href',
-      `/crm/orders/${FIRST.id}`,
+      `/crm/orders/${FIRST.id}/edit`,
     );
+    expect(within(row).getByRole('link', { name: 'Nhân bản đơn' })).toHaveAttribute(
+      'href',
+      `/crm/orders/new?from=${FIRST.id}`,
+    );
+    expect(within(row).queryByRole('button', { name: /Thao tác khác/ })).toBeNull();
   });
 
-  it('sale không có quyền tạo đơn → menu dòng không có "Nhân bản đơn" (luật 7)', async () => {
+  it('sale không có quyền tạo đơn → dòng không có nút "Nhân bản đơn" (luật 7)', async () => {
     search = '';
     renderApp(<OrderListScreen />, {
       me: { ...ME_SALE, permissions: ['sales_order.read'] },
     });
     await screen.findByText(FIRST.docNumber);
-    fireEvent.keyDown(
-      screen.getByRole('button', { name: `Thao tác khác cho đơn ${FIRST.docNumber}` }),
-      { key: 'ArrowDown' },
-    );
-    await screen.findByRole('menuitem', { name: /Mở chi tiết/ });
-    expect(screen.queryByRole('menuitem', { name: /Nhân bản đơn/ })).not.toBeInTheDocument();
+    expect(screen.getAllByRole('button', { name: 'Xem nhanh' }).length).toBeGreaterThan(0);
+    expect(screen.queryByRole('link', { name: 'Nhân bản đơn' })).not.toBeInTheDocument();
   });
 
   it('lọc ít dùng nằm sau "Thêm lọc"; đang có giá trị trên URL thì tự hiện', async () => {
@@ -1216,7 +1217,7 @@ describe('OrderListScreen — Lỗi vận đơn + đơn TikTok (2026-10-28)', ()
     },
   });
 
-  it('tab Lỗi vận đơn: dòng có chip TikTok + SĐT bị che + lý do hãng; "⋯ › Xin lại vận đơn" → POST /shipments/:id/waybill với hãng của phiếu', async () => {
+  it('tab Lỗi vận đơn: dòng có chip TikTok + SĐT bị che + lý do hãng; nút "Xin lại vận đơn" trên dòng → POST /shipments/:id/waybill với hãng của phiếu', async () => {
     search = 'flow=WAYBILL_ERROR';
     const seenFlow: (string | null)[] = [];
     const waybillBodies: unknown[] = [];
@@ -1251,11 +1252,7 @@ describe('OrderListScreen — Lỗi vận đơn + đơn TikTok (2026-10-28)', ()
       'Số điện thoại khách hàng không hợp lệ.',
     );
 
-    fireEvent.keyDown(
-      screen.getByRole('button', { name: `Thao tác khác cho đơn ${FIRST.docNumber}` }),
-      { key: 'ArrowDown' },
-    );
-    fireEvent.click(await screen.findByRole('menuitem', { name: /Xin lại vận đơn/ }));
+    fireEvent.click(screen.getByRole('button', { name: 'Xin lại vận đơn' }));
     await waitFor(() =>
       expect(waybillBodies).toEqual([{ id: 'ship-err-1', body: { carrierCode: 'GHTK' } }]),
     );
@@ -1266,7 +1263,7 @@ describe('OrderListScreen — Lỗi vận đơn + đơn TikTok (2026-10-28)', ()
     );
   });
 
-  it('không có quyền shipment.pack → menu dòng không có "Xin lại vận đơn" (luật 7)', async () => {
+  it('không có quyền shipment.pack → dòng không có nút "Xin lại vận đơn" (luật 7)', async () => {
     search = 'flow=WAYBILL_ERROR';
     server.use(
       http.get('/api/sales-orders', () => HttpResponse.json({ items: [errorRow()], total: 1 })),
@@ -1275,11 +1272,7 @@ describe('OrderListScreen — Lỗi vận đơn + đơn TikTok (2026-10-28)', ()
       me: { ...ME_SALE, permissions: ['sales_order.read', 'sales_order.update'] },
     });
     await screen.findByText(FIRST.docNumber);
-    fireEvent.keyDown(
-      screen.getByRole('button', { name: `Thao tác khác cho đơn ${FIRST.docNumber}` }),
-      { key: 'ArrowDown' },
-    );
-    await screen.findByRole('menuitem', { name: /Mở chi tiết/ });
-    expect(screen.queryByRole('menuitem', { name: /Xin lại vận đơn/ })).not.toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Sửa đơn' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Xin lại vận đơn' })).not.toBeInTheDocument();
   });
 });

@@ -190,7 +190,7 @@ export type CreateOrderValues = z.infer<typeof createOrderSchema>;
 export const EMPTY_LINE: OrderLineValues = { skuId: '', uomId: '', qty: '1', discountPercent: '' };
 
 /** Giá trị trống của form tạo đơn — tab nháp mới. */
-export function emptyOrderValues(warehouseId = ''): CreateOrderValues {
+export function emptyOrderValues(warehouseId = '', posShopId = ''): CreateOrderValues {
   return {
     customerId: '',
     customerName: '',
@@ -209,7 +209,7 @@ export function emptyOrderValues(warehouseId = ''): CreateOrderValues {
     warehouseId,
     channel: 'DIRECT',
     source: '',
-    posShopId: '',
+    posShopId,
     facebookPageId: '',
     shippingFee: '',
     freeShipping: false,
