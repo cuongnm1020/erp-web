@@ -1,7 +1,7 @@
 import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import { http, HttpResponse } from 'msw';
 import { describe, expect, it, vi } from 'vitest';
-import { CARRIERS, makeOrders } from '@/test/msw/handlers';
+import { CARRIERS, ME_SALE, makeOrders } from '@/test/msw/handlers';
 import { server } from '@/test/msw/server';
 import { renderApp } from '@/test/render';
 import { OrderListScreen } from './components/order-list-screen';
@@ -28,12 +28,62 @@ vi.mock('next/navigation', () => ({
 
 const FIRST = makeOrders(1)[0]!;
 
-const selectTwoRows = async () => {
-  renderApp(<OrderListScreen />);
+/** Ghi lại các lần POST /sales-orders/release-pick (thả việc lấy hàng đang giữ, 2026-10-29). */
+const captureRelease = () => {
+  const bodies: unknown[] = [];
+  server.use(
+    http.post('/api/sales-orders/release-pick', async ({ request }) => {
+      const body = (await request.json()) as { orderIds: string[] };
+      bodies.push(body);
+      return HttpResponse.json({ released: body.orderIds.length }, { status: 201 });
+    }),
+  );
+  return bodies;
+};
+
+const selectTwoRows = async (opts?: Parameters<typeof renderApp>[1]) => {
+  renderApp(<OrderListScreen />, opts);
   await screen.findByText(FIRST.docNumber);
   fireEvent.click(screen.getAllByRole('checkbox', { name: 'Chọn dòng' })[0]!);
   fireEvent.click(screen.getAllByRole('checkbox', { name: 'Chọn dòng' })[1]!);
   expect(await screen.findByRole('toolbar')).toBeInTheDocument();
+};
+
+/** Dữ liệu tem tối thiểu cho POST /shipments/label-data. */
+const LABEL = {
+  shipmentId: 'sh-1',
+  shipmentDocNumber: 'DN2610-00001',
+  orderDocNumber: 'SO-0',
+  carrierCode: 'GHTK',
+  carrierName: 'Giao Hàng Tiết Kiệm',
+  trackingNo: 'S1.A1.123',
+  codAmount: '100000.0000',
+  weightKg: '0.5000',
+  recipient: {
+    name: 'Khách A',
+    phone: '0901234567',
+    address: 'Ấp 1, Xã A, Tỉnh B',
+    street: 'Ấp 1',
+    locality: 'Xã A, Tỉnh B',
+    fromWard: 'Xã A, Tỉnh B',
+    fromDistrict: 'Tỉnh B',
+    province: 'Tỉnh B',
+  },
+  sender: {
+    name: 'Shop',
+    phone: '0339213208',
+    address: 'Kho, Xã C, Hà Nội',
+    street: 'Kho',
+    locality: 'Xã C, Hà Nội',
+    fromWard: 'Xã C, Hà Nội',
+    fromDistrict: 'Hà Nội',
+    province: 'Hà Nội',
+    warehouseName: 'Kho Long An',
+  },
+  allowInspection: false,
+  callShopOnFailure: null,
+  items: [{ name: 'Phân bón A', qty: '1.000000' }],
+  note: null,
 };
 
 /** Radix DropdownMenu mở bằng bàn phím trong jsdom (pointerdown không có `button`). */
@@ -91,6 +141,7 @@ describe('Gửi sang ĐVVC — SendToCarrierMenu + SendToCarrierDialog', () => {
         );
       }),
     );
+    const released = captureRelease();
     await selectTwoRows();
     const dialog = await openFor('GHTK');
     const rows = makeOrders(3);
@@ -136,11 +187,22 @@ describe('Gửi sang ĐVVC — SendToCarrierMenu + SendToCarrierDialog', () => {
         lengthCm: 20,
         note: 'Giao giờ hành chính',
       },
+      // Admin đóng gói nhanh được → giữ việc lấy hàng, hỏi "Đóng gói + in" (2026-10-29).
+      holdPick: true,
     });
     await waitFor(() =>
       expect(toastSuccess).toHaveBeenCalledWith('Đã gửi 1 đơn sang GHTK', expect.anything()),
     );
     expect(toastError).not.toHaveBeenCalled();
+    // Gửi 1 đơn vẫn hỏi; mặc định (Enter) là để kho lấy hàng.
+    expect(
+      await within(dialog).findByText('Đóng gói + in vận đơn luôn 1 đơn?'),
+    ).toBeInTheDocument();
+    const keep = within(dialog).getByRole('button', { name: 'Để kho lấy hàng' });
+    expect(keep).toHaveFocus();
+    expect(released).toEqual([]);
+    fireEvent.click(keep);
+    await waitFor(() => expect(released).toEqual([{ orderIds: [rows[0]!.id] }]));
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
     await waitFor(() => expect(screen.queryByRole('toolbar')).not.toBeInTheDocument());
     // Dựng cả màn danh sách đơn + nhiều thao tác: local ~1,3 s, runner CI chậm ~6× vượt 5 s mặc định.
@@ -282,7 +344,9 @@ describe('Gửi sang ĐVVC — SendToCarrierMenu + SendToCarrierDialog', () => {
         'Có mã S1.SG',
       ),
     ).toBeInTheDocument();
-    fireEvent.click(within(panel).getByRole('button', { name: 'Đóng' }));
+    // Đơn lỗi không giữ gì; đơn gửi được (rows[1]) chờ chọn → "Để kho lấy hàng".
+    expect(within(panel).getByText('Đóng gói + in vận đơn luôn 1 đơn?')).toBeInTheDocument();
+    fireEvent.click(within(panel).getByRole('button', { name: 'Để kho lấy hàng' }));
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
     await waitFor(() => expect(screen.queryByRole('toolbar')).not.toBeInTheDocument());
   });
@@ -339,8 +403,145 @@ describe('Gửi sang ĐVVC — SendToCarrierMenu + SendToCarrierDialog', () => {
     expect(within(panel).getByRole('list', { name: 'Danh sách kết quả' })).toHaveTextContent(
       rows[1]!.docNumber,
     );
+    // Đơn SĐT bị che không tính vào số đơn đóng gói.
+    expect(within(panel).getByText('Đóng gói + in vận đơn luôn 1 đơn?')).toBeInTheDocument();
+    fireEvent.click(within(panel).getByRole('button', { name: 'Để kho lấy hàng' }));
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+  });
+
+  it('"Đóng gói + in" sau khi gửi (2026-10-29): bulk-fulfil đơn gửi được (bỏ đơn cần sửa) → in tem → thả việc lấy hàng của cả lô → kết quả đóng gói', async () => {
+    search = '';
+    toastSuccess.mockClear();
+    window.print = vi.fn();
+    const rows = makeOrders(2);
+    const released = captureRelease();
+    const fulfilBodies: unknown[] = [];
+    const base = { carrierId: 'c-ghtk', carrierCode: 'GHTK', carrierAccountId: null, reason: null };
+    server.use(
+      http.post('/api/sales-orders/send-to-carrier', () =>
+        HttpResponse.json(
+          {
+            sent: [
+              {
+                ...base,
+                orderId: rows[0]!.id,
+                docNumber: rows[0]!.docNumber,
+                outcome: 'SAVED',
+                shipmentId: null,
+                shipmentDocNumber: null,
+                trackingNo: null,
+                warning: null,
+              },
+              {
+                ...base,
+                orderId: rows[1]!.id,
+                docNumber: rows[1]!.docNumber,
+                outcome: 'SAVED',
+                shipmentId: null,
+                shipmentDocNumber: null,
+                trackingNo: null,
+                warning: 'RECIPIENT_PHONE_MASKED',
+              },
+            ],
+            failed: [],
+          },
+          { status: 201 },
+        ),
+      ),
+      http.post('/api/sales-orders/bulk-fulfil', async ({ request }) => {
+        fulfilBodies.push(await request.json());
+        return HttpResponse.json(
+          {
+            done: [
+              {
+                orderId: rows[0]!.id,
+                docNumber: rows[0]!.docNumber,
+                shipmentId: 'sh-1',
+                outcome: 'ISSUED',
+                trackingNo: 'S1.A1.123',
+              },
+            ],
+            failed: [],
+          },
+          { status: 201 },
+        );
+      }),
+      http.post('/api/shipments/label-data', () => HttpResponse.json([LABEL])),
+    );
+    await selectTwoRows();
+    const dialog = await openFor('GHTK');
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Cập nhật 2 đơn' }));
+    fireEvent.click(await within(dialog).findByRole('button', { name: 'Đóng gói + in 1 tem' }));
+
+    await waitFor(() => expect(window.print).toHaveBeenCalledTimes(1));
+    expect(fulfilBodies).toEqual([{ orderIds: [rows[0]!.id] }]);
+    // Thả cả lô: đơn đã đóng gói server bỏ qua, đơn cần sửa xuống kho như trước.
+    await waitFor(() => expect(released).toEqual([{ orderIds: [rows[0]!.id, rows[1]!.id] }]));
+    expect(toastSuccess).toHaveBeenCalledWith('Đã đóng gói 1 đơn, in 1 tem', undefined);
+    const panel = await within(dialog).findByRole('region', { name: 'Kết quả từng đơn' });
+    expect(within(panel).getByText('Đã xử lý 1 đơn')).toBeInTheDocument();
     fireEvent.click(within(panel).getByRole('button', { name: 'Đóng' }));
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+    // Không thả lần hai lúc đóng.
+    expect(released).toHaveLength(1);
+  });
+
+  it('đóng popup (Esc) khi đang hỏi = để kho lấy hàng', async () => {
+    search = '';
+    const released = captureRelease();
+    await selectTwoRows();
+    const dialog = await openFor('GHTK');
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Cập nhật 2 đơn' }));
+    // Handler mặc định: đơn đầu có mã, đơn sau chờ đóng gói — cả hai hỏi đóng gói.
+    expect(
+      await within(dialog).findByText('Đóng gói + in vận đơn luôn 2 đơn?'),
+    ).toBeInTheDocument();
+    fireEvent.keyDown(dialog, { key: 'Escape' });
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+    const rows = makeOrders(2);
+    expect(released).toEqual([{ orderIds: [rows[0]!.id, rows[1]!.id] }]);
+  });
+
+  it('sale (không có quyền đóng gói nhanh): không giữ việc lấy hàng, không hỏi', async () => {
+    search = '';
+    const released = captureRelease();
+    const bodies: Record<string, unknown>[] = [];
+    server.use(
+      http.post('/api/sales-orders/send-to-carrier', async ({ request }) => {
+        const body = (await request.json()) as Record<string, unknown>;
+        bodies.push(body);
+        return HttpResponse.json(
+          {
+            sent: (body.orderIds as string[]).map((id, i) => ({
+              orderId: id,
+              docNumber: `SO-${i}`,
+              carrierId: body.carrierId,
+              carrierCode: 'GHTK',
+              carrierAccountId: null,
+              outcome: 'SAVED',
+              shipmentId: null,
+              shipmentDocNumber: null,
+              trackingNo: null,
+              reason: null,
+              warning: null,
+            })),
+            failed: [],
+          },
+          { status: 201 },
+        );
+      }),
+    );
+    await selectTwoRows({
+      me: { ...ME_SALE, permissions: [...ME_SALE.permissions, 'sales_order.update'] },
+    });
+    const dialog = await openFor('GHTK');
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Cập nhật 2 đơn' }));
+    const panel = await within(dialog).findByRole('region', { name: 'Kết quả từng đơn' });
+    expect(bodies[0]).not.toHaveProperty('holdPick');
+    expect(within(panel).queryByText(/Đóng gói \+ in vận đơn luôn/)).not.toBeInTheDocument();
+    fireEvent.click(within(panel).getByRole('button', { name: 'Đóng' }));
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+    expect(released).toEqual([]);
   });
 
   it('kho xuất không có sản phẩm (ORDER_SKU_NOT_IN_WAREHOUSE) → cảnh báo nêu tên kho + từng sản phẩm, không gửi', async () => {

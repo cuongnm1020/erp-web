@@ -1801,6 +1801,11 @@ export const handlers = [
       { status: 201 },
     );
   }),
+  // Thả việc lấy hàng đang giữ sau Gửi ĐVVC (2026-10-29).
+  http.post('/api/sales-orders/release-pick', async ({ request }) => {
+    const body = (await request.json()) as { orderIds: string[] };
+    return HttpResponse.json({ released: body.orderIds.length }, { status: 201 });
+  }),
   http.post('/api/sales-orders/send-to-carrier', async ({ request }) => {
     const body = (await request.json()) as {
       orderIds: string[];

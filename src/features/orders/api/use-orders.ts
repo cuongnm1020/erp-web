@@ -326,6 +326,22 @@ export function useSendOrdersToCarrier() {
   });
 }
 
+/**
+ * POST /sales-orders/release-pick — thả việc lấy hàng đang giữ của các đơn vừa gửi ĐVVC với
+ * `holdPick` (2026-10-29): "Để kho lấy hàng" / đóng popup. Đơn không còn giữ bị bỏ qua — gọi lại an
+ * toàn; bỏ ngang thì server tự thả sau 15 phút.
+ */
+export function useReleasePick() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (orderIds: string[]) =>
+      unwrap(api.POST('/sales-orders/release-pick', { body: { orderIds } })),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: orderKeys.lists() });
+    },
+  });
+}
+
 export type BulkUpdateOrdersBody = components['schemas']['BulkUpdateOrdersDto'];
 export type BulkUpdateOrdersResult = components['schemas']['BulkUpdateOrdersResultDto'];
 

@@ -1,8 +1,8 @@
 'use client';
 
 import { zodResolver } from '@hookform/resolvers/zod';
-import { ScanBarcode, Search, X } from 'lucide-react';
-import { useEffect, useMemo, useState } from 'react';
+import { PackageCheck, ScanBarcode, Search, X } from 'lucide-react';
+import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { useForm } from 'react-hook-form';
 import {
   DatePicker,
@@ -33,16 +33,24 @@ import { toast } from '@/components/ui/toaster';
 import { cn } from '@/lib/cn';
 import { carrierSaid, messageFor, messageForCode } from '@/lib/error-messages';
 import { formatDate, formatTime, toLocalDateKey } from '@/lib/format';
+import { useAbility } from '@/lib/permission';
 import type { Carrier } from '@/features/wms/api/use-shipping';
 import {
   useOrderLookup,
   usePickupWarehouses,
+  useReleasePick,
   useSendOrdersToCarrier,
   type SalesOrder,
   type SendOrderToCarrierItem,
   type SendOrdersToCarrierResult,
 } from '../api/use-orders';
 import { orderEditable, orderStatusLabel, orderStatusTone } from '../labels';
+import {
+  FulfilResultsPanel,
+  WaybillOrientationField,
+  useFulfilPrint,
+  type FulfilPrintOutcome,
+} from './bulk-fulfil-print-dialog';
 import { OrderResultsPanel, type OrderResultRow } from './order-results-panel';
 import {
   CARRIER_SERVICES,
@@ -88,6 +96,19 @@ export function SendToCarrierDialog({
   const lookup = useOrderLookup();
   const warehouses = usePickupWarehouses();
   const send = useSendOrdersToCarrier();
+  const releasePick = useReleasePick();
+  const fp = useFulfilPrint();
+  /**
+   * Kho / admin (đóng gói nhanh được) gửi xong được hỏi "Đóng gói + in vận đơn luôn?" (2026-10-29,
+   * mockup 14xWZb694H9tTFGV6BXnfG): server giữ việc lấy hàng lại (`holdPick`) tới khi chọn "Để kho
+   * lấy hàng" / đóng popup → POST release-pick; bỏ ngang thì server tự thả sau 15 phút.
+   */
+  const canFulfil = useAbility().can('fulfil_manual', 'SalesOrder');
+  /** Đơn vừa gửi đang bị giữ việc lấy hàng — thả đúng một lần. */
+  const [held, setHeld] = useState<string[]>([]);
+  /** Đơn sẽ đóng gói nếu chọn "Đóng gói + in" (gửi được, không cần sửa); null = không hỏi. */
+  const [packIds, setPackIds] = useState<string[] | null>(null);
+  const [fulfilled, setFulfilled] = useState<FulfilPrintOutcome | null>(null);
   /**
    * Tài khoản của hãng (FE-CARRIER-ACC-1): chỉ hỏi khi hãng có từ 2 tài khoản đủ cấu hình (tài
    * khoản chưa cấu hình ẩn, 2026-10-22); chọn sẵn tài khoản chọn từ menu, không có thì mặc định
@@ -110,6 +131,9 @@ export function SendToCarrierDialog({
       setLookupState('idle');
       setFailedResult(null);
       setAccountId(initialAccountId);
+      setHeld([]);
+      setPackIds(null);
+      setFulfilled(null);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps -- chỉ nạp lại lúc mở, không theo rows đổi giữa chừng
   }, [open]);
@@ -170,8 +194,20 @@ export function SendToCarrierDialog({
         ...(carrier.accounts.length > 1 && accountId ? { carrierAccountId: accountId } : {}),
         options: toShippingOptions(v),
         ...(v.customPickup && v.warehouseId ? { warehouseId: v.warehouseId } : {}),
+        ...(canFulfil ? { holdPick: true } : {}),
       });
       announce(carrier.code, r, orders.length - sendable.length);
+      if (canFulfil && r.sent.length > 0) {
+        const sentIds = r.sent.map((x) => x.orderId);
+        // Đơn cần sửa (SĐT bị sàn che) không đóng gói — hãng sẽ từ chối cấp mã.
+        const ids = r.sent.filter((x) => !x.warning).map((x) => x.orderId);
+        if (ids.length > 0) {
+          setHeld(sentIds);
+          setPackIds(ids);
+        } else release(sentIds);
+        setFailedResult(r);
+        return;
+      }
       // Nhiều đơn / có đơn lỗi / cần sửa / hãng chưa phản hồi: giữ dialog mở, hiện kết quả TỪNG đơn
       // (2026-10-28). `onDone` (bỏ chọn trên danh sách) đợi tới lúc đóng — bỏ chọn sớm sẽ gỡ luôn
       // dialog này.
@@ -186,442 +222,502 @@ export function SendToCarrierDialog({
     }
   });
 
+  /** Thả việc lấy hàng cho kho; lỗi mạng thì server vẫn tự thả sau 15 phút. */
+  function release(ids: string[]) {
+    if (ids.length === 0) return;
+    releasePick.mutate(ids, {
+      onError: (err) =>
+        toast.error(messageFor(err), {
+          description: 'Kho sẽ tự nhận việc lấy hàng của các đơn này sau 15 phút.',
+        }),
+    });
+  }
+
+  const releaseHeld = () => {
+    release(held);
+    setHeld([]);
+  };
+
   const close = () => {
+    // Đóng popup khi còn đang hỏi = "Để kho lấy hàng".
+    releaseHeld();
     onOpenChange(false);
     if (failedResult) onDone();
   };
 
+  const packAndPrint = async () => {
+    if (!packIds || fp.pending) return;
+    const out = await fp.run(packIds, new Map(orders.map((o) => [o.id, o])));
+    // Lỗi cả lô (mạng…) → vẫn ở câu hỏi để thử lại hoặc chọn "Để kho lấy hàng".
+    if (!out) return;
+    // Đơn đóng gói xong đã hết giữ; đơn lỗi trước khi trừ tồn thì xuống kho lấy hàng.
+    releaseHeld();
+    setPackIds(null);
+    setFulfilled(out);
+  };
+
   return (
-    <Dialog
-      open={open}
-      onOpenChange={(o) => {
-        if (send.isPending) return;
-        if (o) onOpenChange(true);
-        else close();
-      }}
-    >
-      <DialogContent className="flex h-[90vh] max-w-6xl flex-col gap-0 p-0 sm:rounded-lg">
-        <div className="flex items-center gap-2 border-b px-5 py-3">
-          <DialogTitle className="text-base font-semibold">Sang</DialogTitle>
-          <StatusBadge tone="brand" className="h-6 px-2 text-sm">
-            {carrier.code}
-          </StatusBadge>
-          <span className="text-sm text-muted-foreground">{carrier.name}</span>
-        </div>
+    <>
+      <Dialog
+        open={open}
+        onOpenChange={(o) => {
+          if (send.isPending || fp.pending) return;
+          if (o) onOpenChange(true);
+          else close();
+        }}
+      >
+        <DialogContent className="flex h-[90vh] max-w-6xl flex-col gap-0 p-0 sm:rounded-lg">
+          <div className="flex items-center gap-2 border-b px-5 py-3">
+            <DialogTitle className="text-base font-semibold">Sang</DialogTitle>
+            <StatusBadge tone="brand" className="h-6 px-2 text-sm">
+              {carrier.code}
+            </StatusBadge>
+            <span className="text-sm text-muted-foreground">{carrier.name}</span>
+          </div>
 
-        {failedResult ? (
-          <SendResults
-            carrierCode={carrier.code}
-            result={failedResult}
-            orders={orders}
-            onClose={close}
-          />
-        ) : (
-          <div className="grid min-h-0 flex-1 grid-cols-1 md:grid-cols-[minmax(0,2fr)_minmax(0,3fr)]">
-            {/* ── Trái: đơn đã chọn ─────────────────────────────── */}
-            <section
-              aria-label="Đơn được chọn"
-              className="flex min-h-0 flex-col border-b md:border-b-0 md:border-r"
-            >
-              <div className="space-y-2 px-4 pt-4">
-                <div className="relative">
-                  <Input
-                    value={search}
-                    onChange={(e) => {
-                      setSearch(e.target.value);
-                      if (lookupState === 'missing') setLookupState('idle');
-                    }}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter') {
-                        e.preventDefault();
-                        void addByDocNumber();
-                      }
-                    }}
-                    placeholder="Tìm đơn hàng"
-                    aria-label="Tìm đơn hàng"
-                    aria-invalid={lookupState === 'missing' || undefined}
-                    className="h-9 pr-8"
-                    autoFocus
-                  />
-                  <Search
-                    aria-hidden
-                    className="pointer-events-none absolute right-2.5 top-2.5 h-4 w-4 text-muted-foreground"
-                  />
-                </div>
-                <p className="flex items-center gap-1.5 text-xs italic text-muted-foreground">
-                  <ScanBarcode aria-hidden className="h-3.5 w-3.5" />
-                  Quét barcode (số đơn) rồi Enter để thêm đơn hàng
-                  {lookupState === 'busy' ? ' — đang tìm…' : ''}
-                </p>
-                {lookupState === 'missing' ? (
-                  <p role="alert" className="text-xs text-destructive">
-                    Không thấy đơn &quot;{search.trim()}&quot; trong phạm vi của bạn. Kiểm tra lại
-                    số đơn.
-                  </p>
-                ) : null}
-                <p className="pt-1 text-sm font-semibold">{orders.length} đơn được chọn</p>
-              </div>
-              <ul
-                className="min-h-0 flex-1 space-y-2 overflow-y-auto px-4 py-3"
-                aria-label="Danh sách đơn"
-              >
-                {visible.length === 0 ? (
-                  <li className="py-6 text-center text-sm text-muted-foreground">
-                    {orders.length === 0
-                      ? 'Chưa có đơn nào. Quét mã hoặc gõ số đơn rồi Enter.'
-                      : 'Không đơn nào khớp từ khoá.'}
-                  </li>
-                ) : (
-                  visible.map((o) => {
-                    const editable = orderEditable(o.status);
-                    return (
-                      <li
-                        key={o.id}
-                        className={cn(
-                          'flex items-center gap-3 rounded-md border bg-muted/30 px-3 py-2 text-sm',
-                          !editable && 'opacity-60',
-                        )}
-                      >
-                        <ScanBarcode
-                          aria-hidden
-                          className="h-4 w-4 shrink-0 text-muted-foreground"
+          {fulfilled ? (
+            <FulfilResultsPanel outcome={fulfilled} onClose={close} flush />
+          ) : failedResult ? (
+            <SendResults
+              carrierCode={carrier.code}
+              result={failedResult}
+              orders={orders}
+              onClose={close}
+              ask={
+                packIds
+                  ? {
+                      count: packIds.length,
+                      field: (
+                        <WaybillOrientationField
+                          id="send-carrier-orientation"
+                          value={fp.orientation}
+                          onChange={fp.setOrientation}
+                          hint={false}
                         />
-                        <span className="font-semibold tabular-nums">{o.docNumber}</span>
-                        <span className="text-xs text-muted-foreground">{when(o.orderDate)}</span>
-                        <span className="ml-auto flex items-center gap-2">
-                          {o.carrierId && o.carrierId !== carrier.id ? (
-                            <span className="text-xs text-warning">đang gán hãng khác</span>
-                          ) : null}
-                          {!editable ? (
-                            <span className="text-xs text-muted-foreground">bỏ qua</span>
-                          ) : null}
-                          <StatusBadge tone={orderStatusTone(o.status)}>
-                            {orderStatusLabel(o.status)}
-                          </StatusBadge>
-                          <button
-                            type="button"
-                            onClick={() => remove(o.id)}
-                            aria-label={`Bỏ đơn ${o.docNumber}`}
-                            className="rounded-sm p-0.5 text-muted-foreground hover:bg-muted hover:text-foreground"
-                          >
-                            <X className="h-3.5 w-3.5" />
-                          </button>
-                        </span>
-                      </li>
-                    );
-                  })
-                )}
-              </ul>
-            </section>
-
-            {/* ── Phải: cấu hình ─────────────────────────────────── */}
-            <Form {...form}>
-              <form
-                onSubmit={submit}
-                noValidate
-                className="flex min-h-0 flex-col"
-                aria-label="Cấu hình gửi hãng"
+                      ),
+                      busyLabel: fp.busyLabel,
+                      onPack: () => void packAndPrint(),
+                    }
+                  : null
+              }
+            />
+          ) : (
+            <div className="grid min-h-0 flex-1 grid-cols-1 md:grid-cols-[minmax(0,2fr)_minmax(0,3fr)]">
+              {/* ── Trái: đơn đã chọn ─────────────────────────────── */}
+              <section
+                aria-label="Đơn được chọn"
+                className="flex min-h-0 flex-col border-b md:border-b-0 md:border-r"
               >
-                <div className="min-h-0 flex-1 space-y-5 overflow-y-auto bg-muted/20 px-5 py-4">
-                  <h3 className="text-base font-semibold">Cấu hình</h3>
-
-                  <div className="space-y-1">
-                    <label htmlFor="send-carrier-account" className="text-sm text-muted-foreground">
-                      Tài khoản {carrier.code}
-                    </label>
-                    {/* Ô chọn hãng dùng chung, chỉ tài khoản của hãng này (trường cấu hình bên dưới
-                        theo hãng). Một tài khoản thì chỉ hiện, không cần chọn. */}
-                    <CarrierSelect
-                      id="send-carrier-account"
-                      aria-label={`Tài khoản ${carrier.code}`}
-                      className="h-9 w-full sm:w-80"
-                      filter={(o) => o.carrier.id === carrier.id}
-                      value={{ carrierId: carrier.id, accountId }}
-                      disabled={accounts.length <= 1}
-                      onChange={(_, o) => setAccountId(o?.accountId ?? null)}
+                <div className="space-y-2 px-4 pt-4">
+                  <div className="relative">
+                    <Input
+                      value={search}
+                      onChange={(e) => {
+                        setSearch(e.target.value);
+                        if (lookupState === 'missing') setLookupState('idle');
+                      }}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault();
+                          void addByDocNumber();
+                        }
+                      }}
+                      placeholder="Tìm đơn hàng"
+                      aria-label="Tìm đơn hàng"
+                      aria-invalid={lookupState === 'missing' || undefined}
+                      className="h-9 pr-8"
+                      autoFocus
+                    />
+                    <Search
+                      aria-hidden
+                      className="pointer-events-none absolute right-2.5 top-2.5 h-4 w-4 text-muted-foreground"
                     />
                   </div>
+                  <p className="flex items-center gap-1.5 text-xs italic text-muted-foreground">
+                    <ScanBarcode aria-hidden className="h-3.5 w-3.5" />
+                    Quét barcode (số đơn) rồi Enter để thêm đơn hàng
+                    {lookupState === 'busy' ? ' — đang tìm…' : ''}
+                  </p>
+                  {lookupState === 'missing' ? (
+                    <p role="alert" className="text-xs text-destructive">
+                      Không thấy đơn &quot;{search.trim()}&quot; trong phạm vi của bạn. Kiểm tra lại
+                      số đơn.
+                    </p>
+                  ) : null}
+                  <p className="pt-1 text-sm font-semibold">{orders.length} đơn được chọn</p>
+                </div>
+                <ul
+                  className="min-h-0 flex-1 space-y-2 overflow-y-auto px-4 py-3"
+                  aria-label="Danh sách đơn"
+                >
+                  {visible.length === 0 ? (
+                    <li className="py-6 text-center text-sm text-muted-foreground">
+                      {orders.length === 0
+                        ? 'Chưa có đơn nào. Quét mã hoặc gõ số đơn rồi Enter.'
+                        : 'Không đơn nào khớp từ khoá.'}
+                    </li>
+                  ) : (
+                    visible.map((o) => {
+                      const editable = orderEditable(o.status);
+                      return (
+                        <li
+                          key={o.id}
+                          className={cn(
+                            'flex items-center gap-3 rounded-md border bg-muted/30 px-3 py-2 text-sm',
+                            !editable && 'opacity-60',
+                          )}
+                        >
+                          <ScanBarcode
+                            aria-hidden
+                            className="h-4 w-4 shrink-0 text-muted-foreground"
+                          />
+                          <span className="font-semibold tabular-nums">{o.docNumber}</span>
+                          <span className="text-xs text-muted-foreground">{when(o.orderDate)}</span>
+                          <span className="ml-auto flex items-center gap-2">
+                            {o.carrierId && o.carrierId !== carrier.id ? (
+                              <span className="text-xs text-warning">đang gán hãng khác</span>
+                            ) : null}
+                            {!editable ? (
+                              <span className="text-xs text-muted-foreground">bỏ qua</span>
+                            ) : null}
+                            <StatusBadge tone={orderStatusTone(o.status)}>
+                              {orderStatusLabel(o.status)}
+                            </StatusBadge>
+                            <button
+                              type="button"
+                              onClick={() => remove(o.id)}
+                              aria-label={`Bỏ đơn ${o.docNumber}`}
+                              className="rounded-sm p-0.5 text-muted-foreground hover:bg-muted hover:text-foreground"
+                            >
+                              <X className="h-3.5 w-3.5" />
+                            </button>
+                          </span>
+                        </li>
+                      );
+                    })
+                  )}
+                </ul>
+              </section>
 
-                  <fieldset className="space-y-2">
-                    <legend className="mb-1 text-sm text-muted-foreground">Tùy chọn</legend>
-                    <div className="grid grid-cols-1 gap-x-6 gap-y-2 sm:grid-cols-2">
-                      <CheckField
-                        form={form}
-                        name="shopPaysFee"
-                        label={`Cửa hàng trả phí vận chuyển cho ${carrier.code}`}
+              {/* ── Phải: cấu hình ─────────────────────────────────── */}
+              <Form {...form}>
+                <form
+                  onSubmit={submit}
+                  noValidate
+                  className="flex min-h-0 flex-col"
+                  aria-label="Cấu hình gửi hãng"
+                >
+                  <div className="min-h-0 flex-1 space-y-5 overflow-y-auto bg-muted/20 px-5 py-4">
+                    <h3 className="text-base font-semibold">Cấu hình</h3>
+
+                    <div className="space-y-1">
+                      <label
+                        htmlFor="send-carrier-account"
+                        className="text-sm text-muted-foreground"
+                      >
+                        Tài khoản {carrier.code}
+                      </label>
+                      {/* Ô chọn hãng dùng chung, chỉ tài khoản của hãng này (trường cấu hình bên dưới
+                        theo hãng). Một tài khoản thì chỉ hiện, không cần chọn. */}
+                      <CarrierSelect
+                        id="send-carrier-account"
+                        aria-label={`Tài khoản ${carrier.code}`}
+                        className="h-9 w-full sm:w-80"
+                        filter={(o) => o.carrier.id === carrier.id}
+                        value={{ carrierId: carrier.id, accountId }}
+                        disabled={accounts.length <= 1}
+                        onChange={(_, o) => setAccountId(o?.accountId ?? null)}
                       />
-                      <CheckField form={form} name="allowInspection" label="Cho xem hàng" />
-                      {ghtk ? (
-                        <CheckField form={form} name="byAir" label="Vận chuyển bằng đường bay" />
-                      ) : null}
-                      <CheckField
-                        form={form}
-                        name="callShopOnFailure"
-                        label="Gọi shop khi không giao được"
-                      />
-                      {ghtk ? (
+                    </div>
+
+                    <fieldset className="space-y-2">
+                      <legend className="mb-1 text-sm text-muted-foreground">Tùy chọn</legend>
+                      <div className="grid grid-cols-1 gap-x-6 gap-y-2 sm:grid-cols-2">
                         <CheckField
                           form={form}
-                          name="dropAtPostOffice"
-                          label="Gửi hàng tại bưu cục"
+                          name="shopPaysFee"
+                          label={`Cửa hàng trả phí vận chuyển cho ${carrier.code}`}
                         />
-                      ) : null}
-                    </div>
-                  </fieldset>
-
-                  <div className="grid grid-cols-1 gap-x-6 gap-y-4 sm:grid-cols-2">
-                    <FormField
-                      control={form.control}
-                      name="serviceCode"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Dịch vụ vận chuyển</FormLabel>
-                          {services.length > 0 ? (
-                            <Select
-                              value={field.value === '' ? NO_SERVICE : field.value}
-                              onValueChange={(v) => field.onChange(v === NO_SERVICE ? '' : v)}
-                            >
-                              <FormControl>
-                                <SelectTrigger aria-label="Dịch vụ vận chuyển" className="h-9">
-                                  <SelectValue />
-                                </SelectTrigger>
-                              </FormControl>
-                              <SelectContent>
-                                <SelectItem value={NO_SERVICE}>Mặc định của hãng</SelectItem>
-                                {services.map((s) => (
-                                  <SelectItem key={s.value} value={s.value}>
-                                    {s.label}
-                                  </SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-                          ) : (
-                            <FormControl>
-                              <Input
-                                {...field}
-                                placeholder="Mã dịch vụ của hãng (trống = mặc định)"
-                                className="h-9"
-                              />
-                            </FormControl>
-                          )}
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    <FormField
-                      control={form.control}
-                      name="extraServices"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Dịch vụ bổ sung</FormLabel>
-                          <FormControl>
-                            <Input
-                              {...field}
-                              placeholder="Mã dịch vụ, cách nhau dấu phẩy"
-                              className="h-9"
-                            />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-
-                    {ghtk ? (
-                      <>
-                        <FormField
-                          control={form.control}
-                          name="pickWorkShift"
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormLabel>Thời điểm lấy hàng</FormLabel>
-                              <div
-                                className="flex flex-wrap gap-4 pt-1"
-                                role="radiogroup"
-                                aria-label="Thời điểm lấy hàng"
-                              >
-                                {PICK_SHIFTS.map((s) => (
-                                  <label
-                                    key={s.value}
-                                    className="flex items-center gap-1.5 text-sm"
-                                  >
-                                    <input
-                                      type="radio"
-                                      name="pickWorkShift"
-                                      value={s.value}
-                                      checked={field.value === s.value}
-                                      onChange={() => field.onChange(s.value)}
-                                      className="h-4 w-4 accent-primary"
-                                    />
-                                    {s.label}
-                                  </label>
-                                ))}
-                              </div>
-                            </FormItem>
-                          )}
+                        <CheckField form={form} name="allowInspection" label="Cho xem hàng" />
+                        {ghtk ? (
+                          <CheckField form={form} name="byAir" label="Vận chuyển bằng đường bay" />
+                        ) : null}
+                        <CheckField
+                          form={form}
+                          name="callShopOnFailure"
+                          label="Gọi shop khi không giao được"
                         />
-                        <FormField
-                          control={form.control}
-                          name="pickDate"
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormLabel>Hẹn ngày lấy hàng</FormLabel>
-                              <DatePicker
-                                id="pick-date"
-                                value={field.value as DateKey | ''}
-                                onChange={field.onChange}
-                                fromDate={new Date()}
-                                placeholder="Chọn ngày"
-                                clearable
-                              />
-                              <FormMessage />
-                            </FormItem>
-                          )}
-                        />
-                      </>
-                    ) : null}
-
-                    <FormField
-                      control={form.control}
-                      name="insuranceValue"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Khai giá (bảo hiểm)</FormLabel>
-                          <FormControl>
-                            <MoneyInput
-                              value={field.value}
-                              onChange={field.onChange}
-                              placeholder="Trống = theo tiền thu hộ"
-                              aria-label="Khai giá"
-                              className="h-9"
-                            />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    <FormField
-                      control={form.control}
-                      name="maxWeightKg"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Khối lượng tối đa (kg)</FormLabel>
-                          <FormControl>
-                            <Input
-                              {...field}
-                              inputMode="decimal"
-                              placeholder="Trống = cân nặng của từng đơn"
-                              className="h-9 text-right tabular-nums"
-                            />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-
-                    <FormField
-                      control={form.control}
-                      name="note"
-                      render={({ field }) => (
-                        <FormItem className="sm:col-span-2">
-                          <FormLabel>Ghi chú để in</FormLabel>
-                          <FormControl>
-                            <Textarea {...field} placeholder="Ghi chú để in" rows={3} />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-
-                    <div className="sm:col-span-2">
-                      <Label className="text-sm">Kích thước gói hàng</Label>
-                      <div className="mt-1.5 flex items-center gap-2">
-                        {(['lengthCm', 'widthCm', 'heightCm'] as const).map((name, i) => (
-                          <FormField
-                            key={name}
-                            control={form.control}
-                            name={name}
-                            render={({ field }) => (
-                              <FormItem className="flex items-center gap-2 space-y-0">
-                                {i > 0 ? <span className="text-muted-foreground">×</span> : null}
-                                <FormControl>
-                                  <Input
-                                    {...field}
-                                    inputMode="numeric"
-                                    aria-label={
-                                      name === 'lengthCm'
-                                        ? 'Dài (cm)'
-                                        : name === 'widthCm'
-                                          ? 'Rộng (cm)'
-                                          : 'Cao (cm)'
-                                    }
-                                    placeholder="0"
-                                    className="h-9 w-20 text-right tabular-nums"
-                                  />
-                                </FormControl>
-                              </FormItem>
-                            )}
+                        {ghtk ? (
+                          <CheckField
+                            form={form}
+                            name="dropAtPostOffice"
+                            label="Gửi hàng tại bưu cục"
                           />
-                        ))}
-                        <span className="text-sm text-muted-foreground">(cm)</span>
+                        ) : null}
                       </div>
-                      <p className="text-xs text-destructive">
-                        {form.formState.errors.lengthCm?.message ??
-                          form.formState.errors.widthCm?.message ??
-                          form.formState.errors.heightCm?.message}
-                      </p>
-                    </div>
-                  </div>
+                    </fieldset>
 
-                  <div className="space-y-2 border-t pt-4">
-                    <CheckField form={form} name="customPickup" label="Tùy chọn địa chỉ lấy hàng" />
-                    {customPickup ? (
+                    <div className="grid grid-cols-1 gap-x-6 gap-y-4 sm:grid-cols-2">
                       <FormField
                         control={form.control}
-                        name="warehouseId"
+                        name="serviceCode"
                         render={({ field }) => (
-                          <FormItem className="max-w-md">
-                            <FormLabel>Kho lấy hàng cho cả lô</FormLabel>
-                            <Select value={field.value} onValueChange={field.onChange}>
+                          <FormItem>
+                            <FormLabel>Dịch vụ vận chuyển</FormLabel>
+                            {services.length > 0 ? (
+                              <Select
+                                value={field.value === '' ? NO_SERVICE : field.value}
+                                onValueChange={(v) => field.onChange(v === NO_SERVICE ? '' : v)}
+                              >
+                                <FormControl>
+                                  <SelectTrigger aria-label="Dịch vụ vận chuyển" className="h-9">
+                                    <SelectValue />
+                                  </SelectTrigger>
+                                </FormControl>
+                                <SelectContent>
+                                  <SelectItem value={NO_SERVICE}>Mặc định của hãng</SelectItem>
+                                  {services.map((s) => (
+                                    <SelectItem key={s.value} value={s.value}>
+                                      {s.label}
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                            ) : (
                               <FormControl>
-                                <SelectTrigger aria-label="Kho lấy hàng" className="h-9">
-                                  <SelectValue placeholder="Chọn kho" />
-                                </SelectTrigger>
+                                <Input
+                                  {...field}
+                                  placeholder="Mã dịch vụ của hãng (trống = mặc định)"
+                                  className="h-9"
+                                />
                               </FormControl>
-                              <SelectContent>
-                                {(warehouses.data ?? []).map((w) => (
-                                  <SelectItem key={w.id} value={w.id}>
-                                    {w.name} ({w.code}){w.pickupReady ? '' : ' — chưa khai địa chỉ'}
-                                  </SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
+                            )}
                             <FormMessage />
                           </FormItem>
                         )}
                       />
-                    ) : null}
-                  </div>
-                </div>
+                      <FormField
+                        control={form.control}
+                        name="extraServices"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Dịch vụ bổ sung</FormLabel>
+                            <FormControl>
+                              <Input
+                                {...field}
+                                placeholder="Mã dịch vụ, cách nhau dấu phẩy"
+                                className="h-9"
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
 
-                <DialogFooter className="border-t px-5 py-3">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={() => onOpenChange(false)}
-                    disabled={send.isPending}
-                  >
-                    Hủy
-                  </Button>
-                  <Button type="submit" disabled={sendable.length === 0 || send.isPending}>
-                    {send.isPending ? 'Đang gửi…' : `Cập nhật ${sendable.length} đơn`}
-                  </Button>
-                </DialogFooter>
-              </form>
-            </Form>
-          </div>
-        )}
-      </DialogContent>
-    </Dialog>
+                      {ghtk ? (
+                        <>
+                          <FormField
+                            control={form.control}
+                            name="pickWorkShift"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>Thời điểm lấy hàng</FormLabel>
+                                <div
+                                  className="flex flex-wrap gap-4 pt-1"
+                                  role="radiogroup"
+                                  aria-label="Thời điểm lấy hàng"
+                                >
+                                  {PICK_SHIFTS.map((s) => (
+                                    <label
+                                      key={s.value}
+                                      className="flex items-center gap-1.5 text-sm"
+                                    >
+                                      <input
+                                        type="radio"
+                                        name="pickWorkShift"
+                                        value={s.value}
+                                        checked={field.value === s.value}
+                                        onChange={() => field.onChange(s.value)}
+                                        className="h-4 w-4 accent-primary"
+                                      />
+                                      {s.label}
+                                    </label>
+                                  ))}
+                                </div>
+                              </FormItem>
+                            )}
+                          />
+                          <FormField
+                            control={form.control}
+                            name="pickDate"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>Hẹn ngày lấy hàng</FormLabel>
+                                <DatePicker
+                                  id="pick-date"
+                                  value={field.value as DateKey | ''}
+                                  onChange={field.onChange}
+                                  fromDate={new Date()}
+                                  placeholder="Chọn ngày"
+                                  clearable
+                                />
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                        </>
+                      ) : null}
+
+                      <FormField
+                        control={form.control}
+                        name="insuranceValue"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Khai giá (bảo hiểm)</FormLabel>
+                            <FormControl>
+                              <MoneyInput
+                                value={field.value}
+                                onChange={field.onChange}
+                                placeholder="Trống = theo tiền thu hộ"
+                                aria-label="Khai giá"
+                                className="h-9"
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={form.control}
+                        name="maxWeightKg"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Khối lượng tối đa (kg)</FormLabel>
+                            <FormControl>
+                              <Input
+                                {...field}
+                                inputMode="decimal"
+                                placeholder="Trống = cân nặng của từng đơn"
+                                className="h-9 text-right tabular-nums"
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+
+                      <FormField
+                        control={form.control}
+                        name="note"
+                        render={({ field }) => (
+                          <FormItem className="sm:col-span-2">
+                            <FormLabel>Ghi chú để in</FormLabel>
+                            <FormControl>
+                              <Textarea {...field} placeholder="Ghi chú để in" rows={3} />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+
+                      <div className="sm:col-span-2">
+                        <Label className="text-sm">Kích thước gói hàng</Label>
+                        <div className="mt-1.5 flex items-center gap-2">
+                          {(['lengthCm', 'widthCm', 'heightCm'] as const).map((name, i) => (
+                            <FormField
+                              key={name}
+                              control={form.control}
+                              name={name}
+                              render={({ field }) => (
+                                <FormItem className="flex items-center gap-2 space-y-0">
+                                  {i > 0 ? <span className="text-muted-foreground">×</span> : null}
+                                  <FormControl>
+                                    <Input
+                                      {...field}
+                                      inputMode="numeric"
+                                      aria-label={
+                                        name === 'lengthCm'
+                                          ? 'Dài (cm)'
+                                          : name === 'widthCm'
+                                            ? 'Rộng (cm)'
+                                            : 'Cao (cm)'
+                                      }
+                                      placeholder="0"
+                                      className="h-9 w-20 text-right tabular-nums"
+                                    />
+                                  </FormControl>
+                                </FormItem>
+                              )}
+                            />
+                          ))}
+                          <span className="text-sm text-muted-foreground">(cm)</span>
+                        </div>
+                        <p className="text-xs text-destructive">
+                          {form.formState.errors.lengthCm?.message ??
+                            form.formState.errors.widthCm?.message ??
+                            form.formState.errors.heightCm?.message}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="space-y-2 border-t pt-4">
+                      <CheckField
+                        form={form}
+                        name="customPickup"
+                        label="Tùy chọn địa chỉ lấy hàng"
+                      />
+                      {customPickup ? (
+                        <FormField
+                          control={form.control}
+                          name="warehouseId"
+                          render={({ field }) => (
+                            <FormItem className="max-w-md">
+                              <FormLabel>Kho lấy hàng cho cả lô</FormLabel>
+                              <Select value={field.value} onValueChange={field.onChange}>
+                                <FormControl>
+                                  <SelectTrigger aria-label="Kho lấy hàng" className="h-9">
+                                    <SelectValue placeholder="Chọn kho" />
+                                  </SelectTrigger>
+                                </FormControl>
+                                <SelectContent>
+                                  {(warehouses.data ?? []).map((w) => (
+                                    <SelectItem key={w.id} value={w.id}>
+                                      {w.name} ({w.code})
+                                      {w.pickupReady ? '' : ' — chưa khai địa chỉ'}
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                      ) : null}
+                    </div>
+                  </div>
+
+                  <DialogFooter className="border-t px-5 py-3">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => onOpenChange(false)}
+                      disabled={send.isPending}
+                    >
+                      Hủy
+                    </Button>
+                    <Button type="submit" disabled={sendable.length === 0 || send.isPending}>
+                      {send.isPending ? 'Đang gửi…' : `Cập nhật ${sendable.length} đơn`}
+                    </Button>
+                  </DialogFooter>
+                </form>
+              </Form>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+      {/* Tờ in tem — ngoài hộp thoại, sống tới khi popup đóng. */}
+      {fp.sheet}
+    </>
   );
 }
 
@@ -656,11 +752,21 @@ function SendResults({
   result,
   orders,
   onClose,
+  ask,
 }: {
   carrierCode: string;
   result: SendOrdersToCarrierResult;
   orders: SalesOrder[];
   onClose: () => void;
+  /** Hỏi "Đóng gói + in vận đơn luôn?" (kho / admin, 2026-10-29); null = chỉ nút Đóng. */
+  ask: {
+    count: number;
+    /** Ô hướng tem. */
+    field: ReactNode;
+    /** Chữ nút khi đang chạy; null = rảnh. */
+    busyLabel: string | null;
+    onPack: () => void;
+  } | null;
 }) {
   const byId = new Map(orders.map((o) => [o.id, o]));
   const rows: OrderResultRow[] = [
@@ -722,11 +828,49 @@ function SendResults({
         fix: 'Cần sửa',
       }}
       footer={
-        <DialogFooter className="border-t px-5 py-3">
-          <Button type="button" onClick={onClose}>
-            Đóng
-          </Button>
-        </DialogFooter>
+        ask ? (
+          <>
+            <div
+              role="group"
+              aria-label="Đóng gói luôn"
+              className="mx-5 mb-3 space-y-2.5 rounded-md border border-warning-line bg-warning-weak p-3 text-sm"
+            >
+              <div>
+                <p className="font-semibold">Đóng gói + in vận đơn luôn {ask.count} đơn?</p>
+                <p className="text-xs text-muted-foreground">
+                  Trừ tồn và xin mã hãng ngay, không qua lấy hàng / quét trên PDA. Đơn cần sửa không
+                  được đóng gói.
+                </p>
+              </div>
+              {ask.field}
+            </div>
+            <DialogFooter className="items-center border-t px-5 py-3">
+              <span className="mr-auto text-xs text-muted-foreground">
+                Đóng popup = để kho lấy hàng
+              </span>
+              {/* Mặc định (Enter) là để kho lấy hàng — tránh lỡ tay trừ tồn. */}
+              <Button
+                type="button"
+                variant="outline"
+                autoFocus
+                disabled={ask.busyLabel !== null}
+                onClick={onClose}
+              >
+                Để kho lấy hàng
+              </Button>
+              <Button type="button" disabled={ask.busyLabel !== null} onClick={ask.onPack}>
+                <PackageCheck aria-hidden />
+                {ask.busyLabel ?? `Đóng gói + in ${ask.count} tem`}
+              </Button>
+            </DialogFooter>
+          </>
+        ) : (
+          <DialogFooter className="border-t px-5 py-3">
+            <Button type="button" onClick={onClose}>
+              Đóng
+            </Button>
+          </DialogFooter>
+        )
       }
     />
   );

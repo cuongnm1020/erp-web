@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { PackageCheck } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -21,6 +21,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { toast } from '@/components/ui/toaster';
+import { cn } from '@/lib/cn';
 import { carrierSaid, messageFor, messageForCode } from '@/lib/error-messages';
 import { usePrint } from '@/lib/print';
 import { useShipmentLabelDataMany, type ShipmentLabelData } from '@/features/wms/api/use-pda';
@@ -38,6 +39,14 @@ import { OrderResultsPanel, type OrderResultRow } from './order-results-panel';
 
 type Failed = BulkFulfilOrdersResult['failed'][number];
 
+/** Kết quả một lượt "Đóng gói + in": từng đơn + đơn lỗi (để biết có đơn đã trừ tồn chưa có mã). */
+export interface FulfilPrintOutcome {
+  rows: OrderResultRow[];
+  failed: Failed[];
+  /** Đơn có mã nhưng hãng chưa phản hồi (đang thử lại) — chưa in được. */
+  queued: number;
+}
+
 /** Lý do theo mã lỗi (luật 6) + nguyên văn lời hãng; đơn đã trừ tồn thì nói rõ đừng đóng lại. */
 function failedReason(f: Failed): string {
   const base = f.carrierMessage
@@ -49,59 +58,32 @@ function failedReason(f: Failed): string {
 }
 
 /**
- * "Đóng gói + in vận đơn" cho các đơn đã chọn — kho không pick/pack trên ERP (2026-10-21). POST
- * /sales-orders/bulk-fulfil (mỗi đơn như "Đã đóng gói" trên màn sửa: trừ tồn + xin vận đơn hãng
- * trên đơn), rồi in tem ERP 100×75 của các đơn có mã vận đơn trong MỘT lệnh in. Đơn chưa duyệt /
- * chưa gán hãng bị bỏ qua ngay ở client; đơn server từ chối được liệt kê trong hộp thoại.
+ * Lõi "Đóng gói + in vận đơn" dùng chung cho nút trên thanh chọn và popup sau "Gửi sang ĐVVC"
+ * (2026-10-29): POST /sales-orders/bulk-fulfil (mỗi đơn như "Đã đóng gói" trên màn sửa: trừ tồn +
+ * xin vận đơn hãng trên đơn), rồi in tem ERP 100×75 của các đơn có mã trong MỘT lệnh in. `sheet`
+ * là tờ in — phải mount tới khi in xong (`printing` = false). Hướng tem nhớ chung với bàn đóng gói.
  */
-export function BulkFulfilPrintDialog({
-  rows,
-  onDone,
-}: {
-  rows: SalesOrder[];
-  onDone: () => void;
-}) {
-  const [open, setOpen] = useState(false);
-  const [orientation, setOrientation] = useState<WaybillOrientation>('landscape');
-  useEffect(() => setOrientation(readOrientation()), []);
+export function useFulfilPrint() {
+  const [orientation, setOrientationState] = useState<WaybillOrientation>('landscape');
+  useEffect(() => setOrientationState(readOrientation()), []);
   const [labels, setLabels] = useState<ShipmentLabelData[]>([]);
   const [printedAt, setPrintedAt] = useState(() => new Date());
-  const [failed, setFailed] = useState<Failed[]>([]);
-  /** Kết quả từng đơn của lần bấm vừa rồi (2026-10-28) — null = chưa bấm / không cần xem. */
-  const [results, setResults] = useState<OrderResultRow[] | null>(null);
   const printer = usePrint();
   const bulk = useBulkFulfilOrders();
   const fetchLabels = useShipmentLabelDataMany();
-  const pending = bulk.isPending || fetchLabels.isPending;
 
-  const ready = rows.filter((r) => r.status === 'APPROVED' && r.carrierId);
-  const skipped = rows.length - ready.length;
-
-  // Bỏ chọn (onDone) gỡ cả nút này lẫn tờ in khỏi thanh chọn → chỉ gọi khi tờ in đã in xong và
-  // hộp thoại đã đóng.
-  const [finished, setFinished] = useState(false);
-  useEffect(() => {
-    if (finished && !printer.open && results === null) {
-      setFinished(false);
-      onDone();
-    }
-  }, [finished, printer.open, results, onDone]);
-
-  const close = (o: boolean) => {
-    if (pending) return;
-    setOpen(o);
-    if (!o) {
-      setFailed([]);
-      setResults(null);
-    }
+  const setOrientation = (v: WaybillOrientation) => {
+    setOrientationState(v);
+    rememberOrientation(v);
   };
 
-  const byId = new Map(rows.map((o) => [o.id, o]));
-
-  const submit = async () => {
-    if (ready.length === 0 || pending) return;
+  /** null = lỗi cả lô (đã báo toast). */
+  const run = async (
+    orderIds: string[],
+    byId: Map<string, SalesOrder>,
+  ): Promise<FulfilPrintOutcome | null> => {
     try {
-      const r = await bulk.mutateAsync(ready.map((o) => o.id));
+      const r = await bulk.mutateAsync(orderIds);
       const printable = r.done.filter((d) => d.trackingNo).map((d) => d.shipmentId);
       const queued = r.done.length - printable.length;
       if (printable.length > 0) {
@@ -127,16 +109,171 @@ export function BulkFulfilPrintDialog({
           notes.length > 0 ? { description: notes.join(' ') } : undefined,
         );
       }
-      const rows = resultRows(r, byId);
-      // Nhiều đơn / có lỗi / hãng chưa phản hồi → giữ hộp thoại với kết quả TỪNG đơn (2026-10-28).
-      if (r.failed.length > 0 || rows.length > 1 || queued > 0) {
-        setFailed(r.failed);
-        setResults(rows);
-      } else setOpen(false);
-      setFinished(true);
+      return { rows: resultRows(r, byId), failed: r.failed, queued };
     } catch (err) {
       toast.error(messageFor(err));
+      return null;
     }
+  };
+
+  const sheet: ReactNode =
+    labels.length > 0 ? (
+      <WaybillLabelBatchPrintSheet
+        labels={labels}
+        orientation={orientation}
+        printedAt={printedAt}
+        printer={printer}
+      />
+    ) : null;
+
+  return {
+    orientation,
+    setOrientation,
+    run,
+    sheet,
+    printing: printer.open,
+    pending: bulk.isPending || fetchLabels.isPending,
+    /** Chữ trên nút đang chạy — "Đang đóng gói…" / "Đang lấy tem…"; null = rảnh. */
+    busyLabel: bulk.isPending ? 'Đang đóng gói…' : fetchLabels.isPending ? 'Đang lấy tem…' : null,
+  };
+}
+
+/** Ô "Hướng tem" + nhắc cài hộp thoại in. */
+export function WaybillOrientationField({
+  id,
+  value,
+  onChange,
+  hint = true,
+}: {
+  id: string;
+  value: WaybillOrientation;
+  onChange: (v: WaybillOrientation) => void;
+  hint?: boolean;
+}) {
+  return (
+    <div className="space-y-1.5">
+      <Label htmlFor={id}>Hướng tem</Label>
+      <Select value={value} onValueChange={(v) => onChange(v as WaybillOrientation)}>
+        <SelectTrigger id={id} className="h-9 w-40">
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="landscape">Ngang</SelectItem>
+          <SelectItem value="portrait">Dọc</SelectItem>
+        </SelectContent>
+      </Select>
+      {hint ? (
+        <p className="text-xs text-muted-foreground">
+          Hộp thoại in: chọn máy in tem, khổ giấy 100×75 mm, lề “Không có”, tỉ lệ 100%.
+        </p>
+      ) : null}
+    </div>
+  );
+}
+
+/** Kết quả từng đơn sau "Đóng gói + in" — đơn đã trừ tồn chưa có mã thì chỉ sang tab Lỗi vận đơn. */
+export function FulfilResultsPanel({
+  outcome,
+  onClose,
+  flush = false,
+}: {
+  outcome: FulfilPrintOutcome;
+  onClose: () => void;
+  /** Hộp thoại không padding (popup Gửi sang ĐVVC) — chân tự chừa lề. */
+  flush?: boolean;
+}) {
+  const { rows, failed } = outcome;
+  return (
+    <OrderResultsPanel
+      title={
+        failed.length > 0 ? (
+          <span className="text-destructive">{failed.length} đơn không đóng gói / in được</span>
+        ) : (
+          `Đã xử lý ${rows.length} đơn`
+        )
+      }
+      description={
+        failed.some((f) => f.packed)
+          ? 'Đơn đã đóng gói (đã trừ tồn) mà chưa có mã nằm ở tab Lỗi vận đơn — sửa đơn rồi xin lại vận đơn, không đóng gói lại.'
+          : 'Các đơn có mã đã gửi lệnh in tem. Sửa từng đơn lỗi theo lý do bên dưới rồi làm lại.'
+      }
+      rows={rows}
+      hints={{
+        ok: 'Có mã vận đơn — đã gửi lệnh in',
+        wait: 'Hãng chưa phản hồi — đang thử lại',
+        fix: 'Lỗi — cần sửa',
+      }}
+      footer={
+        <DialogFooter
+          className={cn('items-center border-t sm:justify-between', flush ? 'px-5 py-3' : 'pt-3')}
+        >
+          {failed.some((f) => f.packed) ? (
+            <Link
+              href="/crm/orders?flow=WAYBILL_ERROR"
+              className="text-sm font-semibold text-primary hover:underline"
+              onClick={onClose}
+            >
+              Xem ở tab Lỗi vận đơn
+            </Link>
+          ) : (
+            <span />
+          )}
+          <Button variant="outline" onClick={onClose}>
+            Đóng
+          </Button>
+        </DialogFooter>
+      }
+    />
+  );
+}
+
+/**
+ * "Đóng gói + in vận đơn" cho các đơn đã chọn — kho không pick/pack trên ERP (2026-10-21). Đơn
+ * chưa duyệt / chưa gán hãng bị bỏ qua ngay ở client; đơn server từ chối được liệt kê trong hộp
+ * thoại. Lõi ở {@link useFulfilPrint}.
+ */
+export function BulkFulfilPrintDialog({
+  rows,
+  onDone,
+}: {
+  rows: SalesOrder[];
+  onDone: () => void;
+}) {
+  const [open, setOpen] = useState(false);
+  /** Kết quả từng đơn của lần bấm vừa rồi (2026-10-28) — null = chưa bấm / không cần xem. */
+  const [outcome, setOutcome] = useState<FulfilPrintOutcome | null>(null);
+  const fp = useFulfilPrint();
+
+  const ready = rows.filter((r) => r.status === 'APPROVED' && r.carrierId);
+  const skipped = rows.length - ready.length;
+
+  // Bỏ chọn (onDone) gỡ cả nút này lẫn tờ in khỏi thanh chọn → chỉ gọi khi tờ in đã in xong và
+  // hộp thoại đã đóng.
+  const [finished, setFinished] = useState(false);
+  useEffect(() => {
+    if (finished && !fp.printing && outcome === null) {
+      setFinished(false);
+      onDone();
+    }
+  }, [finished, fp.printing, outcome, onDone]);
+
+  const close = (o: boolean) => {
+    if (fp.pending) return;
+    setOpen(o);
+    if (!o) setOutcome(null);
+  };
+
+  const submit = async () => {
+    if (ready.length === 0 || fp.pending) return;
+    const r = await fp.run(
+      ready.map((o) => o.id),
+      new Map(rows.map((o) => [o.id, o])),
+    );
+    if (!r) return;
+    // Nhiều đơn / có lỗi / hãng chưa phản hồi → giữ hộp thoại với kết quả TỪNG đơn (2026-10-28).
+    if (r.failed.length > 0 || r.rows.length > 1 || r.queued > 0) setOutcome(r);
+    else setOpen(false);
+    setFinished(true);
   };
 
   return (
@@ -152,49 +289,10 @@ export function BulkFulfilPrintDialog({
       </Button>
       <Dialog open={open} onOpenChange={close}>
         <DialogContent>
-          {results ? (
+          {outcome ? (
             <>
               <DialogTitle className="sr-only">Kết quả đóng gói và in vận đơn</DialogTitle>
-              <OrderResultsPanel
-                title={
-                  failed.length > 0 ? (
-                    <span className="text-destructive">
-                      {failed.length} đơn không đóng gói / in được
-                    </span>
-                  ) : (
-                    `Đã xử lý ${results.length} đơn`
-                  )
-                }
-                description={
-                  failed.some((f) => f.packed)
-                    ? 'Đơn đã đóng gói (đã trừ tồn) mà chưa có mã nằm ở tab Lỗi vận đơn — sửa đơn rồi xin lại vận đơn, không đóng gói lại.'
-                    : 'Các đơn có mã đã gửi lệnh in tem. Sửa từng đơn lỗi theo lý do bên dưới rồi làm lại.'
-                }
-                rows={results}
-                hints={{
-                  ok: 'Có mã vận đơn — đã gửi lệnh in',
-                  wait: 'Hãng chưa phản hồi — đang thử lại',
-                  fix: 'Lỗi — cần sửa',
-                }}
-                footer={
-                  <DialogFooter className="items-center border-t pt-3 sm:justify-between">
-                    {failed.some((f) => f.packed) ? (
-                      <Link
-                        href="/crm/orders?flow=WAYBILL_ERROR"
-                        className="text-sm font-semibold text-primary hover:underline"
-                        onClick={() => close(false)}
-                      >
-                        Xem ở tab Lỗi vận đơn
-                      </Link>
-                    ) : (
-                      <span />
-                    )}
-                    <Button variant="outline" onClick={() => close(false)}>
-                      Đóng
-                    </Button>
-                  </DialogFooter>
-                }
-              />
+              <FulfilResultsPanel outcome={outcome} onClose={() => close(false)} />
             </>
           ) : (
             <>
@@ -206,52 +304,25 @@ export function BulkFulfilPrintDialog({
                   {skipped > 0 ? ` ${skipped} đơn chưa duyệt hoặc chưa gán hãng sẽ bị bỏ qua.` : ''}
                 </DialogDescription>
               </DialogHeader>
-              <div className="space-y-1.5">
-                <Label htmlFor="bulk-fulfil-orientation">Hướng tem</Label>
-                <Select
-                  value={orientation}
-                  onValueChange={(v) => {
-                    setOrientation(v as WaybillOrientation);
-                    rememberOrientation(v as WaybillOrientation);
-                  }}
-                >
-                  <SelectTrigger id="bulk-fulfil-orientation" className="h-9 w-40">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="landscape">Ngang</SelectItem>
-                    <SelectItem value="portrait">Dọc</SelectItem>
-                  </SelectContent>
-                </Select>
-                <p className="text-xs text-muted-foreground">
-                  Hộp thoại in: chọn máy in tem, khổ giấy 100×75 mm, lề “Không có”, tỉ lệ 100%.
-                </p>
-              </div>
+              <WaybillOrientationField
+                id="bulk-fulfil-orientation"
+                value={fp.orientation}
+                onChange={fp.setOrientation}
+              />
               <DialogFooter>
-                <Button variant="outline" disabled={pending} onClick={() => close(false)}>
+                <Button variant="outline" disabled={fp.pending} onClick={() => close(false)}>
                   Đóng
                 </Button>
-                <Button disabled={pending || ready.length === 0} onClick={() => void submit()}>
+                <Button disabled={fp.pending || ready.length === 0} onClick={() => void submit()}>
                   <PackageCheck aria-hidden />
-                  {bulk.isPending
-                    ? 'Đang đóng gói…'
-                    : fetchLabels.isPending
-                      ? 'Đang lấy tem…'
-                      : `Đóng gói + in ${ready.length} đơn`}
+                  {fp.busyLabel ?? `Đóng gói + in ${ready.length} đơn`}
                 </Button>
               </DialogFooter>
             </>
           )}
         </DialogContent>
       </Dialog>
-      {labels.length > 0 ? (
-        <WaybillLabelBatchPrintSheet
-          labels={labels}
-          orientation={orientation}
-          printedAt={printedAt}
-          printer={printer}
-        />
-      ) : null}
+      {fp.sheet}
     </>
   );
 }
