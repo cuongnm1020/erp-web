@@ -38,12 +38,18 @@ export function PancakeProfileSection({
   mutation,
   canEdit,
   self = false,
+  hideWorkingShops = false,
 }: {
   query: UseQueryResult<PancakeProfile>;
   mutation: UseMutationResult<PancakeProfileResult, unknown, PancakeProfileInput>;
   canEdit: boolean;
   /** Màn của chính mình — đổi lời hướng dẫn. */
   self?: boolean;
+  /**
+   * Ẩn danh sách "POS đang làm việc" (màn Nhân viên của team CSKH, user yêu cầu 2026-10-29) — lưu
+   * vẫn giữ nguyên các POS đang chọn; đồng bộ Pancake tự thêm POS khi có đơn về.
+   */
+  hideWorkingShops?: boolean;
 }) {
   return (
     <section className="rounded-md border bg-card p-3" aria-labelledby="pancake-profile-title">
@@ -62,6 +68,7 @@ export function PancakeProfileSection({
             profile={profile}
             mutation={mutation}
             canEdit={canEdit}
+            hideWorkingShops={hideWorkingShops}
           />
         )}
       </QueryState>
@@ -79,9 +86,11 @@ function ProfileForm({
   profile,
   mutation,
   canEdit,
+  hideWorkingShops,
 }: {
   profile: PancakeProfile;
   mutation: UseMutationResult<PancakeProfileResult, unknown, PancakeProfileInput>;
+  hideWorkingShops: boolean;
   canEdit: boolean;
 }) {
   const [fbId, setFbId] = useState(profile.fbId ?? '');
@@ -174,7 +183,6 @@ function ProfileForm({
             {profile.shops.map((s) => (
               <SelectItem key={s.shopId} value={s.shopId}>
                 {shopLabel(s)}
-                {s.isActive ? '' : ' (đã ngắt kết nối)'}
               </SelectItem>
             ))}
           </SelectContent>
@@ -184,37 +192,39 @@ function ProfileForm({
         </p>
       </div>
 
-      <fieldset className="space-y-1.5">
-        <legend className="mb-1 text-xs text-muted-foreground">POS đang làm việc</legend>
-        {profile.shops.length === 0 ? (
-          <p className="text-sm text-muted-foreground">
-            Chưa có POS Pancake nào kết nối — kết nối ở màn Kết nối Pancake.
-          </p>
-        ) : (
-          profile.shops.map((s) => (
-            <label key={s.shopId} className="flex items-center gap-2 text-sm">
-              <Checkbox
-                checked={shopIds.includes(s.shopId)}
-                disabled={!canEdit || fb === ''}
-                onCheckedChange={(v) =>
-                  setShopIds((cur) =>
-                    v === true ? [...cur, s.shopId] : cur.filter((x) => x !== s.shopId),
-                  )
-                }
-                aria-label={shopLabel(s)}
-              />
-              <span>{shopLabel(s)}</span>
-              <span className="font-mono text-xs text-muted-foreground">{s.shopId}</span>
-              {s.isActive ? null : (
-                <span className="text-xs text-muted-foreground">(đã ngắt kết nối)</span>
-              )}
-            </label>
-          ))
-        )}
-        {fb === '' && canEdit ? (
-          <p className="text-xs text-muted-foreground">Nhập Facebook ID trước rồi chọn POS.</p>
-        ) : null}
-      </fieldset>
+      {hideWorkingShops ? null : (
+        <fieldset className="space-y-1.5">
+          <legend className="mb-1 text-xs text-muted-foreground">POS đang làm việc</legend>
+          {profile.shops.length === 0 ? (
+            <p className="text-sm text-muted-foreground">
+              Chưa có POS Pancake nào kết nối — kết nối ở màn Kết nối Pancake.
+            </p>
+          ) : (
+            profile.shops.map((s) => (
+              <label key={s.shopId} className="flex items-center gap-2 text-sm">
+                <Checkbox
+                  checked={shopIds.includes(s.shopId)}
+                  disabled={!canEdit || fb === ''}
+                  onCheckedChange={(v) =>
+                    setShopIds((cur) =>
+                      v === true ? [...cur, s.shopId] : cur.filter((x) => x !== s.shopId),
+                    )
+                  }
+                  aria-label={shopLabel(s)}
+                />
+                <span>{shopLabel(s)}</span>
+                <span className="font-mono text-xs text-muted-foreground">{s.shopId}</span>
+                {s.isActive ? null : (
+                  <span className="text-xs text-muted-foreground">(đã ngắt kết nối)</span>
+                )}
+              </label>
+            ))
+          )}
+          {fb === '' && canEdit ? (
+            <p className="text-xs text-muted-foreground">Nhập Facebook ID trước rồi chọn POS.</p>
+          ) : null}
+        </fieldset>
+      )}
 
       {profile.otherFbIds.length ? (
         <p className="text-xs text-muted-foreground">

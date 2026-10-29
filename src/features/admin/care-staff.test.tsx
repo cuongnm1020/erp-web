@@ -135,6 +135,8 @@ describe('CareStaffScreen — Nhân viên của team (trưởng nhóm CSKH, 2026
     expect(screen.queryByLabelText('Họ tên')).toBeNull();
     expect(await screen.findByLabelText('Facebook ID trên Pancake')).toBeEnabled();
     expect(screen.getByRole('combobox', { name: 'POS lên đơn' })).toBeInTheDocument();
+    // Màn CSKH ẩn danh sách POS đang làm việc (2026-10-29).
+    expect(screen.queryByText('POS đang làm việc')).toBeNull();
   });
 
   it('"Thêm nhân viên" mở hộp tạo tài khoản đã gắn sẵn phòng CSKH', async () => {
