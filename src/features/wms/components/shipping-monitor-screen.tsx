@@ -34,12 +34,14 @@ import {
 } from '@/components/ui/table';
 import { cn } from '@/lib/cn';
 import { formatDate, formatDateTime, toLocalDateKey } from '@/lib/format';
+import { useAbility } from '@/lib/permission';
 import { useListState } from '@/lib/url-state';
 import {
   useCarriers,
   useShipmentMonitorList,
   useShipmentMonitorSummary,
   useShipmentStatusLog,
+  useShippingCareTeams,
   type ShipmentMonitorRow,
   type ShipmentMonitorSummary,
   type ShipmentMonitorView,
@@ -187,9 +189,18 @@ const columns: ColumnDef<ShipmentMonitorRow, unknown>[] = [
   },
 ];
 
-const FILTER_KEYS = ['date', 'carrierId', 'carrierAccountId', 'days', 'view'] as const;
+const FILTER_KEYS = [
+  'date',
+  'carrierId',
+  'carrierAccountId',
+  'careTeamId',
+  'days',
+  'view',
+] as const;
 type Filter = (typeof FILTER_KEYS)[number];
 const DEFAULTS = { size: 50, sort: null, filterKeys: FILTER_KEYS };
+/** Giá trị "Tất cả" của ô Phòng ban CSKH (Radix Select không nhận value rỗng). */
+const ALL_CARE_TEAMS = '__all__';
 const DAY_OPTIONS = ['3', '5', '7', '14'] as const;
 const DEFAULT_DAYS = 5;
 const ALL = '__all__';
@@ -324,9 +335,14 @@ export function ShippingMonitorScreen() {
   const [selected, setSelected] = useState<ShipmentMonitorRow | null>(null);
 
   const carrierAccountId = state.filters.carrierAccountId;
+  const careTeamId = state.filters.careTeamId;
+  // Phòng ban CSKH (2026-10-29): danh sách theo người xem từ API — rỗng thì ẩn ô.
+  const ability = useAbility();
+  const careTeams = useShippingCareTeams(ability.can('read', 'SalesOrder'));
+  const careTeamOptions = careTeams.data ?? [];
   const filter = useMemo(
-    () => ({ date, carrierId, carrierAccountId, holdDays }),
-    [date, carrierId, carrierAccountId, holdDays],
+    () => ({ date, carrierId, carrierAccountId, careTeamId, holdDays }),
+    [date, carrierId, carrierAccountId, careTeamId, holdDays],
   );
   const listParams = useMemo(
     () => ({ ...filter, view, q: state.q, ...skipTake }),
@@ -407,6 +423,29 @@ export function ShippingMonitorScreen() {
             }
           />
         </label>
+        {careTeamOptions.length > 0 ? (
+          <label className="flex flex-col gap-0.5 text-xs text-muted-foreground">
+            Phòng ban CSKH
+            <Select
+              value={careTeamId ?? ALL_CARE_TEAMS}
+              onValueChange={(v) =>
+                setFilters({ careTeamId: v === ALL_CARE_TEAMS ? undefined : v })
+              }
+            >
+              <SelectTrigger className="h-8 w-56" aria-label="Phòng ban CSKH">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value={ALL_CARE_TEAMS}>Tất cả</SelectItem>
+                {careTeamOptions.map((t) => (
+                  <SelectItem key={t.teamId} value={t.teamId}>
+                    {t.isActive ? t.name : `${t.name} (ngừng hoạt động)`}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </label>
+        ) : null}
         <label className="flex flex-col gap-0.5 text-xs text-muted-foreground">
           Cảnh báo khi hãng giữ quá
           <Select

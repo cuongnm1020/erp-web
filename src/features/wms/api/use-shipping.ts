@@ -16,6 +16,8 @@ export interface ShipmentMonitorFilter {
   carrierId?: string;
   /** Tài khoản hãng đã cấp vận đơn (ô chọn hãng dùng chung). */
   carrierAccountId?: string;
+  /** Phòng ban CSKH lên đơn (team `DEPT-<mã>`), 2026-10-29. */
+  careTeamId?: string;
   holdDays: number;
 }
 
@@ -33,6 +35,7 @@ export const shippingKeys = {
   all: ['wms', 'shipping'] as const,
   statusLog: (shipmentId: string) => [...shippingKeys.all, 'status-log', shipmentId] as const,
   carriers: () => [...shippingKeys.all, 'carriers'] as const,
+  careTeams: () => [...shippingKeys.all, 'care-teams'] as const,
   monitorSummary: (p: ShipmentMonitorFilter) =>
     [...shippingKeys.all, 'monitor', 'summary', p] as const,
   monitorList: (p: ShipmentMonitorListParams) =>
@@ -163,6 +166,7 @@ export function useShipmentMonitorSummary(params: ShipmentMonitorFilter) {
               date: params.date,
               carrierId: params.carrierId,
               carrierAccountId: params.carrierAccountId,
+              careTeamId: params.careTeamId,
               holdDays: params.holdDays,
             },
           },
@@ -186,6 +190,7 @@ export function useShipmentMonitorList(params: ShipmentMonitorListParams) {
               date: params.date,
               carrierId: params.carrierId,
               carrierAccountId: params.carrierAccountId,
+              careTeamId: params.careTeamId,
               holdDays: params.holdDays,
               q: params.q || undefined,
               take: params.take,
@@ -196,5 +201,18 @@ export function useShipmentMonitorList(params: ShipmentMonitorListParams) {
       ),
     placeholderData: keepPreviousData,
     refetchInterval: MONITOR_REFRESH_MS,
+  });
+}
+
+/**
+ * GET /sales-orders/care-team-options — ô "Phòng ban CSKH" (2026-10-29). API trả theo người xem:
+ * toàn quyền → mọi phòng CSKH, leader CSKH → phòng mình làm leader, người khác → rỗng (ẩn ô).
+ */
+export function useShippingCareTeams(enabled: boolean) {
+  return useQuery({
+    enabled,
+    queryKey: shippingKeys.careTeams(),
+    queryFn: () => unwrap(api.GET('/sales-orders/care-team-options')),
+    staleTime: 300_000,
   });
 }

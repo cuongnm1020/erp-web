@@ -21,6 +21,7 @@ import { Can, useAbility } from '@/lib/permission';
 import {
   useReportOwners,
   useReportPancakeShops,
+  useReportCareTeams,
   useReportTeams,
   useSalesRollupRebuild,
 } from '../api/use-sales-report';
@@ -72,6 +73,8 @@ export function SalesReportScreen() {
   const teamPicker = canView && canAll && ability.can('read', 'Customer');
   const ownerPicker = canView && canAll && ability.can('read', 'User');
   const teams = useReportTeams(teamPicker);
+  // Phòng ban CSKH (2026-10-29): danh sách theo người xem từ API — rỗng thì ẩn ô.
+  const careTeams = useReportCareTeams(canView && ability.can('read', 'SalesOrder'));
   const owners = useReportOwners(ownerPicker);
   // POS Pancake: ai xem được đơn là chọn được; lỗi (vd 403) thì ẩn bộ lọc.
   const shops = useReportPancakeShops(canView && ability.can('read', 'SalesOrder'));
@@ -81,9 +84,11 @@ export function SalesReportScreen() {
 
   const teamOptions = (teams.data ?? []).filter((t) => t.type === 'SALES');
   const ownerOptions = owners.data?.items ?? [];
+  const careTeamOptions = careTeams.data ?? [];
   const teamId = state.filters.teamId;
   const ownerId = state.filters.ownerId;
-  const showTeamChip = !!teamId && !teamOptions.some((t) => t.id === teamId);
+  const isCareTeam = !!teamId && careTeamOptions.some((t) => t.teamId === teamId);
+  const showTeamChip = !!teamId && !isCareTeam && !teamOptions.some((t) => t.id === teamId);
   const showOwnerChip = !!ownerId && !ownerOptions.some((u) => u.id === ownerId);
   const shopOptions = shops.data ?? [];
   const shopId = state.filters.pancakeShopId;
@@ -136,6 +141,18 @@ export function SalesReportScreen() {
             label="Team"
             value={showTeamChip ? undefined : teamId}
             options={teamOptions.map((t) => ({ value: t.id, label: t.name }))}
+            onChange={(v) => setFilters({ teamId: v, teamName: undefined })}
+          />
+        ) : null}
+        {careTeamOptions.length > 0 ? (
+          // Cùng tham số teamId với ô Team (sale) — chọn phòng CSKH thay cho team đang chọn.
+          <FilterSelect
+            label="Phòng ban CSKH"
+            value={isCareTeam ? teamId : undefined}
+            options={careTeamOptions.map((t) => ({
+              value: t.teamId,
+              label: t.isActive ? t.name : `${t.name} (ngừng hoạt động)`,
+            }))}
             onChange={(v) => setFilters({ teamId: v, teamName: undefined })}
           />
         ) : null}
