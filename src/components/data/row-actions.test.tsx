@@ -10,6 +10,31 @@ describe('<RowActions>', () => {
     expect(screen.queryByRole('button', { name: 'Xóa' })).not.toBeInTheDocument();
   });
 
+  it('inline: mục thường thành nút icon trên dòng, không "⋯"; mục tắt vẫn hiện, bị khóa; Xóa vẫn vào menu', async () => {
+    const user = userEvent.setup();
+    const retry = vi.fn();
+    render(
+      <RowActions
+        inline
+        itemName="đơn SO-1"
+        primary={{ label: 'Xem nhanh', icon: <span />, onClick: () => undefined }}
+        items={[
+          { label: 'Sửa đơn', icon: <span />, href: '/o/1/edit' },
+          { label: 'Nhân bản đơn', icon: <span />, disabledReason: 'Không có quyền' },
+          { label: 'Xin lại', icon: <span />, onSelect: retry },
+        ]}
+        onDelete={() => undefined}
+      />,
+    );
+    expect(screen.getByRole('link', { name: 'Sửa đơn' })).toHaveAttribute('href', '/o/1/edit');
+    expect(screen.getByRole('button', { name: 'Nhân bản đơn' })).toBeDisabled();
+    await user.click(screen.getByRole('button', { name: 'Xin lại' }));
+    expect(retry).toHaveBeenCalled();
+    await user.click(screen.getByRole('button', { name: 'Thao tác khác cho đơn SO-1' }));
+    expect(await screen.findByRole('menuitem', { name: 'Xóa' })).toBeInTheDocument();
+    expect(screen.queryByRole('menuitem', { name: 'Sửa đơn' })).not.toBeInTheDocument();
+  });
+
   it('không có action nào → không render gì', () => {
     const { container } = render(<RowActions />);
     expect(container).toBeEmptyDOMElement();

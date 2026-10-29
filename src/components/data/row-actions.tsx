@@ -46,6 +46,12 @@ export interface RowActionsProps {
   itemName?: string;
   /** Mô tả thêm trong hộp xác nhận (mặc định: không hoàn tác được). */
   deleteDescription?: string;
+  /**
+   * Mọi mục (trừ Xóa / Hủy) thành nút icon ngay trên dòng, không có "⋯" — cho bảng chỉ có vài việc
+   * an toàn hay làm (danh sách đơn: Xem nhanh · Sửa · Nhân bản, user yêu cầu 2026-10-29). Mục cần
+   * `icon`; mục nguy hiểm vẫn vào menu.
+   */
+  inline?: boolean;
   className?: string;
 }
 
@@ -64,6 +70,7 @@ export function RowActions({
   deleteLabel = 'Xóa',
   itemName,
   deleteDescription = 'Hành động này không hoàn tác được.',
+  inline = false,
   className,
 }: RowActionsProps) {
   const [confirming, setConfirming] = useState(false);
@@ -96,6 +103,35 @@ export function RowActions({
   if (!direct && menu.length === 0 && dangerItems.length === 0) return null;
 
   const tip = (label: string) => (itemName ? `${label} ${itemName}` : label);
+  const iconButton = (it: RowActionItem) =>
+    it.href && !it.disabledReason ? (
+      <Button
+        key={it.label}
+        variant="ghost"
+        size="icon-sm"
+        className="text-muted-foreground hover:text-foreground"
+        asChild
+        title={tip(it.label)}
+      >
+        <Link href={it.href} aria-label={it.label}>
+          {it.icon}
+        </Link>
+      </Button>
+    ) : (
+      <Button
+        key={it.label}
+        variant="ghost"
+        size="icon-sm"
+        className="text-muted-foreground hover:text-foreground"
+        title={it.disabledReason ? `${it.label} — ${it.disabledReason}` : tip(it.label)}
+        aria-label={it.label}
+        disabled={Boolean(it.disabledReason)}
+        onClick={it.onSelect}
+      >
+        {it.icon}
+      </Button>
+    );
+  const shownMenu = inline ? [] : menu;
   const renderItem = (it: RowActionItem) => (
     <DropdownMenuItem
       key={it.label}
@@ -148,7 +184,8 @@ export function RowActions({
           </Button>
         )
       ) : null}
-      {menu.length > 0 || dangerItems.length > 0 ? (
+      {inline ? menu.map(iconButton) : null}
+      {shownMenu.length > 0 || dangerItems.length > 0 ? (
         <DropdownMenu modal={false}>
           <DropdownMenuTrigger asChild>
             <Button
@@ -162,8 +199,8 @@ export function RowActions({
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
-            {menu.map(renderItem)}
-            {menu.length > 0 && dangerItems.length > 0 ? <DropdownMenuSeparator /> : null}
+            {shownMenu.map(renderItem)}
+            {shownMenu.length > 0 && dangerItems.length > 0 ? <DropdownMenuSeparator /> : null}
             {dangerItems.map(renderItem)}
           </DropdownMenuContent>
         </DropdownMenu>

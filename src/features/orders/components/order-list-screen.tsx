@@ -7,7 +7,6 @@ import {
   ChevronDown,
   Copy,
   Eye,
-  ExternalLink,
   MessageSquareText,
   Pencil,
   Plus,
@@ -242,14 +241,12 @@ interface RowActionContext {
   onRetryWaybill: (row: SalesOrderListItem) => void;
 }
 
-/** Menu "⋯" của một dòng đơn: mở / sửa / nhân bản (redesign 2026-10-22). */
+/**
+ * Nút thao tác của một dòng đơn, đứng cạnh Xem nhanh, không "⋯" (user yêu cầu 2026-10-29): Sửa ·
+ * Nhân bản (+ Xin lại vận đơn ở tab Lỗi vận đơn). Mở chi tiết = bấm mã đơn.
+ */
 function orderRowItems(o: SalesOrderListItem, ctx: RowActionContext): RowActionItem[] {
   return [
-    {
-      label: 'Mở chi tiết',
-      icon: <ExternalLink aria-hidden />,
-      href: `/crm/orders/${o.id}`,
-    },
     ...(ctx.canPack && o.flow === 'WAYBILL_ERROR' && o.shipment?.carrierCode
       ? [
           {
@@ -315,24 +312,30 @@ const buildColumns = (
               </span>
             ) : null}
           </div>
-          <div className="text-xs text-muted-foreground">
-            {o.pancakeOrderId ? (
-              <PancakeOrderLink orderId={o.pancakeOrderId} link={o.pancakeOrderLink} />
-            ) : (
-              'Tạo trong ERP'
-            )}
+          {/* Bảng gọn (2026-10-29): nguồn · NV · page trên MỘT dòng, dài thì cắt (di chuột xem đủ). */}
+          <div
+            className="flex min-w-0 items-center gap-1 text-xs text-muted-foreground"
+            title={[o.ownerName, o.facebookPageName].filter(Boolean).join(' · ') || undefined}
+          >
+            <span className="shrink-0">
+              {o.pancakeOrderId ? (
+                <PancakeOrderLink orderId={o.pancakeOrderId} link={o.pancakeOrderLink} />
+              ) : (
+                'ERP'
+              )}
+            </span>
+            {o.marketplace ? <MarketplaceBadge marketplace={o.marketplace} /> : null}
+            {o.ownerName ? (
+              <span className="truncate text-foreground" data-testid="order-owner">
+                · {o.ownerName}
+              </span>
+            ) : null}
+            {o.facebookPageName ? (
+              <span className="sr-only" data-testid="order-page">
+                {o.facebookPageName}
+              </span>
+            ) : null}
           </div>
-          {o.marketplace ? <MarketplaceBadge marketplace={o.marketplace} /> : null}
-          {o.ownerName ? (
-            <div className="break-words text-xs text-foreground" data-testid="order-owner">
-              {o.ownerName}
-            </div>
-          ) : null}
-          {o.facebookPageName ? (
-            <div className="break-words text-xs text-muted-foreground" data-testid="order-page">
-              {o.facebookPageName}
-            </div>
-          ) : null}
         </div>
       );
     },
@@ -353,7 +356,7 @@ const buildColumns = (
       const o = row.original;
       const telco = phoneCarrier(o.phone);
       return (
-        <div className="space-y-1">
+        <div className="space-y-0.5">
           <span className="block max-w-48 truncate font-medium" title={o.customer.name}>
             {o.recipientName ?? o.customer.name}
           </span>
@@ -379,7 +382,7 @@ const buildColumns = (
     // Không đặt width (2026-10-29): bảng trải đủ ngang, phần thừa dồn vào Địa chỉ + Sản phẩm thay
     // vì chia đều thành khoảng trống giữa mọi cột; chữ dài xuống tối đa 2 dòng.
     cell: ({ row }) => (
-      <div className="min-w-44 space-y-1">
+      <div className="min-w-44 space-y-0.5">
         <span className="line-clamp-2 break-words" title={row.original.addressLine ?? undefined}>
           {row.original.addressLine ?? '—'}
         </span>
@@ -396,7 +399,7 @@ const buildColumns = (
       if (!p) return <span className="text-muted-foreground">—</span>;
       const name = `${p.name} × ${formatQuantity(p.qty)}`;
       return (
-        <div className="min-w-40 space-y-1">
+        <div className="min-w-40 space-y-0.5">
           <span className="line-clamp-2 break-words" title={name}>
             {name}
           </span>
@@ -533,9 +536,10 @@ const buildColumns = (
   {
     id: 'actions',
     header: () => <span className="sr-only">Thao tác</span>,
-    meta: { width: 72, title: 'Thao tác' },
+    meta: { width: 104, title: 'Thao tác' },
     cell: ({ row }) => (
       <RowActions
+        inline
         itemName={`đơn ${row.original.docNumber}`}
         primary={{
           label: 'Xem nhanh',
