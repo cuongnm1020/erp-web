@@ -22,7 +22,12 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { formatMoney, formatQuantity } from '@/lib/format';
-import { useLinePrice, useSkuAvailability, useSkuDetail } from '../../api/use-line-entry';
+import {
+  useComboAvailableIn,
+  useLinePrice,
+  useSkuAvailability,
+  useSkuDetail,
+} from '../../api/use-line-entry';
 import type { CreateOrderValues } from '../../schema';
 
 const QTY_RE = /^\d{1,12}(\.\d{1,6})?$/;
@@ -50,6 +55,7 @@ export function CartLine({
   index,
   customerId,
   channel,
+  warehouseId,
   onMetrics,
   onRemove,
 }: {
@@ -58,6 +64,8 @@ export function CartLine({
   index: number;
   customerId: string;
   channel: CreateOrderValues['channel'];
+  /** Kho xuất của đơn — khả dụng tính trong kho này (2026-10-29); rỗng = mọi kho. */
+  warehouseId: string;
   onMetrics: (fieldId: string, m: LineMetrics) => void;
   onRemove: () => void;
 }) {
@@ -68,7 +76,12 @@ export function CartLine({
   const sku = useSkuDetail(skuId);
   const combo = sku.data?.isCombo ? (sku.data.combo ?? null) : null;
   // Combo không có tồn riêng — khả dụng lấy từ thành phần (GET /skus/{id}.combo), không hỏi /stock.
-  const stock = useSkuAvailability(combo ? '' : (sku.data?.code ?? ''));
+  // Đã chọn Kho xuất → chỉ tính tồn trong kho đó (2026-10-29).
+  const stock = useSkuAvailability(combo ? '' : (sku.data?.code ?? ''), warehouseId);
+  const comboIn = useComboAvailableIn(combo ? (sku.data?.code ?? '') : '', warehouseId);
+  const comboAvailable = warehouseId ? (comboIn.data ?? null) : (combo?.available ?? null);
+  /** Kho xuất không có dòng tồn nào của SKU — coi như 0. */
+  const noStockHere = !combo && warehouseId !== '' && sku.data && stock.isSuccess && !stock.data;
   const qtyValid = QTY_RE.test(qty ?? '');
   const price = useLinePrice({ skuId, uomId, qty: qtyValid ? qty : '', customerId, channel });
 
@@ -87,10 +100,12 @@ export function CartLine({
       : null;
   const qtyBase = qtyValid ? (factor ? new Decimal(qty).mul(factor) : new Decimal(qty)) : null;
   const low = combo
-    ? qtyValid && new Decimal(combo.available).lessThan(qty)
-    : stock.data && qtyBase
-      ? new Decimal(stock.data.available).lessThan(qtyBase)
-      : false;
+    ? qtyValid && comboAvailable !== null && new Decimal(comboAvailable).lessThan(qty)
+    : noStockHere
+      ? qtyValid
+      : stock.data && qtyBase
+        ? new Decimal(stock.data.available).lessThan(qtyBase)
+        : false;
 
   // Đơn giá hiệu lực = giá sửa tay, không thì giá niêm yết; thành tiền = đơn giá × SL (làm tròn 4
   // lẻ như server).
@@ -191,10 +206,14 @@ export function CartLine({
             )}
           />
           {combo ? (
-            <span className={low ? 'font-semibold text-destructive' : undefined}>
-              Còn bán được {formatQuantity(combo.available)} combo
-              {low ? ' — thiếu thành phần' : ''}
-            </span>
+            comboAvailable !== null ? (
+              <span className={low ? 'font-semibold text-destructive' : undefined}>
+                Còn bán được {formatQuantity(comboAvailable)} combo
+                {low ? ' — thiếu thành phần' : ''}
+              </span>
+            ) : null
+          ) : noStockHere ? (
+            <span className="font-semibold text-destructive">Kho xuất chưa có hàng</span>
           ) : stock.data ? (
             <span className={low ? 'font-semibold text-destructive' : undefined}>
               Khả dụng {formatQuantity(stock.data.available)} {stock.data.baseUomCode}

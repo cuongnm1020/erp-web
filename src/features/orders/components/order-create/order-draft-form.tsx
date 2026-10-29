@@ -398,6 +398,7 @@ export const OrderDraftForm = forwardRef<
                             index={i}
                             customerId={customerId}
                             channel={channel}
+                            warehouseId={warehouseId}
                             onMetrics={onMetrics}
                             onRemove={() => lines.remove(i)}
                           />
