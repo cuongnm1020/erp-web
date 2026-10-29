@@ -397,8 +397,8 @@ describe('OrderListScreen — cân nặng gửi hãng + gán hãng hàng loạt'
       fireEvent.click(screen.getAllByRole('checkbox', { name: 'Chọn dòng' })[i]!);
     }
     expect(await screen.findByRole('toolbar')).toBeInTheDocument();
-    openMoreMenu();
-    fireEvent.click(await screen.findByRole('menuitem', { name: /Hủy đơn/ }));
+    // Nút "Hủy đơn" nằm thẳng trên thanh chọn (2026-10-29), không trong menu "Khác".
+    fireEvent.click(await screen.findByRole('button', { name: /Hủy đơn/ }));
     const dialog = await screen.findByRole('dialog');
     expect(dialog).toHaveTextContent('Hủy 2 đơn đã chọn?');
     expect(dialog).toHaveTextContent('1 đơn đã hủy hoặc kho đã đóng gói sẽ bị bỏ qua');
@@ -586,7 +586,17 @@ describe('OrderListScreen — cân nặng gửi hãng + gán hãng hàng loạt'
     ).not.toBeInTheDocument();
   });
 
-  it('không có quyền sales_order.cancel → thanh chọn không có nút "Hủy đơn" (luật 7)', async () => {
+  it('người lên đơn (sales_order.create, không có quyền hủy) vẫn thấy nút "Hủy đơn" — server kiểm từng đơn', async () => {
+    search = '';
+    renderApp(<OrderListScreen />, {
+      me: { ...ME_SALE, permissions: ['sales_order.read', 'sales_order.create'] },
+    });
+    await screen.findByText(FIRST.docNumber);
+    fireEvent.click(screen.getAllByRole('checkbox', { name: 'Chọn dòng' })[0]!);
+    expect(await screen.findByRole('button', { name: /Hủy đơn/ })).toBeInTheDocument();
+  });
+
+  it('không có quyền hủy lẫn lên đơn → thanh chọn không có nút "Hủy đơn" (luật 7)', async () => {
     search = '';
     renderApp(<OrderListScreen />, {
       me: { ...ME_SALE, permissions: ['sales_order.read', 'sales_order.update'] },
@@ -598,7 +608,7 @@ describe('OrderListScreen — cân nặng gửi hãng + gán hãng hàng loạt'
     expect(
       await screen.findByRole('menuitem', { name: /Gán hãng \/ cân nặng/ }),
     ).toBeInTheDocument();
-    expect(screen.queryByRole('menuitem', { name: /Hủy đơn/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Hủy đơn/ })).not.toBeInTheDocument();
   });
 });
 
