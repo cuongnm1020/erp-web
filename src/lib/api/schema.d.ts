@@ -3678,6 +3678,27 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/sales-orders/release-pick": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Thả việc lấy hàng đang giữ của các đơn vừa "Gửi sang ĐVVC" với `holdPick` (2026-10-29): người
+         *     gửi chọn "Để kho lấy hàng" hoặc đóng popup "Đóng gói + in vận đơn luôn?". Đơn không còn giữ
+         *     (đã đóng gói / đã thả / hết hạn) bỏ qua — gọi lại an toàn.
+         */
+        post: operations["SalesOrderController_releasePick"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/sales-orders/bulk-cancel": {
         parameters: {
             query?: never;
@@ -11815,6 +11836,12 @@ export interface components {
             warehouseId?: string;
             /** @description Cân nặng gửi hãng (kg) cho cả lô; bỏ trống = giữ nguyên từng đơn. */
             shippingWeightKg?: string;
+            /**
+             * @description true = chưa đưa việc lấy hàng cho kho: người gửi sắp chọn "Đóng gói + in vận đơn" hay "Để kho
+             *     lấy hàng" (POST /sales-orders/release-pick). Bỏ ngang thì tự thả sau 15 phút. Chỉ có tác dụng
+             *     với người có quyền `sales_order.fulfil_manual`.
+             */
+            holdPick?: boolean;
         };
         SendOrderToCarrierItemDto: {
             orderId: string;
@@ -11862,6 +11889,13 @@ export interface components {
             sent: components["schemas"]["SendOrderToCarrierItemDto"][];
             /** @description Đơn không gửi được (đã post/hủy, ngoài scope, thiếu địa chỉ giao…) — phần còn lại vẫn gửi. */
             failed: components["schemas"]["SendToCarrierFailedItemDto"][];
+        };
+        ReleasePickDto: {
+            orderIds: string[];
+        };
+        ReleasePickResultDto: {
+            /** @description Số đơn vừa được thả (đơn không còn giữ — đã đóng gói / đã thả / hết hạn — không tính). */
+            released: number;
         };
         BulkCancelOrdersDto: {
             orderIds: string[];
@@ -22320,6 +22354,29 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["SendOrdersToCarrierResultDto"];
+                };
+            };
+        };
+    };
+    SalesOrderController_releasePick: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReleasePickDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReleasePickResultDto"];
                 };
             };
         };
