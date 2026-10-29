@@ -15,6 +15,7 @@ import {
   StaffSelect,
   type StaffSelectItem,
 } from '@/components/data/form';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import {
@@ -44,11 +45,15 @@ import {
   type OrgEmployee,
 } from '../api/use-org-tree';
 import { useUpdateUserPancakeProfile, useUserPancakeProfile } from '../api/use-pancake-profile';
+import { useAssignableRoles } from '../api/use-roles';
 import { useUpdateUser } from '../api/use-users';
 import { editStaffSchema, type EditStaffValues } from '../schema';
 import { PancakeProfileSection } from './pancake-profile-section';
 
 const NONE = '__none__';
+
+/** Vai trò CSKH đổi qua ô Chức vụ — server giữ nguyên khi PATCH roleCodes. */
+const CARE_ROLES = ['CSKH_LEADER', 'CSKH_GROUP_LEAD', 'CSKH_MEMBER'];
 
 const POSITION_LABEL: Record<CarePosition, string> = {
   MEMBER: 'Nhân viên',
@@ -79,8 +84,14 @@ export function OrgStaffDialog({
   allowUnassign,
   onOpenChange,
   care,
+  roles,
 }: {
   employee: OrgEmployee;
+  /**
+   * Vai trò hiện tại — có = hiện mục Vai trò (2026-10-29: trưởng phòng đổi vai trò nhân viên).
+   * Tick được vai trò người sửa cấp được (GET /roles/assignable); vai trò ngoài tầm hiện khóa.
+   */
+  roles?: { code: string; name: string }[];
   /** Có = hiện Chức vụ + Trưởng nhóm (màn Nhân viên của team, người sửa là trưởng phòng / quản trị). */
   care?: CareEditOptions;
   departments: { id: string; name: string; path: string }[];
@@ -94,6 +105,18 @@ export function OrgStaffDialog({
   const [position, setPositionValue] = useState<CarePosition>(care?.position ?? 'MEMBER');
   const [groupLeaderId, setGroupLeaderId] = useState(care?.groupLeaderId ?? '');
   const busy = update.isPending || setPosition.isPending || setGroup.isPending;
+  const assignable = useAssignableRoles(roles !== undefined);
+  const currentRoles = (roles ?? []).filter((r) => !CARE_ROLES.includes(r.code));
+  const roleOptions = [
+    ...(assignable.data ?? []).filter((r) => !CARE_ROLES.includes(r.code)),
+    ...currentRoles.filter((r) => !assignable.data?.some((a) => a.code === r.code)),
+  ];
+  const canAssign = (code: string) => assignable.data?.some((a) => a.code === code) ?? false;
+  const [roleCodes, setRoleCodes] = useState(() => currentRoles.map((r) => r.code));
+  const rolesChanged =
+    roles !== undefined &&
+    (roleCodes.length !== currentRoles.length ||
+      roleCodes.some((c) => !currentRoles.some((r) => r.code === c)));
   const pancakeProfile = useUserPancakeProfile(employee.id);
   const updatePancakeProfile = useUpdateUserPancakeProfile(employee.id);
   const form = useForm<EditStaffValues>({
@@ -124,6 +147,7 @@ export function OrgStaffDialog({
           ? { departmentId: v.departmentId || null }
           : {}),
         ...(v.password ? { password: v.password } : {}),
+        ...(rolesChanged ? { roleCodes } : {}),
       },
       {
         onSuccess: async () => {
@@ -224,6 +248,33 @@ export function OrgStaffDialog({
                 </FormItem>
               )}
             />
+            {roles !== undefined && roleOptions.length > 0 ? (
+              <fieldset className="space-y-1.5">
+                <legend className="text-sm font-medium">Vai trò</legend>
+                <div className="grid grid-cols-2 gap-1.5">
+                  {roleOptions.map((r) => (
+                    <label key={r.code} className="flex items-center gap-2 text-sm">
+                      <Checkbox
+                        checked={roleCodes.includes(r.code)}
+                        disabled={busy || !canAssign(r.code)}
+                        onCheckedChange={(v) =>
+                          setRoleCodes((cur) =>
+                            v === true ? [...cur, r.code] : cur.filter((c) => c !== r.code),
+                          )
+                        }
+                        aria-label={r.name}
+                      />
+                      {r.name}
+                    </label>
+                  ))}
+                </div>
+                {roleOptions.some((r) => !canAssign(r.code)) ? (
+                  <p className="text-xs text-muted-foreground">
+                    Vai trò bị khóa nằm ngoài quyền của bạn — chỉ quản trị đổi được.
+                  </p>
+                ) : null}
+              </fieldset>
+            ) : null}
             {care ? (
               <div className="grid gap-3 sm:grid-cols-2">
                 <div className="space-y-1.5">

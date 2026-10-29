@@ -131,6 +131,64 @@ describe('CareStaffScreen — Nhân viên của team (trưởng nhóm CSKH, 2026
     expect(dialog).toHaveTextContent(DEPT.name);
   });
 
+  it('Sửa nhân sự (2026-10-29): mục Vai trò tick vai trò cấp được, vai trò ngoài tầm khóa; Lưu → PATCH roleCodes', async () => {
+    search = '';
+    const patches: unknown[] = [];
+    const role = (code: string, name: string) => ({
+      id: code,
+      code,
+      name,
+      description: null,
+      permissions: [],
+      memberCount: 0,
+    });
+    server.use(
+      http.get('/api/org/care-staff', () =>
+        HttpResponse.json({
+          ...LIST,
+          staff: [
+            staff('a', {
+              roles: [
+                { code: 'CSKH_MEMBER', name: 'Nhân viên CSKH' },
+                { code: 'ACCOUNTANT', name: 'Kế toán' },
+              ],
+            }),
+          ],
+        }),
+      ),
+      http.get('/api/reports/sales/by-staff', () =>
+        HttpResponse.json({ items: [], groupBy: 'owner', totals: {} }),
+      ),
+      http.get('/api/roles/assignable', () =>
+        HttpResponse.json([
+          role('CSKH_MEMBER', 'Nhân viên CSKH'),
+          role('SALES_MEMBER', 'Nhân viên kinh doanh'),
+        ]),
+      ),
+      http.patch('/api/users/:id', async ({ request }) => {
+        patches.push(await request.json());
+        return HttpResponse.json({});
+      }),
+    );
+    renderApp(<CareStaffScreen />, { me: ME_CSKH_LEAD });
+    fireEvent.click(await screen.findByRole('button', { name: 'Sửa cs.a' }));
+    const dialog = await screen.findByRole('dialog');
+    const sale = await within(dialog).findByRole('checkbox', { name: 'Nhân viên kinh doanh' });
+    // Vai trò CSKH đổi qua Chức vụ → không có ô tick; Kế toán ngoài tầm → khóa, giữ nguyên.
+    expect(within(dialog).queryByRole('checkbox', { name: 'Nhân viên CSKH' })).toBeNull();
+    const accountant = within(dialog).getByRole('checkbox', { name: 'Kế toán' });
+    expect(accountant).toBeDisabled();
+    expect(accountant).toBeChecked();
+    fireEvent.click(sale);
+    // Nút thứ hai là của mục Hồ sơ Pancake.
+    fireEvent.click(within(dialog).getAllByRole('button', { name: 'Lưu thay đổi' })[0]!);
+    await waitFor(() =>
+      expect(patches).toEqual([
+        expect.objectContaining({ roleCodes: ['ACCOUNTANT', 'SALES_MEMBER'] }),
+      ]),
+    );
+  });
+
   it('không phụ trách phòng CSKH nào → trạng thái trống, không có nút thêm', async () => {
     search = '';
     server.use(
