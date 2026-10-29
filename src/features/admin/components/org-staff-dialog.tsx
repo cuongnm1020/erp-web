@@ -86,7 +86,10 @@ export function OrgStaffDialog({
   care,
   roles,
   pancakeOnly = false,
+  hideWorkingShops = false,
 }: {
+  /** Ẩn "POS đang làm việc" trong Hồ sơ Pancake (màn Nhân viên của team CSKH, 2026-10-29). */
+  hideWorkingShops?: boolean;
   employee: OrgEmployee;
   /**
    * Chỉ hồ sơ Pancake (fb_id + POS) — trưởng nhóm CSKH chưa được tick quyền sửa nhân viên vẫn khai
@@ -191,7 +194,7 @@ export function OrgStaffDialog({
           </DialogTitle>
           <DialogDescription>
             {pancakeOnly
-              ? `${employee.fullName} — Facebook ID, POS làm việc và POS lên đơn.`
+              ? `${employee.fullName} — Facebook ID và POS lên đơn.`
               : 'Mã nhân viên không đổi được. Để trống mật khẩu nếu không đặt lại.'}
           </DialogDescription>
         </DialogHeader>
@@ -362,7 +365,12 @@ export function OrgStaffDialog({
             </form>
           </Form>
         )}
-        <PancakeProfileSection query={pancakeProfile} mutation={updatePancakeProfile} canEdit />
+        <PancakeProfileSection
+          query={pancakeProfile}
+          mutation={updatePancakeProfile}
+          canEdit
+          hideWorkingShops={hideWorkingShops}
+        />
       </DialogContent>
     </Dialog>
   );

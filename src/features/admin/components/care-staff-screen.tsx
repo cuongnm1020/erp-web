@@ -446,6 +446,7 @@ export function CareStaffScreen() {
           allowUnassign={false}
           roles={editing.canEdit ? editing.roles : undefined}
           pancakeOnly={!editing.canEdit}
+          hideWorkingShops
           onOpenChange={(o) => !o && setEditing(null)}
           care={
             editing.canEdit && editing.canLead
