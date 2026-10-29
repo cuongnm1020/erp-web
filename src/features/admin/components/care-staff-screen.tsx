@@ -1,6 +1,6 @@
 'use client';
 
-import { Lock, LockOpen, Pencil, Plus, ShieldCheck } from 'lucide-react';
+import { Lock, LockOpen, Pencil, Plus, ShieldCheck, Store } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { ConfirmDialog } from '@/components/data/confirm-dialog';
 import { DataTable, type ColumnDef } from '@/components/data/data-table';
@@ -34,6 +34,7 @@ import {
 } from '../api/use-org-tree';
 import { useUpdateUser } from '../api/use-users';
 import { CARE_GRANT_LABELS } from '../labels';
+import { CareDepartmentPosDialog } from './care-department-pos-dialog';
 import { CareGrantDialog } from './care-grant-dialog';
 import { OrgStaffDialog } from './org-staff-dialog';
 import { UserCreateDialog } from './user-create-dialog';
@@ -88,6 +89,7 @@ export function CareStaffScreen() {
   const [editing, setEditing] = useState<CareStaff | null>(null);
   const [locking, setLocking] = useState<CareStaff | null>(null);
   const [granting, setGranting] = useState<CareStaff | null>(null);
+  const [settingPos, setSettingPos] = useState(false);
   const viewer = staff.data?.viewer;
 
   const departments = staff.data?.departments ?? [];
@@ -309,12 +311,20 @@ export function CareStaffScreen() {
           { label: 'Nhân viên của team' },
         ]}
         actions={
-          createDept ? (
-            <Button onClick={() => setCreating(true)}>
-              <Plus aria-hidden />
-              Thêm nhân viên
-            </Button>
-          ) : null
+          <>
+            {departments.length > 0 ? (
+              <Button variant="outline" onClick={() => setSettingPos(true)}>
+                <Store aria-hidden />
+                POS lên đơn của phòng
+              </Button>
+            ) : null}
+            {createDept ? (
+              <Button onClick={() => setCreating(true)}>
+                <Plus aria-hidden />
+                Thêm nhân viên
+              </Button>
+            ) : null}
+          </>
         }
       />
 
@@ -462,6 +472,7 @@ export function CareStaffScreen() {
       ) : null}
       {granting ? <CareGrantDialog lead={granting} onClose={() => setGranting(null)} /> : null}
       {locking ? <LockDialog staff={locking} onClose={() => setLocking(null)} /> : null}
+      {settingPos ? <CareDepartmentPosDialog onClose={() => setSettingPos(false)} /> : null}
     </>
   );
 }
