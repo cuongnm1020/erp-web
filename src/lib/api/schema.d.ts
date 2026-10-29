@@ -6788,6 +6788,38 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/care-departments/default-pos": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["CareDepartmentPosController_list"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/care-departments/{id}/default-pos": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put: operations["CareDepartmentPosController_set"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/health": {
         parameters: {
             query?: never;
@@ -6862,7 +6894,8 @@ export interface components {
             defaultWarehouseId: string | null;
             /**
              * @description POS lên đơn mặc định (shop_id Pancake, chuỗi số — 2026-10-29): màn Tạo đơn tự điền ô POS; leader
-             *     / trưởng nhóm CSKH chọn cho nhân viên. null = không tự điền.
+             *     / trưởng nhóm CSKH chọn cho nhân viên; chưa chọn → POS của phòng ban (phòng gần nhất theo cây có
+             *     đặt). null = không tự điền.
              */
             defaultPosShopId: string | null;
             /** @description Kho đang chọn theo header `X-Warehouse-Id` nếu được phép; null = tất cả kho / kho chọn không còn được phép. */
@@ -10239,6 +10272,8 @@ export interface components {
              * @enum {string}
              */
             kind: "SALES" | "CSKH";
+            /** @description POS lên đơn mặc định của phòng CSKH (shop_id, chuỗi số); null = chưa đặt. */
+            defaultPosShopId: string | null;
             /**
              * @description Trưởng phòng: phòng CSKH = mọi người trong phòng mang vai trò trưởng phòng CSKH (+ `managerId`);
              *     phòng khác = [managerId] (2026-10-24).
@@ -15705,6 +15740,11 @@ export interface components {
             pancakeName: string | null;
             /** @description POS lên đơn mặc định (shop_id, chuỗi số) — màn Tạo đơn tự điền; null = không tự điền. */
             defaultPosShopId: string | null;
+            /**
+             * @description POS lên đơn của phòng ban user (phòng gần nhất theo cây có đặt, 2026-10-29) — màn Tạo đơn dùng khi
+             *     `defaultPosShopId` null. null = phòng chưa đặt.
+             */
+            departmentPosShopId: string | null;
             /** @description Mọi POS đã kết nối + POS user đang gắn (kể cả đã gỡ kết nối). */
             shops: components["schemas"]["PancakeProfileShopDto"][];
             /**
@@ -15736,6 +15776,11 @@ export interface components {
             pancakeName: string | null;
             /** @description POS lên đơn mặc định (shop_id, chuỗi số) — màn Tạo đơn tự điền; null = không tự điền. */
             defaultPosShopId: string | null;
+            /**
+             * @description POS lên đơn của phòng ban user (phòng gần nhất theo cây có đặt, 2026-10-29) — màn Tạo đơn dùng khi
+             *     `defaultPosShopId` null. null = phòng chưa đặt.
+             */
+            departmentPosShopId: string | null;
             /** @description Mọi POS đã kết nối + POS user đang gắn (kể cả đã gỡ kết nối). */
             shops: components["schemas"]["PancakeProfileShopDto"][];
             /**
@@ -15834,6 +15879,25 @@ export interface components {
         };
         StaffCleanupResultDto: {
             items: components["schemas"]["StaffCleanupItemDto"][];
+        };
+        CareDepartmentPosDto: {
+            id: string;
+            code: string;
+            name: string;
+            /** @description POS lên đơn mặc định của phòng (shop_id, chuỗi số); null = chưa đặt. */
+            defaultPosShopId: string | null;
+            /** @description Người gọi đặt được POS cho phòng này (quản trị / leader phòng). */
+            canEdit: boolean;
+        };
+        CareDepartmentPosListDto: {
+            /** @description Phòng CSKH người gọi phụ trách (quản trị: mọi phòng CSKH đang hoạt động). */
+            departments: components["schemas"]["CareDepartmentPosDto"][];
+            /** @description POS chọn được — như ô POS lên đơn ở hồ sơ Pancake. */
+            shops: components["schemas"]["PancakeShopOptionDto"][];
+        };
+        SetDepartmentPosDto: {
+            /** @description shop_id Pancake (chuỗi số); null = bỏ, nhân viên chưa đặt POS riêng thì không tự điền. */
+            posShopId: string | null;
         };
         HealthReportDto: {
             /** @enum {string} */
@@ -20726,7 +20790,9 @@ export interface operations {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": Record<string, never>;
+                };
             };
         };
     };
@@ -20768,7 +20834,9 @@ export interface operations {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": Record<string, never>;
+                };
             };
         };
     };
@@ -27516,6 +27584,50 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["StaffCleanupResultDto"];
+                };
+            };
+        };
+    };
+    CareDepartmentPosController_list: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CareDepartmentPosListDto"];
+                };
+            };
+        };
+    };
+    CareDepartmentPosController_set: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SetDepartmentPosDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CareDepartmentPosDto"];
                 };
             };
         };

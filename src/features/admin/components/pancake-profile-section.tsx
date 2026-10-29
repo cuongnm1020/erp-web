@@ -97,6 +97,13 @@ function ProfileForm({
   const [name, setName] = useState(profile.pancakeName ?? '');
   const [shopIds, setShopIds] = useState<string[]>(selectedOf(profile));
   const [defaultPos, setDefaultPos] = useState(profile.defaultPosShopId ?? '');
+  // POS phòng ban áp khi nhân viên chưa chọn POS riêng (2026-10-29).
+  const deptShop = profile.shops.find((s) => s.shopId === profile.departmentPosShopId);
+  const deptPos = profile.departmentPosShopId
+    ? deptShop
+      ? shopLabel(deptShop)
+      : `POS ${profile.departmentPosShopId}`
+    : null;
 
   const fb = fbId.trim();
   const fbInvalid = fb !== '' && !FB_ID.test(fb);
@@ -179,7 +186,9 @@ function ProfileForm({
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value={NO_POS}>— Không tự điền —</SelectItem>
+            <SelectItem value={NO_POS}>
+              {deptPos ? `— Theo phòng ban: ${deptPos} —` : '— Không tự điền —'}
+            </SelectItem>
             {profile.shops.map((s) => (
               <SelectItem key={s.shopId} value={s.shopId}>
                 {shopLabel(s)}
@@ -188,7 +197,8 @@ function ProfileForm({
           </SelectContent>
         </Select>
         <p className="text-xs text-muted-foreground">
-          Màn Tạo đơn tự điền POS này (vẫn đổi được trên từng đơn).
+          Màn Tạo đơn tự điền POS này (vẫn đổi được trên từng đơn)
+          {deptPos ? '; để trống thì dùng POS của phòng ban.' : '.'}
         </p>
       </div>
 
