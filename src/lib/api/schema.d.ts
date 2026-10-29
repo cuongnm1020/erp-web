@@ -11047,6 +11047,15 @@ export interface components {
             /** @description Tên người phụ trách (core.User.fullName của ownerId). */
             ownerName: string | null;
             /**
+             * @description Người bấm tạo đơn (2026-10-29): đơn ERP = `createdBy`, đơn Pancake = người tạo trên Pancake
+             *     (`external.creatorUserId`; null khi chưa khớp được nhân viên).
+             */
+            creatorName: string | null;
+            /** @description Mã kho lấy hàng (wms.Warehouse.code của warehouseId) — null = chưa chọn kho. */
+            warehouseCode: string | null;
+            /** @description Tên kho lấy hàng (wms.Warehouse.name của warehouseId) — null = chưa chọn kho. */
+            warehouseName: string | null;
+            /**
              * @description Tên page Facebook của đơn (core.FacebookPage.name) — đơn Pancake theo Page ID, đơn ERP theo
              *     page chọn lúc tạo. null = đơn không gắn page (2026-10-26).
              */
@@ -22206,6 +22215,11 @@ export interface operations {
                 /** @description Người phụ trách (SalesOrder.ownerId). */
                 ownerId?: string;
                 /**
+                 * @description Người bấm tạo đơn (2026-10-29): đơn ERP theo `createdBy`, đơn Pancake theo người tạo trên
+                 *     Pancake (`external.creatorUserId`) — cùng nguồn với cột `creatorName`.
+                 */
+                creatorId?: string;
+                /**
                  * @description Team CSKH lên đơn (SalesOrder.teamId) — team phòng ban CSKH, gồm cả phòng ban con. Danh sách:
                  *     GET /sales-orders/care-team-options.
                  */
@@ -22361,6 +22375,11 @@ export interface operations {
                 facebookPageIds?: string;
                 /** @description Người phụ trách (SalesOrder.ownerId). */
                 ownerId?: string;
+                /**
+                 * @description Người bấm tạo đơn (2026-10-29): đơn ERP theo `createdBy`, đơn Pancake theo người tạo trên
+                 *     Pancake (`external.creatorUserId`) — cùng nguồn với cột `creatorName`.
+                 */
+                creatorId?: string;
                 /**
                  * @description Team CSKH lên đơn (SalesOrder.teamId) — team phòng ban CSKH, gồm cả phòng ban con. Danh sách:
                  *     GET /sales-orders/care-team-options.

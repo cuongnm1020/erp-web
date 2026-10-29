@@ -63,6 +63,8 @@ export interface OrderListParams {
   itemOrigin?: OrderItemOrigin;
   /** Team CSKH lên đơn (team phòng ban CSKH, gồm phòng con) — danh sách: useCareTeamOptions. */
   careTeamId?: string;
+  /** NV lên đơn = người bấm tạo đơn (ERP: người tạo, Pancake: người tạo trên Pancake), 2026-10-29. */
+  creatorId?: string;
   /** Page Facebook (id, nối dấu phẩy) — đơn ERP chọn page + đơn Pancake theo Page ID. */
   facebookPageIds?: string;
   /** Sắp theo cột (server); bỏ trống = ngày đặt mới nhất trước. */
@@ -149,6 +151,7 @@ function listQuery(params: Omit<OrderListParams, 'take' | 'skip'>) {
     dateField: params.from || params.to ? params.dateField : undefined,
     itemOrigin: params.itemOrigin,
     careTeamId: params.careTeamId || undefined,
+    creatorId: params.creatorId || undefined,
     facebookPageIds: params.facebookPageIds || undefined,
   };
 }

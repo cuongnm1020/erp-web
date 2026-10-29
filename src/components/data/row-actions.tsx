@@ -49,7 +49,8 @@ export interface RowActionsProps {
   /**
    * Mọi mục (trừ Xóa / Hủy) thành nút icon ngay trên dòng, không có "⋯" — cho bảng chỉ có vài việc
    * an toàn hay làm (danh sách đơn: Xem nhanh · Sửa · Nhân bản, user yêu cầu 2026-10-29). Mục cần
-   * `icon`; mục nguy hiểm vẫn vào menu.
+   * `icon`. Mục nguy hiểm (Hủy đơn — user duyệt mockup 2026-10-29) cũng thành nút icon chữ đỏ, đứng
+   * cuối cụm; vẫn qua hộp xác nhận do màn hình gọi mở.
    */
   inline?: boolean;
   className?: string;
@@ -120,9 +121,9 @@ export function RowActions({
     ) : (
       <Button
         key={it.label}
-        variant="ghost"
+        variant={it.danger ? 'danger-ghost' : 'ghost'}
         size="icon-sm"
-        className="text-muted-foreground hover:text-foreground"
+        className={it.danger ? undefined : 'text-muted-foreground hover:text-foreground'}
         title={it.disabledReason ? `${it.label} — ${it.disabledReason}` : tip(it.label)}
         aria-label={it.label}
         disabled={Boolean(it.disabledReason)}
@@ -132,6 +133,7 @@ export function RowActions({
       </Button>
     );
   const shownMenu = inline ? [] : menu;
+  const shownDanger = inline ? [] : dangerItems;
   const renderItem = (it: RowActionItem) => (
     <DropdownMenuItem
       key={it.label}
@@ -184,8 +186,8 @@ export function RowActions({
           </Button>
         )
       ) : null}
-      {inline ? menu.map(iconButton) : null}
-      {shownMenu.length > 0 || dangerItems.length > 0 ? (
+      {inline ? [...menu, ...dangerItems].map(iconButton) : null}
+      {shownMenu.length > 0 || shownDanger.length > 0 ? (
         <DropdownMenu modal={false}>
           <DropdownMenuTrigger asChild>
             <Button
@@ -200,8 +202,8 @@ export function RowActions({
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
             {shownMenu.map(renderItem)}
-            {shownMenu.length > 0 && dangerItems.length > 0 ? <DropdownMenuSeparator /> : null}
-            {dangerItems.map(renderItem)}
+            {shownMenu.length > 0 && shownDanger.length > 0 ? <DropdownMenuSeparator /> : null}
+            {shownDanger.map(renderItem)}
           </DropdownMenuContent>
         </DropdownMenu>
       ) : null}

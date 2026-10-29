@@ -42,11 +42,13 @@ const createKeys = {
 };
 
 /** GET /sales-orders/staff-options — NV xử lý / đóng hàng / chăm sóc / marketer. */
-export function useOrderStaffOptions() {
+export function useOrderStaffOptions(enabled = true) {
   return useQuery({
     queryKey: createKeys.staff(),
     queryFn: () => unwrap(api.GET('/sales-orders/staff-options')),
     staleTime: 5 * 60_000,
+    // Cần sales_order.create — ô lọc NV lên đơn ở danh sách tắt với người không lên đơn.
+    enabled,
   });
 }
 

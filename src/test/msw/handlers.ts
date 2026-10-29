@@ -550,6 +550,10 @@ function orderListExtras(i: number, status: (typeof ORDER_STATUSES)[number]) {
         }
       : null,
     ownerName: i % 3 === 0 ? null : 'Nguyễn Văn Sale',
+    // Người bấm tạo đơn + kho (API 2026-10-29); tên dài để thử xuống dòng.
+    creatorName: i % 5 === 0 ? null : 'Phạm Nguyễn Hoàng Bảo Ngọc',
+    warehouseCode: i % 7 === 0 ? null : 'WH01',
+    warehouseName: i % 7 === 0 ? null : 'Kho Tổng',
     facebookPageName: i % 4 === 1 ? 'Đất Phương Nam - CS4' : null,
     note: i % 6 === 0 ? 'Gọi trước khi giao' : null,
     shortage: null,

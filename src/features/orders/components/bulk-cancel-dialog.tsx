@@ -84,7 +84,12 @@ export function BulkCancelDialog({
       <Dialog open={open} onOpenChange={(o) => !bulk.isPending && setOpen(o)}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Hủy {cancellable.length} đơn đã chọn?</DialogTitle>
+            <DialogTitle>
+              {/* Một đơn = nút Hủy trên dòng danh sách (2026-10-29) — gọi đúng số đơn. */}
+              {rows.length === 1 && rows[0]
+                ? `Hủy đơn ${rows[0].docNumber}?`
+                : `Hủy ${cancellable.length} đơn đã chọn?`}
+            </DialogTitle>
             <DialogDescription>
               Không hoàn tác được. Hàng đang giữ cho các đơn sẽ được nhả về khả dụng; muốn bán lại
               thì tạo đơn mới.
@@ -115,7 +120,11 @@ export function BulkCancelDialog({
               disabled={bulk.isPending || cancellable.length === 0}
               onClick={() => void submit()}
             >
-              {bulk.isPending ? 'Đang hủy…' : `Hủy ${cancellable.length} đơn`}
+              {bulk.isPending
+                ? 'Đang hủy…'
+                : rows.length === 1
+                  ? 'Hủy đơn'
+                  : `Hủy ${cancellable.length} đơn`}
             </Button>
           </DialogFooter>
         </DialogContent>
