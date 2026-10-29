@@ -60,7 +60,7 @@ export function rangeError(fromDate: string, toDate: string): string | null {
 
 /**
  * Nút "Đồng bộ đơn Pancake" ở danh sách đơn (2026-10-12): chọn POS → server chạy nền, lấy lại
- * từng đơn "Chờ xử lý kho" của POS đó từ Pancake và GHI ĐÈ lên ERP (khách, địa chỉ giao, sản phẩm,
+ * từng đơn "Đã xác nhận" của POS đó từ Pancake và GHI ĐÈ lên ERP (khách, địa chỉ giao, sản phẩm,
  * tiền, trạng thái). Đơn kho đã nhận việc lấy hàng / đóng gói giữ nguyên. Bọc trong <Can map Sync>.
  * `defaultShopId` = POS đang lọc trên danh sách (nếu có).
  */
@@ -123,7 +123,7 @@ export function PancakeOrderResyncButton({ defaultShopId = '' }: { defaultShopId
           <DialogHeader>
             <DialogTitle>Đồng bộ đơn từ Pancake</DialogTitle>
             <DialogDescription>
-              Lấy lại đơn của POS đã chọn từ Pancake. Đơn <strong>Chờ xử lý kho</strong> được ghi đè
+              Lấy lại đơn của POS đã chọn từ Pancake. Đơn <strong>Đã xác nhận</strong> được ghi đè
               khách, địa chỉ giao, sản phẩm, tiền, trạng thái; đơn kho đã nhận việc lấy hàng hoặc đã
               đóng gói giữ nguyên. Đơn Pancake đã gửi qua hãng của Pancake được đánh dấu đã gửi (gắn
               mã vận đơn, rời hàng đợi kho, không trừ tồn). Chạy nền, có thể đóng cửa sổ này.
@@ -141,7 +141,7 @@ export function PancakeOrderResyncButton({ defaultShopId = '' }: { defaultShopId
                 disabled={running}
                 className="mt-1"
               />
-              <span>Đơn đang Chờ xử lý kho trên hệ thống</span>
+              <span>Đơn Đã xác nhận trên hệ thống</span>
             </label>
             <label className="flex cursor-pointer items-start gap-2 text-sm">
               <input

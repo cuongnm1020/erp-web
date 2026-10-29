@@ -244,7 +244,7 @@ export const ORDER_FLOW_TABS: ReadonlyArray<{
   family: OrderFlowFamily;
 }> = [
   { flow: 'PENDING_APPROVAL', label: 'Chờ duyệt', family: 'wait' },
-  { flow: 'WAREHOUSE', label: 'Chờ xử lý kho', family: 'fulfil' },
+  { flow: 'WAREHOUSE', label: 'Đã xác nhận', family: 'fulfil' },
   // Chờ hàng (2026-10-25): thiếu tồn ≥ 24h, chưa Gửi sang ĐVVC — cần người xử lý → họ "chờ".
   { flow: 'WAITING_STOCK', label: 'Chờ hàng', family: 'wait' },
   { flow: 'PICKING', label: 'Đang lấy hàng', family: 'fulfil' },

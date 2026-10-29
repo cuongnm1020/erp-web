@@ -149,7 +149,7 @@ export function OrderSavedViews() {
               maxLength={60}
               value={name}
               onChange={(e) => setName(e.target.value)}
-              placeholder="Ví dụ: Chờ xử lý kho · chưa gán hãng"
+              placeholder="Ví dụ: Đã xác nhận · chưa gán hãng"
             />
           </form>
           <DialogFooter>
