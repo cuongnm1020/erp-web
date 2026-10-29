@@ -67,28 +67,30 @@ describe('OrderListScreen — GET /sales-orders (P1-12)', () => {
     expect(pos).toHaveAttribute('href', pancake.pancakeOrderLink);
     expect(pos).toHaveAttribute('target', '_blank');
     expect(pos).toHaveAttribute('rel', 'noreferrer');
-    // Đơn không có sale → không có dòng tên.
-    expect(within(link.closest('tr')!).queryByTestId('order-owner')).not.toBeInTheDocument();
     // Bấm link không bật xem nhanh của dòng.
     fireEvent.click(pos);
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
   });
 
-  it('bảng gọn (2026-10-29): link Pancake · tên sale cùng MỘT dòng, tên dài cắt + di chuột xem đủ', async () => {
-    const pancake = makeOrders(60).find((o) => o.pancakeOrderId === '110')!;
-    search = 'q=%23110';
+  it('bảng mới (2026-10-29): cột NV lên đơn tên đầy đủ (không cắt), cột Kho tên + mã; thiếu → "—"', async () => {
+    const orders = makeOrders(60);
+    const full = orders.find((o) => o.creatorName && o.warehouseName)!;
+    const bare = orders.find((o) => !o.creatorName && !o.warehouseName)!;
+    search = '';
     renderApp(<OrderListScreen />);
-    await screen.findByText('1 đơn khớp bộ lọc');
-    const row = screen.getByRole('link', { name: pancake.docNumber }).closest('tr')!;
-    const owner = within(row).getByTestId('order-owner');
-    expect(owner).toHaveTextContent('Nguyễn Văn Sale');
-    expect(owner.parentElement).toContainElement(
-      within(row).getByRole('link', { name: 'Pancake #110' }),
+    await screen.findByText(FIRST.docNumber);
+    const row = (id: string) => screen.getByRole('link', { name: id }).closest('tr')!;
+    const creator = within(row(full.docNumber)).getByTestId('order-creator');
+    expect(creator).toHaveTextContent('Phạm Nguyễn Hoàng Bảo Ngọc');
+    expect(creator).not.toHaveClass('truncate');
+    expect(within(row(full.docNumber)).getByTestId('order-warehouse')).toHaveTextContent(
+      'Kho Tổng',
     );
-    expect(owner.parentElement).toHaveAttribute(
-      'title',
-      expect.stringContaining('Nguyễn Văn Sale'),
-    );
+    expect(within(row(full.docNumber)).getByText('WH01')).toBeInTheDocument();
+    expect(within(row(bare.docNumber)).getByTestId('order-creator')).toHaveTextContent('—');
+    expect(within(row(bare.docNumber)).queryByTestId('order-warehouse')).not.toBeInTheDocument();
+    // Không còn tên sale (người phụ trách) dưới mã đơn.
+    expect(screen.queryByTestId('order-owner')).not.toBeInTheDocument();
   });
 
   it('tab theo luồng đơn đọc ?flow= từ URL, lọc phía server; mỗi tab có số đếm từ API (luật 8)', async () => {
@@ -399,9 +401,10 @@ describe('OrderListScreen — cân nặng gửi hãng + gán hãng hàng loạt'
     for (const i of [0, 1, 4]) {
       fireEvent.click(screen.getAllByRole('checkbox', { name: 'Chọn dòng' })[i]!);
     }
-    expect(await screen.findByRole('toolbar')).toBeInTheDocument();
-    // Nút "Hủy đơn" nằm thẳng trên thanh chọn (2026-10-29), không trong menu "Khác".
-    fireEvent.click(await screen.findByRole('button', { name: /Hủy đơn/ }));
+    const toolbar = await screen.findByRole('toolbar');
+    // Nút "Hủy đơn" nằm thẳng trên thanh chọn (2026-10-29), không trong menu "Khác" — mỗi dòng
+    // cũng có nút Hủy riêng nên tìm trong thanh chọn.
+    fireEvent.click(await within(toolbar).findByRole('button', { name: /Hủy đơn/ }));
     const dialog = await screen.findByRole('dialog');
     expect(dialog).toHaveTextContent('Hủy 2 đơn đã chọn?');
     expect(dialog).toHaveTextContent('1 đơn đã hủy hoặc kho đã đóng gói sẽ bị bỏ qua');
@@ -596,7 +599,46 @@ describe('OrderListScreen — cân nặng gửi hãng + gán hãng hàng loạt'
     });
     await screen.findByText(FIRST.docNumber);
     fireEvent.click(screen.getAllByRole('checkbox', { name: 'Chọn dòng' })[0]!);
-    expect(await screen.findByRole('button', { name: /Hủy đơn/ })).toBeInTheDocument();
+    const toolbar = await screen.findByRole('toolbar');
+    expect(await within(toolbar).findByRole('button', { name: /Hủy đơn/ })).toBeInTheDocument();
+  });
+
+  it('nút Hủy trên dòng (2026-10-29): đơn hủy được → hộp "Hủy đơn <mã>?" gửi bulk-cancel MỘT đơn; đơn đã hủy → nút khóa', async () => {
+    search = '';
+    const bodies: Record<string, unknown>[] = [];
+    server.use(
+      http.post('/api/sales-orders/bulk-cancel', async ({ request }) => {
+        const body = (await request.json()) as Record<string, unknown>;
+        bodies.push(body);
+        return HttpResponse.json(
+          {
+            cancelled: [
+              {
+                orderId: (body.orderIds as string[])[0],
+                docNumber: FIRST.docNumber,
+                status: 'CANCELLED',
+                releasedReservationIds: [],
+              },
+            ],
+            failed: [],
+          },
+          { status: 201 },
+        );
+      }),
+    );
+    renderApp(<OrderListScreen />);
+    await screen.findByText(FIRST.docNumber);
+    const rows = makeOrders(5);
+    const rowOf = (doc: string) => screen.getByRole('link', { name: doc }).closest('tr')!;
+    expect(
+      within(rowOf(rows[4]!.docNumber)).getByRole('button', { name: 'Hủy đơn' }),
+    ).toBeDisabled();
+    fireEvent.click(within(rowOf(FIRST.docNumber)).getByRole('button', { name: 'Hủy đơn' }));
+    const dialog = await screen.findByRole('dialog');
+    expect(dialog).toHaveTextContent(`Hủy đơn ${FIRST.docNumber}?`);
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Hủy đơn' }));
+    await waitFor(() => expect(bodies).toEqual([{ orderIds: [FIRST.id] }]));
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
   });
 
   it('không có quyền hủy lẫn lên đơn → thanh chọn không có nút "Hủy đơn" (luật 7)', async () => {
@@ -970,11 +1012,11 @@ describe('OrderListScreen — sao chép SĐT / mã vận đơn, cột kho (2026-
     expect(screen.queryByRole('dialog')).toBeNull();
   });
 
-  it('không còn cột Kho — danh sách đã lọc theo kho làm việc (redesign 2026-10-22)', async () => {
+  it('cột Kho luôn hiện (thêm lại 2026-10-29, user chốt) — cạnh cột NV lên đơn', async () => {
     setup();
     await screen.findByRole('columnheader', { name: /Khách hàng/ });
-    expect(screen.queryByRole('columnheader', { name: /^Kho$/ })).not.toBeInTheDocument();
-    expect(screen.queryByText('Kho Thạch Thất')).not.toBeInTheDocument();
+    expect(screen.getByRole('columnheader', { name: /^Kho$/ })).toBeInTheDocument();
+    expect(screen.getByRole('columnheader', { name: /NV lên đơn/ })).toBeInTheDocument();
   });
 });
 
@@ -1091,14 +1133,14 @@ describe('OrderListScreen — redesign Bán hàng (2026-10-22)', () => {
     expect(screen.queryByRole('link', { name: 'Nhân bản đơn' })).not.toBeInTheDocument();
   });
 
-  it('lọc ít dùng nằm sau "Thêm lọc"; đang có giá trị trên URL thì tự hiện', async () => {
+  it('hiện hết bộ lọc ngay trên thanh, không còn "Thêm lọc" (2026-10-29)', async () => {
     search = '';
     renderApp(<OrderListScreen />);
     await screen.findByText(FIRST.docNumber);
-    expect(screen.queryByRole('combobox', { name: 'Trùng trong ngày' })).not.toBeInTheDocument();
-    fireEvent.keyDown(screen.getByRole('button', { name: /Thêm lọc/ }), { key: 'ArrowDown' });
-    fireEvent.click(await screen.findByRole('menuitem', { name: /Trùng trong ngày/ }));
-    expect(await screen.findByRole('combobox', { name: 'Trùng trong ngày' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Thêm lọc/ })).not.toBeInTheDocument();
+    for (const name of ['Trùng trong ngày', 'Sản phẩm ngoài ERP', 'NV lên đơn']) {
+      expect(screen.getByRole('combobox', { name })).toBeInTheDocument();
+    }
   });
 
   it('?duplicate=true → ô "Trùng trong ngày" hiện sẵn', async () => {

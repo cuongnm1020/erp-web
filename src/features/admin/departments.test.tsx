@@ -200,6 +200,58 @@ describe('TeamsScreen — Phòng ban & team (I-05)', () => {
     expect(calls[0]!.body).toEqual({ code: 'CSKH-MB', name: 'CSKH Miền Bắc', kind: 'CSKH' });
   });
 
+  it('POS lên đơn (2026-10-29): chỉ hiện với phòng CSKH; chọn POS → POST kèm defaultPosShopId', async () => {
+    const { calls } = wire();
+    renderApp(<TeamsScreen />);
+    await screen.findByText('Nhân viên 1');
+    fireEvent.click(screen.getByRole('button', { name: /Thêm phòng ban/ }));
+    const dialog = await screen.findByRole('dialog');
+    expect(within(dialog).queryByRole('combobox', { name: 'POS lên đơn' })).toBeNull();
+    fireEvent.change(within(dialog).getByLabelText(/Mã phòng ban/), {
+      target: { value: 'CSKH-MB' },
+    });
+    fireEvent.change(within(dialog).getByLabelText(/Tên phòng ban/), {
+      target: { value: 'CSKH Miền Bắc' },
+    });
+    fireEvent.click(within(dialog).getByRole('combobox', { name: 'Loại phòng ban' }));
+    fireEvent.click(await screen.findByRole('option', { name: 'Chăm sóc khách hàng (CSKH)' }));
+    fireEvent.click(within(dialog).getByRole('combobox', { name: 'POS lên đơn' }));
+    fireEvent.click(await screen.findByRole('option', { name: /Thiên Nông chính/ }));
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Thêm phòng ban' }));
+    await waitFor(() => expect(calls).toHaveLength(1));
+    expect(calls[0]!.body).toEqual({
+      code: 'CSKH-MB',
+      name: 'CSKH Miền Bắc',
+      kind: 'CSKH',
+      defaultPosShopId: '715130909',
+    });
+  });
+
+  it('Sửa phòng CSKH: POS đang đặt hiện sẵn; chọn "Không tự điền" → PATCH defaultPosShopId null', async () => {
+    const { calls } = wire();
+    const care = {
+      ...SALES_HN,
+      kind: 'CSKH',
+      isActive: true,
+      managerIds: [],
+      groupLeadIds: [],
+      defaultPosShopId: '715130909',
+    };
+    server.use(http.get('/api/departments', () => HttpResponse.json([SALES, care])));
+    search = `dept=${care.id}`;
+    renderApp(<TeamsScreen />);
+    expect(await screen.findByText('Chưa có nhân viên trong phòng ban')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Sửa' }));
+    const dialog = await screen.findByRole('dialog');
+    const pos = await within(dialog).findByRole('combobox', { name: 'POS lên đơn' });
+    await waitFor(() => expect(pos).toHaveTextContent('Thiên Nông chính'));
+    fireEvent.click(pos);
+    fireEvent.click(await screen.findByRole('option', { name: '— Không tự điền —' }));
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Lưu thay đổi' }));
+    await waitFor(() => expect(calls).toHaveLength(1));
+    expect(calls[0]!.body).toMatchObject({ kind: 'CSKH', defaultPosShopId: null });
+  });
+
   it('Thêm thành viên: panel tìm nhân viên ngoài phòng ban, cảnh báo đang ở phòng khác, PUT từng người', async () => {
     const { calls } = wire();
     renderApp(<TeamsScreen />);

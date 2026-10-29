@@ -3,7 +3,7 @@
 import type { RowSelectionState } from '@tanstack/react-table';
 import Decimal from 'decimal.js';
 import {
-  Check,
+  Ban,
   ChevronDown,
   Copy,
   Eye,
@@ -30,7 +30,6 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuLabel,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Input } from '@/components/ui/input';
@@ -74,9 +73,11 @@ import {
   type OrderSortField,
   type SalesOrderListItem,
 } from '../api/use-orders';
+import { useOrderStaffOptions } from '../api/use-order-create';
 import {
   FLOW_FAMILY_DOT,
   fulfilmentLabel,
+  orderCancellable,
   ORDER_FLOW_TABS,
   parseOrderFlow,
   parseOrderStatus,
@@ -111,8 +112,12 @@ import { MarketplaceBadge, MaskedPhoneBadge, waybillErrorText } from './waybill-
  * danh bạ người dùng cho sale).
  *
  * Redesign Bán hàng 2026-10-22 (canvas "Redesign Bán hàng", đã duyệt): tab chia họ màu, thanh lọc
- * gọn (lọc ít dùng vào "Thêm lọc"), "Bộ lọc đã lưu", cột cuối RowActions (Xem nhanh + ⋯ có
- * Nhân bản đơn), chọn nhiều → BulkActionBar thay chỗ thanh lọc, F2 tạo đơn.
+ * gọn, "Bộ lọc đã lưu", cột cuối RowActions, chọn nhiều → BulkActionBar thay chỗ thanh lọc, F2
+ * tạo đơn.
+ *
+ * Bảng mới 2026-10-29 (mockup TmGafrdk3wiAxJu4cFY937, đã duyệt): hiện hết bộ lọc (bỏ "Thêm lọc"),
+ * cột Kho luôn hiện, cột NV lên đơn = người bấm tạo đơn, ngày đặt dưới mã đơn, bỏ dòng COD, chưa
+ * gán hãng = "—", nút Hủy đơn trên dòng (hộp xác nhận dùng chung với hủy hàng loạt).
  */
 const DEFAULTS = {
   size: 50,
@@ -139,6 +144,8 @@ const DEFAULTS = {
     'itemOrigin',
     // Team CSKH lên đơn (phòng ban loại CSKH), 2026-10-24.
     'careTeamId',
+    // NV lên đơn = người bấm tạo đơn (2026-10-29).
+    'creatorId',
     // Page Facebook (id nối dấu phẩy, chọn nhiều), 2026-10-26 — khoá `fbPage` vì `page` là số trang.
     'fbPage',
     // Chữ "Trạng thái VC" hãng gửi (chọn nhiều, 2026-10-28) — mỗi giá trị encodeURIComponent rồi nối
@@ -223,27 +230,23 @@ const DATE_FIELDS: Array<{ value: OrderDateField; label: string }> = [
   { value: 'sentToCarrierAt', label: 'Ngày gán ĐVVC' },
 ];
 
-/** Lọc ít dùng — nằm sau nút "Thêm lọc", tự hiện trên thanh khi đang có giá trị. */
-const EXTRA_FILTERS = [
-  { key: 'duplicate', label: 'Trùng trong ngày' },
-  { key: 'itemOrigin', label: 'Sản phẩm ngoài ERP' },
-  { key: 'weightMin', label: 'Cân nặng' },
-] as const satisfies ReadonlyArray<{ key: OrderFilter; label: string }>;
-type ExtraFilter = (typeof EXTRA_FILTERS)[number]['key'];
-
 /** Quyền + handler mà cột thao tác cần — tính một lần ở màn, không gọi hook trong cell. */
 interface RowActionContext {
   canUpdate: boolean;
   canCreate: boolean;
   /** `shipment.pack` — xin lại vận đơn cho đơn lỗi vận đơn. */
   canPack: boolean;
+  /** Hủy đơn — cùng quyền với nút Hủy của thanh chọn nhiều. */
+  canCancel: boolean;
   onPeek: (row: SalesOrderListItem) => void;
   onRetryWaybill: (row: SalesOrderListItem) => void;
+  onCancel: (row: SalesOrderListItem) => void;
 }
 
 /**
  * Nút thao tác của một dòng đơn, đứng cạnh Xem nhanh, không "⋯" (user yêu cầu 2026-10-29): Sửa ·
- * Nhân bản (+ Xin lại vận đơn ở tab Lỗi vận đơn). Mở chi tiết = bấm mã đơn.
+ * Nhân bản (+ Xin lại vận đơn ở tab Lỗi vận đơn) · Hủy đơn (chữ đỏ, cuối cụm, qua hộp xác nhận —
+ * mockup TmGafrdk3wiAxJu4cFY937). Mở chi tiết = bấm mã đơn.
  */
 function orderRowItems(o: SalesOrderListItem, ctx: RowActionContext): RowActionItem[] {
   return [
@@ -277,12 +280,28 @@ function orderRowItems(o: SalesOrderListItem, ctx: RowActionContext): RowActionI
           },
         ]
       : []),
+    ...(ctx.canCancel
+      ? [
+          {
+            label: 'Hủy đơn',
+            icon: <Ban aria-hidden />,
+            danger: true,
+            onSelect: () => ctx.onCancel(o),
+            disabledReason:
+              o.status === 'CANCELLED'
+                ? 'Đơn đã hủy'
+                : orderCancellable(o.status, o.fulfilmentStatus)
+                  ? undefined
+                  : 'Kho đã đóng gói — xử lý bằng hoàn hàng',
+          },
+        ]
+      : []),
   ];
 }
 
 /**
  * Cột của bảng — `carrierOf` tra mã + tên hãng chọn trên đơn khi kho chưa tạo phiếu giao.
- * Cột Kho đã bỏ (2026-10-22): danh sách luôn lọc theo kho làm việc ở ô chọn kho.
+ * Cột Kho bỏ 2026-10-22, thêm lại 2026-10-29 (luôn hiện, user chốt) cùng cột NV lên đơn.
  */
 const buildColumns = (
   carrierOf: (id: string) => CarrierRef | null,
@@ -312,11 +331,11 @@ const buildColumns = (
               </span>
             ) : null}
           </div>
-          {/* Bảng gọn (2026-10-29): nguồn · NV · page trên MỘT dòng, dài thì cắt (di chuột xem đủ). */}
-          <div
-            className="flex min-w-0 items-center gap-1 text-xs text-muted-foreground"
-            title={[o.ownerName, o.facebookPageName].filter(Boolean).join(' · ') || undefined}
-          >
+          {/* Ngày đặt nằm dưới mã đơn (mockup 2026-10-29) — cột Ngày đặt riêng ẩn mặc định. */}
+          <span className="block whitespace-nowrap text-xs text-muted-foreground">
+            {formatDateTime(o.orderDate)}
+          </span>
+          <div className="flex min-w-0 items-center gap-1 text-xs text-muted-foreground">
             <span className="shrink-0">
               {o.pancakeOrderId ? (
                 <PancakeOrderLink orderId={o.pancakeOrderId} link={o.pancakeOrderLink} />
@@ -325,16 +344,6 @@ const buildColumns = (
               )}
             </span>
             {o.marketplace ? <MarketplaceBadge marketplace={o.marketplace} /> : null}
-            {o.ownerName ? (
-              <span className="truncate text-foreground" data-testid="order-owner">
-                · {o.ownerName}
-              </span>
-            ) : null}
-            {o.facebookPageName ? (
-              <span className="sr-only" data-testid="order-page">
-                {o.facebookPageName}
-              </span>
-            ) : null}
           </div>
         </div>
       );
@@ -365,12 +374,17 @@ const buildColumns = (
             <span className="font-mono text-xs">
               {o.phone ? (normalizePhone(o.phone) ?? o.phone) : formatPhone(o.phone)}
             </span>
-            {telco ? <TelcoBadge name={telco} /> : null}
             {o.phone ? (
               // Chép dạng viết liền (0356523006) để dán thẳng vào Zalo / tổng đài.
               <CopyButton value={normalizePhone(o.phone) ?? o.phone} label="số điện thoại" />
             ) : null}
           </span>
+          {/* Nhà mạng xuống dòng riêng dưới SĐT, mỗi mạng một màu (mockup 2026-10-29). */}
+          {telco ? (
+            <span className="block">
+              <TelcoBadge name={telco} />
+            </span>
+          ) : null}
           <MaskedPhoneBadge masked={o.phoneMasked} />
         </div>
       );
@@ -405,6 +419,49 @@ const buildColumns = (
           </span>
           {p.moreCount > 0 ? (
             <span className="block text-xs text-primary">+{p.moreCount} sản phẩm khác</span>
+          ) : null}
+        </div>
+      );
+    },
+  },
+  {
+    // Cột Kho luôn hiện (user chốt 2026-10-29) — kho lấy hàng của đơn, mã kho dòng dưới.
+    id: 'warehouse',
+    header: 'Kho',
+    meta: { width: 112 },
+    cell: ({ row }) => {
+      const o = row.original;
+      if (!o.warehouseName) return <span className="text-muted-foreground">—</span>;
+      return (
+        <div className="space-y-0.5">
+          <span className="block font-medium" data-testid="order-warehouse">
+            {o.warehouseName}
+          </span>
+          <span className="block font-mono text-xs text-muted-foreground">{o.warehouseCode}</span>
+        </div>
+      );
+    },
+  },
+  {
+    // NV lên đơn = người bấm tạo đơn (user chốt 2026-10-29): tên đầy đủ, dài thì xuống dòng;
+    // page Facebook dòng dưới.
+    id: 'creator',
+    header: 'NV lên đơn',
+    meta: { width: 150 },
+    cell: ({ row }) => {
+      const o = row.original;
+      return (
+        <div className="space-y-0.5">
+          <span className="block break-words font-medium" data-testid="order-creator">
+            {o.creatorName ?? '—'}
+          </span>
+          {o.facebookPageName ? (
+            <span
+              className="block break-words text-xs text-muted-foreground"
+              data-testid="order-page"
+            >
+              {o.facebookPageName}
+            </span>
           ) : null}
         </div>
       );
@@ -458,24 +515,17 @@ const buildColumns = (
   {
     id: 'shipping',
     header: 'Vận chuyển',
-    meta: { width: 120 },
+    meta: { width: 96 },
     cell: ({ row }) => <ShippingCell order={row.original} carrierOf={carrierOf} />,
   },
   {
     id: 'total',
     header: 'Tổng tiền',
-    meta: { align: 'right', width: 104, sortable: true },
-    cell: ({ row }) => {
-      const o = row.original;
-      return (
-        <div className="space-y-1">
-          <span className="block font-semibold">{formatMoney(o.total, { unit: '' })}</span>
-          <span className="block text-xs text-muted-foreground">
-            COD {formatMoney(o.shipment?.codAmount ?? o.total, { unit: '' })}
-          </span>
-        </div>
-      );
-    },
+    // Chỉ tổng tiền đơn, bỏ dòng COD (mockup 2026-10-29); cột hẹp để sát cột Vận chuyển.
+    meta: { align: 'right', width: 92, sortable: true },
+    cell: ({ row }) => (
+      <span className="block font-semibold">{formatMoney(row.original.total, { unit: '' })}</span>
+    ),
   },
   {
     id: 'collected',
@@ -536,7 +586,8 @@ const buildColumns = (
   {
     id: 'actions',
     header: () => <span className="sr-only">Thao tác</span>,
-    meta: { width: 104, title: 'Thao tác' },
+    // Xem nhanh · Sửa · Nhân bản · Hủy (+ Xin lại vận đơn ở tab Lỗi vận đơn) — 28px mỗi nút.
+    meta: { width: 136, title: 'Thao tác' },
     cell: ({ row }) => (
       <RowActions
         inline
@@ -595,7 +646,10 @@ function ShippingCell({
           ) : null}
         </span>
       ) : (
-        <span className="block text-warning">Chưa gán hãng</span>
+        // Chưa gán hãng chỉ hiện "—" (mockup 2026-10-29); lọc "chưa gán hãng" ở ô Hãng VC.
+        <span className="block text-muted-foreground" title="Chưa gán hãng">
+          —
+        </span>
       )}
       {s?.trackingNo ? (
         <CopyText
@@ -712,51 +766,6 @@ function FlowTabs({
         );
       })}
     </div>
-  );
-}
-
-/**
- * "Thêm lọc": bật / tắt các lọc ít dùng trên thanh lọc. Lọc đang có giá trị luôn hiện (không tắt
- * được ở đây — bỏ giá trị bằng chính ô lọc hoặc "Xóa lọc").
- */
-function MoreFilters({
-  shown,
-  active,
-  onToggle,
-}: {
-  shown: ReadonlySet<ExtraFilter>;
-  active: ReadonlySet<ExtraFilter>;
-  onToggle: (key: ExtraFilter) => void;
-}) {
-  return (
-    <DropdownMenu modal={false}>
-      <DropdownMenuTrigger asChild>
-        <Button variant="ghost" size="sm" className="text-primary hover:text-primary-hover">
-          <Plus aria-hidden />
-          Thêm lọc
-        </Button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="start">
-        <DropdownMenuLabel>Lọc thêm theo</DropdownMenuLabel>
-        {EXTRA_FILTERS.map((f) => (
-          <DropdownMenuItem
-            key={f.key}
-            disabled={active.has(f.key)}
-            hint={active.has(f.key) ? 'đang lọc' : undefined}
-            onSelect={(e) => {
-              e.preventDefault();
-              onToggle(f.key);
-            }}
-          >
-            <Check
-              aria-hidden
-              className={cn(shown.has(f.key) || active.has(f.key) ? 'opacity-100' : 'opacity-0')}
-            />
-            {f.label}
-          </DropdownMenuItem>
-        ))}
-      </DropdownMenuContent>
-    </DropdownMenu>
   );
 }
 
@@ -933,6 +942,7 @@ export function OrderListScreen() {
   const duplicate = state.filters.duplicate === 'true';
   const itemOrigin = parseItemOrigin(state.filters.itemOrigin);
   const careTeamId = state.filters.careTeamId ?? '';
+  const creatorId = state.filters.creatorId ?? '';
   const fbPage = state.filters.fbPage ?? '';
   const carrierStatus = state.filters.carrierStatus ?? '';
   const carrierStatusText = useMemo(() => decodeList(carrierStatus), [carrierStatus]);
@@ -976,6 +986,7 @@ export function OrderListScreen() {
       dateField,
       itemOrigin,
       careTeamId,
+      creatorId,
       facebookPageIds: fbPage || undefined,
       carrierStatusText,
     }),
@@ -998,6 +1009,7 @@ export function OrderListScreen() {
       dateField,
       itemOrigin,
       careTeamId,
+      creatorId,
       fbPage,
       carrierStatusText,
     ],
@@ -1018,7 +1030,11 @@ export function OrderListScreen() {
   const canUpdate = ability.can('update', 'SalesOrder');
   const canCreate = ability.can('create', 'SalesOrder');
   const canPack = ability.can('pack', 'Shipment');
+  const canCancel = ability.can('cancel', 'SalesOrder') || canCreate;
+  const staffOptions = useOrderStaffOptions(canCreate);
   const [peek, setPeek] = useState<SalesOrderListItem | null>(null);
+  // Nút Hủy trên dòng → hộp xác nhận dùng chung với hủy hàng loạt (một đơn).
+  const [cancelling, setCancelling] = useState<SalesOrderListItem | null>(null);
   const requestWaybill = useRequestWaybill();
   const columns = useMemo(() => {
     const carrierById = new Map((carriers.data ?? []).map((c) => [c.id, c]));
@@ -1026,7 +1042,9 @@ export function OrderListScreen() {
       canUpdate,
       canCreate,
       canPack,
+      canCancel,
       onPeek: setPeek,
+      onCancel: setCancelling,
       onRetryWaybill: (o) => {
         if (!o.shipment?.carrierCode) return;
         requestWaybill.mutate(
@@ -1047,7 +1065,7 @@ export function OrderListScreen() {
       : all.filter((c) => !WAITING_ONLY_COLUMNS.includes(c.id ?? ''));
     // requestWaybill.mutate ổn định giữa các lần render (TanStack Query).
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [carriers.data, canUpdate, canCreate, canPack, flow]);
+  }, [carriers.data, canUpdate, canCreate, canPack, canCancel, flow]);
   const pickerColumns = useMemo(
     () =>
       columns
@@ -1076,25 +1094,6 @@ export function OrderListScreen() {
   }, [scanned, state.q, query.data, query.isPlaceholderData]);
   useInvalidateOn(['order.created', 'order.updated'], [orderKeys.lists()]);
   const [selected, setSelected] = useState<RowSelectionState>({});
-  // Lọc ít dùng người dùng vừa bật qua "Thêm lọc" (chưa có giá trị) — chỉ sống trong phiên.
-  const [shownExtras, setShownExtras] = useState<ReadonlySet<ExtraFilter>>(new Set());
-  const activeExtras = useMemo(
-    () =>
-      new Set<ExtraFilter>(
-        EXTRA_FILTERS.filter((f) =>
-          f.key === 'weightMin' ? !!(weightMin || weightMax) : !!state.filters[f.key],
-        ).map((f) => f.key),
-      ),
-    [weightMin, weightMax, state.filters],
-  );
-  const toggleExtra = (key: ExtraFilter) =>
-    setShownExtras((s) => {
-      const next = new Set(s);
-      if (next.has(key)) next.delete(key);
-      else next.add(key);
-      return next;
-    });
-  const showExtra = (key: ExtraFilter) => activeExtras.has(key) || shownExtras.has(key);
 
   useHotkey('F2', () => router.push('/crm/orders/new'), { enabled: canCreate });
 
@@ -1119,7 +1118,8 @@ export function OrderListScreen() {
     to !== '' ||
     duplicate ||
     itemOrigin !== undefined ||
-    careTeamId !== '';
+    careTeamId !== '' ||
+    creatorId !== '';
   const customerName = query.data?.items[0]?.customer.name;
   const selectedRows = (query.data?.items ?? []).filter((r) => selected[r.id]);
   const clearSelection = () => setSelected({});
@@ -1251,44 +1251,47 @@ export function OrderListScreen() {
                 label: t.isActive ? t.name : `${t.name} (ngừng hoạt động)`,
               })),
             },
-            ...(showExtra('duplicate')
+            // Hiện hết bộ lọc, bỏ nút "Thêm lọc" (mockup 2026-10-29).
+            ...(canCreate
               ? [
                   {
-                    key: 'duplicate' as const,
-                    label: 'Trùng trong ngày',
+                    // Danh bạ GET /sales-orders/staff-options cần sales_order.create.
+                    key: 'creatorId' as const,
+                    label: 'NV lên đơn',
                     type: 'select' as const,
-                    options: [{ value: 'true', label: 'Chỉ đơn trùng trong ngày' }],
+                    searchable: true,
+                    options: (staffOptions.data ?? []).map((s) => ({
+                      value: s.id,
+                      label: s.fullName,
+                    })),
                   },
                 ]
               : []),
-            ...(showExtra('itemOrigin')
-              ? [
-                  {
-                    key: 'itemOrigin' as const,
-                    label: 'Sản phẩm ngoài ERP',
-                    type: 'select' as const,
-                    options: ITEM_ORIGIN_OPTIONS,
-                  },
-                ]
-              : []),
-            ...(showExtra('weightMin')
-              ? [
-                  {
-                    key: 'weightMin' as const,
-                    label: 'Cân nặng',
-                    type: 'custom' as const,
-                    render: () => (
-                      <WeightRangeFilter
-                        min={state.filters.weightMin}
-                        max={state.filters.weightMax}
-                        onChange={setFilter}
-                      />
-                    ),
-                  },
-                ]
-              : []),
+            {
+              key: 'duplicate',
+              label: 'Trùng trong ngày',
+              type: 'select',
+              options: [{ value: 'true', label: 'Chỉ đơn trùng trong ngày' }],
+            },
+            {
+              key: 'itemOrigin',
+              label: 'Sản phẩm ngoài ERP',
+              type: 'select',
+              options: ITEM_ORIGIN_OPTIONS,
+            },
+            {
+              key: 'weightMin',
+              label: 'Cân nặng',
+              type: 'custom',
+              render: () => (
+                <WeightRangeFilter
+                  min={state.filters.weightMin}
+                  max={state.filters.weightMax}
+                  onChange={setFilter}
+                />
+              ),
+            },
           ]}
-          after={<MoreFilters shown={shownExtras} active={activeExtras} onToggle={toggleExtra} />}
           values={{
             flow: state.filters.flow,
             status: state.filters.status,
@@ -1306,6 +1309,7 @@ export function OrderListScreen() {
             duplicate: state.filters.duplicate,
             itemOrigin: state.filters.itemOrigin,
             careTeamId: state.filters.careTeamId,
+            creatorId: state.filters.creatorId,
             fbPage: state.filters.fbPage,
             carrierStatus: state.filters.carrierStatus,
           }}
@@ -1381,6 +1385,16 @@ export function OrderListScreen() {
       </QueryState>
 
       <OrderQuickView row={peek} onClose={() => setPeek(null)} />
+      {cancelling ? (
+        <BulkCancelDialog
+          rows={[cancelling]}
+          open
+          onOpenChange={(o) => {
+            if (!o) setCancelling(null);
+          }}
+          onDone={() => setCancelling(null)}
+        />
+      ) : null}
     </>
   );
 }

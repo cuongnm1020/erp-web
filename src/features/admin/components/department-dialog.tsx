@@ -15,6 +15,7 @@ import {
   StaffMultiSelect,
   StaffSelect,
 } from '@/components/data/form';
+import { PancakeShopSelect } from '@/components/data/pancake-shop-select';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import {
@@ -36,6 +37,7 @@ import {
 import { toast } from '@/components/ui/toaster';
 import type { ApiError } from '@/lib/api/errors';
 import { useCreateDepartment, useUpdateDepartment, type Department } from '../api/use-departments';
+import { useFacebookPageShops } from '../api/use-facebook-pages';
 import { useUsers, type UserListItem } from '../api/use-users';
 import { createDepartmentSchema, departmentFormSchema, type DepartmentFormValues } from '../schema';
 
@@ -94,11 +96,14 @@ export function DepartmentDialog({
       kind: department?.kind ?? 'SALES',
       managerIds: department?.managerIds ?? [],
       groupLeadIds: department?.groupLeadIds ?? [],
+      defaultPosShopId: department?.defaultPosShopId ?? '',
     },
   });
   // Phòng CSKH đã có (đang sửa, chưa đổi loại): nhiều trưởng phòng + trưởng nhóm, chọn trong phòng.
   const kind = form.watch('kind');
   const careLeaders = editing && department.kind === 'CSKH' && kind === 'CSKH';
+  // POS lên đơn của phòng CSKH (2026-10-29) — danh mục POS chỉ nạp khi phòng là CSKH.
+  const shops = useFacebookPageShops();
   // Người trong phòng + trưởng phòng đang ghi trên phòng mà thuộc phòng khác (dữ liệu cũ — server
   // cho giữ, không cho thêm mới người ngoài phòng).
   // `users` là danh bạ cắt ở 200 người (take tối đa) — công ty > 200 người thì người của phòng có
@@ -145,6 +150,7 @@ export function DepartmentDialog({
           'kind',
           'managerIds',
           'groupLeadIds',
+          'defaultPosShopId',
         ],
       });
     if (editing) {
@@ -158,6 +164,8 @@ export function DepartmentDialog({
           sortOrder: v.sortOrder ? Number(v.sortOrder) : 0,
           isActive: v.isActive,
           kind: v.kind,
+          // Phòng đổi sang Kinh doanh: server tự bỏ POS.
+          ...(v.kind === 'CSKH' ? { defaultPosShopId: v.defaultPosShopId || null } : {}),
         },
         {
           onSuccess: () => {
@@ -177,6 +185,9 @@ export function DepartmentDialog({
         ...(v.managerId ? { managerId: v.managerId } : {}),
         ...(v.sortOrder ? { sortOrder: Number(v.sortOrder) } : {}),
         ...(v.kind === 'CSKH' ? { kind: v.kind } : {}),
+        ...(v.kind === 'CSKH' && v.defaultPosShopId
+          ? { defaultPosShopId: v.defaultPosShopId }
+          : {}),
       },
       {
         onSuccess: () => {
@@ -292,6 +303,32 @@ export function DepartmentDialog({
                 </FormItem>
               )}
             />
+            {kind === 'CSKH' ? (
+              <FormField
+                control={form.control}
+                name="defaultPosShopId"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>POS lên đơn</FormLabel>
+                    <FormControl>
+                      <PancakeShopSelect
+                        label="POS lên đơn"
+                        allLabel="— Không tự điền —"
+                        shops={shops.data ?? []}
+                        value={field.value || undefined}
+                        onChange={(v) => field.onChange(v ?? '')}
+                        className="w-full"
+                      />
+                    </FormControl>
+                    <FormDescription>
+                      Nhân viên phòng chưa chọn POS lên đơn riêng sẽ được tự điền POS này khi tạo
+                      đơn. Phòng con chưa đặt dùng POS của phòng này.
+                    </FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            ) : null}
             {careLeaders ? (
               <>
                 <FormField
