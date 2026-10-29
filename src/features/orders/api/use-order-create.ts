@@ -19,6 +19,7 @@ const createKeys = {
   skuQuick: (q: string, isCombo: boolean) =>
     [...lineEntryKeys.all, 'sku-quick', { q, isCombo }] as const,
   phone: (phone: string) => [...lineEntryKeys.all, 'phone-match', phone] as const,
+  phoneSuggest: (digits: string) => [...lineEntryKeys.all, 'phone-suggest', digits] as const,
   careLookup: (phone: string) => [...lineEntryKeys.all, 'care-lookup', phone] as const,
   sameDay: (phone: string) => [...lineEntryKeys.all, 'same-day', phone] as const,
   quote: (b: ShippingQuotePreviewBody) => [...lineEntryKeys.all, 'quote-preview', b] as const,
@@ -65,7 +66,8 @@ export function useSkuQuickSearch(q: string, isCombo: boolean) {
     queryFn: () =>
       unwrap(
         api.GET('/skus', {
-          params: { query: { q, isCombo, status: 'active', take: 30, skip: 0 } },
+          // Chỉ sản phẩm / combo tạo trong ERP (2026-10-29): bỏ SKU đồng bộ Pancake tự sinh từ đơn.
+          params: { query: { q, isCombo, status: 'active', erpOnly: true, take: 30, skip: 0 } },
         }),
       ),
     enabled: q.trim() !== '',
@@ -94,6 +96,31 @@ export function useCustomerPhoneMatch(rawPhone: string) {
 }
 
 const VALID_PHONE = /^0\d{9,10}$/;
+
+/** Gõ từ chừng này chữ số là bắt đầu gợi ý khách theo SĐT. */
+export const PHONE_SUGGEST_MIN_DIGITS = 4;
+
+/**
+ * Gợi ý khách khi đang gõ dở SĐT trên màn Tạo đơn (2026-10-29, user chốt): GET /customers đã scope
+ * → CHỈ khách người lên đơn được xem (không dò được danh bạ team khác bằng vài số đầu). Gõ đủ số
+ * thì {@link useCustomerPhoneMatch} + {@link useCareLookup} tra toàn hệ thống như trước.
+ * `digits` là chữ số đã chuẩn hoá (debounce ở component).
+ */
+export function useCustomerPhoneSuggest(digits: string) {
+  return useQuery({
+    queryKey: createKeys.phoneSuggest(digits),
+    queryFn: async () => {
+      const r = await unwrap(
+        api.GET('/customers', { params: { query: { q: digits, take: 8, skip: 0 } } }),
+      );
+      // `q` khớp cả tên / mã — chỉ giữ khách có SĐT chứa chuỗi số đã gõ.
+      return r.items.filter((c) => c.phone && normalizePhoneInput(c.phone).includes(digits));
+    },
+    enabled: digits.length >= PHONE_SUGGEST_MIN_DIGITS && !VALID_PHONE.test(digits),
+    staleTime: 30_000,
+    placeholderData: keepPreviousData,
+  });
+}
 
 /**
  * CSKH (2026-10-21): GET /customer-care/lookup — tra SĐT trên TOÀN hệ thống (cả khách của team

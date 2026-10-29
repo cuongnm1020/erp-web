@@ -1660,6 +1660,7 @@ export const handlers = [
           ...found,
           addresses: makeCustomerAddresses(found.id),
           mergedInto: null,
+          lastOrderAddressId: null,
         })
       : errorEnvelope(404, 'NOT_FOUND');
   }),

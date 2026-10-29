@@ -13,7 +13,9 @@ export const lineEntryKeys = {
   customerSearch: (q: string) => [...lineEntryKeys.all, 'customer-search', q] as const,
   skuSearch: (q: string) => [...lineEntryKeys.all, 'sku-search', q] as const,
   sku: (id: string) => [...lineEntryKeys.all, 'sku', id] as const,
-  stock: (skuCode: string) => [...lineEntryKeys.all, 'stock', skuCode] as const,
+  stock: (skuCode: string, warehouseId: string) =>
+    [...lineEntryKeys.all, 'stock', skuCode, warehouseId] as const,
+  comboStock: (code: string) => [...lineEntryKeys.all, 'combo-stock', code] as const,
   price: (p: LinePriceParams) => [...lineEntryKeys.all, 'price', p] as const,
 };
 
@@ -112,17 +114,46 @@ export function useSkuDetail(id: string) {
   });
 }
 
-/** Khả dụng theo SKU (ĐVT cơ sở) — GET /stock?q=<mã SKU>, lấy đúng dòng khớp mã. */
-export function useSkuAvailability(skuCode: string) {
+/**
+ * Khả dụng theo SKU (ĐVT cơ sở) — GET /stock?q=<mã SKU>, lấy đúng dòng khớp mã. Có `warehouseId`
+ * (Kho xuất trên màn Tạo đơn, 2026-10-29) → chỉ tồn trong kho đó; rỗng = mọi kho.
+ */
+export function useSkuAvailability(skuCode: string, warehouseId = '') {
   return useQuery({
-    queryKey: lineEntryKeys.stock(skuCode),
+    queryKey: lineEntryKeys.stock(skuCode, warehouseId),
     queryFn: async () => {
       const r = await unwrap(
-        api.GET('/stock', { params: { query: { q: skuCode, take: 10, skip: 0 } } }),
+        api.GET('/stock', {
+          params: {
+            query: { q: skuCode, take: 10, skip: 0, ...(warehouseId ? { warehouseId } : {}) },
+          },
+        }),
       );
       return r.items.find((i) => i.skuCode === skuCode) ?? null;
     },
     enabled: skuCode !== '',
     staleTime: 15_000,
+  });
+}
+
+/**
+ * Số combo còn bán được trong MỘT kho (Kho xuất, 2026-10-29) — GET /skus?q=<mã>&isCombo trả
+ * `byWarehouse` theo kho; `GET /skus/{id}.combo.available` là mọi kho. null = không có số kho đó.
+ */
+export function useComboAvailableIn(code: string, warehouseId: string) {
+  return useQuery({
+    queryKey: lineEntryKeys.comboStock(code),
+    queryFn: async () => {
+      const r = await unwrap(
+        api.GET('/skus', {
+          params: { query: { q: code, isCombo: true, status: 'active', take: 10, skip: 0 } },
+        }),
+      );
+      return r.items.find((i) => i.code === code)?.byWarehouse ?? null;
+    },
+    enabled: code !== '' && warehouseId !== '',
+    staleTime: 15_000,
+    select: (rows) =>
+      rows ? (rows.find((w) => w.warehouseId === warehouseId)?.available ?? '0') : null,
   });
 }

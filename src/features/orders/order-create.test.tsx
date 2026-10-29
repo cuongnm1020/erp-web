@@ -655,6 +655,53 @@ describe('OrderCreateScreen — màn tạo đơn mới', () => {
     expect(bodies[0]).toMatchObject({ customerId: CUST.id });
   });
 
+  it('gõ dở SĐT → gợi ý khách mình thấy (2026-10-29); chọn → gắn khách + Nhận hàng = địa chỉ đơn mua gần nhất (không phải mặc định)', async () => {
+    const CUST = makeCustomers(1)[0]!;
+    const queries: string[] = [];
+    server.use(
+      http.get('/api/customers', ({ request }) => {
+        queries.push(new URL(request.url).searchParams.get('q') ?? '');
+        return HttpResponse.json({ items: [CUST], total: 1 });
+      }),
+      http.get(`/api/customers/${CUST.id}`, () =>
+        HttpResponse.json({
+          ...CUST,
+          addresses: makeCustomerAddresses(CUST.id),
+          mergedInto: null,
+          // Đơn gần nhất giao về địa chỉ thứ hai (không mặc định).
+          lastOrderAddressId: '00000077-0000-4000-8000-000000000002',
+        }),
+      ),
+    );
+    renderApp(<OrderCreateScreen />);
+    const phoneBox = await screen.findByLabelText('Số điện thoại khách');
+    // 3 số: chưa gợi ý.
+    fireEvent.change(phoneBox, { target: { value: CUST.phone!.slice(0, 3) } });
+    await new Promise((r) => setTimeout(r, 350));
+    expect(screen.queryByRole('listbox', { name: 'Khách có SĐT khớp' })).not.toBeInTheDocument();
+
+    const typed = CUST.phone!.slice(0, 6);
+    fireEvent.change(phoneBox, { target: { value: typed } });
+    const list = await screen.findByRole('listbox', { name: 'Khách có SĐT khớp' });
+    expect(queries).toContain(typed);
+    const option = within(list).getByRole('option', { name: new RegExp(CUST.name) });
+    // Bàn phím: ↓ chọn dòng đầu, Enter gắn.
+    fireEvent.keyDown(phoneBox, { key: 'ArrowDown' });
+    expect(option).toHaveAttribute('aria-selected', 'true');
+    fireEvent.keyDown(phoneBox, { key: 'Enter' });
+
+    expect(await screen.findByText('Khách cũ')).toBeInTheDocument();
+    expect(screen.getByLabelText('Tên khách hàng')).toHaveValue(CUST.name);
+    expect(phoneBox).toHaveValue(CUST.phone);
+    expect(screen.queryByRole('listbox', { name: 'Khách có SĐT khớp' })).not.toBeInTheDocument();
+    await waitFor(() =>
+      expect(screen.getByLabelText('Tên người nhận')).toHaveValue('Trần Văn Bình'),
+    );
+    expect(screen.getByLabelText('Địa chỉ chi tiết (số nhà, đường, thôn/xóm)')).toHaveValue(
+      'Thôn 3, Xóm Đông',
+    );
+  });
+
   it('thẻ Chăm sóc khách: mục đích khách đã có bật sẵn (khóa), bấm thêm mục đích + ghi chú → chốt gửi purposeTagIds + careNote', async () => {
     const CUST = makeCustomers(1)[0]!;
     const DURIAN = '00000000-0000-4000-8000-0000000000d1';
@@ -1029,6 +1076,83 @@ describe('OrderCreateScreen — màn tạo đơn mới', () => {
       'Kho Long An',
     );
     forgetWarehouseSelection(); // store kho là module-level — không để rò sang test sau
+  });
+
+  it('ô tìm sản phẩm / combo chỉ xin hàng tạo trong ERP (erpOnly=true, 2026-10-29) — bỏ SKU đồng bộ Pancake tự sinh', async () => {
+    const urls: URL[] = [];
+    server.use(
+      http.get('/api/skus', ({ request }) => {
+        urls.push(new URL(request.url));
+        return HttpResponse.json({ items: [], total: 0 });
+      }),
+    );
+    renderApp(<OrderCreateScreen />);
+    const box = await screen.findByRole('combobox', { name: 'Tìm sản phẩm' });
+    fireEvent.change(box, { target: { value: 'amino' } });
+    await waitFor(() => expect(urls).toHaveLength(1));
+    fireEvent.click(screen.getByRole('tab', { name: 'Combo' }));
+    await waitFor(() => expect(urls).toHaveLength(2));
+    expect(urls.map((u) => u.searchParams.get('erpOnly'))).toEqual(['true', 'true']);
+    expect(urls.map((u) => u.searchParams.get('isCombo'))).toEqual(['false', 'true']);
+  });
+
+  it('khả dụng trên dòng giỏ tính theo Kho xuất (2026-10-29): GET /stock kèm warehouseId; kho không có hàng → báo đỏ', async () => {
+    const stockCalls: (string | null)[] = [];
+    server.use(
+      // Đứng trước skuHandlers() — MSW lấy handler khớp đầu tiên.
+      http.get('/api/stock', ({ request }) => {
+        const wh = new URL(request.url).searchParams.get('warehouseId');
+        stockCalls.push(wh);
+        const row = {
+          skuId: SKU.id,
+          skuCode: SKU.code,
+          skuName: SKU.name,
+          baseUomId: U1,
+          baseUomCode: 'PCS',
+          isActive: true,
+          onHand: '7',
+          reserved: '0',
+          available: '7',
+          hasCost: true,
+          unitCost: null,
+          weightKg: '0.5',
+        };
+        // Kho Long An có 7; Kho Thạch Thất không có dòng tồn nào.
+        return HttpResponse.json(
+          wh === 'wh-la' ? { items: [row], total: 1 } : { items: [], total: 0 },
+        );
+      }),
+      ...skuHandlers(),
+    );
+    renderApp(
+      <WarehouseProvider
+        me={{
+          ...ME_ADMIN,
+          managesDepartments: false,
+          managesCareTeam: false,
+          warehouseIds: ['wh-tt', 'wh-la'],
+          warehouses: [
+            { id: 'wh-tt', code: 'KHO-TT-01', name: 'Kho Thạch Thất' },
+            { id: 'wh-la', code: 'KHO-LA-01', name: 'Kho Long An' },
+          ],
+          defaultWarehouseId: 'wh-la',
+          selectedWarehouseId: null,
+        }}
+      >
+        <OrderCreateScreen />
+      </WarehouseProvider>,
+    );
+    const box = await screen.findByRole('combobox', { name: 'Tìm sản phẩm' });
+    fireEvent.change(box, { target: { value: 'amino' } });
+    fireEvent.click(await screen.findByRole('option', { name: /Amino GA3 500ml/ }));
+    expect(await screen.findByText('Khả dụng 7 PCS')).toBeInTheDocument();
+    expect(stockCalls).toContain('wh-la');
+
+    fireEvent.click(screen.getByRole('combobox', { name: 'Kho xuất' }));
+    fireEvent.click(await screen.findByRole('option', { name: /Kho Thạch Thất/ }));
+    expect(await screen.findByText('Kho xuất chưa có hàng')).toBeInTheDocument();
+    expect(stockCalls).toContain('wh-tt');
+    forgetWarehouseSelection();
   });
 
   it('ô NV xử lý chỉ liệt kê nhân viên cùng team (GET /sales-orders/owner-options), không lấy danh sách mọi nhân viên', async () => {
