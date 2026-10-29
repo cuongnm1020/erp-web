@@ -377,10 +377,11 @@ const buildColumns = (
   {
     id: 'address',
     header: 'Địa chỉ nhận',
-    meta: { width: 190 },
+    // Không đặt width (2026-10-29): bảng trải đủ ngang, phần thừa dồn vào Địa chỉ + Sản phẩm thay
+    // vì chia đều thành khoảng trống giữa mọi cột; chữ dài xuống tối đa 2 dòng.
     cell: ({ row }) => (
-      <div className="space-y-1">
-        <span className="block max-w-44 truncate" title={row.original.addressLine ?? undefined}>
+      <div className="min-w-44 space-y-1">
+        <span className="line-clamp-2 break-words" title={row.original.addressLine ?? undefined}>
           {row.original.addressLine ?? '—'}
         </span>
         <span className="block text-xs text-muted-foreground">{row.original.province}</span>
@@ -390,14 +391,14 @@ const buildColumns = (
   {
     id: 'product',
     header: 'Sản phẩm',
-    meta: { width: 180 },
+    // Không đặt width — xem cột Địa chỉ nhận.
     cell: ({ row }) => {
       const p = row.original.product;
       if (!p) return <span className="text-muted-foreground">—</span>;
       const name = `${p.name} × ${formatQuantity(p.qty)}`;
       return (
-        <div className="space-y-1">
-          <span className="block max-w-40 truncate" title={name}>
+        <div className="min-w-40 space-y-1">
+          <span className="line-clamp-2 break-words" title={name}>
             {name}
           </span>
           {p.moreCount > 0 ? (
@@ -455,7 +456,7 @@ const buildColumns = (
   {
     id: 'shipping',
     header: 'Vận chuyển',
-    meta: { width: 140 },
+    meta: { width: 120 },
     cell: ({ row }) => <ShippingCell order={row.original} carrierOf={carrierOf} />,
   },
   {
