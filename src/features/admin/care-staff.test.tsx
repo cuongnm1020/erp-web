@@ -153,62 +153,6 @@ describe('CareStaffScreen — Nhân viên của team (trưởng nhóm CSKH, 2026
     expect(dialog).toHaveTextContent(DEPT.name);
   });
 
-  it('POS lên đơn của phòng (2026-10-29): chọn POS → PUT /care-departments/{id}/default-pos', async () => {
-    search = '';
-    const put = vi.fn();
-    server.use(
-      http.get('/api/org/care-staff', () => HttpResponse.json(LIST)),
-      http.get('/api/reports/sales/by-staff', () =>
-        HttpResponse.json({ items: [], groupBy: 'owner', totals: {} }),
-      ),
-      http.get('/api/care-departments/default-pos', () =>
-        HttpResponse.json({
-          departments: [{ ...DEPT, defaultPosShopId: null, canEdit: true }],
-          shops: [
-            { shopId: '111', shopName: 'POS Miền Bắc', isActive: true },
-            { shopId: '222', shopName: 'POS Miền Nam', isActive: true },
-          ],
-        }),
-      ),
-      http.put('/api/care-departments/:id/default-pos', async ({ params, request }) => {
-        put(params.id, await request.json());
-        return HttpResponse.json({ ...DEPT, defaultPosShopId: '222', canEdit: true });
-      }),
-    );
-    renderApp(<CareStaffScreen />, { me: ME_CSKH_LEAD });
-    fireEvent.click(await screen.findByRole('button', { name: /POS lên đơn của phòng/ }));
-    const dialog = await screen.findByRole('dialog');
-    const save = await within(dialog).findByRole('button', { name: 'Lưu thay đổi' });
-    expect(save).toBeDisabled();
-    fireEvent.click(await within(dialog).findByRole('combobox', { name: `POS ${DEPT.name}` }));
-    fireEvent.click(await screen.findByRole('option', { name: /POS Miền Nam/ }));
-    expect(save).toBeEnabled();
-    fireEvent.click(save);
-    await waitFor(() => expect(put).toHaveBeenCalledWith(DEPT.id, { posShopId: '222' }));
-    expect(toastSuccess).toHaveBeenCalledWith('Đã lưu thay đổi');
-  });
-
-  it('POS lên đơn của phòng: trưởng nhóm chỉ xem, không có nút lưu', async () => {
-    search = '';
-    server.use(
-      http.get('/api/org/care-staff', () => HttpResponse.json(LIST)),
-      http.get('/api/reports/sales/by-staff', () =>
-        HttpResponse.json({ items: [], groupBy: 'owner', totals: {} }),
-      ),
-      http.get('/api/care-departments/default-pos', () =>
-        HttpResponse.json({
-          departments: [{ ...DEPT, defaultPosShopId: '111', canEdit: false }],
-          shops: [{ shopId: '111', shopName: 'POS Miền Bắc', isActive: true }],
-        }),
-      ),
-    );
-    renderApp(<CareStaffScreen />, { me: ME_CSKH_LEAD });
-    fireEvent.click(await screen.findByRole('button', { name: /POS lên đơn của phòng/ }));
-    const dialog = await screen.findByRole('dialog');
-    expect(await within(dialog).findByText('POS Miền Bắc')).toBeInTheDocument();
-    expect(within(dialog).queryByRole('button', { name: 'Lưu thay đổi' })).toBeNull();
-  });
-
   it('Sửa nhân sự (2026-10-29): mục Vai trò tick vai trò cấp được, vai trò ngoài tầm khóa; Lưu → PATCH roleCodes', async () => {
     search = '';
     const patches: unknown[] = [];

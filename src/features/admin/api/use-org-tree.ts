@@ -1,6 +1,5 @@
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api, unwrap } from '@/lib/api/client';
-import { meKeys } from '@/lib/auth/me-keys';
 import type { components } from '@/lib/api/schema';
 
 export type OrgTree = components['schemas']['OrgTreeDto'];
@@ -120,40 +119,5 @@ export function useStaffRevenue(from: string, to: string) {
         }),
       ),
     placeholderData: keepPreviousData,
-  });
-}
-
-export type CareDepartmentPosList = components['schemas']['CareDepartmentPosListDto'];
-export type CareDepartmentPos = components['schemas']['CareDepartmentPosDto'];
-
-const careDeptPosKey = [...orgTreeKeys.all, 'care-department-pos'] as const;
-
-/**
- * POS lên đơn của các phòng CSKH người gọi phụ trách (GET /care-departments/default-pos, 2026-10-29)
- * — nhân viên chưa đặt POS riêng thì màn Tạo đơn tự điền POS phòng.
- */
-export function useCareDepartmentPos() {
-  return useQuery({
-    queryKey: careDeptPosKey,
-    queryFn: () => unwrap(api.GET('/care-departments/default-pos')),
-  });
-}
-
-/** Đặt / bỏ POS lên đơn của một phòng CSKH — PUT /care-departments/{id}/default-pos. */
-export function useSetCareDepartmentPos() {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: ({ id, posShopId }: { id: string; posShopId: string | null }) =>
-      unwrap(
-        api.PUT('/care-departments/{id}/default-pos', {
-          params: { path: { id } },
-          body: { posShopId },
-        }),
-      ),
-    onSuccess: () => {
-      void qc.invalidateQueries({ queryKey: careDeptPosKey });
-      // POS tự điền ở màn Tạo đơn đọc từ /auth/me.
-      void qc.invalidateQueries({ queryKey: meKeys.me });
-    },
   });
 }

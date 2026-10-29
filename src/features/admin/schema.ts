@@ -50,6 +50,8 @@ export const departmentFormSchema = z.object({
   /** Phòng CSKH đang sửa (2026-10-24): mọi trưởng phòng / trưởng nhóm — người trong phòng. */
   managerIds: z.array(z.string()).max(20, 'Tối đa 20 leader'),
   groupLeadIds: z.array(z.string()).max(50, 'Tối đa 50 trưởng nhóm'),
+  /** POS lên đơn của phòng CSKH (shop_id, 2026-10-29) — '' = không tự điền. */
+  defaultPosShopId: z.string().regex(/^(|[1-9]\d{0,17})$/, 'POS không hợp lệ'),
 });
 
 export const createDepartmentSchema = departmentFormSchema.extend({ code: codeSchema });
