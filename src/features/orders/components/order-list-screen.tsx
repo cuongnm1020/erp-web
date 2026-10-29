@@ -295,7 +295,7 @@ const buildColumns = (
   {
     id: 'docNumber',
     header: 'Mã đơn',
-    meta: { width: 170, sortable: true },
+    meta: { width: 150, sortable: true },
     cell: ({ row }) => {
       const o = row.original;
       // Dòng phụ 1: nguồn (Pancake # / ERP). Dòng phụ 2: tên sale đầy đủ, xuống dòng khi dài.
@@ -341,7 +341,7 @@ const buildColumns = (
   {
     id: 'orderDate',
     header: 'Ngày đặt',
-    meta: { width: 130, sortable: true },
+    meta: { width: 116, sortable: true },
     cell: ({ row }) => (
       <span className="whitespace-nowrap text-xs">{formatDateTime(row.original.orderDate)}</span>
     ),
@@ -349,7 +349,7 @@ const buildColumns = (
   {
     id: 'customer',
     header: 'Khách hàng',
-    meta: { width: 200, sortable: true },
+    meta: { width: 170, sortable: true },
     cell: ({ row }) => {
       const o = row.original;
       const telco = phoneCarrier(o.phone);
@@ -377,10 +377,10 @@ const buildColumns = (
   {
     id: 'address',
     header: 'Địa chỉ nhận',
-    meta: { width: 240 },
+    meta: { width: 190 },
     cell: ({ row }) => (
       <div className="space-y-1">
-        <span className="block max-w-60 truncate" title={row.original.addressLine ?? undefined}>
+        <span className="block max-w-44 truncate" title={row.original.addressLine ?? undefined}>
           {row.original.addressLine ?? '—'}
         </span>
         <span className="block text-xs text-muted-foreground">{row.original.province}</span>
@@ -390,14 +390,14 @@ const buildColumns = (
   {
     id: 'product',
     header: 'Sản phẩm',
-    meta: { width: 230 },
+    meta: { width: 180 },
     cell: ({ row }) => {
       const p = row.original.product;
       if (!p) return <span className="text-muted-foreground">—</span>;
       const name = `${p.name} × ${formatQuantity(p.qty)}`;
       return (
         <div className="space-y-1">
-          <span className="block max-w-56 truncate" title={name}>
+          <span className="block max-w-40 truncate" title={name}>
             {name}
           </span>
           {p.moreCount > 0 ? (
@@ -455,13 +455,13 @@ const buildColumns = (
   {
     id: 'shipping',
     header: 'Vận chuyển',
-    meta: { width: 200 },
+    meta: { width: 140 },
     cell: ({ row }) => <ShippingCell order={row.original} carrierOf={carrierOf} />,
   },
   {
     id: 'total',
     header: 'Tổng tiền',
-    meta: { align: 'right', width: 120, sortable: true },
+    meta: { align: 'right', width: 104, sortable: true },
     cell: ({ row }) => {
       const o = row.original;
       return (
@@ -486,7 +486,7 @@ const buildColumns = (
         Thực thu ĐVVC
       </span>
     ),
-    meta: { align: 'right', width: 120, title: 'Thực thu ĐVVC' },
+    meta: { align: 'right', width: 96, title: 'Thực thu ĐVVC' },
     cell: ({ row }) => {
       const v = row.original.shipment?.collectedAmount;
       if (!v) return <span className="text-muted-foreground">—</span>;
@@ -503,7 +503,7 @@ const buildColumns = (
     // (và tuỳ chọn sắp đã lưu của người dùng) vẫn chạy.
     id: 'time',
     header: 'Trạng thái',
-    meta: { width: 160, sortable: true, title: 'Trạng thái' },
+    meta: { width: 130, sortable: true, title: 'Trạng thái' },
     cell: ({ row }) => {
       const o = row.original;
       return (
