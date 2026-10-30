@@ -131,6 +131,10 @@ const byProduct = (items: SalesByProduct['items'], total = items.length): SalesB
 
 const staffItem = (id: string | null, name: string, revenue: string) => ({
   key: { id, name },
+  // Doanh số như Pancake = thực thu + hoàn (mẫu không có hoàn → bằng nhau).
+  grossRevenue: revenue,
+  previousGrossRevenue: '900000.0000',
+  grossGrowthPct: '-10.00',
   revenue,
   orderCount: 4,
   aov: '250000.0000',
@@ -153,6 +157,9 @@ const BY_STAFF: SalesByStaff = {
     staffItem(null, 'Chưa gán', '1000000.0000'),
   ],
   totals: {
+    grossRevenue: '3000000.0000',
+    previousGrossRevenue: '1800000.0000',
+    grossGrowthPct: '66.67',
     revenue: '3000000.0000',
     orderCount: 8,
     aov: '375000.0000',
@@ -557,6 +564,57 @@ describe('Tab Nhân viên', () => {
     expect(lastUrl().get('ownerId')).toBe('u-1');
     expect(lastUrl().get('ownerName')).toBe('Trần Thị Sale');
     expect(lastUrl().get('tab')).toBe('staff');
+  });
+
+  it('doanh số như Pancake là cột chính, kèm Hoàn + Thực thu; lọc Tình trạng giao vào URL + query', async () => {
+    search = `tab=staff&from=${RANGE.from}&to=${RANGE.to}`;
+    const fulfil: string[][] = [];
+    const returnedItem = {
+      ...staffItem('u-1', 'Trần Thị Sale', '1700000.0000'),
+      grossRevenue: '2000000.0000',
+      grossProfit: '123000.0000',
+      returnedRevenue: '300000.0000',
+      returnedOrderCount: 1,
+      returnRate: '25.00',
+    };
+    server.use(
+      http.get('/api/reports/sales/by-staff', ({ request }) => {
+        fulfil.push(new URL(request.url).searchParams.getAll('fulfilment'));
+        return HttpResponse.json({ ...BY_STAFF, items: [returnedItem] });
+      }),
+    );
+    renderApp(<SalesReportScreen />, { me: ME_LEADER });
+    const cell = await screen.findByRole('cell', { name: 'Trần Thị Sale' });
+    const row = within(cell.closest('tr')!);
+    expect(screen.getByRole('columnheader', { name: 'Doanh số' })).toBeInTheDocument();
+    expect(screen.getByRole('columnheader', { name: 'Thực thu' })).toBeInTheDocument();
+    expect(row.getByText(/^2\.000\.000\s/)).toBeInTheDocument();
+    expect(row.getByText(/^300\.000\s/)).toBeInTheDocument();
+    expect(row.getByText(/^1\.700\.000\s/)).toBeInTheDocument();
+    // TB/đơn theo doanh số: 2.000.000 / 4 đơn.
+    expect(row.getByText(/^500\.000\s/)).toBeInTheDocument();
+    expect(fulfil[0]).toEqual([]);
+
+    fireEvent.click(screen.getByRole('combobox', { name: 'Tình trạng giao' }));
+    fireEvent.click(await screen.findByRole('option', { name: /Thành công/ }));
+    expect(lastUrl().get('fulfilment')).toBe('DELIVERED');
+  });
+
+  it('fulfilment trên URL đi vào query (lặp tham số), bỏ giá trị lạ', async () => {
+    search = `tab=staff&from=${RANGE.from}&to=${RANGE.to}&fulfilment=RETURNED,LOST,NOT_SHIPPED`;
+    const fulfil: string[][] = [];
+    server.use(
+      http.get('/api/reports/sales/by-staff', ({ request }) => {
+        fulfil.push(new URL(request.url).searchParams.getAll('fulfilment'));
+        return HttpResponse.json(BY_STAFF);
+      }),
+    );
+    renderApp(<SalesReportScreen />, { me: ME_LEADER });
+    await screen.findByRole('cell', { name: 'Trần Thị Sale' });
+    expect(fulfil[0]).toEqual(['RETURNED', 'NOT_SHIPPED']);
+    expect(screen.getByRole('combobox', { name: 'Tình trạng giao' })).toHaveTextContent(
+      'Tình trạng giao: 2 nhóm',
+    );
   });
 
   it('rỗng → EmptyState chuyển sang xem theo team; lỗi → traceId', async () => {

@@ -4,6 +4,7 @@ import { RefreshCw, X } from 'lucide-react';
 import { DateRangePicker } from '@/components/data/date-range-picker';
 import { StaffSelect } from '@/components/data/form';
 import { PancakeShopSelect } from '@/components/data/pancake-shop-select';
+import { SearchableMultiSelect } from '@/components/data/searchable-multi-select';
 import { ForbiddenState } from '@/components/data/states';
 import { PageHeader } from '@/components/layout/page-header';
 import { Button } from '@/components/ui/button';
@@ -28,6 +29,8 @@ import {
 import { rangeLabel } from './report-parts';
 import {
   CHANNELS,
+  FULFILMENT_OPTIONS,
+  parseFulfilment,
   SALES_MAX_DAYS,
   useSalesReportState,
   type ReportFilterKey,
@@ -92,7 +95,8 @@ export function SalesReportScreen() {
   const showOwnerChip = !!ownerId && !ownerOptions.some((u) => u.id === ownerId);
   const shopOptions = shops.data ?? [];
   const shopId = state.filters.pancakeShopId;
-  const hasFilter = !!(state.filters.channel || teamId || ownerId || shopId);
+  const fulfilment = parseFulfilment(state.filters.fulfilment);
+  const hasFilter = !!(state.filters.channel || teamId || ownerId || shopId || fulfilment.length);
 
   const clearKeys = (...keys: ReportFilterKey[]) =>
     setFilters(Object.fromEntries(keys.map((k) => [k, undefined])));
@@ -180,6 +184,22 @@ export function SalesReportScreen() {
             />
           </label>
         ) : null}
+        <label className="flex flex-col gap-0.5 text-xs text-muted-foreground">
+          Tình trạng giao
+          <SearchableMultiSelect
+            label="Tình trạng giao"
+            unit="nhóm"
+            values={fulfilment}
+            options={FULFILMENT_OPTIONS}
+            onChange={(v) =>
+              // Chọn đủ 4 nhóm = không lọc → bỏ khỏi URL để dùng được bảng tổng hợp.
+              setFilters({
+                fulfilment:
+                  v.length && v.length < FULFILMENT_OPTIONS.length ? v.join(',') : undefined,
+              })
+            }
+          />
+        </label>
         {showTeamChip ? (
           <FilterChip
             label={`Team: ${state.filters.teamName ?? 'đã chọn'}`}
@@ -197,7 +217,15 @@ export function SalesReportScreen() {
             variant="ghost"
             size="sm"
             onClick={() =>
-              clearKeys('channel', 'teamId', 'teamName', 'ownerId', 'ownerName', 'pancakeShopId')
+              clearKeys(
+                'channel',
+                'teamId',
+                'teamName',
+                'ownerId',
+                'ownerName',
+                'pancakeShopId',
+                'fulfilment',
+              )
             }
           >
             <X aria-hidden /> Xóa lọc

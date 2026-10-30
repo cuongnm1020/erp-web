@@ -13891,6 +13891,9 @@ export interface components {
         };
         SalesByStaffItemDto: {
             key: components["schemas"]["SalesStaffKeyDto"];
+            grossRevenue: string;
+            previousGrossRevenue: string;
+            grossGrowthPct: string | null;
             revenue: string;
             orderCount: number;
             aov: string;
@@ -13904,6 +13907,9 @@ export interface components {
             growthPct: string | null;
         };
         SalesByStaffTotalsDto: {
+            grossRevenue: string;
+            previousGrossRevenue: string;
+            grossGrowthPct: string | null;
             revenue: string;
             orderCount: number;
             aov: string;
@@ -13924,7 +13930,7 @@ export interface components {
             /** @enum {string} */
             groupBy: "team" | "owner" | "owner_shop";
             /**
-             * @description Sắp doanh thu giảm dần ("Chưa gán" đứng sau khi bằng nhau). Gồm cả người / team chỉ có doanh
+             * @description Sắp doanh số như Pancake (grossRevenue) giảm dần ("Chưa gán" đứng sau khi bằng nhau). Gồm cả người / team chỉ có doanh
              *     số kỳ trước (số kỳ này 0). Nhân viên chỉ thấy dòng của mình; trưởng nhóm thấy team mình.
              */
             items: components["schemas"]["SalesByStaffItemDto"][];
@@ -24237,6 +24243,12 @@ export interface operations {
     SalesReportController_summary: {
         parameters: {
             query: {
+                /**
+                 * @description Tình trạng giao (lặp tham số cho nhiều giá trị: `?fulfilment=DELIVERED&fulfilment=SHIPPING`):
+                 *     DELIVERED thành công · SHIPPING đang giao · NOT_SHIPPED chưa gửi hãng · RETURNED hoàn (cả ĐVVC
+                 *     hoàn cả đơn). Bỏ trống = mọi đơn. Có lọc → luôn tính sống (bảng tổng hợp không lưu).
+                 */
+                fulfilment?: ("DELIVERED" | "SHIPPING" | "NOT_SHIPPED" | "RETURNED")[];
                 /** @description `YYYY-MM-DD` — ngày đầu (giờ VN). */
                 from: string;
                 /** @description `YYYY-MM-DD` — ngày cuối, lấy hết ngày đó. `to` = `from` → một ngày. */
@@ -24272,6 +24284,12 @@ export interface operations {
     SalesReportController_timeseries: {
         parameters: {
             query: {
+                /**
+                 * @description Tình trạng giao (lặp tham số cho nhiều giá trị: `?fulfilment=DELIVERED&fulfilment=SHIPPING`):
+                 *     DELIVERED thành công · SHIPPING đang giao · NOT_SHIPPED chưa gửi hãng · RETURNED hoàn (cả ĐVVC
+                 *     hoàn cả đơn). Bỏ trống = mọi đơn. Có lọc → luôn tính sống (bảng tổng hợp không lưu).
+                 */
+                fulfilment?: ("DELIVERED" | "SHIPPING" | "NOT_SHIPPED" | "RETURNED")[];
                 /** @description `YYYY-MM-DD` — ngày đầu (giờ VN). */
                 from: string;
                 /** @description `YYYY-MM-DD` — ngày cuối, lấy hết ngày đó. `to` = `from` → một ngày. */
@@ -24309,6 +24327,12 @@ export interface operations {
     SalesReportController_byProduct: {
         parameters: {
             query: {
+                /**
+                 * @description Tình trạng giao (lặp tham số cho nhiều giá trị: `?fulfilment=DELIVERED&fulfilment=SHIPPING`):
+                 *     DELIVERED thành công · SHIPPING đang giao · NOT_SHIPPED chưa gửi hãng · RETURNED hoàn (cả ĐVVC
+                 *     hoàn cả đơn). Bỏ trống = mọi đơn. Có lọc → luôn tính sống (bảng tổng hợp không lưu).
+                 */
+                fulfilment?: ("DELIVERED" | "SHIPPING" | "NOT_SHIPPED" | "RETURNED")[];
                 /** @description `YYYY-MM-DD` — ngày đầu (giờ VN). */
                 from: string;
                 /** @description `YYYY-MM-DD` — ngày cuối, lấy hết ngày đó. `to` = `from` → một ngày. */
@@ -24359,6 +24383,12 @@ export interface operations {
     SalesReportController_byStaff: {
         parameters: {
             query: {
+                /**
+                 * @description Tình trạng giao (lặp tham số cho nhiều giá trị: `?fulfilment=DELIVERED&fulfilment=SHIPPING`):
+                 *     DELIVERED thành công · SHIPPING đang giao · NOT_SHIPPED chưa gửi hãng · RETURNED hoàn (cả ĐVVC
+                 *     hoàn cả đơn). Bỏ trống = mọi đơn. Có lọc → luôn tính sống (bảng tổng hợp không lưu).
+                 */
+                fulfilment?: ("DELIVERED" | "SHIPPING" | "NOT_SHIPPED" | "RETURNED")[];
                 /** @description `YYYY-MM-DD` — ngày đầu (giờ VN). */
                 from: string;
                 /** @description `YYYY-MM-DD` — ngày cuối, lấy hết ngày đó. `to` = `from` → một ngày. */
@@ -24395,6 +24425,12 @@ export interface operations {
     SalesReportController_topProducts: {
         parameters: {
             query: {
+                /**
+                 * @description Tình trạng giao (lặp tham số cho nhiều giá trị: `?fulfilment=DELIVERED&fulfilment=SHIPPING`):
+                 *     DELIVERED thành công · SHIPPING đang giao · NOT_SHIPPED chưa gửi hãng · RETURNED hoàn (cả ĐVVC
+                 *     hoàn cả đơn). Bỏ trống = mọi đơn. Có lọc → luôn tính sống (bảng tổng hợp không lưu).
+                 */
+                fulfilment?: ("DELIVERED" | "SHIPPING" | "NOT_SHIPPED" | "RETURNED")[];
                 /** @description `YYYY-MM-DD` — ngày đầu (giờ VN). */
                 from: string;
                 /** @description `YYYY-MM-DD` — ngày cuối, lấy hết ngày đó. `to` = `from` → một ngày. */
@@ -24437,6 +24473,12 @@ export interface operations {
     SalesReportController_bySupplier: {
         parameters: {
             query: {
+                /**
+                 * @description Tình trạng giao (lặp tham số cho nhiều giá trị: `?fulfilment=DELIVERED&fulfilment=SHIPPING`):
+                 *     DELIVERED thành công · SHIPPING đang giao · NOT_SHIPPED chưa gửi hãng · RETURNED hoàn (cả ĐVVC
+                 *     hoàn cả đơn). Bỏ trống = mọi đơn. Có lọc → luôn tính sống (bảng tổng hợp không lưu).
+                 */
+                fulfilment?: ("DELIVERED" | "SHIPPING" | "NOT_SHIPPED" | "RETURNED")[];
                 /** @description `YYYY-MM-DD` — ngày đầu (giờ VN). */
                 from: string;
                 /** @description `YYYY-MM-DD` — ngày cuối, lấy hết ngày đó. `to` = `from` → một ngày. */

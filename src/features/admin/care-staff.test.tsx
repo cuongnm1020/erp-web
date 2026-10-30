@@ -57,6 +57,10 @@ const LIST = {
 };
 const revenue = (id: string, value: string, orders: number) => ({
   key: { id, name: id, shopId: null, shopName: null },
+  // Cột Doanh số đọc grossRevenue (như Pancake, chưa trừ hoàn); mẫu không có hoàn.
+  grossRevenue: value,
+  previousGrossRevenue: '0',
+  grossGrowthPct: null,
   revenue: value,
   orderCount: orders,
   aov: '0',
