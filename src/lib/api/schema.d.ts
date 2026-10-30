@@ -3383,6 +3383,27 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/sales-orders/creator-options": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Ô lọc "NV lên đơn" ở danh sách đơn theo người xem (2026-10-30): leader CSKH → nhân viên team
+         *     mình làm leader, trưởng nhóm → mình + nhân viên nhóm, nhân viên CSKH → chính mình; người khác
+         *     mọi nhân viên — khai TRƯỚC `:id`.
+         */
+        get: operations["SalesOrderController_creatorOptions"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/sales-orders/owner-options": {
         parameters: {
             query?: never;
@@ -21993,6 +22014,25 @@ export interface operations {
         };
     };
     SalesOrderController_staffOptions: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OrderStaffOptionDto"][];
+                };
+            };
+        };
+    };
+    SalesOrderController_creatorOptions: {
         parameters: {
             query?: never;
             header?: never;

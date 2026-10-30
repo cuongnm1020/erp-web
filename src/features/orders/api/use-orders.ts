@@ -259,6 +259,18 @@ export function useCareTeamOptions() {
 }
 
 /**
+ * GET /sales-orders/creator-options — ô lọc "NV lên đơn" theo người xem (2026-10-30): leader CSKH
+ * thấy nhân viên team mình, trưởng nhóm thấy nhóm mình, nhân viên CSKH chỉ mình; người khác mọi NV.
+ */
+export function useOrderCreatorOptions() {
+  return useQuery({
+    queryKey: [...orderKeys.all, 'creator-options'] as const,
+    queryFn: () => unwrap(api.GET('/sales-orders/creator-options')),
+    staleTime: 5 * 60_000,
+  });
+}
+
+/**
  * Tìm POS đã liên kết (đang bật) cho ô chọn POS trên màn tạo đơn — danh mục nhỏ nên lọc theo tên /
  * mã ngay trên danh sách GET /pancake-sync/shops đã cache.
  */

@@ -1151,6 +1151,18 @@ describe('OrderListScreen — redesign Bán hàng (2026-10-22)', () => {
     }
   });
 
+  it('ô NV lên đơn lấy danh sách theo người xem (creator-options), không phải danh bạ tạo đơn', async () => {
+    search = '';
+    renderApp(<OrderListScreen />, {
+      me: { ...ME_SALE, permissions: ['sales_order.read'] },
+    });
+    await screen.findByText(FIRST.docNumber);
+    fireEvent.click(screen.getByRole('combobox', { name: 'NV lên đơn' }));
+    expect(await screen.findByRole('option', { name: 'Nguyễn Văn Sale' })).toBeInTheDocument();
+    // packer.01 chỉ có trong staff-options (màn tạo đơn).
+    expect(screen.queryByRole('option', { name: 'Trần Thị Đóng' })).not.toBeInTheDocument();
+  });
+
   it('?duplicate=true → ô "Trùng trong ngày" hiện sẵn', async () => {
     search = 'duplicate=true';
     renderApp(<OrderListScreen />);

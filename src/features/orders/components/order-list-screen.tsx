@@ -62,6 +62,7 @@ import {
   useRequestWaybill,
   useCareTeamOptions,
   useCarrierStatusOptions,
+  useOrderCreatorOptions,
   useFacebookPageOptions,
   usePancakeShops,
   useSaveOrderListPrefs,
@@ -73,7 +74,6 @@ import {
   type OrderSortField,
   type SalesOrderListItem,
 } from '../api/use-orders';
-import { useOrderStaffOptions } from '../api/use-order-create';
 import {
   FLOW_FAMILY_DOT,
   fulfilmentLabel,
@@ -1031,7 +1031,7 @@ export function OrderListScreen() {
   const canCreate = ability.can('create', 'SalesOrder');
   const canPack = ability.can('pack', 'Shipment');
   const canCancel = ability.can('cancel', 'SalesOrder') || canCreate;
-  const staffOptions = useOrderStaffOptions(canCreate);
+  const creatorOptions = useOrderCreatorOptions();
   const [peek, setPeek] = useState<SalesOrderListItem | null>(null);
   // Nút Hủy trên dòng → hộp xác nhận dùng chung với hủy hàng loạt (một đơn).
   const [cancelling, setCancelling] = useState<SalesOrderListItem | null>(null);
@@ -1258,21 +1258,18 @@ export function OrderListScreen() {
                 ]
               : []),
             // Hiện hết bộ lọc, bỏ nút "Thêm lọc" (mockup 2026-10-29).
-            ...(canCreate
-              ? [
-                  {
-                    // Danh bạ GET /sales-orders/staff-options cần sales_order.create.
-                    key: 'creatorId' as const,
-                    label: 'NV lên đơn',
-                    type: 'select' as const,
-                    searchable: true,
-                    options: (staffOptions.data ?? []).map((s) => ({
-                      value: s.id,
-                      label: s.fullName,
-                    })),
-                  },
-                ]
-              : []),
+            {
+              // Danh sách theo người xem (2026-10-30): leader CSKH → nhân viên team, trưởng nhóm →
+              // nhóm mình, nhân viên CSKH → mình; người khác mọi nhân viên.
+              key: 'creatorId',
+              label: 'NV lên đơn',
+              type: 'select',
+              searchable: true,
+              options: (creatorOptions.data ?? []).map((s) => ({
+                value: s.id,
+                label: s.fullName,
+              })),
+            },
             {
               key: 'duplicate',
               label: 'Trùng trong ngày',
