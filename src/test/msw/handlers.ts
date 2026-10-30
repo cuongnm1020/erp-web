@@ -1587,6 +1587,16 @@ export const handlers = [
       { id: '00000000-0000-4000-8000-0000000000a2', code: 'packer.01', fullName: 'Trần Thị Đóng' },
     ]),
   ),
+  // Ô lọc NV lên đơn: danh sách theo người xem (API lọc theo leader / trưởng nhóm CSKH).
+  http.get('/api/sales-orders/creator-options', () =>
+    HttpResponse.json([
+      {
+        id: '00000000-0000-4000-8000-0000000000a1',
+        code: 'sale.hn.1',
+        fullName: 'Nguyễn Văn Sale',
+      },
+    ]),
+  ),
   // NV xử lý: chỉ nhân viên cùng team người tạo — packer.01 ngoài team nên không có ở đây.
   http.get('/api/sales-orders/owner-options', () =>
     HttpResponse.json([
