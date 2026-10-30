@@ -195,18 +195,23 @@ export function CareStaffScreen() {
       },
       {
         id: 'revenue',
-        header: 'Doanh thu',
+        header: 'Doanh số',
         meta: { align: 'right', width: 140 },
         cell: ({ row }) => {
           const r = row.original.revenue;
           if (revenue.isPending) return <span className="text-muted-foreground">…</span>;
+          const returned = toDecimal(r?.returnedRevenue ?? '0');
           return (
+            // Doanh số như Pancake (chưa trừ hoàn); hoàn hiện dòng dưới để tách.
             <div className="space-y-0.5">
               <span className="block font-semibold">
-                {formatMoney(r?.revenue ?? '0', { unit: '' })}
+                {formatMoney(r?.grossRevenue ?? '0', { unit: '' })}
               </span>
               <span className="block text-xs text-muted-foreground">
                 {groupVi(String(r?.orderCount ?? 0))} đơn
+                {returned && !returned.isZero()
+                  ? ` · hoàn ${formatMoney(returned.toString(), { unit: '' })}`
+                  : ''}
               </span>
             </div>
           );
@@ -291,7 +296,7 @@ export function CareStaffScreen() {
     code: g.code,
   }));
   const teamRevenue = rows.reduce(
-    (acc, r) => acc.plus(toDecimal(r.revenue?.revenue ?? '0') ?? 0),
+    (acc, r) => acc.plus(toDecimal(r.revenue?.grossRevenue ?? '0') ?? 0),
     toDecimal('0')!,
   );
 
@@ -301,7 +306,7 @@ export function CareStaffScreen() {
         title="Nhân viên của team"
         description={
           staff.data
-            ? `${rows.length} nhân viên · doanh thu kỳ chọn ${formatMoney(teamRevenue.toString())}`
+            ? `${rows.length} nhân viên · doanh số kỳ chọn ${formatMoney(teamRevenue.toString())}`
             : 'Đang tải nhân viên của team…'
         }
         breadcrumb={[
@@ -319,9 +324,9 @@ export function CareStaffScreen() {
       />
 
       <div className="mb-3 flex flex-wrap items-end gap-2 rounded-lg border bg-card p-3">
-        <span className="pb-1.5 text-sm font-semibold text-muted-foreground">Doanh thu</span>
+        <span className="pb-1.5 text-sm font-semibold text-muted-foreground">Doanh số</span>
         <DateRangePicker
-          label="Kỳ doanh thu"
+          label="Kỳ doanh số"
           value={range}
           today={today}
           maxDays={MAX_DAYS}

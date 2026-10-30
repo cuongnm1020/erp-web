@@ -4,7 +4,7 @@ import { useCallback, useMemo } from 'react';
 import { normalizeRange, type DateRange } from '@/components/data/date-range-picker';
 import { toLocalDateKey } from '@/lib/format';
 import { useListState } from '@/lib/url-state';
-import type { SalesChannel, SalesFilter } from '../api/use-sales-report';
+import type { FulfilmentGroup, SalesChannel, SalesFilter } from '../api/use-sales-report';
 
 /** Trần khoảng ngày của API báo cáo bán hàng (SALES_REPORT_MAX_DAYS) — chặn trước để không 422. */
 export const SALES_MAX_DAYS = 366;
@@ -26,6 +26,8 @@ export const REPORT_FILTER_KEYS = [
   'ownerName',
   // POS Pancake của đơn
   'pancakeShopId',
+  // Tình trạng giao — các nhóm cách nhau dấu phẩy ("DELIVERED,SHIPPING")
+  'fulfilment',
   // Tổng quan
   'gran',
   'metric',
@@ -56,6 +58,19 @@ export const CHANNELS: Array<{ value: SalesChannel; label: string }> = [
 ];
 const CHANNEL_VALUES = new Set<string>(CHANNELS.map((c) => c.value));
 
+/** Nhóm tình trạng giao (GET /reports/sales/* `fulfilment`) — bỏ Hoàn = thực thu. */
+export const FULFILMENT_OPTIONS: Array<{ value: FulfilmentGroup; label: string }> = [
+  { value: 'DELIVERED', label: 'Thành công' },
+  { value: 'SHIPPING', label: 'Đang giao' },
+  { value: 'NOT_SHIPPED', label: 'Chưa gửi hàng' },
+  { value: 'RETURNED', label: 'Hoàn' },
+];
+const FULFILMENT_VALUES = new Set<string>(FULFILMENT_OPTIONS.map((o) => o.value));
+
+/** "DELIVERED,SHIPPING" trên URL → mảng hợp lệ, bỏ giá trị lạ; rỗng = không lọc. */
+export const parseFulfilment = (raw: string | undefined): FulfilmentGroup[] =>
+  (raw ?? '').split(',').filter((v): v is FulfilmentGroup => FULFILMENT_VALUES.has(v));
+
 export function useSalesReportState() {
   const list = useListState<ReportFilterKey>(DEFAULTS);
   const { state, set } = list;
@@ -70,6 +85,7 @@ export function useSalesReportState() {
     [state.filters.from, state.filters.to, today],
   );
   const channelRaw = state.filters.channel;
+  const fulfilmentRaw = state.filters.fulfilment;
   const filter = useMemo<SalesFilter>(
     () => ({
       from: range.from,
@@ -81,8 +97,19 @@ export function useSalesReportState() {
       pancakeShopId: /^[1-9]\d{0,17}$/.test(state.filters.pancakeShopId ?? '')
         ? state.filters.pancakeShopId
         : undefined,
+      fulfilment: (() => {
+        const v = parseFulfilment(fulfilmentRaw);
+        return v.length ? v : undefined;
+      })(),
     }),
-    [range, channelRaw, state.filters.teamId, state.filters.ownerId, state.filters.pancakeShopId],
+    [
+      range,
+      channelRaw,
+      fulfilmentRaw,
+      state.filters.teamId,
+      state.filters.ownerId,
+      state.filters.pancakeShopId,
+    ],
   );
 
   /** Ghi đè một phần filter (giữ phần còn lại), page về 1. */

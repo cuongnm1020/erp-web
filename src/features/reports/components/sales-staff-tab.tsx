@@ -30,6 +30,10 @@ const GROUPS: ReadonlyArray<readonly [StaffGroupBy, string]> = [
 ];
 const GROUP_VALUES = new Set<string>(GROUPS.map(([g]) => g));
 
+/** TB/đơn theo doanh số như Pancake (API trả `aov` theo thực thu). */
+const grossAov = (gross: string, orders: number): string =>
+  orders > 0 ? (toDecimal(gross)?.div(orders).toFixed(4) ?? '0') : '0';
+
 /** Một người có thể nhiều dòng (mỗi POS một dòng) → id dòng ghép người + POS. */
 const rowKey = (r: SalesByStaffItem) => `${r.key.id ?? 'null'}|${r.key.shopId ?? ''}`;
 
@@ -38,6 +42,8 @@ const rowKey = (r: SalesByStaffItem) => `${r.key.id ?? 'null'}|${r.key.shopId ??
  * được API scope (nhân viên chỉ thấy dòng mình, trưởng nhóm thấy team) — màn không lọc thêm (luật 7).
  * Bấm "Lọc" trên một dòng để xem mọi tab theo riêng người / team đó. "Nhân viên × POS": mỗi sale
  * tách một dòng cho từng POS Pancake đã bán (đơn tạo trên ERP thành dòng riêng).
+ * Số chính là doanh số "như Pancake" (CHƯA trừ hàng hoàn, 2026-10-30); Hoàn và Thực thu (= doanh
+ * số − hoàn) đứng ngay sau để tách; ô "Tình trạng giao" ở thanh lọc tách tiếp theo nhóm đơn.
  */
 export function SalesStaffTab() {
   const { state, setFilters, filter, range } = useSalesReportState();
@@ -70,8 +76,31 @@ export function SalesStaffTab() {
           ]
         : []),
       {
+        id: 'grossRevenue',
+        header: 'Doanh số',
+        meta: { align: 'right', width: 140 },
+        cell: ({ row }) => (
+          <span className="font-semibold">{money(row.original.grossRevenue)}</span>
+        ),
+      },
+      {
+        id: 'returned',
+        header: 'Hoàn',
+        meta: { align: 'right', width: 130 },
+        cell: ({ row }) => (
+          <span className="flex flex-col items-end">
+            {money(row.original.returnedRevenue)}
+            {row.original.returnedOrderCount > 0 ? (
+              <span className="text-xs text-muted-foreground">
+                {row.original.returnedOrderCount} đơn · {pct(row.original.returnRate)}
+              </span>
+            ) : null}
+          </span>
+        ),
+      },
+      {
         id: 'revenue',
-        header: 'Doanh thu',
+        header: 'Thực thu',
         meta: { align: 'right', width: 140 },
         cell: ({ row }) => money(row.original.revenue),
       },
@@ -85,7 +114,7 @@ export function SalesStaffTab() {
         id: 'aov',
         header: 'TB/đơn',
         meta: { align: 'right', width: 120 },
-        cell: ({ row }) => money(row.original.aov),
+        cell: ({ row }) => money(grossAov(row.original.grossRevenue, row.original.orderCount)),
       },
       {
         id: 'grossProfit',
@@ -109,38 +138,23 @@ export function SalesStaffTab() {
         ),
       },
       {
-        id: 'returned',
-        header: 'Hàng hoàn',
-        meta: { align: 'right', width: 130 },
-        cell: ({ row }) => (
-          <span className="flex flex-col items-end">
-            {money(row.original.returnedRevenue)}
-            {row.original.returnedOrderCount > 0 ? (
-              <span className="text-xs text-muted-foreground">
-                {row.original.returnedOrderCount} đơn · {pct(row.original.returnRate)}
-              </span>
-            ) : null}
-          </span>
-        ),
-      },
-      {
-        id: 'previousRevenue',
-        header: 'Doanh thu kỳ trước',
+        id: 'previousGrossRevenue',
+        header: 'Doanh số kỳ trước',
         meta: { align: 'right', width: 150 },
         cell: ({ row }) => (
           <span className="tabular-nums text-muted-foreground">
-            {formatMoney(row.original.previousRevenue)}
+            {formatMoney(row.original.previousGrossRevenue)}
           </span>
         ),
       },
       {
-        id: 'growthPct',
+        id: 'grossGrowthPct',
         header: 'Tăng/giảm',
         meta: { align: 'right', width: 100 },
         cell: ({ row }) => (
           <GrowthIndicator
-            pct={row.original.growthPct}
-            hasCurrent={!(toDecimal(row.original.revenue)?.isZero() ?? true)}
+            pct={row.original.grossGrowthPct}
+            hasCurrent={!(toDecimal(row.original.grossRevenue)?.isZero() ?? true)}
           />
         ),
       },
@@ -186,32 +200,34 @@ export function SalesStaffTab() {
       [
         head,
         ...(byShop ? ['POS'] : []),
-        'Doanh thu',
+        'Doanh số',
+        'Hoàn',
+        'Số đơn hoàn',
+        'Tỷ lệ hoàn %',
+        'Thực thu',
         'Số đơn',
         'TB/đơn',
         'Lãi gộp',
         'Khách mua',
         'Khách mới',
-        'Hàng hoàn',
-        'Số đơn hoàn',
-        'Tỷ lệ hoàn %',
-        'Doanh thu kỳ trước',
+        'Doanh số kỳ trước',
         'Tăng/giảm %',
       ],
       items.map((r) => [
         r.key.name,
         ...(byShop ? [r.key.shopName ?? ''] : []),
-        csvMoney(r.revenue),
-        r.orderCount,
-        csvMoney(r.aov),
-        csvMoney(r.grossProfit),
-        r.customerCount,
-        r.newCustomerCount,
+        csvMoney(r.grossRevenue),
         csvMoney(r.returnedRevenue),
         r.returnedOrderCount,
         r.returnRate ?? '',
-        csvMoney(r.previousRevenue),
-        r.growthPct ?? '',
+        csvMoney(r.revenue),
+        r.orderCount,
+        csvMoney(grossAov(r.grossRevenue, r.orderCount)),
+        csvMoney(r.grossProfit),
+        r.customerCount,
+        r.newCustomerCount,
+        csvMoney(r.previousGrossRevenue),
+        r.grossGrowthPct ?? '',
       ]),
     );
 
@@ -246,24 +262,26 @@ export function SalesStaffTab() {
                 onChange={(g) => setFilters({ staff: g === 'owner' ? undefined : g })}
               />
               <p className="mr-auto text-xs text-muted-foreground">
-                Tổng {formatMoney(d.totals.revenue)} · {d.totals.orderCount} đơn ·{' '}
-                {d.totals.customerCount} khách · kỳ trước {formatMoney(d.totals.previousRevenue)}{' '}
-                <GrowthIndicator pct={d.totals.growthPct} />
+                Doanh số {formatMoney(d.totals.grossRevenue)} · hoàn{' '}
+                {formatMoney(d.totals.returnedRevenue)} · thực thu {formatMoney(d.totals.revenue)} ·{' '}
+                {d.totals.orderCount} đơn · {d.totals.customerCount} khách · kỳ trước{' '}
+                {formatMoney(d.totals.previousGrossRevenue)}{' '}
+                <GrowthIndicator pct={d.totals.grossGrowthPct} />
               </p>
               <ExportButton onClick={() => exportCsv(d.items)} />
             </div>
-            <section className="rounded-md border bg-card p-3" aria-label="Biểu đồ doanh thu">
+            <section className="rounded-md border bg-card p-3" aria-label="Biểu đồ doanh số">
               <h2 className="mb-2 text-sm font-semibold">
-                Doanh thu {Math.min(10, d.items.length)}{' '}
+                Doanh số {Math.min(10, d.items.length)}{' '}
                 {groupBy === 'team' ? 'team' : byShop ? 'dòng nhân viên × POS' : 'người'} cao nhất
               </h2>
               <BarList
-                ariaLabel={`Doanh thu theo ${head.toLowerCase()}`}
+                ariaLabel={`Doanh số theo ${head.toLowerCase()}`}
                 items={d.items.slice(0, 10).map((r) => ({
                   key: rowKey(r),
                   label: byShop ? `${r.key.name} · ${r.key.shopName ?? ''}` : r.key.name,
-                  value: r.revenue,
-                  display: formatMoney(r.revenue),
+                  value: r.grossRevenue,
+                  display: formatMoney(r.grossRevenue),
                   muted: r.key.id === null,
                 }))}
               />

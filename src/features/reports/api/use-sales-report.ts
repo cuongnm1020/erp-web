@@ -29,6 +29,7 @@ export type ProductSort = NonNullable<ByProductQuery['sort']>;
 export type StaffGroupBy = SalesByStaff['groupBy'];
 export type TopRankBy = TopQuery['rankBy'];
 export type SupplierSort = NonNullable<BySupplierQuery['sort']>;
+export type FulfilmentGroup = NonNullable<SummaryQuery['fulfilment']>[number];
 
 /** Bộ lọc chung của mọi báo cáo bán hàng — đã chuẩn hoá từ URL. */
 export interface SalesFilter {
@@ -40,6 +41,8 @@ export interface SalesFilter {
   ownerId?: string;
   /** POS Pancake của đơn (shop_id, chuỗi số). */
   pancakeShopId?: string;
+  /** Tình trạng giao (Thành công / Đang giao / Chưa gửi / Hoàn); bỏ trống = mọi đơn. */
+  fulfilment?: FulfilmentGroup[];
 }
 
 export interface ByProductParams {
@@ -87,6 +90,7 @@ const filterQuery = (f: SalesFilter) => ({
   teamId: f.teamId,
   ownerId: f.ownerId,
   pancakeShopId: f.pancakeShopId,
+  fulfilment: f.fulfilment,
 });
 
 /** GET /reports/sales/summary — KPI kỳ đang xem + kỳ trước cùng độ dài. */
