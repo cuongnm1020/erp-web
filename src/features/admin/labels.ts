@@ -62,6 +62,7 @@ const PERMISSION_LABELS: Record<string, string> = {
   'user.group_add': 'Thêm nhân viên trong nhóm',
   'user.group_edit': 'Sửa nhân viên trong nhóm',
   'user.group_lock': 'Khóa nhân viên trong nhóm',
+  'user.impersonate': 'Đăng nhập thay nhân viên mình quản lý',
   'sync.read': 'Xem tình trạng',
   'sync.map': 'Khai báo mapping',
   'sync.config': 'Cấu hình kết nối',

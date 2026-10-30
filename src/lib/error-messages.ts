@@ -248,6 +248,9 @@ const MESSAGES: Record<string, string> = {
   DEPARTMENT_NOT_MANAGED:
     'Bạn chỉ thêm / chuyển nhân sự vào phòng ban mình phụ trách. Chọn phòng ban khác.',
   ROLE_ESCALATION: 'Không gán được vai trò có quyền bạn không có. Bỏ chọn vai trò đó.',
+  // Đăng nhập thay (POST /auth/impersonate) — vai trò "Đăng nhập thay nhân viên" (2026-10-30)
+  IMPERSONATE_FORBIDDEN:
+    'Không đăng nhập thay được tài khoản này: chỉ nhân viên trong phòng ban / nhóm bạn quản lý, có quyền không vượt quyền bạn. Nhờ superadmin nếu cần.',
   DEPARTMENT_NOT_EMPTY:
     'Phòng ban còn phòng ban con hoặc còn nhân sự. Chuyển họ sang phòng ban khác rồi xóa lại.',
   ROLE_IN_USE: 'Vai trò đang gán cho người dùng. Gỡ vai trò khỏi họ ở màn Nhân viên rồi xóa lại.',

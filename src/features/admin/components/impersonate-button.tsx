@@ -8,18 +8,28 @@ import { useAbility } from '@/lib/permission';
 import { useImpersonate } from '../api/use-impersonate';
 
 /**
- * Nút "Đăng nhập với tư cách" (2026-10-19) — dùng chung cho Sơ đồ nhân sự + màn Nhân viên.
- * Chỉ superadmin (manage all) thấy; ẩn với tài khoản khoá / superadmin (server cũng chặn).
+ * Nút "Đăng nhập với tư cách" (2026-10-19) — dùng chung cho Sơ đồ nhân sự, màn Nhân viên, Nhân viên
+ * của team. Superadmin (manage all) thấy ở mọi người; từ 2026-10-30 người có vai trò "Đăng nhập thay
+ * nhân viên" (`user.impersonate`) thấy ở dòng mình quản lý (`canManage` do server tính). Server kiểm
+ * lại (kể cả nhân viên có quyền vượt mình → lỗi). Ẩn với tài khoản khoá / superadmin.
  * `compact` = nút biểu tượng trên dòng danh sách; mặc định = nút có chữ ở đầu trang.
  */
 export function ImpersonateButton({
   user,
   compact = false,
 }: {
-  user: { id: string; fullName: string; isActive: boolean; isSuperAdmin?: boolean };
+  user: {
+    id: string;
+    fullName: string;
+    isActive: boolean;
+    isSuperAdmin?: boolean;
+    canManage?: boolean;
+  };
   compact?: boolean;
 }) {
-  const canImpersonate = useAbility().can('manage', 'all');
+  const ability = useAbility();
+  const canImpersonate =
+    ability.can('manage', 'all') || (ability.can('impersonate', 'User') && !!user.canManage);
   const impersonate = useImpersonate();
   if (!canImpersonate || !user.isActive || user.isSuperAdmin) return null;
 
