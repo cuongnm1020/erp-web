@@ -238,6 +238,34 @@ describe('Sơ đồ nhân sự (/admin/org-tree, mặc định dạng sơ đồ)
     ).toBeInTheDocument();
   });
 
+  it('người quản trị (user.impersonate + role.update): nút ở mọi người, kể cả ngoài phạm vi', async () => {
+    server.use(
+      http.get('/api/org/tree', () =>
+        HttpResponse.json({
+          ...ORG_TREE_FIXTURE,
+          departments: [
+            {
+              ...SALES,
+              children: [
+                {
+                  ...SALES_HN,
+                  members: SALES_HN.members.map((m) => ({ ...m, canManage: false })),
+                },
+              ],
+            },
+          ],
+        }),
+      ),
+    );
+    search = `dept=${SALES_HN.id}`;
+    renderApp(<OrgTreeScreen />, {
+      me: { ...ME_LEADER, permissions: ['user.impersonate', 'role.update'] },
+    });
+    expect(
+      await screen.findByRole('button', { name: 'Đăng nhập với tư cách Trần Thị Hoa' }),
+    ).toBeInTheDocument();
+  });
+
   it('xóa phòng ban còn người → 409 DEPARTMENT_NOT_EMPTY hiện câu hướng dẫn', async () => {
     server.use(
       http.delete('/api/departments/:id', () =>
