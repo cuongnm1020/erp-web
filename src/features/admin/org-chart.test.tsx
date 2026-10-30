@@ -203,6 +203,41 @@ describe('Sơ đồ nhân sự (/admin/org-tree, mặc định dạng sơ đồ)
     expect(screen.queryByRole('button', { name: /Đăng nhập với tư cách/ })).not.toBeInTheDocument();
   });
 
+  it('vai trò "Đăng nhập thay nhân viên" (user.impersonate): nút chỉ ở người mình quản lý', async () => {
+    server.use(
+      http.get('/api/org/tree', () =>
+        HttpResponse.json({
+          ...ORG_TREE_FIXTURE,
+          departments: [
+            {
+              ...SALES,
+              children: [
+                {
+                  ...SALES_HN,
+                  members: [
+                    { ...SALES_HN.members[0]!, canManage: false },
+                    { ...SALES_HN.members[1]!, canManage: true },
+                  ],
+                },
+              ],
+            },
+          ],
+        }),
+      ),
+    );
+    search = `dept=${SALES_HN.id}`;
+    renderApp(<OrgTreeScreen />, {
+      me: { ...ME_LEADER, permissions: ['user.impersonate'] },
+    });
+    await screen.findByText('Trần Thị Hoa');
+    expect(
+      screen.queryByRole('button', { name: 'Đăng nhập với tư cách Trần Thị Hoa' }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: 'Đăng nhập với tư cách Lê Minh Tuấn' }),
+    ).toBeInTheDocument();
+  });
+
   it('xóa phòng ban còn người → 409 DEPARTMENT_NOT_EMPTY hiện câu hướng dẫn', async () => {
     server.use(
       http.delete('/api/departments/:id', () =>

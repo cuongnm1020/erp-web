@@ -35,6 +35,7 @@ import {
 import { useUpdateUser } from '../api/use-users';
 import { CARE_GRANT_LABELS } from '../labels';
 import { CareGrantDialog } from './care-grant-dialog';
+import { ImpersonateButton } from './impersonate-button';
 import { OrgStaffDialog } from './org-staff-dialog';
 import { UserCreateDialog } from './user-create-dialog';
 
@@ -236,6 +237,7 @@ export function CareStaffScreen() {
           const r = row.original;
           return (
             <div className="flex justify-end gap-1">
+              <ImpersonateButton user={r} compact />
               {r.position === 'GROUP_LEAD' && r.canLead ? (
                 <Button
                   variant="ghost"
