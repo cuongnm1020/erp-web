@@ -59,13 +59,22 @@ export function withClearedAuthCookies(res: NextResponse): NextResponse {
   return apply(res, buildClearCookies({ prefix: env.AUTH_COOKIE_PREFIX, secure: env.isProd }));
 }
 
-/** Gọi thẳng apps/api từ route handler (không qua openapi-fetch để giữ nguyên envelope). */
-export async function callApi(path: string, init: RequestInit & { accessToken?: string } = {}) {
+/**
+ * Gọi thẳng apps/api từ route handler (không qua openapi-fetch để giữ nguyên envelope).
+ * `from` = request của trình duyệt: chuyển `x-forwarded-for` để API ghi IP thật (đăng nhập thay
+ * ghi audit kèm IP).
+ */
+export async function callApi(
+  path: string,
+  init: RequestInit & { accessToken?: string; from?: Request } = {},
+) {
   const env = serverEnv();
   const headers = new Headers(init.headers);
   headers.set('content-type', 'application/json');
   headers.set('x-request-id', crypto.randomUUID());
   if (init.accessToken) headers.set('authorization', `Bearer ${init.accessToken}`);
+  const xff = init.from?.headers.get('x-forwarded-for');
+  if (xff) headers.set('x-forwarded-for', xff);
   // redirect: 'manual' — API thật không bao giờ redirect; nếu apiUrl trỏ nhầm (vd vào chính
   // web app) thì nhận 3xx/!ok thay vì đi theo redirect tới trang HTML rồi vỡ JSON.parse.
   return fetch(`${env.apiUrl}${path}`, { ...init, headers, cache: 'no-store', redirect: 'manual' });

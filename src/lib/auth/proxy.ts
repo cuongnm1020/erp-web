@@ -11,15 +11,16 @@ const FORWARD_REQUEST_HEADERS = [
   'if-none-match',
   // Kho đang làm việc (PLAN-warehouse-context) — API kiểm quyền kho, không tin header mù quáng.
   'x-warehouse-id',
+  // IP người dùng — API (trust proxy mạng riêng) ghi vào audit log thay vì IP container web
+  // (sự cố 2026-10-31). Caddy phía trước web đã ghi đè XFF bằng IP thật (không tin XFF từ client).
+  'x-forwarded-for',
 ] as const;
 
 /**
- * Route công khai của apps/api (`/public/*`, vd hủy nhận tin CRM-12): API đếm rate limit theo
- * phần tử đầu `X-Forwarded-For` và lưu User-Agent làm bằng chứng — phải chuyển tiếp của người
- * truy cập, nếu không mọi khách dùng chung IP của server web. Caddy phía trước web đã ghi đè XFF
- * bằng IP thật (không tin XFF từ client). Không gắn Bearer: trang công khai không mang phiên.
+ * Route công khai của apps/api (`/public/*`, vd hủy nhận tin CRM-12): API lưu User-Agent làm bằng
+ * chứng (IP đã đi theo `x-forwarded-for` ở trên). Không gắn Bearer: trang công khai không mang phiên.
  */
-const PUBLIC_EXTRA_HEADERS = ['x-forwarded-for', 'user-agent'] as const;
+const PUBLIC_EXTRA_HEADERS = ['user-agent'] as const;
 
 export function isPublicApiPath(path: readonly string[]): boolean {
   return path[0] === 'public';

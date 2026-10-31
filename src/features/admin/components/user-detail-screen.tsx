@@ -403,7 +403,11 @@ export function UserDetailScreen({ id }: { id: string }) {
 
           <section>
             <h2 className="mb-2 text-sm font-semibold">Phân quyền</h2>
-            <UserPermissionMatrix userId={user.id} canEdit={canEditPerms(user.canManage)} />
+            {/* Cấp riêng / chặn quyền chỉ superadmin — API 403 USER_PERMISSIONS_SUPERADMIN_ONLY (2026-10-31). */}
+            <UserPermissionMatrix
+              userId={user.id}
+              canEdit={user.canManage && ability.can('edit_permissions', 'Role')}
+            />
           </section>
 
           <EditDialog user={user} open={editOpen} onOpenChange={setEditOpen} />

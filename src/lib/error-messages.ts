@@ -262,6 +262,8 @@ const MESSAGES: Record<string, string> = {
   ROLE_IN_USE: 'Vai trò đang gán cho người dùng. Gỡ vai trò khỏi họ ở màn Nhân viên rồi xóa lại.',
   ROLE_PERMISSIONS_SUPERADMIN_ONLY:
     'Chỉ quản trị hệ thống được đổi quyền của vai trò. Nhờ quản trị hệ thống sửa giúp.',
+  USER_PERMISSIONS_SUPERADMIN_ONLY:
+    'Chỉ quản trị hệ thống được cấp riêng / chặn quyền của nhân viên. Nhờ quản trị hệ thống sửa giúp.',
   // Nhóm / cấp độ / tag khách hàng (/crm/segments)
   GROUP_IN_USE:
     'Nhóm vẫn còn khách hàng nên không xóa hẳn được. Chuyển khách sang nhóm khác, hoặc chỉ ngừng dùng nhóm.',
