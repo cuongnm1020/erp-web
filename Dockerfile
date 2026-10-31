@@ -2,7 +2,7 @@
 # Next.js standalone (next.config.ts output: 'standalone'). Build bởi .github/workflows/deploy.yml.
 # NEXT_PUBLIC_* được inline LÚC BUILD → truyền qua build-arg, đổi giá trị = build lại image.
 
-FROM node:20-bookworm-slim AS base
+FROM node:22.23.4-bookworm-slim AS base
 ENV NEXT_TELEMETRY_DISABLED=1
 RUN npm install -g pnpm@10.33.0
 WORKDIR /app
@@ -19,7 +19,7 @@ ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL \
     NODE_ENV=production
 RUN pnpm build
 
-FROM node:20-bookworm-slim AS runtime
+FROM node:22.23.4-bookworm-slim AS runtime
 ENV NODE_ENV=production \
     NEXT_TELEMETRY_DISABLED=1 \
     PORT=3000 \

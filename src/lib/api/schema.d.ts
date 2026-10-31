@@ -3583,6 +3583,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/sales-orders/{id}/same-day": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Đơn trùng trong ngày của MỘT đơn (icon hover chip "Trùng" ở danh sách): SĐT khách + ngày VN lấy
+         *     từ đơn, bỏ chính đơn đó; mỗi đơn kèm danh sách sản phẩm.
+         */
+        get: operations["SalesOrderController_sameDayOfOrder"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/sales-orders/flow-counts": {
         parameters: {
             query?: never;
@@ -11211,6 +11231,12 @@ export interface components {
             items: components["schemas"]["SalesOrderListItemDto"][];
             total: number;
         };
+        SameDayOrderItemDto: {
+            name: string;
+            /** @description Số lượng (chuỗi decimal) — combo tính theo số combo khách đặt. */
+            qty: string;
+            uomCode: string | null;
+        };
         SameDayOrderDto: {
             id: string;
             docNumber: string;
@@ -11223,6 +11249,8 @@ export interface components {
             ownerName: string | null;
             /** @enum {string} */
             source: "PANCAKE" | "ERP";
+            /** @description Sản phẩm khách đặt (combo gộp một dòng, kèm món gõ tay Pancake). */
+            items: components["schemas"]["SameDayOrderItemDto"][];
         };
         SameDayOrdersDto: {
             /** @description Ngày VN đã kiểm (`YYYY-MM-DD`). */
@@ -22448,6 +22476,27 @@ export interface operations {
             };
             header?: never;
             path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SameDayOrdersDto"];
+                };
+            };
+        };
+    };
+    SalesOrderController_sameDayOfOrder: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
             cookie?: never;
         };
         requestBody?: never;

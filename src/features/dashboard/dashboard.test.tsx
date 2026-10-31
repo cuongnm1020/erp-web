@@ -25,6 +25,13 @@ vi.mock('next/navigation', () => ({
   useSearchParams: () => new URLSearchParams(),
 }));
 
+// Ghim ngày giữa tháng (chỉ giả Date, timer thật cho findBy/waitFor): ngày 1 thì khoảng "hôm nay" ≡
+// "tháng này" → mock trả cùng số, hai ô cùng 3.000.000 ₫ (test đỏ mọi ngày 1, phát hiện 2026-11-01).
+vi.hoisted(() => {
+  vi.useFakeTimers({ toFake: ['Date'] });
+  vi.setSystemTime(new Date('2026-10-15T05:00:00Z'));
+});
+
 const TODAY = toLocalDateKey(new Date())!;
 const YESTERDAY = shiftDay(TODAY, -1);
 const MONTH_START = `${TODAY.slice(0, 8)}01`;

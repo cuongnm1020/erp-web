@@ -96,7 +96,21 @@ export const orderKeys = {
     addressId: string | null = null,
   ) => [...orderKeys.detail(id), 'shipping-quote', carrierId, warehouseId, addressId] as const,
   pickupWarehouses: () => [...orderKeys.all, 'pickup-warehouses'] as const,
+  sameDay: (id: string) => [...orderKeys.detail(id), 'same-day'] as const,
 };
+
+/**
+ * GET /sales-orders/:id/same-day — đơn trùng trong ngày của một đơn (cùng SĐT khách, cùng ngày VN,
+ * bỏ chính đơn đó), kèm sản phẩm từng đơn. Chỉ tải khi rê chuột vào icon ở chip "Trùng".
+ */
+export function useSameDayOfOrder(id: string, enabled: boolean) {
+  return useQuery({
+    queryKey: orderKeys.sameDay(id),
+    queryFn: () => unwrap(api.GET('/sales-orders/{id}/same-day', { params: { path: { id } } })),
+    enabled,
+    staleTime: 30_000,
+  });
+}
 
 /**
  * GET /sales-orders — đã scope sẵn theo khách hàng ở API (bất biến 8, luật 7). Sắp xếp ở server

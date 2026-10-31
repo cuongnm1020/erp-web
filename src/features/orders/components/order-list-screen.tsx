@@ -96,6 +96,7 @@ import { OrderScanButton } from './order-scan-button';
 import { PancakeOrderResyncButton } from './pancake-order-resync-button';
 import { SendToCarrierMenu } from './send-to-carrier-menu';
 import { PancakeOrderLink } from './pancake-order-link';
+import { SameDayOrdersHover } from './same-day-orders-hover';
 import { MarketplaceBadge, MaskedPhoneBadge, waybillErrorText } from './waybill-error';
 
 /**
@@ -600,8 +601,11 @@ const buildColumns = (
               <FlowBadge flow={o.flow} />
             </span>
             {o.sameDayCount > 0 ? (
-              <span title={`Cùng SĐT khách còn ${o.sameDayCount} đơn khác hôm đặt đơn này`}>
-                <StatusBadge tone="warn">Trùng · {o.sameDayCount + 1} đơn</StatusBadge>
+              <span className="inline-flex items-center gap-0.5">
+                <span title={`Cùng SĐT khách còn ${o.sameDayCount} đơn khác hôm đặt đơn này`}>
+                  <StatusBadge tone="warn">Trùng · {o.sameDayCount + 1} đơn</StatusBadge>
+                </span>
+                <SameDayOrdersHover orderId={o.id} count={o.sameDayCount} />
               </span>
             ) : null}
           </span>
