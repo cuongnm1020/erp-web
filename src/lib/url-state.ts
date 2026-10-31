@@ -1,7 +1,7 @@
 'use client';
 
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
-import { useCallback, useMemo } from 'react';
+import { useCallback, useMemo, useRef } from 'react';
 
 /**
  * Trạng thái danh sách nằm trên URL (luật 8): page / size / sort / q / filter.
@@ -118,23 +118,35 @@ export function useListState<F extends string = string>(defaults: ListStateDefau
     [paramsKey, defaultsRef],
   );
 
+  // URL đã ghi nhưng router.replace chưa áp (bất đồng bộ). Hai `set` liền nhau trong cùng một
+  // nhịp (vd "Xóa lọc": set({ q: '' }) rồi set({ filters })) phải cộng dồn — dựng từ URL cũ thì
+  // lần sau ghi đè lần trước (ô tìm nhanh không xóa được, 2026-10-31). URL thật đổi → bỏ bản chờ.
+  const pending = useRef<{ base: string; qs: string } | null>(null);
+  if (pending.current && pending.current.base !== paramsKey) pending.current = null;
+
   const set = useCallback(
     (patch: Partial<ListState<F>>) => {
+      const currentKey = pending.current?.qs ?? paramsKey;
+      const current =
+        currentKey === paramsKey
+          ? state
+          : parseListState<F>(new URLSearchParams(currentKey), defaultsRef);
       const resetsPage =
         patch.page === undefined &&
         ('filters' in patch || 'q' in patch || 'size' in patch || 'sort' in patch);
       const next: ListState<F> = {
-        ...state,
+        ...current,
         ...patch,
-        page: resetsPage ? 1 : (patch.page ?? state.page),
+        page: resetsPage ? 1 : (patch.page ?? current.page),
       };
       const listParams = serializeListState(next, defaultsRef);
       // Giữ lại param không thuộc danh sách (ví dụ tab, scope).
-      const merged = new URLSearchParams(paramsKey);
+      const merged = new URLSearchParams(currentKey);
       for (const k of ['page', 'size', 'sort', 'q', ...(defaultsRef.filterKeys ?? [])])
         merged.delete(k);
       for (const [k, v] of listParams) merged.set(k, v);
       const qs = merged.toString();
+      pending.current = { base: paramsKey, qs };
       router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
     },
     [state, defaultsRef, paramsKey, pathname, router],
