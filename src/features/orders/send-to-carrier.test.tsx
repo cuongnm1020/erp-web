@@ -409,6 +409,73 @@ describe('Gửi sang ĐVVC — SendToCarrierMenu + SendToCarrierDialog', () => {
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
   });
 
+  it('xin mã sẵn (2026-10-31): gửi xong mọi đơn "Đang xin mã", hỏi lại POST /shipments/waybill-status → đơn có mã / đơn hãng từ chối cập nhật tại chỗ, thanh "Đã có mã x/N"', async () => {
+    search = '';
+    const rows = makeOrders(2);
+    const base = { carrierId: 'c-ghtk', carrierCode: 'GHTK', carrierAccountId: null };
+    let polls = 0;
+    server.use(
+      http.post('/api/sales-orders/send-to-carrier', () =>
+        HttpResponse.json(
+          {
+            sent: rows.map((r, i) => ({
+              ...base,
+              orderId: r.id,
+              docNumber: r.docNumber,
+              outcome: 'QUEUED',
+              shipmentId: `sh-${i}`,
+              shipmentDocNumber: `DN-${i}`,
+              trackingNo: null,
+              reason: 'Đang xin mã vận đơn',
+              warning: null,
+            })),
+            failed: [],
+          },
+          { status: 201 },
+        ),
+      ),
+      http.post('/api/shipments/waybill-status', () => {
+        polls += 1;
+        const none = { trackingNo: null, waybillError: null, waybillErrorCode: null };
+        return HttpResponse.json(
+          polls === 1
+            ? [
+                { shipmentId: 'sh-0', orderId: rows[0]!.id, ...none },
+                { shipmentId: 'sh-1', orderId: rows[1]!.id, ...none },
+              ]
+            : [
+                { shipmentId: 'sh-0', orderId: rows[0]!.id, ...none, trackingNo: 'S9.A1.777' },
+                {
+                  shipmentId: 'sh-1',
+                  orderId: rows[1]!.id,
+                  trackingNo: null,
+                  waybillError: 'Địa chỉ không hợp lệ',
+                  waybillErrorCode: 'CARRIER_REJECTED',
+                },
+              ],
+        );
+      }),
+    );
+    await selectTwoRows();
+    const dialog = await openFor('GHTK');
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Cập nhật 2 đơn' }));
+    const panel = await within(dialog).findByRole('region', { name: 'Kết quả từng đơn' });
+    const bar = await within(dialog).findByRole('progressbar', {
+      name: 'Tiến độ xin mã vận đơn',
+    });
+    expect(bar).toHaveAttribute('aria-valuenow', '0');
+    // Hỏi lại sau 2 s → một đơn có mã, một đơn hãng từ chối.
+    await waitFor(() => expect(within(panel).getByText('Có mã S9.A1.777')).toBeInTheDocument(), {
+      timeout: 5000,
+    });
+    fireEvent.click(within(panel).getByRole('button', { name: 'Cần sửa 1' }));
+    const fix = within(panel).getByRole('list', { name: 'Danh sách đơn lỗi' });
+    expect(fix).toHaveTextContent(rows[1]!.docNumber);
+    expect(fix).toHaveTextContent('GHTK không cấp được mã');
+    expect(fix).toHaveTextContent('Địa chỉ không hợp lệ');
+    expect(within(dialog).getByText('1/2 đơn')).toBeInTheDocument();
+  });
+
   it('"Đóng gói + in" sau khi gửi (2026-10-29): bulk-fulfil đơn gửi được (bỏ đơn cần sửa) → in tem → thả việc lấy hàng của cả lô → kết quả đóng gói', async () => {
     search = '';
     toastSuccess.mockClear();

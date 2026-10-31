@@ -373,6 +373,25 @@ export function useConfirmOrder() {
   });
 }
 
+export type ShipmentWaybillStatus = components['schemas']['ShipmentWaybillStatusDto'];
+
+/** Phiếu đã có kết quả xin mã: có mã hoặc có lỗi vận đơn cuối. */
+export const waybillResolved = (s: ShipmentWaybillStatus): boolean =>
+  s.trackingNo !== null || s.waybillError !== null;
+
+/**
+ * POST /shipments/waybill-status (2026-10-31) — mã vận đơn xin SẴN lúc "Gửi sang ĐVVC" (worker xin
+ * ngầm) đã về chưa. Hỏi lại mỗi 2 s tới khi mọi phiếu có mã / có lỗi. Chỉ đọc.
+ */
+export function useWaybillStatus(shipmentIds: string[], enabled: boolean) {
+  return useQuery({
+    queryKey: ['wms', 'shipments', 'waybill-status', shipmentIds],
+    queryFn: () => unwrap(api.POST('/shipments/waybill-status', { body: { shipmentIds } })),
+    enabled: enabled && shipmentIds.length > 0,
+    refetchInterval: (q) => (q.state.data && q.state.data.every(waybillResolved) ? false : 2000),
+  });
+}
+
 export type SetOrdersWaitingStockResult = components['schemas']['SetOrdersWaitingStockResultDto'];
 
 /**

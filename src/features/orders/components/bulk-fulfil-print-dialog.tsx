@@ -180,30 +180,53 @@ interface FulfilProgressState {
 
 /** Thanh tiến độ "Đóng gói + in vận đơn" (2026-10-31) — cùng kiểu thanh của đồng bộ Pancake. */
 function FulfilProgress({ state }: { state: FulfilProgressState }) {
-  const pct =
-    state.stage === 'labels'
-      ? 100
-      : state.total === 0
-        ? 0
-        : Math.round((state.done / state.total) * 100);
+  return state.stage === 'pack' ? (
+    <ProgressLine
+      label="Đang đóng gói và xin mã vận đơn"
+      done={state.done}
+      total={state.total}
+      ariaLabel="Tiến độ đóng gói và in vận đơn"
+    />
+  ) : (
+    <ProgressLine
+      label={`Đang lấy dữ liệu ${state.total} tem để in`}
+      done={state.total}
+      total={state.total}
+      ariaLabel="Tiến độ đóng gói và in vận đơn"
+      showCount={false}
+    />
+  );
+}
+
+/** Một dòng tiến độ "nhãn … x/N đơn" + thanh (2026-10-31) — đóng gói + in, xin mã vận đơn. */
+export function ProgressLine({
+  label,
+  done,
+  total,
+  ariaLabel,
+  showCount = true,
+}: {
+  label: string;
+  done: number;
+  total: number;
+  ariaLabel: string;
+  showCount?: boolean;
+}) {
+  const pct = total === 0 ? 0 : Math.round((done / total) * 100);
   return (
     <div className="space-y-1.5" aria-live="polite">
       <div className="flex items-baseline justify-between text-sm">
-        <span>
-          {state.stage === 'pack'
-            ? 'Đang đóng gói và xin mã vận đơn'
-            : `Đang lấy dữ liệu ${state.total} tem để in`}
-        </span>
-        {state.stage === 'pack' ? (
+        <span>{label}</span>
+        {showCount ? (
           <span className="font-semibold tabular-nums">
-            {state.done}/{state.total} đơn
+            {done}/{total} đơn
           </span>
         ) : null}
       </div>
       <div
         className="h-2 overflow-hidden rounded bg-muted"
         role="progressbar"
-        aria-label="Tiến độ đóng gói và in vận đơn"
+        aria-label={ariaLabel}
         aria-valuenow={pct}
         aria-valuemin={0}
         aria-valuemax={100}
