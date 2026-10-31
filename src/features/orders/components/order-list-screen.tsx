@@ -1418,7 +1418,10 @@ function OrderBulkBar({ rows, onClear }: { rows: SalesOrderListItem[]; onClear: 
   const openChange = (d: Exclude<BulkDialog, null>) => (o: boolean) => setDialog(o ? d : null);
   const total = rows.reduce((s, r) => s.plus(r.total), new Decimal(0));
   const cod = rows.reduce((s, r) => s.plus(r.shipment?.codAmount ?? r.total), new Decimal(0));
-  const canUpdate = ability.can('update', 'SalesOrder');
+  // Gán hãng / cân nặng + Gửi sang ĐVVC: sale (update) HOẶC kho (send_carrier, 2026-10-31) — kho
+  // chỉ ghi được trường gửi hãng, server kiểm.
+  const canUpdate =
+    ability.can('update', 'SalesOrder') || ability.can('send_carrier', 'SalesOrder');
   const canReprint = ability.can('pack', 'Shipment');
   const canCancel = ability.can('cancel', 'SalesOrder') || ability.can('create', 'SalesOrder');
 
@@ -1467,9 +1470,7 @@ function OrderBulkBar({ rows, onClear }: { rows: SalesOrderListItem[]; onClear: 
             </DropdownMenuContent>
           </DropdownMenu>
         ) : null}
-        <Can I="update" a="SalesOrder">
-          <SendToCarrierMenu rows={rows} onDone={onClear} />
-        </Can>
+        {canUpdate ? <SendToCarrierMenu rows={rows} onDone={onClear} /> : null}
       </BulkActionBar>
       {canUpdate ? (
         <BulkShippingDialog
