@@ -592,6 +592,37 @@ describe('OrderListScreen — cân nặng gửi hãng + gán hãng hàng loạt'
     ).not.toBeInTheDocument();
   });
 
+  it('kho có sales_order.send_carrier (không có update, 2026-10-31) → thấy "Gửi sang ĐVVC" + "Gán hãng / cân nặng"', async () => {
+    search = '';
+    renderApp(<OrderListScreen />, {
+      me: {
+        ...ME_SALE,
+        permissions: ['sales_order.read', 'sales_order.read_all', 'sales_order.send_carrier'],
+      },
+    });
+    await screen.findByText(FIRST.docNumber);
+    fireEvent.click(screen.getAllByRole('checkbox', { name: 'Chọn dòng' })[0]!);
+    const toolbar = await screen.findByRole('toolbar');
+    expect(
+      await within(toolbar).findByRole('button', { name: /Gửi sang ĐVVC/ }),
+    ).toBeInTheDocument();
+    openMoreMenu();
+    expect(
+      await screen.findByRole('menuitem', { name: /Gán hãng \/ cân nặng/ }),
+    ).toBeInTheDocument();
+  });
+
+  it('không có update lẫn send_carrier → không có nút "Gửi sang ĐVVC" (luật 7)', async () => {
+    search = '';
+    renderApp(<OrderListScreen />, {
+      me: { ...ME_SALE, permissions: ['sales_order.read', 'sales_order.create'] },
+    });
+    await screen.findByText(FIRST.docNumber);
+    fireEvent.click(screen.getAllByRole('checkbox', { name: 'Chọn dòng' })[0]!);
+    expect(await screen.findByRole('toolbar')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Gửi sang ĐVVC/ })).not.toBeInTheDocument();
+  });
+
   it('người lên đơn (sales_order.create, không có quyền hủy) vẫn thấy nút "Hủy đơn" — server kiểm từng đơn', async () => {
     search = '';
     renderApp(<OrderListScreen />, {

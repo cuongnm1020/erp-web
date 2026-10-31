@@ -54,6 +54,7 @@ const PERMISSION_LABELS: Record<string, string> = {
   'product.barcode_print': 'In tem barcode',
   'sales_order.read_all': 'Xem mọi đơn (kho in phiếu)',
   'sales_order.fulfil_manual': 'Đóng pick / gói tay',
+  'sales_order.send_carrier': 'Gửi sang ĐVVC (kho)',
   'task.read': 'Xem việc của mình',
   'task.read_all': 'Xem mọi việc (điều phối)',
   'stock.cost': 'Nhập giá vốn',
