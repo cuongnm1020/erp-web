@@ -347,6 +347,25 @@ describe('SalesReportScreen — quyền + bộ lọc chung', () => {
 });
 
 describe('Tab Tổng quan theo thời gian', () => {
+  it('ô Kênh: Pancake / Hệ thống (ERP) đi vào query `origin`, không gửi `channel` (2026-10-31)', async () => {
+    search = `from=${RANGE.from}&to=${RANGE.to}&channel=PANCAKE`;
+    const calls: URLSearchParams[] = [];
+    server.use(
+      http.get('/api/reports/sales/summary', ({ request }) => {
+        calls.push(new URL(request.url).searchParams);
+        return HttpResponse.json(SUMMARY);
+      }),
+      http.get('/api/reports/sales/timeseries', () => HttpResponse.json(SERIES)),
+    );
+    renderApp(<SalesReportScreen />, { me: ME_LEADER });
+    await screen.findByText('Doanh thu theo thời gian');
+    expect(calls[0]!.get('origin')).toBe('PANCAKE');
+    expect(calls[0]!.get('channel')).toBeNull();
+    expect(screen.getByRole('combobox', { name: 'Kênh' })).toHaveTextContent('Pancake');
+    // Lãi gộp 900k trên thực thu 2,9 tr (doanh thu 3 tr gồm hoàn 100k) = 31,03%.
+    expect(screen.getByText('31,03% trên thực thu')).toBeInTheDocument();
+  });
+
   it('KPI so kỳ trước (▲ %), biểu đồ, bảng từng kỳ, dataAsOf', async () => {
     search = `from=${RANGE.from}&to=${RANGE.to}`;
     server.use(

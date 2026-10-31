@@ -59,8 +59,9 @@ const ALL = '__all__';
 
 /**
  * Báo cáo doanh thu bán hàng (RPT-07) — /reports/sales. Bộ lọc chung (khoảng ngày + kênh + team +
- * người phụ trách + POS Pancake) và tab nằm trên URL (luật 8), áp cho mọi tab. Doanh thu theo D-CR1 (đơn đã chốt,
- * ngày đặt hàng giờ VN, net KM − hàng hoàn); phạm vi xem do API scope theo D-CR2.
+ * người phụ trách + POS Pancake) và tab nằm trên URL (luật 8), áp cho mọi tab. Ô Kênh có thêm nguồn đơn
+ * Pancake / Hệ thống (ERP). Doanh thu theo ngày đặt hàng giờ VN, net KM, GỒM hàng hoàn (2026-10-31;
+ * lãi gộp trên thực thu); phạm vi xem do API scope theo D-CR2.
  */
 export function SalesReportScreen() {
   const ability = useAbility();

@@ -30,6 +30,8 @@ export type StaffGroupBy = SalesByStaff['groupBy'];
 export type TopRankBy = TopQuery['rankBy'];
 export type SupplierSort = NonNullable<BySupplierQuery['sort']>;
 export type FulfilmentGroup = NonNullable<SummaryQuery['fulfilment']>[number];
+/** Nguồn đơn: PANCAKE = đồng bộ từ Pancake, ERP = tạo trên hệ thống. */
+export type OrderOrigin = NonNullable<SummaryQuery['origin']>;
 
 /** Bộ lọc chung của mọi báo cáo bán hàng — đã chuẩn hoá từ URL. */
 export interface SalesFilter {
@@ -37,6 +39,8 @@ export interface SalesFilter {
   from: string;
   to: string;
   channel?: SalesChannel;
+  /** Nguồn đơn Pancake / hệ thống — chọn ở ô Kênh. */
+  origin?: OrderOrigin;
   teamId?: string;
   ownerId?: string;
   /** POS Pancake của đơn (shop_id, chuỗi số). */
@@ -87,6 +91,7 @@ const filterQuery = (f: SalesFilter) => ({
   from: f.from,
   to: f.to,
   channel: f.channel,
+  origin: f.origin,
   teamId: f.teamId,
   ownerId: f.ownerId,
   pancakeShopId: f.pancakeShopId,

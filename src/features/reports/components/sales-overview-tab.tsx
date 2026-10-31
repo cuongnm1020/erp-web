@@ -1,5 +1,6 @@
 'use client';
 
+import Decimal from 'decimal.js';
 import Link from 'next/link';
 import { useMemo } from 'react';
 import { ComparisonLineChart, type ComparisonPoint } from '@/components/data/charts';
@@ -284,7 +285,11 @@ export function SalesOverviewTab() {
 
 function KpiRow({ current: c, previous: p }: { current: SalesKpis; previous: SalesKpis }) {
   const prev = (v: string) => `Kỳ trước ${formatMoney(v)}`;
-  const margin = ratioPct(c.grossProfit, c.revenue);
+  // Doanh thu gồm hàng hoàn (2026-10-31); lãi gộp tính trên thực thu → tỉ suất cũng trên thực thu.
+  const margin = ratioPct(
+    c.grossProfit,
+    new Decimal(c.revenue).minus(c.returnedRevenue).toFixed(4),
+  );
   return (
     <div className="grid grid-cols-2 gap-2 md:grid-cols-3 xl:grid-cols-6">
       <KpiCard
@@ -317,7 +322,7 @@ function KpiRow({ current: c, previous: p }: { current: SalesKpis; previous: Sal
         detail={
           <KpiDelta
             pct={growthPct(c.grossProfit, p.grossProfit)}
-            text={`${pct(margin)} trên doanh thu`}
+            text={`${pct(margin)} trên thực thu`}
           />
         }
       />
