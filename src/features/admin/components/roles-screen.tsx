@@ -17,7 +17,7 @@ import { useHotkey } from '@/lib/use-hotkey';
 import { usePermissions, type Permission } from '../api/use-permissions';
 import { useRoles, useUpdateRole, type Role } from '../api/use-roles';
 import { moduleLabel, permissionLabel } from '../labels';
-import { CreateRoleDialog, RoleMenu } from './role-dialogs';
+import { CreateRoleDialog, RoleMenu, SavePermissionsDialog, type RoleChange } from './role-dialogs';
 
 /** key ô = `${roleCode}:${permissionCode}` */
 const cellKey = (role: string, perm: string) => `${role}:${perm}`;
@@ -71,7 +71,9 @@ export function RolesScreen() {
   const permissions = usePermissions();
   const update = useUpdateRole();
   const ability = useAbility();
-  const canEdit = ability.can('update', 'Role');
+  // Tick quyền chỉ superadmin (manage all) — API trả 403 ROLE_PERMISSIONS_SUPERADMIN_ONLY với
+  // người khác (sự cố 2026-10-31). Không có mã quyền backend nào mở `edit_permissions`.
+  const canEdit = ability.can('edit_permissions', 'Role');
 
   const [draft, setDraft] = useState<Record<string, boolean>>({});
   // Nhóm đang mở — mặc định đóng hết, chỉ thấy tên nhóm + ô "cả nhóm".
@@ -80,6 +82,8 @@ export function RolesScreen() {
   const [scope, setScope] = useState<Scope>('all');
   const [create, setCreate] = useState<{ from: Role | null } | null>(null);
   const [saving, setSaving] = useState(false);
+  // Bản chụp thay đổi lúc bấm Lưu — hộp xác nhận không co lại khi từng vai trò lưu xong.
+  const [confirming, setConfirming] = useState<RoleChange[] | null>(null);
 
   const roleList = useMemo(() => roles.data ?? [], [roles.data]);
   const perms = useMemo(() => permissions.data ?? [], [permissions.data]);
@@ -158,7 +162,18 @@ export function RolesScreen() {
     }
   };
 
-  useHotkey('Ctrl+S', () => void onSave(), { enabled: canEdit && hasDirty && !saving });
+  /** Tóm tắt bản nháp cho hộp xác nhận lưu: từng vai trò thêm / bớt quyền nào, còn bao nhiêu. */
+  const changes = (): RoleChange[] =>
+    roleList.filter(roleDirty).map((r) => ({
+      role: r,
+      added: perms.filter((p) => value(r, p) && !server(r, p)).map(permissionLabel),
+      removed: perms.filter((p) => !value(r, p) && server(r, p)).map(permissionLabel),
+      after: perms.filter((p) => value(r, p)).length,
+    }));
+
+  useHotkey('Ctrl+S', () => setConfirming(changes()), {
+    enabled: canEdit && hasDirty && !saving && confirming === null,
+  });
 
   const modules = useMemo(() => {
     const groups = new Map<string, Permission[]>();
@@ -187,7 +202,11 @@ export function RolesScreen() {
     <>
       <PageHeader
         title="Vai trò & quyền"
-        description="Bật / tắt quyền của từng vai trò · lưu một lần cho cả bảng"
+        description={
+          canEdit
+            ? 'Bật / tắt quyền của từng vai trò · lưu một lần cho cả bảng'
+            : 'Chỉ quản trị hệ thống được đổi quyền · bạn đang xem'
+        }
         status={
           hasDirty ? (
             <span title={`Vai trò bị đổi: ${touchedRoles.map((r) => r.name).join(', ')}`}>
@@ -202,19 +221,27 @@ export function RolesScreen() {
               <Plus aria-hidden />
               Thêm vai trò
             </Button>
-            <Button variant="outline" disabled={!hasDirty || saving} onClick={() => setDraft({})}>
-              <Undo2 aria-hidden />
-              Hoàn tác
-            </Button>
-            <Button
-              disabled={!hasDirty}
-              loading={saving}
-              loadingText="Đang lưu…"
-              shortcut="Ctrl S"
-              onClick={() => void onSave()}
-            >
-              Lưu thay đổi
-            </Button>
+            {canEdit ? (
+              <>
+                <Button
+                  variant="outline"
+                  disabled={!hasDirty || saving}
+                  onClick={() => setDraft({})}
+                >
+                  <Undo2 aria-hidden />
+                  Hoàn tác
+                </Button>
+                <Button
+                  disabled={!hasDirty}
+                  loading={saving}
+                  loadingText="Đang lưu…"
+                  shortcut="Ctrl S"
+                  onClick={() => setConfirming(changes())}
+                >
+                  Lưu thay đổi
+                </Button>
+              </>
+            ) : null}
           </Can>
         }
       />
@@ -509,6 +536,13 @@ export function RolesScreen() {
         onOpenChange={(o) => !o && setCreate(null)}
         roles={roleList}
         from={create?.from ?? null}
+      />
+      <SavePermissionsDialog
+        open={confirming !== null}
+        onOpenChange={(o) => !o && setConfirming(null)}
+        changes={confirming ?? []}
+        total={perms.length}
+        onConfirm={onSave}
       />
     </>
   );

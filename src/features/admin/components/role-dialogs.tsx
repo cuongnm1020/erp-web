@@ -4,6 +4,7 @@ import { AlertTriangle, Copy, MoreHorizontal, Pencil, Trash2, Users } from 'luci
 import Link from 'next/link';
 import { useRef, useState } from 'react';
 import { ConfirmDialog } from '@/components/data/confirm-dialog';
+import { StatusBadge } from '@/components/data/status-badge';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -33,6 +34,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { toast } from '@/components/ui/toaster';
 import { isApiError } from '@/lib/api/errors';
 import { messageFor } from '@/lib/error-messages';
+import { useAbility } from '@/lib/permission';
 import { useCreateRole, useDeleteRole, useUpdateRole, type Role } from '../api/use-roles';
 
 const CODE_RE = /^[A-Z0-9_]{2,50}$/;
@@ -79,6 +81,8 @@ function CreateRoleForm({
   onDone: () => void;
 }) {
   const create = useCreateRole();
+  // Sao chép quyền = cấp quyền → chỉ superadmin (API 403 ROLE_PERMISSIONS_SUPERADMIN_ONLY).
+  const canCopyPermissions = useAbility().can('edit_permissions', 'Role');
   const [name, setName] = useState(from ? `${from.name} (bản sao)` : '');
   const [code, setCode] = useState('');
   const [source, setSource] = useState(from?.code ?? NO_PERMS);
@@ -87,7 +91,7 @@ function CreateRoleForm({
 
   const taken = roles.some((r) => r.code === code);
   const codeError = taken ? 'Mã này đã có — chọn mã khác.' : serverCodeError;
-  const sourceRole = roles.find((r) => r.code === source) ?? null;
+  const sourceRole = canCopyPermissions ? (roles.find((r) => r.code === source) ?? null) : null;
   const canSubmit = !create.isPending && name.trim() !== '' && CODE_RE.test(code) && !codeError;
 
   const submit = () =>
@@ -157,25 +161,27 @@ function CreateRoleForm({
             2–50 ký tự: chữ IN HOA, số, dấu gạch dưới. Không đổi được sau khi tạo.
           </p>
         </div>
-        <div className="space-y-1">
-          <Label htmlFor="role-source">Bắt đầu với quyền của</Label>
-          <Select value={source} onValueChange={setSource}>
-            <SelectTrigger id="role-source">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value={NO_PERMS}>Không có quyền nào</SelectItem>
-              {roles.map((r) => (
-                <SelectItem key={r.code} value={r.code}>
-                  {r.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <p className="text-xs text-muted-foreground">
-            Sao chép quyền để đỡ tick lại từ đầu; sửa được ngay sau đó.
-          </p>
-        </div>
+        {canCopyPermissions ? (
+          <div className="space-y-1">
+            <Label htmlFor="role-source">Bắt đầu với quyền của</Label>
+            <Select value={source} onValueChange={setSource}>
+              <SelectTrigger id="role-source">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value={NO_PERMS}>Không có quyền nào</SelectItem>
+                {roles.map((r) => (
+                  <SelectItem key={r.code} value={r.code}>
+                    {r.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <p className="text-xs text-muted-foreground">
+              Sao chép quyền để đỡ tick lại từ đầu; sửa được ngay sau đó.
+            </p>
+          </div>
+        ) : null}
         <div className="space-y-1">
           <Label htmlFor="role-desc">
             Mô tả <span className="font-normal text-muted-foreground">(không bắt buộc)</span>
@@ -324,6 +330,7 @@ function DeleteBlockedDialog({
  */
 export function RoleMenu({ role, onClone }: { role: Role; onClone: (r: Role) => void }) {
   const remove = useDeleteRole();
+  const canClone = useAbility().can('edit_permissions', 'Role');
   const [editing, setEditing] = useState(false);
   const [deleting, setDeleting] = useState(false);
   // Mục mở hộp thoại: không trả focus về nút "⋯" khi menu đóng, để hộp thoại giữ focus ô đầu.
@@ -357,10 +364,12 @@ export function RoleMenu({ role, onClone }: { role: Role; onClone: (r: Role) => 
             <Pencil aria-hidden />
             Sửa tên & mô tả
           </DropdownMenuItem>
-          <DropdownMenuItem onSelect={openDialog(() => onClone(role))}>
-            <Copy aria-hidden />
-            Nhân bản thành vai trò mới
-          </DropdownMenuItem>
+          {canClone ? (
+            <DropdownMenuItem onSelect={openDialog(() => onClone(role))}>
+              <Copy aria-hidden />
+              Nhân bản thành vai trò mới
+            </DropdownMenuItem>
+          ) : null}
           <DropdownMenuItem asChild>
             <Link href={usersOfRole(role.code)}>
               <Users aria-hidden />
@@ -393,5 +402,170 @@ export function RoleMenu({ role, onClone }: { role: Role; onClone: (r: Role) => 
         />
       )}
     </>
+  );
+}
+
+/** Một vai trò bị đổi trong bản nháp ma trận — nhãn quyền thêm / bớt và số quyền sau khi lưu. */
+export interface RoleChange {
+  role: Role;
+  added: string[];
+  removed: string[];
+  after: number;
+}
+
+/** Một vai trò thêm / bớt từ chừng này quyền trở lên là thay đổi lớn. */
+const BIG_CHANGE = 10;
+/** Đổi cùng lúc nhiều hơn chừng này vai trò là thay đổi lớn. */
+const MANY_ROLES = 3;
+const CONFIRM_WORD = 'XAC NHAN';
+const PREVIEW = 6;
+
+const preview = (labels: string[]) =>
+  labels.length > PREVIEW
+    ? `${labels.slice(0, PREVIEW).join(', ')} và ${labels.length - PREVIEW} quyền khác`
+    : labels.join(', ');
+
+/** Cảnh báo của một vai trò: mất hết quyền / có toàn bộ quyền / đổi nhiều quyền. */
+function riskOf(c: RoleChange, total: number): string | null {
+  if (c.after === 0) return 'Mất hết quyền';
+  if (c.after === total) return 'Có toàn bộ quyền';
+  if (c.added.length + c.removed.length >= BIG_CHANGE) return 'Đổi nhiều quyền';
+  return null;
+}
+
+/**
+ * Xác nhận trước khi lưu ma trận quyền (sau sự cố 2026-10-31: tick đủ quyền cho mọi vai trò rồi
+ * lưu, một giờ sau bỏ hết về 0). Liệt kê từng vai trò thêm / bớt gì; thay đổi lớn (vai trò về 0
+ * quyền, có toàn bộ quyền, đổi ≥ 10 quyền, hoặc > 3 vai trò cùng lúc) phải gõ chữ xác nhận.
+ */
+export function SavePermissionsDialog({
+  open,
+  onOpenChange,
+  changes,
+  total,
+  onConfirm,
+}: {
+  open: boolean;
+  onOpenChange: (o: boolean) => void;
+  changes: RoleChange[];
+  total: number;
+  onConfirm: () => Promise<void>;
+}) {
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      {open ? (
+        <SavePermissionsForm
+          changes={changes}
+          total={total}
+          onConfirm={onConfirm}
+          onDone={() => onOpenChange(false)}
+        />
+      ) : null}
+    </Dialog>
+  );
+}
+
+function SavePermissionsForm({
+  changes,
+  total,
+  onConfirm,
+  onDone,
+}: {
+  changes: RoleChange[];
+  total: number;
+  onConfirm: () => Promise<void>;
+  onDone: () => void;
+}) {
+  const [typed, setTyped] = useState('');
+  const [pending, setPending] = useState(false);
+  const risky = changes.length > MANY_ROLES || changes.some((c) => riskOf(c, total) !== null);
+  const canSubmit = !pending && (!risky || typed.trim().toUpperCase() === CONFIRM_WORD);
+
+  const submit = async () => {
+    setPending(true);
+    try {
+      await onConfirm();
+      onDone();
+    } finally {
+      setPending(false);
+    }
+  };
+
+  return (
+    <DialogContent wide onInteractOutside={(e) => pending && e.preventDefault()}>
+      <DialogHeader>
+        <DialogTitle>Lưu quyền của {changes.length} vai trò?</DialogTitle>
+        <DialogDescription>
+          Nhân viên mang các vai trò này nhận quyền mới ngay ở thao tác kế tiếp.
+        </DialogDescription>
+      </DialogHeader>
+      <form
+        className="space-y-3"
+        onSubmit={(e) => {
+          e.preventDefault();
+          if (canSubmit) void submit();
+        }}
+      >
+        <ul className="divide-y rounded-md border">
+          {changes.map((c) => {
+            const risk = riskOf(c, total);
+            return (
+              <li key={c.role.code} className="space-y-1 px-3 py-2 text-sm">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="font-semibold">{c.role.name}</span>
+                  <span className="font-mono text-xs text-muted-foreground">{c.role.code}</span>
+                  <span className="ml-auto text-xs text-muted-foreground">
+                    còn {c.after}/{total} quyền
+                  </span>
+                  {risk ? (
+                    <StatusBadge tone={c.after === 0 ? 'err' : 'warn'}>{risk}</StatusBadge>
+                  ) : null}
+                </div>
+                {c.added.length > 0 ? (
+                  <p className="text-xs">
+                    <span className="font-semibold text-success">+{c.added.length} </span>
+                    {preview(c.added)}
+                  </p>
+                ) : null}
+                {c.removed.length > 0 ? (
+                  <p className="text-xs">
+                    <span className="font-semibold text-destructive">−{c.removed.length} </span>
+                    {preview(c.removed)}
+                  </p>
+                ) : null}
+              </li>
+            );
+          })}
+        </ul>
+        {risky ? (
+          <div className="space-y-1">
+            <Label htmlFor="confirm-perms">
+              Thay đổi lớn — gõ <span className="font-mono">{CONFIRM_WORD}</span> để lưu
+            </Label>
+            <Input
+              id="confirm-perms"
+              autoFocus
+              autoComplete="off"
+              value={typed}
+              onChange={(e) => setTyped(e.target.value)}
+            />
+          </div>
+        ) : null}
+        <DialogFooter>
+          <Button variant="outline" onClick={onDone} disabled={pending}>
+            Hủy
+          </Button>
+          <Button
+            type="submit"
+            variant={risky ? 'destructive' : 'default'}
+            disabled={!canSubmit}
+            loading={pending}
+            loadingText="Đang lưu…"
+          >
+            Lưu thay đổi
+          </Button>
+        </DialogFooter>
+      </form>
+    </DialogContent>
   );
 }

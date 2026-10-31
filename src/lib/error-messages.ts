@@ -260,6 +260,8 @@ const MESSAGES: Record<string, string> = {
   DEPARTMENT_NOT_EMPTY:
     'Phòng ban còn phòng ban con hoặc còn nhân sự. Chuyển họ sang phòng ban khác rồi xóa lại.',
   ROLE_IN_USE: 'Vai trò đang gán cho người dùng. Gỡ vai trò khỏi họ ở màn Nhân viên rồi xóa lại.',
+  ROLE_PERMISSIONS_SUPERADMIN_ONLY:
+    'Chỉ quản trị hệ thống được đổi quyền của vai trò. Nhờ quản trị hệ thống sửa giúp.',
   // Nhóm / cấp độ / tag khách hàng (/crm/segments)
   GROUP_IN_USE:
     'Nhóm vẫn còn khách hàng nên không xóa hẳn được. Chuyển khách sang nhóm khác, hoặc chỉ ngừng dùng nhóm.',

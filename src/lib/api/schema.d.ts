@@ -148,6 +148,7 @@ export interface paths {
             cookie?: never;
         };
         get: operations["RbacController_getRole"];
+        /** `permissions` (thay toàn bộ quyền) chỉ superadmin — người khác 403 ROLE_PERMISSIONS_SUPERADMIN_ONLY. */
         put: operations["RbacController_updateRole"];
         post?: never;
         delete: operations["RbacController_deleteRole"];
