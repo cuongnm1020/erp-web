@@ -159,8 +159,9 @@ const FULFILMENT_LABEL: Record<OrderFulfilmentStatus, string> = {
   PICKING: 'Đang pick',
   PICKED: 'Đã pick xong',
   PACKING: 'Đang đóng gói',
-  PACKED: 'Đã đóng gói',
-  SHIPPED: 'Đã lấy hàng',
+  // Tên theo Pancake (2026-10-31): đóng gói + in xong = 9 "Chờ chuyển hàng", hãng quét = 2 "Đã gửi hàng".
+  PACKED: 'Chờ chuyển hàng',
+  SHIPPED: 'Đã gửi hàng',
   IN_TRANSIT: 'Đang vận chuyển',
   OUT_FOR_DELIVERY: 'Đang giao hàng',
   DELIVERED: 'Thành công',
@@ -248,10 +249,10 @@ export const ORDER_FLOW_TABS: ReadonlyArray<{
   // Chờ hàng (2026-10-25): thiếu tồn ≥ 24h, chưa Gửi sang ĐVVC — cần người xử lý → họ "chờ".
   { flow: 'WAITING_STOCK', label: 'Chờ hàng', family: 'wait' },
   { flow: 'PICKING', label: 'Đang lấy hàng', family: 'fulfil' },
-  { flow: 'PACKED', label: 'Đã đóng gói', family: 'fulfil' },
+  { flow: 'PACKED', label: 'Chờ chuyển hàng', family: 'fulfil' },
   // Lỗi vận đơn (2026-10-28): đã đóng gói mà hãng không cấp được mã — kho phải xử lý.
   { flow: 'WAYBILL_ERROR', label: 'Lỗi vận đơn', family: 'issue' },
-  { flow: 'PICKED_UP', label: 'Đã lấy hàng', family: 'ship' },
+  { flow: 'PICKED_UP', label: 'Đã gửi hàng', family: 'ship' },
   { flow: 'IN_TRANSIT', label: 'Đang vận chuyển', family: 'ship' },
   { flow: 'OUT_FOR_DELIVERY', label: 'Đang giao hàng', family: 'ship' },
   { flow: 'DELIVERED', label: 'Thành công', family: 'done' },

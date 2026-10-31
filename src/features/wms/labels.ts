@@ -111,7 +111,7 @@ export const CARRIER_SOURCE: Record<string, string> = {
 
 export const SHIPMENT_STATUS_BADGE: Record<string, { label: string; tone: StatusTone }> = {
   PENDING: { label: 'Chờ lấy', tone: 'neutral' },
-  PICKED_UP: { label: 'Đã lấy hàng', tone: 'brand' },
+  PICKED_UP: { label: 'Đã gửi hàng', tone: 'brand' },
   IN_TRANSIT: { label: 'Đang vận chuyển', tone: 'brand' },
   OUT_FOR_DELIVERY: { label: 'Đang giao hàng', tone: 'brand' },
   DELIVERED: { label: 'Thành công', tone: 'ok' },

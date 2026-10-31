@@ -456,7 +456,7 @@ describe('OrderEditScreen — trang sửa đơn (D-05, PATCH /sales-orders/{id})
 describe('OrderEditScreen — "Trạng thái kho" đặt tay (POST /sales-orders/{id}/fulfil)', () => {
   const APPROVED = { ...DETAIL, status: 'APPROVED' as const };
 
-  it('chọn "Đã đóng gói" + hãng GHTK → PATCH carrierId rồi POST fulfil PACKED; vận đơn ISSUED → về chi tiết kèm ?printLabel=1', async () => {
+  it('chọn "Chờ chuyển hàng" (đóng gói tay) + hãng GHTK → PATCH carrierId rồi POST fulfil PACKED; vận đơn ISSUED → về chi tiết kèm ?printLabel=1', async () => {
     push.mockClear();
     const patched: Record<string, unknown>[] = [];
     const fulfilled: Record<string, unknown>[] = [];
@@ -512,9 +512,9 @@ describe('OrderEditScreen — "Trạng thái kho" đặt tay (POST /sales-orders
     expect((await screen.findAllByRole('option')).map((o) => o.textContent)).toEqual([
       'Chờ pick (hiện tại)',
       'Đã pick xong',
-      'Đã đóng gói',
+      'Chờ chuyển hàng',
     ]);
-    fireEvent.click(screen.getByRole('option', { name: 'Đã đóng gói' }));
+    fireEvent.click(screen.getByRole('option', { name: 'Chờ chuyển hàng' }));
     expect(screen.getByText(/Đóng gói KHÔNG quét/)).toBeInTheDocument();
 
     // Chưa chọn hãng → chặn tại chỗ, không gọi API nào.
