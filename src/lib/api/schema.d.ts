@@ -24450,6 +24450,11 @@ export interface operations {
         parameters: {
             query: {
                 /**
+                 * @description Nguồn đơn: PANCAKE = đơn đồng bộ từ Pancake, ERP = đơn tạo trên hệ thống. Bỏ trống = mọi đơn.
+                 *     Có lọc → luôn tính sống (bảng tổng hợp không lưu).
+                 */
+                origin?: "PANCAKE" | "ERP";
+                /**
                  * @description Tình trạng giao (lặp tham số cho nhiều giá trị: `?fulfilment=DELIVERED&fulfilment=SHIPPING`):
                  *     DELIVERED thành công · SHIPPING đang giao · NOT_SHIPPED chưa gửi hãng · RETURNED hoàn (cả ĐVVC
                  *     hoàn cả đơn). Bỏ trống = mọi đơn. Có lọc → luôn tính sống (bảng tổng hợp không lưu).
@@ -24490,6 +24495,11 @@ export interface operations {
     SalesReportController_timeseries: {
         parameters: {
             query: {
+                /**
+                 * @description Nguồn đơn: PANCAKE = đơn đồng bộ từ Pancake, ERP = đơn tạo trên hệ thống. Bỏ trống = mọi đơn.
+                 *     Có lọc → luôn tính sống (bảng tổng hợp không lưu).
+                 */
+                origin?: "PANCAKE" | "ERP";
                 /**
                  * @description Tình trạng giao (lặp tham số cho nhiều giá trị: `?fulfilment=DELIVERED&fulfilment=SHIPPING`):
                  *     DELIVERED thành công · SHIPPING đang giao · NOT_SHIPPED chưa gửi hãng · RETURNED hoàn (cả ĐVVC
@@ -24533,6 +24543,11 @@ export interface operations {
     SalesReportController_byProduct: {
         parameters: {
             query: {
+                /**
+                 * @description Nguồn đơn: PANCAKE = đơn đồng bộ từ Pancake, ERP = đơn tạo trên hệ thống. Bỏ trống = mọi đơn.
+                 *     Có lọc → luôn tính sống (bảng tổng hợp không lưu).
+                 */
+                origin?: "PANCAKE" | "ERP";
                 /**
                  * @description Tình trạng giao (lặp tham số cho nhiều giá trị: `?fulfilment=DELIVERED&fulfilment=SHIPPING`):
                  *     DELIVERED thành công · SHIPPING đang giao · NOT_SHIPPED chưa gửi hãng · RETURNED hoàn (cả ĐVVC
@@ -24590,6 +24605,11 @@ export interface operations {
         parameters: {
             query: {
                 /**
+                 * @description Nguồn đơn: PANCAKE = đơn đồng bộ từ Pancake, ERP = đơn tạo trên hệ thống. Bỏ trống = mọi đơn.
+                 *     Có lọc → luôn tính sống (bảng tổng hợp không lưu).
+                 */
+                origin?: "PANCAKE" | "ERP";
+                /**
                  * @description Tình trạng giao (lặp tham số cho nhiều giá trị: `?fulfilment=DELIVERED&fulfilment=SHIPPING`):
                  *     DELIVERED thành công · SHIPPING đang giao · NOT_SHIPPED chưa gửi hãng · RETURNED hoàn (cả ĐVVC
                  *     hoàn cả đơn). Bỏ trống = mọi đơn. Có lọc → luôn tính sống (bảng tổng hợp không lưu).
@@ -24631,6 +24651,11 @@ export interface operations {
     SalesReportController_topProducts: {
         parameters: {
             query: {
+                /**
+                 * @description Nguồn đơn: PANCAKE = đơn đồng bộ từ Pancake, ERP = đơn tạo trên hệ thống. Bỏ trống = mọi đơn.
+                 *     Có lọc → luôn tính sống (bảng tổng hợp không lưu).
+                 */
+                origin?: "PANCAKE" | "ERP";
                 /**
                  * @description Tình trạng giao (lặp tham số cho nhiều giá trị: `?fulfilment=DELIVERED&fulfilment=SHIPPING`):
                  *     DELIVERED thành công · SHIPPING đang giao · NOT_SHIPPED chưa gửi hãng · RETURNED hoàn (cả ĐVVC
@@ -24679,6 +24704,11 @@ export interface operations {
     SalesReportController_bySupplier: {
         parameters: {
             query: {
+                /**
+                 * @description Nguồn đơn: PANCAKE = đơn đồng bộ từ Pancake, ERP = đơn tạo trên hệ thống. Bỏ trống = mọi đơn.
+                 *     Có lọc → luôn tính sống (bảng tổng hợp không lưu).
+                 */
+                origin?: "PANCAKE" | "ERP";
                 /**
                  * @description Tình trạng giao (lặp tham số cho nhiều giá trị: `?fulfilment=DELIVERED&fulfilment=SHIPPING`):
                  *     DELIVERED thành công · SHIPPING đang giao · NOT_SHIPPED chưa gửi hãng · RETURNED hoàn (cả ĐVVC

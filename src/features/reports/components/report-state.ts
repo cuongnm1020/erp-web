@@ -4,7 +4,12 @@ import { useCallback, useMemo } from 'react';
 import { normalizeRange, type DateRange } from '@/components/data/date-range-picker';
 import { toLocalDateKey } from '@/lib/format';
 import { useListState } from '@/lib/url-state';
-import type { FulfilmentGroup, SalesChannel, SalesFilter } from '../api/use-sales-report';
+import type {
+  FulfilmentGroup,
+  OrderOrigin,
+  SalesChannel,
+  SalesFilter,
+} from '../api/use-sales-report';
 
 /** Trần khoảng ngày của API báo cáo bán hàng (SALES_REPORT_MAX_DAYS) — chặn trước để không 422. */
 export const SALES_MAX_DAYS = 366;
@@ -50,13 +55,26 @@ const DEFAULTS = {
   sort: { id: 'revenue', desc: true },
 };
 
-export const CHANNELS: Array<{ value: SalesChannel; label: string }> = [
+/** Nguồn đơn chọn ở ô Kênh (`?channel=PANCAKE|ERP` trên URL) → tham số `origin` của API. */
+const ORIGINS: Array<{ value: OrderOrigin; label: string }> = [
+  { value: 'PANCAKE', label: 'Pancake' },
+  { value: 'ERP', label: 'Hệ thống (ERP)' },
+];
+const ORIGIN_VALUES = new Set<string>(ORIGINS.map((o) => o.value));
+
+const SALES_CHANNELS: Array<{ value: SalesChannel; label: string }> = [
   { value: 'DIRECT', label: 'Trực tiếp' },
   { value: 'MARKETPLACE', label: 'Sàn TMĐT' },
   { value: 'WEBSITE', label: 'Website' },
   { value: 'POS', label: 'Tại quầy' },
 ];
-const CHANNEL_VALUES = new Set<string>(CHANNELS.map((c) => c.value));
+const CHANNEL_VALUES = new Set<string>(SALES_CHANNELS.map((c) => c.value));
+
+/** Lựa chọn ô Kênh: nguồn đơn Pancake / hệ thống trước, rồi kênh bán. */
+export const CHANNELS: Array<{ value: OrderOrigin | SalesChannel; label: string }> = [
+  ...ORIGINS,
+  ...SALES_CHANNELS,
+];
 
 /** Nhóm tình trạng giao (GET /reports/sales/* `fulfilment`) — bỏ Hoàn = thực thu. */
 export const FULFILMENT_OPTIONS: Array<{ value: FulfilmentGroup; label: string }> = [
@@ -92,6 +110,7 @@ export function useSalesReportState() {
       to: range.to,
       channel:
         channelRaw && CHANNEL_VALUES.has(channelRaw) ? (channelRaw as SalesChannel) : undefined,
+      origin: channelRaw && ORIGIN_VALUES.has(channelRaw) ? (channelRaw as OrderOrigin) : undefined,
       teamId: state.filters.teamId,
       ownerId: state.filters.ownerId,
       pancakeShopId: /^[1-9]\d{0,17}$/.test(state.filters.pancakeShopId ?? '')
