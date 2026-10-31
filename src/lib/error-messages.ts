@@ -171,6 +171,12 @@ const MESSAGES: Record<string, string> = {
     'Đơn đã đóng gói, hàng đã trừ kho — không hủy được. Xử lý bằng hoàn hàng / nhập lại kho.',
   SHIPMENT_CANCELLED: 'Phiếu giao này đã hủy theo đơn — không đóng gói / giao hãng được nữa.',
   SHIPMENT_CANCEL_VIA_ORDER: 'Muốn hủy phiếu giao thì hủy đơn bán, không đổi tay trạng thái phiếu.',
+  // Luồng đơn ERP (2026-10-31).
+  ORDER_STAGE_LOCKED:
+    'Kho đã xử lý đơn này (gửi hãng / chờ hàng / đang lấy hàng) — không sửa hay hủy được nữa. Liên hệ kho hoặc quản lý.',
+  ORDER_NOT_DRAFT: 'Đơn không còn ở trạng thái Đơn mới — không cần xác nhận lại.',
+  ORDER_WAITING_STOCK_INVALID:
+    'Chỉ đơn Đã xác nhận (chưa gửi hãng, kho chưa lấy hàng) mới chuyển Chờ hàng; chỉ đơn đang Chờ hàng mới đưa lại được.',
   ORDER_PICK_SHORTAGE:
     'Không có dòng nào lấy được — thiếu tồn ở vị trí pick được. Nhập kho hoặc chuyển hàng vào vị trí pick rồi thử lại.',
   PDA_PICK_NEEDS_ASSIGNMENT:

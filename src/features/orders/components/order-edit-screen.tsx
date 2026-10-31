@@ -202,6 +202,8 @@ function Editor({ order }: { order: SalesOrderDetail }) {
   const targets = manualStatusTargets(order.status, (a) => ability.can(a, 'SalesOrder'));
   // Chỉ người tạo đơn / NV xử lý / trưởng nhóm của họ sửa được các ô (server: order.canEdit).
   const carrierEditable = canUpdate && orderEditable(order.status) && order.canEdit;
+  // Hãng vận chuyển chỉ kho / admin chọn (2026-10-31) — sale / CSKH chỉ xem hãng đã gán.
+  const canChooseCarrier = ability.can('send_carrier', 'SalesOrder');
   const statusEditable = canUpdate && targets.length > 0;
   const activeCarriers = (carriers.data ?? []).filter(
     (c) => c.isActive || c.id === order.carrierId,
@@ -1149,33 +1151,39 @@ function Editor({ order }: { order: SalesOrderDetail }) {
           <Card
             title="Vận chuyển"
             actions={
-              <CarrierSelect
-                className={cn('w-64', (carrierChanged || accountChanged) && DIRTY)}
-                value={
-                  carrierId === NO_CARRIER
-                    ? NO_CARRIER
-                    : { carrierId, accountId: accountId === DEFAULT_ACCOUNT ? null : accountId }
-                }
-                specials={[{ value: NO_CARRIER, label: '— Chưa chọn —' }]}
-                placeholder="ĐVVC"
-                disabled={!carrierEditable}
-                onChange={(v, option) => {
-                  if (typeof v === 'string' || !option) {
-                    setCarrierId(NO_CARRIER);
-                    setAccountId(DEFAULT_ACCOUNT);
-                    return;
+              !canChooseCarrier ? (
+                <span className="text-sm font-medium">
+                  {order.carrierId ? carrierLabel(order.carrierId) : 'Kho chọn khi gửi hàng'}
+                </span>
+              ) : (
+                <CarrierSelect
+                  className={cn('w-64', (carrierChanged || accountChanged) && DIRTY)}
+                  value={
+                    carrierId === NO_CARRIER
+                      ? NO_CARRIER
+                      : { carrierId, accountId: accountId === DEFAULT_ACCOUNT ? null : accountId }
                   }
-                  setCarrierId(v.carrierId);
-                  // Tài khoản mặc định = null ("theo mặc định"); đơn đã ghi đích danh id tài
-                  // khoản đó thì giữ nguyên id để không báo "đã đổi" giả.
-                  setAccountId(
-                    v.accountId ??
-                      (option.accountId && option.accountId === order.carrierAccountId
-                        ? option.accountId
-                        : DEFAULT_ACCOUNT),
-                  );
-                }}
-              />
+                  specials={[{ value: NO_CARRIER, label: '— Chưa chọn —' }]}
+                  placeholder="ĐVVC"
+                  disabled={!carrierEditable}
+                  onChange={(v, option) => {
+                    if (typeof v === 'string' || !option) {
+                      setCarrierId(NO_CARRIER);
+                      setAccountId(DEFAULT_ACCOUNT);
+                      return;
+                    }
+                    setCarrierId(v.carrierId);
+                    // Tài khoản mặc định = null ("theo mặc định"); đơn đã ghi đích danh id tài
+                    // khoản đó thì giữ nguyên id để không báo "đã đổi" giả.
+                    setAccountId(
+                      v.accountId ??
+                        (option.accountId && option.accountId === order.carrierAccountId
+                          ? option.accountId
+                          : DEFAULT_ACCOUNT),
+                    );
+                  }}
+                />
+              )
             }
           >
             {waybillError ? (
@@ -1214,7 +1222,9 @@ function Editor({ order }: { order: SalesOrderDetail }) {
               </div>
             ) : null}
             <p className="text-xs text-muted-foreground">
-              {carrierChanged && order.carrierId ? (
+              {!canChooseCarrier ? (
+                'Kho chọn hãng vận chuyển khi gửi sang ĐVVC.'
+              ) : carrierChanged && order.carrierId ? (
                 <span className="text-warning">Đã đổi từ {carrierLabel(order.carrierId)}</span>
               ) : carrierEditable ? (
                 'Phiếu giao tạo sau khi pick lấy sẵn hãng này.'

@@ -14,7 +14,8 @@ import type {
  * bắt lỗi ở đây, không âm thầm hiện mã enum ra màn hình.
  */
 const STATUS_LABEL: Record<SalesOrderStatus, string> = {
-  DRAFT: 'Nháp',
+  // Đơn tạo trên ERP chờ người tạo "Xác nhận" (2026-10-31).
+  DRAFT: 'Đơn mới',
   PENDING_APPROVAL: 'Chờ duyệt',
   APPROVED: 'Đã duyệt',
   POSTED: 'Đã chốt',
@@ -244,6 +245,8 @@ export const ORDER_FLOW_TABS: ReadonlyArray<{
   label: string;
   family: OrderFlowFamily;
 }> = [
+  // Đơn mới (2026-10-31): đơn tạo trên ERP chờ người tạo "Xác nhận" / đơn Pancake 0 "Mới".
+  { flow: 'NEW', label: 'Đơn mới', family: 'wait' },
   { flow: 'PENDING_APPROVAL', label: 'Chờ duyệt', family: 'wait' },
   { flow: 'WAREHOUSE', label: 'Đã xác nhận', family: 'fulfil' },
   // Chờ hàng (2026-10-25): thiếu tồn ≥ 24h, chưa Gửi sang ĐVVC — cần người xử lý → họ "chờ".
@@ -271,7 +274,8 @@ export function detailOrderFlow(
   fulfilment: OrderFulfilmentStatus,
 ): OrderFlow | null {
   if (status === 'CANCELLED') return 'CANCELLED';
-  if (status === 'DRAFT' || status === 'PENDING_APPROVAL') return 'PENDING_APPROVAL';
+  if (status === 'DRAFT') return 'NEW';
+  if (status === 'PENDING_APPROVAL') return 'PENDING_APPROVAL';
   switch (fulfilment) {
     case 'NOT_STARTED':
       return 'WAREHOUSE';
@@ -314,6 +318,8 @@ export const FLOW_FAMILY_DOT: Record<OrderFlowFamily, string> = {
  * class — Tailwind chỉ sinh class thấy được trong mã nguồn.
  */
 const FLOW_CLASS: Record<OrderFlow, string> = {
+  // Đơn mới (2026-10-31) cùng họ "chờ" với Chờ duyệt — dùng lại màu đó, không thêm token.
+  NEW: 'bg-flow-pending-weak text-flow-pending',
   PENDING_APPROVAL: 'bg-flow-pending-weak text-flow-pending',
   WAREHOUSE: 'bg-flow-warehouse-weak text-flow-warehouse',
   WAITING_STOCK: 'bg-flow-wait-weak text-flow-wait',

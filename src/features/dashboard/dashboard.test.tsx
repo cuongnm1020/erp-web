@@ -194,6 +194,7 @@ const SHIPPING: ShipmentMonitorSummary = {
 
 const flow = (over: Partial<OrderFlowCounts> = {}): OrderFlowCounts => ({
   total: 0,
+  NEW: 0,
   PENDING_APPROVAL: 0,
   WAREHOUSE: 0,
   WAITING_STOCK: 0,

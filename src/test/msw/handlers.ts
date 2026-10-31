@@ -508,14 +508,16 @@ function orderListExtras(i: number, status: (typeof ORDER_STATUSES)[number]) {
   const flow =
     status === 'CANCELLED'
       ? ('CANCELLED' as const)
-      : status === 'DRAFT' || status === 'PENDING_APPROVAL'
-        ? ('PENDING_APPROVAL' as const)
-        : FIXTURE_FLOWS[i % FIXTURE_FLOWS.length]!;
+      : status === 'DRAFT'
+        ? ('NEW' as const)
+        : status === 'PENDING_APPROVAL'
+          ? ('PENDING_APPROVAL' as const)
+          : FIXTURE_FLOWS[i % FIXTURE_FLOWS.length]!;
   const shipped = flow === 'OUT_FOR_DELIVERY' || flow === 'DELIVERED' || flow === 'RETURNED';
   return {
     flow,
     fulfilmentStatus:
-      flow === 'PENDING_APPROVAL' || flow === 'CANCELLED'
+      flow === 'NEW' || flow === 'PENDING_APPROVAL' || flow === 'CANCELLED'
         ? null
         : flow === 'WAREHOUSE'
           ? ('NOT_STARTED' as const)
@@ -598,6 +600,10 @@ export function makeOrderDetail(id: string) {
     canEdit: header.status !== 'POSTED' && header.status !== 'CANCELLED',
     // Mặc định khóa sửa sản phẩm — test giỏ sửa được tự ghi đè (tránh tải chi tiết SKU ở mọi test).
     linesLockedReason: 'Kho đã bắt đầu lấy hàng' as string | null,
+    // Luồng Đơn mới / Chờ hàng (2026-10-31).
+    stageLockedReason: null as string | null,
+    canConfirm: header.status === 'DRAFT',
+    waitingStockAt: null as string | null,
     timeline: {
       approvedAt:
         header.status === 'APPROVED' || header.status === 'POSTED' ? header.createdAt : null,
@@ -1696,6 +1702,7 @@ export const handlers = [
     const count = (f: string) => all.filter((o) => o.flow === f).length;
     return HttpResponse.json({
       total: all.length,
+      NEW: count('NEW'),
       PENDING_APPROVAL: count('PENDING_APPROVAL'),
       WAREHOUSE: count('WAREHOUSE'),
       WAITING_STOCK: count('WAITING_STOCK'),

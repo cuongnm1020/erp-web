@@ -4,6 +4,7 @@ import type { RowSelectionState } from '@tanstack/react-table';
 import Decimal from 'decimal.js';
 import {
   Ban,
+  CheckCircle2,
   ChevronDown,
   Copy,
   Eye,
@@ -35,7 +36,7 @@ import {
 import { Input } from '@/components/ui/input';
 import { toast } from '@/components/ui/toaster';
 import { cn } from '@/lib/cn';
-import { messageFor } from '@/lib/error-messages';
+import { messageFor, messageForCode } from '@/lib/error-messages';
 import {
   formatDateTime,
   formatMoney,
@@ -60,6 +61,8 @@ import {
   useOrderListPrefs,
   useOrders,
   useRequestWaybill,
+  useConfirmOrder,
+  useSetOrdersWaitingStock,
   useCareTeamOptions,
   useCarrierStatusOptions,
   useOrderCreatorOptions,
@@ -238,6 +241,13 @@ interface RowActionContext {
   canPack: boolean;
   /** Hủy đơn — cùng quyền với nút Hủy của thanh chọn nhiều. */
   canCancel: boolean;
+  /**
+   * Quyền rộng (`sales_order.cancel` / `edit_all`) — không bị khóa khi kho đã xử lý đơn. Người lên
+   * đơn chỉ sửa / hủy ở Đơn mới / Chờ duyệt / Đã xác nhận (2026-10-31; server kiểm lại chính xác).
+   */
+  canCancelAny: boolean;
+  canEditAny: boolean;
+  onConfirm: (row: SalesOrderListItem) => void;
   onPeek: (row: SalesOrderListItem) => void;
   onRetryWaybill: (row: SalesOrderListItem) => void;
   onCancel: (row: SalesOrderListItem) => void;
@@ -248,8 +258,23 @@ interface RowActionContext {
  * Nhân bản (+ Xin lại vận đơn ở tab Lỗi vận đơn) · Hủy đơn (chữ đỏ, cuối cụm, qua hộp xác nhận —
  * mockup TmGafrdk3wiAxJu4cFY937). Mở chi tiết = bấm mã đơn.
  */
+/** Tab còn trước khi kho thao tác — người lên đơn còn sửa / hủy được (2026-10-31). */
+const OPEN_FLOWS: readonly string[] = ['NEW', 'PENDING_APPROVAL', 'WAREHOUSE'];
+const STAGE_LOCKED = 'Kho đã xử lý đơn — không sửa / hủy được nữa';
+
 function orderRowItems(o: SalesOrderListItem, ctx: RowActionContext): RowActionItem[] {
+  const stageOpen = OPEN_FLOWS.includes(o.flow);
   return [
+    ...(ctx.canCreate && o.flow === 'NEW' && o.status === 'DRAFT'
+      ? [
+          {
+            // Đơn mới → Đã xác nhận (2026-10-31); server kiểm người tạo / đơn Pancake.
+            label: 'Xác nhận',
+            icon: <CheckCircle2 aria-hidden />,
+            onSelect: () => ctx.onConfirm(o),
+          },
+        ]
+      : []),
     ...(ctx.canPack && o.flow === 'WAYBILL_ERROR' && o.shipment?.carrierCode
       ? [
           {
@@ -266,7 +291,12 @@ function orderRowItems(o: SalesOrderListItem, ctx: RowActionContext): RowActionI
             label: 'Sửa đơn',
             icon: <Pencil aria-hidden />,
             href: `/crm/orders/${o.id}/edit`,
-            disabledReason: o.status === 'CANCELLED' ? 'Đơn đã hủy' : undefined,
+            disabledReason:
+              o.status === 'CANCELLED'
+                ? 'Đơn đã hủy'
+                : !stageOpen && !ctx.canEditAny
+                  ? STAGE_LOCKED
+                  : undefined,
           },
         ]
       : []),
@@ -290,9 +320,11 @@ function orderRowItems(o: SalesOrderListItem, ctx: RowActionContext): RowActionI
             disabledReason:
               o.status === 'CANCELLED'
                 ? 'Đơn đã hủy'
-                : orderCancellable(o.status, o.fulfilmentStatus)
-                  ? undefined
-                  : 'Kho đã đóng gói — xử lý bằng hoàn hàng',
+                : !orderCancellable(o.status, o.fulfilmentStatus)
+                  ? 'Kho đã đóng gói — xử lý bằng hoàn hàng'
+                  : !stageOpen && !ctx.canCancelAny
+                    ? STAGE_LOCKED
+                    : undefined,
           },
         ]
       : []),
@@ -1030,7 +1062,10 @@ export function OrderListScreen() {
   const canUpdate = ability.can('update', 'SalesOrder');
   const canCreate = ability.can('create', 'SalesOrder');
   const canPack = ability.can('pack', 'Shipment');
-  const canCancel = ability.can('cancel', 'SalesOrder') || canCreate;
+  const canCancelAny = ability.can('cancel', 'SalesOrder');
+  const canEditAny = ability.can('edit_all', 'SalesOrder');
+  const canCancel = canCancelAny || canCreate;
+  const confirmOrder = useConfirmOrder();
   const creatorOptions = useOrderCreatorOptions();
   const [peek, setPeek] = useState<SalesOrderListItem | null>(null);
   // Nút Hủy trên dòng → hộp xác nhận dùng chung với hủy hàng loạt (một đơn).
@@ -1043,8 +1078,20 @@ export function OrderListScreen() {
       canCreate,
       canPack,
       canCancel,
+      canCancelAny,
+      canEditAny,
       onPeek: setPeek,
       onCancel: setCancelling,
+      onConfirm: (o) =>
+        confirmOrder.mutate(o.id, {
+          onSuccess: (r) =>
+            toast.success(
+              r.status === 'APPROVED'
+                ? `Đã xác nhận đơn ${o.docNumber}`
+                : `Đơn ${o.docNumber} vượt ngưỡng — đã gửi duyệt`,
+            ),
+          onError: (err) => toast.error(`Đơn ${o.docNumber}: ${messageFor(err)}`),
+        }),
       onRetryWaybill: (o) => {
         if (!o.shipment?.carrierCode) return;
         requestWaybill.mutate(
@@ -1065,7 +1112,7 @@ export function OrderListScreen() {
       : all.filter((c) => !WAITING_ONLY_COLUMNS.includes(c.id ?? ''));
     // requestWaybill.mutate ổn định giữa các lần render (TanStack Query).
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [carriers.data, canUpdate, canCreate, canPack, canCancel, flow]);
+  }, [carriers.data, canUpdate, canCreate, canPack, canCancel, canCancelAny, canEditAny, flow]);
   const pickerColumns = useMemo(
     () =>
       columns
@@ -1418,10 +1465,27 @@ function OrderBulkBar({ rows, onClear }: { rows: SalesOrderListItem[]; onClear: 
   const openChange = (d: Exclude<BulkDialog, null>) => (o: boolean) => setDialog(o ? d : null);
   const total = rows.reduce((s, r) => s.plus(r.total), new Decimal(0));
   const cod = rows.reduce((s, r) => s.plus(r.shipment?.codAmount ?? r.total), new Decimal(0));
-  // Gán hãng / cân nặng + Gửi sang ĐVVC: sale (update) HOẶC kho (send_carrier, 2026-10-31) — kho
-  // chỉ ghi được trường gửi hãng, server kiểm.
-  const canUpdate =
-    ability.can('update', 'SalesOrder') || ability.can('send_carrier', 'SalesOrder');
+  // Gán hãng / cân nặng + Gửi sang ĐVVC + Chờ hàng: chỉ kho / admin (`send_carrier`, 2026-10-31) —
+  // sale / CSKH không chọn hãng.
+  const canUpdate = ability.can('send_carrier', 'SalesOrder');
+  const waiting = useSetOrdersWaitingStock();
+  const setWaiting = (on: boolean) =>
+    waiting.mutate(
+      { orderIds: rows.map((r) => r.id), waiting: on },
+      {
+        onSuccess: (r) => {
+          const verb = on ? 'chuyển Chờ hàng' : 'đưa lại Đã xác nhận';
+          if (r.updated.length > 0) toast.success(`Đã ${verb} ${r.updated.length} đơn`);
+          if (r.failed.length > 0) {
+            toast.error(
+              `${r.failed.length} đơn không ${verb} được: ${messageForCode(r.failed[0]!.code, 409)}`,
+            );
+          }
+          if (r.failed.length === 0) onClear();
+        },
+        onError: (err) => toast.error(messageFor(err)),
+      },
+    );
   const canReprint = ability.can('pack', 'Shipment');
   const canCancel = ability.can('cancel', 'SalesOrder') || ability.can('create', 'SalesOrder');
 
@@ -1460,6 +1524,16 @@ function OrderBulkBar({ rows, onClear }: { rows: SalesOrderListItem[]; onClear: 
               {canUpdate ? (
                 <DropdownMenuItem onSelect={() => setDialog('shipping')}>
                   Gán hãng / cân nặng
+                </DropdownMenuItem>
+              ) : null}
+              {canUpdate ? (
+                <DropdownMenuItem onSelect={() => setWaiting(true)}>
+                  Chuyển Chờ hàng
+                </DropdownMenuItem>
+              ) : null}
+              {canUpdate ? (
+                <DropdownMenuItem onSelect={() => setWaiting(false)}>
+                  Đưa lại Đã xác nhận
                 </DropdownMenuItem>
               ) : null}
               {canReprint ? (

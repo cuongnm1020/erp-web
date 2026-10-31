@@ -3799,6 +3799,47 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/sales-orders/{id}/confirm": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Người lên đơn "Xác nhận" đơn mới (2026-10-31): Đơn mới → Đã xác nhận (OrderConfirmed), hoặc
+         *     Chờ duyệt khi vượt ngưỡng duyệt. Người được sửa đơn (người tạo / NV xử lý / trưởng nhóm /
+         *     `sales_order.edit_all`); đơn Pancake không xác nhận ở đây.
+         */
+        post: operations["SalesOrderController_confirm"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/sales-orders/waiting-stock": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Kho chuyển Đã xác nhận ↔ Chờ hàng (2026-10-31): `sales_order.send_carrier`, đơn của kho mình
+         *     bất kể khách (ngoại lệ có tên của bất biến 8). Đơn Pancake đẩy 11 / 1 lên POS.
+         */
+        post: operations["SalesOrderController_setWaitingStock"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/sales-orders/{id}/approve": {
         parameters: {
             query?: never;
@@ -11022,7 +11063,7 @@ export interface components {
              * @description Tab của đơn — `flowOf(status, fulfilmentStatus, chờ hàng, lỗi vận đơn)`.
              * @enum {string}
              */
-            flow: "PENDING_APPROVAL" | "CANCELLED" | "WAREHOUSE" | "PICKING" | "PACKED" | "IN_TRANSIT" | "OUT_FOR_DELIVERY" | "DELIVERED" | "RETURNED" | "CARRIER_CANCELLED" | "PICKED_UP" | "WAITING_STOCK" | "WAYBILL_ERROR";
+            flow: "PENDING_APPROVAL" | "CANCELLED" | "WAREHOUSE" | "NEW" | "PICKING" | "PACKED" | "IN_TRANSIT" | "OUT_FOR_DELIVERY" | "DELIVERED" | "RETURNED" | "CARRIER_CANCELLED" | "PICKED_UP" | "WAITING_STOCK" | "WAYBILL_ERROR";
             /**
              * @description Trạng thái kho / giao hàng chi tiết (snapshot) — null = chưa tính (coi như NOT_STARTED).
              * @enum {string|null}
@@ -11164,6 +11205,8 @@ export interface components {
         SalesOrderFlowCountsDto: {
             /** @description Tất cả (khớp tab "Tất cả"). */
             total: number;
+            /** @description Đơn mới (2026-10-31) — đơn nháp chờ người tạo "Xác nhận" / đơn Pancake 0 "Mới". */
+            NEW: number;
             PENDING_APPROVAL: number;
             WAREHOUSE: number;
             /** @description Chờ hàng (2026-10-25) — không tính vào WAREHOUSE / PICKING. */
@@ -11390,6 +11433,16 @@ export interface components {
              *     bắt đầu lấy hàng / đã có phiếu giao.
              */
             linesLockedReason: string | null;
+            /**
+             * @description Kho đã thao tác trên đơn (2026-10-31): đã Gửi ĐVVC / kho chuyển Chờ hàng / kho đã nhận việc lấy
+             *     hàng / có phiếu giao / đơn đã kết thúc. Khác null → người lên đơn KHÔNG sửa / hủy được nữa
+             *     (người có `sales_order.edit_all` / `sales_order.cancel` vẫn được). null = còn Đơn mới / Đã xác nhận.
+             */
+            stageLockedReason: string | null;
+            /** @description Người đang xem bấm được "Xác nhận" (đơn mới tạo trên ERP, người được sửa đơn). */
+            canConfirm: boolean;
+            /** @description Kho chuyển đơn sang Chờ hàng bằng tay lúc này (ISO); null = không. */
+            waitingStockAt: string | null;
             timeline: components["schemas"]["OrderTimelineDto"];
             /** @description Địa chỉ giao hiệu lực — null = khách chưa có địa chỉ dùng được (tra cước / cấp vận đơn sẽ 422). */
             shippingAddress: components["schemas"]["SalesOrderAddressDto"] | null;
@@ -12110,11 +12163,6 @@ export interface components {
         CancelOrderDto: {
             reason?: string;
         };
-        OrderDecisionDto: {
-            /** Format: uuid */
-            requestId: string;
-            comment?: string;
-        };
         ApproveOrderResultDto: {
             orderId: string;
             docNumber: string;
@@ -12122,6 +12170,24 @@ export interface components {
             status: "DRAFT" | "PENDING_APPROVAL" | "APPROVED" | "POSTED" | "CANCELLED";
             /** @description true = đã qua bước duyệt cuối → đơn sang APPROVED và event đã emit. */
             completed: boolean;
+        };
+        SetOrdersWaitingStockDto: {
+            orderIds: string[];
+            waiting: boolean;
+        };
+        OrderWaitingStockItemDto: {
+            orderId: string;
+            docNumber: string;
+        };
+        SetOrdersWaitingStockResultDto: {
+            updated: components["schemas"]["OrderWaitingStockItemDto"][];
+            /** @description Đơn không chuyển được (ORDER_WAITING_STOCK_INVALID, NOT_FOUND…). */
+            failed: components["schemas"]["BulkUpdateFailedItemDto"][];
+        };
+        OrderDecisionDto: {
+            /** Format: uuid */
+            requestId: string;
+            comment?: string;
         };
         PickupWarehouseDto: {
             id: string;
@@ -22200,7 +22266,7 @@ export interface operations {
                  * @description Tab của danh sách đơn (2026-10-12) — gộp trạng thái chứng từ + kho / giao hàng
                  *     (`flowOf` trong sales-order-flow.ts). Đếm từng tab: GET /sales-orders/flow-counts.
                  */
-                flow?: "PENDING_APPROVAL" | "WAREHOUSE" | "WAITING_STOCK" | "PICKING" | "PACKED" | "WAYBILL_ERROR" | "PICKED_UP" | "IN_TRANSIT" | "OUT_FOR_DELIVERY" | "DELIVERED" | "RETURNED" | "CARRIER_CANCELLED" | "CANCELLED";
+                flow?: "NEW" | "PENDING_APPROVAL" | "WAREHOUSE" | "WAITING_STOCK" | "PICKING" | "PACKED" | "WAYBILL_ERROR" | "PICKED_UP" | "IN_TRANSIT" | "OUT_FOR_DELIVERY" | "DELIVERED" | "RETURNED" | "CARRIER_CANCELLED" | "CANCELLED";
                 /**
                  * @description Đơn có sản phẩm KHÔNG phải hàng ERP (2026-10-22): `CUSTOM` = có món gõ tay trên Pancake
                  *     (`sales_order_external.custom_items`), `POS_SKU` = có dòng là SKU do đồng bộ Pancake tự tạo
@@ -22361,7 +22427,7 @@ export interface operations {
                  * @description Tab của danh sách đơn (2026-10-12) — gộp trạng thái chứng từ + kho / giao hàng
                  *     (`flowOf` trong sales-order-flow.ts). Đếm từng tab: GET /sales-orders/flow-counts.
                  */
-                flow?: "PENDING_APPROVAL" | "WAREHOUSE" | "WAITING_STOCK" | "PICKING" | "PACKED" | "WAYBILL_ERROR" | "PICKED_UP" | "IN_TRANSIT" | "OUT_FOR_DELIVERY" | "DELIVERED" | "RETURNED" | "CARRIER_CANCELLED" | "CANCELLED";
+                flow?: "NEW" | "PENDING_APPROVAL" | "WAREHOUSE" | "WAITING_STOCK" | "PICKING" | "PACKED" | "WAYBILL_ERROR" | "PICKED_UP" | "IN_TRANSIT" | "OUT_FOR_DELIVERY" | "DELIVERED" | "RETURNED" | "CARRIER_CANCELLED" | "CANCELLED";
                 /**
                  * @description Đơn có sản phẩm KHÔNG phải hàng ERP (2026-10-22): `CUSTOM` = có món gõ tay trên Pancake
                  *     (`sales_order_external.custom_items`), `POS_SKU` = có dòng là SKU do đồng bộ Pancake tự tạo
@@ -22733,6 +22799,50 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["CancelOrderResultDto"];
+                };
+            };
+        };
+    };
+    SalesOrderController_confirm: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApproveOrderResultDto"];
+                };
+            };
+        };
+    };
+    SalesOrderController_setWaitingStock: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SetOrdersWaitingStockDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SetOrdersWaitingStockResultDto"];
                 };
             };
         };

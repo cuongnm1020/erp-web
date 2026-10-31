@@ -675,7 +675,8 @@ describe('OrderListScreen — cân nặng gửi hãng + gán hãng hàng loạt'
   it('không có quyền hủy lẫn lên đơn → thanh chọn không có nút "Hủy đơn" (luật 7)', async () => {
     search = '';
     renderApp(<OrderListScreen />, {
-      me: { ...ME_SALE, permissions: ['sales_order.read', 'sales_order.update'] },
+      // "Gán hãng / cân nặng" chỉ cho người có send_carrier (2026-10-31).
+      me: { ...ME_SALE, permissions: ['sales_order.read', 'sales_order.send_carrier'] },
     });
     await screen.findByText(FIRST.docNumber);
     fireEvent.click(screen.getAllByRole('checkbox', { name: 'Chọn dòng' })[0]!);
@@ -1362,10 +1363,76 @@ describe('OrderListScreen — Lỗi vận đơn + đơn TikTok (2026-10-28)', ()
       http.get('/api/sales-orders', () => HttpResponse.json({ items: [errorRow()], total: 1 })),
     );
     renderApp(<OrderListScreen />, {
-      me: { ...ME_SALE, permissions: ['sales_order.read', 'sales_order.update'] },
+      // edit_all: đơn lỗi vận đơn đã qua kho — người lên đơn thường bị khóa sửa (2026-10-31).
+      me: {
+        ...ME_SALE,
+        permissions: ['sales_order.read', 'sales_order.update', 'sales_order.edit_all'],
+      },
     });
     await screen.findByText(FIRST.docNumber);
     expect(screen.getByRole('link', { name: 'Sửa đơn' })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Xin lại vận đơn' })).not.toBeInTheDocument();
+  });
+});
+
+describe('OrderListScreen — Đơn mới / Xác nhận / Chờ hàng (2026-10-31)', () => {
+  it('tab "Đơn mới" đứng đầu; dòng đơn mới có "Xác nhận" → POST /sales-orders/{id}/confirm', async () => {
+    search = '';
+    const confirmed: string[] = [];
+    server.use(
+      http.post('/api/sales-orders/:id/confirm', ({ params }) => {
+        confirmed.push(params.id as string);
+        return HttpResponse.json(
+          { orderId: params.id, docNumber: FIRST.docNumber, status: 'APPROVED', completed: true },
+          { status: 201 },
+        );
+      }),
+    );
+    renderApp(<OrderListScreen />, { me: ME_SALE });
+    await screen.findByText(FIRST.docNumber);
+    expect(screen.getByRole('tab', { name: /Đơn mới/ })).toBeInTheDocument();
+    const row = screen.getAllByRole('row').find((r) => r.textContent?.includes(FIRST.docNumber))!;
+    fireEvent.click(within(row).getByRole('button', { name: 'Xác nhận' }));
+    await waitFor(() => expect(confirmed).toEqual([FIRST.id]));
+    await waitFor(() =>
+      expect(toastSuccess).toHaveBeenCalledWith(`Đã xác nhận đơn ${FIRST.docNumber}`),
+    );
+  });
+
+  it('sale không có send_carrier → thanh chọn không có "Gửi sang ĐVVC" / "Khác"', async () => {
+    search = '';
+    renderApp(<OrderListScreen />, {
+      me: { ...ME_SALE, permissions: [...ME_SALE.permissions, 'sales_order.update'] },
+    });
+    await screen.findByText(FIRST.docNumber);
+    fireEvent.click(screen.getAllByRole('checkbox', { name: 'Chọn dòng' })[0]!);
+    expect(await screen.findByRole('toolbar')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Gửi sang ĐVVC/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /^Khác/ })).not.toBeInTheDocument();
+  });
+
+  it('kho: "Khác" › "Chuyển Chờ hàng" → POST /sales-orders/waiting-stock { waiting: true }', async () => {
+    search = '';
+    const bodies: unknown[] = [];
+    server.use(
+      http.post('/api/sales-orders/waiting-stock', async ({ request }) => {
+        const body = (await request.json()) as { orderIds: string[] };
+        bodies.push(body);
+        return HttpResponse.json({
+          updated: body.orderIds.map((id) => ({ orderId: id, docNumber: FIRST.docNumber })),
+          failed: [],
+        });
+      }),
+    );
+    renderApp(<OrderListScreen />, {
+      me: { ...ME_SALE, permissions: ['sales_order.read', 'sales_order.send_carrier'] },
+    });
+    await screen.findByText(FIRST.docNumber);
+    fireEvent.click(screen.getAllByRole('checkbox', { name: 'Chọn dòng' })[0]!);
+    expect(await screen.findByRole('toolbar')).toBeInTheDocument();
+    openMoreMenu();
+    fireEvent.click(await screen.findByRole('menuitem', { name: 'Chuyển Chờ hàng' }));
+    await waitFor(() => expect(bodies).toEqual([{ orderIds: [FIRST.id], waiting: true }]));
+    await waitFor(() => expect(toastSuccess).toHaveBeenCalledWith('Đã chuyển Chờ hàng 1 đơn'));
   });
 });

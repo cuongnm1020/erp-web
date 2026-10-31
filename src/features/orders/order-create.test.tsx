@@ -1221,4 +1221,10 @@ describe('OrderCreateScreen — màn tạo đơn mới', () => {
       'VTP Viettel Post',
     ]);
   });
+
+  it('sale / CSKH không có send_carrier → không có ô ĐVVC, chỉ "Kho chọn khi gửi hàng" (2026-10-31)', async () => {
+    renderApp(<OrderCreateScreen />, { me: ME_SALE });
+    expect(await screen.findByText('Kho chọn khi gửi hàng')).toBeInTheDocument();
+    expect(screen.queryByRole('combobox', { name: 'Đơn vị vận chuyển' })).not.toBeInTheDocument();
+  });
 });

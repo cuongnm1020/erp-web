@@ -84,7 +84,7 @@ describe('OrderEditScreen — trang sửa đơn (D-05, PATCH /sales-orders/{id})
 
     fireEvent.click(screen.getByRole('combobox', { name: 'Trạng thái' }));
     expect((await screen.findAllByRole('option')).map((o) => o.textContent)).toEqual([
-      'Nháp (hiện tại)',
+      'Đơn mới (hiện tại)',
       'Đã duyệt',
       'Đã hủy',
     ]);
@@ -406,7 +406,9 @@ describe('OrderEditScreen — trang sửa đơn (D-05, PATCH /sales-orders/{id})
     expect(screen.getByRole('status')).toHaveTextContent('Bạn chỉ có quyền xem đơn này');
     expect(screen.queryByRole('button', { name: /Lưu thay đổi/ })).not.toBeInTheDocument();
     expect(screen.getByRole('combobox', { name: 'Trạng thái' })).toBeDisabled();
-    expect(screen.getByRole('combobox', { name: 'Hãng vận chuyển' })).toBeDisabled();
+    // Sale không chọn hãng (2026-10-31): không có ô chọn, chỉ dòng chữ.
+    expect(screen.queryByRole('combobox', { name: 'Hãng vận chuyển' })).not.toBeInTheDocument();
+    expect(screen.getByText('Kho chọn hãng vận chuyển khi gửi sang ĐVVC.')).toBeInTheDocument();
   });
 
   it('đơn POSTED: hãng khóa, chỉ còn Đã hủy; đơn CANCELLED: banner trạng thái cuối, nút Lưu bị khóa', async () => {
