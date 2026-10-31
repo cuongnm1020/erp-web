@@ -136,6 +136,46 @@ describe('OrderListScreen — GET /sales-orders (P1-12)', () => {
     expect(seen.at(-1)!.get('duplicate')).toBe('true');
   });
 
+  it('rê chuột icon cạnh chip "Trùng" → popup đơn trùng: giờ đặt + sản phẩm', async () => {
+    search = '';
+    const orders = makeOrders(1);
+    const asked: string[] = [];
+    server.use(
+      http.get('/api/sales-orders', () =>
+        HttpResponse.json({ items: [{ ...orders[0]!, sameDayCount: 1 }], total: 1 }),
+      ),
+      http.get('/api/sales-orders/:id/same-day', ({ params }) => {
+        asked.push(String(params.id));
+        return HttpResponse.json({
+          day: '2026-10-31',
+          total: 1,
+          hiddenCount: 0,
+          orders: [
+            {
+              id: 'other-1',
+              docNumber: 'SOP2610-112988',
+              orderDate: '2026-10-31T16:14:00.000Z',
+              status: 'APPROVED',
+              total: '680000',
+              ownerName: null,
+              source: 'PANCAKE',
+              items: [{ name: 'Canxi bo organic 500ml', qty: '10', uomCode: 'CHAI' }],
+            },
+          ],
+        });
+      }),
+    );
+    renderApp(<OrderListScreen />);
+    const icon = await screen.findByRole('button', { name: 'Xem 1 đơn trùng khác' });
+    expect(asked).toHaveLength(0);
+    fireEvent.mouseEnter(icon);
+    expect(await screen.findByText('SOP2610-112988')).toBeInTheDocument();
+    expect(screen.getByText('Canxi bo organic 500ml')).toBeInTheDocument();
+    expect(screen.getByText(/× 10 CHAI/)).toBeInTheDocument();
+    expect(screen.getByText(/31\/10\/2026 23:14/)).toBeInTheDocument();
+    expect(asked).toEqual([orders[0]!.id]);
+  });
+
   it('SĐT hiện đủ trên một dòng kèm nhà mạng rút gọn (Viettel / Vina / Mobi)', async () => {
     search = '';
     renderApp(<OrderListScreen />);
