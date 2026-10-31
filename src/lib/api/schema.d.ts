@@ -644,6 +644,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/shipments/waybill-status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Mã vận đơn đã về chưa (2026-10-31) — mã xin SẴN lúc "Gửi sang ĐVVC" do worker xin ngầm; màn gửi
+         *     hãng / "Đóng gói + in" hỏi lại vài giây một lần. Theo thứ tự `shipmentIds`; phiếu không có bỏ qua.
+         */
+        post: operations["ShippingController_waybillStatus"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/shipments/{id}/pack": {
         parameters: {
             query?: never;
@@ -7619,6 +7639,15 @@ export interface components {
         };
         ShipmentLabelDataBulkDto: {
             shipmentIds: string[];
+        };
+        ShipmentWaybillStatusDto: {
+            shipmentId: string;
+            orderId: string | null;
+            /** @description null = hãng chưa trả mã (đang xin / đang thử lại / bị từ chối — xem waybillError). */
+            trackingNo: string | null;
+            /** @description Lỗi vận đơn cuối (hãng từ chối / hết lượt thử); null = chưa có lỗi. */
+            waybillError: string | null;
+            waybillErrorCode: string | null;
         };
         PackDto: {
             /**
@@ -17124,6 +17153,29 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ShipmentLabelDataDto"][];
+                };
+            };
+        };
+    };
+    ShippingController_waybillStatus: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ShipmentLabelDataBulkDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ShipmentWaybillStatusDto"][];
                 };
             };
         };

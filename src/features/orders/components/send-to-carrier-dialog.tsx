@@ -40,13 +40,18 @@ import {
   usePickupWarehouses,
   useReleasePick,
   useSendOrdersToCarrier,
+  useWaybillStatus,
+  waybillResolved,
   type SalesOrder,
   type SendOrderToCarrierItem,
   type SendOrdersToCarrierResult,
+  type ShipmentWaybillStatus,
 } from '../api/use-orders';
 import { orderEditable, orderStatusLabel, orderStatusTone } from '../labels';
+import { waybillErrorText } from './waybill-error';
 import {
   FulfilResultsPanel,
+  ProgressLine,
   WaybillOrientationField,
   useFulfilPrint,
   type FulfilPrintOutcome,
@@ -109,6 +114,26 @@ export function SendToCarrierDialog({
   /** Đơn sẽ đóng gói nếu chọn "Đóng gói + in" (gửi được, không cần sửa); null = không hỏi. */
   const [packIds, setPackIds] = useState<string[] | null>(null);
   const [fulfilled, setFulfilled] = useState<FulfilPrintOutcome | null>(null);
+  /**
+   * Mã vận đơn xin SẴN (2026-10-31): gửi xong worker xin mã ngầm — hỏi lại tới khi mọi đơn có mã /
+   * có lỗi, hiện "Đã có mã x/N" + trạng thái từng đơn.
+   */
+  const queuedShipments = (failedResult?.sent ?? []).flatMap((x) =>
+    x.outcome === 'QUEUED' && x.shipmentId ? [x.shipmentId] : [],
+  );
+  const waybills = useWaybillStatus(queuedShipments, failedResult !== null && fulfilled === null);
+  const live = new Map((waybills.data ?? []).map((s) => [s.shipmentId, s]));
+  const issuing = {
+    done: queuedShipments.filter((id) => live.get(id)?.trackingNo).length,
+    total: queuedShipments.length,
+  };
+  const allResolved = queuedShipments.every((id) => {
+    const s = live.get(id);
+    return s !== undefined && waybillResolved(s);
+  });
+  /** Đã bấm "Đóng gói + in" khi mã chưa về đủ — chạy khi đủ / quá {@link WAIT_WAYBILL_MS}. */
+  const [packWhenReady, setPackWhenReady] = useState(false);
+  const [waitTimedOut, setWaitTimedOut] = useState(false);
   /**
    * Tài khoản của hãng (FE-CARRIER-ACC-1): chỉ hỏi khi hãng có từ 2 tài khoản đủ cấu hình (tài
    * khoản chưa cấu hình ẩn, 2026-10-22); chọn sẵn tài khoản chọn từ menu, không có thì mặc định
@@ -247,7 +272,24 @@ export function SendToCarrierDialog({
 
   const packAndPrint = async () => {
     if (!packIds || fp.pending) return;
-    const out = await fp.run(packIds, new Map(orders.map((o) => [o.id, o])));
+    // Mã chưa về đủ → chờ (thanh "Đã có mã x/N"), hiệu ứng bên dưới gọi lại khi đủ / quá hạn.
+    if (!allResolved && !waitTimedOut) {
+      setPackWhenReady(true);
+      return;
+    }
+    setPackWhenReady(false);
+    // Đơn hãng từ chối cấp mã không đóng gói — sửa đơn rồi gửi lại.
+    const rejected = new Set(
+      (failedResult?.sent ?? []).flatMap((x) =>
+        x.shipmentId && live.get(x.shipmentId)?.waybillError ? [x.orderId] : [],
+      ),
+    );
+    const ids = packIds.filter((id) => !rejected.has(id));
+    if (ids.length === 0) {
+      toast.error('Không còn đơn nào đóng gói được — hãng không cấp mã cho các đơn đã chọn.');
+      return;
+    }
+    const out = await fp.run(ids, new Map(orders.map((o) => [o.id, o])));
     // Lỗi cả lô (mạng…) → vẫn ở câu hỏi để thử lại hoặc chọn "Để kho lấy hàng".
     if (!out) return;
     // Đơn đóng gói xong đã hết giữ; đơn lỗi trước khi trừ tồn thì xuống kho lấy hàng.
@@ -255,6 +297,20 @@ export function SendToCarrierDialog({
     setPackIds(null);
     setFulfilled(out);
   };
+
+  // Đã bấm "Đóng gói + in" lúc mã chưa đủ: mã về đủ → chạy; quá hạn → chạy với phần đã có (đơn
+  // chưa có mã đi đường xin mã đồng bộ cũ trong bulk-fulfil).
+  useEffect(() => {
+    if (!packWhenReady) return;
+    if (allResolved || waitTimedOut) {
+      void packAndPrint();
+      return;
+    }
+    const timer = setTimeout(() => setWaitTimedOut(true), WAIT_WAYBILL_MS);
+    return () => clearTimeout(timer);
+    // packAndPrint đọc state mới nhất mỗi lần render — chỉ cần chạy lại khi các cờ đổi.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [packWhenReady, allResolved, waitTimedOut]);
 
   return (
     <>
@@ -295,12 +351,16 @@ export function SendToCarrierDialog({
                           hint={false}
                         />
                       ),
-                      busyLabel: fp.busyLabel,
+                      busyLabel:
+                        fp.busyLabel ??
+                        (packWhenReady ? `Chờ mã vận đơn ${issuing.done}/${issuing.total}…` : null),
                       progress: fp.progressBar,
                       onPack: () => void packAndPrint(),
                     }
                   : null
               }
+              live={live}
+              issuing={issuing}
             />
           ) : (
             <div className="grid min-h-0 flex-1 grid-cols-1 md:grid-cols-[minmax(0,2fr)_minmax(0,3fr)]">
@@ -736,6 +796,9 @@ function failedReason(f: SendOrdersToCarrierResult['failed'][number]): string {
 }
 
 /** Có gì người gửi cần xem từng đơn: nhiều đơn, đơn lỗi, đơn cần sửa, hãng chưa phản hồi. */
+/** Chờ mã vận đơn xin sẵn tối đa bao lâu trước khi "Đóng gói + in" chạy với phần đã có. */
+const WAIT_WAYBILL_MS = 90_000;
+
 function needsReview(r: SendOrdersToCarrierResult): boolean {
   return (
     r.sent.length + r.failed.length > 1 ||
@@ -754,6 +817,8 @@ function SendResults({
   orders,
   onClose,
   ask,
+  live,
+  issuing,
 }: {
   carrierCode: string;
   result: SendOrdersToCarrierResult;
@@ -770,6 +835,10 @@ function SendResults({
     progress: ReactNode;
     onPack: () => void;
   } | null;
+  /** Trạng thái sống của mã xin sẵn, theo shipmentId (2026-10-31). */
+  live: Map<string, ShipmentWaybillStatus>;
+  /** Số đơn đã có mã / tổng số đơn đang xin mã. */
+  issuing: { done: number; total: number };
 }) {
   const byId = new Map(orders.map((o) => [o.id, o]));
   const rows: OrderResultRow[] = [
@@ -799,11 +868,27 @@ function SendResults({
           reason: `SĐT người nhận bị sàn che — ${carrierCode} sẽ từ chối khi cấp vận đơn. Nhập SĐT thật ở màn sửa đơn rồi mới đóng gói.`,
         };
       }
+      // Mã xin SẴN do worker (2026-10-31): trạng thái sống từ POST /shipments/waybill-status.
+      const l = s.shipmentId ? live.get(s.shipmentId) : undefined;
+      if (s.outcome === 'QUEUED' && l?.trackingNo) {
+        return { ...base, group: 'ok', status: `Có mã ${l.trackingNo}` };
+      }
+      if (s.outcome === 'QUEUED' && l?.waybillError) {
+        return {
+          ...base,
+          group: 'fix',
+          status: `${carrierCode} không cấp được mã`,
+          reason: waybillErrorText(l.waybillErrorCode, l.waybillError),
+        };
+      }
       return {
         ...base,
         group: 'wait',
-        status: s.outcome === 'QUEUED' ? 'Hãng chưa phản hồi' : 'Chờ đóng gói',
-        reason: s.outcome === 'QUEUED' ? 'Hệ thống tự xin lại vận đơn.' : OUTCOME_LABEL[s.outcome],
+        status: s.outcome === 'QUEUED' ? 'Đang xin mã vận đơn' : 'Chờ đóng gói',
+        reason:
+          s.outcome === 'QUEUED'
+            ? 'Hãng chưa trả mã — tự cập nhật, đóng popup vẫn tiếp tục.'
+            : OUTCOME_LABEL[s.outcome],
       };
     }),
   ];
@@ -822,17 +907,27 @@ function SendResults({
       description={
         failed > 0 && result.sent.length > 0
           ? `${result.sent.length} đơn còn lại đã gửi xong. Sửa từng đơn theo lý do bên dưới rồi gửi lại.`
-          : 'Đơn chưa đóng gói chưa có mã — vận đơn cấp lúc đóng gói. Đơn lỗi sau khi đóng gói nằm ở tab Lỗi vận đơn.'
+          : 'Hệ thống đang xin mã vận đơn của hãng cho từng đơn. Đơn hãng không cấp được mã nằm ở tab Lỗi vận đơn.'
       }
       rows={rows}
       hints={{
         ok: 'Có mã vận đơn — in được tem',
-        wait: 'Đã gán hãng — cấp mã khi đóng gói',
+        wait: 'Đang xin mã vận đơn',
         fix: 'Cần sửa',
       }}
       footer={
         ask ? (
           <>
+            {issuing.total > 0 ? (
+              <div className="mx-5 mb-3">
+                <ProgressLine
+                  label="Đã có mã vận đơn"
+                  done={issuing.done}
+                  total={issuing.total}
+                  ariaLabel="Tiến độ xin mã vận đơn"
+                />
+              </div>
+            ) : null}
             <div
               role="group"
               aria-label="Đóng gói luôn"
@@ -869,11 +964,23 @@ function SendResults({
             </DialogFooter>
           </>
         ) : (
-          <DialogFooter className="border-t px-5 py-3">
-            <Button type="button" onClick={onClose}>
-              Đóng
-            </Button>
-          </DialogFooter>
+          <>
+            {issuing.total > 0 && issuing.done < issuing.total ? (
+              <div className="mx-5 mb-3">
+                <ProgressLine
+                  label="Đã có mã vận đơn"
+                  done={issuing.done}
+                  total={issuing.total}
+                  ariaLabel="Tiến độ xin mã vận đơn"
+                />
+              </div>
+            ) : null}
+            <DialogFooter className="border-t px-5 py-3">
+              <Button type="button" onClick={onClose}>
+                Đóng
+              </Button>
+            </DialogFooter>
+          </>
         )
       }
     />
