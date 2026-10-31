@@ -82,16 +82,22 @@ export function WaybillLabel({
   data,
   orientation,
   printedAt,
+  seq,
 }: {
   data: ShipmentLabelData;
   orientation: WaybillOrientation;
   printedAt: Date;
+  /** Số thứ tự tem trong lô in (2026-10-31) — "3/50" cạnh giờ in; in lẻ thì bỏ. */
+  seq?: { index: number; total: number };
 }) {
   const land = orientation === 'landscape';
   // Đơn GHTK đã có mã đúng dạng GHTK: ngang → tem GHTK xếp gọn 100×75 (2026-10-14); dọc →
   // cùng khung tem dọc chung (2026-10-16), mã vạch mang đoạn số cuối + in mã phân loại.
   const ghtk = data.carrierCode === 'GHTK' ? parseGhtkTracking(data.trackingNo) : null;
-  if (ghtk && land) return <GhtkWaybillLabel data={data} ghtk={ghtk} printedAt={printedAt} />;
+  if (ghtk && land) {
+    return <GhtkWaybillLabel data={data} ghtk={ghtk} printedAt={printedAt} seq={seq} />;
+  }
+  const seqText = seq ? `#${seq.index}/${seq.total}` : null;
   const size = SIZE[orientation];
   const code = data.trackingNo ?? data.shipmentDocNumber;
   /** Giá trị mã vạch: GHTK quét đoạn số cuối, hãng khác quét cả mã. */
@@ -163,7 +169,7 @@ export function WaybillLabel({
         </span>
         <span className="shrink-0 font-bold tabular-nums" style={{ fontSize: f(8.5) }}>
           {printed}
-          <span style={{ fontSize: f(11), marginLeft: u(2) }}>1/1</span>
+          <span style={{ fontSize: f(11), marginLeft: u(2) }}>{seqText ?? '1/1'}</span>
         </span>
       </div>
       {barcode(land ? 12 : 14, land ? 8.5 : 7.5)}
@@ -196,6 +202,11 @@ export function WaybillLabel({
         >
           {printed}
         </span>
+        {seqText ? (
+          <span className="font-extrabold tabular-nums leading-none" style={{ fontSize: f(10) }}>
+            {seqText}
+          </span>
+        ) : null}
       </div>
       {barcode(land ? 11 : 13, land ? 12 : 11)}
     </div>
@@ -415,9 +426,15 @@ export function WaybillLabelBatchPrintSheet({
       onDone={printer.done}
       size={orientation === 'landscape' ? 'WAYBILL_100x75' : 'WAYBILL_75x100'}
     >
-      {sortLabelsForPrint(labels).map((data) => (
+      {sortLabelsForPrint(labels).map((data, i, all) => (
         <div key={data.shipmentId} data-print-page>
-          <WaybillLabel data={data} orientation={orientation} printedAt={printedAt} />
+          <WaybillLabel
+            data={data}
+            orientation={orientation}
+            printedAt={printedAt}
+            // Lô từ 2 tem: in số thứ tự "x/N" theo đúng thứ tự in (2026-10-31).
+            seq={all.length > 1 ? { index: i + 1, total: all.length } : undefined}
+          />
         </div>
       ))}
     </PrintSheet>

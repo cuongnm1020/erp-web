@@ -47,10 +47,13 @@ export function GhtkWaybillLabel({
   data,
   ghtk,
   printedAt,
+  seq,
 }: {
   data: ShipmentLabelData;
   ghtk: GhtkTracking;
   printedAt: Date;
+  /** Số thứ tự tem trong lô in (2026-10-31); in lẻ thì bỏ. */
+  seq?: { index: number; total: number };
 }) {
   const W = LABEL_SIZES.WAYBILL_100x75.labelWidthMm ?? 100;
   const H = LABEL_SIZES.WAYBILL_100x75.labelHeightMm ?? 75;
@@ -98,9 +101,14 @@ export function GhtkWaybillLabel({
             </span>
           </span>
           <span className="flex flex-col items-end whitespace-nowrap" style={{ gap: u(0.5) }}>
-            {route ? (
+            {route || seq ? (
               <span className="font-extrabold leading-none" style={{ fontSize: f(9) }}>
                 {route}
+                {seq ? (
+                  <span className="tabular-nums" style={{ marginLeft: route ? u(1.5) : 0 }}>
+                    #{seq.index}/{seq.total}
+                  </span>
+                ) : null}
               </span>
             ) : null}
             <span className="leading-none" style={{ fontSize: f(6) }}>

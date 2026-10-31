@@ -502,7 +502,7 @@ describe('Gửi sang ĐVVC — SendToCarrierMenu + SendToCarrierDialog', () => {
     expect(released).toEqual([{ orderIds: [rows[0]!.id, rows[1]!.id] }]);
   });
 
-  it('sale (không có quyền đóng gói nhanh): không giữ việc lấy hàng, không hỏi', async () => {
+  it('kho không có quyền đóng gói nhanh: không giữ việc lấy hàng, không hỏi', async () => {
     search = '';
     const released = captureRelease();
     const bodies: Record<string, unknown>[] = [];
@@ -532,7 +532,8 @@ describe('Gửi sang ĐVVC — SendToCarrierMenu + SendToCarrierDialog', () => {
       }),
     );
     await selectTwoRows({
-      me: { ...ME_SALE, permissions: [...ME_SALE.permissions, 'sales_order.update'] },
+      // Từ 2026-10-31 chỉ người có send_carrier (kho) gửi hãng — kho thiếu quyền đóng gói nhanh.
+      me: { ...ME_SALE, permissions: [...ME_SALE.permissions, 'sales_order.send_carrier'] },
     });
     const dialog = await openFor('GHTK');
     fireEvent.click(within(dialog).getByRole('button', { name: 'Cập nhật 2 đơn' }));

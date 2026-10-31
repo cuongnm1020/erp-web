@@ -1001,6 +1001,8 @@ export function ShippingCard({
   codAmount: string | null;
 }) {
   const carriers = useCarriers();
+  // Hãng vận chuyển chỉ kho / admin chọn (2026-10-31) — sale / CSKH không thấy ô chọn hãng.
+  const canChooseCarrier = useAbility().can('send_carrier', 'SalesOrder');
   const [carrierId, carrierAccountId, warehouseId, province, ward, district, line1, weight] =
     useWatch({
       control: form.control,
@@ -1042,36 +1044,43 @@ export function ShippingCard({
   return (
     <Card title="Vận chuyển">
       <div className="grid gap-2.5 sm:grid-cols-2">
-        <FormField
-          control={form.control}
-          name="carrierId"
-          render={({ field }) => (
-            <FormItem className="sm:col-span-2">
-              <FormLabel className={FIELD_LABEL}>ĐVVC</FormLabel>
-              <FormControl>
-                <CarrierSelect
-                  aria-label="Đơn vị vận chuyển"
-                  value={
-                    field.value
-                      ? { carrierId: field.value, accountId: carrierAccountId || null }
-                      : NONE
-                  }
-                  specials={[{ value: NONE, label: 'Chưa chọn ĐVVC' }]}
-                  placeholder="Chưa chọn ĐVVC"
-                  onChange={(v) => {
-                    field.onChange(typeof v === 'string' ? '' : v.carrierId);
-                    form.setValue(
-                      'carrierAccountId',
-                      typeof v === 'string' ? '' : (v.accountId ?? ''),
-                      { shouldDirty: true },
-                    );
-                  }}
-                />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
+        {!canChooseCarrier ? (
+          <div className="flex min-w-0 flex-col gap-1 sm:col-span-2">
+            <span className={FIELD_LABEL}>ĐVVC</span>
+            <span className="text-sm text-muted-foreground">Kho chọn khi gửi hàng</span>
+          </div>
+        ) : (
+          <FormField
+            control={form.control}
+            name="carrierId"
+            render={({ field }) => (
+              <FormItem className="sm:col-span-2">
+                <FormLabel className={FIELD_LABEL}>ĐVVC</FormLabel>
+                <FormControl>
+                  <CarrierSelect
+                    aria-label="Đơn vị vận chuyển"
+                    value={
+                      field.value
+                        ? { carrierId: field.value, accountId: carrierAccountId || null }
+                        : NONE
+                    }
+                    specials={[{ value: NONE, label: 'Chưa chọn ĐVVC' }]}
+                    placeholder="Chưa chọn ĐVVC"
+                    onChange={(v) => {
+                      field.onChange(typeof v === 'string' ? '' : v.carrierId);
+                      form.setValue(
+                        'carrierAccountId',
+                        typeof v === 'string' ? '' : (v.accountId ?? ''),
+                        { shouldDirty: true },
+                      );
+                    }}
+                  />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+        )}
         <FormField
           control={form.control}
           name="shippingWeightKg"

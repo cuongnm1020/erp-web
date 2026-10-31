@@ -24,6 +24,7 @@ export async function POST(req: Request): Promise<NextResponse> {
     method: 'POST',
     body: await req.text(),
     accessToken: access,
+    from: req,
   });
   if (!upstream.ok) return passthroughError(upstream);
   const pair = await readJsonSafe<TokenPairLike>(upstream);

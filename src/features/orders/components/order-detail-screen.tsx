@@ -59,6 +59,7 @@ import { useHotkey } from '@/lib/use-hotkey';
 import {
   orderKeys,
   useCancelOrder,
+  useConfirmOrder,
   useDecideOrder,
   useOrder,
   useOrders,
@@ -129,7 +130,7 @@ const SHIPMENT_STATUS_LABEL: Record<
   string
 > = {
   PENDING: 'Chờ lấy',
-  PICKED_UP: 'Đã lấy hàng',
+  PICKED_UP: 'Đã gửi hàng',
   IN_TRANSIT: 'Đang vận chuyển',
   OUT_FOR_DELIVERY: 'Đang giao hàng',
   DELIVERED: 'Thành công',
@@ -745,8 +746,12 @@ function Detail({ order }: { order: SalesOrderDetail }) {
   const canCreate = ability.can('create', 'SalesOrder');
   // Người lên đơn / trưởng phòng, trưởng nhóm CSKH hủy được không cần quyền hủy (2026-10-29) —
   // server kiểm từng đơn, không được thì báo lỗi.
+  // Từ 2026-10-31: kho đã xử lý đơn (`stageLockedReason`) thì người lên đơn thôi hủy.
   const canCancel =
-    live && (ability.can('cancel', 'SalesOrder') || ability.can('create', 'SalesOrder'));
+    live &&
+    (ability.can('cancel', 'SalesOrder') ||
+      (ability.can('create', 'SalesOrder') && !order.stageLockedReason));
+  const confirm = useConfirmOrder();
   const canRecreate = canCancel && canCreate;
   const canReturn =
     RETURNABLE_FULFILMENT.has(order.fulfilment.status) && ability.can('receive', 'Stock');
@@ -856,13 +861,32 @@ function Detail({ order }: { order: SalesOrderDetail }) {
               </DropdownMenu>
             ) : null}
             {canEdit ? (
-              <Button asChild shortcut="E">
+              <Button asChild shortcut="E" variant={order.canConfirm ? 'outline' : 'default'}>
                 <Link href={`/crm/orders/${order.id}/edit`}>Sửa đơn</Link>
+              </Button>
+            ) : null}
+            {order.canConfirm ? (
+              // Đơn mới → Đã xác nhận (2026-10-31) — nút chính khi đơn còn ở Đơn mới.
+              <Button
+                loading={confirm.isPending}
+                onClick={() =>
+                  confirm.mutate(order.id, {
+                    onSuccess: () => toast.success(`Đã xác nhận đơn ${order.docNumber}`),
+                    onError: (err) => toast.error(messageFor(err)),
+                  })
+                }
+              >
+                Xác nhận
               </Button>
             ) : null}
           </>
         }
       />
+      {order.stageLockedReason && live ? (
+        <p className="rounded-md border border-warning-line bg-warning-weak px-3 py-2 text-sm">
+          Không sửa / hủy được nữa: {order.stageLockedReason}.
+        </p>
+      ) : null}
       {openWork.data?.items.length ? (
         <div className="flex flex-wrap items-center gap-x-2 gap-y-1 rounded-md border border-info-line bg-info-weak px-3 py-2 text-sm">
           <span>Đơn có {openWork.data.total} yêu cầu hỗ trợ đang mở:</span>

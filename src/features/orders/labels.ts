@@ -14,7 +14,8 @@ import type {
  * bắt lỗi ở đây, không âm thầm hiện mã enum ra màn hình.
  */
 const STATUS_LABEL: Record<SalesOrderStatus, string> = {
-  DRAFT: 'Nháp',
+  // Đơn tạo trên ERP chờ người tạo "Xác nhận" (2026-10-31).
+  DRAFT: 'Đơn mới',
   PENDING_APPROVAL: 'Chờ duyệt',
   APPROVED: 'Đã duyệt',
   POSTED: 'Đã chốt',
@@ -159,8 +160,9 @@ const FULFILMENT_LABEL: Record<OrderFulfilmentStatus, string> = {
   PICKING: 'Đang pick',
   PICKED: 'Đã pick xong',
   PACKING: 'Đang đóng gói',
-  PACKED: 'Đã đóng gói',
-  SHIPPED: 'Đã lấy hàng',
+  // Tên theo Pancake (2026-10-31): đóng gói + in xong = 9 "Chờ chuyển hàng", hãng quét = 2 "Đã gửi hàng".
+  PACKED: 'Chờ chuyển hàng',
+  SHIPPED: 'Đã gửi hàng',
   IN_TRANSIT: 'Đang vận chuyển',
   OUT_FOR_DELIVERY: 'Đang giao hàng',
   DELIVERED: 'Thành công',
@@ -243,15 +245,17 @@ export const ORDER_FLOW_TABS: ReadonlyArray<{
   label: string;
   family: OrderFlowFamily;
 }> = [
+  // Đơn mới (2026-10-31): đơn tạo trên ERP chờ người tạo "Xác nhận" / đơn Pancake 0 "Mới".
+  { flow: 'NEW', label: 'Đơn mới', family: 'wait' },
   { flow: 'PENDING_APPROVAL', label: 'Chờ duyệt', family: 'wait' },
   { flow: 'WAREHOUSE', label: 'Đã xác nhận', family: 'fulfil' },
   // Chờ hàng (2026-10-25): thiếu tồn ≥ 24h, chưa Gửi sang ĐVVC — cần người xử lý → họ "chờ".
   { flow: 'WAITING_STOCK', label: 'Chờ hàng', family: 'wait' },
   { flow: 'PICKING', label: 'Đang lấy hàng', family: 'fulfil' },
-  { flow: 'PACKED', label: 'Đã đóng gói', family: 'fulfil' },
+  { flow: 'PACKED', label: 'Chờ chuyển hàng', family: 'fulfil' },
   // Lỗi vận đơn (2026-10-28): đã đóng gói mà hãng không cấp được mã — kho phải xử lý.
   { flow: 'WAYBILL_ERROR', label: 'Lỗi vận đơn', family: 'issue' },
-  { flow: 'PICKED_UP', label: 'Đã lấy hàng', family: 'ship' },
+  { flow: 'PICKED_UP', label: 'Đã gửi hàng', family: 'ship' },
   { flow: 'IN_TRANSIT', label: 'Đang vận chuyển', family: 'ship' },
   { flow: 'OUT_FOR_DELIVERY', label: 'Đang giao hàng', family: 'ship' },
   { flow: 'DELIVERED', label: 'Thành công', family: 'done' },
@@ -270,7 +274,8 @@ export function detailOrderFlow(
   fulfilment: OrderFulfilmentStatus,
 ): OrderFlow | null {
   if (status === 'CANCELLED') return 'CANCELLED';
-  if (status === 'DRAFT' || status === 'PENDING_APPROVAL') return 'PENDING_APPROVAL';
+  if (status === 'DRAFT') return 'NEW';
+  if (status === 'PENDING_APPROVAL') return 'PENDING_APPROVAL';
   switch (fulfilment) {
     case 'NOT_STARTED':
       return 'WAREHOUSE';
@@ -313,6 +318,8 @@ export const FLOW_FAMILY_DOT: Record<OrderFlowFamily, string> = {
  * class — Tailwind chỉ sinh class thấy được trong mã nguồn.
  */
 const FLOW_CLASS: Record<OrderFlow, string> = {
+  // Đơn mới (2026-10-31) cùng họ "chờ" với Chờ duyệt — dùng lại màu đó, không thêm token.
+  NEW: 'bg-flow-pending-weak text-flow-pending',
   PENDING_APPROVAL: 'bg-flow-pending-weak text-flow-pending',
   WAREHOUSE: 'bg-flow-warehouse-weak text-flow-warehouse',
   WAITING_STOCK: 'bg-flow-wait-weak text-flow-wait',

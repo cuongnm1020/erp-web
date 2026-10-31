@@ -532,6 +532,57 @@ describe('OrderListScreen — cân nặng gửi hãng + gán hãng hàng loạt'
     await waitFor(() => expect(screen.queryByRole('toolbar')).not.toBeInTheDocument());
   });
 
+  it('"Đóng gói + in vận đơn" lô 10 đơn → gửi từng nhóm 8 + 2, thanh tiến độ "8/10 đơn" (2026-10-31)', async () => {
+    search = '';
+    const rows = makeOrders(10).map((o) => ({
+      ...o,
+      status: 'APPROVED' as const,
+      carrierId: 'c-ghtk',
+    }));
+    const sizes: number[] = [];
+    let release: () => void = () => {};
+    const gate = new Promise<void>((r) => (release = r));
+    server.use(
+      http.get('/api/sales-orders', () => HttpResponse.json({ items: rows, total: rows.length })),
+      http.post('/api/sales-orders/bulk-fulfil', async ({ request }) => {
+        const { orderIds } = (await request.json()) as { orderIds: string[] };
+        sizes.push(orderIds.length);
+        if (sizes.length === 2) await gate;
+        return HttpResponse.json(
+          {
+            // Hãng chưa phản hồi (không mã) → không lấy tem, không in.
+            done: orderIds.map((id) => ({
+              orderId: id,
+              docNumber: rows.find((r) => r.id === id)!.docNumber,
+              shipmentId: `sh-${id}`,
+              outcome: 'QUEUED',
+              trackingNo: null,
+            })),
+            failed: [],
+          },
+          { status: 201 },
+        );
+      }),
+    );
+    renderApp(<OrderListScreen />);
+    await screen.findByText(rows[0]!.docNumber);
+    for (let i = 0; i < 10; i++) {
+      fireEvent.click(screen.getAllByRole('checkbox', { name: 'Chọn dòng' })[i]!);
+    }
+    fireEvent.click(await screen.findByRole('button', { name: /Đóng gói \+ in vận đơn/ }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Đóng gói + in 10 đơn' }));
+
+    const bar = await screen.findByRole('progressbar', {
+      name: 'Tiến độ đóng gói và in vận đơn',
+    });
+    await waitFor(() => expect(screen.getByText('8/10 đơn')).toBeInTheDocument());
+    expect(bar).toHaveAttribute('aria-valuenow', '80');
+    expect(screen.getByRole('button', { name: /Đang đóng gói 8\/10/ })).toBeDisabled();
+    release();
+    await waitFor(() => expect(sizes).toEqual([8, 2]));
+    await waitFor(() => expect(screen.queryByRole('progressbar')).not.toBeInTheDocument());
+  });
+
   it('"Đóng gói + in vận đơn" với đơn đã có vận đơn (gửi ngoài ERP) → báo chỉ in lại tem, không "đã đóng gói" (SOP2610-49238)', async () => {
     search = '';
     toastSuccess.mockClear();
@@ -675,7 +726,8 @@ describe('OrderListScreen — cân nặng gửi hãng + gán hãng hàng loạt'
   it('không có quyền hủy lẫn lên đơn → thanh chọn không có nút "Hủy đơn" (luật 7)', async () => {
     search = '';
     renderApp(<OrderListScreen />, {
-      me: { ...ME_SALE, permissions: ['sales_order.read', 'sales_order.update'] },
+      // "Gán hãng / cân nặng" chỉ cho người có send_carrier (2026-10-31).
+      me: { ...ME_SALE, permissions: ['sales_order.read', 'sales_order.send_carrier'] },
     });
     await screen.findByText(FIRST.docNumber);
     fireEvent.click(screen.getAllByRole('checkbox', { name: 'Chọn dòng' })[0]!);
@@ -1362,10 +1414,76 @@ describe('OrderListScreen — Lỗi vận đơn + đơn TikTok (2026-10-28)', ()
       http.get('/api/sales-orders', () => HttpResponse.json({ items: [errorRow()], total: 1 })),
     );
     renderApp(<OrderListScreen />, {
-      me: { ...ME_SALE, permissions: ['sales_order.read', 'sales_order.update'] },
+      // edit_all: đơn lỗi vận đơn đã qua kho — người lên đơn thường bị khóa sửa (2026-10-31).
+      me: {
+        ...ME_SALE,
+        permissions: ['sales_order.read', 'sales_order.update', 'sales_order.edit_all'],
+      },
     });
     await screen.findByText(FIRST.docNumber);
     expect(screen.getByRole('link', { name: 'Sửa đơn' })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Xin lại vận đơn' })).not.toBeInTheDocument();
+  });
+});
+
+describe('OrderListScreen — Đơn mới / Xác nhận / Chờ hàng (2026-10-31)', () => {
+  it('tab "Đơn mới" đứng đầu; dòng đơn mới có "Xác nhận" → POST /sales-orders/{id}/confirm', async () => {
+    search = '';
+    const confirmed: string[] = [];
+    server.use(
+      http.post('/api/sales-orders/:id/confirm', ({ params }) => {
+        confirmed.push(params.id as string);
+        return HttpResponse.json(
+          { orderId: params.id, docNumber: FIRST.docNumber, status: 'APPROVED', completed: true },
+          { status: 201 },
+        );
+      }),
+    );
+    renderApp(<OrderListScreen />, { me: ME_SALE });
+    await screen.findByText(FIRST.docNumber);
+    expect(screen.getByRole('tab', { name: /Đơn mới/ })).toBeInTheDocument();
+    const row = screen.getAllByRole('row').find((r) => r.textContent?.includes(FIRST.docNumber))!;
+    fireEvent.click(within(row).getByRole('button', { name: 'Xác nhận' }));
+    await waitFor(() => expect(confirmed).toEqual([FIRST.id]));
+    await waitFor(() =>
+      expect(toastSuccess).toHaveBeenCalledWith(`Đã xác nhận đơn ${FIRST.docNumber}`),
+    );
+  });
+
+  it('sale không có send_carrier → thanh chọn không có "Gửi sang ĐVVC" / "Khác"', async () => {
+    search = '';
+    renderApp(<OrderListScreen />, {
+      me: { ...ME_SALE, permissions: [...ME_SALE.permissions, 'sales_order.update'] },
+    });
+    await screen.findByText(FIRST.docNumber);
+    fireEvent.click(screen.getAllByRole('checkbox', { name: 'Chọn dòng' })[0]!);
+    expect(await screen.findByRole('toolbar')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Gửi sang ĐVVC/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /^Khác/ })).not.toBeInTheDocument();
+  });
+
+  it('kho: "Khác" › "Chuyển Chờ hàng" → POST /sales-orders/waiting-stock { waiting: true }', async () => {
+    search = '';
+    const bodies: unknown[] = [];
+    server.use(
+      http.post('/api/sales-orders/waiting-stock', async ({ request }) => {
+        const body = (await request.json()) as { orderIds: string[] };
+        bodies.push(body);
+        return HttpResponse.json({
+          updated: body.orderIds.map((id) => ({ orderId: id, docNumber: FIRST.docNumber })),
+          failed: [],
+        });
+      }),
+    );
+    renderApp(<OrderListScreen />, {
+      me: { ...ME_SALE, permissions: ['sales_order.read', 'sales_order.send_carrier'] },
+    });
+    await screen.findByText(FIRST.docNumber);
+    fireEvent.click(screen.getAllByRole('checkbox', { name: 'Chọn dòng' })[0]!);
+    expect(await screen.findByRole('toolbar')).toBeInTheDocument();
+    openMoreMenu();
+    fireEvent.click(await screen.findByRole('menuitem', { name: 'Chuyển Chờ hàng' }));
+    await waitFor(() => expect(bodies).toEqual([{ orderIds: [FIRST.id], waiting: true }]));
+    await waitFor(() => expect(toastSuccess).toHaveBeenCalledWith('Đã chuyển Chờ hàng 1 đơn'));
   });
 });

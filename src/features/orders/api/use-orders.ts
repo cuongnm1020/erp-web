@@ -357,6 +357,40 @@ export function useReleasePick() {
   });
 }
 
+/**
+ * POST /sales-orders/{id}/confirm (2026-10-31) — người lên đơn "Xác nhận": Đơn mới / Chờ duyệt → Đã
+ * xác nhận, không qua duyệt kể cả bán dưới trần. Chờ server trả rồi mới đổi UI (luật 5).
+ */
+export function useConfirmOrder() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (orderId: string) =>
+      unwrap(api.POST('/sales-orders/{id}/confirm', { params: { path: { id: orderId } } })),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: orderKeys.lists() });
+      void qc.invalidateQueries({ queryKey: orderKeys.details() });
+    },
+  });
+}
+
+export type SetOrdersWaitingStockResult = components['schemas']['SetOrdersWaitingStockResultDto'];
+
+/**
+ * POST /sales-orders/waiting-stock (2026-10-31) — kho chuyển đơn Đã xác nhận sang Chờ hàng
+ * (`waiting: true`) hoặc đưa lại Đã xác nhận. Đơn không chuyển được về trong `failed`.
+ */
+export function useSetOrdersWaitingStock() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (body: { orderIds: string[]; waiting: boolean }) =>
+      unwrap(api.POST('/sales-orders/waiting-stock', { body })),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: orderKeys.lists() });
+      void qc.invalidateQueries({ queryKey: orderKeys.details() });
+    },
+  });
+}
+
 export type BulkUpdateOrdersBody = components['schemas']['BulkUpdateOrdersDto'];
 export type BulkUpdateOrdersResult = components['schemas']['BulkUpdateOrdersResultDto'];
 

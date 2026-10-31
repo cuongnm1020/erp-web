@@ -36,6 +36,15 @@ async function expandAll() {
   fireEvent.click(await screen.findByRole('button', { name: /Mở rộng tất cả/ }));
 }
 
+/** Bấm "Lưu thay đổi" trên đầu trang → hộp xác nhận; thay đổi lớn thì gõ chữ xác nhận trước. */
+async function saveAndConfirm() {
+  fireEvent.click(screen.getByRole('button', { name: /^Lưu thay đổi/ }));
+  const dialog = await screen.findByRole('dialog');
+  const word = within(dialog).queryByLabelText(/gõ XAC NHAN/);
+  if (word) fireEvent.change(word, { target: { value: 'xac nhan' } });
+  fireEvent.click(within(dialog).getByRole('button', { name: 'Lưu thay đổi' }));
+}
+
 async function openRoleMenu(roleName: string) {
   const trigger = await screen.findByRole('button', { name: `Thao tác vai trò ${roleName}` });
   fireEvent.keyDown(trigger, { key: 'Enter' });
@@ -75,7 +84,7 @@ describe('RolesScreen — ma trận vai trò × quyền (I-03, mockup Cấu hìn
     );
     expect(screen.getByText('Có thay đổi chưa lưu')).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole('button', { name: /^Lưu thay đổi/ }));
+    await saveAndConfirm();
     await waitFor(() => expect(sent.SALES_MEMBER).toBeDefined());
     expect([...sent.SALES_MEMBER!.permissions!].sort()).toEqual(
       [...ROLES_FIXTURE[1]!.permissions, 'role.update'].sort(),
@@ -94,7 +103,7 @@ describe('RolesScreen — ma trận vai trò × quyền (I-03, mockup Cấu hìn
     );
     await expandAll();
     fireEvent.click(screen.getByRole('checkbox', { name: 'Tồn kho: Điều chỉnh · mọi vai trò' }));
-    fireEvent.click(screen.getByRole('button', { name: /^Lưu thay đổi/ }));
+    await saveAndConfirm();
     await waitFor(() => expect(sent.ADMIN).toBeDefined());
     await waitFor(() => expect(sent.SALES_MEMBER).toBeDefined());
     expect(sent.SALES_MEMBER!.permissions).toEqual(
@@ -117,7 +126,7 @@ describe('RolesScreen — ma trận vai trò × quyền (I-03, mockup Cấu hìn
     fireEvent.click(
       await screen.findByRole('checkbox', { name: 'Nhân viên kinh doanh · Vai trò & quyền: Sửa' }),
     );
-    fireEvent.click(screen.getByRole('button', { name: /^Lưu thay đổi/ }));
+    await saveAndConfirm();
     await waitFor(() =>
       expect(toastError).toHaveBeenCalledWith(
         'Chưa lưu được: Nhân viên kinh doanh',
@@ -248,6 +257,72 @@ describe('RolesScreen — ma trận vai trò × quyền (I-03, mockup Cấu hìn
     fireEvent.click(within(dialog).getByRole('button', { name: 'Tạo vai trò' }));
     await waitFor(() => expect(body.code).toBe('CSKH'));
     expect(body.permissions).toEqual(ROLES_FIXTURE[1]!.permissions);
+  });
+
+  it('hộp xác nhận lưu: liệt kê thêm / bớt; vai trò về 0 quyền phải gõ XAC NHAN mới lưu được', async () => {
+    const sent = capturePuts();
+    renderApp(<RolesScreen />);
+    // Bỏ tick "tất cả quyền" của Nhân viên kinh doanh → còn 0 quyền (sự cố 2026-10-31).
+    fireEvent.click(
+      await screen.findByRole('checkbox', { name: 'Nhân viên kinh doanh · tất cả quyền' }),
+    );
+    fireEvent.click(
+      await screen.findByRole('checkbox', { name: 'Nhân viên kinh doanh · tất cả quyền' }),
+    );
+    fireEvent.click(screen.getByRole('button', { name: /^Lưu thay đổi/ }));
+    const dialog = await screen.findByRole('dialog');
+    expect(within(dialog).getByText('Lưu quyền của 1 vai trò?')).toBeInTheDocument();
+    expect(within(dialog).getByText('Mất hết quyền')).toBeInTheDocument();
+    expect(within(dialog).getByText(/^còn 0\//)).toBeInTheDocument();
+    const confirm = within(dialog).getByRole('button', { name: 'Lưu thay đổi' });
+    expect(confirm).toBeDisabled();
+    fireEvent.change(within(dialog).getByLabelText(/gõ XAC NHAN/), { target: { value: 'XAC' } });
+    expect(confirm).toBeDisabled();
+    fireEvent.change(within(dialog).getByLabelText(/gõ XAC NHAN/), {
+      target: { value: 'XAC NHAN' },
+    });
+    fireEvent.click(confirm);
+    await waitFor(() => expect(sent.SALES_MEMBER).toEqual({ permissions: [] }));
+  });
+
+  it('thay đổi nhỏ: hộp xác nhận không bắt gõ chữ; Hủy thì không gửi gì, nháp còn nguyên', async () => {
+    const sent = capturePuts();
+    renderApp(<RolesScreen />);
+    await expandAll();
+    fireEvent.click(
+      await screen.findByRole('checkbox', { name: 'Nhân viên kinh doanh · Vai trò & quyền: Sửa' }),
+    );
+    fireEvent.click(screen.getByRole('button', { name: /^Lưu thay đổi/ }));
+    const dialog = await screen.findByRole('dialog');
+    expect(within(dialog).queryByLabelText(/gõ XAC NHAN/)).not.toBeInTheDocument();
+    expect(within(dialog).getByText('+1')).toBeInTheDocument();
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Hủy' }));
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+    expect(sent.SALES_MEMBER).toBeUndefined();
+    expect(screen.getByText('Có thay đổi chưa lưu')).toBeInTheDocument();
+  });
+
+  it('có role.update nhưng không phải superadmin → chỉ xem quyền, không nhân bản / sao chép quyền', async () => {
+    renderApp(<RolesScreen />, {
+      me: { ...ME_SALE, permissions: ['role.read', 'role.update'] },
+    });
+    await expandAll();
+    expect(
+      await screen.findByRole('checkbox', { name: 'Nhân viên kinh doanh · Khách hàng: Xem' }),
+    ).toBeDisabled();
+    expect(screen.queryByRole('button', { name: /^Lưu thay đổi/ })).not.toBeInTheDocument();
+    expect(screen.getByText(/Chỉ quản trị hệ thống được đổi quyền/)).toBeInTheDocument();
+
+    await openRoleMenu('Nhân viên kinh doanh');
+    expect(await screen.findByRole('menuitem', { name: 'Sửa tên & mô tả' })).toBeInTheDocument();
+    expect(
+      screen.queryByRole('menuitem', { name: 'Nhân bản thành vai trò mới' }),
+    ).not.toBeInTheDocument();
+    fireEvent.keyDown(document.activeElement ?? document.body, { key: 'Escape' });
+
+    fireEvent.click(screen.getByRole('button', { name: /Thêm vai trò/ }));
+    const dialog = await screen.findByRole('dialog');
+    expect(within(dialog).queryByLabelText('Bắt đầu với quyền của')).not.toBeInTheDocument();
   });
 
   it('catalog đủ nhóm module thật', async () => {

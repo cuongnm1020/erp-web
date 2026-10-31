@@ -111,7 +111,9 @@ describe('proxy', () => {
       apiUrl: 'http://api',
       accessToken: 'TOKEN',
     });
-    expect(priv.headers.has('x-forwarded-for')).toBe(false);
+    // Route có phiên cũng chuyển XFF: audit log ghi IP thật của người dùng (2026-10-31).
+    expect(priv.headers.get('x-forwarded-for')).toBe('203.0.113.7');
+    expect(priv.headers.has('user-agent')).toBe(false);
     expect(priv.headers.get('authorization')).toBe('Bearer TOKEN');
   });
 

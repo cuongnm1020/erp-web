@@ -119,3 +119,43 @@ describe('Chi tiết nhân viên — kho được phép + kho mặc định', ()
     expect(patches[0]).not.toHaveProperty('warehouseId');
   });
 });
+
+describe('Chi tiết nhân viên — cấp riêng / chặn quyền chỉ superadmin (2026-10-31)', () => {
+  // canManage = người xem quản lý được nhân viên này — cô lập điều kiện superadmin.
+  const manageable = () =>
+    server.use(
+      http.get('/api/users/:id', () =>
+        HttpResponse.json({ ...USER_DETAIL_FIXTURE, canManage: true }),
+      ),
+    );
+
+  it('có user.update + role.update nhưng không superadmin → ma trận quyền chỉ xem', async () => {
+    manageable();
+    const me = {
+      ...ME_EDITOR,
+      hasGlobalAccess: false,
+      permissions: ['user.read', 'user.update', 'role.read', 'role.update'],
+    };
+    renderApp(
+      <WarehouseProvider me={me}>
+        <UserDetailScreen id={USER_DETAIL_FIXTURE.id} />
+      </WarehouseProvider>,
+      { me },
+    );
+    const cell = await screen.findByRole('button', { name: /Khách hàng · Xem/ });
+    expect(cell).toBeDisabled();
+  });
+
+  it('superadmin → sửa được ma trận quyền', async () => {
+    manageable();
+    renderApp(
+      <WarehouseProvider me={ME_EDITOR}>
+        <UserDetailScreen id={USER_DETAIL_FIXTURE.id} />
+      </WarehouseProvider>,
+      { me: ME_EDITOR },
+    );
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: /Khách hàng · Xem/ })).toBeEnabled(),
+    );
+  });
+});
