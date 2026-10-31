@@ -871,12 +871,7 @@ function Detail({ order }: { order: SalesOrderDetail }) {
                 loading={confirm.isPending}
                 onClick={() =>
                   confirm.mutate(order.id, {
-                    onSuccess: (r) =>
-                      toast.success(
-                        r.status === 'APPROVED'
-                          ? `Đã xác nhận đơn ${order.docNumber}`
-                          : `Đơn ${order.docNumber} vượt ngưỡng — đã gửi duyệt`,
-                      ),
+                    onSuccess: () => toast.success(`Đã xác nhận đơn ${order.docNumber}`),
                     onError: (err) => toast.error(messageFor(err)),
                   })
                 }

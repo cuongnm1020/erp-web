@@ -265,10 +265,12 @@ const STAGE_LOCKED = 'Kho đã xử lý đơn — không sửa / hủy được 
 function orderRowItems(o: SalesOrderListItem, ctx: RowActionContext): RowActionItem[] {
   const stageOpen = OPEN_FLOWS.includes(o.flow);
   return [
-    ...(ctx.canCreate && o.flow === 'NEW' && o.status === 'DRAFT'
+    ...(ctx.canCreate &&
+    ((o.flow === 'NEW' && o.status === 'DRAFT') || o.status === 'PENDING_APPROVAL')
       ? [
           {
-            // Đơn mới → Đã xác nhận (2026-10-31); server kiểm người tạo / đơn Pancake.
+            // Đơn mới / Chờ duyệt → Đã xác nhận, không qua duyệt kể cả bán dưới trần (2026-10-31);
+            // server kiểm người tạo / đơn Pancake.
             label: 'Xác nhận',
             icon: <CheckCircle2 aria-hidden />,
             onSelect: () => ctx.onConfirm(o),
@@ -1084,12 +1086,7 @@ export function OrderListScreen() {
       onCancel: setCancelling,
       onConfirm: (o) =>
         confirmOrder.mutate(o.id, {
-          onSuccess: (r) =>
-            toast.success(
-              r.status === 'APPROVED'
-                ? `Đã xác nhận đơn ${o.docNumber}`
-                : `Đơn ${o.docNumber} vượt ngưỡng — đã gửi duyệt`,
-            ),
+          onSuccess: () => toast.success(`Đã xác nhận đơn ${o.docNumber}`),
           onError: (err) => toast.error(`Đơn ${o.docNumber}: ${messageFor(err)}`),
         }),
       onRetryWaybill: (o) => {

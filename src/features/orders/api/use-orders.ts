@@ -358,8 +358,8 @@ export function useReleasePick() {
 }
 
 /**
- * POST /sales-orders/{id}/confirm (2026-10-31) — người lên đơn "Xác nhận" đơn mới: Đơn mới → Đã xác
- * nhận (hoặc Chờ duyệt khi vượt ngưỡng). Chờ server trả rồi mới đổi UI (luật 5).
+ * POST /sales-orders/{id}/confirm (2026-10-31) — người lên đơn "Xác nhận": Đơn mới / Chờ duyệt → Đã
+ * xác nhận, không qua duyệt kể cả bán dưới trần. Chờ server trả rồi mới đổi UI (luật 5).
  */
 export function useConfirmOrder() {
   const qc = useQueryClient();

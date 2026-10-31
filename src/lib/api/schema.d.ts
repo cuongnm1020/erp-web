@@ -3810,8 +3810,8 @@ export interface paths {
         get?: never;
         put?: never;
         /**
-         * Người lên đơn "Xác nhận" đơn mới (2026-10-31): Đơn mới → Đã xác nhận (OrderConfirmed), hoặc
-         *     Chờ duyệt khi vượt ngưỡng duyệt. Người được sửa đơn (người tạo / NV xử lý / trưởng nhóm /
+         * Người lên đơn "Xác nhận" đơn (2026-10-31): Đơn mới / Chờ duyệt → Đã xác nhận (OrderConfirmed),
+         *     KHÔNG qua duyệt kể cả bán dưới trần. Người được sửa đơn (người tạo / NV xử lý / trưởng nhóm /
          *     `sales_order.edit_all`); đơn Pancake không xác nhận ở đây.
          */
         post: operations["SalesOrderController_confirm"];
@@ -11440,7 +11440,10 @@ export interface components {
              *     (người có `sales_order.edit_all` / `sales_order.cancel` vẫn được). null = còn Đơn mới / Đã xác nhận.
              */
             stageLockedReason: string | null;
-            /** @description Người đang xem bấm được "Xác nhận" (đơn mới tạo trên ERP, người được sửa đơn). */
+            /**
+             * @description Người đang xem bấm được "Xác nhận" (đơn tạo trên ERP ở Đơn mới / Chờ duyệt, người được sửa đơn)
+             *     — không qua duyệt, kể cả bán dưới trần (2026-10-31).
+             */
             canConfirm: boolean;
             /** @description Kho chuyển đơn sang Chờ hàng bằng tay lúc này (ISO); null = không. */
             waitingStockAt: string | null;
