@@ -77,16 +77,38 @@ export function useFulfilPrint() {
     rememberOrientation(v);
   };
 
+  const [progress, setProgress] = useState<FulfilProgressState | null>(null);
+
   /** null = lỗi cả lô (đã báo toast). */
   const run = async (
     orderIds: string[],
     byId: Map<string, SalesOrder>,
   ): Promise<FulfilPrintOutcome | null> => {
+    // Gửi từng nhóm nhỏ (2026-10-31): biết đã xong bao nhiêu đơn để hiện thanh tiến độ "x/N".
+    // Server xin vận đơn song song trong mỗi nhóm. Một nhóm lỗi mạng → dừng, vẫn in phần đã xong
+    // (các đơn đó đã trừ tồn).
+    const total = orderIds.length;
+    const r: BulkFulfilOrdersResult = { done: [], failed: [] };
+    setProgress({ stage: 'pack', done: 0, total });
     try {
-      const r = await bulk.mutateAsync(orderIds);
+      for (let i = 0; i < total; i += FULFIL_CHUNK) {
+        try {
+          const part = await bulk.mutateAsync(orderIds.slice(i, i + FULFIL_CHUNK));
+          r.done.push(...part.done);
+          r.failed.push(...part.failed);
+        } catch (err) {
+          if (r.done.length + r.failed.length === 0) throw err;
+          toast.error(`Dừng ở đơn ${i + 1}/${total}: ${messageFor(err)}`, {
+            description: 'Các đơn trước đó đã đóng gói — vẫn in tem. Chọn lại phần còn lại.',
+          });
+          break;
+        }
+        setProgress({ stage: 'pack', done: Math.min(i + FULFIL_CHUNK, total), total });
+      }
       const printable = r.done.filter((d) => d.trackingNo).map((d) => d.shipmentId);
       const queued = r.done.length - printable.length;
       if (printable.length > 0) {
+        setProgress({ stage: 'labels', done: printable.length, total: printable.length });
         const data = await fetchLabels.mutateAsync(printable);
         if (data.length > 0) {
           setLabels(data);
@@ -113,6 +135,8 @@ export function useFulfilPrint() {
     } catch (err) {
       toast.error(messageFor(err));
       return null;
+    } finally {
+      setProgress(null);
     }
   };
 
@@ -132,10 +156,62 @@ export function useFulfilPrint() {
     run,
     sheet,
     printing: printer.open,
-    pending: bulk.isPending || fetchLabels.isPending,
-    /** Chữ trên nút đang chạy — "Đang đóng gói…" / "Đang lấy tem…"; null = rảnh. */
-    busyLabel: bulk.isPending ? 'Đang đóng gói…' : fetchLabels.isPending ? 'Đang lấy tem…' : null,
+    pending: progress !== null || bulk.isPending || fetchLabels.isPending,
+    /** Chữ trên nút đang chạy — "Đang đóng gói 16/50…" / "Đang lấy tem…"; null = rảnh. */
+    busyLabel: progress
+      ? progress.stage === 'pack'
+        ? `Đang đóng gói ${progress.done}/${progress.total}…`
+        : 'Đang lấy tem…'
+      : null,
+    /** Thanh tiến độ của lượt đang chạy; null = rảnh. */
+    progressBar: progress ? <FulfilProgress state={progress} /> : null,
   };
+}
+
+/** Số đơn mỗi lần gọi bulk-fulfil — đủ nhỏ để thanh tiến độ nhích đều. */
+const FULFIL_CHUNK = 8;
+
+interface FulfilProgressState {
+  /** `pack` = đóng gói + xin vận đơn; `labels` = lấy dữ liệu tem để in. */
+  stage: 'pack' | 'labels';
+  done: number;
+  total: number;
+}
+
+/** Thanh tiến độ "Đóng gói + in vận đơn" (2026-10-31) — cùng kiểu thanh của đồng bộ Pancake. */
+function FulfilProgress({ state }: { state: FulfilProgressState }) {
+  const pct =
+    state.stage === 'labels'
+      ? 100
+      : state.total === 0
+        ? 0
+        : Math.round((state.done / state.total) * 100);
+  return (
+    <div className="space-y-1.5" aria-live="polite">
+      <div className="flex items-baseline justify-between text-sm">
+        <span>
+          {state.stage === 'pack'
+            ? 'Đang đóng gói và xin mã vận đơn'
+            : `Đang lấy dữ liệu ${state.total} tem để in`}
+        </span>
+        {state.stage === 'pack' ? (
+          <span className="font-semibold tabular-nums">
+            {state.done}/{state.total} đơn
+          </span>
+        ) : null}
+      </div>
+      <div
+        className="h-2 overflow-hidden rounded bg-muted"
+        role="progressbar"
+        aria-label="Tiến độ đóng gói và in vận đơn"
+        aria-valuenow={pct}
+        aria-valuemin={0}
+        aria-valuemax={100}
+      >
+        <div className="h-full bg-primary transition-[width]" style={{ width: `${pct}%` }} />
+      </div>
+    </div>
+  );
 }
 
 /** Ô "Hướng tem" + nhắc cài hộp thoại in. */
@@ -309,6 +385,7 @@ export function BulkFulfilPrintDialog({
                 value={fp.orientation}
                 onChange={fp.setOrientation}
               />
+              {fp.progressBar}
               <DialogFooter>
                 <Button variant="outline" disabled={fp.pending} onClick={() => close(false)}>
                   Đóng

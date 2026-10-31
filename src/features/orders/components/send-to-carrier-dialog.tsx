@@ -296,6 +296,7 @@ export function SendToCarrierDialog({
                         />
                       ),
                       busyLabel: fp.busyLabel,
+                      progress: fp.progressBar,
                       onPack: () => void packAndPrint(),
                     }
                   : null
@@ -765,6 +766,8 @@ function SendResults({
     field: ReactNode;
     /** Chữ nút khi đang chạy; null = rảnh. */
     busyLabel: string | null;
+    /** Thanh tiến độ "x/N đơn" khi đang đóng gói + in (2026-10-31); null = rảnh. */
+    progress: ReactNode;
     onPack: () => void;
   } | null;
 }) {
@@ -843,6 +846,7 @@ function SendResults({
                 </p>
               </div>
               {ask.field}
+              {ask.progress}
             </div>
             <DialogFooter className="items-center border-t px-5 py-3">
               <span className="mr-auto text-xs text-muted-foreground">

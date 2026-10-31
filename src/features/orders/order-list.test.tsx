@@ -532,6 +532,57 @@ describe('OrderListScreen — cân nặng gửi hãng + gán hãng hàng loạt'
     await waitFor(() => expect(screen.queryByRole('toolbar')).not.toBeInTheDocument());
   });
 
+  it('"Đóng gói + in vận đơn" lô 10 đơn → gửi từng nhóm 8 + 2, thanh tiến độ "8/10 đơn" (2026-10-31)', async () => {
+    search = '';
+    const rows = makeOrders(10).map((o) => ({
+      ...o,
+      status: 'APPROVED' as const,
+      carrierId: 'c-ghtk',
+    }));
+    const sizes: number[] = [];
+    let release: () => void = () => {};
+    const gate = new Promise<void>((r) => (release = r));
+    server.use(
+      http.get('/api/sales-orders', () => HttpResponse.json({ items: rows, total: rows.length })),
+      http.post('/api/sales-orders/bulk-fulfil', async ({ request }) => {
+        const { orderIds } = (await request.json()) as { orderIds: string[] };
+        sizes.push(orderIds.length);
+        if (sizes.length === 2) await gate;
+        return HttpResponse.json(
+          {
+            // Hãng chưa phản hồi (không mã) → không lấy tem, không in.
+            done: orderIds.map((id) => ({
+              orderId: id,
+              docNumber: rows.find((r) => r.id === id)!.docNumber,
+              shipmentId: `sh-${id}`,
+              outcome: 'QUEUED',
+              trackingNo: null,
+            })),
+            failed: [],
+          },
+          { status: 201 },
+        );
+      }),
+    );
+    renderApp(<OrderListScreen />);
+    await screen.findByText(rows[0]!.docNumber);
+    for (let i = 0; i < 10; i++) {
+      fireEvent.click(screen.getAllByRole('checkbox', { name: 'Chọn dòng' })[i]!);
+    }
+    fireEvent.click(await screen.findByRole('button', { name: /Đóng gói \+ in vận đơn/ }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Đóng gói + in 10 đơn' }));
+
+    const bar = await screen.findByRole('progressbar', {
+      name: 'Tiến độ đóng gói và in vận đơn',
+    });
+    await waitFor(() => expect(screen.getByText('8/10 đơn')).toBeInTheDocument());
+    expect(bar).toHaveAttribute('aria-valuenow', '80');
+    expect(screen.getByRole('button', { name: /Đang đóng gói 8\/10/ })).toBeDisabled();
+    release();
+    await waitFor(() => expect(sizes).toEqual([8, 2]));
+    await waitFor(() => expect(screen.queryByRole('progressbar')).not.toBeInTheDocument());
+  });
+
   it('"Đóng gói + in vận đơn" với đơn đã có vận đơn (gửi ngoài ERP) → báo chỉ in lại tem, không "đã đóng gói" (SOP2610-49238)', async () => {
     search = '';
     toastSuccess.mockClear();
