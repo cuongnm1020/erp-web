@@ -8,6 +8,7 @@ export {
   toDecimal,
 } from './money';
 export type { MoneyFormatOptions, MoneyInput } from './money';
+export { moneyInWordsVi, readIntegerVi } from './money-words';
 export { formatQuantity, gramsToKg, kgToGrams } from './quantity';
 export type { QuantityFormatOptions } from './quantity';
 export {

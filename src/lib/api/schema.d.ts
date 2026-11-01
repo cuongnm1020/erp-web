@@ -5087,6 +5087,47 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/reports/sales/duplicates": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * RPT-DUP (2026-11-02) — đơn trùng trong ngày (cùng SĐT, cùng ngày VN) trong phạm vi người xem:
+         *     tổng đơn trùng / đơn hoàn / tỉ lệ hoàn so với đơn không trùng + danh sách nhóm kèm từng đơn.
+         *     Luôn tính sống. Phân trang take ≤ 200.
+         */
+        get: operations["SalesReportController_duplicates"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/reports/sales/top-products/monthly": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * RPT-06b (2026-11-02) — top SKU từng tháng của một năm + top cả năm (mọi POS / kênh khi không
+         *     lọc). Năm hiện tại tính tới hôm nay; tháng chưa tới không trả.
+         */
+        get: operations["SalesReportController_topProductsMonthly"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/reports/sales/by-supplier": {
         parameters: {
             query?: never;
@@ -5464,8 +5505,29 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Thêm đơn hãng báo giao thành công trong khoảng ngày (chưa có đối soát → cảnh báo). */
+        /**
+         * Thêm đơn hãng báo giao thành công chưa có trong hàng chờ. Có `from`/`to` = trong khoảng ngày;
+         *     bỏ trống = mọi đơn — thêm tối đa 2.000 đơn tại chỗ, phần còn lại giao worker (job tự chạy mỗi
+         *     10 phút + đêm cũng làm việc này).
+         */
         post: operations["EInvoiceController_collect"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/einvoices/export": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** File Excel nhập meInvoice (mẫu MISA "Hóa đơn GTGT") của hóa đơn đã duyệt. */
+        get: operations["EInvoiceController_export"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -14076,7 +14138,7 @@ export interface components {
             previousFrom: string;
             previousTo: string;
             /** @enum {string} */
-            groupBy: "team" | "owner" | "owner_shop";
+            groupBy: "team" | "owner" | "owner_shop" | "shop";
             /**
              * @description Sắp doanh số như Pancake (grossRevenue) giảm dần ("Chưa gán" đứng sau khi bằng nhau). Gồm cả người / team chỉ có doanh
              *     số kỳ trước (số kỳ này 0). Nhân viên chỉ thấy dòng của mình; trưởng nhóm thấy team mình.
@@ -14117,6 +14179,63 @@ export interface components {
             rankBy: "customers" | "orders" | "qty" | "revenue" | "grossProfit";
             /** @description Tối đa `limit` SKU, hạng 1..n. Bằng nhau thì doanh thu cao hơn đứng trước. */
             items: components["schemas"]["SalesTopProductItemDto"][];
+            dataAsOf: string | null;
+        };
+        SalesDuplicatesTotalsDto: {
+            /** @description Số nhóm (SĐT × ngày) có ≥ 2 đơn. */
+            groupCount: number;
+            duplicateOrders: number;
+            duplicateReturned: number;
+            duplicateReturnRate: string | null;
+            /** @description Đơn KHÔNG trùng trong cùng kỳ / bộ lọc — để so sánh. */
+            otherOrders: number;
+            otherReturned: number;
+            otherReturnRate: string | null;
+        };
+        SalesDuplicateOrderDto: {
+            id: string;
+            docNumber: string;
+            /** @description ISO — giờ đặt đơn. */
+            orderDate: string;
+            /** @description Decimal(18,4) chuỗi. */
+            total: string;
+            returned: boolean;
+        };
+        SalesDuplicateGroupDto: {
+            /** @description SĐT chuẩn hoá (core.normalize_phone). */
+            phone: string;
+            /** @description `YYYY-MM-DD` — ngày VN. */
+            day: string;
+            customerName: string;
+            orderCount: number;
+            returnedCount: number;
+            returnRate: string | null;
+            /** @description Theo giờ đặt tăng dần. */
+            orders: components["schemas"]["SalesDuplicateOrderDto"][];
+        };
+        SalesDuplicatesDto: {
+            from: string;
+            to: string;
+            totals: components["schemas"]["SalesDuplicatesTotalsDto"];
+            items: components["schemas"]["SalesDuplicateGroupDto"][];
+            /** @description Tổng số nhóm sau lọc (phân trang). */
+            total: number;
+        };
+        SalesTopProductsMonthDto: {
+            month: number;
+            from: string;
+            to: string;
+            /** @description Top `limit` SKU của tháng — previous* so với tháng liền trước (cùng độ dài). */
+            items: components["schemas"]["SalesTopProductItemDto"][];
+        };
+        SalesTopProductsMonthlyDto: {
+            year: number;
+            /** @enum {string} */
+            rankBy: "customers" | "orders" | "qty" | "revenue" | "grossProfit";
+            /** @description Chỉ các tháng đã bắt đầu (năm hiện tại: tới tháng này). */
+            months: components["schemas"]["SalesTopProductsMonthDto"][];
+            /** @description Top `limit` SKU cả năm (01/01 → 31/12 hoặc hôm nay) — previous* so với năm trước cùng độ dài. */
+            yearItems: components["schemas"]["SalesTopProductItemDto"][];
             dataAsOf: string | null;
         };
         SalesBySupplierItemDto: {
@@ -14502,6 +14621,10 @@ export interface components {
             invoiceWithCode: boolean;
             isCashRegister: boolean;
             requireTwoPeople: boolean;
+            /** @description Người bán in trên bản xem trước — tên công ty, địa chỉ, số tài khoản + ngân hàng. */
+            sellerName: string | null;
+            sellerAddress: string | null;
+            sellerBank: string | null;
             lastVerifiedAt: string | null;
             lastVerifyError: string | null;
             updatedAt: string;
@@ -14519,6 +14642,9 @@ export interface components {
             invoiceWithCode?: boolean;
             isCashRegister?: boolean;
             requireTwoPeople?: boolean;
+            sellerName?: string | null;
+            sellerAddress?: string | null;
+            sellerBank?: string | null;
         };
         MisaTemplateDto: {
             templateId: string;
@@ -14590,11 +14716,13 @@ export interface components {
         };
         CollectDeliveredDto: {
             /** @description YYYY-MM-DD, giờ Việt Nam. */
-            from: string;
-            to: string;
+            from?: string;
+            to?: string;
         };
         CollectDeliveredResultDto: {
             added: number;
+            /** @description Đơn đã giao còn chờ thêm — worker thêm tiếp ở nền. */
+            remaining: number;
         };
         /** @enum {string} */
         EInvoiceStatus: "PENDING_REVIEW" | "APPROVED" | "PUSHED" | "ISSUED" | "FAILED" | "SKIPPED";
@@ -14625,6 +14753,8 @@ export interface components {
             invSeries: string | null;
             invNo: string | null;
             errorMessage: string | null;
+            /** @description Lần cuối xuất file Excel nhập meInvoice. */
+            exportedAt: string | null;
             version: number;
         };
         EInvoiceListResponseDto: {
@@ -14688,6 +14818,13 @@ export interface components {
             email: string | null;
             customerCode: string | null;
         };
+        EInvoiceSellerDto: {
+            name: string | null;
+            taxCode: string | null;
+            address: string | null;
+            bank: string | null;
+            invSeries: string | null;
+        };
         EInvoiceDetailDto: {
             status: components["schemas"]["EInvoiceStatus"];
             id: string;
@@ -14715,6 +14852,8 @@ export interface components {
             invSeries: string | null;
             invNo: string | null;
             errorMessage: string | null;
+            /** @description Lần cuối xuất file Excel nhập meInvoice. */
+            exportedAt: string | null;
             version: number;
             customerId: string | null;
             reconLineId: string | null;
@@ -14735,6 +14874,7 @@ export interface components {
             lastSyncedAt: string | null;
             createdAt: string;
             updatedAt: string;
+            seller: components["schemas"]["EInvoiceSellerDto"];
         };
         EditEInvoiceLineDto: {
             /** Format: uuid */
@@ -22365,6 +22505,13 @@ export interface operations {
                 weightMin?: string;
                 /** @description Cận trên (≤), kg. Cùng giá trị với weightMin = lọc đúng một mức cân. */
                 weightMax?: string;
+                /**
+                 * @description Giá trị đơn (`total`, gồm phí ship / phụ thu / làm tròn) ≥ giá trị này — chuỗi decimal ≥ 0
+                 *     (2026-11-02). Lọc "= X" gửi totalMin = totalMax = X; "≤ X" chỉ gửi totalMax.
+                 */
+                totalMin?: string;
+                /** @description Giá trị đơn ≤ giá trị này — chuỗi decimal ≥ 0. Phải ≥ totalMin. */
+                totalMax?: string;
                 /** @description Chỉ đơn CHƯA chọn hãng (`true`) — gom đơn cần gán hãng. */
                 noCarrier?: string;
                 /** @description Đơn ĐÃ gán hãng này (wms.Carrier.id). Kết hợp được với from/to. */
@@ -22547,6 +22694,13 @@ export interface operations {
                 weightMin?: string;
                 /** @description Cận trên (≤), kg. Cùng giá trị với weightMin = lọc đúng một mức cân. */
                 weightMax?: string;
+                /**
+                 * @description Giá trị đơn (`total`, gồm phí ship / phụ thu / làm tròn) ≥ giá trị này — chuỗi decimal ≥ 0
+                 *     (2026-11-02). Lọc "= X" gửi totalMin = totalMax = X; "≤ X" chỉ gửi totalMax.
+                 */
+                totalMin?: string;
+                /** @description Giá trị đơn ≤ giá trị này — chuỗi decimal ≥ 0. Phải ≥ totalMin. */
+                totalMax?: string;
                 /** @description Chỉ đơn CHƯA chọn hãng (`true`) — gom đơn cần gán hãng. */
                 noCarrier?: string;
                 /** @description Đơn ĐÃ gán hãng này (wms.Carrier.id). Kết hợp được với from/to. */
@@ -24679,7 +24833,7 @@ export interface operations {
                 customerId?: string;
                 /** @description POS Pancake của đơn (shop_id, chuỗi số) — như `pancakeShopId` của GET /sales-orders. */
                 pancakeShopId?: string;
-                groupBy: "owner" | "team" | "owner_shop";
+                groupBy: "owner" | "team" | "owner_shop" | "shop";
             };
             header?: never;
             path?: never;
@@ -24746,6 +24900,93 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["SalesTopProductsDto"];
+                };
+            };
+        };
+    };
+    SalesReportController_duplicates: {
+        parameters: {
+            query: {
+                /**
+                 * @description Nguồn đơn: PANCAKE = đơn đồng bộ từ Pancake, ERP = đơn tạo trên hệ thống. Bỏ trống = mọi đơn.
+                 *     Có lọc → luôn tính sống (bảng tổng hợp không lưu).
+                 */
+                origin?: "PANCAKE" | "ERP";
+                /**
+                 * @description Tình trạng giao (lặp tham số cho nhiều giá trị: `?fulfilment=DELIVERED&fulfilment=SHIPPING`):
+                 *     DELIVERED thành công · SHIPPING đang giao · NOT_SHIPPED chưa gửi hãng · RETURNED hoàn (cả ĐVVC
+                 *     hoàn cả đơn). Bỏ trống = mọi đơn. Có lọc → luôn tính sống (bảng tổng hợp không lưu).
+                 */
+                fulfilment?: ("DELIVERED" | "SHIPPING" | "NOT_SHIPPED" | "RETURNED")[];
+                /** @description `YYYY-MM-DD` — ngày đầu (giờ VN). */
+                from: string;
+                /** @description `YYYY-MM-DD` — ngày cuối, lấy hết ngày đó. `to` = `from` → một ngày. */
+                to: string;
+                /** @description Kênh bán. */
+                channel?: "DIRECT" | "MARKETPLACE" | "WEBSITE" | "POS";
+                /** @description Snapshot `SalesOrder.teamId` lúc tạo đơn. */
+                teamId?: string;
+                /** @description Snapshot `SalesOrder.ownerId` lúc tạo đơn. */
+                ownerId?: string;
+                /** @description Kho lấy hàng chọn trên đơn (`SalesOrder.warehouseId`). */
+                warehouseId?: string;
+                customerId?: string;
+                /** @description POS Pancake của đơn (shop_id, chuỗi số) — như `pancakeShopId` của GET /sales-orders. */
+                pancakeShopId?: string;
+                /** @description `true` = chỉ nhóm có ≥ 1 đơn hoàn. */
+                onlyReturned?: "true" | "false";
+                /** @description Sắp nhóm: `day` (mới nhất trước, mặc định) · `orders` (nhiều đơn trước) · `returned` (nhiều đơn hoàn trước). */
+                sort?: "day" | "orders" | "returned";
+                /** @description Mặc định 50, tối đa 200. */
+                take?: number;
+                skip?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SalesDuplicatesDto"];
+                };
+            };
+        };
+    };
+    SalesReportController_topProductsMonthly: {
+        parameters: {
+            query: {
+                origin?: "PANCAKE" | "ERP";
+                /** @description Năm dương lịch, 2020–2100. */
+                year: number;
+                rankBy: "qty" | "revenue" | "grossProfit" | "orders" | "customers";
+                /** @description Số SKU mỗi tháng — mặc định 10, tối đa 50. */
+                limit?: number;
+                channel?: "DIRECT" | "MARKETPLACE" | "WEBSITE" | "POS";
+                teamId?: string;
+                ownerId?: string;
+                warehouseId?: string;
+                pancakeShopId?: string;
+                categoryId?: string;
+                brandId?: string;
+                supplierId?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SalesTopProductsMonthlyDto"];
                 };
             };
         };
@@ -25396,6 +25637,27 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["CollectDeliveredResultDto"];
                 };
+            };
+        };
+    };
+    EInvoiceController_export: {
+        parameters: {
+            query?: {
+                ids?: string;
+                /** @description Ngày hóa đơn YYYY-MM-DD (mặc định hôm nay, giờ Việt Nam). */
+                invDate?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };

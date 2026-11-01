@@ -47,10 +47,12 @@ export function useEInvoices(q: EInvoiceListQuery) {
   });
 }
 
-export function useEInvoice(id: string) {
+/** `enabled = false` — chưa tải (hộp xem trước đang đóng). */
+export function useEInvoice(id: string, enabled = true) {
   return useQuery({
     queryKey: einvoiceKeys.detail(id),
     queryFn: () => unwrap(api.GET('/einvoices/{id}', { params: { path: { id } } })),
+    enabled: enabled && !!id,
   });
 }
 
@@ -118,13 +120,26 @@ export function useSyncEInvoices() {
   });
 }
 
+/** Bỏ trống from / to = mọi đơn đã giao chưa có trong hàng chờ (phần còn lại worker thêm tiếp). */
 export function useCollectDelivered() {
   const invalidate = useInvalidate();
   return useMutation({
-    mutationFn: (body: { from: string; to: string }) =>
+    mutationFn: (body: { from?: string; to?: string } = {}) =>
       unwrap(api.POST('/einvoices/collect-delivered', { body })),
     onSuccess: invalidate,
   });
+}
+
+/**
+ * Link tải file Excel nhập meInvoice (mẫu MISA "Hóa đơn GTGT") — GET /einvoices/export, anchor thật
+ * để cookie phiên đi kèm. Bỏ `ids` = mọi hóa đơn Đã duyệt.
+ */
+export const einvoiceExportUrl = (ids: string[] = []) =>
+  `/api/einvoices/export${ids.length ? `?ids=${encodeURIComponent(ids.join(','))}` : ''}`;
+
+/** Sau khi tải file: server đã ghi mốc "Đã xuất file" → làm mới danh sách. */
+export function useInvalidateEInvoices() {
+  return useInvalidate();
 }
 
 /** Tải file đối soát hãng (multipart "file"). */

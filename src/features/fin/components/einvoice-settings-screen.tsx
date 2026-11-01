@@ -46,19 +46,41 @@ export function EInvoiceSettingsScreen() {
 
 type Plain = Pick<
   EInvoiceSetting,
-  'baseUrl' | 'clientId' | 'taxCode' | 'username' | 'templateId' | 'invSeries'
+  | 'baseUrl'
+  | 'clientId'
+  | 'taxCode'
+  | 'username'
+  | 'templateId'
+  | 'invSeries'
+  | 'sellerName'
+  | 'sellerAddress'
+  | 'sellerBank'
 >;
+
+function pickPlain(s: EInvoiceSetting): Plain {
+  return {
+    baseUrl: s.baseUrl,
+    clientId: s.clientId,
+    taxCode: s.taxCode,
+    username: s.username,
+    templateId: s.templateId,
+    invSeries: s.invSeries,
+    sellerName: s.sellerName,
+    sellerAddress: s.sellerAddress,
+    sellerBank: s.sellerBank,
+  };
+}
 
 function SettingsForm({ s }: { s: EInvoiceSetting }) {
   const update = useUpdateEInvoiceSettings();
   const verify = useVerifyEInvoiceSettings();
-  const [form, setForm] = useState<Plain>(s);
+  const [form, setForm] = useState<Plain>(() => pickPlain(s));
   const [secret, setSecret] = useState('');
   const [password, setPassword] = useState('');
   const [twoPeople, setTwoPeople] = useState(s.requireTwoPeople);
   const [result, setResult] = useState<EInvoiceVerifyResult | null>(null);
   useEffect(() => {
-    setForm(s);
+    setForm(pickPlain(s));
     setTwoPeople(s.requireTwoPeople);
   }, [s]);
 
@@ -76,6 +98,9 @@ function SettingsForm({ s }: { s: EInvoiceSetting }) {
       username: form.username ?? null,
       templateId: form.templateId ?? null,
       invSeries: form.invSeries ?? null,
+      sellerName: form.sellerName ?? null,
+      sellerAddress: form.sellerAddress ?? null,
+      sellerBank: form.sellerBank ?? null,
       requireTwoPeople: twoPeople,
       ...(secret ? { clientSecret: secret } : {}),
       ...(password ? { password } : {}),
@@ -287,6 +312,21 @@ function SettingsForm({ s }: { s: EInvoiceSetting }) {
             <div className="grid grid-cols-1 gap-3 border-t p-3.5 md:grid-cols-2">
               {field('templateId', 'ID mẫu (IPTemplateID)', true)}
               {field('invSeries', 'Ký hiệu', true)}
+            </div>
+          </section>
+
+          <section className="rounded-lg border bg-card">
+            <h2 className="flex min-h-11 items-center border-b px-3.5 text-sm font-bold">
+              Người bán trên bản xem trước
+            </h2>
+            <div className="grid grid-cols-1 gap-3 p-3.5">
+              {field('sellerName', 'Tên công ty')}
+              {field('sellerAddress', 'Địa chỉ')}
+              {field('sellerBank', 'Số tài khoản + ngân hàng')}
+              <p className="text-sm text-muted-foreground">
+                Chỉ dùng để xem trước khi duyệt — khi phát hành, MISA in thông tin người bán theo
+                tài khoản meInvoice. Mã số thuế lấy ở ô Mã số thuế phía trên.
+              </p>
             </div>
           </section>
 
