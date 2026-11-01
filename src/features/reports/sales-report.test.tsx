@@ -703,6 +703,39 @@ describe('Tab Nhân viên × POS Pancake', () => {
     expect(lastUrl().get('pancakeShopId')).toBeNull();
   });
 
+  it('Xem theo POS (2026-11-02): groupBy=shop, cột Tỉ lệ hoàn; Lọc đặt pancakeShopId; dòng đơn ERP không có Lọc', async () => {
+    search = `tab=staff&staff=shop&from=${RANGE.from}&to=${RANGE.to}`;
+    const groups: string[] = [];
+    const posRow = (id: string | null, name: string, revenue: string, rate: string | null) => ({
+      ...staffItem(id, name, revenue),
+      key: { id, name, shopId: id, shopName: name },
+      returnRate: rate,
+    });
+    server.use(
+      http.get('/api/reports/sales/by-staff', ({ request }) => {
+        groups.push(new URL(request.url).searchParams.get('groupBy')!);
+        return HttpResponse.json({
+          ...BY_STAFF,
+          groupBy: 'shop',
+          items: [
+            posRow('715130909', 'Thiên Nông chính', '1500000.0000', '12.50'),
+            posRow(null, 'Đơn tạo trên ERP', '500000.0000', null),
+          ],
+        });
+      }),
+    );
+    renderApp(<SalesReportScreen />, { me: ME_POS });
+    expect(await screen.findByRole('columnheader', { name: 'Tỉ lệ hoàn' })).toBeInTheDocument();
+    expect(groups[0]).toBe('shop');
+    const row = screen.getByRole('cell', { name: 'Thiên Nông chính' }).closest('tr')!;
+    expect(within(row).getByText('12,50%')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Chỉ xem số của Thiên Nông chính' }));
+    expect(lastUrl().get('pancakeShopId')).toBe('715130909');
+    expect(lastUrl().get('ownerId')).toBeNull();
+    const erp = screen.getByRole('cell', { name: 'Đơn tạo trên ERP' }).closest('tr')!;
+    expect(within(erp).queryByRole('button', { name: /Chỉ xem số/ })).not.toBeInTheDocument();
+  });
+
   it('pancakeShopId trên URL đi vào query; có ô chọn POS; "Xóa lọc" bỏ POS', async () => {
     search = `from=${RANGE.from}&to=${RANGE.to}&pancakeShopId=715130909`;
     const calls: URLSearchParams[] = [];

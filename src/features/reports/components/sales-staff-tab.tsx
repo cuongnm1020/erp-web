@@ -27,6 +27,8 @@ const GROUPS: ReadonlyArray<readonly [StaffGroupBy, string]> = [
   ['owner', 'Nhân viên'],
   ['team', 'Team'],
   ['owner_shop', 'Nhân viên × POS'],
+  // Tỉ lệ hoàn từng POS (2026-11-02) — đơn không từ Pancake gom "Đơn tạo trên ERP".
+  ['shop', 'POS'],
 ];
 const GROUP_VALUES = new Set<string>(GROUPS.map(([g]) => g));
 
@@ -51,8 +53,9 @@ export function SalesStaffTab() {
   const groupBy: StaffGroupBy =
     staffRaw && GROUP_VALUES.has(staffRaw) ? (staffRaw as StaffGroupBy) : 'owner';
   const byShop = groupBy === 'owner_shop';
+  const posOnly = groupBy === 'shop';
   const query = useSalesByStaff(filter, groupBy);
-  const head = groupBy === 'team' ? 'Team' : 'Nhân viên phụ trách';
+  const head = groupBy === 'team' ? 'Team' : posOnly ? 'POS' : 'Nhân viên phụ trách';
 
   const columns = useMemo<ColumnDef<SalesByStaffItem, unknown>[]>(
     () => [
@@ -98,6 +101,18 @@ export function SalesStaffTab() {
           </span>
         ),
       },
+      ...(posOnly
+        ? [
+            {
+              id: 'returnRate',
+              header: 'Tỉ lệ hoàn',
+              meta: { align: 'right', width: 100 },
+              cell: ({ row }) => (
+                <span className="font-semibold tabular-nums">{pct(row.original.returnRate)}</span>
+              ),
+            } satisfies ColumnDef<SalesByStaffItem, unknown>,
+          ]
+        : []),
       {
         id: 'revenue',
         header: 'Thực thu',
@@ -176,11 +191,13 @@ export function SalesStaffTab() {
                 setFilters(
                   groupBy === 'team'
                     ? { teamId: id, teamName: name }
-                    : {
-                        ownerId: id,
-                        ownerName: name,
-                        ...(byShop && shopId ? { pancakeShopId: shopId } : {}),
-                      },
+                    : posOnly
+                      ? { pancakeShopId: id }
+                      : {
+                          ownerId: id,
+                          ownerName: name,
+                          ...(byShop && shopId ? { pancakeShopId: shopId } : {}),
+                        },
                 )
               }
             >
@@ -191,12 +208,12 @@ export function SalesStaffTab() {
         },
       },
     ],
-    [head, groupBy, byShop, setFilters],
+    [head, groupBy, byShop, posOnly, setFilters],
   );
 
   const exportCsv = (items: SalesByStaffItem[]) =>
     downloadCsv(
-      `doanh-thu-theo-${groupBy === 'team' ? 'team' : byShop ? 'nhan-vien-pos' : 'nhan-vien'}_${range.from}_${range.to}`,
+      `doanh-thu-theo-${groupBy === 'team' ? 'team' : posOnly ? 'pos' : byShop ? 'nhan-vien-pos' : 'nhan-vien'}_${range.from}_${range.to}`,
       [
         head,
         ...(byShop ? ['POS'] : []),
@@ -273,7 +290,14 @@ export function SalesStaffTab() {
             <section className="rounded-md border bg-card p-3" aria-label="Biểu đồ doanh số">
               <h2 className="mb-2 text-sm font-semibold">
                 Doanh số {Math.min(10, d.items.length)}{' '}
-                {groupBy === 'team' ? 'team' : byShop ? 'dòng nhân viên × POS' : 'người'} cao nhất
+                {groupBy === 'team'
+                  ? 'team'
+                  : posOnly
+                    ? 'POS'
+                    : byShop
+                      ? 'dòng nhân viên × POS'
+                      : 'người'}{' '}
+                cao nhất
               </h2>
               <BarList
                 ariaLabel={`Doanh số theo ${head.toLowerCase()}`}
