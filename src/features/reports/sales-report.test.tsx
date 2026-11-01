@@ -822,6 +822,53 @@ describe('Tab Bán chạy', () => {
     expect(lastUrl().get('rank')).toBe('customers');
   });
 
+  it('Theo tháng trong năm (2026-11-02): gọi /monthly với năm + top, KHÔNG gọi top-products theo khoảng; bảng cả năm + thẻ từng tháng', async () => {
+    const thisYear = new Date().getFullYear();
+    search = `tab=top&topView=year&topYear=${thisYear - 1}&channel=POS&from=${RANGE.from}&to=${RANGE.to}`;
+    const monthly: URLSearchParams[] = [];
+    const ranged: unknown[] = [];
+    server.use(
+      http.get('/api/reports/sales/top-products', () => {
+        ranged.push(1);
+        return HttpResponse.json(TOP);
+      }),
+      http.get('/api/reports/sales/top-products/monthly', ({ request }) => {
+        monthly.push(new URL(request.url).searchParams);
+        return HttpResponse.json({
+          year: thisYear - 1,
+          rankBy: 'revenue',
+          yearItems: [topItem(1, 2), topItem(2, null)],
+          months: [
+            { month: 1, from: `${thisYear - 1}-01-01`, to: `${thisYear - 1}-01-31`, items: [] },
+            {
+              month: 2,
+              from: `${thisYear - 1}-02-01`,
+              to: `${thisYear - 1}-02-28`,
+              items: [topItem(1, null)],
+            },
+          ],
+          dataAsOf: null,
+        });
+      }),
+    );
+    renderApp(<SalesReportScreen />, { me: ME_LEADER });
+    expect(
+      await screen.findByText(`Top 10 cả năm ${thisYear - 1} (tới hết tháng 2)`),
+    ).toBeInTheDocument();
+    expect(monthly[0]!.get('year')).toBe(String(thisYear - 1));
+    expect(monthly[0]!.get('limit')).toBe('10');
+    expect(monthly[0]!.get('channel')).toBe('POS');
+    expect(monthly[0]!.has('from')).toBe(false);
+    expect(ranged).toHaveLength(0);
+    const jan = screen.getByRole('region', { name: 'Tháng 1' });
+    expect(within(jan).getByText('Chưa có SKU nào bán ra')).toBeInTheDocument();
+    const feb = screen.getByRole('region', { name: 'Tháng 2' });
+    expect(within(feb).getByText('Phân bón NPK 1')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Khoảng ngày đang chọn' }));
+    expect(lastUrl().get('topView')).toBeNull();
+  });
+
   it('rỗng → EmptyState; lỗi → traceId', async () => {
     search = `tab=top&from=${RANGE.from}&to=${RANGE.to}`;
     server.use(

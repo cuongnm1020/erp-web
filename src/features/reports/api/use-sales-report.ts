@@ -254,6 +254,93 @@ export function useSalesTopProducts(
   });
 }
 
+export type SalesTopMonthly = components['schemas']['SalesTopProductsMonthlyDto'];
+export type SalesTopMonth = components['schemas']['SalesTopProductsMonthDto'];
+
+/**
+ * GET /reports/sales/top-products/monthly (RPT-06b) — top `limit` SKU từng tháng của `year` + top cả
+ * năm. Không nhận khoảng ngày / tình trạng giao; các lọc kênh / nguồn / team / người / POS / NCC giữ.
+ */
+export function useSalesTopProductsMonthly(
+  f: SalesFilter,
+  year: number,
+  rankBy: TopRankBy,
+  limit: number,
+  supplierId?: string,
+  enabled = true,
+) {
+  const query = {
+    year,
+    rankBy,
+    limit,
+    channel: f.channel,
+    origin: f.origin,
+    teamId: f.teamId,
+    ownerId: f.ownerId,
+    pancakeShopId: f.pancakeShopId,
+    supplierId,
+  };
+  return useQuery({
+    enabled,
+    queryKey: [...salesReportKeys.all, 'top-products-monthly', query] as const,
+    queryFn: () => unwrap(api.GET('/reports/sales/top-products/monthly', { params: { query } })),
+    placeholderData: keepPreviousData,
+  });
+}
+
+export type SalesDuplicates = components['schemas']['SalesDuplicatesDto'];
+export type SalesDuplicateGroup = components['schemas']['SalesDuplicateGroupDto'];
+export type DuplicateSort = NonNullable<
+  NonNullable<paths['/reports/sales/duplicates']['get']['parameters']['query']>['sort']
+>;
+
+export interface DuplicatesParams {
+  onlyReturned: boolean;
+  sort: DuplicateSort;
+  take: number;
+  skip: number;
+}
+
+const duplicatesQuery = (f: SalesFilter, p: DuplicatesParams) => ({
+  ...filterQuery(f),
+  onlyReturned: p.onlyReturned ? ('true' as const) : undefined,
+  sort: p.sort,
+  take: p.take,
+  skip: p.skip,
+});
+
+/** GET /reports/sales/duplicates (RPT-DUP) — đơn trùng trong ngày + tỉ lệ hoàn, phân trang nhóm. */
+export function useSalesDuplicates(f: SalesFilter, p: DuplicatesParams, enabled = true) {
+  return useQuery({
+    enabled,
+    queryKey: [...salesReportKeys.all, 'duplicates', f, p] as const,
+    queryFn: () =>
+      unwrap(api.GET('/reports/sales/duplicates', { params: { query: duplicatesQuery(f, p) } })),
+    placeholderData: keepPreviousData,
+  });
+}
+
+/** Xuất mọi nhóm đơn trùng (lặp trang 200, tối đa EXPORT_MAX_ROWS nhóm) — qua useMutation (luật 3). */
+export function useExportSalesDuplicates() {
+  return useMutation({
+    mutationFn: async ({ filter, params }: { filter: SalesFilter; params: DuplicatesParams }) => {
+      const items: SalesDuplicateGroup[] = [];
+      let total = Number.POSITIVE_INFINITY;
+      for (let skip = 0; skip < Math.min(total, EXPORT_MAX_ROWS); skip += EXPORT_PAGE) {
+        const page = await unwrap(
+          api.GET('/reports/sales/duplicates', {
+            params: { query: duplicatesQuery(filter, { ...params, take: EXPORT_PAGE, skip }) },
+          }),
+        );
+        total = page.total;
+        items.push(...page.items);
+        if (page.items.length < EXPORT_PAGE) break;
+      }
+      return { items, total: Number.isFinite(total) ? total : items.length };
+    },
+  });
+}
+
 /** POST /reports/sales/rollup/rebuild (report.sales_all) — 202, worker tính lại dần. */
 export function useSalesRollupRebuild() {
   const qc = useQueryClient();
