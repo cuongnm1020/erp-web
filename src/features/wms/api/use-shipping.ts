@@ -178,27 +178,31 @@ export function useShipmentMonitorSummary(params: ShipmentMonitorFilter) {
 }
 
 /** GET /shipment-monitor — danh sách phiếu giao theo góc nhìn (đóng gói / bàn giao / đang giữ / quá hạn). */
+/** Một lần gọi của `useShipmentMonitorList` — dùng lại cho "Xuất Excel" (kéo lần lượt mọi trang). */
+export function fetchShipmentMonitorList(params: ShipmentMonitorListParams) {
+  return unwrap(
+    api.GET('/shipment-monitor', {
+      params: {
+        query: {
+          view: params.view,
+          date: params.date,
+          carrierId: params.carrierId,
+          carrierAccountId: params.carrierAccountId,
+          careTeamId: params.careTeamId,
+          holdDays: params.holdDays,
+          q: params.q || undefined,
+          take: params.take,
+          skip: params.skip,
+        },
+      },
+    }),
+  );
+}
+
 export function useShipmentMonitorList(params: ShipmentMonitorListParams) {
   return useQuery({
     queryKey: shippingKeys.monitorList(params),
-    queryFn: () =>
-      unwrap(
-        api.GET('/shipment-monitor', {
-          params: {
-            query: {
-              view: params.view,
-              date: params.date,
-              carrierId: params.carrierId,
-              carrierAccountId: params.carrierAccountId,
-              careTeamId: params.careTeamId,
-              holdDays: params.holdDays,
-              q: params.q || undefined,
-              take: params.take,
-              skip: params.skip,
-            },
-          },
-        }),
-      ),
+    queryFn: () => fetchShipmentMonitorList(params),
     placeholderData: keepPreviousData,
     refetchInterval: MONITOR_REFRESH_MS,
   });

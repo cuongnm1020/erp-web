@@ -34,10 +34,15 @@ export const einvoiceKeys = {
     ['fin', 'einvoices', 'reconciliations', id, 'lines', q] as const,
 };
 
+/** Một lần gọi của `useEInvoices` — dùng lại cho "Xuất Excel" (kéo lần lượt mọi trang). */
+export function fetchEInvoices(q: EInvoiceListQuery) {
+  return unwrap(api.GET('/einvoices', { params: { query: q } }));
+}
+
 export function useEInvoices(q: EInvoiceListQuery) {
   return useQuery({
     queryKey: einvoiceKeys.list(q),
-    queryFn: () => unwrap(api.GET('/einvoices', { params: { query: q } })),
+    queryFn: () => fetchEInvoices(q),
     placeholderData: keepPreviousData,
   });
 }

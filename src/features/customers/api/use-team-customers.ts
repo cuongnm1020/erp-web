@@ -33,29 +33,33 @@ export const teamCustomerKeys = {
 const csv = (ids?: string[]) => (ids && ids.length ? ids.join(',') : undefined);
 
 /** GET /customer-care/customers — khách của team CSKH người xem (API đã scope). */
+/** Một lần gọi của `useTeamCustomers` — dùng lại cho "Xuất Excel" (kéo lần lượt mọi trang). */
+export function fetchTeamCustomers(params: TeamCustomersParams) {
+  return unwrap(
+    api.GET('/customer-care/customers', {
+      params: {
+        query: {
+          assignedFrom: params.assignedFrom,
+          assignedTo: params.assignedTo,
+          from: params.from,
+          to: params.to,
+          sort: params.sort,
+          top: params.top,
+          purposeIds: csv(params.purposeIds),
+          skuIds: csv(params.skuIds),
+          q: params.q || undefined,
+          take: params.take,
+          skip: params.skip,
+        },
+      },
+    }),
+  );
+}
+
 export function useTeamCustomers(params: TeamCustomersParams) {
   return useQuery({
     queryKey: teamCustomerKeys.list(params),
-    queryFn: () =>
-      unwrap(
-        api.GET('/customer-care/customers', {
-          params: {
-            query: {
-              assignedFrom: params.assignedFrom,
-              assignedTo: params.assignedTo,
-              from: params.from,
-              to: params.to,
-              sort: params.sort,
-              top: params.top,
-              purposeIds: csv(params.purposeIds),
-              skuIds: csv(params.skuIds),
-              q: params.q || undefined,
-              take: params.take,
-              skip: params.skip,
-            },
-          },
-        }),
-      ),
+    queryFn: () => fetchTeamCustomers(params),
     placeholderData: keepPreviousData,
   });
 }

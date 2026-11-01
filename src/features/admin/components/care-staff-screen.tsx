@@ -9,6 +9,7 @@ import {
   defaultRangePresets,
   normalizeRange,
 } from '@/components/data/date-range-picker';
+import { ExportExcelButton } from '@/components/data/export-excel-button';
 import { SearchSelect, type StaffSelectItem } from '@/components/data/form';
 import { EmptyState, ListSkeleton, QueryState } from '@/components/data/states';
 import { StatusBadge } from '@/components/data/status-badge';
@@ -25,6 +26,7 @@ import { toast } from '@/components/ui/toaster';
 import { messageFor } from '@/lib/error-messages';
 import { formatMoney, formatPhone, groupVi, toLocalDateKey, toDecimal } from '@/lib/format';
 import { useListState } from '@/lib/url-state';
+import { decimalCell } from '@/lib/xlsx-writer';
 import {
   useCareStaff,
   useStaffRevenue,
@@ -316,12 +318,47 @@ export function CareStaffScreen() {
           { label: 'Nhân viên của team' },
         ]}
         actions={
-          createDept ? (
-            <Button onClick={() => setCreating(true)}>
-              <Plus aria-hidden />
-              Thêm nhân viên
-            </Button>
-          ) : null
+          <>
+            <ExportExcelButton
+              fileName="nhan-vien-cua-team"
+              rows={rows}
+              columns={[
+                { header: 'Mã NV', value: (r: Row) => r.code, width: 14 },
+                { header: 'Nhân viên', value: (r: Row) => r.fullName, width: 26 },
+                { header: 'Email', value: (r: Row) => r.email, width: 28 },
+                { header: 'SĐT', value: (r: Row) => r.phone ?? null, width: 14 },
+                { header: 'Chức vụ', value: (r: Row) => POSITION[r.position].label },
+                {
+                  header: 'Nhóm',
+                  value: (r: Row) =>
+                    r.position === 'GROUP_LEAD'
+                      ? `${r.groupSize} nhân viên`
+                      : r.groupLeaderName
+                        ? `Nhóm ${r.groupLeaderName}`
+                        : null,
+                  width: 20,
+                },
+                { header: 'Phòng ban', value: (r: Row) => r.departmentName ?? null, width: 20 },
+                {
+                  header: 'Doanh số',
+                  value: (r: Row) => decimalCell(r.revenue?.grossRevenue ?? '0'),
+                },
+                { header: 'Số đơn', value: (r: Row) => r.revenue?.orderCount ?? 0 },
+                {
+                  header: 'Hoàn',
+                  value: (r: Row) => decimalCell(r.revenue?.returnedRevenue ?? '0'),
+                },
+                { header: 'Trạng thái', value: (r: Row) => (r.isActive ? 'Đang làm' : 'Đã khóa') },
+              ]}
+              disabled={rows.length === 0}
+            />
+            {createDept ? (
+              <Button onClick={() => setCreating(true)}>
+                <Plus aria-hidden />
+                Thêm nhân viên
+              </Button>
+            ) : null}
+          </>
         }
       />
 

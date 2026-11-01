@@ -1,6 +1,7 @@
 export { DataTable, ROW_NUMBER_COLUMN_ID, VIRTUALIZE_THRESHOLD } from './data-table';
 export type { DataTableColumnMeta, DataTableProps } from './data-table';
 export { ColumnHeader } from './column-header';
+export { exportColumnsOf } from './export-columns';
 export { ColumnPicker } from './column-picker';
 export type { ColumnPickerOption } from './column-picker';
 export { DataTablePagination } from './pagination';

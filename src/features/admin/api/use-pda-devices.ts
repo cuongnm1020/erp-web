@@ -25,23 +25,27 @@ export const pdaDeviceKeys = {
 };
 
 /** GET /devices — lọc + phân trang phía server (luật 8). */
+/** Một lần gọi của `usePdaDevices` — dùng lại cho "Xuất Excel" (kéo lần lượt mọi trang). */
+export function fetchPdaDevices(params: PdaDeviceListParams) {
+  return unwrap(
+    api.GET('/devices', {
+      params: {
+        query: {
+          q: params.q || undefined,
+          status: params.status,
+          warehouseId: params.warehouseId,
+          take: params.take,
+          skip: params.skip,
+        },
+      },
+    }),
+  );
+}
+
 export function usePdaDevices(params: PdaDeviceListParams) {
   return useQuery({
     queryKey: pdaDeviceKeys.list(params),
-    queryFn: () =>
-      unwrap(
-        api.GET('/devices', {
-          params: {
-            query: {
-              q: params.q || undefined,
-              status: params.status,
-              warehouseId: params.warehouseId,
-              take: params.take,
-              skip: params.skip,
-            },
-          },
-        }),
-      ),
+    queryFn: () => fetchPdaDevices(params),
     placeholderData: keepPreviousData,
   });
 }

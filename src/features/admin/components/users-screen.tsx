@@ -4,6 +4,11 @@ import { Plus } from 'lucide-react';
 import Link from 'next/link';
 import { useMemo, useState } from 'react';
 import { DataTable, FilterBar, type ColumnDef, type FilterDef } from '@/components/data/data-table';
+import {
+  ExportExcelButton,
+  takeSkip,
+  type ExportColumn,
+} from '@/components/data/export-excel-button';
 import { RowActions } from '@/components/data/row-actions';
 import { EmptyState, ListSkeleton, QueryState } from '@/components/data/states';
 import { StatusBadge } from '@/components/data/status-badge';
@@ -12,7 +17,7 @@ import { Button } from '@/components/ui/button';
 import { formatDate } from '@/lib/format';
 import { Can, useAbility } from '@/lib/permission';
 import { useListState } from '@/lib/url-state';
-import { toUserSort, useUsers, type UserListItem } from '../api/use-users';
+import { fetchUsers, toUserSort, useUsers, type UserListItem } from '../api/use-users';
 import { useRoles } from '../api/use-roles';
 import { ImpersonateButton } from './impersonate-button';
 import { UserCreateDialog } from './user-create-dialog';
@@ -121,6 +126,20 @@ const columns: ColumnDef<UserListItem, unknown>[] = [
   },
 ];
 
+const EXPORT_COLUMNS: ExportColumn<UserListItem>[] = [
+  { header: 'Mã NV', value: (r) => r.code, width: 14 },
+  { header: 'Họ tên', value: (r) => r.fullName, width: 26 },
+  { header: 'Email', value: (r) => r.email, width: 28 },
+  { header: 'Phòng ban', value: (r) => r.departmentName ?? null, width: 20 },
+  {
+    header: 'Vai trò',
+    value: (r) => (r.isSuperAdmin ? 'Superadmin' : r.roleCodes.join(', ') || null),
+    width: 26,
+  },
+  { header: 'Trạng thái', value: (r) => (r.isActive ? 'Hoạt động' : 'Đã khóa') },
+  { header: 'Tạo lúc', value: (r) => formatDate(r.createdAt), width: 12 },
+];
+
 export function UsersScreen() {
   const { state, set, skipTake } = useListState<FilterKey>(DEFAULTS);
   const [createOpen, setCreateOpen] = useState(false);
@@ -169,12 +188,21 @@ export function UsersScreen() {
         description={query.data ? `${query.data.total} tài khoản` : 'Đang đếm…'}
         breadcrumb={[{ label: 'Quản trị' }, { label: 'Nhân viên' }]}
         actions={
-          <Can I="create" a="User">
-            <Button size="sm" onClick={() => setCreateOpen(true)}>
-              <Plus aria-hidden />
-              Thêm nhân viên
-            </Button>
-          </Can>
+          <>
+            <ExportExcelButton
+              size="sm"
+              fileName="nhan-vien"
+              columns={EXPORT_COLUMNS}
+              fetchPage={(page, size) => fetchUsers({ ...params, ...takeSkip(page, size) })}
+              disabled={!query.data?.total}
+            />
+            <Can I="create" a="User">
+              <Button size="sm" onClick={() => setCreateOpen(true)}>
+                <Plus aria-hidden />
+                Thêm nhân viên
+              </Button>
+            </Can>
+          </>
         }
       />
 

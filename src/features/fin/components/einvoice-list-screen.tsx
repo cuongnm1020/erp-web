@@ -7,7 +7,13 @@ import Link from 'next/link';
 import { useMemo, useState } from 'react';
 import { BulkActionBar } from '@/components/data/bulk-action-bar';
 import { Copyable } from '@/components/data/copy-button';
-import { DataTable, FilterBar, type ColumnDef } from '@/components/data/data-table';
+import {
+  DataTable,
+  exportColumnsOf,
+  FilterBar,
+  type ColumnDef,
+} from '@/components/data/data-table';
+import { ExportExcelButton, takeSkip } from '@/components/data/export-excel-button';
 import { DateRangePicker } from '@/components/data/date-range-picker';
 import { EmptyState, ListSkeleton, QueryState } from '@/components/data/states';
 import { StatusBadge } from '@/components/data/status-badge';
@@ -29,7 +35,9 @@ import { messageFor } from '@/lib/error-messages';
 import { formatDateTime, formatMoney, toLocalDateKey } from '@/lib/format';
 import { Can, useAbility } from '@/lib/permission';
 import { useListState } from '@/lib/url-state';
+import { decimalCell } from '@/lib/xlsx-writer';
 import {
+  fetchEInvoices,
   useCollectDelivered,
   useEInvoiceAction,
   useEInvoices,
@@ -99,6 +107,7 @@ export function EInvoiceListScreen() {
   const counts = query.data?.counts;
   const filtered = !!(state.q || state.filters.from || state.filters.issue);
   const columns = useMemo(() => buildColumns(tab), [tab]);
+  const exportColumns = useMemo(() => exportColumnsOf(columns), [columns]);
 
   const run = (a: EInvoiceAction, list: string[] = ids) =>
     action.mutate(
@@ -157,6 +166,12 @@ export function EInvoiceListScreen() {
                 Lấy kết quả từ MISA
               </Button>
             </Can>
+            <ExportExcelButton
+              fileName="hoa-don-dien-tu"
+              columns={exportColumns}
+              fetchPage={(page, size) => fetchEInvoices({ ...params, ...takeSkip(page, size) })}
+              disabled={!query.data?.total}
+            />
             <Can I="review" a="Einvoice">
               <Button onClick={() => setDialog('import')}>
                 <FileSpreadsheet aria-hidden /> Nhập đối soát hãng
@@ -380,7 +395,7 @@ function buildColumns(tab: EInvoiceStatus): ColumnDef<EInvoiceListItem, unknown>
     {
       id: 'order',
       header: 'Mã đơn',
-      meta: { width: 150 },
+      meta: { width: 150, exportValue: (r) => r.orderDocNumber },
       cell: ({ row }) => (
         <Copyable value={row.original.orderDocNumber} label="Chép mã đơn">
           <Link
@@ -395,13 +410,22 @@ function buildColumns(tab: EInvoiceStatus): ColumnDef<EInvoiceListItem, unknown>
     {
       id: 'delivered',
       header: 'Giao thành công',
-      meta: { width: 130 },
+      meta: {
+        width: 130,
+        exportValue: (r) => (r.deliveredAt ? formatDateTime(r.deliveredAt) : null),
+      },
       cell: ({ row }) => formatDateTime(row.original.deliveredAt),
     },
     {
       id: 'carrier',
       header: 'Hãng · mã vận đơn',
-      meta: { width: 200 },
+      meta: {
+        width: 200,
+        exportValue: (r) =>
+          [CARRIER_NAME[r.carrierCode ?? ''] ?? r.carrierCode, r.trackingNo]
+            .filter(Boolean)
+            .join(' · ') || null,
+      },
       cell: ({ row }) => (
         <div className="leading-tight">
           <div>
@@ -422,6 +446,10 @@ function buildColumns(tab: EInvoiceStatus): ColumnDef<EInvoiceListItem, unknown>
     {
       id: 'buyer',
       header: 'Người mua',
+      meta: {
+        exportValue: (r) =>
+          `${r.buyerName ?? ''}${r.buyerTaxCode ? ` · MST ${r.buyerTaxCode}` : ' · Khách lẻ'}`,
+      },
       cell: ({ row }) => (
         <div className="leading-tight">
           <div className="truncate" title={row.original.buyerName ?? undefined}>
@@ -436,7 +464,11 @@ function buildColumns(tab: EInvoiceStatus): ColumnDef<EInvoiceListItem, unknown>
     {
       id: 'rates',
       header: 'Thuế suất',
-      meta: { width: 100 },
+      meta: {
+        width: 100,
+        exportValue: (r) =>
+          r.ratePercents.map((p) => (p === '?' ? 'Chưa gán' : `${p}%`)).join(', ') || null,
+      },
       cell: ({ row }) => (
         <span className="flex gap-1">
           {row.original.ratePercents.map((p) => (
@@ -450,7 +482,7 @@ function buildColumns(tab: EInvoiceStatus): ColumnDef<EInvoiceListItem, unknown>
     {
       id: 'collected',
       header: 'Hãng thu',
-      meta: { width: 110, align: 'right' },
+      meta: { width: 110, align: 'right', exportValue: (r) => decimalCell(r.collectedAmount) },
       cell: ({ row }) =>
         row.original.collectedAmount === null ? (
           <span className="text-muted-foreground">Chưa đối soát</span>
@@ -461,28 +493,37 @@ function buildColumns(tab: EInvoiceStatus): ColumnDef<EInvoiceListItem, unknown>
     {
       id: 'subtotal',
       header: 'Trước thuế',
-      meta: { width: 110, align: 'right' },
+      meta: { width: 110, align: 'right', exportValue: (r) => decimalCell(r.subtotal) },
       cell: ({ row }) => formatMoney(row.original.subtotal, { unit: '' }),
     },
     {
       id: 'vat',
       header: 'Thuế GTGT',
-      meta: { width: 100, align: 'right' },
+      meta: { width: 100, align: 'right', exportValue: (r) => decimalCell(r.vatAmount) },
       cell: ({ row }) => formatMoney(row.original.vatAmount, { unit: '' }),
     },
     {
       id: 'total',
       header: 'Tổng thanh toán',
-      meta: { width: 120, align: 'right' },
+      meta: { width: 120, align: 'right', exportValue: (r) => decimalCell(r.total) },
       cell: ({ row }) => <b>{formatMoney(row.original.total, { unit: '' })}</b>,
     },
     {
       id: 'state',
       header: tab === 'ISSUED' ? 'Số hóa đơn' : 'Tình trạng',
-      meta: { width: 220 },
+      meta: { width: 220, exportValue: stateText },
       cell: ({ row }) => <StateCell r={row.original} />,
     },
   ];
+}
+
+/** Chữ của cột Tình trạng / Số hóa đơn cho file Excel (cùng luật với StateCell). */
+function stateText(r: EInvoiceListItem): string {
+  if (r.status === 'ISSUED') return `${r.invSeries ?? ''} · ${r.invNo ?? ''}`;
+  if (r.status === 'FAILED') return r.errorMessage ?? 'MISA từ chối';
+  if (r.status === 'SKIPPED') return r.skipReason ?? '';
+  if (r.issues.length === 0) return 'Sẵn sàng';
+  return r.issues.map(issueLabel).join(' · ');
 }
 
 function StateCell({ r }: { r: EInvoiceListItem }) {

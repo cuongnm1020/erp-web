@@ -3,14 +3,25 @@
 import { MailCheck } from 'lucide-react';
 import Link from 'next/link';
 import { useMemo } from 'react';
-import { DataTable, FilterBar, type ColumnDef } from '@/components/data/data-table';
+import {
+  DataTable,
+  exportColumnsOf,
+  FilterBar,
+  type ColumnDef,
+} from '@/components/data/data-table';
+import { ExportExcelButton, takeSkip } from '@/components/data/export-excel-button';
 import { EmptyState, ListSkeleton, QueryState } from '@/components/data/states';
 import { StatusBadge } from '@/components/data/status-badge';
 import { PageHeader } from '@/components/layout/page-header';
 import { Button } from '@/components/ui/button';
 import { formatDateTime, formatPhone, groupVi } from '@/lib/format';
 import { useListState } from '@/lib/url-state';
-import { useConsents, type ConsentListParams, type ConsentStateItem } from '../api/use-consents';
+import {
+  fetchConsents,
+  useConsents,
+  type ConsentListParams,
+  type ConsentStateItem,
+} from '../api/use-consents';
 import {
   CONSENT_CHANNELS,
   consentChannelLabel,
@@ -52,7 +63,7 @@ const columns: ColumnDef<ConsentStateItem, unknown>[] = [
   {
     id: 'code',
     header: 'Mã KH',
-    meta: { width: 120 },
+    meta: { width: 120, exportValue: (r) => r.customer.code },
     cell: ({ row }) => (
       <Link
         href={`/crm/customers/${row.original.customer.id}`}
@@ -65,7 +76,7 @@ const columns: ColumnDef<ConsentStateItem, unknown>[] = [
   {
     id: 'name',
     header: 'Khách hàng',
-    meta: { width: 260 },
+    meta: { width: 260, exportValue: (r) => r.customer.name },
     cell: ({ row }) => (
       <Link href={`/crm/customers/${row.original.customer.id}`} className="hover:underline">
         {row.original.customer.name}
@@ -75,7 +86,7 @@ const columns: ColumnDef<ConsentStateItem, unknown>[] = [
   {
     id: 'phone',
     header: 'Điện thoại',
-    meta: { width: 130 },
+    meta: { width: 130, exportValue: (r) => r.customer.phone ?? null },
     cell: ({ row }) => (
       <span className="font-mono text-xs">{formatPhone(row.original.customer.phone)}</span>
     ),
@@ -83,13 +94,13 @@ const columns: ColumnDef<ConsentStateItem, unknown>[] = [
   {
     id: 'channel',
     header: 'Kênh',
-    meta: { width: 100 },
+    meta: { width: 100, exportValue: (r) => consentChannelLabel(r.channel) },
     cell: ({ row }) => consentChannelLabel(row.original.channel),
   },
   {
     id: 'granted',
     header: 'Trạng thái',
-    meta: { width: 110 },
+    meta: { width: 110, exportValue: (r) => consentStateLabel(r.granted) },
     cell: ({ row }) => (
       <StatusBadge tone={consentStateTone(row.original.granted)}>
         {consentStateLabel(row.original.granted)}
@@ -99,19 +110,19 @@ const columns: ColumnDef<ConsentStateItem, unknown>[] = [
   {
     id: 'source',
     header: 'Nguồn',
-    meta: { width: 150 },
+    meta: { width: 150, exportValue: (r) => consentSourceLabel(r.source) },
     cell: ({ row }) => consentSourceLabel(row.original.source),
   },
   {
     id: 'purpose',
     header: 'Mục đích',
-    meta: { width: 110 },
+    meta: { width: 110, exportValue: (r) => consentPurposeLabel(r.purpose) },
     cell: ({ row }) => consentPurposeLabel(row.original.purpose),
   },
   {
     id: 'recordedAt',
     header: 'Cập nhật',
-    meta: { width: 140 },
+    meta: { width: 140, exportValue: (r) => formatDateTime(r.recordedAt) },
     cell: ({ row }) => (
       <span className="tabular-nums">{formatDateTime(row.original.recordedAt)}</span>
     ),
@@ -119,7 +130,7 @@ const columns: ColumnDef<ConsentStateItem, unknown>[] = [
   {
     id: 'recordedBy',
     header: 'Người ghi',
-    meta: { width: 160 },
+    meta: { width: 160, exportValue: (r) => r.recordedBy?.name ?? 'Khách tự thao tác' },
     cell: ({ row }) =>
       row.original.recordedBy ? (
         row.original.recordedBy.name
@@ -128,6 +139,8 @@ const columns: ColumnDef<ConsentStateItem, unknown>[] = [
       ),
   },
 ];
+
+const exportColumns = exportColumnsOf(columns);
 
 export function MarketingConsentScreen() {
   const { state, set, skipTake } = useListState<ConsentFilter>(DEFAULTS);
@@ -153,6 +166,14 @@ export function MarketingConsentScreen() {
           { label: 'Khách hàng', href: '/crm/customers' },
           { label: 'Đồng ý marketing' },
         ]}
+        actions={
+          <ExportExcelButton
+            fileName="dong-y-marketing"
+            columns={exportColumns}
+            fetchPage={(page, size) => fetchConsents({ ...params, ...takeSkip(page, size) })}
+            disabled={!query.data?.total}
+          />
+        }
       />
 
       <FilterBar<ConsentFilter>

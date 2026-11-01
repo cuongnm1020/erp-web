@@ -58,6 +58,35 @@ export const customerKeys = {
   detail: (id: string) => [...customerKeys.details(), id] as const,
 };
 
+/** Một lần gọi của `useCustomers` — dùng lại cho "Xuất Excel" (kéo lần lượt mọi trang). */
+export function fetchCustomers(params: CustomerListParams) {
+  return unwrap(
+    api.GET('/customers', {
+      params: {
+        query: {
+          q: params.q || undefined,
+          sortBy: params.sortBy,
+          sortDir: params.sortDir,
+          teamId: params.teamId,
+          ownerId: params.ownerId,
+          unassigned: params.unassigned,
+          isActive: params.isActive,
+          groupId: params.groupId,
+          tierId: params.tierId,
+          tagIds: params.tagIds && params.tagIds.length > 0 ? params.tagIds : undefined,
+          tagMatch: params.tagIds && params.tagIds.length > 0 ? params.tagMatch : undefined,
+          province: params.province || undefined,
+          type: params.type,
+          createdFrom: params.createdFrom,
+          createdTo: params.createdTo,
+          take: params.take,
+          skip: params.skip,
+        },
+      },
+    }),
+  );
+}
+
 /**
  * GET /customers — đã scope sẵn ở API (luật 7: không lọc lại ở frontend).
  * Sắp xếp chạy phía server qua `sortBy`/`sortDir`; bỏ trống thì API dùng `name` tăng dần.
@@ -65,32 +94,7 @@ export const customerKeys = {
 export function useCustomers(params: CustomerListParams) {
   return useQuery({
     queryKey: customerKeys.list(params),
-    queryFn: () =>
-      unwrap(
-        api.GET('/customers', {
-          params: {
-            query: {
-              q: params.q || undefined,
-              sortBy: params.sortBy,
-              sortDir: params.sortDir,
-              teamId: params.teamId,
-              ownerId: params.ownerId,
-              unassigned: params.unassigned,
-              isActive: params.isActive,
-              groupId: params.groupId,
-              tierId: params.tierId,
-              tagIds: params.tagIds && params.tagIds.length > 0 ? params.tagIds : undefined,
-              tagMatch: params.tagIds && params.tagIds.length > 0 ? params.tagMatch : undefined,
-              province: params.province || undefined,
-              type: params.type,
-              createdFrom: params.createdFrom,
-              createdTo: params.createdTo,
-              take: params.take,
-              skip: params.skip,
-            },
-          },
-        }),
-      ),
+    queryFn: () => fetchCustomers(params),
     placeholderData: keepPreviousData,
   });
 }

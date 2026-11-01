@@ -3,6 +3,7 @@
 import { Merge, Plus, Sprout } from 'lucide-react';
 import { useState } from 'react';
 import { DataTable, type ColumnDef } from '@/components/data/data-table';
+import { ExportExcelButton } from '@/components/data/export-excel-button';
 import { RowActions } from '@/components/data/row-actions';
 import { SearchableSelect } from '@/components/data/searchable-select';
 import { EmptyState, ForbiddenState, ListSkeleton, QueryState } from '@/components/data/states';
@@ -225,10 +226,21 @@ export function PurposesScreen() {
         description="Khách dùng sản phẩm cho cây gì — nhân viên gắn khi lên đơn, CSKH lọc khách theo mục đích ở màn Khách của team."
         breadcrumb={[{ label: 'Chăm sóc khách hàng' }, { label: 'Mục đích sử dụng' }]}
         actions={
-          <Button onClick={() => setEditing({ kind: 'create' })}>
-            <Plus aria-hidden />
-            Thêm mục đích
-          </Button>
+          <>
+            <ExportExcelButton
+              fileName="muc-dich-su-dung"
+              rows={query.data ?? []}
+              columns={[
+                { header: 'Mục đích', value: (r: Purpose) => r.name, width: 30 },
+                { header: 'Số khách', value: (r: Purpose) => r.customerCount },
+              ]}
+              disabled={!query.data?.length}
+            />
+            <Button onClick={() => setEditing({ kind: 'create' })}>
+              <Plus aria-hidden />
+              Thêm mục đích
+            </Button>
+          </>
         }
       />
       <QueryState

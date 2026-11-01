@@ -20,6 +20,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { BulkActionBar } from '@/components/data/bulk-action-bar';
 import { CopyButton } from '@/components/data/copy-button';
 import { CopyText } from '@/components/data/copy-text';
+import { ExportExcelButton, type ExportColumn } from '@/components/data/export-excel-button';
 import { pancakeShopLabel } from '@/components/data/pancake-shop-select';
 import { ColumnPicker, DataTable, FilterBar, type ColumnDef } from '@/components/data/data-table';
 import { RowActions, type RowActionItem } from '@/components/data/row-actions';
@@ -53,9 +54,11 @@ import { Can, useAbility } from '@/lib/permission';
 import { useInvalidateOn } from '@/lib/realtime';
 import { useHotkey } from '@/lib/use-hotkey';
 import { useListState, type SortState } from '@/lib/url-state';
+import { decimalCell } from '@/lib/xlsx-writer';
 import { useCarriers } from '@/features/wms/api/use-shipping';
 import { CarrierSelect } from '@/features/wms/components/carrier-select';
 import {
+  fetchOrdersPage,
   orderKeys,
   useOrderFlowCounts,
   useOrderListPrefs,
@@ -81,6 +84,7 @@ import {
   FLOW_FAMILY_DOT,
   fulfilmentLabel,
   orderCancellable,
+  orderFlowLabel,
   ORDER_FLOW_TABS,
   parseOrderFlow,
   parseOrderStatus,
@@ -647,6 +651,58 @@ interface CarrierRef {
 }
 
 /**
+ * Cột file "Xuất Excel" của danh sách đơn — cố định (không theo ô chọn cột): mã, ngày giờ đặt,
+ * khách, SĐT, sản phẩm, NV lên đơn, kho, tổng tiền, trạng thái, vận chuyển.
+ */
+const buildExportColumns = (
+  carrierOf: (id: string) => CarrierRef | null,
+): ExportColumn<SalesOrderListItem>[] => [
+  { header: 'Mã đơn', value: (o) => o.docNumber, width: 16 },
+  { header: 'Ngày đặt', value: (o) => formatDateTime(o.orderDate), width: 17 },
+  { header: 'Nguồn', value: (o) => (o.pancakeOrderId ? `Pancake #${o.pancakeOrderId}` : 'ERP') },
+  { header: 'Khách hàng', value: (o) => o.recipientName ?? o.customer.name, width: 24 },
+  {
+    header: 'SĐT',
+    value: (o) => (o.phone ? (normalizePhone(o.phone) ?? o.phone) : null),
+    width: 13,
+  },
+  { header: 'Địa chỉ nhận', value: (o) => o.addressLine ?? null, width: 36 },
+  { header: 'Tỉnh/TP', value: (o) => o.province ?? null, width: 16 },
+  {
+    header: 'Sản phẩm',
+    value: (o) => {
+      const p = o.product;
+      if (!p) return null;
+      const more = p.moreCount > 0 ? ` (+${p.moreCount} sản phẩm khác)` : '';
+      return `${p.name} × ${formatQuantity(p.qty)}${more}`;
+    },
+    width: 40,
+  },
+  { header: 'NV lên đơn', value: (o) => o.creatorName ?? null, width: 20 },
+  { header: 'Page', value: (o) => o.facebookPageName ?? null, width: 18 },
+  { header: 'Kho', value: (o) => o.warehouseName ?? null, width: 16 },
+  { header: 'Tổng tiền', value: (o) => decimalCell(o.total), width: 13 },
+  {
+    header: 'Trạng thái',
+    value: (o) =>
+      orderFlowLabel(o.flow) + (o.sameDayCount > 0 ? ` · Trùng ${o.sameDayCount + 1} đơn` : ''),
+    width: 18,
+  },
+  {
+    header: 'Hãng vận chuyển',
+    value: (o) => {
+      const picked = o.carrierId ? carrierOf(o.carrierId) : null;
+      return o.shipment?.carrierName ?? picked?.name ?? o.shipment?.carrierCode ?? null;
+    },
+    width: 18,
+  },
+  { header: 'Mã vận đơn', value: (o) => o.shipment?.trackingNo ?? null, width: 20 },
+  { header: 'Phí vận chuyển', value: (o) => decimalCell(o.shipment?.shipFee ?? null) },
+  { header: 'Thực thu ĐVVC', value: (o) => decimalCell(o.shipment?.collectedAmount ?? null) },
+  { header: 'Ghi chú', value: (o) => o.note ?? null, width: 30 },
+];
+
+/**
  * Hãng (viết tắt = mã hãng: GHTK, VTP…) + phí VC + mã vận đơn; chưa có phiếu giao thì hãng chọn
  * trên đơn / "Chưa gán hãng". Có mã vận đơn → bấm mã hãng (hoặc mã vận đơn) là sao chép mã vận đơn.
  */
@@ -1127,6 +1183,20 @@ export function OrderListScreen() {
   );
   const query = useOrders(params);
   const counts = useOrderFlowCounts(filterParams);
+  // Xuất Excel = mọi trang của đúng bộ lọc + tab + sắp xếp đang xem.
+  const exportParams = useMemo(
+    () => ({
+      ...filterParams,
+      flow,
+      sortBy,
+      sortDir: sortBy ? (sort?.desc ? ('desc' as const) : ('asc' as const)) : undefined,
+    }),
+    [filterParams, flow, sortBy, sort?.desc],
+  );
+  const exportColumns = useMemo(() => {
+    const carrierById = new Map((carriers.data ?? []).map((c) => [c.id, c]));
+    return buildExportColumns((id) => carrierById.get(id) ?? null);
+  }, [carriers.data]);
   // Quét bằng camera: bỏ mọi lọc (đơn có thể ở tab khác) rồi tìm theo mã; ra đúng một đơn thì mở
   // xem nhanh luôn — mã vận đơn / số đơn gần như luôn khớp một đơn.
   const [scanned, setScanned] = useState<string | null>(null);
@@ -1188,6 +1258,12 @@ export function OrderListScreen() {
             <Can I="map" a="Sync">
               <PancakeOrderResyncButton defaultShopId={posShopId} />
             </Can>
+            <ExportExcelButton
+              fileName="don-hang"
+              columns={exportColumns}
+              fetchPage={(page, size) => fetchOrdersPage(exportParams, page, size)}
+              disabled={!query.data?.total}
+            />
             <Can I="create" a="SalesOrder">
               <Button asChild shortcut="F2">
                 <Link href="/crm/orders/new">

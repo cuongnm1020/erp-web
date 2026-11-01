@@ -4,6 +4,11 @@ import { Info } from 'lucide-react';
 import Link from 'next/link';
 import { useMemo } from 'react';
 import { DataTable, FilterBar, type ColumnDef, type FilterDef } from '@/components/data/data-table';
+import {
+  ExportExcelButton,
+  takeSkip,
+  type ExportColumn,
+} from '@/components/data/export-excel-button';
 import { EmptyState, ListSkeleton, QueryState } from '@/components/data/states';
 import { StatusBadge, type StatusTone } from '@/components/data/status-badge';
 import { PageHeader } from '@/components/layout/page-header';
@@ -12,7 +17,9 @@ import { cn } from '@/lib/cn';
 import { formatDate, formatQuantity } from '@/lib/format';
 import { useInvalidateOn } from '@/lib/realtime';
 import { useListState } from '@/lib/url-state';
+import { decimalCell } from '@/lib/xlsx-writer';
 import {
+  fetchReplenishment,
   replenishmentKeys,
   useReplenishment,
   type ReplenishmentRow,
@@ -161,6 +168,26 @@ const columns: ColumnDef<ReplenishmentRow, unknown>[] = [
   },
 ];
 
+const EXPORT_COLUMNS: ExportColumn<ReplenishmentRow>[] = [
+  { header: 'Trạng thái', value: (r) => STATUS[r.status].label },
+  { header: 'SKU', value: (r) => r.skuCode, width: 16 },
+  { header: 'Tên thương mại', value: (r) => r.productName, width: 36 },
+  { header: 'Tên SKU', value: (r) => r.skuName, width: 36 },
+  { header: 'ĐVT', value: (r) => r.baseUomCode },
+  { header: 'Mức tồn kho', value: (r) => decimalCell(r.reorderLevel) },
+  { header: 'Tồn thực', value: (r) => decimalCell(r.onHand) },
+  { header: 'Khả dụng', value: (r) => decimalCell(r.available) },
+  { header: 'Bán hôm nay', value: (r) => decimalCell(r.soldToday) },
+  { header: 'Bán hôm qua', value: (r) => decimalCell(r.sold1d) },
+  { header: 'Bán hôm kia', value: (r) => decimalCell(r.sold2d) },
+  { header: 'TB / ngày', value: (r) => decimalCell(r.avgDaily) },
+  { header: 'Còn bán được (ngày)', value: (r) => decimalCell(r.daysLeft) },
+  {
+    header: 'Dự kiến hết',
+    value: (r) => (r.projectedOutDate === null ? null : formatDate(r.projectedOutDate)),
+  },
+];
+
 export function ReplenishmentAlertScreen() {
   const { state, set, skipTake } = useListState<Filter>(DEFAULTS);
   const onlyAlert = state.filters.scope !== 'all';
@@ -194,9 +221,18 @@ export function ReplenishmentAlertScreen() {
         }
         breadcrumb={[{ label: 'Kho' }, { label: 'Cảnh báo nhập hàng' }]}
         actions={
-          <Button variant="outline" size="sm" asChild>
-            <Link href="/catalog/products">Đặt mức tồn kho ở Sản phẩm</Link>
-          </Button>
+          <>
+            <Button variant="outline" size="sm" asChild>
+              <Link href="/catalog/products">Đặt mức tồn kho ở Sản phẩm</Link>
+            </Button>
+            <ExportExcelButton
+              size="sm"
+              fileName="canh-bao-nhap-hang"
+              columns={EXPORT_COLUMNS}
+              fetchPage={(page, size) => fetchReplenishment({ ...params, ...takeSkip(page, size) })}
+              disabled={!data?.total}
+            />
+          </>
         }
       />
 

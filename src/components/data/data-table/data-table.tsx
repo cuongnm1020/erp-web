@@ -21,6 +21,7 @@ import {
 } from '@/components/ui/table';
 import { cn } from '@/lib/cn';
 import type { SortState } from '@/lib/url-state';
+import type { XlsxCell } from '@/lib/xlsx-writer';
 import { ariaSort, ColumnHeader } from './column-header';
 import { StickyHorizontalScrollbar, useDragScroll } from './horizontal-scroll';
 import { DataTablePagination } from './pagination';
@@ -41,8 +42,15 @@ export interface DataTableColumnMeta {
 }
 
 declare module '@tanstack/react-table' {
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars, @typescript-eslint/no-empty-object-type
-  interface ColumnMeta<TData, TValue> extends DataTableColumnMeta {}
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  interface ColumnMeta<TData, TValue> extends DataTableColumnMeta {
+    /**
+     * Giá trị ô khi "Xuất Excel" (`exportColumnsOf`). Bỏ trống: cột có accessor trả chuỗi/số thì
+     * xuất nguyên giá trị đó, không thì cột bị bỏ khỏi file. `false` = không bao giờ xuất.
+     * Tiền / số lượng: `decimalCell(...)`; ngày: `formatDateTime(...)`.
+     */
+    exportValue?: ((row: TData) => XlsxCell) | false;
+  }
 }
 
 export interface DataTableProps<T> {

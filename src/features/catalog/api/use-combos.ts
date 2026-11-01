@@ -31,24 +31,28 @@ export const comboKeys = {
 };
 
 /** GET /combos — danh sách combo kèm giá bán mặc định và số combo còn bán được (từ tồn thành phần). */
+/** Một lần gọi của `useCombos` — dùng lại cho "Xuất Excel" (kéo lần lượt mọi trang). */
+export function fetchCombos(params: ComboListParams) {
+  return unwrap(
+    api.GET('/combos', {
+      params: {
+        query: {
+          q: params.q || undefined,
+          isActive: params.isActive,
+          sortBy: params.sortBy,
+          sortDir: params.sortDir,
+          take: params.take,
+          skip: params.skip,
+        },
+      },
+    }),
+  );
+}
+
 export function useCombos(params: ComboListParams) {
   return useQuery({
     queryKey: comboKeys.list(params),
-    queryFn: () =>
-      unwrap(
-        api.GET('/combos', {
-          params: {
-            query: {
-              q: params.q || undefined,
-              isActive: params.isActive,
-              sortBy: params.sortBy,
-              sortDir: params.sortDir,
-              take: params.take,
-              skip: params.skip,
-            },
-          },
-        }),
-      ),
+    queryFn: () => fetchCombos(params),
     placeholderData: keepPreviousData,
   });
 }

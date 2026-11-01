@@ -21,10 +21,15 @@ export const goodsIssueKeys = {
 };
 
 /** GET /goods-issues — GDN sinh/POST tự động theo luồng pick→pack; màn này CHỈ ĐỌC. */
+/** Một lần gọi của `useGoodsIssues` — dùng lại cho "Xuất Excel" (kéo lần lượt mọi trang). */
+export function fetchGoodsIssues(params: GoodsIssueListParams) {
+  return unwrap(api.GET('/goods-issues', { params: { query: params } }));
+}
+
 export function useGoodsIssues(params: GoodsIssueListParams) {
   return useQuery({
     queryKey: goodsIssueKeys.list(params),
-    queryFn: () => unwrap(api.GET('/goods-issues', { params: { query: params } })),
+    queryFn: () => fetchGoodsIssues(params),
     placeholderData: (prev) => prev,
   });
 }

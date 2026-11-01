@@ -27,24 +27,28 @@ export const facebookPageKeys = {
 };
 
 /** GET /facebook-pages — lọc + phân trang phía server (luật 8), page nhiều đơn lên trước. */
+/** Một lần gọi của `useFacebookPages` — dùng lại cho "Xuất Excel" (kéo lần lượt mọi trang). */
+export function fetchFacebookPages(params: FacebookPageListParams) {
+  return unwrap(
+    api.GET('/facebook-pages', {
+      params: {
+        query: {
+          q: params.q || undefined,
+          shopId: params.shopId,
+          origin: params.origin,
+          isActive: params.isActive,
+          take: params.take,
+          skip: params.skip,
+        },
+      },
+    }),
+  );
+}
+
 export function useFacebookPages(params: FacebookPageListParams) {
   return useQuery({
     queryKey: facebookPageKeys.list(params),
-    queryFn: () =>
-      unwrap(
-        api.GET('/facebook-pages', {
-          params: {
-            query: {
-              q: params.q || undefined,
-              shopId: params.shopId,
-              origin: params.origin,
-              isActive: params.isActive,
-              take: params.take,
-              skip: params.skip,
-            },
-          },
-        }),
-      ),
+    queryFn: () => fetchFacebookPages(params),
     placeholderData: keepPreviousData,
   });
 }

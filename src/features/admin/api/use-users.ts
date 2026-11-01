@@ -55,27 +55,31 @@ export function useWarehouseOptions(enabled = true) {
   });
 }
 
+/** Một lần gọi của `useUsers` — dùng lại cho "Xuất Excel" (kéo lần lượt mọi trang). */
+export function fetchUsers(params: UserListParams) {
+  return unwrap(
+    api.GET('/users', {
+      params: {
+        query: {
+          q: params.q || undefined,
+          roleCode: params.roleCode,
+          departmentId: params.departmentId,
+          isActive: params.isActive,
+          sortBy: params.sortBy,
+          sortDir: params.sortDir,
+          take: params.take,
+          skip: params.skip,
+        },
+      },
+    }),
+  );
+}
+
 export function useUsers(params: UserListParams, enabled = true) {
   return useQuery({
     enabled,
     queryKey: userKeys.list(params),
-    queryFn: () =>
-      unwrap(
-        api.GET('/users', {
-          params: {
-            query: {
-              q: params.q || undefined,
-              roleCode: params.roleCode,
-              departmentId: params.departmentId,
-              isActive: params.isActive,
-              sortBy: params.sortBy,
-              sortDir: params.sortDir,
-              take: params.take,
-              skip: params.skip,
-            },
-          },
-        }),
-      ),
+    queryFn: () => fetchUsers(params),
     placeholderData: keepPreviousData,
   });
 }

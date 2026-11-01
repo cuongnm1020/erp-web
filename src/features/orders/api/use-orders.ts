@@ -141,6 +141,18 @@ export function orderListQuery(params: OrderListParams) {
   };
 }
 
+/**
+ * Một trang GET /sales-orders theo đúng bộ lọc + sắp xếp đang xem (trang đếm từ 1) — nguồn của
+ * nút "Xuất Excel" (kéo lần lượt mọi trang).
+ */
+export function fetchOrdersPage(
+  params: Omit<OrderListParams, 'take' | 'skip'>,
+  page: number,
+  size: number,
+) {
+  return orderListQuery({ ...params, take: size, skip: (page - 1) * size }).queryFn();
+}
+
 /** Bộ lọc chung của danh sách + đếm tab (không gồm phân trang). */
 function listQuery(params: Omit<OrderListParams, 'take' | 'skip'>) {
   return {

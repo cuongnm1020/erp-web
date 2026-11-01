@@ -4,6 +4,11 @@ import { Plus, ScanBarcode } from 'lucide-react';
 import Link from 'next/link';
 import { useMemo } from 'react';
 import { DataTable, FilterBar, type ColumnDef } from '@/components/data/data-table';
+import {
+  ExportExcelButton,
+  takeSkip,
+  type ExportColumn,
+} from '@/components/data/export-excel-button';
 import { RowActions } from '@/components/data/row-actions';
 import { EmptyState, ListSkeleton, QueryState } from '@/components/data/states';
 import { StatusBadge } from '@/components/data/status-badge';
@@ -15,7 +20,9 @@ import { messageFor } from '@/lib/error-messages';
 import { formatDateTime, formatQuantity } from '@/lib/format';
 import { useAbility } from '@/lib/permission';
 import { toSkipTake, useListState } from '@/lib/url-state';
+import { decimalCell } from '@/lib/xlsx-writer';
 import {
+  fetchReturnReceipts,
   useCancelReturn,
   useReturnReceipts,
   type ReturnReceiptRow,
@@ -35,6 +42,17 @@ const TABS: Array<{ key: '' | ReturnReceiptStatus; label: string }> = [
   { key: 'DRAFT', label: 'Nháp' },
   { key: 'POSTED', label: 'Đã post' },
   { key: 'CANCELLED', label: 'Hủy' },
+];
+
+const EXPORT_COLUMNS: ExportColumn<ReturnReceiptRow>[] = [
+  { header: 'Số phiếu', value: (r) => r.docNumber, width: 16 },
+  { header: 'Đơn bán', value: (r) => r.orderDocNumber, width: 16 },
+  { header: 'Lý do', value: (r) => r.reason ?? null, width: 30 },
+  { header: 'Kho', value: (r) => r.warehouseName },
+  { header: 'Số dòng', value: (r) => r.lineCount },
+  { header: 'Tổng SL', value: (r) => decimalCell(r.totalQty) },
+  { header: 'Trạng thái', value: (r) => RETURN_STATUS[r.status].label },
+  { header: 'Ngày', value: (r) => formatDateTime(r.receivedAt), width: 17 },
 ];
 
 export function ReturnListScreen() {
@@ -175,7 +193,20 @@ export function ReturnListScreen() {
             : 'Đang tải…'
         }
         breadcrumb={[{ label: 'Kho' }, { label: 'Nhập hàng hoàn' }]}
-        actions={newButton}
+        actions={
+          <>
+            <ExportExcelButton
+              size="sm"
+              fileName="nhap-hang-hoan"
+              columns={EXPORT_COLUMNS}
+              fetchPage={(page, size) =>
+                fetchReturnReceipts({ ...params, ...takeSkip(page, size) })
+              }
+              disabled={!query.data?.total}
+            />
+            {newButton}
+          </>
+        }
       />
 
       <FilterBar<Filter>

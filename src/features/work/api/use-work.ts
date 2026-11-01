@@ -35,10 +35,15 @@ export const workKeys = {
 /** Tự tải lại danh sách / đếm 30 giây (chưa có realtime cho module này — PLAN §5). */
 export const WORK_REFETCH_MS = 30_000;
 
+/** Một lần gọi của `useWorkList` — dùng lại cho "Xuất Excel" (kéo lần lượt mọi trang). */
+export function fetchWorkList(params: WorkListQuery) {
+  return unwrap(api.GET('/work-items', { params: { query: params } }));
+}
+
 export function useWorkList(params: WorkListQuery, opts: { enabled?: boolean } = {}) {
   return useQuery({
     queryKey: workKeys.list(params),
-    queryFn: () => unwrap(api.GET('/work-items', { params: { query: params } })),
+    queryFn: () => fetchWorkList(params),
     placeholderData: keepPreviousData,
     refetchInterval: WORK_REFETCH_MS,
     enabled: opts.enabled ?? true,

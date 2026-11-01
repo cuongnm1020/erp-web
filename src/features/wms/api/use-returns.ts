@@ -26,10 +26,15 @@ export const returnKeys = {
 };
 
 /** GET /return-receipts — phiếu nhập hàng hoàn; cần stock.read. */
+/** Một lần gọi của `useReturnReceipts` — dùng lại cho "Xuất Excel" (kéo lần lượt mọi trang). */
+export function fetchReturnReceipts(params: ReturnListParams) {
+  return unwrap(api.GET('/return-receipts', { params: { query: params } }));
+}
+
 export function useReturnReceipts(params: ReturnListParams) {
   return useQuery({
     queryKey: returnKeys.list(params),
-    queryFn: () => unwrap(api.GET('/return-receipts', { params: { query: params } })),
+    queryFn: () => fetchReturnReceipts(params),
     placeholderData: (prev) => prev,
   });
 }

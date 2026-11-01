@@ -33,10 +33,15 @@ export const receiptKeys = {
 };
 
 /** GET /goods-receipts — danh sách + statusCounts cho dải tab; cần stock.read. */
+/** Một lần gọi của `useReceipts` — dùng lại cho "Xuất Excel" (kéo lần lượt mọi trang). */
+export function fetchReceipts(params: ReceiptListParams) {
+  return unwrap(api.GET('/goods-receipts', { params: { query: params } }));
+}
+
 export function useReceipts(params: ReceiptListParams) {
   return useQuery({
     queryKey: receiptKeys.list(params),
-    queryFn: () => unwrap(api.GET('/goods-receipts', { params: { query: params } })),
+    queryFn: () => fetchReceipts(params),
     placeholderData: (prev) => prev,
   });
 }

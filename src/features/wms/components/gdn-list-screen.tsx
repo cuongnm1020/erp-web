@@ -3,13 +3,20 @@
 import Link from 'next/link';
 import { useMemo } from 'react';
 import { DataTable, FilterBar, type ColumnDef } from '@/components/data/data-table';
+import {
+  ExportExcelButton,
+  takeSkip,
+  type ExportColumn,
+} from '@/components/data/export-excel-button';
 import { EmptyState, ListSkeleton, QueryState } from '@/components/data/states';
 import { StatusBadge } from '@/components/data/status-badge';
 import { PageHeader } from '@/components/layout/page-header';
 import { cn } from '@/lib/cn';
 import { formatDateTime, formatQuantity } from '@/lib/format';
 import { toSkipTake, useListState } from '@/lib/url-state';
+import { decimalCell } from '@/lib/xlsx-writer';
 import {
+  fetchGoodsIssues,
   GDN_KIND_LABEL,
   gdnStage,
   useGoodsIssues,
@@ -45,6 +52,24 @@ const TABS: Array<{ key: '' | GoodsIssueStatus; label: string }> = [
   { key: 'DRAFT', label: 'Đang xử lý' },
   { key: 'POSTED', label: 'Đã post' },
   { key: 'CANCELLED', label: 'Hủy' },
+];
+
+const EXPORT_COLUMNS: ExportColumn<GoodsIssueListRow>[] = [
+  { header: 'Số phiếu', value: (r) => r.docNumber, width: 16 },
+  { header: 'Loại', value: (r) => GDN_KIND_LABEL[r.kind].label },
+  {
+    header: 'Tham chiếu',
+    value: (r) => (r.refType === 'SalesOrder' && r.refId ? 'Đơn bán' : null),
+  },
+  { header: 'Kho', value: (r) => r.warehouseName },
+  { header: 'Số dòng', value: (r) => r.lineCount },
+  { header: 'SL kế hoạch', value: (r) => decimalCell(r.totalQtyPlanned) },
+  {
+    header: 'SL đã xuất',
+    value: (r) => (r.status === 'POSTED' ? decimalCell(r.totalQtyDone) : null),
+  },
+  { header: 'Trạng thái', value: (r) => gdnStage(r).label },
+  { header: 'Ngày tạo', value: (r) => formatDateTime(r.createdAt), width: 17 },
 ];
 
 export function GdnListScreen() {
@@ -168,6 +193,15 @@ export function GdnListScreen() {
             : 'Đang tải…'
         }
         breadcrumb={[{ label: 'Kho' }, { label: 'Xuất kho' }]}
+        actions={
+          <ExportExcelButton
+            size="sm"
+            fileName="phieu-xuat-kho"
+            columns={EXPORT_COLUMNS}
+            fetchPage={(page, size) => fetchGoodsIssues({ ...params, ...takeSkip(page, size) })}
+            disabled={!query.data?.total}
+          />
+        }
       />
 
       <FilterBar<GdnFilter>
