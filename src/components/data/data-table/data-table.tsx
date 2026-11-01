@@ -70,8 +70,13 @@ export interface DataTableProps<T> {
   pagination?: boolean;
   /** id cột đang ẩn — chọn bằng `ColumnPicker`. */
   hiddenColumns?: string[];
+  /** Cột STT đầu bảng (mặc định bật) — false cho bảng nhỏ trong thẻ / hộp thoại. */
+  rowNumbers?: boolean;
   className?: string;
 }
+
+/** id cột STT — không sort, không nằm trong ColumnPicker (picker nhận cột của màn). */
+export const ROW_NUMBER_COLUMN_ID = '__rowNo';
 
 /**
  * Bảng chuẩn (luật 8): dữ liệu đã phân trang/sort ở server, component chỉ hiển thị và
@@ -95,14 +100,26 @@ export function DataTable<T>({
   maxHeight = '70vh',
   pagination = true,
   hiddenColumns,
+  rowNumbers = true,
   className,
 }: DataTableProps<T>) {
   // Cột chọn chỉ dùng row/table API, không đọc `selection` — memo theo cờ bật/tắt, KHÔNG theo
   // object prop (caller thường tạo object mới mỗi render → cột đổi identity → cell remount sau
   // mỗi lần tick, mất focus bàn phím và node DOM đang giữ).
   const hasSelection = !!selection;
+  // STT = vị trí trong toàn bộ kết quả (trang 2 cỡ 50 bắt đầu 51); bảng không phân trang đếm từ 1.
+  const rowNoOffset = pagination ? Math.max(0, (page - 1) * size) : 0;
   const columns = useMemo<ColumnDef<T, unknown>[]>(() => {
-    if (!hasSelection) return userColumns;
+    const lead: ColumnDef<T, unknown>[] = [];
+    if (rowNumbers) {
+      lead.push({
+        id: ROW_NUMBER_COLUMN_ID,
+        meta: { width: 48, align: 'right', title: 'STT', className: 'text-muted-foreground' },
+        header: () => <span className="block text-right">STT</span>,
+        cell: ({ row }) => rowNoOffset + row.index + 1,
+      });
+    }
+    if (!hasSelection) return [...lead, ...userColumns];
     const selectCol: ColumnDef<T, unknown> = {
       id: '__select',
       meta: { width: 36 },
@@ -128,8 +145,8 @@ export function DataTable<T>({
         />
       ),
     };
-    return [selectCol, ...userColumns];
-  }, [userColumns, hasSelection]);
+    return [selectCol, ...lead, ...userColumns];
+  }, [userColumns, hasSelection, rowNumbers, rowNoOffset]);
 
   const table = useReactTable({
     data: rows,
@@ -164,7 +181,8 @@ export function DataTable<T>({
   });
 
   const selectedIds = Object.keys(selection?.selected ?? {}).filter((k) => selection?.selected[k]);
-  const stickyIdx = selection ? 1 : 0;
+  // Cột dính = cột dữ liệu đầu tiên (sau ô chọn và STT).
+  const stickyIdx = (selection ? 1 : 0) + (rowNumbers ? 1 : 0);
 
   const renderRow = (row: Row<T>, style?: React.CSSProperties) => (
     <TableRow

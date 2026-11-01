@@ -31,7 +31,8 @@ describe('Lịch sử mua hàng trên hồ sơ 360 (CRM-06)', () => {
     const region = await openProfile();
     expect(await within(region).findByText('12.345.000 ₫')).toBeInTheDocument();
     expect(within(region).getByText('Số đơn')).toBeInTheDocument();
-    expect(within(region).getByText('10')).toBeInTheDocument();
+    // "10" = KPI Số đơn (bảng đơn có thêm cột STT 1..10 nên lọc theo thẻ span của KPI).
+    expect(within(region).getByText('10', { selector: 'span' })).toBeInTheDocument();
     expect(within(region).getByText('1.234.500 ₫')).toBeInTheDocument();
     expect(within(region).getAllByText('30/09/2026').length).toBeGreaterThan(0);
     expect(within(region).getByText('đơn đầu tiên 15/01/2026')).toBeInTheDocument();

@@ -1,4 +1,4 @@
-export { DataTable, VIRTUALIZE_THRESHOLD } from './data-table';
+export { DataTable, ROW_NUMBER_COLUMN_ID, VIRTUALIZE_THRESHOLD } from './data-table';
 export type { DataTableColumnMeta, DataTableProps } from './data-table';
 export { ColumnHeader } from './column-header';
 export { ColumnPicker } from './column-picker';
