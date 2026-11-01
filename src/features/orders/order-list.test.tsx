@@ -285,6 +285,46 @@ describe('OrderListScreen — cân nặng gửi hãng + gán hãng hàng loạt'
     expect(url).toContain('noCarrier=true');
   });
 
+  it('lọc giá trị đơn (2026-11-02): URL totalMin = totalMax → "=", ô hiện có dấu chấm; gõ + Enter ghi URL', async () => {
+    search = 'totalMin=500000&totalMax=500000';
+    const seen: URLSearchParams[] = [];
+    server.events.on('request:start', ({ request }) => {
+      const u = new URL(request.url);
+      if (u.pathname === '/api/sales-orders') seen.push(u.searchParams);
+    });
+    renderApp(<OrderListScreen />);
+    const box = await screen.findByLabelText('Giá trị đơn (₫)');
+    expect(box).toHaveValue('500.000');
+    expect(screen.getByRole('combobox', { name: 'Toán tử giá trị đơn' })).toHaveTextContent('=');
+    await waitFor(() =>
+      expect(
+        seen.some((q) => q.get('totalMin') === '500000' && q.get('totalMax') === '500000'),
+      ).toBe(true),
+    );
+    replace.mockClear();
+    fireEvent.change(box, { target: { value: '1.200.000 ₫' } });
+    expect(box).toHaveValue('1.200.000');
+    expect(replace).not.toHaveBeenCalled();
+    fireEvent.keyDown(box, { key: 'Enter' });
+    expect(replace).toHaveBeenCalledTimes(1);
+    const url = String(replace.mock.calls[0]![0]);
+    expect(url).toContain('totalMin=1200000');
+    expect(url).toContain('totalMax=1200000');
+    server.events.removeAllListeners();
+  });
+
+  it('lọc giá trị đơn: chỉ totalMax → "≤"; min ≠ max → "Từ … đến" hiện hai ô', async () => {
+    search = 'totalMax=300000';
+    renderApp(<OrderListScreen />);
+    expect(await screen.findByLabelText('Giá trị đơn (₫)')).toHaveValue('300.000');
+    expect(screen.getByRole('combobox', { name: 'Toán tử giá trị đơn' })).toHaveTextContent('≤');
+    cleanup();
+    search = 'totalMin=100000&totalMax=900000';
+    renderApp(<OrderListScreen />);
+    expect(await screen.findByLabelText('Giá trị đơn từ (₫)')).toHaveValue('100.000');
+    expect(screen.getByLabelText('Giá trị đơn đến (₫)')).toHaveValue('900.000');
+  });
+
   it('chọn 2 đơn → "Gán hãng / cân nặng" → POST /sales-orders/bulk-update đúng orderIds + cân nặng + hãng, bỏ chọn sau khi xong', async () => {
     search = '';
     const bodies: Record<string, unknown>[] = [];

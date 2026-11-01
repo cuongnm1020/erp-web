@@ -35,6 +35,13 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Input } from '@/components/ui/input';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { toast } from '@/components/ui/toaster';
 import { cn } from '@/lib/cn';
 import { messageFor, messageForCode } from '@/lib/error-messages';
@@ -135,6 +142,9 @@ const DEFAULTS = {
     'customerId',
     'weightMin',
     'weightMax',
+    // Giá trị đơn ≥ / = / ≤ / khoảng (2026-11-02).
+    'totalMin',
+    'totalMax',
     'noCarrier',
     'carrierId',
     // Tài khoản hãng (ô chọn hãng dùng chung) + ai gán hãng (ERP / Pancake), 2026-10-25.
@@ -922,6 +932,120 @@ function WeightRangeFilter({
   );
 }
 
+type TotalOp = 'gte' | 'lte' | 'eq' | 'between';
+const TOTAL_OPS: ReadonlyArray<{ value: TotalOp; label: string }> = [
+  { value: 'gte', label: '≥' },
+  { value: 'lte', label: '≤' },
+  { value: 'eq', label: '=' },
+  { value: 'between', label: 'Từ … đến' },
+];
+
+/** Toán tử đang áp, suy từ URL: chỉ min = ≥, chỉ max = ≤, hai cận bằng nhau = "=", khác = khoảng. */
+export function totalOpOf(min: string | undefined, max: string | undefined): TotalOp {
+  if (min && max) return min === max ? 'eq' : 'between';
+  return max ? 'lte' : 'gte';
+}
+
+/** "1.500.000", "1 500 000 ₫" → "1500000"; không có chữ số → undefined. Tiền đồng, số nguyên. */
+export function parseVnd(s: string): string | undefined {
+  const d = s.replace(/[^\d]/g, '').replace(/^0+(?=\d)/, '');
+  return d === '' || d.length > 15 ? undefined : d;
+}
+
+/** Chuỗi tiền đồng nguyên → "1.500.000" để hiện trong ô (không tính toán, chỉ chèn dấu chấm). */
+const groupVnd = (d: string) => d.replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+
+/**
+ * Lọc giá trị đơn (tổng tiền) — chọn toán tử rồi gõ số, Enter / rời ô mới áp lên URL
+ * (totalMin / totalMax). "=" gửi hai cận bằng nhau.
+ */
+export function TotalValueFilter({
+  min,
+  max,
+  onChange,
+}: {
+  min: string | undefined;
+  max: string | undefined;
+  onChange: (next: { totalMin: string | undefined; totalMax: string | undefined }) => void;
+}) {
+  const [op, setOp] = useState<TotalOp>(totalOpOf(min, max));
+  const [a, setA] = useState(groupVnd((op === 'lte' ? max : min) ?? ''));
+  const [b, setB] = useState(groupVnd(max ?? ''));
+  useEffect(() => {
+    const o = totalOpOf(min, max);
+    setOp(o);
+    setA(groupVnd((o === 'lte' ? max : min) ?? ''));
+    setB(groupVnd(max ?? ''));
+  }, [min, max]);
+  const apply = (nextOp: TotalOp, rawA: string, rawB: string) => {
+    const va = parseVnd(rawA);
+    const vb = parseVnd(rawB);
+    const next =
+      nextOp === 'gte'
+        ? { totalMin: va, totalMax: undefined }
+        : nextOp === 'lte'
+          ? { totalMin: undefined, totalMax: va }
+          : nextOp === 'eq'
+            ? { totalMin: va, totalMax: va }
+            : { totalMin: va, totalMax: vb };
+    if (next.totalMin === min && next.totalMax === max) return;
+    onChange(next);
+  };
+  const onKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') apply(op, a, b);
+  };
+  return (
+    <div className="flex items-center gap-1 text-sm text-muted-foreground">
+      <span>Giá trị đơn</span>
+      <Select
+        value={op}
+        onValueChange={(v) => {
+          const o = v as TotalOp;
+          setOp(o);
+          if (a.trim() !== '') apply(o, a, b);
+        }}
+      >
+        <SelectTrigger className="h-9 w-24" aria-label="Toán tử giá trị đơn">
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          {TOTAL_OPS.map((o) => (
+            <SelectItem key={o.value} value={o.value}>
+              {o.label}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+      <Input
+        value={a}
+        onChange={(e) => setA(groupVnd(parseVnd(e.target.value) ?? ''))}
+        onBlur={() => apply(op, a, b)}
+        onKeyDown={onKeyDown}
+        inputMode="numeric"
+        placeholder={op === 'between' ? 'từ' : 'số tiền'}
+        aria-label={op === 'between' ? 'Giá trị đơn từ (₫)' : 'Giá trị đơn (₫)'}
+        className="h-9 w-28 text-right tabular-nums"
+      />
+      {op === 'between' ? (
+        <>
+          <span>–</span>
+          <Input
+            value={b}
+            onChange={(e) => setB(groupVnd(parseVnd(e.target.value) ?? ''))}
+            onBlur={() => apply(op, a, b)}
+            onKeyDown={onKeyDown}
+            inputMode="numeric"
+            placeholder="đến"
+            aria-label="Giá trị đơn đến (₫)"
+            className="h-9 w-28 text-right tabular-nums"
+          />
+        </>
+      ) : null}
+      <span>₫</span>
+    </div>
+  );
+}
+
 /**
  * Dải giải thích của tab Chờ hàng + chip "Đang lọc đơn thiếu <SP>" (từ màn Hàng chờ). Điều kiện
  * ghi đúng như API tính (apps/api docs/pick-pack-flow.md §3.6).
@@ -1014,6 +1138,8 @@ export function OrderListScreen() {
   const customerId = state.filters.customerId ?? '';
   const weightMin = state.filters.weightMin ?? '';
   const weightMax = state.filters.weightMax ?? '';
+  const totalMin = state.filters.totalMin ?? '';
+  const totalMax = state.filters.totalMax ?? '';
   const noCarrier = state.filters.noCarrier === 'true';
   const carrierId = state.filters.carrierId ?? '';
   const carrierAccountId = state.filters.carrierAccountId ?? '';
@@ -1068,6 +1194,8 @@ export function OrderListScreen() {
       customerId,
       weightMin,
       weightMax,
+      totalMin,
+      totalMax,
       noCarrier,
       carrierId,
       carrierAccountId,
@@ -1091,6 +1219,8 @@ export function OrderListScreen() {
       customerId,
       weightMin,
       weightMax,
+      totalMin,
+      totalMax,
       noCarrier,
       carrierId,
       carrierAccountId,
@@ -1225,6 +1355,8 @@ export function OrderListScreen() {
     customerId !== '' ||
     weightMin !== '' ||
     weightMax !== '' ||
+    totalMin !== '' ||
+    totalMax !== '' ||
     noCarrier ||
     carrierId !== '' ||
     carrierAccountId !== '' ||
@@ -1407,6 +1539,18 @@ export function OrderListScreen() {
               options: ITEM_ORIGIN_OPTIONS,
             },
             {
+              key: 'totalMin',
+              label: 'Giá trị đơn',
+              type: 'custom',
+              render: () => (
+                <TotalValueFilter
+                  min={state.filters.totalMin}
+                  max={state.filters.totalMax}
+                  onChange={setFilter}
+                />
+              ),
+            },
+            {
               key: 'weightMin',
               label: 'Cân nặng',
               type: 'custom',
@@ -1425,6 +1569,8 @@ export function OrderListScreen() {
             customerId: state.filters.customerId,
             weightMin: state.filters.weightMin,
             weightMax: state.filters.weightMax,
+            totalMin: state.filters.totalMin,
+            totalMax: state.filters.totalMax,
             noCarrier: state.filters.noCarrier,
             carrierId: state.filters.carrierId,
             carrierAccountId: state.filters.carrierAccountId,

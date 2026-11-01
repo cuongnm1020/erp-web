@@ -40,6 +40,9 @@ export interface OrderListParams {
   /** Cân nặng gửi hãng hiệu lực (kg, chuỗi decimal) — cận dưới / cận trên. */
   weightMin?: string;
   weightMax?: string;
+  /** Giá trị đơn (tổng tiền, chuỗi decimal ₫) — cận dưới ≥ / cận trên ≤; bằng nhau = lọc "=". */
+  totalMin?: string;
+  totalMax?: string;
   /** Trường ngày của from/to — bỏ trống = ngày đặt (2026-10-28). */
   dateField?: OrderDateField;
   /** true = chỉ đơn chưa chọn hãng. */
@@ -165,6 +168,8 @@ function listQuery(params: Omit<OrderListParams, 'take' | 'skip'>) {
     customerId: params.customerId || undefined,
     weightMin: params.weightMin || undefined,
     weightMax: params.weightMax || undefined,
+    totalMin: params.totalMin || undefined,
+    totalMax: params.totalMax || undefined,
     noCarrier: params.noCarrier ? ('true' as const) : undefined,
     carrierId: params.carrierId || undefined,
     carrierAccountId: params.carrierAccountId || undefined,
