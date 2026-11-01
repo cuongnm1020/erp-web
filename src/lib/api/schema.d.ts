@@ -1710,6 +1710,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/customers/crop-options": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Gợi ý cây trồng cho ô "Cây trồng" (2026-11-02). */
+        get: operations["CustomerController_cropOptions"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/customers/{id}": {
         parameters: {
             query?: never;
@@ -7500,6 +7517,13 @@ export interface components {
             /** @description Decimal(18,4) dạng string */
             creditLimit: string | null;
             paymentTerm: number | null;
+            /** @description Thông tin khai thác (2026-11-02) — null / [] = chưa khai thác. Diện tích Decimal(14,2) chuỗi. */
+            farmArea: string | null;
+            /** @enum {string|null} */
+            farmAreaUnit: "M2" | "SAO" | "MAU" | "HA" | null;
+            crops: string[];
+            treeAge: string | null;
+            diseaseHistory: string | null;
             createdAt: string;
             updatedAt: string;
         };
@@ -9194,12 +9218,22 @@ export interface components {
             /** @description Decimal(18,4) dạng string */
             creditLimit: string | null;
             paymentTerm: number | null;
+            /** @description Thông tin khai thác (2026-11-02) — null / [] = chưa khai thác. Diện tích Decimal(14,2) chuỗi. */
+            farmArea: string | null;
+            /** @enum {string|null} */
+            farmAreaUnit: "M2" | "SAO" | "MAU" | "HA" | null;
+            crops: string[];
+            treeAge: string | null;
+            diseaseHistory: string | null;
             createdAt: string;
             updatedAt: string;
         };
         CustomerListResponseDto: {
             items: components["schemas"]["CustomerListItemDto"][];
             total: number;
+        };
+        CropOptionsDto: {
+            items: string[];
         };
         CustomerMergeTargetDto: {
             id: string;
@@ -9229,6 +9263,13 @@ export interface components {
             /** @description Decimal(18,4) dạng string */
             creditLimit: string | null;
             paymentTerm: number | null;
+            /** @description Thông tin khai thác (2026-11-02) — null / [] = chưa khai thác. Diện tích Decimal(14,2) chuỗi. */
+            farmArea: string | null;
+            /** @enum {string|null} */
+            farmAreaUnit: "M2" | "SAO" | "MAU" | "HA" | null;
+            crops: string[];
+            treeAge: string | null;
+            diseaseHistory: string | null;
             createdAt: string;
             updatedAt: string;
             addresses: components["schemas"]["CustomerAddressDto"][];
@@ -9260,6 +9301,16 @@ export interface components {
             priceListId?: string;
             creditLimit?: string;
             paymentTerm?: number;
+            /** @description Diện tích canh tác — chuỗi decimal > 0, ≤ 2 chữ số thập phân. */
+            farmArea: string;
+            /** @enum {string} */
+            farmAreaUnit: "M2" | "SAO" | "MAU" | "HA";
+            /** @description Cây trồng — 1..20 mục, mỗi mục 1..100 ký tự (bỏ trùng, cắt khoảng trắng). */
+            crops: string[];
+            /** @description Độ tuổi cây — gõ tự do, 1..100 ký tự. */
+            treeAge: string;
+            /** @description Lịch sử bệnh — gõ tự do, 1..2000 ký tự ("Chưa từng" cũng là câu trả lời). */
+            diseaseHistory: string;
         };
         CustomerDto: {
             id: string;
@@ -9280,11 +9331,24 @@ export interface components {
             /** @description Decimal(18,4) dạng string */
             creditLimit: string | null;
             paymentTerm: number | null;
+            /** @description Thông tin khai thác (2026-11-02) — null / [] = chưa khai thác. Diện tích Decimal(14,2) chuỗi. */
+            farmArea: string | null;
+            /** @enum {string|null} */
+            farmAreaUnit: "M2" | "SAO" | "MAU" | "HA" | null;
+            crops: string[];
+            treeAge: string | null;
+            diseaseHistory: string | null;
             createdAt: string;
             updatedAt: string;
         };
         UpdateCustomerDto: {
             name?: string;
+            farmArea?: string;
+            /** @enum {string} */
+            farmAreaUnit?: "M2" | "SAO" | "MAU" | "HA";
+            crops?: string[];
+            treeAge?: string;
+            diseaseHistory?: string;
             taxCode?: string;
             phone?: string;
             /** Format: email */
@@ -11779,6 +11843,16 @@ export interface components {
             birthday?: string;
             /** @enum {string} */
             gender?: "MALE" | "FEMALE" | "OTHER";
+            /**
+             * @description Thông tin khai thác (2026-11-02) — tuỳ chọn ở API (đồng bộ / khách cũ không chặn lên đơn); màn
+             *     tạo đơn bắt buộc khi khách MỚI. Luật giá trị như POST /customers.
+             */
+            farmArea?: string;
+            /** @enum {string} */
+            farmAreaUnit?: "M2" | "SAO" | "MAU" | "HA";
+            crops?: string[];
+            treeAge?: string;
+            diseaseHistory?: string;
         };
         InlineAddressDto: {
             recipient: string;
@@ -19136,6 +19210,25 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["CustomerDto"];
+                };
+            };
+        };
+    };
+    CustomerController_cropOptions: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CropOptionsDto"];
                 };
             };
         };

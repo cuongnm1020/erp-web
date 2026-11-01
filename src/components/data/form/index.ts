@@ -23,3 +23,5 @@ export type { StaffSelectItem, StaffSelectProps } from './staff-select';
 export { StaffMultiSelect } from './staff-multi-select';
 export type { StaffMultiSelectProps } from './staff-multi-select';
 export { applyServerErrors } from './apply-server-errors';
+export { TagsInput } from './tags-input';
+export type { TagsInputProps } from './tags-input';

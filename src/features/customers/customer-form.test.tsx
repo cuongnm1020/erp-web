@@ -52,6 +52,29 @@ const fillCreateForm = async () => {
   fireEvent.change(screen.getByLabelText(/Mã KH/), { target: { value: 'KH-TEST-01' } });
   fireEvent.click(screen.getByRole('combobox', { name: 'Team chăm sóc' }));
   fireEvent.click(await screen.findByRole('option', { name: 'Kinh doanh Hà Nội' }));
+  await fillFarm();
+};
+
+/** Thông tin khai thác (2026-11-02) — bắt buộc khi tạo. */
+const fillFarm = async () => {
+  fireEvent.change(screen.getByLabelText(/^Diện tích/), { target: { value: '2,5' } });
+  fireEvent.click(screen.getByRole('combobox', { name: 'Đơn vị diện tích' }));
+  fireEvent.click(await screen.findByRole('option', { name: 'sào' }));
+  const crops = screen.getByRole('combobox', { name: 'Cây trồng' });
+  fireEvent.change(crops, { target: { value: 'Sầu riêng' } });
+  fireEvent.keyDown(crops, { key: 'Enter' });
+  fireEvent.change(crops, { target: { value: 'Cây bơ' } });
+  fireEvent.keyDown(crops, { key: 'Enter' });
+  fireEvent.change(screen.getByLabelText(/^Độ tuổi cây/), { target: { value: '4 năm' } });
+  fireEvent.change(screen.getByLabelText(/^Lịch sử bệnh/), { target: { value: 'Chưa từng' } });
+};
+
+const FARM_BODY = {
+  farmArea: '2.5',
+  farmAreaUnit: 'SAO',
+  crops: ['Sầu riêng', 'Cây bơ'],
+  treeAge: '4 năm',
+  diseaseHistory: 'Chưa từng',
 };
 
 beforeEach(() => {
@@ -82,8 +105,46 @@ describe('CustomerFormScreen — POST /customers (B-03 tạo)', () => {
       name: 'Cửa hàng An Nhiên',
       teamId: TEAM.id,
       type: 'RETAIL',
+      ...FARM_BODY,
     });
     await waitFor(() => expect(push).toHaveBeenCalledWith('/crm/customers/new-cust-1'));
+  });
+
+  it('thông tin khai thác bắt buộc: thiếu → báo tại từng ô, KHÔNG gọi API', async () => {
+    const posts: unknown[] = [];
+    server.use(
+      teamsHandler,
+      http.post('/api/customers', () => {
+        posts.push(1);
+        return HttpResponse.json({});
+      }),
+    );
+    renderApp(<CustomerFormScreen />);
+    fireEvent.change(screen.getByLabelText(/^Diện tích/), { target: { value: '0' } });
+    clickSave(/Lưu khách hàng/);
+    expect(
+      await screen.findByText('Diện tích phải là số > 0, tối đa 2 chữ số thập phân'),
+    ).toBeInTheDocument();
+    expect(screen.getByText('Chọn đơn vị')).toBeInTheDocument();
+    expect(screen.getByText('Chọn hoặc gõ ít nhất một cây trồng')).toBeInTheDocument();
+    expect(screen.getByText('Nhập độ tuổi cây')).toBeInTheDocument();
+    expect(screen.getByText(/Nhập lịch sử bệnh/)).toBeInTheDocument();
+    expect(posts).toHaveLength(0);
+  });
+
+  it('ô Cây trồng: gợi ý từ GET /customers/crop-options, bỏ trùng, Backspace bỏ mục cuối', async () => {
+    server.use(teamsHandler);
+    renderApp(<CustomerFormScreen />);
+    const crops = screen.getByRole('combobox', { name: 'Cây trồng' });
+    fireEvent.focus(crops);
+    fireEvent.change(crops, { target: { value: 'sau' } });
+    fireEvent.mouseDown(await screen.findByRole('option', { name: 'Sầu riêng' }));
+    fireEvent.change(crops, { target: { value: 'sầu riêng ' } });
+    fireEvent.keyDown(crops, { key: 'Enter' });
+    const chosen = screen.getByRole('list', { name: 'Cây trồng đã chọn' });
+    expect(within(chosen).getAllByRole('listitem')).toHaveLength(1);
+    fireEvent.keyDown(crops, { key: 'Backspace' });
+    expect(screen.queryByRole('list', { name: 'Cây trồng đã chọn' })).not.toBeInTheDocument();
   });
 
   it('bỏ trống bắt buộc → lỗi validate tại field, KHÔNG gọi API', async () => {
@@ -128,6 +189,27 @@ describe('CustomerFormScreen — POST /customers (B-03 tạo)', () => {
 
 describe('CustomerFormScreen — PATCH /customers/{id} (B-03 sửa)', () => {
   const CUST = makeCustomers(1)[0]!;
+
+  it('khách cũ chưa khai thác: báo rõ, lưu phải điền đủ, PATCH gửi kèm 4 mục vừa điền', async () => {
+    const OLD = makeCustomers(7)[6]!; // i % 7 === 6 → chưa khai thác
+    const patched: unknown[] = [];
+    server.use(
+      http.patch('/api/customers/:id', async ({ request }) => {
+        patched.push(await request.json());
+        return HttpResponse.json({});
+      }),
+    );
+    renderApp(<CustomerFormScreen customerId={OLD.id} />);
+    expect(await screen.findByText(/Khách chưa khai thác/)).toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText(/Tên khách hàng/), { target: { value: 'Tên mới' } });
+    clickSave(/Lưu thay đổi/);
+    expect(await screen.findByText('Chọn đơn vị')).toBeInTheDocument();
+    expect(patched).toHaveLength(0);
+    await fillFarm();
+    clickSave(/Lưu thay đổi/);
+    await waitFor(() => expect(patched).toHaveLength(1));
+    expect(patched[0]).toEqual({ name: 'Tên mới', ...FARM_BODY });
+  });
 
   it('prefill từ GET /customers/{id}; PATCH CHỈ field đã đổi; mã KH khóa lại', async () => {
     const patched: Array<{ id: unknown; body: unknown }> = [];

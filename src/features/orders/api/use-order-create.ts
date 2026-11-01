@@ -7,6 +7,16 @@ import { lineEntryKeys } from './use-line-entry';
 
 export type SkuQuickRow = components['schemas']['SkuListRowDto'];
 
+/** GET /customers/crop-options — gợi ý ô Cây trồng của khách mới trên màn tạo đơn (2026-11-02). */
+export function useOrderCropOptions(enabled: boolean) {
+  return useQuery({
+    queryKey: ['crm', 'customers', 'crop-options'],
+    queryFn: () => unwrap(api.GET('/customers/crop-options')),
+    staleTime: 10 * 60_000,
+    enabled,
+  });
+}
+
 /**
  * POS lên đơn mặc định của người đang đăng nhập (`/auth/me.defaultPosShopId`, 2026-10-29) — leader /
  * trưởng nhóm CSKH chọn cho nhân viên; màn Tạo đơn tự điền ô POS. Cùng key + fetcher với phiên

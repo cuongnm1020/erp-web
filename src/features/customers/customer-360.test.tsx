@@ -1,4 +1,4 @@
-import { fireEvent, screen, waitFor } from '@testing-library/react';
+import { cleanup, fireEvent, screen, waitFor } from '@testing-library/react';
 import { http, HttpResponse } from 'msw';
 import { describe, expect, it, vi } from 'vitest';
 import { CUSTOMER_TAGS, makeCustomers, scenario } from '@/test/msw/handlers';
@@ -22,6 +22,18 @@ describe('Customer360Screen — GET /customers/{id} (P1-12)', () => {
     expect(screen.getAllByText(FIRST.code).length).toBeGreaterThan(0);
     expect(screen.getAllByText('Bán lẻ').length).toBeGreaterThan(0);
     expect(screen.getByText('Hạn mức công nợ')).toBeInTheDocument();
+  });
+
+  it('thông tin khai thác (2026-11-02): đủ 4 mục hiện giá trị; khách chưa khai báo "Chưa khai thác đủ"', async () => {
+    renderApp(<Customer360Screen id={FIRST.id} />);
+    expect(await screen.findByText('2,5 sào')).toBeInTheDocument();
+    expect(screen.getByText('Lúa, Ngô')).toBeInTheDocument();
+    expect(screen.getByText('3 năm')).toBeInTheDocument();
+    expect(screen.getByText('Đạo ôn năm 2025')).toBeInTheDocument();
+    expect(screen.queryByText('Chưa khai thác đủ')).not.toBeInTheDocument();
+    cleanup();
+    renderApp(<Customer360Screen id={makeCustomers(7)[6]!.id} />);
+    expect(await screen.findByText('Chưa khai thác đủ')).toBeInTheDocument();
   });
 
   it('không bịa số: các thẻ thiếu API được nêu tên thay vì hiện dữ liệu mẫu', async () => {

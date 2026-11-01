@@ -117,6 +117,16 @@ export function toCustomerSort(sort: { id: string; desc: boolean } | null): {
   return { sortBy: sort.id as CustomerSortBy, sortDir: sort.desc ? 'desc' : 'asc' };
 }
 
+/** GET /customers/crop-options — gợi ý ô Cây trồng (cây đã khai nhiều nhất trước + mặc định). */
+export function useCropOptions(enabled = true) {
+  return useQuery({
+    queryKey: ['crm', 'customers', 'crop-options'],
+    queryFn: () => unwrap(api.GET('/customers/crop-options')),
+    staleTime: 10 * 60_000,
+    enabled,
+  });
+}
+
 /** GET /customers/{id} — 404 khi ngoài scope (backend không phân biệt "không có" và "không thấy"). */
 export function useCustomer(id: string) {
   return useQuery({

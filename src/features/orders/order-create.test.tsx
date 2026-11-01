@@ -300,6 +300,54 @@ describe('createOrderSchema — kiểm tra trước khi gọi API', () => {
   it('khách chọn sẵn, không gõ địa chỉ → hợp lệ', () => {
     expect(createOrderSchema.safeParse(values({ customerId: C1 })).success).toBe(true);
   });
+
+  it('khách MỚI (2026-11-02): thiếu thông tin khai thác → báo đúng 5 ô; khách đã có không hỏi', () => {
+    const base = { customerName: 'Hùng', customerPhone: '0909888777' };
+    const r = createOrderSchema.safeParse(values({ ...base, customerIsNew: true }));
+    const paths = r.success ? [] : r.error.issues.map((i) => i.path.join('.'));
+    expect(paths).toEqual(
+      expect.arrayContaining(['farmArea', 'farmAreaUnit', 'crops', 'treeAge', 'diseaseHistory']),
+    );
+    expect(createOrderSchema.safeParse(values(base)).success).toBe(true);
+    expect(
+      createOrderSchema.safeParse(
+        values({
+          ...base,
+          customerIsNew: true,
+          farmArea: '1,5',
+          farmAreaUnit: 'HA',
+          crops: ['Cà phê'],
+          treeAge: '5 năm',
+          diseaseHistory: 'Chưa từng',
+        }),
+      ).success,
+    ).toBe(true);
+  });
+});
+
+describe('toCreateOrderBody — thông tin khai thác khách mới (2026-11-02)', () => {
+  it('khách mới: gửi kèm 5 trường trong khối customer (diện tích đổi dấu phẩy); khách có sẵn: không gửi', () => {
+    const farm = {
+      farmArea: '1,5',
+      farmAreaUnit: 'HA' as const,
+      crops: ['Cà phê', 'Hồ tiêu'],
+      treeAge: '5 năm',
+      diseaseHistory: 'Chưa từng',
+    };
+    const body = toCreateOrderBody(
+      values({ customerName: 'Hùng', customerPhone: '0909888777', customerIsNew: true, ...farm }),
+    );
+    expect(body.customer).toEqual({
+      name: 'Hùng',
+      phone: '0909888777',
+      ...farm,
+      farmArea: '1.5',
+    });
+    const notNew = toCreateOrderBody(
+      values({ customerName: 'Hùng', customerPhone: '0909888777', ...farm }),
+    );
+    expect(notNew.customer).toEqual({ name: 'Hùng', phone: '0909888777' });
+  });
 });
 
 describe('OrderCreateScreen — màn tạo đơn mới', () => {
@@ -966,6 +1014,7 @@ describe('OrderCreateScreen — màn tạo đơn mới', () => {
     expect(await screen.findByText('Khách đã có')).toBeInTheDocument();
     expect(screen.getByText(/Đơn này tính doanh thu cho bạn và team bạn/)).toBeInTheDocument();
     expect(screen.queryByText(/Khách mới — sẽ tạo hồ sơ khách/)).not.toBeInTheDocument();
+    expect(screen.queryByText('Thông tin khai thác khách mới')).not.toBeInTheDocument();
     expect(lookups.length).toBeGreaterThan(0);
   });
 
@@ -980,6 +1029,9 @@ describe('OrderCreateScreen — màn tạo đơn mới', () => {
       target: { value: '0909888777' },
     });
     expect(await screen.findByText(/Khách mới — sẽ tạo hồ sơ khách/)).toBeInTheDocument();
+    // Khách mới → khối thông tin khai thác bắt buộc (2026-11-02)
+    expect(await screen.findByText('Thông tin khai thác khách mới')).toBeInTheDocument();
+    expect(screen.getByRole('combobox', { name: 'Cây trồng' })).toBeInTheDocument();
     // SĐT khách mới chép xuống SĐT người nhận; sửa SĐT khách thì người nhận đi theo.
     await waitFor(() =>
       expect(screen.getByRole('textbox', { name: 'Số điện thoại' })).toHaveValue('0909888777'),

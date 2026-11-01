@@ -61,6 +61,7 @@ import {
 import { useGeoSuggest, type GeoSuggestion } from '../../api/use-orders';
 import { GENDER_LABEL } from '../../labels';
 import { GENDERS, normalizePhoneInput, type CreateOrderValues } from '../../schema';
+import { NewCustomerFarm } from './new-customer-farm';
 import { useDebounced } from './use-debounced';
 
 type Form = UseFormReturn<CreateOrderValues>;
@@ -439,6 +440,12 @@ export function CustomerCard({ form }: { form: Form }) {
     match.data === null &&
     care.isSuccess &&
     !care.data.customer;
+  // Khách mới → bắt buộc thông tin khai thác (2026-11-02); cờ nằm trong form để schema kiểm.
+  useEffect(() => {
+    if (form.getValues('customerIsNew') !== isNewCustomer) {
+      form.setValue('customerIsNew', isNewCustomer);
+    }
+  }, [isNewCustomer, form]);
   const autoRecipientPhone = useRef('');
   useEffect(() => {
     if (!isNewCustomer) return;
@@ -756,6 +763,8 @@ export function CustomerCard({ form }: { form: Form }) {
           Khách mới — sẽ tạo hồ sơ khách khi chốt đơn.
         </p>
       ) : null}
+
+      {isNewCustomer ? <NewCustomerFarm form={form} /> : null}
 
       {sameDay.data && sameDay.data.total > 0 ? (
         <p role="status" className="rounded-md bg-warning-weak px-3 py-2 text-sm text-warning">

@@ -14,7 +14,9 @@ import { formatDate, formatDateTime, formatMoney, formatPhone } from '@/lib/form
 import { Can, useAbility } from '@/lib/permission';
 import { useInvalidateOn } from '@/lib/realtime';
 import { customerKeys, useCustomer, type CustomerDetail } from '../api/use-customers';
+import { FARM_AREA_UNIT_LABEL } from '@/lib/shared';
 import { customerTypeLabel, customerTypeTone } from '../labels';
+import { farmAreaInput } from '../schema';
 import { formatAddress } from './customer-address-section';
 import { CustomerNotesCard, CustomerPurposeCard } from './customer-care-cards';
 import { CustomerConsentCard } from './customer-consent-card';
@@ -58,6 +60,18 @@ function Card({
       {children}
     </section>
   );
+}
+
+/** Đủ 4 mục khai thác (2026-11-02) — khách cũ / Pancake thường chưa đủ. */
+function farmComplete(c: CustomerDetail): boolean {
+  return (
+    !!c.farmArea && !!c.farmAreaUnit && c.crops.length > 0 && !!c.treeAge && !!c.diseaseHistory
+  );
+}
+
+/** "2.50" → "2,5" (diện tích, không phải tiền / số lượng tồn — chỉ đổi dấu thập phân để đọc). */
+function formatFarmArea(v: string): string {
+  return farmAreaInput(v).replace('.', ',');
 }
 
 function Field({ label, children }: { label: string; children: ReactNode }) {
@@ -216,6 +230,43 @@ function Profile({ c }: { c: CustomerDetail }) {
               )}
             </Field>
             <Field label="Cập nhật gần nhất">{formatDateTime(c.updatedAt)}</Field>
+          </dl>
+        </Card>
+
+        <Card
+          className="lg:col-span-3"
+          title="Thông tin khai thác"
+          action={
+            !farmComplete(c) ? <StatusBadge tone="warn">Chưa khai thác đủ</StatusBadge> : null
+          }
+        >
+          <dl className="grid grid-cols-2 gap-x-4 gap-y-3 px-3 py-3 sm:grid-cols-3">
+            <Field label="Diện tích">
+              {c.farmArea && c.farmAreaUnit ? (
+                `${formatFarmArea(c.farmArea)} ${FARM_AREA_UNIT_LABEL[c.farmAreaUnit]}`
+              ) : (
+                <span className="text-muted-foreground">chưa có</span>
+              )}
+            </Field>
+            <Field label="Cây trồng">
+              {c.crops.length ? (
+                c.crops.join(', ')
+              ) : (
+                <span className="text-muted-foreground">chưa có</span>
+              )}
+            </Field>
+            <Field label="Độ tuổi cây">
+              {c.treeAge ?? <span className="text-muted-foreground">chưa có</span>}
+            </Field>
+            <div className="col-span-2 sm:col-span-3">
+              <Field label="Lịch sử bệnh">
+                {c.diseaseHistory ? (
+                  <span className="whitespace-pre-line">{c.diseaseHistory}</span>
+                ) : (
+                  <span className="text-muted-foreground">chưa có</span>
+                )}
+              </Field>
+            </div>
           </dl>
         </Card>
 
