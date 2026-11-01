@@ -869,6 +869,69 @@ describe('Tab Bán chạy', () => {
     expect(lastUrl().get('topView')).toBeNull();
   });
 
+  it('Tab Đơn trùng (2026-11-02): KPI tỉ lệ hoàn trùng vs không trùng, nhóm + từng đơn (link, Hoàn), lọc / sắp / trang vào query', async () => {
+    search = `tab=duplicates&dupSort=returned&from=${RANGE.from}&to=${RANGE.to}`;
+    const calls: URLSearchParams[] = [];
+    server.use(
+      http.get('/api/reports/sales/duplicates', ({ request }) => {
+        calls.push(new URL(request.url).searchParams);
+        return HttpResponse.json({
+          ...RANGE,
+          totals: {
+            groupCount: 1,
+            duplicateOrders: 2,
+            duplicateReturned: 1,
+            duplicateReturnRate: '50.00',
+            otherOrders: 8,
+            otherReturned: 1,
+            otherReturnRate: '12.50',
+          },
+          items: [
+            {
+              phone: '0912345678',
+              day: '2026-10-02',
+              customerName: 'Nguyễn Văn A',
+              orderCount: 2,
+              returnedCount: 1,
+              returnRate: '50.00',
+              orders: [
+                {
+                  id: 'o-1',
+                  docNumber: 'SO-1',
+                  orderDate: '2026-10-02T02:00:00.000Z',
+                  total: '300000.0000',
+                  returned: false,
+                },
+                {
+                  id: 'o-2',
+                  docNumber: 'SO-2',
+                  orderDate: '2026-10-02T05:00:00.000Z',
+                  total: '450000.0000',
+                  returned: true,
+                },
+              ],
+            },
+          ],
+          total: 1,
+        });
+      }),
+    );
+    renderApp(<SalesReportScreen />, { me: ME_LEADER });
+    expect(await screen.findByText('Nguyễn Văn A')).toBeInTheDocument();
+    expect(calls[0]!.get('sort')).toBe('returned');
+    expect(calls[0]!.get('onlyReturned')).toBeNull();
+    expect(calls[0]!.get('take')).toBe('50');
+    expect(screen.getByText('Tỉ lệ hoàn — đơn trùng').parentElement).toHaveTextContent('50,00%');
+    expect(screen.getByText('Tỉ lệ hoàn — đơn không trùng').parentElement).toHaveTextContent(
+      '12,50%',
+    );
+    expect(screen.getByRole('link', { name: 'SO-2' })).toHaveAttribute('href', '/crm/orders/o-2');
+    const row = screen.getByRole('link', { name: 'SO-2' }).closest('li')!;
+    expect(within(row).getByText('Hoàn')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('checkbox'));
+    expect(lastUrl().get('dupReturned')).toBe('true');
+  });
+
   it('rỗng → EmptyState; lỗi → traceId', async () => {
     search = `tab=top&from=${RANGE.from}&to=${RANGE.to}`;
     server.use(

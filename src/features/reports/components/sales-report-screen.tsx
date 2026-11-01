@@ -40,8 +40,9 @@ import { SalesProductTab } from './sales-product-tab';
 import { SalesStaffTab } from './sales-staff-tab';
 import { SalesSupplierTab } from './sales-supplier-tab';
 import { SalesTopTab } from './sales-top-tab';
+import { SalesDuplicatesTab } from './sales-duplicates-tab';
 
-type TabKey = 'overview' | 'product' | 'staff' | 'supplier' | 'top';
+type TabKey = 'overview' | 'product' | 'staff' | 'supplier' | 'top' | 'duplicates';
 
 /** Tab của màn. Chỉ tab đang mở mới gọi API (component tab khác không mount). */
 const TABS: ReadonlyArray<{ key: TabKey; label: string }> = [
@@ -50,6 +51,8 @@ const TABS: ReadonlyArray<{ key: TabKey; label: string }> = [
   { key: 'staff', label: 'Nhân viên' },
   { key: 'supplier', label: 'Nhà cung cấp' },
   { key: 'top', label: 'Bán chạy' },
+  // Đơn trùng trong ngày + tỉ lệ hoàn (2026-11-02).
+  { key: 'duplicates', label: 'Đơn trùng' },
 ];
 
 /** Tab nhận bộ lọc NCC chính (supplierId) — tab khác bỏ lọc này khi chuyển sang. */
@@ -250,6 +253,8 @@ export function SalesReportScreen() {
                 filters: {
                   ...state.filters,
                   tab: t.key === 'overview' ? undefined : t.key,
+                  // Trang của tab Đơn trùng không mang sang lần mở sau.
+                  dupPage: undefined,
                   ...(SUPPLIER_FILTER_TABS.has(t.key)
                     ? {}
                     : { supplierId: undefined, supplierName: undefined }),
@@ -274,6 +279,7 @@ export function SalesReportScreen() {
         {tab === 'staff' ? <SalesStaffTab /> : null}
         {tab === 'supplier' ? <SalesSupplierTab /> : null}
         {tab === 'top' ? <SalesTopTab /> : null}
+        {tab === 'duplicates' ? <SalesDuplicatesTab /> : null}
       </div>
     </div>
   );
