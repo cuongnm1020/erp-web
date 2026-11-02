@@ -82,6 +82,12 @@ export interface OrderListParams {
   creatorId?: string;
   /** Page Facebook (id, nối dấu phẩy) — đơn ERP chọn page + đơn Pancake theo Page ID. */
   facebookPageIds?: string;
+  /** Nhóm đơn lỗi — màn Xử lý đơn lỗi, CHỈ superadmin (2026-11-02). */
+  issue?: OrderIssue;
+  /** Ngày đơn cũ hơn N ngày (dùng với `issue`). */
+  olderThanDays?: number;
+  /** Với `issue=PACK_ERROR`: true = nay đóng gói lại được, false = vẫn thiếu tồn. */
+  stockReady?: boolean;
   /** Sắp theo cột (server); bỏ trống = ngày đặt mới nhất trước. */
   sortBy?: OrderSortField;
   sortDir?: 'asc' | 'desc';
@@ -94,6 +100,8 @@ export type OrderItemOrigin = NonNullable<OrderListQuery['itemOrigin']>;
 export type OrderCarrierSource = NonNullable<OrderListQuery['carrierSource']>;
 export type OrderPrintStatus = NonNullable<OrderListQuery['printStatus']>;
 export type OrderSortField = NonNullable<OrderListQuery['sortBy']>;
+export type OrderIssue = NonNullable<OrderListQuery['issue']>;
+export type OrderIssueCounts = components['schemas']['SalesOrderIssueCountsDto'];
 
 /** Query key theo phễu (luật 3): ['crm','orders','list', params] / ['crm','orders','detail', id]. */
 export const orderKeys = {
@@ -103,6 +111,8 @@ export const orderKeys = {
   /** Đếm tab nằm dưới prefix `lists` — invalidate danh sách là đếm lại luôn. */
   flowCounts: (p: Omit<OrderListParams, 'flow' | 'take' | 'skip'>) =>
     [...orderKeys.lists(), 'flow-counts', p] as const,
+  issueCounts: (p: Omit<OrderListParams, 'issue' | 'stockReady' | 'take' | 'skip'>) =>
+    [...orderKeys.lists(), 'issue-counts', p] as const,
   details: () => [...orderKeys.all, 'detail'] as const,
   detail: (id: string) => [...orderKeys.details(), id] as const,
   shippingQuote: (
@@ -204,6 +214,10 @@ function listQuery(params: Omit<OrderListParams, 'take' | 'skip'>) {
     teamIds: params.teamIds || undefined,
     creatorId: params.creatorId || undefined,
     facebookPageIds: params.facebookPageIds || undefined,
+    issue: params.issue,
+    olderThanDays: params.olderThanDays,
+    stockReady:
+      params.stockReady === undefined ? undefined : (String(params.stockReady) as 'true' | 'false'),
   };
 }
 
@@ -374,6 +388,25 @@ export function useOrderFlowCounts(params: Omit<OrderListParams, 'flow' | 'take'
       unwrap(
         api.GET('/sales-orders/flow-counts', {
           // take / skip vô nghĩa với đếm — spec vẫn đòi vì dùng chung DTO lọc với danh sách.
+          params: { query: { ...listQuery(params), take: 1, skip: 0 } },
+        }),
+      ),
+    placeholderData: keepPreviousData,
+  });
+}
+
+/**
+ * GET /sales-orders/issue-counts — số đơn từng nhóm của màn Xử lý đơn lỗi (CHỈ superadmin, API 403
+ * với người khác). Nằm dưới prefix `lists` — thao tác trên đơn làm tươi luôn.
+ */
+export function useOrderIssueCounts(
+  params: Omit<OrderListParams, 'issue' | 'stockReady' | 'take' | 'skip'>,
+) {
+  return useQuery({
+    queryKey: orderKeys.issueCounts(params),
+    queryFn: () =>
+      unwrap(
+        api.GET('/sales-orders/issue-counts', {
           params: { query: { ...listQuery(params), take: 1, skip: 0 } },
         }),
       ),

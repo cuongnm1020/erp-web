@@ -3793,6 +3793,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/sales-orders/issue-counts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Số đơn từng nhóm của màn Quản trị › Xử lý đơn lỗi (2026-11-02) — CHỈ superadmin (403
+         *     ORDER_ISSUES_SUPERADMIN_ONLY). Cùng bộ lọc với GET /sales-orders — khai TRƯỚC `:id`.
+         */
+        get: operations["SalesOrderController_issueCounts"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/sales-orders/{id}": {
         parameters: {
             query?: never;
@@ -11764,6 +11784,35 @@ export interface components {
             RETURNED: number;
             CARRIER_CANCELLED: number;
             CANCELLED: number;
+        };
+        OrderIssueCodeCountDto: {
+            /** @description PICKUP_WAREHOUSE_NOT_READY, CARRIER_REJECTED, CARRIER_WAYBILL_DATA… */
+            code: string;
+            count: number;
+        };
+        SalesOrderIssueCountsDto: {
+            /** @description Lỗi vận đơn (`issue=WAYBILL_ERROR`). */
+            waybillError: number;
+            /** @description Lỗi vận đơn theo mã, nhiều nhất trước. */
+            waybillErrorCodes: components["schemas"]["OrderIssueCodeCountDto"][];
+            /** @description Hãng hủy mã, chưa xin lại (`issue=CARRIER_CANCELLED`). */
+            carrierCancelled: number;
+            /** @description "Đóng gói + in" lần trước không đóng gói được (`issue=PACK_ERROR`). */
+            packError: number;
+            /** @description Trong `packError`: nay hết thiếu tồn — đóng gói lại được (`stockReady=true`). */
+            packErrorStockReady: number;
+            /** @description Có mã vận đơn, hãng chưa lấy hàng (`issue=AWAITING_PICKUP`). */
+            awaitingPickup: number;
+            /** @description Trong `awaitingPickup`: ngày đơn cũ hơn `olderThanDays` ngày. */
+            awaitingPickupOld: number;
+            /** @description Đã xác nhận, chưa Gửi sang ĐVVC (`issue=UNSENT`). */
+            unsent: number;
+            /** @description Trong `unsent`: ngày đơn cũ hơn `olderThanDays` ngày. */
+            unsentOld: number;
+            /** @description Trong `unsent`: việc lấy hàng đang thiếu tồn. */
+            unsentShort: number;
+            /** @description Mốc "quá N ngày" đã dùng (mặc định 2). */
+            olderThanDays: number;
         };
         OrderTimelineDto: {
             /** @description Lần đầu đơn sang Đã duyệt (audit `status.after = APPROVED`); đơn tạo thẳng Đã duyệt = giờ tạo. */
@@ -23301,6 +23350,13 @@ export interface operations {
                  *     `ERROR` có lỗi — "Đóng gói + in" không đóng gói được (`packError`) hoặc lỗi vận đơn.
                  */
                 printStatus?: "PRINTED" | "NOT_PRINTED" | "ERROR";
+                /**
+                 * @description Nhóm đơn lỗi (2026-11-02, CHỈ superadmin — người khác 403 ORDER_ISSUES_SUPERADMIN_ONLY), đơn
+                 *     chưa hủy: `WAYBILL_ERROR` phiếu giao mới nhất lỗi vận đơn · `CARRIER_CANCELLED` hãng hủy mã,
+                 *     chưa xin lại · `PACK_ERROR` "Đóng gói + in" lần trước không đóng gói được · `AWAITING_PICKUP`
+                 *     có mã vận đơn, hãng chưa lấy hàng · `UNSENT` đã xác nhận, chưa Gửi sang ĐVVC.
+                 */
+                issue?: "WAYBILL_ERROR" | "CARRIER_CANCELLED" | "PACK_ERROR" | "AWAITING_PICKUP" | "UNSENT";
                 /** @description Trường ngày mà from/to lọc — xem ORDER_DATE_FIELDS. Bỏ trống = `orderDate`. */
                 dateField?: "orderDate" | "createdAt" | "updatedAt" | "sentToCarrierAt";
                 /**
@@ -23338,6 +23394,13 @@ export interface operations {
                  *     (`carrierAccountId` null) tính là tài khoản mặc định của hãng. Thay được cho `carrierId`.
                  */
                 carrierAccountId?: string;
+                /** @description Chỉ đơn có ngày đơn cũ hơn N ngày (so với bây giờ) — dùng với `issue`. */
+                olderThanDays?: number;
+                /**
+                 * @description Với `issue=PACK_ERROR`: `true` = việc lấy hàng nay không còn dòng thiếu tồn (đóng gói lại
+                 *     được), `false` = vẫn thiếu. Theo snapshot `SalesOrderFulfilment.waitingStockSince`.
+                 */
+                stockReady?: "true" | "false";
                 /** @description Đơn có dòng SKU này (core.Sku.id) — kể cả dòng thành phần của combo SKU này (2026-11-02). */
                 skuId?: string;
                 /** @description Đơn đang thiếu tồn SKU này (core.Sku.id) — "Xem đơn" từ màn Hàng chờ (2026-10-25). */
@@ -23504,6 +23567,13 @@ export interface operations {
                  *     `ERROR` có lỗi — "Đóng gói + in" không đóng gói được (`packError`) hoặc lỗi vận đơn.
                  */
                 printStatus?: "PRINTED" | "NOT_PRINTED" | "ERROR";
+                /**
+                 * @description Nhóm đơn lỗi (2026-11-02, CHỈ superadmin — người khác 403 ORDER_ISSUES_SUPERADMIN_ONLY), đơn
+                 *     chưa hủy: `WAYBILL_ERROR` phiếu giao mới nhất lỗi vận đơn · `CARRIER_CANCELLED` hãng hủy mã,
+                 *     chưa xin lại · `PACK_ERROR` "Đóng gói + in" lần trước không đóng gói được · `AWAITING_PICKUP`
+                 *     có mã vận đơn, hãng chưa lấy hàng · `UNSENT` đã xác nhận, chưa Gửi sang ĐVVC.
+                 */
+                issue?: "WAYBILL_ERROR" | "CARRIER_CANCELLED" | "PACK_ERROR" | "AWAITING_PICKUP" | "UNSENT";
                 /** @description Trường ngày mà from/to lọc — xem ORDER_DATE_FIELDS. Bỏ trống = `orderDate`. */
                 dateField?: "orderDate" | "createdAt" | "updatedAt" | "sentToCarrierAt";
                 /**
@@ -23541,6 +23611,13 @@ export interface operations {
                  *     (`carrierAccountId` null) tính là tài khoản mặc định của hãng. Thay được cho `carrierId`.
                  */
                 carrierAccountId?: string;
+                /** @description Chỉ đơn có ngày đơn cũ hơn N ngày (so với bây giờ) — dùng với `issue`. */
+                olderThanDays?: number;
+                /**
+                 * @description Với `issue=PACK_ERROR`: `true` = việc lấy hàng nay không còn dòng thiếu tồn (đóng gói lại
+                 *     được), `false` = vẫn thiếu. Theo snapshot `SalesOrderFulfilment.waitingStockSince`.
+                 */
+                stockReady?: "true" | "false";
                 /** @description Đơn có dòng SKU này (core.Sku.id) — kể cả dòng thành phần của combo SKU này (2026-11-02). */
                 skuId?: string;
                 /** @description Đơn đang thiếu tồn SKU này (core.Sku.id) — "Xem đơn" từ màn Hàng chờ (2026-10-25). */
@@ -23610,6 +23687,151 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["SalesOrderFlowCountsDto"];
+                };
+            };
+        };
+    };
+    SalesOrderController_issueCounts: {
+        parameters: {
+            query: {
+                /**
+                 * @description Ai gán hãng (2026-10-25): `ERP` = chọn trong ERP (sửa đơn / Gửi sang ĐVVC / tạo đơn) — đã có
+                 *     hãng, phiếu giao mới nhất không gửi ngoài ERP; `PANCAKE` = Pancake gán hãng + cấp vận đơn
+                 *     (phiếu gửi ngoài ERP).
+                 */
+                carrierSource?: "ERP" | "PANCAKE";
+                /**
+                 * @description Chữ "Trạng thái VC" gần nhất hãng gửi (2026-10-28) — khớp ĐÚNG một trong các giá trị (lặp
+                 *     tham số cho nhiều giá trị: `?carrierStatusText=a&carrierStatusText=b`). Giá trị chọn được:
+                 *     GET /sales-orders/carrier-status-options.
+                 */
+                carrierStatusText?: string[];
+                /**
+                 * @description Bộ lọc "Đã gửi ĐVVC — in tem" (2026-11-02), chỉ đơn ĐÃ gửi sang ĐVVC (`sentToCarrierAt`):
+                 *     `PRINTED` đã in tem (phiếu giao mới nhất có `labelPrintedAt`); `NOT_PRINTED` chưa in, không lỗi;
+                 *     `ERROR` có lỗi — "Đóng gói + in" không đóng gói được (`packError`) hoặc lỗi vận đơn.
+                 */
+                printStatus?: "PRINTED" | "NOT_PRINTED" | "ERROR";
+                /**
+                 * @description Nhóm đơn lỗi (2026-11-02, CHỈ superadmin — người khác 403 ORDER_ISSUES_SUPERADMIN_ONLY), đơn
+                 *     chưa hủy: `WAYBILL_ERROR` phiếu giao mới nhất lỗi vận đơn · `CARRIER_CANCELLED` hãng hủy mã,
+                 *     chưa xin lại · `PACK_ERROR` "Đóng gói + in" lần trước không đóng gói được · `AWAITING_PICKUP`
+                 *     có mã vận đơn, hãng chưa lấy hàng · `UNSENT` đã xác nhận, chưa Gửi sang ĐVVC.
+                 */
+                issue?: "WAYBILL_ERROR" | "CARRIER_CANCELLED" | "PACK_ERROR" | "AWAITING_PICKUP" | "UNSENT";
+                /** @description Trường ngày mà from/to lọc — xem ORDER_DATE_FIELDS. Bỏ trống = `orderDate`. */
+                dateField?: "orderDate" | "createdAt" | "updatedAt" | "sentToCarrierAt";
+                /**
+                 * @description Tab của danh sách đơn (2026-10-12) — gộp trạng thái chứng từ + kho / giao hàng
+                 *     (`flowOf` trong sales-order-flow.ts). Đếm từng tab: GET /sales-orders/flow-counts.
+                 */
+                flow?: "NEW" | "PENDING_APPROVAL" | "WAREHOUSE" | "WAITING_STOCK" | "PICKING" | "PACKED" | "NEEDS_FIX" | "PICKED_UP" | "IN_TRANSIT" | "OUT_FOR_DELIVERY" | "DELIVERED" | "RETURNED" | "CARRIER_CANCELLED" | "CANCELLED";
+                /**
+                 * @description Đơn có sản phẩm KHÔNG phải hàng ERP (2026-10-22): `CUSTOM` = có món gõ tay trên Pancake
+                 *     (`sales_order_external.custom_items`), `POS_SKU` = có dòng là SKU do đồng bộ Pancake tự tạo
+                 *     (liên kết sản phẩm `auto`), `NON_ERP` = một trong hai.
+                 */
+                itemOrigin?: "CUSTOM" | "POS_SKU" | "NON_ERP";
+                /** @description Sắp xếp theo cột (2026-10-22); mặc định ngày đặt mới nhất trước. */
+                sortBy?: "orderDate" | "docNumber" | "customer" | "total" | "time" | "statusChangedAt";
+                customerId?: string;
+                status?: "DRAFT" | "PENDING_APPROVAL" | "APPROVED" | "POSTED" | "CANCELLED";
+                /** @description Lọc theo cân nặng gửi hãng HIỆU LỰC (đặt tay, không thì Σ dòng) — kg, chuỗi decimal, cận dưới (≥). */
+                weightMin?: string;
+                /** @description Cận trên (≤), kg. Cùng giá trị với weightMin = lọc đúng một mức cân. */
+                weightMax?: string;
+                /**
+                 * @description Giá trị đơn (`total`, gồm phí ship / phụ thu / làm tròn) ≥ giá trị này — chuỗi decimal ≥ 0
+                 *     (2026-11-02). Lọc "= X" gửi totalMin = totalMax = X; "≤ X" chỉ gửi totalMax.
+                 */
+                totalMin?: string;
+                /** @description Giá trị đơn ≤ giá trị này — chuỗi decimal ≥ 0. Phải ≥ totalMin. */
+                totalMax?: string;
+                /** @description Chỉ đơn CHƯA chọn hãng (`true`) — gom đơn cần gán hãng. */
+                noCarrier?: string;
+                /** @description Đơn ĐÃ gán hãng này (wms.Carrier.id). Kết hợp được với from/to. */
+                carrierId?: string;
+                /**
+                 * @description Đơn gán MỘT tài khoản hãng (wms.CarrierAccount.id, 2026-10-25) — đơn chưa chọn tài khoản
+                 *     (`carrierAccountId` null) tính là tài khoản mặc định của hãng. Thay được cho `carrierId`.
+                 */
+                carrierAccountId?: string;
+                /** @description Chỉ đơn có ngày đơn cũ hơn N ngày (so với bây giờ) — dùng với `issue`. */
+                olderThanDays?: number;
+                /**
+                 * @description Với `issue=PACK_ERROR`: `true` = việc lấy hàng nay không còn dòng thiếu tồn (đóng gói lại
+                 *     được), `false` = vẫn thiếu. Theo snapshot `SalesOrderFulfilment.waitingStockSince`.
+                 */
+                stockReady?: "true" | "false";
+                /** @description Đơn có dòng SKU này (core.Sku.id) — kể cả dòng thành phần của combo SKU này (2026-11-02). */
+                skuId?: string;
+                /** @description Đơn đang thiếu tồn SKU này (core.Sku.id) — "Xem đơn" từ màn Hàng chờ (2026-10-25). */
+                shortSkuId?: string;
+                /**
+                 * @description Khoảng ngày (ISO) trên trường `dateField` (mặc định `orderDate`): `from` ≤ ngày. `to` là NGÀY
+                 *     (`YYYY-MM-DD`) thì lấy hết ngày đó (< to + 1 ngày, giờ Việt Nam); là datetime thì ≤ to.
+                 */
+                from?: string;
+                to?: string;
+                /** @description Kho lấy hàng chọn trên đơn (wms.Warehouse.id). */
+                warehouseId?: string;
+                /** @description Nguồn đơn: `PANCAKE` = đồng bộ từ Pancake, `ERP` = tạo trong ERP. */
+                source?: "PANCAKE" | "ERP";
+                /**
+                 * @description Chỉ đơn đồng bộ từ MỘT shop (POS) Pancake — mã shop Pancake (số nguyên dương, chuỗi). Danh
+                 *     sách POS: GET /pancake-sync/shops. Kèm `source=ERP` thì không đơn nào khớp.
+                 */
+                pancakeShopId?: string;
+                /**
+                 * @description Chỉ đơn của các page Facebook này (id core.FacebookPage, cách nhau dấu phẩy, tối đa 100) — đơn
+                 *     Pancake theo Page ID + đơn ERP chọn page (2026-10-26). Danh sách: GET /facebook-pages/options.
+                 */
+                facebookPageIds?: string;
+                /** @description Người phụ trách (SalesOrder.ownerId). */
+                ownerId?: string;
+                /**
+                 * @description Người bấm tạo đơn (2026-10-29): đơn ERP theo `createdBy`, đơn Pancake theo người tạo trên
+                 *     Pancake (`external.creatorUserId`) — cùng nguồn với cột `creatorName`.
+                 */
+                creatorId?: string;
+                /**
+                 * @description Team CSKH lên đơn (SalesOrder.teamId) — team phòng ban CSKH, gồm cả phòng ban con. Danh sách:
+                 *     GET /sales-orders/care-team-options.
+                 */
+                careTeamId?: string;
+                /**
+                 * @description Phòng ban lên đơn — nhiều phòng (team `DEPT-<mã>`, cách nhau dấu phẩy, tối đa 100), mỗi phòng
+                 *     gồm cả phòng con; bỏ trống = mọi phòng (2026-11-02). Danh sách: GET
+                 *     /sales-orders/team-filter-options (phòng CSKH + phòng Sale/MKT đã có đơn).
+                 */
+                teamIds?: string;
+                /**
+                 * @description `true` = chỉ đơn có đơn trùng trong ngày (cùng SĐT khách, cùng ngày VN, chưa hủy, mọi nguồn —
+                 *     CSKH-5). Theo from/to nếu có, không thì 7 ngày VN gần nhất.
+                 */
+                duplicate?: string;
+                sortDir?: "asc" | "desc";
+                /**
+                 * @description Tìm theo số chứng từ, mã hoặc tên khách (không phân biệt hoa thường), SĐT khách, mã vận đơn,
+                 *     tên sản phẩm trong đơn (tên SKU / combo, có chữ cái, ≥ 2 ký tự) — hoặc id đơn Pancake (id theo shop hoặc id hệ thống trong link đơn, khớp tuyệt đối, cho phép
+                 *     tiền tố `#`).
+                 */
+                q?: string;
+                take: number;
+                skip: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SalesOrderIssueCountsDto"];
                 };
             };
         };
