@@ -22,7 +22,11 @@ import {
 import { toast } from '@/components/ui/toaster';
 import { messageFor } from '@/lib/error-messages';
 import { usePrint } from '@/lib/print';
-import { useShipmentLabelDataMany, type ShipmentLabelData } from '@/features/wms/api/use-pda';
+import {
+  useMarkLabelsPrinted,
+  useShipmentLabelDataMany,
+  type ShipmentLabelData,
+} from '@/features/wms/api/use-pda';
 import { readOrientation, rememberOrientation } from '@/features/wms/components/label-print-dialog';
 import {
   WaybillLabelBatchPrintSheet,
@@ -93,6 +97,7 @@ export function ReprintWaybillDialog({
   const [printedAt, setPrintedAt] = useState(() => new Date());
   const printer = usePrint();
   const fetchLabels = useShipmentLabelDataMany();
+  const markPrinted = useMarkLabelsPrinted();
 
   const printable = shipments.filter((sh) => sh.trackingNo && !DEAD.has(sh.status));
   const skipped = total - printable.length;
@@ -109,6 +114,11 @@ export function ReprintWaybillDialog({
       setPrintedAt(new Date());
       setOpen(false);
       printer.print();
+      // Bộ lọc "In tem" của danh sách đơn (2026-11-02) — ghi nhận không chặn việc in.
+      markPrinted.mutate(
+        data.filter((l) => l.trackingNo).map((l) => l.shipmentId),
+        { onError: () => undefined },
+      );
     } catch (err) {
       toast.error(messageFor(err));
     }

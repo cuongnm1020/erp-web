@@ -185,6 +185,31 @@ const MESSAGES: Record<string, string> = {
     'Đơn đã đóng gói, hàng đã trừ kho — không hủy được. Xử lý bằng hoàn hàng / nhập lại kho.',
   SHIPMENT_CANCELLED: 'Phiếu giao này đã hủy theo đơn — không đóng gói / giao hãng được nữa.',
   SHIPMENT_CANCEL_VIA_ORDER: 'Muốn hủy phiếu giao thì hủy đơn bán, không đổi tay trạng thái phiếu.',
+  // "Đóng gói + in vận đơn" (bulk-fulfil) — mã trước đây rơi về câu chung "Yêu cầu không hợp lệ"
+  // (2026-11-02, đơn SOP2611-1827xx).
+  ORDER_NOT_EDITABLE: 'Đơn đã kết thúc (đã chốt hoặc đã hủy) — không đóng gói được nữa.',
+  SHIPMENT_ALREADY_DISPATCHED:
+    'Hãng đã lấy hàng / phiếu giao đã rời kho — không đóng gói lại được. Kiểm tra tồn với quản lý kho.',
+  SHIPMENT_INVALID_TRANSITION:
+    'Phiếu giao không ở trạng thái đóng gói được (đã hủy / hãng đã xử lý). Mở đơn xem trạng thái phiếu giao.',
+  SHIPMENT_NOT_FOUND: 'Không tìm thấy phiếu giao của đơn. Tải lại danh sách rồi thử lại.',
+  SHIPMENT_NOT_PACKED: 'Phiếu giao chưa đóng gói — đóng gói trước rồi mới xin vận đơn / in tem.',
+  PACK_TASK_NOT_FOUND:
+    'Đơn chưa có việc đóng gói (PACK) — việc pick chưa xong hoặc chưa sinh. Thử lại sau ít phút.',
+  PACK_LINE_NO_RESERVATION:
+    'Hàng của đơn không còn được giữ chỗ trong kho (giữ chỗ đã nhả / tồn đã chuyển vị trí). Báo quản lý kho kiểm tồn và giữ chỗ lại cho đơn.',
+  RESERVATION_NOT_ACTIVE:
+    'Chỗ giữ hàng của đơn không còn hiệu lực (đã nhả hoặc đã dùng). Báo quản lý kho kiểm tồn của đơn.',
+  INSUFFICIENT_COST_LAYERS:
+    'Tồn của sản phẩm chưa có giá vốn (nhập tồn không qua phiếu nhập) — không trừ kho được. Báo kế toán / kho nhập giá vốn cho sản phẩm.',
+  BALANCE_INCONSISTENT: 'Số tồn của sản phẩm đang lệch sổ — báo IT số đơn để kiểm tra.',
+  TASK_INVALID_TRANSITION:
+    'Việc lấy hàng / đóng gói đang ở trạng thái không đóng được (sự cố / đã hủy). Mở bảng điều phối xử lý việc đó trước.',
+  INVALID_TASK_INPUT: 'Dữ liệu việc kho của đơn không hợp lệ. Báo IT số đơn.',
+  INVALID_SHIPPING_INPUT:
+    'Thông tin gửi hãng của đơn chưa hợp lệ (cân nặng / COD). Sửa đơn rồi thử lại.',
+  RECIPIENT_ADDRESS_MISSING:
+    'Đơn thiếu địa chỉ người nhận. Bổ sung địa chỉ ở màn sửa đơn rồi thử lại.',
   // Luồng đơn ERP (2026-10-31).
   ORDER_STAGE_LOCKED:
     'Kho đã xử lý đơn này (gửi hãng / chờ hàng / đang lấy hàng) — không sửa hay hủy được nữa. Liên hệ kho hoặc quản lý.',
@@ -344,6 +369,14 @@ export function messageForCode(code: string, status?: number): string {
     (status !== undefined ? BY_STATUS[status] : undefined) ??
     (status !== undefined && status >= 500 ? MESSAGES.SERVER_ERROR! : MESSAGES.BAD_REQUEST!)
   );
+}
+
+/**
+ * Câu cho lỗi TỪNG ĐƠN trong lô (bulk-fulfil, gửi hãng…, 2026-11-02): mã chưa có câu dịch thì nói rõ
+ * mã lỗi để kho báo IT — không rơi về câu chung "Yêu cầu không hợp lệ" (vô nghĩa với từng đơn).
+ */
+export function messageForItemCode(code: string): string {
+  return MESSAGES[code] ?? `Lỗi ${code} khi xử lý đơn này. Báo IT số đơn và mã lỗi.`;
 }
 
 /** Câu hiển thị cho mọi lỗi — ApiError hoặc lỗi JS bất kỳ. Không bao giờ trả message thô. */

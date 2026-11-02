@@ -135,6 +135,22 @@ export function useShipmentLabelDataMany() {
 }
 
 /**
+ * POST /sales-orders/labels-printed — ghi nhận đã mở lệnh in tem ERP 100×75 cho các phiếu (bộ lọc
+ * "In tem" của danh sách đơn, 2026-11-02). Gọi ngay khi mở hộp in; lỗi không chặn việc in nên
+ * người gọi dùng `mutate` (không chờ) và bỏ qua lỗi. Làm mới danh sách đơn (prefix crm/orders/list).
+ */
+export function useMarkLabelsPrinted() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (shipmentIds: string[]) =>
+      unwrap(api.POST('/sales-orders/labels-printed', { body: { shipmentIds } })),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ['crm', 'orders', 'list'] });
+    },
+  });
+}
+
+/**
  * GET /pda/packed/:taskId — đơn đã đóng gói: dòng đã đóng + phiếu giao, để xem lại và in lại
  * nhãn vận đơn (chưa kịp in, máy in lỗi, hãng chưa cấp lúc đóng). Quyền shipment.pack.
  */

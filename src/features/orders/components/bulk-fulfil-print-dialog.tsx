@@ -22,9 +22,13 @@ import {
 } from '@/components/ui/select';
 import { toast } from '@/components/ui/toaster';
 import { cn } from '@/lib/cn';
-import { carrierSaid, messageFor, messageForCode } from '@/lib/error-messages';
+import { carrierSaid, messageFor, messageForItemCode } from '@/lib/error-messages';
 import { usePrint } from '@/lib/print';
-import { useShipmentLabelDataMany, type ShipmentLabelData } from '@/features/wms/api/use-pda';
+import {
+  useMarkLabelsPrinted,
+  useShipmentLabelDataMany,
+  type ShipmentLabelData,
+} from '@/features/wms/api/use-pda';
 import { readOrientation, rememberOrientation } from '@/features/wms/components/label-print-dialog';
 import {
   WaybillLabelBatchPrintSheet,
@@ -50,8 +54,8 @@ export interface FulfilPrintOutcome {
 /** Lý do theo mã lỗi (luật 6) + nguyên văn lời hãng; đơn đã trừ tồn thì nói rõ đừng đóng lại. */
 function failedReason(f: Failed): string {
   const base = f.carrierMessage
-    ? `${messageForCode(f.code)} ${carrierSaid(f.carrierMessage)}`
-    : messageForCode(f.code);
+    ? `${messageForItemCode(f.code)} ${carrierSaid(f.carrierMessage)}`
+    : messageForItemCode(f.code);
   return f.packed
     ? `Đã đóng gói (đã trừ tồn) nhưng chưa có mã vận đơn — ${base} Sửa đơn rồi gửi lại hãng, không đóng gói lại.`
     : base;
@@ -71,6 +75,7 @@ export function useFulfilPrint() {
   const printer = usePrint();
   const bulk = useBulkFulfilOrders();
   const fetchLabels = useShipmentLabelDataMany();
+  const markPrinted = useMarkLabelsPrinted();
 
   const setOrientation = (v: WaybillOrientation) => {
     setOrientationState(v);
@@ -114,6 +119,11 @@ export function useFulfilPrint() {
           setLabels(data);
           setPrintedAt(new Date());
           printer.print();
+          // Bộ lọc "In tem" của danh sách đơn (2026-11-02) — ghi nhận không chặn việc in.
+          markPrinted.mutate(
+            data.filter((l) => l.trackingNo).map((l) => l.shipmentId),
+            { onError: () => undefined },
+          );
         } else toast.error('Không lấy được dữ liệu tem của đơn nào.');
       }
       if (r.done.length > 0) {
