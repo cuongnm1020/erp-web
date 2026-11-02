@@ -3,7 +3,7 @@
 import Decimal from 'decimal.js';
 import { Lock, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { useCallback, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useFieldArray, useForm, useWatch, type UseFormReturn } from 'react-hook-form';
 import { Form } from '@/components/data/form';
 import { cn } from '@/lib/cn';
@@ -154,6 +154,7 @@ export function OrderEditLines({
   removedCustom,
   onRemoveCustom,
   readOnly,
+  onSubtotal,
 }: {
   form: LinesForm;
   order: SalesOrderDetail;
@@ -164,6 +165,8 @@ export function OrderEditLines({
   onRemoveCustom: (key: string) => void;
   /** Danh sách chỉ đọc (khi khóa) — màn cha vẽ bảng cũ. */
   readOnly: React.ReactNode;
+  /** Tạm tính giỏ đang sửa (null = còn dòng chưa có giá) — màn cha tính lại thẻ Giá trị đơn hàng. */
+  onSubtotal?: (subtotal: string | null) => void;
 }) {
   const lines = useFieldArray({ control: form.control, name: 'lines' });
   const searchRef = useRef<HTMLInputElement>(null);
@@ -200,6 +203,9 @@ export function OrderEditLines({
     if (priced.length !== lines.fields.length) return null;
     return priced.reduce((a, [, m]) => a.plus(m.total as string), new Decimal(0)).toFixed(4);
   }, [metrics, lines.fields]);
+  useEffect(() => {
+    onSubtotal?.(subtotal);
+  }, [onSubtotal, subtotal]);
 
   if (lockedReason) {
     return (
