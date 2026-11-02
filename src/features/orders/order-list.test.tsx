@@ -448,6 +448,7 @@ describe('OrderListScreen — cân nặng gửi hãng + gán hãng hàng loạt'
   it('chọn 3 đơn (1 đã hủy) → "Hủy đơn" → POST /sales-orders/bulk-cancel chỉ 2 đơn còn hủy được + lý do, báo đơn lỗi, bỏ chọn', async () => {
     search = '';
     toastSuccess.mockClear();
+    toastError.mockClear();
     const bodies: Record<string, unknown>[] = [];
     server.use(
       http.post('/api/sales-orders/bulk-cancel', async ({ request }) => {
@@ -462,14 +463,17 @@ describe('OrderListScreen — cân nặng gửi hãng + gán hãng hàng loạt'
                 docNumber: 'SO-A',
                 status: 'CANCELLED',
                 releasedReservationIds: [],
+                carrierCancel: 'CANCELLED',
+                returnReceiptDocNumber: null,
               },
             ],
             failed: [
               {
                 orderId: second,
                 docNumber: 'SO-B',
-                code: 'ORDER_ALREADY_PACKED',
-                message: 'đã đóng gói',
+                code: 'ORDER_CARRIER_CANCEL_REJECTED',
+                message: 'hãng từ chối',
+                carrierMessage: 'Đơn đã lấy hàng',
               },
             ],
           },
@@ -491,7 +495,8 @@ describe('OrderListScreen — cân nặng gửi hãng + gán hãng hàng loạt'
     fireEvent.click(await within(toolbar).findByRole('button', { name: /Hủy đơn/ }));
     const dialog = await screen.findByRole('dialog');
     expect(dialog).toHaveTextContent('Hủy 2 đơn đã chọn?');
-    expect(dialog).toHaveTextContent('1 đơn đã hủy hoặc kho đã đóng gói sẽ bị bỏ qua');
+    // Người test có quyền hủy sau khi gán ĐVVC → chỉ bỏ đơn đã hủy / hãng đã lấy hàng.
+    expect(dialog).toHaveTextContent('1 đơn đã hủy hoặc hãng đã lấy hàng sẽ bị bỏ qua');
     fireEvent.change(screen.getByLabelText('Lý do hủy (tùy chọn)'), {
       target: { value: ' Khách đổi ý ' },
     });
@@ -499,11 +504,21 @@ describe('OrderListScreen — cân nặng gửi hãng + gán hãng hàng loạt'
 
     await waitFor(() => expect(bodies).toHaveLength(1));
     expect(bodies[0]).toEqual({ orderIds: [rows[0]!.id, rows[1]!.id], reason: 'Khách đổi ý' });
+    // Hủy được: báo đã hủy vận đơn bên hãng (2026-11-02).
     await waitFor(() =>
       expect(toastSuccess).toHaveBeenCalledWith(
         'Đã hủy 1 đơn',
-        expect.objectContaining({ description: '1 đơn không hủy được: SO-B' }),
+        expect.objectContaining({ description: 'Đã hủy 1 vận đơn bên hãng.' }),
       ),
+    );
+    // Không hủy được: lý do theo mã + nguyên văn lời hãng, không phải message thô (luật 6).
+    expect(toastError).toHaveBeenCalledWith(
+      '1 đơn KHÔNG hủy được',
+      expect.objectContaining({
+        description: expect.stringMatching(
+          /^SO-B: Hãng không đồng ý hủy vận đơn.*“Đơn đã lấy hàng”/,
+        ),
+      }),
     );
     await waitFor(() => expect(screen.queryByRole('toolbar')).not.toBeInTheDocument());
   });

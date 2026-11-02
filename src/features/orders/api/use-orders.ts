@@ -508,6 +508,8 @@ export function useBulkUpdateOrders() {
 }
 
 export type BulkCancelOrdersBody = components['schemas']['BulkCancelOrdersDto'];
+/** Kết quả hủy một đơn — kèm kết quả hủy vận đơn bên hãng + phiếu nhập lại kho (2026-11-02). */
+export type CancelOrderResult = components['schemas']['CancelOrderResultDto'];
 
 /**
  * POST /sales-orders/bulk-cancel — hủy các đơn chọn trên danh sách, cùng một lý do. Server hủy

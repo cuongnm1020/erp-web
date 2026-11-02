@@ -4424,6 +4424,77 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/return-receipts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["ReturnsController_list"];
+        put?: never;
+        /** Tạo phiếu DRAFT (chưa chạm tồn). `Idempotency-Key` header hoặc body (luật 4 web). */
+        post: operations["ReturnsController_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/return-receipts/returnable": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Dòng đơn còn hoàn được (đã xuất − đã hoàn) + bin / lô / giá vốn mặc định. `?code=` = mã quét
+         *     trên kiện hoàn (số đơn / vận đơn hãng / số phiếu giao) — PDA và camera điện thoại dùng.
+         */
+        get: operations["ReturnsController_returnable"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/return-receipts/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["ReturnsController_get"];
+        put?: never;
+        post?: never;
+        /** Hủy phiếu NHÁP (idempotent). */
+        delete: operations["ReturnsController_cancel"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/return-receipts/{id}/post": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** POST phiếu: nhập lại kho dòng RESTOCK + chốt giá vốn. Gọi lại → 409 DOCUMENT_POSTED. */
+        post: operations["ReturnsController_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/sales-orders/move-warehouse": {
         parameters: {
             query?: never;
@@ -5088,77 +5159,6 @@ export interface paths {
         get: operations["WaitingStockController_match"];
         put?: never;
         post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/return-receipts": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get: operations["ReturnsController_list"];
-        put?: never;
-        /** Tạo phiếu DRAFT (chưa chạm tồn). `Idempotency-Key` header hoặc body (luật 4 web). */
-        post: operations["ReturnsController_create"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/return-receipts/returnable": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Dòng đơn còn hoàn được (đã xuất − đã hoàn) + bin / lô / giá vốn mặc định. `?code=` = mã quét
-         *     trên kiện hoàn (số đơn / vận đơn hãng / số phiếu giao) — PDA và camera điện thoại dùng.
-         */
-        get: operations["ReturnsController_returnable"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/return-receipts/{id}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get: operations["ReturnsController_get"];
-        put?: never;
-        post?: never;
-        /** Hủy phiếu NHÁP (idempotent). */
-        delete: operations["ReturnsController_cancel"];
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/return-receipts/{id}/post": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** POST phiếu: nhập lại kho dòng RESTOCK + chốt giá vốn. Gọi lại → 409 DOCUMENT_POSTED. */
-        post: operations["ReturnsController_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -12656,11 +12656,31 @@ export interface components {
             /** @enum {string} */
             status: "DRAFT" | "PENDING_APPROVAL" | "APPROVED" | "POSTED" | "CANCELLED";
             releasedReservationIds: string[];
+            /**
+             * @description Hủy vận đơn bên hãng (2026-11-02): `CANCELLED` đã hủy trên hệ thống hãng; `MANUAL_REQUIRED`
+             *     hãng không hủy được qua API — hủy tay trên portal hãng; `NONE` không có vận đơn để hủy.
+             * @enum {string}
+             */
+            carrierCancel: "NONE" | "CANCELLED" | "MANUAL_REQUIRED";
+            /** @description Số phiếu nhập hàng hoàn tự tạo khi hủy đơn đã đóng gói (hàng về kho); null = không có. */
+            returnReceiptDocNumber: string | null;
+        };
+        BulkCancelFailedItemDto: {
+            orderId: string;
+            docNumber: string | null;
+            /** @description Mã lỗi nghiệp vụ (NOT_FOUND, ORDER_NOT_EDITABLE…). */
+            code: string;
+            message: string;
+            /** @description Lời hãng khi `code = ORDER_CARRIER_CANCEL_REJECTED`; null nếu không phải. */
+            carrierMessage: string | null;
         };
         BulkCancelOrdersResultDto: {
             cancelled: components["schemas"]["CancelOrderResultDto"][];
-            /** @description Đơn không hủy được (ORDER_ALREADY_PACKED, INVALID_TRANSITION, NOT_FOUND…). */
-            failed: components["schemas"]["BulkUpdateFailedItemDto"][];
+            /**
+             * @description Đơn không hủy được (ORDER_ALREADY_PACKED, ORDER_CARRIER_PICKED_UP,
+             *     ORDER_CARRIER_CANCEL_REJECTED, ORDER_CARRIER_CANCEL_FAILED, INVALID_TRANSITION, NOT_FOUND…).
+             */
+            failed: components["schemas"]["BulkCancelFailedItemDto"][];
         };
         CancelOrderDto: {
             reason?: string;
@@ -12981,6 +13001,149 @@ export interface components {
         StuckShipmentListDto: {
             items: components["schemas"]["StuckShipmentDto"][];
             total: number;
+        };
+        ReturnReceiptListRowDto: {
+            id: string;
+            docNumber: string;
+            /** @enum {string} */
+            status: "DRAFT" | "PENDING_APPROVAL" | "APPROVED" | "POSTED" | "CANCELLED";
+            orderId: string;
+            orderDocNumber: string;
+            warehouseId: string;
+            warehouseName: string;
+            reason: string | null;
+            /** @description ISO datetime. */
+            receivedAt: string;
+            lineCount: number;
+            /** @description Σ SL hoàn (ĐVT cơ sở). */
+            totalQty: string;
+        };
+        ReturnReceiptListResponseDto: {
+            items: components["schemas"]["ReturnReceiptListRowDto"][];
+            total: number;
+        };
+        ReturnShipmentDto: {
+            id: string;
+            docNumber: string;
+            /** @description Mã vận đơn hãng. null = chưa có vận đơn. */
+            trackingNo: string | null;
+            carrierCode: string | null;
+            carrierName: string | null;
+            /** @enum {string} */
+            status: "CANCELLED" | "PENDING" | "IN_TRANSIT" | "OUT_FOR_DELIVERY" | "DELIVERED" | "FAILED" | "RETURNED" | "CARRIER_CANCELLED" | "PICKED_UP";
+            /** @description Gửi qua kết nối hãng của Pancake — ERP không trừ tồn lúc gửi. */
+            shippedOutsideErp: boolean;
+        };
+        ReturnableLineDto: {
+            orderLineId: string;
+            lineNo: number;
+            skuId: string;
+            skuCode: string;
+            skuName: string;
+            /** @description SL đặt (ĐVT cơ sở). */
+            qtyOrdered: string;
+            /** @description SL đã xuất kho (trừ tồn lúc PACK). */
+            qtyShipped: string;
+            /** @description Đã hoàn ở các phiếu POSTED. */
+            qtyReturned: string;
+            /** @description qtyShipped − qtyReturned. */
+            qtyReturnable: string;
+            /** @description Giá vốn FIFO bình quân đã xuất — giá nhập lại kho. null = chưa xuất. */
+            unitCost: string | null;
+            /** @description Bin + lô mặc định nhận lại (nơi đã lấy nhiều nhất). */
+            defaultLocationId: string | null;
+            defaultLocationCode: string | null;
+            defaultLotId: string | null;
+            defaultLotNumber: string | null;
+        };
+        ReturnableOrderDto: {
+            orderId: string;
+            docNumber: string;
+            status: string;
+            /**
+             * @description Đơn gửi ngoài ERP, kho chưa từng trừ tồn (2026-10-24, user chốt): SL hoàn được tính theo SL đặt
+             *     thay vì SL đã xuất, nhận lại vào vị trí DEFAULT, giá vốn theo lô FIFO đang mở.
+             */
+            stockNotDeducted: boolean;
+            /** @description Phiếu giao còn hiệu lực gần nhất (hoặc phiếu khớp mã quét). null = đơn chưa có phiếu giao. */
+            shipment: components["schemas"]["ReturnShipmentDto"] | null;
+            lines: components["schemas"]["ReturnableLineDto"][];
+        };
+        ReturnReceiptLineDto: {
+            id: string;
+            lineNo: number;
+            orderLineId: string;
+            skuId: string;
+            skuCode: string;
+            skuName: string;
+            qtyBase: string;
+            /** @enum {string} */
+            disposition: "SCRAP" | "RESTOCK";
+            locationId: string | null;
+            locationCode: string | null;
+            lotId: string | null;
+            lotNumber: string | null;
+            /** @description Có sau POST: giá vốn FIFO bình quân đã xuất. */
+            unitCost: string | null;
+            costAmount: string | null;
+        };
+        ReturnReceiptDetailDto: {
+            id: string;
+            docNumber: string;
+            /** @enum {string} */
+            status: "DRAFT" | "PENDING_APPROVAL" | "APPROVED" | "POSTED" | "CANCELLED";
+            orderId: string;
+            orderDocNumber: string;
+            warehouseId: string;
+            warehouseName: string;
+            reason: string | null;
+            /** @description ISO datetime. */
+            receivedAt: string;
+            lineCount: number;
+            /** @description Σ SL hoàn (ĐVT cơ sở). */
+            totalQty: string;
+            note: string | null;
+            /** @description ISO datetime, null khi chưa POST. */
+            postedAt: string | null;
+            lines: components["schemas"]["ReturnReceiptLineDto"][];
+        };
+        CreateReturnLineDto: {
+            /**
+             * Format: uuid
+             * @description core.SalesOrderLine.id của đơn đang hoàn.
+             */
+            orderLineId: string;
+            /** @description SL hoàn theo ĐVT cơ sở — Decimal(18,6) chuỗi, > 0. */
+            qty: string;
+            /**
+             * @description RESTOCK (mặc định) = nhập lại kho; SCRAP = hỏng, không nhập kho.
+             * @enum {string}
+             */
+            disposition?: "SCRAP" | "RESTOCK";
+            /**
+             * Format: uuid
+             * @description Bin nhận lại (RESTOCK) — bỏ trống = bin đã lấy hàng cho dòng đơn này.
+             */
+            locationId?: string;
+            /**
+             * Format: uuid
+             * @description Lô nhận lại — phải là lô đã xuất cho dòng; bỏ trống = lô xuất nhiều nhất.
+             */
+            lotId?: string;
+        };
+        CreateReturnReceiptDto: {
+            /** Format: uuid */
+            orderId: string;
+            reason?: string;
+            note?: string;
+            /** @description Header `Idempotency-Key` thắng nếu có cả hai (luật 4 phía web). */
+            idempotencyKey?: string;
+            lines: components["schemas"]["CreateReturnLineDto"][];
+        };
+        CreateReturnReceiptResponseDto: {
+            receiptId: string;
+            docNumber: string;
+            status: string;
         };
         MoveOrdersWarehouseDto: {
             orderIds: string[];
@@ -14115,149 +14278,6 @@ export interface components {
             lines: components["schemas"]["WaitingMatchLineDto"][];
             /** @description Đơn PARTIAL, chờ lâu trước (tối đa 200). */
             warnings: components["schemas"]["WaitingMatchOrderDto"][];
-        };
-        ReturnReceiptListRowDto: {
-            id: string;
-            docNumber: string;
-            /** @enum {string} */
-            status: "DRAFT" | "PENDING_APPROVAL" | "APPROVED" | "POSTED" | "CANCELLED";
-            orderId: string;
-            orderDocNumber: string;
-            warehouseId: string;
-            warehouseName: string;
-            reason: string | null;
-            /** @description ISO datetime. */
-            receivedAt: string;
-            lineCount: number;
-            /** @description Σ SL hoàn (ĐVT cơ sở). */
-            totalQty: string;
-        };
-        ReturnReceiptListResponseDto: {
-            items: components["schemas"]["ReturnReceiptListRowDto"][];
-            total: number;
-        };
-        ReturnShipmentDto: {
-            id: string;
-            docNumber: string;
-            /** @description Mã vận đơn hãng. null = chưa có vận đơn. */
-            trackingNo: string | null;
-            carrierCode: string | null;
-            carrierName: string | null;
-            /** @enum {string} */
-            status: "CANCELLED" | "PENDING" | "IN_TRANSIT" | "OUT_FOR_DELIVERY" | "DELIVERED" | "FAILED" | "RETURNED" | "CARRIER_CANCELLED" | "PICKED_UP";
-            /** @description Gửi qua kết nối hãng của Pancake — ERP không trừ tồn lúc gửi. */
-            shippedOutsideErp: boolean;
-        };
-        ReturnableLineDto: {
-            orderLineId: string;
-            lineNo: number;
-            skuId: string;
-            skuCode: string;
-            skuName: string;
-            /** @description SL đặt (ĐVT cơ sở). */
-            qtyOrdered: string;
-            /** @description SL đã xuất kho (trừ tồn lúc PACK). */
-            qtyShipped: string;
-            /** @description Đã hoàn ở các phiếu POSTED. */
-            qtyReturned: string;
-            /** @description qtyShipped − qtyReturned. */
-            qtyReturnable: string;
-            /** @description Giá vốn FIFO bình quân đã xuất — giá nhập lại kho. null = chưa xuất. */
-            unitCost: string | null;
-            /** @description Bin + lô mặc định nhận lại (nơi đã lấy nhiều nhất). */
-            defaultLocationId: string | null;
-            defaultLocationCode: string | null;
-            defaultLotId: string | null;
-            defaultLotNumber: string | null;
-        };
-        ReturnableOrderDto: {
-            orderId: string;
-            docNumber: string;
-            status: string;
-            /**
-             * @description Đơn gửi ngoài ERP, kho chưa từng trừ tồn (2026-10-24, user chốt): SL hoàn được tính theo SL đặt
-             *     thay vì SL đã xuất, nhận lại vào vị trí DEFAULT, giá vốn theo lô FIFO đang mở.
-             */
-            stockNotDeducted: boolean;
-            /** @description Phiếu giao còn hiệu lực gần nhất (hoặc phiếu khớp mã quét). null = đơn chưa có phiếu giao. */
-            shipment: components["schemas"]["ReturnShipmentDto"] | null;
-            lines: components["schemas"]["ReturnableLineDto"][];
-        };
-        ReturnReceiptLineDto: {
-            id: string;
-            lineNo: number;
-            orderLineId: string;
-            skuId: string;
-            skuCode: string;
-            skuName: string;
-            qtyBase: string;
-            /** @enum {string} */
-            disposition: "SCRAP" | "RESTOCK";
-            locationId: string | null;
-            locationCode: string | null;
-            lotId: string | null;
-            lotNumber: string | null;
-            /** @description Có sau POST: giá vốn FIFO bình quân đã xuất. */
-            unitCost: string | null;
-            costAmount: string | null;
-        };
-        ReturnReceiptDetailDto: {
-            id: string;
-            docNumber: string;
-            /** @enum {string} */
-            status: "DRAFT" | "PENDING_APPROVAL" | "APPROVED" | "POSTED" | "CANCELLED";
-            orderId: string;
-            orderDocNumber: string;
-            warehouseId: string;
-            warehouseName: string;
-            reason: string | null;
-            /** @description ISO datetime. */
-            receivedAt: string;
-            lineCount: number;
-            /** @description Σ SL hoàn (ĐVT cơ sở). */
-            totalQty: string;
-            note: string | null;
-            /** @description ISO datetime, null khi chưa POST. */
-            postedAt: string | null;
-            lines: components["schemas"]["ReturnReceiptLineDto"][];
-        };
-        CreateReturnLineDto: {
-            /**
-             * Format: uuid
-             * @description core.SalesOrderLine.id của đơn đang hoàn.
-             */
-            orderLineId: string;
-            /** @description SL hoàn theo ĐVT cơ sở — Decimal(18,6) chuỗi, > 0. */
-            qty: string;
-            /**
-             * @description RESTOCK (mặc định) = nhập lại kho; SCRAP = hỏng, không nhập kho.
-             * @enum {string}
-             */
-            disposition?: "SCRAP" | "RESTOCK";
-            /**
-             * Format: uuid
-             * @description Bin nhận lại (RESTOCK) — bỏ trống = bin đã lấy hàng cho dòng đơn này.
-             */
-            locationId?: string;
-            /**
-             * Format: uuid
-             * @description Lô nhận lại — phải là lô đã xuất cho dòng; bỏ trống = lô xuất nhiều nhất.
-             */
-            lotId?: string;
-        };
-        CreateReturnReceiptDto: {
-            /** Format: uuid */
-            orderId: string;
-            reason?: string;
-            note?: string;
-            /** @description Header `Idempotency-Key` thắng nếu có cả hai (luật 4 phía web). */
-            idempotencyKey?: string;
-            lines: components["schemas"]["CreateReturnLineDto"][];
-        };
-        CreateReturnReceiptResponseDto: {
-            receiptId: string;
-            docNumber: string;
-            status: string;
         };
         ProfitSummaryDto: {
             orderCount: number;
@@ -24315,6 +24335,147 @@ export interface operations {
             };
         };
     };
+    ReturnsController_list: {
+        parameters: {
+            query: {
+                orderId?: string;
+                /** @description Kho nhận hàng hoàn (mặc định theo kho đang chọn — header X-Warehouse-Id). */
+                warehouseId?: string;
+                status?: "DRAFT" | "PENDING_APPROVAL" | "APPROVED" | "POSTED" | "CANCELLED";
+                /** @description Số phiếu RTN (contains, không phân biệt hoa thường). */
+                q?: string;
+                take: number;
+                skip: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReturnReceiptListResponseDto"];
+                };
+            };
+        };
+    };
+    ReturnsController_create: {
+        parameters: {
+            query?: never;
+            header: {
+                "idempotency-key": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateReturnReceiptDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CreateReturnReceiptResponseDto"];
+                };
+            };
+        };
+    };
+    ReturnsController_returnable: {
+        parameters: {
+            query?: {
+                orderId?: string;
+                docNumber?: string;
+                /**
+                 * @description Mã quét / gõ trên kiện hoàn về (2026-10-24): số đơn bán, mã vận đơn hãng, số phiếu giao, hoặc
+                 *     đoạn số cuối trên mã vạch tem GHTK.
+                 */
+                code?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReturnableOrderDto"];
+                };
+            };
+        };
+    };
+    ReturnsController_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReturnReceiptDetailDto"];
+                };
+            };
+        };
+    };
+    ReturnsController_cancel: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    ReturnsController_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReturnReceiptDetailDto"];
+                };
+            };
+        };
+    };
     OrderWarehouseController_move: {
         parameters: {
             query?: never;
@@ -25201,147 +25362,6 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["WaitingMatchDto"];
-                };
-            };
-        };
-    };
-    ReturnsController_list: {
-        parameters: {
-            query: {
-                orderId?: string;
-                /** @description Kho nhận hàng hoàn (mặc định theo kho đang chọn — header X-Warehouse-Id). */
-                warehouseId?: string;
-                status?: "DRAFT" | "PENDING_APPROVAL" | "APPROVED" | "POSTED" | "CANCELLED";
-                /** @description Số phiếu RTN (contains, không phân biệt hoa thường). */
-                q?: string;
-                take: number;
-                skip: number;
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ReturnReceiptListResponseDto"];
-                };
-            };
-        };
-    };
-    ReturnsController_create: {
-        parameters: {
-            query?: never;
-            header: {
-                "idempotency-key": string;
-            };
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["CreateReturnReceiptDto"];
-            };
-        };
-        responses: {
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["CreateReturnReceiptResponseDto"];
-                };
-            };
-        };
-    };
-    ReturnsController_returnable: {
-        parameters: {
-            query?: {
-                orderId?: string;
-                docNumber?: string;
-                /**
-                 * @description Mã quét / gõ trên kiện hoàn về (2026-10-24): số đơn bán, mã vận đơn hãng, số phiếu giao, hoặc
-                 *     đoạn số cuối trên mã vạch tem GHTK.
-                 */
-                code?: string;
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ReturnableOrderDto"];
-                };
-            };
-        };
-    };
-    ReturnsController_get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ReturnReceiptDetailDto"];
-                };
-            };
-        };
-    };
-    ReturnsController_cancel: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            204: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    ReturnsController_post: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ReturnReceiptDetailDto"];
                 };
             };
         };

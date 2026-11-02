@@ -280,6 +280,8 @@ interface RowActionContext {
    * đơn chỉ sửa / hủy ở Đơn mới / Chờ duyệt / Đã xác nhận (2026-10-31; server kiểm lại chính xác).
    */
   canCancelAny: boolean;
+  /** `sales_order.cancel_after_carrier` — hủy cả đơn đã đóng gói mà hãng chưa lấy (2026-11-02). */
+  canCancelAfterCarrier: boolean;
   canEditAny: boolean;
   onConfirm: (row: SalesOrderListItem) => void;
   onPeek: (row: SalesOrderListItem) => void;
@@ -356,9 +358,11 @@ function orderRowItems(o: SalesOrderListItem, ctx: RowActionContext): RowActionI
             disabledReason:
               o.status === 'CANCELLED'
                 ? 'Đơn đã hủy'
-                : !orderCancellable(o.status, o.fulfilmentStatus)
-                  ? 'Kho đã đóng gói — xử lý bằng hoàn hàng'
-                  : !stageOpen && !ctx.canCancelAny
+                : !orderCancellable(o.status, o.fulfilmentStatus, ctx.canCancelAfterCarrier)
+                  ? ctx.canCancelAfterCarrier
+                    ? 'Hãng đã lấy hàng — xử lý bằng hoàn hàng'
+                    : 'Kho đã đóng gói — nhờ trưởng phòng / quản trị hủy'
+                  : !stageOpen && !ctx.canCancelAny && !ctx.canCancelAfterCarrier
                     ? STAGE_LOCKED
                     : undefined,
           },
@@ -1271,8 +1275,9 @@ export function OrderListScreen() {
   const canCreate = ability.can('create', 'SalesOrder');
   const canPack = ability.can('pack', 'Shipment');
   const canCancelAny = ability.can('cancel', 'SalesOrder');
+  const canCancelAfterCarrier = ability.can('cancel_after_carrier', 'SalesOrder');
   const canEditAny = ability.can('edit_all', 'SalesOrder');
-  const canCancel = canCancelAny || canCreate;
+  const canCancel = canCancelAny || canCancelAfterCarrier || canCreate;
   const confirmOrder = useConfirmOrder();
   const creatorOptions = useOrderCreatorOptions(canFilterTeam);
   const [peek, setPeek] = useState<SalesOrderListItem | null>(null);
@@ -1287,6 +1292,7 @@ export function OrderListScreen() {
       canPack,
       canCancel,
       canCancelAny,
+      canCancelAfterCarrier,
       canEditAny,
       onPeek: setPeek,
       onCancel: setCancelling,
@@ -1312,7 +1318,16 @@ export function OrderListScreen() {
     return all;
     // requestWaybill.mutate ổn định giữa các lần render (TanStack Query).
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [carriers.data, canUpdate, canCreate, canPack, canCancel, canCancelAny, canEditAny]);
+  }, [
+    carriers.data,
+    canUpdate,
+    canCreate,
+    canPack,
+    canCancel,
+    canCancelAny,
+    canCancelAfterCarrier,
+    canEditAny,
+  ]);
   const pickerColumns = useMemo(
     () =>
       columns
@@ -1760,7 +1775,10 @@ function OrderBulkBar({ rows, onClear }: { rows: SalesOrderListItem[]; onClear: 
       },
     );
   const canReprint = ability.can('pack', 'Shipment');
-  const canCancel = ability.can('cancel', 'SalesOrder') || ability.can('create', 'SalesOrder');
+  const canCancel =
+    ability.can('cancel', 'SalesOrder') ||
+    ability.can('cancel_after_carrier', 'SalesOrder') ||
+    ability.can('create', 'SalesOrder');
 
   return (
     <div className="mb-3">
