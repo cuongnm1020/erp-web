@@ -23,8 +23,8 @@ import { useOrderCropOptions } from '../../api/use-order-create';
 import type { CreateOrderValues } from '../../schema';
 
 /**
- * Thông tin khai thác của KHÁCH MỚI trên màn tạo đơn (2026-11-02) — 4 mục bắt buộc, gửi kèm khối
- * `customer` khi chốt đơn. Chỉ hiện khi SĐT chưa có khách nào.
+ * Thông tin khai thác của KHÁCH MỚI trên màn tạo đơn (2026-11-02) — tạm KHÔNG bắt buộc (mục nào
+ * điền thì gửi kèm khối `customer` khi chốt đơn). Chỉ hiện khi SĐT chưa có khách nào.
  */
 export function NewCustomerFarm({ form }: { form: UseFormReturn<CreateOrderValues> }) {
   const crops = useOrderCropOptions(true);
@@ -39,7 +39,7 @@ export function NewCustomerFarm({ form }: { form: UseFormReturn<CreateOrderValue
           name="farmArea"
           render={({ field }) => (
             <FormItem className="flex-1">
-              <FormLabel required>Diện tích</FormLabel>
+              <FormLabel>Diện tích</FormLabel>
               <FormControl>
                 <Input
                   {...field}
@@ -57,7 +57,7 @@ export function NewCustomerFarm({ form }: { form: UseFormReturn<CreateOrderValue
           name="farmAreaUnit"
           render={({ field }) => (
             <FormItem className="w-24">
-              <FormLabel required>Đơn vị</FormLabel>
+              <FormLabel>Đơn vị</FormLabel>
               <Select value={field.value || undefined} onValueChange={field.onChange}>
                 <FormControl>
                   <SelectTrigger aria-label="Đơn vị diện tích">
@@ -82,7 +82,7 @@ export function NewCustomerFarm({ form }: { form: UseFormReturn<CreateOrderValue
         name="treeAge"
         render={({ field }) => (
           <FormItem>
-            <FormLabel required>Độ tuổi cây</FormLabel>
+            <FormLabel>Độ tuổi cây</FormLabel>
             <FormControl>
               <Input {...field} placeholder="vd: 3 năm, mới trồng" />
             </FormControl>
@@ -95,7 +95,7 @@ export function NewCustomerFarm({ form }: { form: UseFormReturn<CreateOrderValue
         name="crops"
         render={({ field }) => (
           <FormItem className="sm:col-span-2">
-            <FormLabel required>Cây trồng</FormLabel>
+            <FormLabel>Cây trồng</FormLabel>
             <FormControl>
               <TagsInput
                 ref={field.ref}
@@ -115,7 +115,7 @@ export function NewCustomerFarm({ form }: { form: UseFormReturn<CreateOrderValue
         name="diseaseHistory"
         render={({ field }) => (
           <FormItem className="sm:col-span-2">
-            <FormLabel required>Lịch sử bệnh</FormLabel>
+            <FormLabel>Lịch sử bệnh</FormLabel>
             <FormControl>
               <Textarea
                 {...field}

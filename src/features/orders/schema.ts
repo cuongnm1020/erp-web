@@ -102,7 +102,7 @@ export const createOrderSchema = z
     customerBirthday: dateKeySchema.or(z.literal('')),
     customerGender: z.enum(GENDERS).or(z.literal('')),
     /**
-     * Thông tin khai thác (2026-11-02) — BẮT BUỘC khi khách MỚI (`customerIsNew`, màn tính từ tra
+     * Thông tin khai thác (2026-11-02) — hỏi khi khách MỚI, tạm KHÔNG bắt buộc (`customerIsNew`, màn tính từ tra
      * SĐT); khách đã có thì không hỏi. Luật giá trị: customerFarmProfileSchema (lib/shared).
      */
     customerIsNew: z.boolean(),
@@ -177,21 +177,20 @@ export const createOrderSchema = z
         issue('customerPhone', 'Số điện thoại không hợp lệ');
       }
     }
-    // Khách mới: đủ 4 mục khai thác theo luật chung (lỗi gắn đúng ô).
+    // Khách mới: thông tin khai thác KHÔNG bắt buộc (tạm bỏ 2026-11-02) — mục nào điền thì phải
+    // đúng luật chung (customerFarmProfileSchema); có diện tích thì phải chọn đơn vị.
     if (!v.customerId && v.customerIsNew) {
-      const farm = customerFarmProfileSchema.safeParse({
-        farmArea: normalizeFarmArea(v.farmArea),
-        farmAreaUnit: v.farmAreaUnit === '' ? undefined : v.farmAreaUnit,
-        crops: v.crops,
-        treeAge: v.treeAge,
-        diseaseHistory: v.diseaseHistory,
+      const farm = customerFarmProfileSchema.partial().safeParse({
+        ...(v.farmArea !== '' ? { farmArea: normalizeFarmArea(v.farmArea) } : {}),
+        ...(v.farmAreaUnit !== '' ? { farmAreaUnit: v.farmAreaUnit } : {}),
+        ...(v.crops.length ? { crops: v.crops } : {}),
+        ...(v.treeAge.trim() !== '' ? { treeAge: v.treeAge } : {}),
+        ...(v.diseaseHistory.trim() !== '' ? { diseaseHistory: v.diseaseHistory } : {}),
       });
       if (!farm.success) {
-        for (const i of farm.error.issues) {
-          const path = String(i.path[0]);
-          issue(path, path === 'farmAreaUnit' ? 'Chọn đơn vị' : i.message);
-        }
+        for (const i of farm.error.issues) issue(String(i.path[0]), i.message);
       }
+      if (v.farmArea !== '' && v.farmAreaUnit === '') issue('farmAreaUnit', 'Chọn đơn vị');
     }
     // Địa chỉ gõ tay: điền một ô là phải đủ người nhận, SĐT, địa chỉ, tỉnh/thành.
     const typed = [v.recipient, v.recipientPhone, v.line1, v.ward, v.district, v.province].some(
@@ -300,11 +299,12 @@ export function toCreateOrderBody(v: CreateOrderValues) {
     // Thông tin khai thác — chỉ gửi kèm khách MỚI (khách đã có không hỏi trên màn này).
     ...(!v.customerId && v.customerIsNew
       ? {
-          farmArea: normalizeFarmArea(v.farmArea),
+          // Mục nào bỏ trống thì không gửi (API từ chối chuỗi rỗng).
+          ...(v.farmArea !== '' ? { farmArea: normalizeFarmArea(v.farmArea) } : {}),
           ...(v.farmAreaUnit ? { farmAreaUnit: v.farmAreaUnit } : {}),
-          crops: v.crops,
-          treeAge: v.treeAge,
-          diseaseHistory: v.diseaseHistory,
+          ...(v.crops.length ? { crops: v.crops } : {}),
+          ...(v.treeAge.trim() !== '' ? { treeAge: v.treeAge.trim() } : {}),
+          ...(v.diseaseHistory.trim() !== '' ? { diseaseHistory: v.diseaseHistory.trim() } : {}),
         }
       : {}),
   };
