@@ -702,6 +702,36 @@ describe('OrderCreateScreen — màn tạo đơn mới', () => {
     expect(asked.every((q) => q.length >= 6)).toBe(true);
   });
 
+  it('ô Tỉnh / Huyện đã có → gửi kèm làm ngữ cảnh gợi ý địa giới (2026-11-02)', async () => {
+    const asked: Array<Record<string, string>> = [];
+    server.use(
+      ...skuHandlers(),
+      http.get('/api/geo/suggest', ({ request }) => {
+        asked.push(Object.fromEntries(new URL(request.url).searchParams));
+        return HttpResponse.json({ ready: true, items: [] });
+      }),
+    );
+    renderApp(<OrderCreateScreen />);
+    fireEvent.change(await screen.findByLabelText('Tỉnh / Thành phố'), {
+      target: { value: 'Tiền Giang' },
+    });
+    fireEvent.change(screen.getByLabelText('Quận / Huyện (cũ)'), {
+      target: { value: 'Thị xã Cai Lậy' },
+    });
+    fireEvent.change(screen.getByLabelText('Địa chỉ chi tiết (số nhà, đường, thôn/xóm)'), {
+      target: { value: 'ấp Tân Sơn, Xã Ngũ Hiệp' },
+    });
+    await waitFor(() =>
+      expect(asked).toContainEqual(
+        expect.objectContaining({
+          q: 'ấp Tân Sơn, Xã Ngũ Hiệp',
+          province: 'Tiền Giang',
+          district: 'Thị xã Cai Lậy',
+        }),
+      ),
+    );
+  });
+
   it('ô Page: page ngưng ẩn; chọn page một POS khi ô POS trống → tự điền POS; có POS thì "Page của POS này" lên trước', async () => {
     server.use(...skuHandlers());
     renderApp(<OrderCreateScreen />);
