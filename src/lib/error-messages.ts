@@ -103,6 +103,12 @@ const MESSAGES: Record<string, string> = {
     'Đã có đơn hàng dùng mức này nên không đổi được %. Thêm mức mới rồi gán cho sản phẩm.',
   TAX_RATE_DEFAULT_REQUIRED: 'Phải luôn có một mức mặc định — đặt mức khác làm mặc định trước.',
   TAX_RATE_CODE_TAKEN: 'Mã này đã có trong danh mục thuế suất — chọn mã khác.',
+  // Xuất Excel qua email chờ duyệt (2026-11-02)
+  EXPORT_APPROVAL_REQUIRED:
+    'Bạn chưa có quyền xuất Excel trực tiếp — nhập email để gửi yêu cầu, quản trị duyệt xong sẽ gửi file.',
+  EXPORT_FILE_INVALID:
+    'File xuất không hợp lệ hoặc quá lớn (tối đa 15 MB) — thu hẹp bộ lọc rồi xuất lại.',
+  EXPORT_REQUEST_STATE: 'Yêu cầu xuất vừa được người khác xử lý — tải lại để xem trạng thái mới.',
   // Hóa đơn điện tử MISA (2026-10-28)
   EINVOICE_NOT_CONFIGURED:
     'Chưa cấu hình đủ kết nối MISA — vào Hóa đơn điện tử › Cài đặt kết nối để nhập và chọn mẫu hóa đơn.',

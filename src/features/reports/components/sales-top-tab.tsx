@@ -1,6 +1,7 @@
 'use client';
 
 import { useMemo } from 'react';
+import { useCsvExport } from '@/components/data/export-delivery';
 import { DataTable, type ColumnDef } from '@/components/data/data-table';
 import { GrowthIndicator } from '@/components/data/growth-indicator';
 import { EmptyState, ListSkeleton, QueryState } from '@/components/data/states';
@@ -13,7 +14,6 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { cn } from '@/lib/cn';
-import { downloadCsv } from '@/lib/export-csv';
 import { formatMoney, formatQuantity } from '@/lib/format';
 import {
   useSalesTopProducts,
@@ -195,6 +195,7 @@ export function SalesTopTab() {
     [rankBy, rankLabel],
   );
 
+  const downloadCsv = useCsvExport('Báo cáo sản phẩm bán chạy');
   const exportCsv = (items: SalesTopProductItem[]) =>
     downloadCsv(
       `ban-chay-theo-${rankBy}_${range.from}_${range.to}`,

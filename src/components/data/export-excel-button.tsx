@@ -6,7 +6,8 @@ import { Button } from '@/components/ui/button';
 import { toast } from '@/components/ui/toaster';
 import { messageFor } from '@/lib/error-messages';
 import { groupVi, toLocalDateKey } from '@/lib/format';
-import { downloadXlsx, type XlsxCell } from '@/lib/xlsx-writer';
+import { xlsxBlob, xlsxFileName, type XlsxCell } from '@/lib/xlsx-writer';
+import { exportResourceKey, useExportDelivery } from './export-delivery';
 
 /** Một cột của file xuất — giá trị thô (tiền: `decimalCell(...)`, ngày: `formatDateTime(...)`). */
 export interface ExportColumn<T> {
@@ -46,6 +47,10 @@ export type ExportExcelButtonProps<T> = Source<T> & {
   fileName: string;
   /** Tên sheet; mặc định = fileName. */
   sheetName?: string;
+  /** Tên màn cho người duyệt / nhật ký (vd "Đơn hàng"); mặc định = sheetName ?? fileName. */
+  title?: string;
+  /** Bộ lọc đang xem — ghi kèm yêu cầu xuất / nhật ký. */
+  filters?: Record<string, unknown>;
   columns: ExportColumn<T>[];
   disabled?: boolean;
   /** Nhãn nút; mặc định "Xuất Excel". */
@@ -80,15 +85,17 @@ export async function collectExportRows<T>(
 /**
  * Nút "Xuất Excel" dùng chung (design system actions.md: hành động cả màn → PageHeader bên phải,
  * nút phụ). Xuất TOÀN BỘ kết quả khớp bộ lọc hiện tại (không chỉ trang đang xem), cột đầu STT.
+ * Có quyền `export.direct` → tải ngay; không → hỏi email, file chờ quản trị duyệt (2026-11-02).
  */
 export function ExportExcelButton<T>(props: ExportExcelButtonProps<T>) {
   const { fileName, sheetName, columns, disabled, label = 'Xuất Excel', size } = props;
+  const delivery = useExportDelivery();
   const run = useMutation({
     mutationFn: async () => {
       const got = props.fetchPage
         ? await collectExportRows(props.fetchPage)
         : { rows: props.rows ?? [], total: props.rows?.length ?? 0, truncated: false };
-      downloadXlsx(`${fileName}_${toLocalDateKey(new Date()) ?? ''}`, {
+      const blob = xlsxBlob({
         name: sheetName ?? fileName,
         header: ['STT', ...columns.map((c) => c.header)],
         rows: got.rows.map((r, i) => [i + 1, ...columns.map((c) => c.value(r))]),
@@ -97,9 +104,19 @@ export function ExportExcelButton<T>(props: ExportExcelButtonProps<T>) {
           ...columns.map((c) => c.width ?? Math.min(40, Math.max(10, c.header.length + 4))),
         ],
       });
-      return got;
+      const outcome = await delivery.deliverFile({
+        blob,
+        fileName: xlsxFileName(`${fileName}_${toLocalDateKey(new Date()) ?? ''}`),
+        resource: exportResourceKey(fileName),
+        title: props.title ?? sheetName ?? fileName,
+        rowCount: got.rows.length,
+        filters: props.filters,
+      });
+      return { ...got, outcome };
     },
     onSuccess: (got) => {
+      // Gửi yêu cầu / bỏ ngang: provider đã báo kết quả.
+      if (got.outcome !== 'downloaded') return;
       if (got.truncated) {
         toast.warning(
           `Đã xuất Excel ${groupVi(String(EXPORT_MAX_ROWS))} / ${groupVi(String(got.total))} dòng — thu hẹp bộ lọc để xuất phần còn lại.`,

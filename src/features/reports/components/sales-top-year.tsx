@@ -1,8 +1,8 @@
 'use client';
 
+import { useCsvExport } from '@/components/data/export-delivery';
 import { DataTable, type ColumnDef } from '@/components/data/data-table';
 import { EmptyState, ListSkeleton, QueryState } from '@/components/data/states';
-import { downloadCsv } from '@/lib/export-csv';
 import { formatDate } from '@/lib/format';
 import {
   useSalesTopProductsMonthly,
@@ -83,6 +83,7 @@ export function SalesTopYearView({
 }) {
   const query = useSalesTopProductsMonthly(filter, year, rankBy, limit, supplierId);
 
+  const downloadCsv = useCsvExport('Báo cáo bán chạy theo tháng');
   const exportCsv = (months: SalesTopMonth[], yearItems: SalesTopProductItem[]) =>
     downloadCsv(
       `ban-chay-${year}-theo-thang_${rankBy}`,

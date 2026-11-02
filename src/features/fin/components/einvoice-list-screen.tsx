@@ -5,6 +5,7 @@ import Decimal from 'decimal.js';
 import { Download, FileSpreadsheet, ReceiptText, Truck } from 'lucide-react';
 import Link from 'next/link';
 import { useMemo, useState } from 'react';
+import { ServerExportButton } from '@/components/data/export-delivery';
 import { BulkActionBar } from '@/components/data/bulk-action-bar';
 import { Copyable } from '@/components/data/copy-button';
 import {
@@ -37,6 +38,7 @@ import { useListState } from '@/lib/url-state';
 import { decimalCell } from '@/lib/xlsx-writer';
 import {
   einvoiceExportUrl,
+  requestEInvoiceExportByEmail,
   fetchEInvoices,
   useCollectDelivered,
   useEInvoiceAction,
@@ -176,11 +178,18 @@ export function EInvoiceListScreen() {
               </Button>
             </Can>
             {tab === 'APPROVED' && counts?.APPROVED ? (
-              <Button variant="outline" asChild>
-                <a href={einvoiceExportUrl()} download onClick={afterExport}>
-                  <Download aria-hidden /> Xuất file meInvoice ({counts.APPROVED})
-                </a>
-              </Button>
+              <ServerExportButton
+                exp={{
+                  href: einvoiceExportUrl(),
+                  requestByEmail: requestEInvoiceExportByEmail(),
+                  resource: 'einvoice-misa',
+                  title: 'Hóa đơn điện tử (meInvoice)',
+                  rowCount: counts.APPROVED,
+                }}
+                onDone={afterExport}
+              >
+                <Download aria-hidden /> Xuất file meInvoice ({counts.APPROVED})
+              </ServerExportButton>
             ) : null}
             <Can I="issue" a="Einvoice">
               <Button
@@ -275,11 +284,19 @@ export function EInvoiceListScreen() {
               </Can>
             ) : null}
             {tab === 'APPROVED' || tab === 'PUSHED' || tab === 'ISSUED' ? (
-              <Button size="sm" variant="outline" asChild>
-                <a href={einvoiceExportUrl(ids)} download onClick={afterExport}>
-                  <Download aria-hidden /> Xuất file meInvoice
-                </a>
-              </Button>
+              <ServerExportButton
+                size="sm"
+                exp={{
+                  href: einvoiceExportUrl(ids),
+                  requestByEmail: requestEInvoiceExportByEmail(ids),
+                  resource: 'einvoice-misa',
+                  title: 'Hóa đơn điện tử (meInvoice)',
+                  rowCount: ids.length,
+                }}
+                onDone={afterExport}
+              >
+                <Download aria-hidden /> Xuất file meInvoice
+              </ServerExportButton>
             ) : null}
             {tab === 'APPROVED' || tab === 'FAILED' ? (
               <>

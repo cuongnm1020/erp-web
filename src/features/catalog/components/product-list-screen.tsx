@@ -10,6 +10,7 @@ import {
   type FilterDef,
   type RowSelectionState,
 } from '@/components/data/data-table';
+import { ServerExportButton } from '@/components/data/export-delivery';
 import { ConfirmDialog } from '@/components/data/confirm-dialog';
 import { RowActions } from '@/components/data/row-actions';
 import { EmptyState, ListSkeleton, QueryState } from '@/components/data/states';
@@ -30,6 +31,10 @@ import { formatDate, formatQuantity } from '@/lib/format';
 import { Can, useAbility } from '@/lib/permission';
 import { useListState } from '@/lib/url-state';
 import {
+  pancakeProductsHref,
+  requestPancakeProductsByEmail,
+  requestSkuCsvByEmail,
+  skuCsvHref,
   useBrands,
   useBulkDeleteProducts,
   useCategories,
@@ -697,27 +702,32 @@ export function ProductListScreen() {
                 Import từ file
               </Link>
             </Button>
-            <Button size="sm" variant="outline" asChild>
-              {/* Endpoint tải file, không phải page: anchor thật để cookie httpOnly
-                  đi kèm và trình duyệt tự tải — <Link> sẽ client-navigate, hỏng download. */}
-              {/* eslint-disable-next-line @next/next/no-html-link-for-pages */}
-              <a href="/api/exports/skus?format=csv">
-                <Download aria-hidden />
-                Xuất CSV
-              </a>
-            </Button>
-            <Button size="sm" variant="outline" asChild>
-              {/* File xlsx đúng mẫu "Import sản phẩm" của Pancake POS — tải về rồi nhập thẳng
-                  vào POS. Cùng cơ chế anchor thật như Xuất CSV. */}
-              {/* eslint-disable-next-line @next/next/no-html-link-for-pages */}
-              <a
-                href="/api/exports/pancake-products"
-                title="Tải file xlsx theo mẫu import sản phẩm của Pancake POS"
-              >
-                <FileSpreadsheet aria-hidden />
-                Xuất Pancake
-              </a>
-            </Button>
+            <ServerExportButton
+              size="sm"
+              exp={{
+                href: skuCsvHref,
+                requestByEmail: requestSkuCsvByEmail,
+                resource: 'export-skus',
+                title: 'Danh mục SKU (CSV)',
+              }}
+            >
+              <Download aria-hidden />
+              Xuất CSV
+            </ServerExportButton>
+            {/* File xlsx đúng mẫu "Import sản phẩm" của Pancake POS — tải về rồi nhập thẳng vào POS. */}
+            <ServerExportButton
+              size="sm"
+              title="Tải file xlsx theo mẫu import sản phẩm của Pancake POS"
+              exp={{
+                href: pancakeProductsHref,
+                requestByEmail: requestPancakeProductsByEmail,
+                resource: 'pancake-products',
+                title: 'Danh mục sản phẩm (mẫu Pancake)',
+              }}
+            >
+              <FileSpreadsheet aria-hidden />
+              Xuất Pancake
+            </ServerExportButton>
             <Can I="config" a="Sync">
               <PancakeSyncButton />
             </Can>

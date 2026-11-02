@@ -207,14 +207,18 @@ const optionHandlers = [
   ),
 ];
 
-/** downloadCsv bị mock (jsdom không tải file được) — giữ nội dung CSV thật qua toCsv. */
-const downloads: Array<{ filename: string; text: string }> = [];
-vi.mock('@/lib/export-csv', async (importOriginal) => {
-  const real = await importOriginal<typeof import('@/lib/export-csv')>();
+/**
+ * Xuất CSV đi qua luồng xuất có kiểm soát (`useCsvExport`, 2026-11-02) — mock để giữ nội dung CSV
+ * thật qua toCsv (jsdom không tải file được).
+ */
+const downloads: Array<{ filename: string; text: string; title: string }> = [];
+vi.mock('@/components/data/export-delivery', async (importOriginal) => {
+  const real = await importOriginal<typeof import('@/components/data/export-delivery')>();
+  const { toCsv } = await import('@/lib/export-csv');
   return {
     ...real,
-    downloadCsv: (filename: string, header: string[], rows: CsvCell[][]) =>
-      downloads.push({ filename, text: real.toCsv(header, rows) }),
+    useCsvExport: (title: string) => (filename: string, header: string[], rows: CsvCell[][]) =>
+      downloads.push({ filename, text: toCsv(header, rows), title }),
   };
 });
 

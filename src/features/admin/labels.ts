@@ -21,6 +21,7 @@ export const MODULE_LABELS: Record<string, string> = {
   warehouse: 'Kho',
   work: 'Công việc',
   tax_rate: 'Thuế suất',
+  export: 'Xuất Excel',
 };
 
 export const ACTION_LABELS: Record<string, string> = {
@@ -86,6 +87,9 @@ const PERMISSION_LABELS: Record<string, string> = {
   'einvoice.review': 'Duyệt hóa đơn điện tử (bước 1)',
   'einvoice.issue': 'Đẩy hóa đơn lên MISA (bước 2)',
   'einvoice.config': 'Cài đặt kết nối MISA',
+  // Xuất Excel (2026-11-02): không có direct = nhập email, chờ duyệt.
+  'export.direct': 'Xuất Excel trực tiếp (không chờ duyệt)',
+  'export.approve': 'Duyệt xuất Excel + xem nhật ký xuất / nhập',
 };
 
 export const moduleLabel = (m: string): string => MODULE_LABELS[m] ?? m;

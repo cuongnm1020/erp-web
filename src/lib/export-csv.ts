@@ -17,12 +17,22 @@ export function toCsv(header: string[], rows: CsvCell[][]): string {
   return [header, ...rows].map((r) => r.map(escapeCell).join(',')).join('\r\n');
 }
 
+/** Nội dung CSV (có BOM) dạng Blob — để tải về hoặc gửi kèm yêu cầu xuất qua email. */
+export function csvBlob(header: string[], rows: CsvCell[][]): Blob {
+  return new Blob(['\uFEFF', toCsv(header, rows)], { type: 'text/csv;charset=utf-8' });
+}
+
+/** Tên file luôn có đuôi `.csv`. */
+export function csvFileName(filename: string): string {
+  return filename.endsWith('.csv') ? filename : `${filename}.csv`;
+}
+
 export function downloadCsv(filename: string, header: string[], rows: CsvCell[][]): void {
-  const blob = new Blob(['\uFEFF', toCsv(header, rows)], { type: 'text/csv;charset=utf-8' });
+  const blob = csvBlob(header, rows);
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
-  a.download = filename.endsWith('.csv') ? filename : `${filename}.csv`;
+  a.download = csvFileName(filename);
   document.body.appendChild(a);
   a.click();
   a.remove();

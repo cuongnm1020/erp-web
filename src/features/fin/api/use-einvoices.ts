@@ -137,6 +137,16 @@ export function useCollectDelivered() {
 export const einvoiceExportUrl = (ids: string[] = []) =>
   `/api/einvoices/export${ids.length ? `?ids=${encodeURIComponent(ids.join(','))}` : ''}`;
 
+/** Không có quyền xuất trực tiếp: GET /einvoices/export?email= → yêu cầu chờ duyệt (2026-11-02). */
+export const requestEInvoiceExportByEmail =
+  (ids: string[] = []) =>
+  (email: string) =>
+    unwrap(
+      api.GET('/einvoices/export', {
+        params: { query: { ...(ids.length ? { ids: ids.join(',') } : {}), email } },
+      }),
+    );
+
 /** Sau khi tải file: server đã ghi mốc "Đã xuất file" → làm mới danh sách. */
 export function useInvalidateEInvoices() {
   return useInvalidate();

@@ -2,6 +2,7 @@
 
 import { FileDown, FileUp } from 'lucide-react';
 import { useState } from 'react';
+import { ServerExportButton } from '@/components/data/export-delivery';
 import { StatusBadge } from '@/components/data/status-badge';
 import { Button } from '@/components/ui/button';
 import {
@@ -25,6 +26,7 @@ import { messageFor } from '@/lib/error-messages';
 import { formatQuantity } from '@/lib/format';
 import { ALL_WAREHOUSES, useWarehouse } from '@/lib/warehouse';
 import {
+  requestStockExcelByEmail,
   stockExcelHref,
   useImportStockExcel,
   type StockExcelImportResult,
@@ -102,13 +104,19 @@ export function StockExcelExportButton() {
               Hủy
             </Button>
             {warehouseId ? (
-              <Button asChild>
-                {/* Anchor thật: tải file qua cookie phiên, như nút Xuất Pancake. */}
-                {/* eslint-disable-next-line @next/next/no-html-link-for-pages */}
-                <a href={stockExcelHref(warehouseId)} onClick={() => setOpen(false)}>
-                  Tải file
-                </a>
-              </Button>
+              <ServerExportButton
+                variant="default"
+                exp={{
+                  href: stockExcelHref(warehouseId),
+                  requestByEmail: requestStockExcelByEmail(warehouseId),
+                  resource: 'stock-excel',
+                  title: 'Tồn kho theo kho (Excel)',
+                  filters: { warehouseId },
+                }}
+                onDone={() => setOpen(false)}
+              >
+                Tải file
+              </ServerExportButton>
             ) : (
               <Button disabled>Tải file</Button>
             )}

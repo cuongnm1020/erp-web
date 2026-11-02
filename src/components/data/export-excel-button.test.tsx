@@ -1,12 +1,19 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { ExportDeliveryContextProvider, type ExportFile } from './export-delivery';
 import { collectExportRows, EXPORT_PAGE_SIZE, ExportExcelButton } from './export-excel-button';
 
+/** Tên file đã lưu + nội dung sheet (jsdom không tải file được). */
 const download = vi.fn();
+let lastSheet: unknown;
 vi.mock('@/lib/xlsx-writer', async (orig) => ({
   ...(await orig<typeof import('@/lib/xlsx-writer')>()),
-  downloadXlsx: (...a: unknown[]) => download(...a),
+  xlsxBlob: (sheet: unknown) => {
+    lastSheet = sheet;
+    return new Blob(['x']);
+  },
+  saveBlob: (_b: Blob, name: string) => download(name, lastSheet),
 }));
 
 interface Row {
@@ -64,7 +71,7 @@ describe('<ExportExcelButton>', () => {
     fireEvent.click(screen.getByRole('button', { name: /Xuất Excel/ }));
     await waitFor(() => expect(download).toHaveBeenCalledTimes(1));
     const [name, sheet] = download.mock.calls[0]!;
-    expect(name).toMatch(/^don-hang_\d{4}-\d{2}-\d{2}$/);
+    expect(name).toMatch(/^don-hang_\d{4}-\d{2}-\d{2}\.xlsx$/);
     expect(sheet).toMatchObject({
       header: ['STT', 'Tên'],
       rows: [
@@ -85,5 +92,35 @@ describe('<ExportExcelButton>', () => {
     fireEvent.click(screen.getByRole('button', { name: /Xuất Excel/ }));
     await waitFor(() => expect(download).toHaveBeenCalledTimes(1));
     expect(download.mock.calls[0]![1]).toMatchObject({ rows: [[1, 5]] });
+  });
+
+  it('không có quyền xuất trực tiếp → giao file cho luồng email chờ duyệt, không tải về', async () => {
+    const deliverFile = vi.fn(async (_f: ExportFile) => 'requested' as const);
+    const qc = new QueryClient({ defaultOptions: { mutations: { retry: false } } });
+    render(
+      <QueryClientProvider client={qc}>
+        <ExportDeliveryContextProvider
+          value={{ canDirect: false, deliverFile, deliverServer: vi.fn() }}
+        >
+          <ExportExcelButton
+            fileName="khach-hang"
+            title="Khách hàng"
+            filters={{ q: 'Lan' }}
+            columns={[{ header: 'Tên', value: (r: Row) => r.name }]}
+            rows={make(1, 3)}
+          />
+        </ExportDeliveryContextProvider>
+      </QueryClientProvider>,
+    );
+    fireEvent.click(screen.getByRole('button', { name: /Xuất Excel/ }));
+    await waitFor(() => expect(deliverFile).toHaveBeenCalledTimes(1));
+    expect(deliverFile.mock.calls[0]![0]).toMatchObject({
+      resource: 'khach-hang',
+      title: 'Khách hàng',
+      rowCount: 3,
+      filters: { q: 'Lan' },
+    });
+    expect(deliverFile.mock.calls[0]![0].fileName).toMatch(/^khach-hang_.*\.xlsx$/);
+    expect(download).not.toHaveBeenCalled();
   });
 });

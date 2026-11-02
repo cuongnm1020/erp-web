@@ -257,16 +257,39 @@ export function buildXlsx(sheet: XlsxSheet): Uint8Array {
 
 export const XLSX_MIME = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
 
-/** Tải file .xlsx về máy (trình duyệt). */
-export function downloadXlsx(filename: string, sheet: XlsxSheet): void {
-  const bytes = buildXlsx(sheet);
-  const blob = new Blob([bytes as BlobPart], { type: XLSX_MIME });
+/** Nội dung .xlsx dạng Blob — để tải về (`saveBlob`) hoặc gửi kèm yêu cầu xuất qua email. */
+export function xlsxBlob(sheet: XlsxSheet): Blob {
+  return new Blob([buildXlsx(sheet) as BlobPart], { type: XLSX_MIME });
+}
+
+/** Tên file luôn có đuôi `.xlsx`. */
+export function xlsxFileName(filename: string): string {
+  return filename.endsWith('.xlsx') ? filename : `${filename}.xlsx`;
+}
+
+/** Lưu Blob thành file về máy (trình duyệt). */
+export function saveBlob(blob: Blob, filename: string): void {
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
-  a.download = filename.endsWith('.xlsx') ? filename : `${filename}.xlsx`;
+  a.download = filename;
   document.body.appendChild(a);
   a.click();
   a.remove();
   URL.revokeObjectURL(url);
+}
+
+/** Mở link tải file do server tạo (anchor thật, cookie phiên đi kèm). */
+export function openDownload(href: string): void {
+  const a = document.createElement('a');
+  a.href = href;
+  a.download = '';
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+}
+
+/** Tải file .xlsx về máy (trình duyệt). */
+export function downloadXlsx(filename: string, sheet: XlsxSheet): void {
+  saveBlob(xlsxBlob(sheet), xlsxFileName(filename));
 }

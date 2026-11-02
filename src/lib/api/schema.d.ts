@@ -367,6 +367,139 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/export-requests": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Người duyệt thấy mọi yêu cầu (trừ khi `mine=true`); người khác chỉ yêu cầu của mình. */
+        get: operations["ExportRequestController_list"];
+        put?: never;
+        /** Multipart: `file` (.xlsx / .csv ≤ 15 MB) + email, resource, title, rowCount, filters (JSON). */
+        post: operations["ExportRequestController_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/export-requests/pending-count": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["ExportRequestController_pendingCount"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/export-requests/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["ExportRequestController_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/export-requests/{id}/file": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Người duyệt tải file để xem trước khi duyệt (ghi nhật ký). */
+        get: operations["ExportRequestController_file"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/export-requests/{id}/approve": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["ExportRequestController_approve"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/export-requests/{id}/reject": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["ExportRequestController_reject"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/export-requests/{id}/resend": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Gửi lại yêu cầu đã gửi / gửi lỗi. */
+        post: operations["ExportRequestController_resend"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/excel-logs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["ExcelLogController_list"];
+        put?: never;
+        /** Trình duyệt báo một lần xuất trực tiếp (file tạo ở trình duyệt) — chỉ người có `export.direct`. */
+        post: operations["ExcelLogController_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/prices/resolve": {
         parameters: {
             query?: never;
@@ -7298,6 +7431,80 @@ export interface components {
         DecisionDto: {
             comment?: string;
         };
+        /** @enum {string} */
+        ExportRequestStatus: "PENDING" | "APPROVED" | "SENT" | "FAILED" | "REJECTED";
+        ExcelUserRefDto: {
+            id: string;
+            code: string;
+            fullName: string;
+        };
+        ExportRequestDto: {
+            filters: {
+                [key: string]: unknown;
+            };
+            status: components["schemas"]["ExportRequestStatus"];
+            id: string;
+            requester: components["schemas"]["ExcelUserRefDto"] | null;
+            resource: string;
+            title: string;
+            fileName: string;
+            fileSize: number;
+            rowCount: number | null;
+            email: string;
+            reviewer: components["schemas"]["ExcelUserRefDto"] | null;
+            reviewedAt: string | null;
+            rejectReason: string | null;
+            sentAt: string | null;
+            sendError: string | null;
+            sendCount: number;
+            createdAt: string;
+        };
+        ExportRequestListDto: {
+            items: components["schemas"]["ExportRequestDto"][];
+            total: number;
+        };
+        ExportPendingCountDto: {
+            count: number;
+            /** @description SMTP đã cấu hình chưa — chưa thì duyệt xong sẽ gửi lỗi. */
+            mailConfigured: boolean;
+        };
+        RejectExportRequestDto: {
+            reason: string;
+        };
+        CreateExcelLogDto: {
+            fileName: string;
+            fileSize?: number;
+            /** @description Khoá màn (vd `orders`, `customers`). */
+            resource: string;
+            /** @description Tên hiển thị (vd "Đơn hàng"). */
+            title: string;
+            rowCount?: number;
+            /** @description JSON bộ lọc đang xem lúc xuất (chuỗi, ≤ 4.000 ký tự). */
+            filters?: string;
+        };
+        /** @enum {string} */
+        ExcelAction: "EXPORT" | "EXPORT_REQUEST" | "EXPORT_APPROVE" | "EXPORT_REJECT" | "EXPORT_SENT" | "EXPORT_FAILED" | "IMPORT";
+        ExcelLogDto: {
+            action: components["schemas"]["ExcelAction"];
+            detail: {
+                [key: string]: unknown;
+            };
+            id: string;
+            user: components["schemas"]["ExcelUserRefDto"] | null;
+            resource: string;
+            title: string | null;
+            fileName: string | null;
+            fileSize: number | null;
+            rowCount: number | null;
+            email: string | null;
+            requestId: string | null;
+            ip: string | null;
+            createdAt: string;
+        };
+        ExcelLogListDto: {
+            items: components["schemas"]["ExcelLogDto"][];
+            total: number;
+        };
         ResolvedPriceDto: {
             priceListId: string;
             /** @description Decimal(18,4) dạng chuỗi — giá niêm yết một đơn vị theo `uomId`. */
@@ -8380,7 +8587,7 @@ export interface components {
         PancakeOrderResyncStatusDto: {
             shopId: string;
             /** @enum {string} */
-            state: "completed" | "failed" | "active" | "waiting" | "idle";
+            state: "idle" | "completed" | "failed" | "active" | "waiting";
             done: number;
             total: number;
             counts: components["schemas"]["PancakeOrderResyncCountsDto"];
@@ -8420,7 +8627,7 @@ export interface components {
         };
         PancakeBulkPushStatusDto: {
             /** @enum {string} */
-            state: "completed" | "failed" | "active" | "waiting" | "idle";
+            state: "idle" | "completed" | "failed" | "active" | "waiting";
             /** @description Số sản phẩm đã duyệt / tổng — tính theo sản phẩm, không theo shop. */
             done: number;
             total: number;
@@ -8571,7 +8778,7 @@ export interface components {
         };
         CatalogMigrationStatusDto: {
             /** @enum {string} */
-            state: "completed" | "failed" | "active" | "waiting" | "idle";
+            state: "idle" | "completed" | "failed" | "active" | "waiting";
             /**
              * @description Bước đang chạy: combos → links → catalog → push → done (`hide` chỉ còn ở lượt trước 2026-10-18).
              * @enum {string|null}
@@ -12408,7 +12615,7 @@ export interface components {
         };
         CarrierSettingFieldDto: {
             /** @enum {string} */
-            key: "shopId" | "baseUrl" | "partnerCode" | "username" | "password" | "token" | "apiKey" | "webhookSecret";
+            key: "shopId" | "baseUrl" | "partnerCode" | "username" | "token" | "password" | "apiKey" | "webhookSecret";
             label: string;
             /** @description Bí mật: không bao giờ trả giá trị, chỉ `hint`. */
             secret: boolean;
@@ -16962,6 +17169,239 @@ export interface operations {
                 content: {
                     "application/json": Record<string, never>;
                 };
+            };
+        };
+    };
+    ExportRequestController_list: {
+        parameters: {
+            query?: {
+                status?: "APPROVED" | "PENDING" | "REJECTED" | "FAILED" | "SENT";
+                /** @description `true` = chỉ yêu cầu của tôi (người duyệt mặc định thấy mọi yêu cầu). */
+                mine?: string;
+                skip?: number;
+                take?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ExportRequestListDto"];
+                };
+            };
+        };
+    };
+    ExportRequestController_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": {
+                    /** Format: binary */
+                    file: string;
+                    email: string;
+                    resource: string;
+                    title: string;
+                    rowCount?: number;
+                    filters?: string;
+                };
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ExportRequestDto"];
+                };
+            };
+        };
+    };
+    ExportRequestController_pendingCount: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ExportPendingCountDto"];
+                };
+            };
+        };
+    };
+    ExportRequestController_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ExportRequestDto"];
+                };
+            };
+        };
+    };
+    ExportRequestController_file: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    ExportRequestController_approve: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ExportRequestDto"];
+                };
+            };
+        };
+    };
+    ExportRequestController_reject: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RejectExportRequestDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ExportRequestDto"];
+                };
+            };
+        };
+    };
+    ExportRequestController_resend: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ExportRequestDto"];
+                };
+            };
+        };
+    };
+    ExcelLogController_list: {
+        parameters: {
+            query?: {
+                action?: "EXPORT" | "EXPORT_REQUEST" | "EXPORT_APPROVE" | "EXPORT_REJECT" | "EXPORT_SENT" | "EXPORT_FAILED" | "IMPORT";
+                /** @description Nhóm: `export` = mọi hành động xuất, `import` = nhập. */
+                kind?: string;
+                userId?: string;
+                resource?: string;
+                /** @description Ngày từ / đến (YYYY-MM-DD, giờ Việt Nam). */
+                from?: string;
+                to?: string;
+                skip?: number;
+                take?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ExcelLogListDto"];
+                };
+            };
+        };
+    };
+    ExcelLogController_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateExcelLogDto"];
+            };
+        };
+        responses: {
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };
@@ -22112,7 +22552,13 @@ export interface operations {
     };
     ExportController_downloadPancakeProducts: {
         parameters: {
-            query?: never;
+            query?: {
+                /**
+                 * @description Có email = không trả file mà tạo yêu cầu xuất chờ duyệt (trả `ExportRequestDto`). Bỏ trống = tải
+                 *     ngay, cần quyền `export.direct`.
+                 */
+                email?: string;
+            };
             header?: never;
             path?: never;
             cookie?: never;
@@ -22130,7 +22576,8 @@ export interface operations {
     ExportController_download: {
         parameters: {
             query?: {
-                format?: unknown;
+                format?: "csv" | "xlsx";
+                email?: string;
             };
             header?: never;
             path: {
@@ -25538,6 +25985,7 @@ export interface operations {
     StockExcelController_download: {
         parameters: {
             query: {
+                email?: string;
                 warehouseId: string;
             };
             header?: never;
@@ -25557,9 +26005,9 @@ export interface operations {
     StockExcelController_import: {
         parameters: {
             query: {
-                warehouseId: string;
                 /** @description `true` = chỉ kiểm tra + xem trước, không ghi. */
                 dryRun?: string;
+                warehouseId: string;
             };
             header: {
                 "idempotency-key": string;
@@ -25746,6 +26194,11 @@ export interface operations {
                 ids?: string;
                 /** @description Ngày hóa đơn YYYY-MM-DD (mặc định hôm nay, giờ Việt Nam). */
                 invDate?: string;
+                /**
+                 * @description Có email = không trả file mà tạo yêu cầu xuất chờ duyệt (202 + ExportRequestDto). Bỏ trống =
+                 *     tải ngay, cần quyền `export.direct` (2026-11-02).
+                 */
+                email?: string;
             };
             header?: never;
             path?: never;

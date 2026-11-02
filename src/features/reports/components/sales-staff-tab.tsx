@@ -2,12 +2,12 @@
 
 import { Filter } from 'lucide-react';
 import { useMemo } from 'react';
+import { useCsvExport } from '@/components/data/export-delivery';
 import { BarList } from '@/components/data/charts';
 import { DataTable, type ColumnDef } from '@/components/data/data-table';
 import { GrowthIndicator } from '@/components/data/growth-indicator';
 import { EmptyState, ListSkeleton, QueryState } from '@/components/data/states';
 import { Button } from '@/components/ui/button';
-import { downloadCsv } from '@/lib/export-csv';
 import { formatMoney, toDecimal } from '@/lib/format';
 import { useSalesByStaff, type SalesByStaffItem, type StaffGroupBy } from '../api/use-sales-report';
 import {
@@ -211,6 +211,7 @@ export function SalesStaffTab() {
     [head, groupBy, byShop, posOnly, setFilters],
   );
 
+  const downloadCsv = useCsvExport('Báo cáo doanh thu theo nhân viên / POS');
   const exportCsv = (items: SalesByStaffItem[]) =>
     downloadCsv(
       `doanh-thu-theo-${groupBy === 'team' ? 'team' : posOnly ? 'pos' : byShop ? 'nhan-vien-pos' : 'nhan-vien'}_${range.from}_${range.to}`,

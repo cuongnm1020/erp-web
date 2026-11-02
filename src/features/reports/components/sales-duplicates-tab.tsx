@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { useMemo } from 'react';
+import { useCsvExport } from '@/components/data/export-delivery';
 import { DataTable, type ColumnDef } from '@/components/data/data-table';
 import { KpiCard } from '@/components/data/kpi-card';
 import { EmptyState, ListSkeleton, QueryState } from '@/components/data/states';
@@ -10,7 +11,6 @@ import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { toast } from '@/components/ui/toaster';
 import { messageFor } from '@/lib/error-messages';
-import { downloadCsv } from '@/lib/export-csv';
 import { formatDate, formatDateTime, formatMoney, formatPhone } from '@/lib/format';
 import {
   useExportSalesDuplicates,
@@ -119,6 +119,7 @@ export function SalesDuplicatesTab() {
     [],
   );
 
+  const downloadCsv = useCsvExport('Báo cáo đơn trùng');
   const runExport = () =>
     exporter.mutate(
       { filter, params },
