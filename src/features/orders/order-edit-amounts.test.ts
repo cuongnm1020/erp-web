@@ -9,6 +9,10 @@ const base = {
   roundingAmount: '0.0000',
   total: '410000.0000',
   pancakeOrderId: null,
+  taxAmount: '0.0000',
+  shippingFee: '0.0000',
+  surcharge: '0.0000',
+  lines: [{ discount: '0.0000', lineTotal: '410000.0000' }],
 };
 
 describe('previewAmounts — thẻ Giá trị đơn hàng tính lại khi sửa thành tiền (2026-11-02)', () => {
@@ -24,7 +28,7 @@ describe('previewAmounts — thẻ Giá trị đơn hàng tính lại khi sửa 
 
   it('sửa thành tiền 410.000 → 350.000: tạm tính + tổng theo giỏ mới, phí ship giữ nguyên', () => {
     const r = previewAmounts(
-      { ...base, total: '440000.0000' /* có 30.000 phí ship */ },
+      { ...base, shippingFee: '30000.0000', total: '440000.0000' },
       '350000.0000',
     );
     expect(r.subtotal).toBe('350000.0000');
@@ -60,10 +64,50 @@ describe('previewAmounts — thẻ Giá trị đơn hàng tính lại khi sửa 
         roundingAmount: '1000.0000',
         total: '216000.0000',
         pancakeOrderId: '46422',
+        lines: [{ discount: '0.0000', lineTotal: '215000.0000' }],
       },
       '200000.0000',
     );
     expect(r.roundingAmount).toBe('0.0000');
     expect(r.total).toBe('200000.0000');
+  });
+
+  it('đơn Pancake có chiết khấu từng dòng (SOP2610-107401): tiền = Σ thành tiền, không trừ chiết khấu dòng lần hai', () => {
+    // Pancake: 42 × niêm yết 150.000 = 6.300.000, chiết khấu dòng 42 × 21.429 = 900.018.
+    const order = {
+      ...base,
+      subtotal: '6300000.0000',
+      discount: '900018.0000',
+      total: '5399982.0000',
+      pancakeOrderId: '107401',
+      lines: [{ discount: '900018.0000', lineTotal: '5399982.0000' }],
+    };
+    expect(previewAmounts(order, '5399982.0000').total).toBe('5399982.0000');
+    const r = previewAmounts(order, '5400000.0000');
+    expect(r.discount).toBe('0.0000');
+    expect(r.total).toBe('5400000.0000');
+    // Có thêm giảm giá cấp đơn 50.000 trên Pancake → giữ nguyên khoản đó.
+    const withOrderLevel = previewAmounts(
+      { ...order, discount: '950018.0000', total: '5349982.0000' },
+      '5400000.0000',
+    );
+    expect(withOrderLevel.discount).toBe('50000.0000');
+    expect(withOrderLevel.total).toBe('5350000.0000');
+  });
+
+  it('đơn ERP có chiết khấu dòng: giảm giá xem trước chỉ còn giảm giá tay', () => {
+    const r = previewAmounts(
+      {
+        ...base,
+        subtotal: '500000.0000',
+        discount: '60000.0000',
+        manualDiscount: '10000.0000',
+        total: '440000.0000',
+        lines: [{ discount: '50000.0000', lineTotal: '450000.0000' }],
+      },
+      '400000.0000',
+    );
+    expect(r.discount).toBe('10000.0000');
+    expect(r.total).toBe('390000.0000');
   });
 });
