@@ -45,6 +45,7 @@ import { useWarehouse } from '@/lib/warehouse';
 import { useSameDayOrders, type SkuQuickRow } from '../../api/use-order-create';
 import {
   useCareTeamOptions,
+  useConfirmOrder,
   useCreateOrder,
   useFacebookPageSearch,
   usePancakeShops,
@@ -92,7 +93,11 @@ const ATTACHMENT_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'application/
 export type CreateOrderResult = Awaited<
   ReturnType<ReturnType<typeof useCreateOrder>['mutateAsync']>
 >;
-export type AfterCreate = 'open' | 'next';
+/**
+ * Nút đã bấm (2026-11-02): `draft` = "Lưu nháp" → đơn nằm Đơn mới (DRAFT); `confirm` = "Chốt đơn"
+ * (F10) → tạo rồi xác nhận luôn (POST /:id/confirm) → Đã xác nhận.
+ */
+export type AfterCreate = 'draft' | 'confirm';
 
 /** Lỗi 422 của API có `details.path` → ô tương ứng trên form + câu tiếng Việt (luật 6). */
 const SERVER_PATHS: Record<string, { field: Path<CreateOrderValues>; message: string }> = {
@@ -143,11 +148,12 @@ export const OrderDraftForm = forwardRef<
   }
 >(function OrderDraftForm({ initialValues, files, onFilesChange, onValuesChange, onCreated }, ref) {
   const create = useCreateOrder();
+  const confirmOrder = useConfirmOrder();
   const { options: warehouseOptions } = useWarehouse();
   const searchRef = useRef<HTMLInputElement>(null);
   // Idempotency-Key sinh lúc bấm, GIỮ NGUYÊN khi retry lỗi mạng/5xx; đổi khi người dùng sửa form.
   const idemKey = useRef<string | null>(null);
-  const afterCreate = useRef<AfterCreate>('open');
+  const afterCreate = useRef<AfterCreate>('confirm');
 
   const form = useForm<CreateOrderValues>({
     resolver: zodResolver(createOrderSchema),
@@ -288,7 +294,22 @@ export const OrderDraftForm = forwardRef<
       {
         onSuccess: (r) => {
           setPendingDup(null);
-          onCreated(r, afterCreate.current);
+          const mode = afterCreate.current;
+          if (mode !== 'confirm' || r.status !== 'DRAFT') {
+            onCreated(r, mode);
+            return;
+          }
+          // Chốt đơn = tạo (Đơn mới) rồi xác nhận ngay. Xác nhận hỏng thì đơn VẪN đã lưu ở Đơn mới —
+          // báo rõ, không tạo lại (idempotency key đã dùng); màn mở đơn để xác nhận lại.
+          confirmOrder.mutate(r.orderId, {
+            onSuccess: (c) => onCreated({ ...r, status: c.status }, mode),
+            onError: (err) => {
+              toast.error(`Đơn ${r.docNumber} đã lưu ở Đơn mới nhưng chưa xác nhận`, {
+                description: messageFor(err),
+              });
+              onCreated(r, mode);
+            },
+          });
         },
         onError: (err) => {
           setPendingDup(null);
@@ -345,7 +366,7 @@ export const OrderDraftForm = forwardRef<
       <form
         id="order-create"
         onSubmit={(e) => {
-          afterCreate.current = 'open';
+          afterCreate.current = 'confirm';
           void onSubmit(e);
         }}
         className={cn('flex flex-col gap-3', DENSE)}
@@ -510,23 +531,25 @@ export const OrderDraftForm = forwardRef<
                 </span>
               </div>
               <div className="mt-1.5 flex gap-2">
+                {/* Lưu nháp → Đơn mới (chưa giữ hàng); Chốt đơn → Đã xác nhận (2026-11-02). */}
                 <Button
                   type="button"
                   variant="outline"
                   className="flex-1"
-                  disabled={create.isPending}
+                  shortcut="F8"
+                  disabled={create.isPending || confirmOrder.isPending}
                   onClick={() => {
-                    afterCreate.current = 'next';
+                    afterCreate.current = 'draft';
                     void onSubmit();
                   }}
                 >
-                  Chốt &amp; tạo đơn mới
+                  Lưu nháp
                 </Button>
                 <Button
                   type="submit"
                   className="flex-1"
                   shortcut="F10"
-                  loading={create.isPending}
+                  loading={create.isPending || confirmOrder.isPending}
                   loadingText="Đang chốt…"
                 >
                   Chốt đơn

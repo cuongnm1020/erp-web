@@ -132,9 +132,12 @@ export function OrderCreateScreen() {
       } else if (e.key === 'F9') {
         e.preventDefault();
         formRef.current?.focusSearch();
+      } else if (e.key === 'F8') {
+        e.preventDefault();
+        formRef.current?.submit('draft');
       } else if (e.key === 'F10') {
         e.preventDefault();
-        formRef.current?.submit('open');
+        formRef.current?.submit('confirm');
       }
     };
     window.addEventListener('keydown', onKey);
@@ -149,11 +152,17 @@ export function OrderCreateScreen() {
 
   const onCreated = async (r: CreateOrderResult, mode: AfterCreate) => {
     const draftId = activeId;
+    // Lưu nháp → Đơn mới; Chốt đơn → Đã xác nhận (2026-11-02). Chốt đơn mà xác nhận hỏng (đơn vẫn
+    // DRAFT) thì OrderDraftForm đã báo lỗi — chỉ mở đơn để xác nhận lại.
     if (r.status === 'PENDING_APPROVAL') {
       toast.success(`Đã gửi duyệt đơn ${r.docNumber}`, {
         description: 'Đơn vượt ngưỡng duyệt — chờ quản lý xác nhận.',
       });
-    } else {
+    } else if (r.status === 'DRAFT' && mode === 'draft') {
+      toast.success(`Đã lưu nháp đơn ${r.docNumber}`, {
+        description: 'Đơn nằm ở tab Đơn mới — chưa giữ hàng tới khi chốt đơn.',
+      });
+    } else if (r.status !== 'DRAFT') {
       toast.success(`Đã chốt đơn ${r.docNumber}`, { description: 'Hàng đã được giữ cho đơn này.' });
     }
     // Tệp đính kèm: đơn đã chốt rồi mới tải (cần id đơn). Hỏng tệp nào báo tệp đó, đơn vẫn giữ.
@@ -173,7 +182,8 @@ export function OrderCreateScreen() {
     }
     setFiles((m) => omitKey(m, draftId));
     closeDraft(draftId);
-    if (mode === 'next') openDraft();
+    // Lưu nháp: mở tab nháp trống để lên đơn tiếp; Chốt đơn: mở đơn vừa chốt.
+    if (mode === 'draft' && r.status === 'DRAFT') openDraft();
     else router.push(`/crm/orders/${r.orderId}`);
   };
 
