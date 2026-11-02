@@ -1545,9 +1545,12 @@ function Row({
 }
 
 /**
- * Thẻ Giá trị đơn hàng khi đang sửa sản phẩm (2026-11-02): tính lại theo tạm tính giỏ mới như server
- * lúc lưu (`replaceLinesInTx`) — giảm giá tay theo % tính lại trên tạm tính mới, theo số tiền giữ
- * nguyên; đơn Pancake giữ giảm giá cấp đơn và bỏ làm tròn. `draftSubtotal` null → số đã lưu.
+ * Thẻ Giá trị đơn hàng khi đang sửa sản phẩm — cùng công thức server lúc lưu
+ * (`SalesOrderService.replaceLinesInTx`): tạm tính mới = Σ thành tiền giỏ mới; chiết khấu TỪNG DÒNG
+ * đã nằm trong thành tiền nên KHÔNG trừ lại. Đơn Pancake: chỉ giữ giảm giá CẤP ĐƠN (= giảm giá đơn −
+ * Σ chiết khấu dòng đã lưu), bỏ làm tròn → tiền cần thu = Σ thành tiền (2026-11-02, SOP2610-107401:
+ * trước đây trừ cả 900.018 chiết khấu dòng lần hai → 4.499.982 thay vì 5.400.000). Đơn ERP: chỉ giảm
+ * giá tay (% tính lại trên tạm tính mới, số tiền giữ nguyên). `draftSubtotal` null → số đã lưu.
  */
 export function previewAmounts(
   order: Pick<
@@ -1559,10 +1562,14 @@ export function previewAmounts(
     | 'roundingAmount'
     | 'total'
     | 'pancakeOrderId'
-  >,
+    | 'taxAmount'
+    | 'shippingFee'
+    | 'surcharge'
+  > & { lines: ReadonlyArray<Pick<SalesOrderDetail['lines'][number], 'discount' | 'lineTotal'>> },
   draftSubtotal: string | null,
 ): { subtotal: string; discount: string; roundingAmount: string; total: string } {
-  if (draftSubtotal === null || new Decimal(draftSubtotal).eq(order.subtotal)) {
+  const savedLines = order.lines.reduce((s, l) => s.plus(l.lineTotal), new Decimal(0));
+  if (draftSubtotal === null || new Decimal(draftSubtotal).eq(savedLines)) {
     return {
       subtotal: order.subtotal,
       discount: order.discount,
@@ -1571,24 +1578,39 @@ export function previewAmounts(
     };
   }
   const next = new Decimal(draftSubtotal);
+  const ship = new Decimal(order.shippingFee || 0).plus(order.surcharge || 0);
   // `!= null`: dữ liệu cũ / fixture có thể thiếu trường (undefined) — coi như không có.
-  const pancake = order.pancakeOrderId != null;
-  let discount = new Decimal(order.discount);
-  if (!pancake && order.manualDiscountRate != null) {
-    const manualNew = next.gt(0) ? next.mul(order.manualDiscountRate) : new Decimal(0);
-    discount = discount.minus(order.manualDiscount || 0).plus(manualNew);
+  if (order.pancakeOrderId != null) {
+    const orderLevel = order.lines.reduce(
+      (s, l) => s.minus(l.discount),
+      new Decimal(order.discount),
+    );
+    const discount = Decimal.max(orderLevel, 0);
+    const total = next
+      .minus(discount)
+      .plus(order.taxAmount || 0)
+      .plus(ship);
+    return {
+      subtotal: next.toFixed(4),
+      discount: discount.toFixed(4),
+      roundingAmount: '0.0000',
+      total: Decimal.max(total, 0).toFixed(4),
+    };
   }
-  const rounding = pancake ? new Decimal(0) : new Decimal(order.roundingAmount);
-  const total = new Decimal(order.total)
-    .minus(order.subtotal)
-    .plus(next)
-    .minus(new Decimal(discount).minus(order.discount))
-    .minus(order.roundingAmount)
-    .plus(rounding);
+  const manual =
+    order.manualDiscountRate != null
+      ? next.gt(0)
+        ? next.mul(order.manualDiscountRate)
+        : new Decimal(0)
+      : new Decimal(order.manualDiscount || 0);
+  const total = next
+    .minus(manual)
+    .plus(ship)
+    .plus(order.roundingAmount || 0);
   return {
     subtotal: next.toFixed(4),
-    discount: discount.toFixed(4),
-    roundingAmount: rounding.toFixed(4),
+    discount: manual.toFixed(4),
+    roundingAmount: new Decimal(order.roundingAmount || 0).toFixed(4),
     total: Decimal.max(total, 0).toFixed(4),
   };
 }
