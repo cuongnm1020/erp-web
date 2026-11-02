@@ -78,6 +78,7 @@ import {
   manualDiscountNote,
 } from '../labels';
 import { groupOrderLines } from '../combo-lines';
+import { cancelOutcomeNotes } from './bulk-cancel-dialog';
 import { CarrierStatusCard } from './carrier-status-card';
 import { OrderEditHistory } from './order-edit-history';
 import { waybillErrorText } from './waybill-error';
@@ -608,9 +609,11 @@ function CancelOrderDialog({
     cancel.mutate(
       { reason: reason.trim() || (recreate ? 'Sửa đơn — hủy & tạo lại' : undefined) },
       {
-        onSuccess: () => {
+        onSuccess: (r) => {
+          const notes = cancelOutcomeNotes([r]);
           toast.success(`Đã hủy đơn ${order.docNumber}`, {
-            description: 'Hàng đang giữ cho đơn này đã được nhả về khả dụng.',
+            description: notes.join(' ') || 'Hàng đang giữ cho đơn này đã được nhả về khả dụng.',
+            duration: notes.length > 0 ? 10_000 : undefined,
           });
           onOpenChange(false);
           if (recreate) router.push(`/crm/orders/new?from=${order.id}`);
@@ -631,7 +634,15 @@ function CancelOrderDialog({
           <DialogDescription>
             {recreate
               ? 'Đơn đã chốt không sửa tại chỗ được. Đơn này sẽ bị hủy (hàng đang giữ được nhả), rồi mở form tạo đơn mới đổ sẵn nội dung cũ để chỉnh và chốt lại — số chứng từ sẽ cấp mới.'
-              : 'Không hoàn tác được. Hàng đang giữ cho đơn sẽ được nhả về khả dụng; muốn bán lại thì tạo đơn mới.'}
+              : `Không hoàn tác được. Hàng đang giữ cho đơn sẽ được nhả về khả dụng; muốn bán lại thì tạo đơn mới.${
+                  order.shipment?.trackingNo
+                    ? ' Đơn đã có mã vận đơn: hệ thống hủy vận đơn bên hãng trước — hãng không đồng ý thì đơn giữ nguyên.'
+                    : ''
+                }${
+                  order.fulfilment.status === 'PACKED'
+                    ? ' Kho đã đóng gói: hàng tự nhập lại kho (phiếu nhập hàng hoàn), lấy kiện ra khỏi khu chờ giao.'
+                    : ''
+                }`}
           </DialogDescription>
         </DialogHeader>
         <div className="space-y-1.5">
@@ -750,6 +761,7 @@ function Detail({ order }: { order: SalesOrderDetail }) {
   const canCancel =
     live &&
     (ability.can('cancel', 'SalesOrder') ||
+      ability.can('cancel_after_carrier', 'SalesOrder') ||
       (ability.can('create', 'SalesOrder') && !order.stageLockedReason));
   const confirm = useConfirmOrder();
   const canRecreate = canCancel && canCreate;

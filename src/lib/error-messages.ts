@@ -182,7 +182,14 @@ const MESSAGES: Record<string, string> = {
     'Đơn đang nằm trong lượt pick gộp. Hoàn tất lượt trên màn quét, không đóng tay từng đơn được.',
   // Hủy đơn (2026-09-28): đơn đã đóng gói thì tồn đã trừ — không hủy chứng từ được.
   ORDER_ALREADY_PACKED:
-    'Đơn đã đóng gói, hàng đã trừ kho — không hủy được. Xử lý bằng hoàn hàng / nhập lại kho.',
+    'Đơn đã đóng gói, hàng đã trừ kho — bạn không có quyền hủy đơn sau khi gán ĐVVC. Nhờ trưởng phòng / quản trị hủy (hàng tự nhập lại kho).',
+  // Hủy đơn đã gán ĐVVC (2026-11-02): hệ thống gọi hãng hủy vận đơn TRƯỚC khi hủy đơn.
+  ORDER_CARRIER_PICKED_UP:
+    'Hãng đã lấy hàng — không hủy đơn được nữa. Liên hệ hãng chặn giao rồi xử lý bằng hoàn hàng.',
+  ORDER_CARRIER_CANCEL_REJECTED:
+    'Hãng không đồng ý hủy vận đơn nên đơn CHƯA bị hủy. Xem lý do của hãng, xử lý trên portal hãng rồi thử lại.',
+  ORDER_CARRIER_CANCEL_FAILED:
+    'Không gọi được hãng để hủy vận đơn nên đơn CHƯA bị hủy. Thử lại sau ít phút.',
   SHIPMENT_CANCELLED: 'Phiếu giao này đã hủy theo đơn — không đóng gói / giao hãng được nữa.',
   SHIPMENT_CANCEL_VIA_ORDER: 'Muốn hủy phiếu giao thì hủy đơn bán, không đổi tay trạng thái phiếu.',
   // "Đóng gói + in vận đơn" (bulk-fulfil) — mã trước đây rơi về câu chung "Yêu cầu không hợp lệ"
@@ -390,6 +397,13 @@ export function messageFor(err: unknown): string {
       const d = err.details as { code?: unknown; skuCode?: unknown; skuName?: unknown } | null;
       if (d && typeof d.skuCode === 'string') {
         return `Mã ${String(d.code ?? '')} đã gán cho ${d.skuCode}${typeof d.skuName === 'string' ? ` — ${d.skuName}` : ''}. Mỗi mã chỉ thuộc một sản phẩm.`;
+      }
+    }
+    if (err.code === 'ORDER_CARRIER_CANCEL_REJECTED') {
+      // Lời hãng là dữ liệu (details.carrierMessage), không phải message thô của server (luật 6).
+      const d = err.details as { carrierMessage?: unknown } | null;
+      if (d && typeof d.carrierMessage === 'string' && d.carrierMessage) {
+        return `${MESSAGES.ORDER_CARRIER_CANCEL_REJECTED!} ${carrierSaid(d.carrierMessage)}`;
       }
     }
     if (err.code === 'STOCK_EXCEL_WAREHOUSE_MISMATCH') {

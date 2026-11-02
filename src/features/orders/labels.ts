@@ -139,15 +139,31 @@ const PACKED_OR_LATER: ReadonlySet<string> = new Set([
   'CARRIER_CANCELLED',
 ]);
 
+/** Hãng đã lấy hàng trở đi — hãng không hủy vận đơn được nữa (ORDER_CARRIER_PICKED_UP). */
+const CARRIER_HAS_GOODS: ReadonlySet<string> = new Set([
+  'SHIPPED',
+  'IN_TRANSIT',
+  'OUT_FOR_DELIVERY',
+  'DELIVERED',
+  'FAILED',
+  'RETURNED',
+]);
+
 /**
- * Gợi ý đơn còn hủy được trên danh sách: chưa hủy và kho chưa đóng gói. Chỉ để bỏ bớt đơn chắc
- * chắn hỏng trước khi gửi — server vẫn là nơi quyết định (đơn lệch pha về `failed`).
+ * Gợi ý đơn còn hủy được trên danh sách: chưa hủy và kho chưa đóng gói. Người có quyền hủy sau
+ * khi gán ĐVVC (`afterCarrier`, 2026-11-02) hủy được cả đơn đã đóng gói mà hãng chưa lấy hàng
+ * (server gọi hãng hủy vận đơn + tự nhập lại kho). Chỉ để bỏ bớt đơn chắc chắn hỏng trước khi gửi —
+ * server vẫn là nơi quyết định (đơn lệch pha về `failed`).
  */
 export function orderCancellable(
   status: SalesOrderStatus,
   fulfilmentStatus: string | null,
+  afterCarrier = false,
 ): boolean {
-  return status !== 'CANCELLED' && !(fulfilmentStatus && PACKED_OR_LATER.has(fulfilmentStatus));
+  if (status === 'CANCELLED' || !fulfilmentStatus) return status !== 'CANCELLED';
+  return afterCarrier
+    ? !CARRIER_HAS_GOODS.has(fulfilmentStatus)
+    : !PACKED_OR_LATER.has(fulfilmentStatus);
 }
 
 // ── Trạng thái KHO của đơn (fulfilment) — suy từ task PICK/PACK + phiếu giao ở server ──
