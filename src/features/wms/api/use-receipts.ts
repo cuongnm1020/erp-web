@@ -128,6 +128,25 @@ export function useSetReceiptCosts(id: string) {
   });
 }
 
+export type CorrectReceiptQuantitiesBody = components['schemas']['CorrectReceiptQuantitiesDto'];
+
+/**
+ * POST /goods-receipts/:id/quantities — sửa số lượng dòng nhập sai (2026-11-02, `stock.adjust`).
+ * Phiếu đã ghi sổ: server ghi movement điều chỉnh (sổ cái thêm dòng "Điều chỉnh"); không
+ * optimistic (luật 5) — chờ server rồi tải lại chi tiết + sổ cái + danh sách.
+ */
+export function useCorrectReceiptQuantities(id: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (body: CorrectReceiptQuantitiesBody) =>
+      unwrap(api.POST('/goods-receipts/{id}/quantities', { params: { path: { id } }, body })),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: receiptKeys.lists() });
+      void qc.invalidateQueries({ queryKey: receiptKeys.detail(id) });
+    },
+  });
+}
+
 /**
  * POST /goods-receipts/:id/putaway-default — cất mọi thùng / hàng rời CHƯA cất của phiếu vào vị
  * trí DEFAULT của kho (2026-11-02), đóng việc cất → phiếu sang Chờ nhập giá / Hoàn thành.

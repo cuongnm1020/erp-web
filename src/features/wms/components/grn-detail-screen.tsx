@@ -10,12 +10,13 @@ import {
   CopyPlus,
   Lock,
   PackageCheck,
+  Pencil,
   Printer,
 } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { ConfirmDialog } from '@/components/data/confirm-dialog';
-import { MoneyInput } from '@/components/data/form';
+import { MoneyInput, QuantityInput } from '@/components/data/form';
 import { DetailSkeleton, QueryState } from '@/components/data/states';
 import { StatusBadge } from '@/components/data/status-badge';
 import { PageHeader } from '@/components/layout/page-header';
@@ -40,6 +41,7 @@ import { GrnContainers } from './grn-containers';
 import { GrnWaitingMatch } from './grn-waiting-match';
 import {
   useCancelReceipt,
+  useCorrectReceiptQuantities,
   usePostReceipt,
   usePutAwayReceiptToDefault,
   useReceipt,
@@ -60,12 +62,16 @@ import {
  * theo ĐVT đã nhập của dòng → "Lưu giá" gọi POST :id/costs (phiếu cất xong + đủ giá → Hoàn
  * thành). Phiếu "Chờ nhập giá" mở sẵn chế độ nhập.
  *
- * Khác design: chưa có "Tạo phiếu điều chỉnh" (chưa có chứng từ điều chỉnh) và
- * "In phiếu"; hủy phiếu đã post bị 409 đúng nghĩa — không có đường xóa ledger.
+ * 2026-11-02 — "Sửa số lượng" (`stock.adjust`): ô SL cho dòng hàng rời → POST :id/quantities.
+ * Phiếu đã ghi sổ: server ghi movement "Điều chỉnh" vào sổ cái (bất biến 5 — không sửa dòng
+ * sổ cũ), hộp xác nhận liệt kê chênh lệch trước khi ghi. Dòng nhập theo thùng chỉ đọc.
+ *
+ * Khác design: chưa có "In phiếu"; hủy phiếu đã post bị 409 đúng nghĩa — không có đường xóa ledger.
  */
 const MOVEMENT_LABEL: Record<string, string> = {
   RECEIPT: '+ Nhập',
   PUT_AWAY: 'Cất hàng',
+  ADJUSTMENT: 'Điều chỉnh',
 };
 
 /** Cùng regex với moneySchema (Decimal(18,4), không âm). */
@@ -313,7 +319,9 @@ function StageBanner({ receipt }: { receipt: ReceiptDetail }) {
         {receipt.costedAt
           ? ` Giá nhập do ${receipt.costedByName ?? '—'} nhập ${formatDateTime(receipt.costedAt)}.`
           : ''}{' '}
-        Chứng từ bất biến — mọi trường chỉ đọc. Sai sót → tạo phiếu điều chỉnh (chưa có trên web).
+        {
+          'Sai số lượng → "Sửa số lượng" (ghi điều chỉnh tồn vào sổ cái); sai giá → kế toán "Sửa giá nhập".'
+        }
       </span>
     </p>
   );
@@ -326,14 +334,23 @@ interface CostEntry {
   errors: Record<string, string>;
 }
 
+interface QtyEntry {
+  editing: boolean;
+  drafts: Record<string, string>;
+  setDraft: (lineId: string, value: string) => void;
+  errors: Record<string, string>;
+}
+
 function DetailBody({
   receipt,
   canCost,
   cost,
+  qty,
 }: {
   receipt: ReceiptDetail;
   canCost: boolean;
   cost: CostEntry;
+  qty: QtyEntry;
 }) {
   const printer = usePrint();
   const [labels, setLabels] = useState<LpnLabelData[]>([]);
@@ -435,9 +452,10 @@ function DetailBody({
             <TableBody>
               {receipt.lines.map((l) => {
                 const err = cost.errors[l.id];
+                const qtyErr = qty.errors[l.id];
                 const value = lineValue(l);
                 return (
-                  <TableRow key={l.id} className={cn(err && 'bg-destructive-weak')}>
+                  <TableRow key={l.id} className={cn((err || qtyErr) && 'bg-destructive-weak')}>
                     <TableCell className="px-2.5 py-1.5 text-muted-foreground">
                       {l.lineNo}
                     </TableCell>
@@ -449,7 +467,30 @@ function DetailBody({
                       {l.baseUomCode}
                     </TableCell>
                     <TableCell className="px-2.5 py-1.5 text-right tabular-nums">
-                      {formatQuantity(l.qtyBase)}
+                      {qty.editing && !l.packaging ? (
+                        <div className="flex flex-col items-end gap-0.5">
+                          <QuantityInput
+                            min={1}
+                            aria-label={`Số lượng dòng ${l.lineNo}`}
+                            aria-invalid={Boolean(qtyErr)}
+                            className="w-20"
+                            value={qty.drafts[l.id] ?? ''}
+                            onChange={(v) => qty.setDraft(l.id, v)}
+                          />
+                          {qtyErr ? (
+                            <span className="text-xs text-destructive">{qtyErr}</span>
+                          ) : null}
+                        </div>
+                      ) : (
+                        <>
+                          {formatQuantity(l.qtyBase)}
+                          {qty.editing ? (
+                            <div className="text-xs text-muted-foreground">
+                              Theo thùng — chỉ đọc
+                            </div>
+                          ) : null}
+                        </>
+                      )}
                     </TableCell>
                     <TableCell className="px-2.5 py-1.5 font-mono text-xs">
                       {l.lotNumber ?? '—'}
@@ -581,6 +622,7 @@ export function GrnDetailScreen({ id }: { id: string }) {
   const openCostEntry = (r: ReceiptDetail) => {
     setDrafts(Object.fromEntries(r.lines.map((l) => [l.id, enteredCostOf(l)])));
     setErrors({});
+    setQtyEditing(false);
     setEditing(true);
   };
   const awaitingCost = receipt?.stage === 'AWAITING_COST';
@@ -607,6 +649,78 @@ export function GrnDetailScreen({ id }: { id: string }) {
     }),
     [editing, drafts, errors],
   );
+
+  // ── Sửa số lượng (stock.adjust) ── phiếu nháp, hoặc đã ghi sổ + cất xong; chỉ dòng hàng rời.
+  const canAdjust = ability.can('adjust', 'Stock');
+  const correctQty = useCorrectReceiptQuantities(id);
+  const canEditQty = Boolean(
+    receipt &&
+    canAdjust &&
+    (receipt.status === 'DRAFT' ||
+      receipt.stage === 'AWAITING_COST' ||
+      receipt.stage === 'COMPLETED') &&
+    receipt.lines.some((l) => !l.packaging),
+  );
+  const [qtyEditing, setQtyEditing] = useState(false);
+  const [qtyDrafts, setQtyDrafts] = useState<Record<string, string>>({});
+  const [qtyErrors, setQtyErrors] = useState<Record<string, string>>({});
+  /** Dòng đổi SL chờ xác nhận (phiếu đã ghi sổ) — null = hộp đóng. */
+  const [qtyConfirm, setQtyConfirm] = useState<Array<{ line: Line; to: string }> | null>(null);
+  const openQtyEntry = (r: ReceiptDetail) => {
+    setQtyDrafts(Object.fromEntries(r.lines.map((l) => [l.id, new Decimal(l.qtyBase).toFixed()])));
+    setQtyErrors({});
+    setEditing(false);
+    setQtyEditing(true);
+  };
+  const qtyEntry = useMemo<QtyEntry>(
+    () => ({
+      editing: qtyEditing,
+      drafts: qtyDrafts,
+      errors: qtyErrors,
+      setDraft: (lineId, value) => {
+        setQtyDrafts((d) => ({ ...d, [lineId]: value }));
+        setQtyErrors((e) => {
+          if (!e[lineId]) return e;
+          const rest = { ...e };
+          delete rest[lineId];
+          return rest;
+        });
+      },
+    }),
+    [qtyEditing, qtyDrafts, qtyErrors],
+  );
+  const submitQty = (changes: Array<{ line: Line; to: string }>) =>
+    correctQty
+      .mutateAsync({ lines: changes.map((c) => ({ lineId: c.line.id, qtyBase: c.to })) })
+      .then(() => {
+        setQtyEditing(false);
+        toast.success(`Đã lưu số lượng ${changes.length} dòng`);
+      })
+      .catch((err) => toast.error(messageFor(err)));
+  const saveQty = () => {
+    if (!receipt || correctQty.isPending) return;
+    const next: Record<string, string> = {};
+    const changes: Array<{ line: Line; to: string }> = [];
+    for (const l of receipt.lines) {
+      if (l.packaging) continue;
+      const v = (qtyDrafts[l.id] ?? '').trim();
+      if (!/^\d+$/.test(v) || new Decimal(v).lte(0)) {
+        next[l.id] = 'Số lượng phải lớn hơn 0';
+        continue;
+      }
+      if (!new Decimal(v).eq(l.qtyBase)) changes.push({ line: l, to: v });
+    }
+    setQtyErrors(next);
+    if (Object.keys(next).length) return;
+    if (changes.length === 0) {
+      toast.success('Không có số lượng nào thay đổi');
+      setQtyEditing(false);
+      return;
+    }
+    // Phiếu nháp chưa chạm tồn — lưu thẳng; đã ghi sổ thì xác nhận chênh lệch trước.
+    if (receipt.status === 'DRAFT') void submitQty(changes);
+    else setQtyConfirm(changes);
+  };
 
   const saveCosts = () => {
     if (!receipt || setCosts.isPending) return;
@@ -659,7 +773,7 @@ export function GrnDetailScreen({ id }: { id: string }) {
           { label: receipt?.docNumber ?? '…' },
         ]}
         actions={
-          receipt && (canReceive || canEnterCost) ? (
+          receipt && (canReceive || canEnterCost || canEditQty) ? (
             <>
               {/* Nhân bản: form tạo phiếu điền sẵn dòng của phiếu này (mọi trạng thái). */}
               {canReceive ? (
@@ -684,7 +798,36 @@ export function GrnDetailScreen({ id }: { id: string }) {
                   Cất tất cả vào vị trí mặc định
                 </Button>
               ) : null}
-              {canEnterCost && !editing ? (
+              {canEditQty && !qtyEditing && !editing ? (
+                <Button variant="outline" size="sm" onClick={() => openQtyEntry(receipt)}>
+                  <Pencil aria-hidden />
+                  Sửa số lượng
+                </Button>
+              ) : null}
+              {canEditQty && qtyEditing ? (
+                <>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    disabled={correctQty.isPending}
+                    onClick={() => {
+                      setQtyEditing(false);
+                      setQtyErrors({});
+                    }}
+                  >
+                    Bỏ sửa số lượng
+                  </Button>
+                  <Button
+                    size="sm"
+                    loading={correctQty.isPending}
+                    loadingText="Đang lưu…"
+                    onClick={saveQty}
+                  >
+                    Lưu số lượng
+                  </Button>
+                </>
+              ) : null}
+              {canEnterCost && !editing && !qtyEditing ? (
                 <Button
                   variant={awaitingCost ? 'default' : 'outline'}
                   size="sm"
@@ -756,8 +899,26 @@ export function GrnDetailScreen({ id }: { id: string }) {
       ) : null}
 
       <QueryState query={query} skeleton={<DetailSkeleton />}>
-        {(r) => <DetailBody receipt={r} canCost={canCost} cost={costEntry} />}
+        {(r) => <DetailBody receipt={r} canCost={canCost} cost={costEntry} qty={qtyEntry} />}
       </QueryState>
+      <ConfirmDialog
+        open={qtyConfirm !== null}
+        onOpenChange={(o) => {
+          if (!o) setQtyConfirm(null);
+        }}
+        title="Ghi điều chỉnh số lượng?"
+        description={`${(qtyConfirm ?? [])
+          .map((c) => {
+            const d = new Decimal(c.to).minus(c.line.qtyBase);
+            return `Dòng ${c.line.lineNo} ${c.line.skuCode}: ${formatQuantity(c.line.qtyBase)} → ${formatQuantity(c.to)} (${d.gt(0) ? '+' : ''}${formatQuantity(d.toFixed())} ${c.line.baseUomCode})`;
+          })
+          .join(
+            '; ',
+          )}. Tồn kho ghi thêm dòng "Điều chỉnh" vào sổ cái — phần tăng vào vị trí đã cất, phần giảm trừ hàng chưa giữ chỗ.`}
+        confirmLabel="Ghi điều chỉnh"
+        destructive={false}
+        onConfirm={() => (qtyConfirm ? submitQty(qtyConfirm) : undefined)}
+      />
       <ConfirmDialog
         open={putAwayKey !== null}
         onOpenChange={(o) => {
