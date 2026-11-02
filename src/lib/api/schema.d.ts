@@ -8133,6 +8133,10 @@ export interface components {
             docNumber: string;
             orderId: string | null;
             orderDocNumber: string | null;
+            /** @description Nhân viên lên đơn (như danh sách đơn: đơn Pancake = người tạo trên Pancake); null = chưa khớp. */
+            creatorName: string | null;
+            /** @description Sản phẩm của đơn: "Tên SKU ×SL ĐVT", nối bằng ", " theo thứ tự dòng; null = không có đơn. */
+            products: string | null;
             /** @enum {string} */
             status: "CANCELLED" | "PENDING" | "IN_TRANSIT" | "OUT_FOR_DELIVERY" | "DELIVERED" | "FAILED" | "RETURNED" | "CARRIER_CANCELLED" | "PICKED_UP";
             carrierId: string | null;
