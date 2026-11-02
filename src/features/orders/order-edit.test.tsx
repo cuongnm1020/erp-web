@@ -770,8 +770,12 @@ describe('OrderEditScreen — sửa sản phẩm / người nhận, quyền sử
     );
     renderApp(<OrderEditScreen orderId={ORDER.id} />);
     await screen.findByRole('heading', { level: 1 });
+    // Tiền cần thu (thẻ Giá trị đơn hàng) đi theo giỏ đang sửa, không chờ lưu (2026-11-02).
+    const collect = () => screen.getByText('Tiền cần thu').nextElementSibling?.textContent;
+    const before = collect();
     fireEvent.click((await screen.findAllByRole('button', { name: 'Tăng số lượng' }))[0]!);
     expect(screen.getAllByText(/thay đổi chưa lưu/).length).toBeGreaterThan(0);
+    await waitFor(() => expect(collect()).not.toBe(before));
     fireEvent.click(screen.getByRole('button', { name: /Lưu thay đổi/ }));
     await waitFor(() => expect(puts).toHaveLength(1));
     const first = DETAIL.lines.find((l) => !l.combo)!;

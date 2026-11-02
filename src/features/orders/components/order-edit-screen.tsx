@@ -161,6 +161,7 @@ function Editor({ order }: { order: SalesOrderDetail }) {
     ? { body: null, changed: false, invalid: null }
     : linesChange(order, watchedLines ?? [], removedCustom);
   const linesChanged = lineEdit.changed;
+  const [draftSubtotal, setDraftSubtotal] = useState<string | null>(null);
   const moveWarehouse = useMoveOrdersWarehouse();
   const carriers = useCarriers();
   const warehouses = usePickupWarehouses();
@@ -622,7 +623,11 @@ function Editor({ order }: { order: SalesOrderDetail }) {
   // Ô SĐT riêng còn trống mà SĐT hiệu lực bị che → tô đỏ, hãng sẽ từ chối.
   const phoneStillMasked = order.recipientPhoneMasked && trimOrNull(recipientPhone) === null;
   const prepaid = new Decimal(order.prepaidAmount || 0);
-  const cod = Decimal.max(new Decimal(order.total).minus(prepaid), 0).toFixed(4);
+  const amounts = previewAmounts(
+    order,
+    linesChanged && !order.linesLockedReason ? draftSubtotal : null,
+  );
+  const cod = Decimal.max(new Decimal(amounts.total).minus(prepaid), 0).toFixed(4);
   const nonZero = (v: string) => !(toDecimal(v)?.isZero() ?? true);
   const lineWeight = toDecimal(order.lineWeightKg);
 
@@ -844,6 +849,7 @@ function Editor({ order }: { order: SalesOrderDetail }) {
             dirty={linesChanged}
             removedCustom={removedCustom}
             onRemoveCustom={(key) => setRemovedCustom((prev) => [...prev, key])}
+            onSubtotal={setDraftSubtotal}
             readOnly={
               <>
                 <p className="text-sm text-muted-foreground">
@@ -971,9 +977,9 @@ function Editor({ order }: { order: SalesOrderDetail }) {
                 </div>
               ) : null}
               <div className="flex flex-col gap-2 border-t border-dashed pt-3">
-                <SumRow label="Tạm tính" value={formatMoney(order.subtotal)} />
-                {nonZero(order.discount) ? (
-                  <SumRow label="Giảm giá" value={`−${formatMoney(order.discount)}`} tone="neg" />
+                <SumRow label="Tạm tính" value={formatMoney(amounts.subtotal)} />
+                {nonZero(amounts.discount) ? (
+                  <SumRow label="Giảm giá" value={`−${formatMoney(amounts.discount)}`} tone="neg" />
                 ) : null}
                 {manualDiscountNote(order) ? (
                   <p className="text-right text-xs text-muted-foreground">
@@ -984,13 +990,13 @@ function Editor({ order }: { order: SalesOrderDetail }) {
                 {nonZero(order.surcharge) ? (
                   <SumRow label="Phụ thu" value={formatMoney(order.surcharge)} />
                 ) : null}
-                {nonZero(order.roundingAmount) ? (
-                  <SumRow label="Làm tròn" value={formatMoney(order.roundingAmount)} />
+                {nonZero(amounts.roundingAmount) ? (
+                  <SumRow label="Làm tròn" value={formatMoney(amounts.roundingAmount)} />
                 ) : null}
                 {nonZero(order.taxAmount) ? (
                   <SumRow label="Thuế" value={formatMoney(order.taxAmount)} />
                 ) : null}
-                <SumRow label="Tổng số tiền" value={formatMoney(order.total)} />
+                <SumRow label="Tổng số tiền" value={formatMoney(amounts.total)} />
                 {prepaid.isZero() ? null : (
                   <SumRow
                     label="Đã chuyển khoản"
@@ -1536,6 +1542,55 @@ function Row({
       <div className="w-full sm:w-56">{children}</div>
     </div>
   );
+}
+
+/**
+ * Thẻ Giá trị đơn hàng khi đang sửa sản phẩm (2026-11-02): tính lại theo tạm tính giỏ mới như server
+ * lúc lưu (`replaceLinesInTx`) — giảm giá tay theo % tính lại trên tạm tính mới, theo số tiền giữ
+ * nguyên; đơn Pancake giữ giảm giá cấp đơn và bỏ làm tròn. `draftSubtotal` null → số đã lưu.
+ */
+export function previewAmounts(
+  order: Pick<
+    SalesOrderDetail,
+    | 'subtotal'
+    | 'discount'
+    | 'manualDiscount'
+    | 'manualDiscountRate'
+    | 'roundingAmount'
+    | 'total'
+    | 'pancakeOrderId'
+  >,
+  draftSubtotal: string | null,
+): { subtotal: string; discount: string; roundingAmount: string; total: string } {
+  if (draftSubtotal === null || new Decimal(draftSubtotal).eq(order.subtotal)) {
+    return {
+      subtotal: order.subtotal,
+      discount: order.discount,
+      roundingAmount: order.roundingAmount,
+      total: order.total,
+    };
+  }
+  const next = new Decimal(draftSubtotal);
+  // `!= null`: dữ liệu cũ / fixture có thể thiếu trường (undefined) — coi như không có.
+  const pancake = order.pancakeOrderId != null;
+  let discount = new Decimal(order.discount);
+  if (!pancake && order.manualDiscountRate != null) {
+    const manualNew = next.gt(0) ? next.mul(order.manualDiscountRate) : new Decimal(0);
+    discount = discount.minus(order.manualDiscount || 0).plus(manualNew);
+  }
+  const rounding = pancake ? new Decimal(0) : new Decimal(order.roundingAmount);
+  const total = new Decimal(order.total)
+    .minus(order.subtotal)
+    .plus(next)
+    .minus(new Decimal(discount).minus(order.discount))
+    .minus(order.roundingAmount)
+    .plus(rounding);
+  return {
+    subtotal: next.toFixed(4),
+    discount: discount.toFixed(4),
+    roundingAmount: rounding.toFixed(4),
+    total: Decimal.max(total, 0).toFixed(4),
+  };
 }
 
 function SumRow({
