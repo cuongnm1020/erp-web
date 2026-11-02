@@ -1,7 +1,8 @@
 'use client';
 
 import Decimal from 'decimal.js';
-import { Lock } from 'lucide-react';
+import { Lock, Trash2 } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 import { useCallback, useMemo, useRef, useState } from 'react';
 import { useFieldArray, useForm, useWatch, type UseFormReturn } from 'react-hook-form';
 import { Form } from '@/components/data/form';
@@ -31,16 +32,45 @@ function initialLines(order: SalesOrderDetail): CreateOrderValues['lines'] {
   }));
 }
 
+/** Món gõ tay / ngoài hệ thống của đơn — hiện thành dòng chỉ đọc trong bảng Sản phẩm. */
+export interface CustomRow {
+  key: string;
+  name: string;
+  /** Mã sản phẩm trên Pancake (nếu có). */
+  code: string | null;
+  qty: string;
+  unitPrice: string | null;
+  total: string | null;
+}
+
 /**
- * Món gõ tay / ngoài hệ thống của đơn (dòng `nonStock` + `customItems` đơn Pancake cũ) — không vào
- * giỏ sửa: lưu giỏ là THAY toàn bộ dòng nên các món này bị bỏ (tab Cần sửa, 2026-11-02).
+ * Món gõ tay / ngoài hệ thống của đơn (dòng `nonStock` + `customItems` đơn Pancake cũ). Không vào
+ * giỏ sửa (lưu giỏ là THAY toàn bộ dòng, món này không có trên danh mục) — hiện thành dòng để nhân
+ * viên biết đơn đang có gì, bấm xóa rồi chọn sản phẩm tương ứng (2026-11-02).
  */
-export function customLeftovers(order: SalesOrderDetail): string[] {
+export function customRows(order: SalesOrderDetail): CustomRow[] {
   return [
     ...order.lines
       .filter((l) => l.nonStock)
-      .map((l) => `${l.skuName} × ${new Decimal(l.qty).toString()}`),
-    ...order.customItems.map((c) => `${c.name} × ${new Decimal(c.qty).toString()}`),
+      .map((l) => ({
+        key: `line:${l.id}`,
+        name: l.pancakeName ?? l.skuName,
+        code: l.pancakeSkuCode,
+        qty: new Decimal(l.qty).toString(),
+        unitPrice: l.unitPrice,
+        total: l.lineTotal,
+      })),
+    ...order.customItems.map((c, i) => {
+      const price = c.unitPrice !== null ? new Decimal(c.unitPrice).minus(c.discount || 0) : null;
+      return {
+        key: `custom:${i}`,
+        name: c.name,
+        code: null,
+        qty: new Decimal(c.qty).toString(),
+        unitPrice: price ? price.toFixed(4) : null,
+        total: price ? price.times(c.qty).toFixed(4) : null,
+      };
+    }),
   ];
 }
 
@@ -59,21 +89,24 @@ export function useOrderLinesForm(order: SalesOrderDetail): LinesForm {
 const same = (a: string, b: string) =>
   a === b || (a !== '' && b !== '' && /^\d/.test(a) && /^\d/.test(b) && new Decimal(a).eq(b));
 
+/** Lý do không lưu được giỏ — màn cha dịch thành thông báo. */
+export type LinesInvalid = 'empty' | 'qty' | 'custom' | null;
+
 /**
  * Body PUT /sales-orders/{id}/lines khi giỏ khác ban đầu; null = không đổi. ĐVT trống (dòng combo
- * trước khi tải SKU) không tính là đổi. Dòng SL sai → `invalid`.
+ * trước khi tải SKU) không tính là đổi. Món ngoài hệ thống: không đụng tới thì không gửi PUT (đơn giữ
+ * nguyên, vẫn sửa được người nhận…); đã xóa món hoặc đổi giỏ thì phải xóa HẾT món ngoài hệ thống —
+ * lưu giỏ là thay toàn bộ dòng, không để món còn hiện trên bảng bị bỏ ngầm.
  */
 export function linesChange(
   order: SalesOrderDetail,
   current: CreateOrderValues['lines'],
-): { body: ReplaceOrderLinesBody | null; invalid: boolean } {
+  removedCustom: readonly string[] = [],
+): { body: ReplaceOrderLinesBody | null; changed: boolean; invalid: LinesInvalid } {
   const before = initialLines(order);
-  const invalid = current.some(
-    (l) => !/^\d{1,12}(\.\d{1,6})?$/.test(l.qty) || new Decimal(l.qty).lte(0),
-  );
-  // Còn món gõ tay → lưu giỏ (kể cả giữ nguyên các dòng khác) là bỏ được các món đó.
+  const remaining = customRows(order).filter((r) => !removedCustom.includes(r.key));
   const changed =
-    customLeftovers(order).length > 0 ||
+    removedCustom.length > 0 ||
     before.length !== current.length ||
     current.some((l, i) => {
       const b = before[i]!;
@@ -84,9 +117,18 @@ export function linesChange(
         !same(l.unitPrice ?? '', b.unitPrice ?? '')
       );
     });
-  if (!changed || current.length === 0)
-    return { body: null, invalid: invalid || current.length === 0 };
+  if (!changed) return { body: null, changed, invalid: null };
+  const invalid: LinesInvalid =
+    remaining.length > 0
+      ? 'custom'
+      : current.length === 0
+        ? 'empty'
+        : current.some((l) => !/^\d{1,12}(\.\d{1,6})?$/.test(l.qty) || new Decimal(l.qty).lte(0))
+          ? 'qty'
+          : null;
+  if (invalid === 'custom' || invalid === 'empty') return { body: null, changed, invalid };
   return {
+    changed,
     invalid,
     body: {
       lines: current.map((l) => ({
@@ -109,12 +151,17 @@ export function OrderEditLines({
   order,
   lockedReason,
   dirty,
+  removedCustom,
+  onRemoveCustom,
   readOnly,
 }: {
   form: LinesForm;
   order: SalesOrderDetail;
   lockedReason: string | null;
   dirty: boolean;
+  /** Khóa `CustomRow.key` các món ngoài hệ thống đã bấm xóa (màn cha giữ để tính `linesChange`). */
+  removedCustom: readonly string[];
+  onRemoveCustom: (key: string) => void;
   /** Danh sách chỉ đọc (khi khóa) — màn cha vẽ bảng cũ. */
   readOnly: React.ReactNode;
 }) {
@@ -130,7 +177,7 @@ export function OrderEditLines({
     );
   }, []);
   useWatch({ control: form.control, name: 'lines' });
-  const leftovers = customLeftovers(order);
+  const custom = customRows(order).filter((r) => !removedCustom.includes(r.key));
 
   const addSku = useCallback(
     ({ skuId, baseUomId }: SkuQuickRow) => {
@@ -182,10 +229,10 @@ export function OrderEditLines({
           ? ' Đơn Pancake: lưu là cập nhật luôn sản phẩm trên đơn Pancake.'
           : ''}
       </p>
-      {leftovers.length > 0 ? (
+      {custom.length > 0 ? (
         <p role="note" className="rounded-md bg-warning-weak px-3 py-2 text-xs text-warning">
-          Món ngoài hệ thống: <b>{leftovers.join(', ')}</b>. Tìm sản phẩm tương ứng ở ô phía trên —
-          lưu sẽ bỏ các món này khỏi đơn.
+          Đơn có {custom.length} món ngoài hệ thống (gõ tay trên Pancake, không có trong danh mục).
+          Muốn đổi sản phẩm: xóa các món này rồi tìm sản phẩm tương ứng ở ô phía trên.
         </p>
       ) : null}
       <Form {...form}>
@@ -204,10 +251,50 @@ export function OrderEditLines({
               <span className="text-right">Thành tiền</span>
               <span />
             </div>
+            {custom.length > 0 ? (
+              <div className="divide-y border-b">
+                {custom.map((r, i) => (
+                  <div key={r.key} className={cn(CART_GRID, 'items-center bg-muted/30')}>
+                    <span className="text-sm text-muted-foreground">{i + 1}</span>
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-medium" title={r.name}>
+                        {r.name}
+                      </p>
+                      <p className="flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground">
+                        <span className="rounded bg-warning-weak px-1.5 py-0.5 font-semibold text-warning">
+                          Ngoài hệ thống
+                        </span>
+                        {r.code ? <span>Mã Pancake {r.code}</span> : null}
+                      </p>
+                    </div>
+                    <span className="text-center text-sm tabular-nums">{r.qty}</span>
+                    <span className="text-right text-sm tabular-nums">
+                      {r.unitPrice !== null ? formatMoney(r.unitPrice) : '—'}
+                    </span>
+                    <span className="text-right text-sm font-semibold tabular-nums">
+                      {r.total !== null ? formatMoney(r.total) : '—'}
+                    </span>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8 text-muted-foreground"
+                      aria-label={`Xóa món ${r.name}`}
+                      title="Xóa món ngoài hệ thống"
+                      onClick={() => onRemoveCustom(r.key)}
+                    >
+                      <Trash2 aria-hidden />
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            ) : null}
             {lines.fields.length === 0 ? (
-              <p className="px-3 py-4 text-center text-sm text-destructive">
-                Đơn phải có ít nhất một sản phẩm — tìm và thêm sản phẩm ở ô phía trên.
-              </p>
+              custom.length > 0 ? null : (
+                <p className="px-3 py-4 text-center text-sm text-destructive">
+                  Đơn phải có ít nhất một sản phẩm — tìm và thêm sản phẩm ở ô phía trên.
+                </p>
+              )
             ) : (
               <div className={cn('divide-y', dirty && 'bg-warning-weak')}>
                 {lines.fields.map((f, i) => (
@@ -226,7 +313,7 @@ export function OrderEditLines({
               </div>
             )}
             <div className="flex flex-wrap items-center justify-between gap-2 border-t px-3 py-2 text-sm text-muted-foreground">
-              <span>{lines.fields.length} dòng</span>
+              <span>{lines.fields.length + custom.length} dòng</span>
               <span>
                 Tạm tính{' '}
                 <b className="ml-1 text-base tabular-nums text-foreground">

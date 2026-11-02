@@ -21676,6 +21676,10 @@ export interface operations {
                 /** @description Dòng địa chỉ gõ tự do: "0332119579, Xã Quảng Tân, Huyện Tuy Đức, Đắk Nông". */
                 q: string;
                 limit?: number;
+                /** @description Ô Tỉnh/TP đang có trên form — ngữ cảnh khi dòng địa chỉ không gõ tên tỉnh (gợi ý cùng tỉnh lên đầu). */
+                province?: string;
+                /** @description Ô Quận/Huyện đang có trên form — cùng mục đích với `province`. */
+                district?: string;
             };
             header?: never;
             path?: never;

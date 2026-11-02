@@ -958,7 +958,9 @@ function AddressSuggestions({
     name: ['line1', 'ward', 'district', 'province'],
   });
   const q = useDebounced(line1 ?? '', 300);
-  const suggest = useGeoSuggest(q);
+  const ctxProvince = useDebounced(province ?? '', 300);
+  const ctxDistrict = useDebounced(district ?? '', 300);
+  const suggest = useGeoSuggest(q, { province: ctxProvince, district: ctxDistrict });
   const items = (suggest.data?.items ?? []).filter(
     (s) =>
       !(

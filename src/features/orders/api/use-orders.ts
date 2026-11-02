@@ -275,13 +275,25 @@ export type GeoSuggestion = components['schemas']['GeoSuggestionDto'];
 
 /**
  * GET /geo/suggest — gợi ý Xã / Huyện / Tỉnh từ dòng địa chỉ gõ tự do (2026-10-26, kiểu Pancake).
- * Chỉ gọi khi đủ 6 ký tự; danh mục tĩnh nên giữ kết quả theo chuỗi 10 phút.
+ * Chỉ gọi khi đủ 6 ký tự; danh mục tĩnh nên giữ kết quả theo chuỗi 10 phút. Kèm ô Tỉnh / Huyện
+ * đang có làm ngữ cảnh: không gõ tên tỉnh thì gợi ý cùng tỉnh lên đầu.
  */
-export function useGeoSuggest(q: string) {
+export function useGeoSuggest(
+  q: string,
+  context: { province?: string | null; district?: string | null } = {},
+) {
   const text = q.trim();
+  // Ô Tỉnh / Huyện đang có: ngữ cảnh khi dòng địa chỉ không gõ tên tỉnh (2026-11-02).
+  const province = context.province?.trim() || undefined;
+  const district = context.district?.trim() || undefined;
   return useQuery({
-    queryKey: ['geo', 'suggest', text] as const,
-    queryFn: () => unwrap(api.GET('/geo/suggest', { params: { query: { q: text, limit: 3 } } })),
+    queryKey: ['geo', 'suggest', text, province ?? '', district ?? ''] as const,
+    queryFn: () =>
+      unwrap(
+        api.GET('/geo/suggest', {
+          params: { query: { q: text, limit: 3, province, district } },
+        }),
+      ),
     enabled: text.length >= 6,
     staleTime: 10 * 60_000,
   });

@@ -72,7 +72,7 @@ import { DENSE } from './order-create/order-draft-form';
 import { Card } from './order-create/order-side-cards';
 import { OrderTagsField } from './order-tags-field';
 import { OrderEditHistory } from './order-edit-history';
-import { linesChange, OrderEditLines, useOrderLinesForm } from './order-edit-lines';
+import { customRows, linesChange, OrderEditLines, useOrderLinesForm } from './order-edit-lines';
 import { normalizePhoneInput } from '../schema';
 
 /**
@@ -156,10 +156,11 @@ function Editor({ order }: { order: SalesOrderDetail }) {
   const replaceLines = useReplaceOrderLines(order.id);
   const linesForm = useOrderLinesForm(order);
   const watchedLines = useWatch({ control: linesForm.control, name: 'lines' });
+  const [removedCustom, setRemovedCustom] = useState<string[]>([]);
   const lineEdit = order.linesLockedReason
-    ? { body: null, invalid: false }
-    : linesChange(order, watchedLines ?? []);
-  const linesChanged = lineEdit.body !== null;
+    ? { body: null, changed: false, invalid: null }
+    : linesChange(order, watchedLines ?? [], removedCustom);
+  const linesChanged = lineEdit.changed;
   const moveWarehouse = useMoveOrdersWarehouse();
   const carriers = useCarriers();
   const warehouses = usePickupWarehouses();
@@ -333,6 +334,12 @@ function Editor({ order }: { order: SalesOrderDetail }) {
   const save = () => {
     if (update.isPending || fulfil.isPending || moveWarehouse.isPending) return;
     if (requestWaybill.isPending || replaceLines.isPending) return;
+    if (lineEdit.invalid === 'custom') {
+      toast.error(
+        'Còn món ngoài hệ thống trên đơn — xóa hết các món này trước khi lưu thay đổi sản phẩm',
+      );
+      return;
+    }
     if (lineEdit.invalid) {
       toast.error('Kiểm tra lại sản phẩm: đơn cần ít nhất một dòng, số lượng lớn hơn 0');
       return;
@@ -525,8 +532,8 @@ function Editor({ order }: { order: SalesOrderDetail }) {
       ? [
           {
             label: 'Sản phẩm',
-            from: `${collapsedCount(order)} dòng`,
-            to: `${watchedLines.length} dòng`,
+            from: `${collapsedCount(order) + customRows(order).length} dòng`,
+            to: `${watchedLines.length + customRows(order).length - removedCustom.length} dòng`,
           },
         ]
       : []),
@@ -835,6 +842,8 @@ function Editor({ order }: { order: SalesOrderDetail }) {
             order={order}
             lockedReason={order.linesLockedReason}
             dirty={linesChanged}
+            removedCustom={removedCustom}
+            onRemoveCustom={(key) => setRemovedCustom((prev) => [...prev, key])}
             readOnly={
               <>
                 <p className="text-sm text-muted-foreground">
