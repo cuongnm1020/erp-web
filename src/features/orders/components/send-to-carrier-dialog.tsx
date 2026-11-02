@@ -56,6 +56,7 @@ import {
   useFulfilPrint,
   type FulfilPrintOutcome,
 } from './bulk-fulfil-print-dialog';
+import { CancelWaybillDialog } from './cancel-waybill-dialog';
 import { OrderResultsPanel, type OrderResultRow } from './order-results-panel';
 import {
   CARRIER_SERVICES,
@@ -841,6 +842,7 @@ function SendResults({
   issuing: { done: number; total: number };
 }) {
   const byId = new Map(orders.map((o) => [o.id, o]));
+  const [cancelLocked, setCancelLocked] = useState(false);
   const rows: OrderResultRow[] = [
     ...result.failed.map((f): OrderResultRow => ({
       orderId: f.orderId,
@@ -893,6 +895,33 @@ function SendResults({
     }),
   ];
   const failed = result.failed.length;
+  // Đơn đã có vận đơn ở tài khoản khác của hãng (2026-11-02): hủy vận đơn cũ ngay tại đây rồi gửi lại.
+  const locked = result.failed.filter((f) => f.code === 'ORDER_WAYBILL_ACCOUNT_LOCKED');
+  const lockedBand =
+    locked.length > 0 ? (
+      <div
+        role="group"
+        aria-label="Hủy vận đơn cũ"
+        className="mx-5 mb-3 flex items-center gap-3 rounded-md border border-warning-line bg-warning-weak p-3 text-sm"
+      >
+        <p className="mr-auto">
+          {locked.length} đơn đã có vận đơn ở tài khoản khác. Hủy vận đơn cũ rồi gửi lại để lấy vận
+          đơn mới.
+        </p>
+        <Button type="button" variant="outline" size="sm" onClick={() => setCancelLocked(true)}>
+          Hủy vận đơn cũ
+        </Button>
+        <CancelWaybillDialog
+          rows={locked.map((f) => ({
+            id: f.orderId,
+            docNumber: f.docNumber ?? byId.get(f.orderId)?.docNumber ?? f.orderId.slice(0, 8),
+            trackingNo: byId.get(f.orderId)?.shipment?.trackingNo ?? null,
+          }))}
+          open={cancelLocked}
+          onOpenChange={setCancelLocked}
+        />
+      </div>
+    ) : null;
   return (
     <OrderResultsPanel
       title={
@@ -918,6 +947,7 @@ function SendResults({
       footer={
         ask ? (
           <>
+            {lockedBand}
             {issuing.total > 0 ? (
               <div className="mx-5 mb-3">
                 <ProgressLine
@@ -965,6 +995,7 @@ function SendResults({
           </>
         ) : (
           <>
+            {lockedBand}
             {issuing.total > 0 && issuing.done < issuing.total ? (
               <div className="mx-5 mb-3">
                 <ProgressLine

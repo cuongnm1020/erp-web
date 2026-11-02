@@ -61,6 +61,11 @@ describe('ShippingMonitorScreen — đóng gói / bàn giao / hãng giữ + cả
       'aria-pressed',
       'true',
     );
+    // Cột NV lên đơn + Sản phẩm (2026-11-02); đơn chưa khớp người / không có đơn → "—".
+    expect(screen.getByRole('columnheader', { name: 'NV lên đơn' })).toBeInTheDocument();
+    expect(screen.getByRole('columnheader', { name: 'Sản phẩm' })).toBeInTheDocument();
+    expect(screen.getByText('Nguyễn Sale')).toBeInTheDocument();
+    expect(screen.getByTitle('Amino Ga3 ×2 CHAI, Phân bón lá ×1 GOI')).toBeInTheDocument();
   });
 
   it('đổi ngưỡng ?days=7 → cảnh báo và danh sách tính lại phía server', async () => {

@@ -99,6 +99,7 @@ import {
   parseOrderStatus,
 } from '../labels';
 import { BulkCancelDialog } from './bulk-cancel-dialog';
+import { CancelWaybillDialog } from './cancel-waybill-dialog';
 import { BulkMoveWarehouseDialog } from './bulk-move-warehouse-dialog';
 import { BulkFulfilPrintDialog } from './bulk-fulfil-print-dialog';
 import { BulkReprintWaybillDialog } from './bulk-reprint-waybill-dialog';
@@ -1737,7 +1738,7 @@ export function OrderListScreen() {
   );
 }
 
-type BulkDialog = 'shipping' | 'reprint' | null;
+type BulkDialog = 'shipping' | 'reprint' | 'cancel-waybill' | null;
 
 /**
  * Thanh chọn nhiều (design system BulkActionBar, thay chỗ thanh lọc): tổng tiền / COD của các đơn
@@ -1775,6 +1776,9 @@ function OrderBulkBar({ rows, onClear }: { rows: SalesOrderListItem[]; onClear: 
       },
     );
   const canReprint = ability.can('pack', 'Shipment');
+  // Hủy vận đơn (2026-11-02) — đi cùng Gửi sang ĐVVC: chỉ người chọn hãng (kho / admin).
+  const canCancelWaybill = canUpdate;
+  const withWaybill = rows.filter((r) => r.shipment?.trackingNo);
   const canCancel =
     ability.can('cancel', 'SalesOrder') ||
     ability.can('cancel_after_carrier', 'SalesOrder') ||
@@ -1803,7 +1807,7 @@ function OrderBulkBar({ rows, onClear }: { rows: SalesOrderListItem[]; onClear: 
         <Can I="fulfil_manual" a="SalesOrder">
           <BulkFulfilPrintDialog rows={rows} onDone={onClear} />
         </Can>
-        {canUpdate || canReprint ? (
+        {canUpdate || canReprint || canCancelWaybill ? (
           <DropdownMenu modal={false}>
             <DropdownMenuTrigger asChild>
               <Button variant="outline" size="sm">
@@ -1832,6 +1836,15 @@ function OrderBulkBar({ rows, onClear }: { rows: SalesOrderListItem[]; onClear: 
                   In lại vận đơn
                 </DropdownMenuItem>
               ) : null}
+              {canCancelWaybill ? (
+                <DropdownMenuItem
+                  danger
+                  disabled={withWaybill.length === 0}
+                  onSelect={() => setDialog('cancel-waybill')}
+                >
+                  Hủy vận đơn{withWaybill.length > 0 ? ` (${withWaybill.length})` : ''}
+                </DropdownMenuItem>
+              ) : null}
             </DropdownMenuContent>
           </DropdownMenu>
         ) : null}
@@ -1843,6 +1856,18 @@ function OrderBulkBar({ rows, onClear }: { rows: SalesOrderListItem[]; onClear: 
           onDone={onClear}
           open={dialog === 'shipping'}
           onOpenChange={openChange('shipping')}
+        />
+      ) : null}
+      {canCancelWaybill ? (
+        <CancelWaybillDialog
+          rows={withWaybill.map((r) => ({
+            id: r.id,
+            docNumber: r.docNumber,
+            trackingNo: r.shipment?.trackingNo ?? null,
+          }))}
+          open={dialog === 'cancel-waybill'}
+          onOpenChange={openChange('cancel-waybill')}
+          onDone={onClear}
         />
       ) : null}
       {canReprint ? (

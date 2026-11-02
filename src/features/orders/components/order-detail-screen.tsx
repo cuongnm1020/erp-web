@@ -79,6 +79,7 @@ import {
 } from '../labels';
 import { groupOrderLines } from '../combo-lines';
 import { cancelOutcomeNotes } from './bulk-cancel-dialog';
+import { CancelWaybillDialog } from './cancel-waybill-dialog';
 import { CarrierStatusCard } from './carrier-status-card';
 import { OrderEditHistory } from './order-edit-history';
 import { waybillErrorText } from './waybill-error';
@@ -749,6 +750,7 @@ function ProfileItem({ label, children }: { label: string; children: ReactNode }
 function Detail({ order }: { order: SalesOrderDetail }) {
   const router = useRouter();
   const [dialog, setDialog] = useState<'cancel' | 'recreate' | null>(null);
+  const [cancelWaybill, setCancelWaybill] = useState(false);
   const printer = usePrint();
   const ability = useAbility();
   const autoPrint = useSearchParams().get('printLabel') === '1';
@@ -765,6 +767,13 @@ function Detail({ order }: { order: SalesOrderDetail }) {
       (ability.can('create', 'SalesOrder') && !order.stageLockedReason));
   const confirm = useConfirmOrder();
   const canRecreate = canCancel && canCreate;
+  // Hủy vận đơn (2026-11-02): còn mã vận đơn, hãng chưa lấy hàng — để gửi lại bằng tài khoản /
+  // hãng khác. Đi cùng Gửi sang ĐVVC: chỉ người chọn hãng (kho / admin, `send_carrier`).
+  const canCancelWaybill =
+    live &&
+    order.shipment?.status === 'PENDING' &&
+    !!order.shipment.trackingNo &&
+    ability.can('send_carrier', 'SalesOrder');
   const canReturn =
     RETURNABLE_FULFILMENT.has(order.fulfilment.status) && ability.can('receive', 'Stock');
   // Module Công việc (2026-10-22): CSKH tạo yêu cầu hỗ trợ từ đơn; ai đọc được việc thấy dải nhắc.
@@ -832,7 +841,7 @@ function Detail({ order }: { order: SalesOrderDetail }) {
                 </Link>
               </Button>
             ) : null}
-            {canRecreate || canReturn || canCancel || canWorkCustomer ? (
+            {canRecreate || canReturn || canCancel || canWorkCustomer || canCancelWaybill ? (
               <DropdownMenu modal={false}>
                 <DropdownMenuTrigger asChild>
                   <Button variant="outline" size="icon" aria-label="Thao tác khác">
@@ -859,9 +868,19 @@ function Detail({ order }: { order: SalesOrderDetail }) {
                       </Link>
                     </DropdownMenuItem>
                   ) : null}
-                  {canCancel ? (
+                  {canCancelWaybill ? (
                     <>
                       {canRecreate || canReturn || canWorkCustomer ? (
+                        <DropdownMenuSeparator />
+                      ) : null}
+                      <DropdownMenuItem danger onSelect={() => setCancelWaybill(true)}>
+                        Hủy vận đơn…
+                      </DropdownMenuItem>
+                    </>
+                  ) : null}
+                  {canCancel ? (
+                    <>
+                      {(canRecreate || canReturn || canWorkCustomer) && !canCancelWaybill ? (
                         <DropdownMenuSeparator />
                       ) : null}
                       <DropdownMenuItem danger onSelect={() => setDialog('cancel')}>
@@ -929,6 +948,19 @@ function Detail({ order }: { order: SalesOrderDetail }) {
         recreate={dialog === 'recreate'}
         onOpenChange={(o) => setDialog(o ? dialog : null)}
       />
+      {canCancelWaybill ? (
+        <CancelWaybillDialog
+          rows={[
+            {
+              id: order.id,
+              docNumber: order.docNumber,
+              trackingNo: order.shipment?.trackingNo ?? null,
+            },
+          ]}
+          open={cancelWaybill}
+          onOpenChange={setCancelWaybill}
+        />
+      ) : null}
 
       {flow && flow !== 'CANCELLED' && flow !== 'RETURNED' && flow !== 'CARRIER_CANCELLED' ? (
         <section className="rounded-lg border bg-card px-4 py-3" aria-label="Tiến độ">

@@ -135,6 +135,29 @@ const columns: ColumnDef<ShipmentMonitorRow, unknown>[] = [
     cell: ({ getValue }) => mono(getValue() as string | null),
   },
   {
+    // NV lên đơn + Sản phẩm (2026-11-02) — như cột cùng tên của danh sách đơn.
+    id: 'creatorName',
+    accessorKey: 'creatorName',
+    header: 'NV lên đơn',
+    meta: { width: 150 },
+    cell: ({ getValue }) => (getValue() as string | null) ?? '—',
+  },
+  {
+    id: 'products',
+    accessorKey: 'products',
+    header: 'Sản phẩm',
+    // Không đặt width — cột co giãn, tối đa 2 dòng; đủ chữ ở title + Xuất Excel.
+    cell: ({ getValue }) => {
+      const v = getValue() as string | null;
+      if (!v) return <span className="text-muted-foreground">—</span>;
+      return (
+        <span className="line-clamp-2 min-w-40 break-words" title={v}>
+          {v}
+        </span>
+      );
+    },
+  },
+  {
     id: 'carrierName',
     accessorKey: 'carrierName',
     header: 'Hãng',

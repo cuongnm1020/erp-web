@@ -351,6 +351,79 @@ describe('Gửi sang ĐVVC — SendToCarrierMenu + SendToCarrierDialog', () => {
     await waitFor(() => expect(screen.queryByRole('toolbar')).not.toBeInTheDocument());
   });
 
+  it('đơn đã có vận đơn ở tài khoản khác (ORDER_WAYBILL_ACCOUNT_LOCKED) → nút "Hủy vận đơn cũ" → xác nhận → POST /sales-orders/cancel-waybill đúng đơn, báo đã hủy', async () => {
+    search = '';
+    toastSuccess.mockClear();
+    const rows = makeOrders(2);
+    const cancelBodies: unknown[] = [];
+    server.use(
+      http.post('/api/sales-orders/send-to-carrier', () =>
+        HttpResponse.json(
+          {
+            sent: [],
+            failed: rows.map((r) => ({
+              orderId: r.id,
+              docNumber: r.docNumber,
+              code: 'ORDER_WAYBILL_ACCOUNT_LOCKED',
+              message: 'raw',
+              carrierMessage: null,
+              warehouseName: null,
+              missingSkus: null,
+            })),
+          },
+          { status: 201 },
+        ),
+      ),
+      http.post('/api/sales-orders/cancel-waybill', async ({ request }) => {
+        cancelBodies.push(await request.json());
+        return HttpResponse.json(
+          {
+            cancelled: [
+              {
+                orderId: rows[0]!.id,
+                docNumber: rows[0]!.docNumber,
+                trackingNo: 'S1.OLD',
+                carrierCode: 'GHTK',
+              },
+            ],
+            failed: [
+              {
+                orderId: rows[1]!.id,
+                docNumber: rows[1]!.docNumber,
+                code: 'ORDER_CARRIER_PICKED_UP',
+                message: 'raw',
+                carrierMessage: null,
+              },
+            ],
+          },
+          { status: 201 },
+        );
+      }),
+    );
+    await selectTwoRows();
+    const dialog = await openFor('GHTK');
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Cập nhật 2 đơn' }));
+
+    const band = await within(dialog).findByRole('group', { name: 'Hủy vận đơn cũ' });
+    expect(band).toHaveTextContent('2 đơn đã có vận đơn ở tài khoản khác');
+    fireEvent.click(within(band).getByRole('button', { name: 'Hủy vận đơn cũ' }));
+    const confirm = await screen.findByRole('dialog', { name: 'Hủy vận đơn của 2 đơn đã chọn?' });
+    fireEvent.click(within(confirm).getByRole('button', { name: 'Hủy 2 vận đơn' }));
+
+    await waitFor(() => expect(cancelBodies).toHaveLength(1));
+    expect(cancelBodies[0]).toEqual({ orderIds: rows.map((r) => r.id) });
+    await waitFor(() =>
+      expect(toastSuccess).toHaveBeenCalledWith('Đã hủy 1 vận đơn', expect.anything()),
+    );
+    const err = toastError.mock.calls.find((c) => c[0] === '1 đơn KHÔNG hủy được vận đơn');
+    expect(err).toBeDefined();
+    // Câu riêng cho hủy vận đơn (không phải câu "hủy đơn"), không render message thô.
+    expect((err![1] as { description: string }).description).toContain(
+      'Hãng đã lấy hàng — không hủy vận đơn được nữa.',
+    );
+    expect((err![1] as { description: string }).description).not.toContain('raw');
+  });
+
   it('lô nhiều đơn (2026-10-28): kết quả TỪNG đơn — có mã / chờ đóng gói / cần sửa; SĐT bị che (TikTok) → nhóm Cần sửa với việc phải làm', async () => {
     search = '';
     const rows = makeOrders(2);

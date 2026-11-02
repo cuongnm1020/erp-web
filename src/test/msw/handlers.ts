@@ -1313,6 +1313,8 @@ export function makeMonitorRows(n: number, holdDays = 5) {
     docNumber: `DN-2608-${String(i + 1).padStart(5, '0')}`,
     orderId: uuid('00000001', i),
     orderDocNumber: `SO-2608-${String(i + 1).padStart(5, '0')}`,
+    creatorName: i === 0 ? 'Nguyễn Sale' : null,
+    products: i === 0 ? 'Amino Ga3 ×2 CHAI, Phân bón lá ×1 GOI' : null,
     status: (['PICKED_UP', 'IN_TRANSIT', 'FAILED'] as const)[i % 3]!,
     carrierId: uuid('0000000c', 0),
     carrierCode: 'GHTK',

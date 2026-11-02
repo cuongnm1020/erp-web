@@ -527,6 +527,24 @@ export function useBulkCancelOrders() {
   });
 }
 
+export type CancelOrderWaybillsResult = components['schemas']['CancelOrderWaybillsResultDto'];
+
+/**
+ * POST /sales-orders/cancel-waybill (2026-11-02) — hủy vận đơn bên hãng của một hay nhiều đơn để
+ * gửi lại bằng tài khoản / hãng khác. Đơn giữ nguyên, phiếu giao về Hãng hủy. Không retry tự động.
+ */
+export function useCancelOrderWaybills() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (body: components['schemas']['CancelOrderWaybillsDto']) =>
+      unwrap(api.POST('/sales-orders/cancel-waybill', { body })),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: orderKeys.lists() });
+      void qc.invalidateQueries({ queryKey: orderKeys.details() });
+    },
+  });
+}
+
 export type BulkFulfilOrdersResult = components['schemas']['BulkFulfilOrdersResultDto'];
 
 /**

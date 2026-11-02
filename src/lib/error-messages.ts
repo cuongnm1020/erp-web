@@ -161,7 +161,9 @@ const MESSAGES: Record<string, string> = {
   ORDER_WAYBILL_ERROR_UNRESOLVED:
     'Đơn đang lỗi vận đơn. Sửa đơn rồi bấm "Xin lại vận đơn" (tab Cần sửa) thay vì gửi lại.',
   ORDER_WAYBILL_ACCOUNT_LOCKED:
-    'Đơn đã có vận đơn ở tài khoản khác của hãng này. Hủy vận đơn trên phiếu giao rồi gửi lại.',
+    'Đơn đã có vận đơn ở tài khoản khác của hãng này. Bấm "Hủy vận đơn cũ" rồi gửi lại.',
+  ORDER_NO_ACTIVE_WAYBILL:
+    'Đơn không có vận đơn còn hiệu lực để hủy (chưa cấp mã, đã hủy, hoặc gửi ngoài ERP qua Pancake).',
   PICKUP_WAREHOUSE_NOT_READY:
     'Kho lấy hàng chưa khai tỉnh/thành, phường/xã hoặc số điện thoại. Khai ở Kho › Kho & vị trí › Sửa kho rồi thử lại.',
   PICKUP_WAREHOUSE_MISSING:

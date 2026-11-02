@@ -4016,6 +4016,28 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/sales-orders/cancel-waybill": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * "Hủy vận đơn" (2026-11-02) — một hay nhiều đơn: hãng hủy vận đơn (đúng tài khoản đã cấp), phiếu
+         *     giao chưa rời kho về Hãng hủy ngay → "Gửi sang ĐVVC" lại được bằng tài khoản / hãng khác. Đơn
+         *     giữ nguyên. Chỉ người chọn hãng (`sales_order.send_carrier` — kho / admin; sale không chọn hãng
+         *     từ 2026-10-31). Đơn không hủy được nằm ở `failed`.
+         */
+        post: operations["SalesOrderController_cancelWaybill"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/sales-orders/{id}/cancel": {
         parameters: {
             query?: never;
@@ -8111,6 +8133,10 @@ export interface components {
             docNumber: string;
             orderId: string | null;
             orderDocNumber: string | null;
+            /** @description Nhân viên lên đơn (như danh sách đơn: đơn Pancake = người tạo trên Pancake); null = chưa khớp. */
+            creatorName: string | null;
+            /** @description Sản phẩm của đơn: "Tên SKU ×SL ĐVT", nối bằng ", " theo thứ tự dòng; null = không có đơn. */
+            products: string | null;
             /** @enum {string} */
             status: "CANCELLED" | "PENDING" | "IN_TRANSIT" | "OUT_FOR_DELIVERY" | "DELIVERED" | "FAILED" | "RETURNED" | "CARRIER_CANCELLED" | "PICKED_UP";
             carrierId: string | null;
@@ -12714,6 +12740,27 @@ export interface components {
             /**
              * @description Đơn không hủy được (ORDER_ALREADY_PACKED, ORDER_CARRIER_PICKED_UP,
              *     ORDER_CARRIER_CANCEL_REJECTED, ORDER_CARRIER_CANCEL_FAILED, INVALID_TRANSITION, NOT_FOUND…).
+             */
+            failed: components["schemas"]["BulkCancelFailedItemDto"][];
+        };
+        CancelOrderWaybillsDto: {
+            orderIds: string[];
+            /** @description Lý do gửi kèm cho hãng; bỏ trống = "Hủy vận đơn để gửi lại". */
+            reason?: string;
+        };
+        CancelledOrderWaybillDto: {
+            orderId: string;
+            docNumber: string;
+            /** @description Mã vận đơn vừa hủy bên hãng. */
+            trackingNo: string;
+            carrierCode: string;
+        };
+        CancelOrderWaybillsResultDto: {
+            /** @description Đơn đã hủy vận đơn — phiếu giao về Hãng hủy, gửi sang ĐVVC lại được ngay. */
+            cancelled: components["schemas"]["CancelledOrderWaybillDto"][];
+            /**
+             * @description Đơn không hủy được (ORDER_NO_ACTIVE_WAYBILL, ORDER_CARRIER_PICKED_UP,
+             *     ORDER_CARRIER_CANCEL_REJECTED, ORDER_CARRIER_CANCEL_FAILED, CARRIER_OPERATION_UNSUPPORTED, NOT_FOUND…).
              */
             failed: components["schemas"]["BulkCancelFailedItemDto"][];
         };
@@ -23848,6 +23895,29 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["BulkCancelOrdersResultDto"];
+                };
+            };
+        };
+    };
+    SalesOrderController_cancelWaybill: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CancelOrderWaybillsDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CancelOrderWaybillsResultDto"];
                 };
             };
         };
