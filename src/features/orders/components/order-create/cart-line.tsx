@@ -28,6 +28,7 @@ import {
   useSkuAvailability,
   useSkuDetail,
 } from '../../api/use-line-entry';
+import { pancakeAmountFix } from '../../pancake-line-amount';
 import type { CreateOrderValues } from '../../schema';
 
 const QTY_RE = /^\d{1,12}(\.\d{1,6})?$/;
@@ -37,6 +38,8 @@ export interface LineMetrics {
   total: string | null;
   /** Cân nặng dòng (kg) = SL cơ sở × cân nặng SKU; null = SKU chưa khai cân nặng. */
   weightKg: string | null;
+  /** Chỉ khi `wholeUnitPrice`: thành tiền không chia hết cho SL cơ sở — Pancake không giữ được. */
+  indivisible?: boolean;
 }
 
 /** Cột của giỏ hàng — header ở order-draft-form dùng chung để thẳng hàng. */
@@ -58,6 +61,7 @@ export function CartLine({
   warehouseId,
   onMetrics,
   onRemove,
+  wholeUnitPrice = false,
 }: {
   fieldId: string;
   form: UseFormReturn<CreateOrderValues>;
@@ -68,6 +72,12 @@ export function CartLine({
   warehouseId: string;
   onMetrics: (fieldId: string, m: LineMetrics) => void;
   onRemove: () => void;
+  /**
+   * Đơn Pancake (màn Sửa đơn): Pancake chỉ lưu đơn giá NGUYÊN đồng × SL → thành tiền phải chia hết
+   * cho SL cơ sở, không thì báo + gợi ý hai mức gần nhất (sự cố SOP2610-107401, 2026-11-03).
+   * Combo bỏ qua ở đây (server phân bổ thành phần rồi kiểm, 422 PANCAKE_LINE_AMOUNT_INDIVISIBLE).
+   */
+  wholeUnitPrice?: boolean;
 }) {
   const skuId = useWatch({ control: form.control, name: `lines.${index}.skuId` });
   const uomId = useWatch({ control: form.control, name: `lines.${index}.uomId` });
@@ -116,9 +126,14 @@ export function CartLine({
       ? new Decimal(unitPrice).mul(qty).toDecimalPlaces(4).toFixed(4)
       : null;
   const weightKg = qtyBase && sku.data?.weightKg ? qtyBase.mul(sku.data.weightKg).toFixed(4) : null;
+  const amountFix =
+    wholeUnitPrice && !combo && lineTotal !== null && qtyBase
+      ? pancakeAmountFix(lineTotal, qtyBase)
+      : null;
+  const indivisible = amountFix !== null;
   useEffect(() => {
-    onMetrics(fieldId, { total: lineTotal, weightKg });
-  }, [fieldId, lineTotal, weightKg, onMetrics]);
+    onMetrics(fieldId, { total: lineTotal, weightKg, indivisible });
+  }, [fieldId, lineTotal, weightKg, indivisible, onMetrics]);
 
   // Giá sửa tay thấp (kể cả 0, dưới trần CK) không còn vào duyệt — 2026-10-29 tắt quy tắc
   // "Đơn giá dưới trần chiết khấu" phía server.
@@ -303,7 +318,30 @@ export function CartLine({
           onChange={setLineTotal}
           disabled={!qtyValid}
           className="font-semibold"
+          aria-invalid={indivisible || undefined}
         />
+        {amountFix ? (
+          <p role="alert" className="mt-1 text-right text-xs text-destructive">
+            Pancake chỉ nhận đơn giá nguyên đồng — chọn{' '}
+            <Button
+              type="button"
+              variant="link"
+              className="h-auto p-0 text-xs"
+              onClick={() => setLineTotal(amountFix.lower)}
+            >
+              {formatMoney(amountFix.lower, { unit: '' })}
+            </Button>{' '}
+            hoặc{' '}
+            <Button
+              type="button"
+              variant="link"
+              className="h-auto p-0 text-xs"
+              onClick={() => setLineTotal(amountFix.upper)}
+            >
+              {formatMoney(amountFix.upper, { unit: '' })}
+            </Button>
+          </p>
+        ) : null}
       </div>
 
       <Button

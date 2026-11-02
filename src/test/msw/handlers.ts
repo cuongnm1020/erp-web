@@ -506,6 +506,7 @@ export function makeOrders(n: number) {
     pancakeOrderId: i % 7 === 3 ? String(100 + i) : null,
     pancakeOrderLink:
       i % 7 === 3 ? `https://pos.pages.fm/shop/715130909/order?order_id=9${100 + i}` : null,
+    pancakeErpLockedAt: i % 14 === 3 ? '2026-11-03T02:00:00.000Z' : null,
     postedAt:
       ORDER_STATUSES[i % ORDER_STATUSES.length] === 'POSTED' ? '2026-08-24T02:00:00.000Z' : null,
     createdAt: new Date(Date.UTC(2026, 7, 23) - i * 3_600_000).toISOString(),

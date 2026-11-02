@@ -525,6 +525,22 @@ export function useReleasePick() {
  * POST /sales-orders/{id}/confirm (2026-10-31) — người lên đơn "Xác nhận": Đơn mới / Chờ duyệt → Đã
  * xác nhận, không qua duyệt kể cả bán dưới trần. Chờ server trả rồi mới đổi UI (luật 5).
  */
+/**
+ * "Nhận lại từ Pancake" (2026-11-03, chỉ superadmin): gỡ cờ "ERP giữ" của đơn Pancake đã sửa trên
+ * ERP rồi chiếu lại đơn theo bản Pancake mới nhất.
+ */
+export function usePancakeUnlock() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (orderId: string) =>
+      unwrap(api.POST('/sales-orders/{id}/pancake-unlock', { params: { path: { id: orderId } } })),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: orderKeys.lists() });
+      void qc.invalidateQueries({ queryKey: orderKeys.details() });
+    },
+  });
+}
+
 export function useConfirmOrder() {
   const qc = useQueryClient();
   return useMutation({

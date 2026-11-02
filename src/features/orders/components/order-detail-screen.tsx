@@ -8,6 +8,7 @@ import { Fragment, useEffect, useRef, useState, type ReactNode } from 'react';
 import { CopyButton } from '@/components/data/copy-button';
 import { PdfPrintDialog } from '@/components/data/pdf-print-dialog';
 import { DetailSkeleton, QueryState } from '@/components/data/states';
+import { ConfirmDialog } from '@/components/data/confirm-dialog';
 import { StatusBadge } from '@/components/data/status-badge';
 import { Breadcrumb } from '@/components/layout/breadcrumb';
 import { NotFoundCard } from '@/components/layout/not-found-screen';
@@ -60,6 +61,7 @@ import {
   orderKeys,
   useCancelOrder,
   useConfirmOrder,
+  usePancakeUnlock,
   useDecideOrder,
   useOrder,
   useOrders,
@@ -87,7 +89,7 @@ import { OrderPrintSheet } from './order-print-sheet';
 import { OrderProgress } from './order-progress';
 import { TelcoBadge } from './order-quick-view';
 import { ReprintWaybillDialog } from './bulk-reprint-waybill-dialog';
-import { PancakeOrderLink } from './pancake-order-link';
+import { PancakeErpLockedBadge, PancakeOrderLink } from './pancake-order-link';
 
 /**
  * D-04 Chi tiết đơn hàng — GET /sales-orders/{id}.
@@ -750,6 +752,8 @@ function ProfileItem({ label, children }: { label: string; children: ReactNode }
 function Detail({ order }: { order: SalesOrderDetail }) {
   const router = useRouter();
   const [dialog, setDialog] = useState<'cancel' | 'recreate' | null>(null);
+  const [pancakeUnlock, setPancakeUnlock] = useState(false);
+  const unlock = usePancakeUnlock();
   const [cancelWaybill, setCancelWaybill] = useState(false);
   const printer = usePrint();
   const ability = useAbility();
@@ -778,6 +782,8 @@ function Detail({ order }: { order: SalesOrderDetail }) {
     RETURNABLE_FULFILMENT.has(order.fulfilment.status) && ability.can('receive', 'Stock');
   // Module Công việc (2026-10-22): CSKH tạo yêu cầu hỗ trợ từ đơn; ai đọc được việc thấy dải nhắc.
   const canWorkCustomer = ability.can('create_customer', 'Work');
+  // "Nhận lại từ Pancake" — chỉ superadmin (không mã quyền nào cấp `manage OrderIssue`).
+  const canPancakeUnlock = order.pancakeErpLockedAt !== null && ability.can('manage', 'OrderIssue');
   const openWork = useOrderOpenWork(order.id, ability.can('read', 'Work'));
   const flow = detailOrderFlow(order.status, order.fulfilment.status);
   const addr = order.shippingAddress;
@@ -807,6 +813,7 @@ function Detail({ order }: { order: SalesOrderDetail }) {
                 {fulfilmentLabel(order.fulfilment.status)}
               </StatusBadge>
             ) : null}
+            <PancakeErpLockedBadge lockedAt={order.pancakeErpLockedAt} />
           </>
         }
         description={
@@ -841,7 +848,12 @@ function Detail({ order }: { order: SalesOrderDetail }) {
                 </Link>
               </Button>
             ) : null}
-            {canRecreate || canReturn || canCancel || canWorkCustomer || canCancelWaybill ? (
+            {canRecreate ||
+            canReturn ||
+            canCancel ||
+            canWorkCustomer ||
+            canCancelWaybill ||
+            canPancakeUnlock ? (
               <DropdownMenu modal={false}>
                 <DropdownMenuTrigger asChild>
                   <Button variant="outline" size="icon" aria-label="Thao tác khác">
@@ -868,9 +880,14 @@ function Detail({ order }: { order: SalesOrderDetail }) {
                       </Link>
                     </DropdownMenuItem>
                   ) : null}
+                  {canPancakeUnlock ? (
+                    <DropdownMenuItem onSelect={() => setPancakeUnlock(true)}>
+                      Nhận lại từ Pancake…
+                    </DropdownMenuItem>
+                  ) : null}
                   {canCancelWaybill ? (
                     <>
-                      {canRecreate || canReturn || canWorkCustomer ? (
+                      {canRecreate || canReturn || canWorkCustomer || canPancakeUnlock ? (
                         <DropdownMenuSeparator />
                       ) : null}
                       <DropdownMenuItem danger onSelect={() => setCancelWaybill(true)}>
@@ -880,7 +897,8 @@ function Detail({ order }: { order: SalesOrderDetail }) {
                   ) : null}
                   {canCancel ? (
                     <>
-                      {(canRecreate || canReturn || canWorkCustomer) && !canCancelWaybill ? (
+                      {(canRecreate || canReturn || canWorkCustomer || canPancakeUnlock) &&
+                      !canCancelWaybill ? (
                         <DropdownMenuSeparator />
                       ) : null}
                       <DropdownMenuItem danger onSelect={() => setDialog('cancel')}>
@@ -948,6 +966,32 @@ function Detail({ order }: { order: SalesOrderDetail }) {
         recreate={dialog === 'recreate'}
         onOpenChange={(o) => setDialog(o ? dialog : null)}
       />
+      {canPancakeUnlock ? (
+        <ConfirmDialog
+          open={pancakeUnlock}
+          onOpenChange={setPancakeUnlock}
+          title={`Nhận lại đơn ${order.docNumber} từ Pancake?`}
+          description="Đơn đang giữ bản sửa trên ERP. Nhận lại thì dòng hàng, tiền, khách, trạng thái… lấy theo bản Pancake mới nhất — phần đã sửa trên ERP mà Pancake chưa có sẽ mất; Pancake đã hủy thì đơn ERP hủy theo."
+          confirmLabel="Nhận lại từ Pancake"
+          onConfirm={() =>
+            unlock.mutateAsync(order.id).then(
+              (r) => {
+                if (r.outcome === 'failed' || r.outcome === 'missing') {
+                  toast.warning(
+                    `Đã gỡ cờ đơn ${order.docNumber} nhưng chưa chiếu lại được — đơn cập nhật ở lần Pancake gửi tiếp theo`,
+                  );
+                } else {
+                  toast.success(`Đơn ${order.docNumber} đã nhận lại dữ liệu từ Pancake`);
+                }
+              },
+              (e: unknown) => {
+                toast.error(messageFor(e));
+                throw e;
+              },
+            )
+          }
+        />
+      ) : null}
       {canCancelWaybill ? (
         <CancelWaybillDialog
           rows={[

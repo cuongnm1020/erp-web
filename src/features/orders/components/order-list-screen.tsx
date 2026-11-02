@@ -110,7 +110,7 @@ import { OrderSavedViews } from './order-saved-views';
 import { OrderScanButton } from './order-scan-button';
 import { PancakeOrderResyncButton } from './pancake-order-resync-button';
 import { SendToCarrierMenu } from './send-to-carrier-menu';
-import { PancakeOrderLink } from './pancake-order-link';
+import { PancakeErpLockedBadge, PancakeOrderLink } from './pancake-order-link';
 import { SameDayOrdersHover } from './same-day-orders-hover';
 import { MarketplaceBadge, MaskedPhoneBadge, waybillErrorText } from './waybill-error';
 import { EntityPicker } from '@/components/data/form';
@@ -417,6 +417,7 @@ const buildColumns = (
                 'ERP'
               )}
             </span>
+            <PancakeErpLockedBadge lockedAt={o.pancakeErpLockedAt} />
             {o.marketplace ? <MarketplaceBadge marketplace={o.marketplace} /> : null}
           </div>
         </div>

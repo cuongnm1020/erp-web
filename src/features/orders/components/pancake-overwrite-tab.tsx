@@ -69,6 +69,8 @@ const SKIP_TEXT: Record<string, string> = {
   HAS_CUSTOM_ITEMS: 'Đơn có món gõ tay Pancake — sửa tay ở Sửa đơn.',
   DUPLICATE_SKU: 'Đơn có nhiều dòng cùng sản phẩm — sửa tay ở Sửa đơn.',
   SKU_NOT_FOUND: 'Sản phẩm nhân viên thêm không còn trên ERP — sửa tay ở Sửa đơn.',
+  AMOUNT_NOT_DIVISIBLE:
+    'Thành tiền nhân viên đặt không chia hết cho số lượng — Pancake chỉ nhận đơn giá nguyên đồng. Sửa tay ở Sửa đơn, chọn mức chia hết.',
 };
 
 const MONEY_FIELDS = new Set([

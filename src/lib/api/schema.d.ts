@@ -4133,6 +4133,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/sales-orders/{id}/pancake-unlock": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * "Nhận lại từ Pancake" (2026-11-03) — chỉ superadmin: gỡ cờ "ERP giữ" (đơn đã sửa trên ERP thì
+         *     không nhận cập nhật Pancake) + các trường ERP giữ riêng, rồi chiếu lại đơn theo bản Pancake.
+         */
+        post: operations["SalesOrderController_pancakeUnlock"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/sales-orders/{id}/cancel": {
         parameters: {
             query?: never;
@@ -11801,6 +11821,11 @@ export interface components {
             pancakeOrderId: string | null;
             /** @description Link mở đơn trên Pancake POS (`…/order?order_id=<id hệ thống>`) — null nếu không phải đơn Pancake. */
             pancakeOrderLink: string | null;
+            /**
+             * @description Đơn Pancake "ERP giữ" (ISO datetime, 2026-11-03): đã sửa trên ERP → không nhận cập nhật từ
+             *     Pancake nữa, chỉ đẩy ERP → Pancake. null = Pancake vẫn là nguồn / không phải đơn Pancake.
+             */
+            pancakeErpLockedAt: string | null;
             /** @description ISO datetime — chỉ có khi đơn POSTED. */
             postedAt: string | null;
             createdAt: string;
@@ -11954,14 +11979,18 @@ export interface components {
             docNumber: string;
             /**
              * @description NOTHING_TO_RESTORE · ORDER_CANCELLED · NEEDS_CANCEL · HAS_COMBO · HAS_CUSTOM_ITEMS ·
-             *     DUPLICATE_SKU · SKU_NOT_FOUND
+             *     DUPLICATE_SKU · SKU_NOT_FOUND · AMOUNT_NOT_DIVISIBLE (thành tiền không chia hết cho SL —
+             *     Pancake chỉ giữ đơn giá nguyên đồng)
              */
             code: string;
         };
         PancakeOverwriteFailedDto: {
             orderId: string;
             docNumber: string;
-            /** @description Mã lỗi nghiệp vụ của Sửa đơn (ORDER_LINES_LOCKED, PANCAKE_ORDER_ITEMS_LOCKED…). */
+            /**
+             * @description Mã lỗi nghiệp vụ của Sửa đơn (ORDER_LINES_LOCKED, PANCAKE_ORDER_ITEMS_LOCKED,
+             *     PANCAKE_LINE_AMOUNT_INDIVISIBLE…).
+             */
             code: string;
         };
         PancakeOverwriteRestoreResultDto: {
@@ -12305,6 +12334,11 @@ export interface components {
             pancakeOrderId: string | null;
             /** @description Link mở đơn trên Pancake POS (`…/order?order_id=<id hệ thống>`) — null nếu không phải đơn Pancake. */
             pancakeOrderLink: string | null;
+            /**
+             * @description Đơn Pancake "ERP giữ" (ISO datetime, 2026-11-03): đã sửa trên ERP → không nhận cập nhật từ
+             *     Pancake nữa, chỉ đẩy ERP → Pancake. null = Pancake vẫn là nguồn / không phải đơn Pancake.
+             */
+            pancakeErpLockedAt: string | null;
             /** @description ISO datetime — chỉ có khi đơn POSTED. */
             postedAt: string | null;
             createdAt: string;
@@ -12967,6 +13001,17 @@ export interface components {
              *     ORDER_CARRIER_CANCEL_REJECTED, ORDER_CARRIER_CANCEL_FAILED, CARRIER_OPERATION_UNSUPPORTED, NOT_FOUND…).
              */
             failed: components["schemas"]["BulkCancelFailedItemDto"][];
+        };
+        PancakeUnlockResultDto: {
+            /** Format: uuid */
+            orderId: string;
+            docNumber: string;
+            /**
+             * @description `not_locked` = đơn chưa bị ERP giữ, không làm gì; `updated` / `already_posted` = đã chiếu lại theo Pancake; `failed` / `missing` = chưa chiếu được (cờ đã gỡ, webhook kế tiếp của đơn chiếu lại).
+             * @enum {string}
+             */
+            outcome: "not_locked" | "created" | "updated" | "already_posted" | "skipped" | "blocked" | "failed" | "missing";
+            reason: string | null;
         };
         CancelOrderDto: {
             reason?: string;
@@ -24381,6 +24426,27 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["CancelOrderWaybillsResultDto"];
+                };
+            };
+        };
+    };
+    SalesOrderController_pancakeUnlock: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PancakeUnlockResultDto"];
                 };
             };
         };

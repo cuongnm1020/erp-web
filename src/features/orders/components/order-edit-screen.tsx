@@ -162,6 +162,9 @@ function Editor({ order }: { order: SalesOrderDetail }) {
     : linesChange(order, watchedLines ?? [], removedCustom);
   const linesChanged = lineEdit.changed;
   const [draftSubtotal, setDraftSubtotal] = useState<string | null>(null);
+  // Đơn Pancake: dòng có thành tiền không chia hết cho SL — Pancake chỉ giữ đơn giá nguyên đồng,
+  // lưu thì webhook ghi đè ngược số khác (SOP2610-107401, 2026-11-03) → chặn lưu.
+  const [indivisibleLines, setIndivisibleLines] = useState(0);
   const moveWarehouse = useMoveOrdersWarehouse();
   const carriers = useCarriers();
   const warehouses = usePickupWarehouses();
@@ -343,6 +346,12 @@ function Editor({ order }: { order: SalesOrderDetail }) {
     }
     if (lineEdit.invalid) {
       toast.error('Kiểm tra lại sản phẩm: đơn cần ít nhất một dòng, số lượng lớn hơn 0');
+      return;
+    }
+    if (lineEdit.body && indivisibleLines > 0) {
+      toast.error(
+        'Thành tiền phải chia hết cho số lượng — Pancake chỉ nhận đơn giá nguyên đồng. Chọn một trong hai mức gợi ý dưới ô Thành tiền.',
+      );
       return;
     }
     if (receiverInvalid) {
@@ -850,6 +859,7 @@ function Editor({ order }: { order: SalesOrderDetail }) {
             removedCustom={removedCustom}
             onRemoveCustom={(key) => setRemovedCustom((prev) => [...prev, key])}
             onSubtotal={setDraftSubtotal}
+            onIndivisible={setIndivisibleLines}
             readOnly={
               <>
                 <p className="text-sm text-muted-foreground">
