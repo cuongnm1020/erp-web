@@ -13,6 +13,7 @@ import {
   scenario,
 } from '@/test/msw/handlers';
 import { server } from '@/test/msw/server';
+import { toast } from '@/components/ui/toaster';
 import { renderApp } from '@/test/render';
 import { OrderEditScreen } from './components/order-edit-screen';
 
@@ -778,5 +779,43 @@ describe('OrderEditScreen — sửa sản phẩm / người nhận, quyền sử
     expect(sent.skuId).toBe(first.skuId);
     expect(sent.unitPrice).toBeDefined();
     await waitFor(() => expect(push).toHaveBeenCalledWith(`/crm/orders/${ORDER.id}`));
+  });
+
+  it('đơn Pancake có món gõ tay (tab Cần sửa, 2026-11-02): ghi chú món ngoài hệ thống; Lưu ngay (không đổi giỏ) → PUT /lines bỏ món gõ tay; Pancake chặn → báo SKU thiếu trên shop', async () => {
+    withDetail({
+      linesLockedReason: null,
+      pancakeOrderId: '46422',
+      customItems: [{ name: 'Phân bón gõ tay', qty: '2', unitPrice: '90000', discount: '0' }],
+    });
+    const puts: Array<Record<string, unknown>> = [];
+    server.use(
+      http.put('/api/sales-orders/:id/lines', async ({ request }) => {
+        puts.push((await request.json()) as Record<string, unknown>);
+        return HttpResponse.json(
+          {
+            code: 'PANCAKE_ORDER_ITEMS_LOCKED',
+            message: 'raw server text',
+            details: { missingSkus: [{ code: 'SP-0999', name: 'Kali trắng' }] },
+            traceId: 't-1',
+          },
+          { status: 409 },
+        );
+      }),
+    );
+    const error = vi.spyOn(toast, 'error').mockImplementation(() => '' as never);
+    renderApp(<OrderEditScreen orderId={ORDER.id} />);
+    const note = await screen.findByText(/Món ngoài hệ thống/);
+    expect(note).toHaveTextContent('Phân bón gõ tay × 2');
+    expect(screen.getByText(/cập nhật luôn sản phẩm trên đơn Pancake/)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /Lưu thay đổi/ }));
+    await waitFor(() => expect(puts).toHaveLength(1));
+    expect((puts[0]!.lines as unknown[]).length).toBeGreaterThan(0);
+    await waitFor(() =>
+      expect(error).toHaveBeenCalledWith(
+        expect.stringContaining('Sản phẩm chưa có trên shop Pancake của đơn: SP-0999 Kali trắng'),
+      ),
+    );
+    expect(error).not.toHaveBeenCalledWith(expect.stringContaining('raw server text'));
+    error.mockRestore();
   });
 });

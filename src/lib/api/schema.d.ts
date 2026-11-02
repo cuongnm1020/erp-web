@@ -3884,8 +3884,10 @@ export interface paths {
         get?: never;
         /**
          * Sửa sản phẩm (2026-10-29): THAY toàn bộ dòng — thêm / bỏ / đổi số lượng, định giá lại, giữ
-         *     chỗ lại, lập lại PICK chờ. Chỉ người được sửa đơn (403 FORBIDDEN), đơn ERP không khuyến mãi,
-         *     kho chưa bắt đầu lấy hàng (409 ORDER_LINES_LOCKED). Ghi lịch sử sửa đơn.
+         *     chỗ lại, lập lại PICK chờ. Chỉ người được sửa đơn (403 FORBIDDEN), đơn không khuyến mãi,
+         *     kho chưa bắt đầu lấy hàng (409 ORDER_LINES_LOCKED). Đơn Pancake (2026-11-02): đẩy dòng mới lên
+         *     Pancake cùng lúc, bỏ món gõ tay — Pancake đã đóng gói / có vận đơn / SKU chưa có trên shop /
+         *     Pancake từ chối → 409 PANCAKE_ORDER_ITEMS_LOCKED, ERP không đổi. Ghi lịch sử sửa đơn.
          */
         put: operations["SalesOrderController_replaceLines"];
         post?: never;

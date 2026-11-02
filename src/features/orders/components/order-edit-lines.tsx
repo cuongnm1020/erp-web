@@ -31,6 +31,19 @@ function initialLines(order: SalesOrderDetail): CreateOrderValues['lines'] {
   }));
 }
 
+/**
+ * Món gõ tay / ngoài hệ thống của đơn (dòng `nonStock` + `customItems` đơn Pancake cũ) — không vào
+ * giỏ sửa: lưu giỏ là THAY toàn bộ dòng nên các món này bị bỏ (tab Cần sửa, 2026-11-02).
+ */
+export function customLeftovers(order: SalesOrderDetail): string[] {
+  return [
+    ...order.lines
+      .filter((l) => l.nonStock)
+      .map((l) => `${l.skuName} × ${new Decimal(l.qty).toString()}`),
+    ...order.customItems.map((c) => `${c.name} × ${new Decimal(c.qty).toString()}`),
+  ];
+}
+
 /** Form giỏ riêng của màn Sửa đơn — dùng lại CartLine của màn tạo đơn (cần CreateOrderValues). */
 export function useOrderLinesForm(order: SalesOrderDetail): LinesForm {
   return useForm<CreateOrderValues>({
@@ -58,7 +71,9 @@ export function linesChange(
   const invalid = current.some(
     (l) => !/^\d{1,12}(\.\d{1,6})?$/.test(l.qty) || new Decimal(l.qty).lte(0),
   );
+  // Còn món gõ tay → lưu giỏ (kể cả giữ nguyên các dòng khác) là bỏ được các món đó.
   const changed =
+    customLeftovers(order).length > 0 ||
     before.length !== current.length ||
     current.some((l, i) => {
       const b = before[i]!;
@@ -86,7 +101,8 @@ export function linesChange(
 
 /**
  * Thẻ Sản phẩm sửa được: tìm thêm sản phẩm / combo, đổi SL, đơn giá, bỏ dòng — như giỏ màn tạo
- * đơn. `lockedReason` khác null → chỉ đọc kèm lý do (kho đã lấy hàng, đơn Pancake, có KM…).
+ * đơn. `lockedReason` khác null → chỉ đọc kèm lý do (kho đã lấy hàng, có KM…). Đơn Pancake sửa
+ * được (2026-11-02): server đẩy dòng mới lên Pancake; món gõ tay hiện thành ghi chú, lưu là bỏ.
  */
 export function OrderEditLines({
   form,
@@ -114,6 +130,7 @@ export function OrderEditLines({
     );
   }, []);
   useWatch({ control: form.control, name: 'lines' });
+  const leftovers = customLeftovers(order);
 
   const addSku = useCallback(
     ({ skuId, baseUomId }: SkuQuickRow) => {
@@ -161,7 +178,16 @@ export function OrderEditLines({
       <p className="text-xs text-muted-foreground">
         Sửa được tới khi kho bắt đầu lấy hàng. Lưu xong hệ thống giữ hàng lại theo dòng mới và lập
         lại việc lấy hàng; đơn giá dòng cũ giữ nguyên, dòng mới theo bảng giá.
+        {order.pancakeOrderId
+          ? ' Đơn Pancake: lưu là cập nhật luôn sản phẩm trên đơn Pancake.'
+          : ''}
       </p>
+      {leftovers.length > 0 ? (
+        <p role="note" className="rounded-md bg-warning-weak px-3 py-2 text-xs text-warning">
+          Món ngoài hệ thống: <b>{leftovers.join(', ')}</b>. Tìm sản phẩm tương ứng ở ô phía trên —
+          lưu sẽ bỏ các món này khỏi đơn.
+        </p>
+      ) : null}
       <Form {...form}>
         <div className="overflow-x-auto rounded-md border">
           <div className="min-w-[680px]">

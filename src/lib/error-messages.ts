@@ -77,6 +77,9 @@ const MESSAGES: Record<string, string> = {
   MOVE_TARGET_WAREHOUSE_INVALID: 'Kho chuyển tới đã ngừng dùng. Chọn kho khác.',
   PANCAKE_ORDER_WAREHOUSE_LOCKED:
     'Pancake không cho đổi kho đơn này (đơn trên Pancake đã qua bước đóng gói, đã có vận đơn, hoặc Pancake từ chối) nên ERP không chuyển. Kiểm tra đơn trên Pancake rồi thử lại.',
+  // Sửa sản phẩm đơn Pancake trên ERP rồi đẩy lên Pancake (2026-11-02).
+  PANCAKE_ORDER_ITEMS_LOCKED:
+    'Pancake không cho sửa sản phẩm đơn này nên ERP chưa sửa gì. Kiểm tra đơn trên Pancake rồi thử lại.',
   // Quyền theo kho (PLAN-warehouse-context)
   WAREHOUSE_FORBIDDEN:
     'Bạn chưa được cấp quyền làm việc ở kho này. Đổi kho làm việc ở góc trái, hoặc nhờ quản lý cấp thêm kho.',
@@ -389,6 +392,30 @@ export function messageFor(err: unknown): string {
       const d = err.details as { skuCode?: unknown; reserved?: unknown } | null;
       if (d && typeof d.skuCode === 'string') {
         return `${d.skuCode}: tồn thực tế thấp hơn phần đang giữ cho đơn (${String(d.reserved ?? '')}). Xử lý đơn đang giữ hàng rồi nhập lại.`;
+      }
+    }
+    if (err.code === 'PANCAKE_ORDER_ITEMS_LOCKED') {
+      // SKU thiếu / trạng thái / vận đơn / lời Pancake là dữ liệu (details), không phải message thô.
+      const d = err.details as {
+        missingSkus?: { code?: unknown; name?: unknown }[];
+        pancakeStatus?: unknown;
+        waybill?: unknown;
+        pancakeSaid?: unknown;
+      } | null;
+      const skus = (d?.missingSkus ?? [])
+        .filter((s) => typeof s.code === 'string')
+        .map((s) => `${String(s.code)}${typeof s.name === 'string' ? ` ${s.name}` : ''}`);
+      if (skus.length) {
+        return `Sản phẩm chưa có trên shop Pancake của đơn: ${skus.join(', ')}. Đẩy sản phẩm lên Pancake (Danh mục) hoặc chọn sản phẩm khác — ERP chưa sửa gì.`;
+      }
+      if (typeof d?.waybill === 'string') {
+        return `Đơn đã có vận đơn ${d.waybill} trên Pancake — không sửa sản phẩm được nữa.`;
+      }
+      if (typeof d?.pancakeStatus === 'string') {
+        return `Đơn đang ở trạng thái "${d.pancakeStatus}" trên Pancake — hàng đã đóng gói / đi, không sửa sản phẩm được nữa.`;
+      }
+      if (typeof d?.pancakeSaid === 'string') {
+        return `Pancake từ chối sửa sản phẩm, ERP chưa sửa gì. Pancake báo: "${d.pancakeSaid}".`;
       }
     }
     const base = messageForCode(err.code, err.status);
