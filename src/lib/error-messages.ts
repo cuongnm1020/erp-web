@@ -198,6 +198,8 @@ const MESSAGES: Record<string, string> = {
     'Đơn chưa có việc đóng gói (PACK) — việc pick chưa xong hoặc chưa sinh. Thử lại sau ít phút.',
   PACK_LINE_NO_RESERVATION:
     'Phần hàng đang giữ chỗ cho đơn ít hơn số cần đóng gói (giữ chỗ đã bị nhả). Hủy rồi lên lại đơn, hoặc báo IT số đơn để giữ chỗ lại.',
+  PACK_STOCK_SHORT:
+    'Kệ lấy hàng không đủ hàng cho đơn — hàng ở đó đã giữ cho đơn khác đang lấy. Kiểm hàng thật trên kệ / nhập thêm hàng rồi đóng gói lại.',
   RESERVATION_NOT_ACTIVE:
     'Chỗ giữ hàng của đơn không còn hiệu lực (đã nhả hoặc đã dùng). Báo quản lý kho kiểm tồn của đơn.',
   INSUFFICIENT_COST_LAYERS:
