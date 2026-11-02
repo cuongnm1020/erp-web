@@ -9998,6 +9998,8 @@ export interface components {
             ingredients: string | null;
             usageInstructions: string | null;
             orderNote: string | null;
+            /** @description SĐT người gửi trên vận đơn — thắng SĐT POS / kho; null = không đặt. */
+            senderPhone: string | null;
             internalNote: string | null;
             allowNegativeStock: boolean;
             /** @description Tên dân dã / viết tắt / tên cũ — ô tìm sản phẩm ăn cả các alias này. */
@@ -10070,6 +10072,11 @@ export interface components {
              *     null = tắt cảnh báo cho sản phẩm này (GET /stock/replenishment bỏ qua).
              */
             reorderLevel?: string | null;
+            /**
+             * @description SĐT người gửi trên vận đơn (2026-11-02) — shipper gọi về khi đơn có vấn đề. Thắng SĐT POS và
+             *     SĐT kho; đơn nhiều sản phẩm lấy số của món thành tiền cao nhất. Trống / null = không đặt.
+             */
+            senderPhone?: string | null;
             /** @description Tên dân dã / viết tắt / tên cũ cho search. */
             searchAliases?: string[];
             /** @description Attribute value MÔ TẢ (isVariant=false) — value sinh biến thể bị từ chối 422. */
@@ -10097,6 +10104,8 @@ export interface components {
             usageInstructions: string | null;
             /** @description Lưu ý khi lên đơn — nhắc sale lúc chốt đơn. */
             orderNote: string | null;
+            /** @description SĐT người gửi trên vận đơn — thắng SĐT POS / kho; null = không đặt. */
+            senderPhone: string | null;
             /** @description Ghi chú nội bộ — không đưa ra kênh bán/khách. */
             internalNote: string | null;
             /** @description Bán âm (2026-10-25): thiếu tồn vẫn lên được đơn — phần thiếu giữ vượt tồn ở DEFAULT, đơn chờ hàng (onHand không âm). */
@@ -10156,6 +10165,11 @@ export interface components {
             taxRateId?: string;
             /** @description Mức tồn kho cảnh báo nhập hàng — Decimal(18,6) chuỗi; null = tắt cảnh báo. */
             reorderLevel?: string | null;
+            /**
+             * @description SĐT người gửi trên vận đơn (2026-11-02) — shipper gọi về khi đơn có vấn đề. Thắng SĐT POS và
+             *     SĐT kho; đơn nhiều sản phẩm lấy số của món thành tiền cao nhất. Trống / null = không đặt.
+             */
+            senderPhone?: string | null;
             searchAliases?: string[];
             /** @description Có mặt = THAY TOÀN BỘ danh sách link attribute mô tả. */
             attributes?: components["schemas"]["AttributeLinkDto"][];
@@ -14461,6 +14475,8 @@ export interface components {
             grossProfit: string;
             cogs: string;
             returnedRevenue: string;
+            /** @description Phí ship thu khách — đã cộng trong revenue, không vào lãi gộp. */
+            shippingFee: string;
             customerCount: number;
             newCustomerCount: number;
         };
@@ -14573,6 +14589,8 @@ export interface components {
             customerCount: number;
             newCustomerCount: number;
             returnedRevenue: string;
+            /** @description Phí ship thu khách — đã cộng trong grossRevenue, không vào revenue (thực thu) / lãi gộp. */
+            shippingFee: string;
             returnedOrderCount: number;
             returnRate: string | null;
             previousRevenue: string;
@@ -14589,6 +14607,8 @@ export interface components {
             customerCount: number;
             newCustomerCount: number;
             returnedRevenue: string;
+            /** @description Phí ship thu khách — đã cộng trong grossRevenue, không vào revenue (thực thu) / lãi gộp. */
+            shippingFee: string;
             returnedOrderCount: number;
             returnRate: string | null;
             previousRevenue: string;

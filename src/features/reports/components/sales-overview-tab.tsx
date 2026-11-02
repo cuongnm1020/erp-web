@@ -286,10 +286,11 @@ export function SalesOverviewTab() {
 
 function KpiRow({ current: c, previous: p }: { current: SalesKpis; previous: SalesKpis }) {
   const prev = (v: string) => `Kỳ trước ${formatMoney(v)}`;
-  // Doanh thu gồm hàng hoàn (2026-10-31); lãi gộp tính trên thực thu → tỉ suất cũng trên thực thu.
+  // Doanh thu gồm hàng hoàn (2026-10-31) + phí ship thu khách (2026-11-02, như Pancake); lãi gộp
+  // tính trên thực thu tiền hàng → tỉ suất cũng trên thực thu (bỏ cả hoàn lẫn phí ship).
   const margin = ratioPct(
     c.grossProfit,
-    new Decimal(c.revenue).minus(c.returnedRevenue).toFixed(4),
+    new Decimal(c.revenue).minus(c.returnedRevenue).minus(c.shippingFee).toFixed(4),
   );
   return (
     <div className="grid grid-cols-2 gap-2 md:grid-cols-3 xl:grid-cols-6">

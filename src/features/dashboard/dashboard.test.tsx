@@ -52,6 +52,7 @@ const kpis = (over: Partial<SalesKpis> = {}): SalesKpis => ({
   grossProfit: '900000.0000',
   cogs: '2100000.0000',
   returnedRevenue: '0.0000',
+  shippingFee: '0.0000',
   customerCount: 9,
   newCustomerCount: 2,
   ...over,
