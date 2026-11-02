@@ -1,6 +1,7 @@
 'use client';
 
 import { useMemo } from 'react';
+import { useCsvExport } from '@/components/data/export-delivery';
 import { DataTable, type ColumnDef } from '@/components/data/data-table';
 import { GrowthIndicator } from '@/components/data/growth-indicator';
 import { EmptyState, ListSkeleton, QueryState } from '@/components/data/states';
@@ -13,7 +14,6 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { cn } from '@/lib/cn';
-import { downloadCsv } from '@/lib/export-csv';
 import { formatMoney, formatQuantity } from '@/lib/format';
 import {
   useSalesTopProducts,
@@ -32,6 +32,7 @@ import {
   SupplierFilterChip,
 } from './report-parts';
 import { useSalesReportState } from './report-state';
+import { SalesTopYearView } from './sales-top-year';
 
 const RANKS: ReadonlyArray<readonly [TopRankBy, string]> = [
   ['revenue', 'Doanh thu'],
@@ -73,16 +74,35 @@ function RankMove({ rank, previousRank }: { rank: number; previousRank: number |
   );
 }
 
-/** Tab "Bán chạy": top N SKU theo 5 tiêu chí, kèm hạng + giá trị kỳ trước. */
+type TopView = 'range' | 'year';
+const VIEWS: ReadonlyArray<readonly [TopView, string]> = [
+  ['range', 'Khoảng ngày đang chọn'],
+  ['year', 'Theo tháng trong năm'],
+];
+/** Theo tháng: top mỗi tháng tối đa 50 (API) — chọn 5 / 10 / 20, mặc định 10. */
+const YEAR_LIMITS = [5, 10, 20] as const;
+const YEAR_DEFAULT_LIMIT = 10;
+
+/**
+ * Tab "Bán chạy": top N SKU theo 5 tiêu chí, kèm hạng + giá trị kỳ trước. Hai chế độ (2026-11-02):
+ * theo khoảng ngày của thanh lọc, hoặc theo từng tháng của một năm + top cả năm (`topView=year`).
+ */
 export function SalesTopTab() {
-  const { state, setFilters, filter, range } = useSalesReportState();
+  const { state, setFilters, filter, range, today } = useSalesReportState();
+  const view: TopView = state.filters.topView === 'year' ? 'year' : 'range';
+  const thisYear = Number.parseInt(today.slice(0, 4), 10);
+  const years = [thisYear, thisYear - 1, thisYear - 2, thisYear - 3];
+  const yearRaw = Number.parseInt(state.filters.topYear ?? '', 10);
+  const year = years.includes(yearRaw) ? yearRaw : thisYear;
   const rankBy: TopRankBy = RANKS.some(([k]) => k === state.filters.rank)
     ? (state.filters.rank as TopRankBy)
     : 'revenue';
   const limitRaw = Number.parseInt(state.filters.limit ?? '', 10);
-  const limit = (LIMITS as readonly number[]).includes(limitRaw) ? limitRaw : DEFAULT_LIMIT;
+  const limits: readonly number[] = view === 'year' ? YEAR_LIMITS : LIMITS;
+  const defaultLimit = view === 'year' ? YEAR_DEFAULT_LIMIT : DEFAULT_LIMIT;
+  const limit = limits.includes(limitRaw) ? limitRaw : defaultLimit;
   const supplierId = state.filters.supplierId || undefined;
-  const query = useSalesTopProducts(filter, rankBy, limit, supplierId);
+  const query = useSalesTopProducts(filter, rankBy, limit, supplierId, view === 'range');
   const rankLabel = RANKS.find(([k]) => k === rankBy)![1];
 
   const columns = useMemo<ColumnDef<SalesTopProductItem, unknown>[]>(
@@ -175,6 +195,7 @@ export function SalesTopTab() {
     [rankBy, rankLabel],
   );
 
+  const downloadCsv = useCsvExport('Báo cáo sản phẩm bán chạy');
   const exportCsv = (items: SalesTopProductItem[]) =>
     downloadCsv(
       `ban-chay-theo-${rankBy}_${range.from}_${range.to}`,
@@ -217,6 +238,33 @@ export function SalesTopTab() {
   return (
     <div className="flex flex-col gap-3">
       <div className="flex flex-wrap items-center gap-2">
+        <Segmented
+          label="Kỳ xếp hạng"
+          value={view}
+          options={VIEWS}
+          onChange={(v) =>
+            setFilters({ topView: v === 'year' ? 'year' : undefined, limit: undefined })
+          }
+        />
+        {view === 'year' ? (
+          <Select
+            value={String(year)}
+            onValueChange={(v) => setFilters({ topYear: Number(v) === thisYear ? undefined : v })}
+          >
+            <SelectTrigger className="h-8 w-28" aria-label="Năm">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {years.map((y) => (
+                <SelectItem key={y} value={String(y)}>
+                  Năm {y}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        ) : null}
+      </div>
+      <div className="flex flex-wrap items-center gap-2">
         <span className="text-xs text-muted-foreground">Xếp hạng theo</span>
         <Segmented
           label="Xếp hạng theo"
@@ -226,13 +274,13 @@ export function SalesTopTab() {
         />
         <Select
           value={String(limit)}
-          onValueChange={(v) => setFilters({ limit: Number(v) === DEFAULT_LIMIT ? undefined : v })}
+          onValueChange={(v) => setFilters({ limit: Number(v) === defaultLimit ? undefined : v })}
         >
           <SelectTrigger className="h-8 w-28" aria-label="Số SKU">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
-            {LIMITS.map((l) => (
+            {limits.map((l) => (
               <SelectItem key={l} value={String(l)}>
                 Top {l}
               </SelectItem>
@@ -245,66 +293,79 @@ export function SalesTopTab() {
             onClear={() => setFilters({ supplierId: undefined, supplierName: undefined })}
           />
         ) : null}
-        {query.data && query.data.items.length > 0 ? (
+        {view === 'range' && query.data && query.data.items.length > 0 ? (
           <span className="ml-auto">
             <ExportButton onClick={() => exportCsv(query.data.items)} />
           </span>
         ) : null}
       </div>
-      <QueryState
-        query={query}
-        skeleton={<ListSkeleton rows={10} columns={10} />}
-        isEmpty={(d) => d.items.length === 0}
-        empty={
-          <EmptyState
-            title="Chưa có SKU nào bán ra trong khoảng này"
-            description="Bảng xếp hạng tính trên đơn đã chốt theo ngày đặt hàng."
-            action={
-              <Button
-                variant="outline"
-                onClick={() =>
-                  setFilters({
-                    supplierId: undefined,
-                    supplierName: undefined,
-                    channel: undefined,
-                    teamId: undefined,
-                    teamName: undefined,
-                    ownerId: undefined,
-                    ownerName: undefined,
-                  })
-                }
-              >
-                {supplierId
-                  ? 'Bỏ lọc NCC / kênh / team / nhân viên'
-                  : 'Bỏ lọc kênh / team / nhân viên'}
-              </Button>
-            }
-          />
-        }
-      >
-        {(d) => (
-          <>
-            <DataAsOfNotice
-              dataAsOf={d.dataAsOf}
-              previousFrom={d.previousFrom}
-              previousTo={d.previousTo}
+      {view === 'year' ? (
+        <SalesTopYearView
+          filter={filter}
+          year={year}
+          rankBy={rankBy}
+          rankLabel={rankLabel}
+          limit={limit}
+          supplierId={supplierId}
+          columns={columns}
+          formatValue={formatRankValue}
+        />
+      ) : (
+        <QueryState
+          query={query}
+          skeleton={<ListSkeleton rows={10} columns={10} />}
+          isEmpty={(d) => d.items.length === 0}
+          empty={
+            <EmptyState
+              title="Chưa có SKU nào bán ra trong khoảng này"
+              description="Bảng xếp hạng tính trên đơn đã chốt theo ngày đặt hàng."
+              action={
+                <Button
+                  variant="outline"
+                  onClick={() =>
+                    setFilters({
+                      supplierId: undefined,
+                      supplierName: undefined,
+                      channel: undefined,
+                      teamId: undefined,
+                      teamName: undefined,
+                      ownerId: undefined,
+                      ownerName: undefined,
+                    })
+                  }
+                >
+                  {supplierId
+                    ? 'Bỏ lọc NCC / kênh / team / nhân viên'
+                    : 'Bỏ lọc kênh / team / nhân viên'}
+                </Button>
+              }
             />
-            <DataTable
-              columns={columns}
-              rows={d.items}
-              getRowId={(r) => r.sku.id}
-              total={d.items.length}
-              page={1}
-              size={Math.max(d.items.length, 1)}
-              sort={null}
-              onPageChange={() => undefined}
-              onSizeChange={() => undefined}
-              onSortChange={() => undefined}
-              pagination={false}
-            />
-          </>
-        )}
-      </QueryState>
+          }
+        >
+          {(d) => (
+            <>
+              <DataAsOfNotice
+                dataAsOf={d.dataAsOf}
+                previousFrom={d.previousFrom}
+                previousTo={d.previousTo}
+              />
+              <DataTable
+                columns={columns}
+                rows={d.items}
+                getRowId={(r) => r.sku.id}
+                total={d.items.length}
+                page={1}
+                size={Math.max(d.items.length, 1)}
+                sort={null}
+                onPageChange={() => undefined}
+                onSizeChange={() => undefined}
+                onSortChange={() => undefined}
+                pagination={false}
+              />
+            </>
+          )}
+        </QueryState>
+      )}
     </div>
   );
 }

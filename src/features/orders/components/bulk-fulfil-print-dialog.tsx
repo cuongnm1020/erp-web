@@ -270,7 +270,7 @@ export function WaybillOrientationField({
   );
 }
 
-/** Kết quả từng đơn sau "Đóng gói + in" — đơn đã trừ tồn chưa có mã thì chỉ sang tab Lỗi vận đơn. */
+/** Kết quả từng đơn sau "Đóng gói + in" — đơn đã trừ tồn chưa có mã thì chỉ sang tab Cần sửa. */
 export function FulfilResultsPanel({
   outcome,
   onClose,
@@ -293,7 +293,7 @@ export function FulfilResultsPanel({
       }
       description={
         failed.some((f) => f.packed)
-          ? 'Đơn đã đóng gói (đã trừ tồn) mà chưa có mã nằm ở tab Lỗi vận đơn — sửa đơn rồi xin lại vận đơn, không đóng gói lại.'
+          ? 'Đơn đã đóng gói (đã trừ tồn) mà chưa có mã nằm ở tab Cần sửa — sửa đơn rồi xin lại vận đơn, không đóng gói lại.'
           : 'Các đơn có mã đã gửi lệnh in tem. Sửa từng đơn lỗi theo lý do bên dưới rồi làm lại.'
       }
       rows={rows}
@@ -308,11 +308,11 @@ export function FulfilResultsPanel({
         >
           {failed.some((f) => f.packed) ? (
             <Link
-              href="/crm/orders?flow=WAYBILL_ERROR"
+              href="/crm/orders?flow=NEEDS_FIX"
               className="text-sm font-semibold text-primary hover:underline"
               onClick={onClose}
             >
-              Xem ở tab Lỗi vận đơn
+              Xem ở tab Cần sửa
             </Link>
           ) : (
             <span />

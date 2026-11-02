@@ -207,14 +207,18 @@ const optionHandlers = [
   ),
 ];
 
-/** downloadCsv bị mock (jsdom không tải file được) — giữ nội dung CSV thật qua toCsv. */
-const downloads: Array<{ filename: string; text: string }> = [];
-vi.mock('@/lib/export-csv', async (importOriginal) => {
-  const real = await importOriginal<typeof import('@/lib/export-csv')>();
+/**
+ * Xuất CSV đi qua luồng xuất có kiểm soát (`useCsvExport`, 2026-11-02) — mock để giữ nội dung CSV
+ * thật qua toCsv (jsdom không tải file được).
+ */
+const downloads: Array<{ filename: string; text: string; title: string }> = [];
+vi.mock('@/components/data/export-delivery', async (importOriginal) => {
+  const real = await importOriginal<typeof import('@/components/data/export-delivery')>();
+  const { toCsv } = await import('@/lib/export-csv');
   return {
     ...real,
-    downloadCsv: (filename: string, header: string[], rows: CsvCell[][]) =>
-      downloads.push({ filename, text: real.toCsv(header, rows) }),
+    useCsvExport: (title: string) => (filename: string, header: string[], rows: CsvCell[][]) =>
+      downloads.push({ filename, text: toCsv(header, rows), title }),
   };
 });
 
@@ -703,6 +707,39 @@ describe('Tab Nhân viên × POS Pancake', () => {
     expect(lastUrl().get('pancakeShopId')).toBeNull();
   });
 
+  it('Xem theo POS (2026-11-02): groupBy=shop, cột Tỉ lệ hoàn; Lọc đặt pancakeShopId; dòng đơn ERP không có Lọc', async () => {
+    search = `tab=staff&staff=shop&from=${RANGE.from}&to=${RANGE.to}`;
+    const groups: string[] = [];
+    const posRow = (id: string | null, name: string, revenue: string, rate: string | null) => ({
+      ...staffItem(id, name, revenue),
+      key: { id, name, shopId: id, shopName: name },
+      returnRate: rate,
+    });
+    server.use(
+      http.get('/api/reports/sales/by-staff', ({ request }) => {
+        groups.push(new URL(request.url).searchParams.get('groupBy')!);
+        return HttpResponse.json({
+          ...BY_STAFF,
+          groupBy: 'shop',
+          items: [
+            posRow('715130909', 'Thiên Nông chính', '1500000.0000', '12.50'),
+            posRow(null, 'Đơn tạo trên ERP', '500000.0000', null),
+          ],
+        });
+      }),
+    );
+    renderApp(<SalesReportScreen />, { me: ME_POS });
+    expect(await screen.findByRole('columnheader', { name: 'Tỉ lệ hoàn' })).toBeInTheDocument();
+    expect(groups[0]).toBe('shop');
+    const row = screen.getByRole('cell', { name: 'Thiên Nông chính' }).closest('tr')!;
+    expect(within(row).getByText('12,50%')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Chỉ xem số của Thiên Nông chính' }));
+    expect(lastUrl().get('pancakeShopId')).toBe('715130909');
+    expect(lastUrl().get('ownerId')).toBeNull();
+    const erp = screen.getByRole('cell', { name: 'Đơn tạo trên ERP' }).closest('tr')!;
+    expect(within(erp).queryByRole('button', { name: /Chỉ xem số/ })).not.toBeInTheDocument();
+  });
+
   it('pancakeShopId trên URL đi vào query; có ô chọn POS; "Xóa lọc" bỏ POS', async () => {
     search = `from=${RANGE.from}&to=${RANGE.to}&pancakeShopId=715130909`;
     const calls: URLSearchParams[] = [];
@@ -787,6 +824,116 @@ describe('Tab Bán chạy', () => {
     expect(screen.getByRole('columnheader', { name: 'Số lượng kỳ trước' })).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Số khách' }));
     expect(lastUrl().get('rank')).toBe('customers');
+  });
+
+  it('Theo tháng trong năm (2026-11-02): gọi /monthly với năm + top, KHÔNG gọi top-products theo khoảng; bảng cả năm + thẻ từng tháng', async () => {
+    const thisYear = new Date().getFullYear();
+    search = `tab=top&topView=year&topYear=${thisYear - 1}&channel=POS&from=${RANGE.from}&to=${RANGE.to}`;
+    const monthly: URLSearchParams[] = [];
+    const ranged: unknown[] = [];
+    server.use(
+      http.get('/api/reports/sales/top-products', () => {
+        ranged.push(1);
+        return HttpResponse.json(TOP);
+      }),
+      http.get('/api/reports/sales/top-products/monthly', ({ request }) => {
+        monthly.push(new URL(request.url).searchParams);
+        return HttpResponse.json({
+          year: thisYear - 1,
+          rankBy: 'revenue',
+          yearItems: [topItem(1, 2), topItem(2, null)],
+          months: [
+            { month: 1, from: `${thisYear - 1}-01-01`, to: `${thisYear - 1}-01-31`, items: [] },
+            {
+              month: 2,
+              from: `${thisYear - 1}-02-01`,
+              to: `${thisYear - 1}-02-28`,
+              items: [topItem(1, null)],
+            },
+          ],
+          dataAsOf: null,
+        });
+      }),
+    );
+    renderApp(<SalesReportScreen />, { me: ME_LEADER });
+    expect(
+      await screen.findByText(`Top 10 cả năm ${thisYear - 1} (tới hết tháng 2)`),
+    ).toBeInTheDocument();
+    expect(monthly[0]!.get('year')).toBe(String(thisYear - 1));
+    expect(monthly[0]!.get('limit')).toBe('10');
+    expect(monthly[0]!.get('channel')).toBe('POS');
+    expect(monthly[0]!.has('from')).toBe(false);
+    expect(ranged).toHaveLength(0);
+    const jan = screen.getByRole('region', { name: 'Tháng 1' });
+    expect(within(jan).getByText('Chưa có SKU nào bán ra')).toBeInTheDocument();
+    const feb = screen.getByRole('region', { name: 'Tháng 2' });
+    expect(within(feb).getByText('Phân bón NPK 1')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Khoảng ngày đang chọn' }));
+    expect(lastUrl().get('topView')).toBeNull();
+  });
+
+  it('Tab Đơn trùng (2026-11-02): KPI tỉ lệ hoàn trùng vs không trùng, nhóm + từng đơn (link, Hoàn), lọc / sắp / trang vào query', async () => {
+    search = `tab=duplicates&dupSort=returned&from=${RANGE.from}&to=${RANGE.to}`;
+    const calls: URLSearchParams[] = [];
+    server.use(
+      http.get('/api/reports/sales/duplicates', ({ request }) => {
+        calls.push(new URL(request.url).searchParams);
+        return HttpResponse.json({
+          ...RANGE,
+          totals: {
+            groupCount: 1,
+            duplicateOrders: 2,
+            duplicateReturned: 1,
+            duplicateReturnRate: '50.00',
+            otherOrders: 8,
+            otherReturned: 1,
+            otherReturnRate: '12.50',
+          },
+          items: [
+            {
+              phone: '0912345678',
+              day: '2026-10-02',
+              customerName: 'Nguyễn Văn A',
+              orderCount: 2,
+              returnedCount: 1,
+              returnRate: '50.00',
+              orders: [
+                {
+                  id: 'o-1',
+                  docNumber: 'SO-1',
+                  orderDate: '2026-10-02T02:00:00.000Z',
+                  total: '300000.0000',
+                  returned: false,
+                },
+                {
+                  id: 'o-2',
+                  docNumber: 'SO-2',
+                  orderDate: '2026-10-02T05:00:00.000Z',
+                  total: '450000.0000',
+                  returned: true,
+                },
+              ],
+            },
+          ],
+          total: 1,
+        });
+      }),
+    );
+    renderApp(<SalesReportScreen />, { me: ME_LEADER });
+    expect(await screen.findByText('Nguyễn Văn A')).toBeInTheDocument();
+    expect(calls[0]!.get('sort')).toBe('returned');
+    expect(calls[0]!.get('onlyReturned')).toBeNull();
+    expect(calls[0]!.get('take')).toBe('50');
+    expect(screen.getByText('Tỉ lệ hoàn — đơn trùng').parentElement).toHaveTextContent('50,00%');
+    expect(screen.getByText('Tỉ lệ hoàn — đơn không trùng').parentElement).toHaveTextContent(
+      '12,50%',
+    );
+    expect(screen.getByRole('link', { name: 'SO-2' })).toHaveAttribute('href', '/crm/orders/o-2');
+    const row = screen.getByRole('link', { name: 'SO-2' }).closest('li')!;
+    expect(within(row).getByText('Hoàn')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('checkbox'));
+    expect(lastUrl().get('dupReturned')).toBe('true');
   });
 
   it('rỗng → EmptyState; lỗi → traceId', async () => {

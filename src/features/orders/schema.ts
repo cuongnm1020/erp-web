@@ -1,6 +1,17 @@
 import Decimal from 'decimal.js';
 import { z } from 'zod';
-import { dateKeySchema, idSchema, moneySchema, phoneSchema, quantitySchema } from '@/lib/shared';
+import {
+  customerFarmProfileSchema,
+  dateKeySchema,
+  FARM_AREA_UNITS,
+  idSchema,
+  moneySchema,
+  phoneSchema,
+  quantitySchema,
+} from '@/lib/shared';
+
+/** Ô diện tích cho gõ dấu phẩy thập phân kiểu Việt: "2,5" → "2.5". */
+export const normalizeFarmArea = (v: string) => v.trim().replace(',', '.');
 
 /**
  * Khớp CreateOrderDto của apps/api (luật 11 — không chặt/lỏng hơn DTO).
@@ -90,6 +101,16 @@ export const createOrderSchema = z
     customerEmail: z.string().trim().email('Email không hợp lệ').max(200).or(z.literal('')),
     customerBirthday: dateKeySchema.or(z.literal('')),
     customerGender: z.enum(GENDERS).or(z.literal('')),
+    /**
+     * Thông tin khai thác (2026-11-02) — BẮT BUỘC khi khách MỚI (`customerIsNew`, màn tính từ tra
+     * SĐT); khách đã có thì không hỏi. Luật giá trị: customerFarmProfileSchema (lib/shared).
+     */
+    customerIsNew: z.boolean(),
+    farmArea: z.string().trim(),
+    farmAreaUnit: z.enum(FARM_AREA_UNITS).or(z.literal('')),
+    crops: z.array(z.string()),
+    treeAge: z.string().trim(),
+    diseaseHistory: z.string().trim(),
     /** Địa chỉ đã lưu của khách; '' = gõ tay bên dưới (hoặc để server lấy mặc định của khách). */
     addressId: optionalId,
     recipient: z.string().trim().max(200, 'Tối đa 200 ký tự'),
@@ -156,6 +177,22 @@ export const createOrderSchema = z
         issue('customerPhone', 'Số điện thoại không hợp lệ');
       }
     }
+    // Khách mới: đủ 4 mục khai thác theo luật chung (lỗi gắn đúng ô).
+    if (!v.customerId && v.customerIsNew) {
+      const farm = customerFarmProfileSchema.safeParse({
+        farmArea: normalizeFarmArea(v.farmArea),
+        farmAreaUnit: v.farmAreaUnit === '' ? undefined : v.farmAreaUnit,
+        crops: v.crops,
+        treeAge: v.treeAge,
+        diseaseHistory: v.diseaseHistory,
+      });
+      if (!farm.success) {
+        for (const i of farm.error.issues) {
+          const path = String(i.path[0]);
+          issue(path, path === 'farmAreaUnit' ? 'Chọn đơn vị' : i.message);
+        }
+      }
+    }
     // Địa chỉ gõ tay: điền một ô là phải đủ người nhận, SĐT, địa chỉ, tỉnh/thành.
     const typed = [v.recipient, v.recipientPhone, v.line1, v.ward, v.district, v.province].some(
       (x) => x !== '',
@@ -200,6 +237,12 @@ export function emptyOrderValues(warehouseId = '', posShopId = ''): CreateOrderV
     customerEmail: '',
     customerBirthday: '',
     customerGender: '',
+    customerIsNew: false,
+    farmArea: '',
+    farmAreaUnit: '',
+    crops: [],
+    treeAge: '',
+    diseaseHistory: '',
     addressId: '',
     recipient: '',
     recipientPhone: '',
@@ -254,6 +297,16 @@ export function toCreateOrderBody(v: CreateOrderValues) {
     ...(v.customerEmail ? { email: v.customerEmail } : {}),
     ...(v.customerBirthday ? { birthday: v.customerBirthday } : {}),
     ...(v.customerGender ? { gender: v.customerGender } : {}),
+    // Thông tin khai thác — chỉ gửi kèm khách MỚI (khách đã có không hỏi trên màn này).
+    ...(!v.customerId && v.customerIsNew
+      ? {
+          farmArea: normalizeFarmArea(v.farmArea),
+          ...(v.farmAreaUnit ? { farmAreaUnit: v.farmAreaUnit } : {}),
+          crops: v.crops,
+          treeAge: v.treeAge,
+          diseaseHistory: v.diseaseHistory,
+        }
+      : {}),
   };
   // Khách chọn sẵn: chỉ gửi kèm hồ sơ (email / ngày sinh / giới tính) để server cập nhật — API
   // vẫn đòi tên + SĐT hợp lệ trong khối `customer`, khách cũ thiếu SĐT thì bỏ qua phần này.

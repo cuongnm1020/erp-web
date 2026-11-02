@@ -23,6 +23,23 @@ export const replenishmentKeys = {
   list: (p: ReplenishmentParams) => [...replenishmentKeys.lists(), p] as const,
 };
 
+/** Một lần gọi của `useReplenishment` — dùng lại cho "Xuất Excel" (kéo lần lượt mọi trang). */
+export function fetchReplenishment(params: ReplenishmentParams) {
+  return unwrap(
+    api.GET('/stock/replenishment', {
+      params: {
+        query: {
+          q: params.q || undefined,
+          warehouseId: params.warehouseId || undefined,
+          onlyAlert: params.onlyAlert,
+          take: params.take,
+          skip: params.skip,
+        },
+      },
+    }),
+  );
+}
+
 /**
  * GET /stock/replenishment — cảnh báo nhập hàng theo mức tồn kho đặt trên form sản phẩm:
  * tồn thực, số bán hôm nay / hôm qua / hôm kia, tốc độ bán, ngày dự kiến hết. Mọi con số do API
@@ -32,20 +49,7 @@ export const replenishmentKeys = {
 export function useReplenishment(params: ReplenishmentParams, enabled = true) {
   return useQuery({
     queryKey: replenishmentKeys.list(params),
-    queryFn: () =>
-      unwrap(
-        api.GET('/stock/replenishment', {
-          params: {
-            query: {
-              q: params.q || undefined,
-              warehouseId: params.warehouseId || undefined,
-              onlyAlert: params.onlyAlert,
-              take: params.take,
-              skip: params.skip,
-            },
-          },
-        }),
-      ),
+    queryFn: () => fetchReplenishment(params),
     placeholderData: keepPreviousData,
     refetchInterval: 60_000,
     enabled,

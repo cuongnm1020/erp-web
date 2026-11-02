@@ -126,6 +126,37 @@ describe('<DataTable>', () => {
     expect(screen.getByRole('button', { name: 'Gán sale (2)' })).toBeInTheDocument();
   });
 
+  it('STT: cột đầu, đếm theo trang (trang 2 cỡ 50 bắt đầu 51)', () => {
+    render(<DataTable {...base} rows={make(3)} total={103} page={2} />);
+    const heads = screen.getAllByRole('columnheader');
+    expect(heads[0]).toHaveTextContent('STT');
+    const rows = screen.getAllByRole('row').slice(1);
+    expect(rows.map((r) => r.querySelector('td')?.textContent)).toEqual(['51', '52', '53']);
+  });
+
+  it('STT: bảng không phân trang đếm từ 1; có ô chọn thì STT đứng sau ô chọn', () => {
+    render(
+      <DataTable
+        {...base}
+        rows={make(2)}
+        total={2}
+        page={3}
+        pagination={false}
+        selection={{ selected: {}, onChange: vi.fn() }}
+      />,
+    );
+    const heads = screen.getAllByRole('columnheader');
+    expect(heads[1]).toHaveTextContent('STT');
+    const first = screen.getAllByRole('row')[1]!.querySelectorAll('td');
+    expect(first[1]).toHaveTextContent('1');
+    expect(screen.queryByRole('button', { name: /Sắp xếp theo STT/ })).not.toBeInTheDocument();
+  });
+
+  it('rowNumbers={false} → không có cột STT', () => {
+    render(<DataTable {...base} rows={make(2)} total={2} rowNumbers={false} />);
+    expect(screen.queryByRole('columnheader', { name: 'STT' })).not.toBeInTheDocument();
+  });
+
   it('rỗng → dòng "Không có dòng nào"', () => {
     render(<DataTable {...base} rows={[]} total={0} />);
     expect(screen.getAllByText('Không có dòng nào').length).toBeGreaterThan(0);

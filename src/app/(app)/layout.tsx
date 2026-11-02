@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react';
+import { ExportDeliveryProvider } from '@/features/admin/components/export-delivery-provider';
 import { AuthenticatedShell } from '@/features/auth';
 
 /**
@@ -10,5 +11,10 @@ export const dynamic = 'force-dynamic';
 
 /** Mọi route đã đăng nhập. Middleware đã chặn khi thiếu cookie. */
 export default function AppLayout({ children }: { children: ReactNode }) {
-  return <AuthenticatedShell>{children}</AuthenticatedShell>;
+  return (
+    <AuthenticatedShell>
+      {/* Xuất Excel: tải ngay (export.direct) hoặc gửi email chờ duyệt — mọi màn dùng chung. */}
+      <ExportDeliveryProvider>{children}</ExportDeliveryProvider>
+    </AuthenticatedShell>
+  );
 }

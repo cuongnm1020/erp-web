@@ -10,6 +10,11 @@ import {
   type FilterDef,
   type RowSelectionState,
 } from '@/components/data/data-table';
+import {
+  ExportExcelButton,
+  takeSkip,
+  type ExportColumn,
+} from '@/components/data/export-excel-button';
 import { RowActions } from '@/components/data/row-actions';
 import { EmptyState, ListSkeleton, QueryState } from '@/components/data/states';
 import { StatusBadge } from '@/components/data/status-badge';
@@ -21,6 +26,7 @@ import { formatDateTime } from '@/lib/format';
 import { Can } from '@/lib/permission';
 import { useListState } from '@/lib/url-state';
 import {
+  fetchPdaDevices,
   useAdminWarehouses,
   useBulkDeletePdaDevices,
   useDeletePdaDevice,
@@ -195,6 +201,36 @@ export function PdaDevicesScreen() {
     ],
     [whById, del],
   );
+  const exportColumns = useMemo<ExportColumn<PdaDevice>[]>(
+    () => [
+      { header: 'Mã máy', value: (r) => r.code, width: 16 },
+      { header: 'Tên / model', value: (r) => r.model ?? null, width: 18 },
+      { header: 'Serial', value: (r) => r.serialNumber, width: 20 },
+      {
+        header: 'Kho',
+        value: (r) => {
+          if (!r.warehouseId) return 'Mọi kho';
+          const w = whById.get(r.warehouseId);
+          return w ? `${w.code} · ${w.name}` : 'Kho khác';
+        },
+        width: 20,
+      },
+      {
+        header: 'Khóa cho nhân viên',
+        value: (r) =>
+          r.boundUser ? `${r.boundUser.fullName} (${r.boundUser.code})` : 'Ai cũng được',
+        width: 24,
+      },
+      {
+        header: 'Đăng nhập cuối',
+        value: (r) => (r.lastSeenAt ? formatDateTime(r.lastSeenAt) : null),
+        width: 17,
+      },
+      { header: 'App', value: (r) => r.appVersion ?? null },
+      { header: 'Trạng thái', value: (r) => DEVICE_STATUS[r.status].label },
+    ],
+    [whById],
+  );
 
   const filters: FilterDef<FilterKey>[] = [
     {
@@ -228,12 +264,21 @@ export function PdaDevicesScreen() {
         description={query.data ? `${query.data.total} thiết bị` : 'Đang đếm…'}
         breadcrumb={[{ label: 'Quản trị' }, { label: 'Hệ thống' }, { label: 'Thiết bị PDA' }]}
         actions={
-          <Can I="update" a="User">
-            <Button size="sm" onClick={openCreate}>
-              <Plus aria-hidden />
-              Đăng ký thiết bị
-            </Button>
-          </Can>
+          <>
+            <ExportExcelButton
+              size="sm"
+              fileName="thiet-bi-pda"
+              columns={exportColumns}
+              fetchPage={(page, size) => fetchPdaDevices({ ...params, ...takeSkip(page, size) })}
+              disabled={!query.data?.total}
+            />
+            <Can I="update" a="User">
+              <Button size="sm" onClick={openCreate}>
+                <Plus aria-hidden />
+                Đăng ký thiết bị
+              </Button>
+            </Can>
+          </>
         }
       />
 

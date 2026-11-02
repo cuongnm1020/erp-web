@@ -367,6 +367,139 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/export-requests": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Người duyệt thấy mọi yêu cầu (trừ khi `mine=true`); người khác chỉ yêu cầu của mình. */
+        get: operations["ExportRequestController_list"];
+        put?: never;
+        /** Multipart: `file` (.xlsx / .csv ≤ 15 MB) + email, resource, title, rowCount, filters (JSON). */
+        post: operations["ExportRequestController_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/export-requests/pending-count": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["ExportRequestController_pendingCount"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/export-requests/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["ExportRequestController_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/export-requests/{id}/file": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Người duyệt tải file để xem trước khi duyệt (ghi nhật ký). */
+        get: operations["ExportRequestController_file"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/export-requests/{id}/approve": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["ExportRequestController_approve"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/export-requests/{id}/reject": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["ExportRequestController_reject"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/export-requests/{id}/resend": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Gửi lại yêu cầu đã gửi / gửi lỗi. */
+        post: operations["ExportRequestController_resend"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/excel-logs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["ExcelLogController_list"];
+        put?: never;
+        /** Trình duyệt báo một lần xuất trực tiếp (file tạo ở trình duyệt) — chỉ người có `export.direct`. */
+        post: operations["ExcelLogController_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/prices/resolve": {
         parameters: {
             query?: never;
@@ -1704,6 +1837,23 @@ export interface paths {
         get: operations["CustomerController_list"];
         put?: never;
         post: operations["CustomerController_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/customers/crop-options": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Gợi ý cây trồng cho ô "Cây trồng" (2026-11-02). */
+        get: operations["CustomerController_cropOptions"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -3462,6 +3612,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/sales-orders/team-filter-options": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Ô lọc "Phòng ban" của danh sách đơn (2026-11-02): phòng CSKH + phòng Sale/MKT đã có đơn, chỉ
+         *     với người có `sales_order.filter_team` (người khác rỗng → màn ẩn ô) — khai TRƯỚC `:id`.
+         */
+        get: operations["SalesOrderController_teamFilterOptions"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/sales-orders/carrier-status-options": {
         parameters: {
             query?: never;
@@ -4728,6 +4898,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/goods-receipts/{id}/putaway-default": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Mọi thùng / hàng rời chưa cất của phiếu → vị trí DEFAULT của kho; đóng việc PUT_AWAY, phiếu đi
+         *     tiếp. Không còn hàng chờ cất → 409 `RECEIPT_PUTAWAY_NOTHING`. Idempotency-Key trong body.
+         */
+        post: operations["ReceiptPutAwayController_putAwayToDefault"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/goods-receipts": {
         parameters: {
             query?: never;
@@ -5079,6 +5269,47 @@ export interface paths {
          *     trước và % tăng giảm.
          */
         get: operations["SalesReportController_topProducts"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/reports/sales/duplicates": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * RPT-DUP (2026-11-02) — đơn trùng trong ngày (cùng SĐT, cùng ngày VN) trong phạm vi người xem:
+         *     tổng đơn trùng / đơn hoàn / tỉ lệ hoàn so với đơn không trùng + danh sách nhóm kèm từng đơn.
+         *     Luôn tính sống. Phân trang take ≤ 200.
+         */
+        get: operations["SalesReportController_duplicates"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/reports/sales/top-products/monthly": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * RPT-06b (2026-11-02) — top SKU từng tháng của một năm + top cả năm (mọi POS / kênh khi không
+         *     lọc). Năm hiện tại tính tới hôm nay; tháng chưa tới không trả.
+         */
+        get: operations["SalesReportController_topProductsMonthly"];
         put?: never;
         post?: never;
         delete?: never;
@@ -5464,8 +5695,29 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Thêm đơn hãng báo giao thành công trong khoảng ngày (chưa có đối soát → cảnh báo). */
+        /**
+         * Thêm đơn hãng báo giao thành công chưa có trong hàng chờ. Có `from`/`to` = trong khoảng ngày;
+         *     bỏ trống = mọi đơn — thêm tối đa 2.000 đơn tại chỗ, phần còn lại giao worker (job tự chạy mỗi
+         *     10 phút + đêm cũng làm việc này).
+         */
         post: operations["EInvoiceController_collect"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/einvoices/export": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** File Excel nhập meInvoice (mẫu MISA "Hóa đơn GTGT") của hóa đơn đã duyệt. */
+        get: operations["EInvoiceController_export"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -7219,6 +7471,80 @@ export interface components {
         DecisionDto: {
             comment?: string;
         };
+        /** @enum {string} */
+        ExportRequestStatus: "PENDING" | "APPROVED" | "SENT" | "FAILED" | "REJECTED";
+        ExcelUserRefDto: {
+            id: string;
+            code: string;
+            fullName: string;
+        };
+        ExportRequestDto: {
+            filters: {
+                [key: string]: unknown;
+            };
+            status: components["schemas"]["ExportRequestStatus"];
+            id: string;
+            requester: components["schemas"]["ExcelUserRefDto"] | null;
+            resource: string;
+            title: string;
+            fileName: string;
+            fileSize: number;
+            rowCount: number | null;
+            email: string;
+            reviewer: components["schemas"]["ExcelUserRefDto"] | null;
+            reviewedAt: string | null;
+            rejectReason: string | null;
+            sentAt: string | null;
+            sendError: string | null;
+            sendCount: number;
+            createdAt: string;
+        };
+        ExportRequestListDto: {
+            items: components["schemas"]["ExportRequestDto"][];
+            total: number;
+        };
+        ExportPendingCountDto: {
+            count: number;
+            /** @description SMTP đã cấu hình chưa — chưa thì duyệt xong sẽ gửi lỗi. */
+            mailConfigured: boolean;
+        };
+        RejectExportRequestDto: {
+            reason: string;
+        };
+        CreateExcelLogDto: {
+            fileName: string;
+            fileSize?: number;
+            /** @description Khoá màn (vd `orders`, `customers`). */
+            resource: string;
+            /** @description Tên hiển thị (vd "Đơn hàng"). */
+            title: string;
+            rowCount?: number;
+            /** @description JSON bộ lọc đang xem lúc xuất (chuỗi, ≤ 4.000 ký tự). */
+            filters?: string;
+        };
+        /** @enum {string} */
+        ExcelAction: "EXPORT" | "EXPORT_REQUEST" | "EXPORT_APPROVE" | "EXPORT_REJECT" | "EXPORT_SENT" | "EXPORT_FAILED" | "IMPORT";
+        ExcelLogDto: {
+            action: components["schemas"]["ExcelAction"];
+            detail: {
+                [key: string]: unknown;
+            };
+            id: string;
+            user: components["schemas"]["ExcelUserRefDto"] | null;
+            resource: string;
+            title: string | null;
+            fileName: string | null;
+            fileSize: number | null;
+            rowCount: number | null;
+            email: string | null;
+            requestId: string | null;
+            ip: string | null;
+            createdAt: string;
+        };
+        ExcelLogListDto: {
+            items: components["schemas"]["ExcelLogDto"][];
+            total: number;
+        };
         ResolvedPriceDto: {
             priceListId: string;
             /** @description Decimal(18,4) dạng chuỗi — giá niêm yết một đơn vị theo `uomId`. */
@@ -7438,6 +7764,13 @@ export interface components {
             /** @description Decimal(18,4) dạng string */
             creditLimit: string | null;
             paymentTerm: number | null;
+            /** @description Thông tin khai thác (2026-11-02) — null / [] = chưa khai thác. Diện tích Decimal(14,2) chuỗi. */
+            farmArea: string | null;
+            /** @enum {string|null} */
+            farmAreaUnit: "M2" | "SAO" | "MAU" | "HA" | null;
+            crops: string[];
+            treeAge: string | null;
+            diseaseHistory: string | null;
             createdAt: string;
             updatedAt: string;
         };
@@ -8294,7 +8627,7 @@ export interface components {
         PancakeOrderResyncStatusDto: {
             shopId: string;
             /** @enum {string} */
-            state: "completed" | "failed" | "active" | "waiting" | "idle";
+            state: "idle" | "completed" | "failed" | "active" | "waiting";
             done: number;
             total: number;
             counts: components["schemas"]["PancakeOrderResyncCountsDto"];
@@ -8334,7 +8667,7 @@ export interface components {
         };
         PancakeBulkPushStatusDto: {
             /** @enum {string} */
-            state: "completed" | "failed" | "active" | "waiting" | "idle";
+            state: "idle" | "completed" | "failed" | "active" | "waiting";
             /** @description Số sản phẩm đã duyệt / tổng — tính theo sản phẩm, không theo shop. */
             done: number;
             total: number;
@@ -8485,7 +8818,7 @@ export interface components {
         };
         CatalogMigrationStatusDto: {
             /** @enum {string} */
-            state: "completed" | "failed" | "active" | "waiting" | "idle";
+            state: "idle" | "completed" | "failed" | "active" | "waiting";
             /**
              * @description Bước đang chạy: combos → links → catalog → push → done (`hide` chỉ còn ở lượt trước 2026-10-18).
              * @enum {string|null}
@@ -9132,12 +9465,22 @@ export interface components {
             /** @description Decimal(18,4) dạng string */
             creditLimit: string | null;
             paymentTerm: number | null;
+            /** @description Thông tin khai thác (2026-11-02) — null / [] = chưa khai thác. Diện tích Decimal(14,2) chuỗi. */
+            farmArea: string | null;
+            /** @enum {string|null} */
+            farmAreaUnit: "M2" | "SAO" | "MAU" | "HA" | null;
+            crops: string[];
+            treeAge: string | null;
+            diseaseHistory: string | null;
             createdAt: string;
             updatedAt: string;
         };
         CustomerListResponseDto: {
             items: components["schemas"]["CustomerListItemDto"][];
             total: number;
+        };
+        CropOptionsDto: {
+            items: string[];
         };
         CustomerMergeTargetDto: {
             id: string;
@@ -9167,6 +9510,13 @@ export interface components {
             /** @description Decimal(18,4) dạng string */
             creditLimit: string | null;
             paymentTerm: number | null;
+            /** @description Thông tin khai thác (2026-11-02) — null / [] = chưa khai thác. Diện tích Decimal(14,2) chuỗi. */
+            farmArea: string | null;
+            /** @enum {string|null} */
+            farmAreaUnit: "M2" | "SAO" | "MAU" | "HA" | null;
+            crops: string[];
+            treeAge: string | null;
+            diseaseHistory: string | null;
             createdAt: string;
             updatedAt: string;
             addresses: components["schemas"]["CustomerAddressDto"][];
@@ -9198,6 +9548,16 @@ export interface components {
             priceListId?: string;
             creditLimit?: string;
             paymentTerm?: number;
+            /** @description Diện tích canh tác — chuỗi decimal > 0, ≤ 2 chữ số thập phân. */
+            farmArea: string;
+            /** @enum {string} */
+            farmAreaUnit: "M2" | "SAO" | "MAU" | "HA";
+            /** @description Cây trồng — 1..20 mục, mỗi mục 1..100 ký tự (bỏ trùng, cắt khoảng trắng). */
+            crops: string[];
+            /** @description Độ tuổi cây — gõ tự do, 1..100 ký tự. */
+            treeAge: string;
+            /** @description Lịch sử bệnh — gõ tự do, 1..2000 ký tự ("Chưa từng" cũng là câu trả lời). */
+            diseaseHistory: string;
         };
         CustomerDto: {
             id: string;
@@ -9218,11 +9578,24 @@ export interface components {
             /** @description Decimal(18,4) dạng string */
             creditLimit: string | null;
             paymentTerm: number | null;
+            /** @description Thông tin khai thác (2026-11-02) — null / [] = chưa khai thác. Diện tích Decimal(14,2) chuỗi. */
+            farmArea: string | null;
+            /** @enum {string|null} */
+            farmAreaUnit: "M2" | "SAO" | "MAU" | "HA" | null;
+            crops: string[];
+            treeAge: string | null;
+            diseaseHistory: string | null;
             createdAt: string;
             updatedAt: string;
         };
         UpdateCustomerDto: {
             name?: string;
+            farmArea?: string;
+            /** @enum {string} */
+            farmAreaUnit?: "M2" | "SAO" | "MAU" | "HA";
+            crops?: string[];
+            treeAge?: string;
+            diseaseHistory?: string;
             taxCode?: string;
             phone?: string;
             /** Format: email */
@@ -10994,6 +11367,18 @@ export interface components {
              */
             mine: boolean;
         };
+        OrderTeamFilterOptionDto: {
+            /** @description Team phòng ban (`DEPT-<mã>`) — giá trị cho `teamIds` của GET /sales-orders. */
+            teamId: string;
+            /** @description Tên hiển thị: phòng CSKH = tên phòng; phòng Sale/MKT = "<phòng cha> · <tên phòng>". */
+            name: string;
+            /**
+             * @description Nhóm trong ô chọn.
+             * @enum {string}
+             */
+            group: "SALES" | "CSKH";
+            isActive: boolean;
+        };
         OrderCarrierStatusOptionDto: {
             /** @description Giá trị cho `carrierStatusText` của GET /sales-orders (nguyên văn chữ hãng). */
             statusText: string;
@@ -11110,10 +11495,10 @@ export interface components {
         };
         SalesOrderListItemDto: {
             /**
-             * @description Tab của đơn — `flowOf(status, fulfilmentStatus, chờ hàng, lỗi vận đơn)`.
+             * @description Tab của đơn — `flowOf(status, fulfilmentStatus, chờ hàng, lỗi vận đơn, SP ngoài hệ thống)`.
              * @enum {string}
              */
-            flow: "PENDING_APPROVAL" | "CANCELLED" | "WAREHOUSE" | "NEW" | "PICKING" | "PACKED" | "IN_TRANSIT" | "OUT_FOR_DELIVERY" | "DELIVERED" | "RETURNED" | "CARRIER_CANCELLED" | "PICKED_UP" | "WAITING_STOCK" | "WAYBILL_ERROR";
+            flow: "PENDING_APPROVAL" | "CANCELLED" | "WAREHOUSE" | "NEW" | "PICKING" | "PACKED" | "IN_TRANSIT" | "OUT_FOR_DELIVERY" | "DELIVERED" | "RETURNED" | "CARRIER_CANCELLED" | "PICKED_UP" | "WAITING_STOCK" | "NEEDS_FIX";
             /**
              * @description Trạng thái kho / giao hàng chi tiết (snapshot) — null = chưa tính (coi như NOT_STARTED).
              * @enum {string|null}
@@ -11130,8 +11515,13 @@ export interface components {
              * @enum {string|null}
              */
             marketplace: "TIKTOK" | "SHOPEE" | "LAZADA" | null;
-            /** @description Lỗi vận đơn cuối (tab Lỗi vận đơn): câu của hãng khi `waybillErrorCode` = CARRIER_REJECTED. */
+            /** @description Lỗi vận đơn cuối (tab Cần sửa): câu của hãng khi `waybillErrorCode` = CARRIER_REJECTED. */
             waybillError: string | null;
+            /**
+             * @description Đơn có sản phẩm ngoài hệ thống — món gõ tay Pancake / SP Pancake tự tạo (2026-11-02). Chưa đóng
+             *     gói thì đơn nằm tab Cần sửa và không được "Gửi sang ĐVVC".
+             */
+            nonErpItems: boolean;
             /** @description Mã lỗi vận đơn (CARRIER_REJECTED, …) — web dịch theo mã; null = không lỗi. */
             waybillErrorCode: string | null;
             /** @description ISO — lúc ghi lỗi vận đơn. */
@@ -11271,6 +11661,8 @@ export interface components {
             WAITING_STOCK: number;
             PICKING: number;
             PACKED: number;
+            /** @description Cần sửa (2026-11-02) — lỗi vận đơn + đơn chưa đóng gói có SP ngoài hệ thống. */
+            NEEDS_FIX: number;
             PICKED_UP: number;
             IN_TRANSIT: number;
             OUT_FOR_DELIVERY: number;
@@ -11717,6 +12109,16 @@ export interface components {
             birthday?: string;
             /** @enum {string} */
             gender?: "MALE" | "FEMALE" | "OTHER";
+            /**
+             * @description Thông tin khai thác (2026-11-02) — tuỳ chọn ở API (đồng bộ / khách cũ không chặn lên đơn); màn
+             *     tạo đơn bắt buộc khi khách MỚI. Luật giá trị như POST /customers.
+             */
+            farmArea?: string;
+            /** @enum {string} */
+            farmAreaUnit?: "M2" | "SAO" | "MAU" | "HA";
+            crops?: string[];
+            treeAge?: string;
+            diseaseHistory?: string;
         };
         InlineAddressDto: {
             recipient: string;
@@ -12265,7 +12667,7 @@ export interface components {
         };
         CarrierSettingFieldDto: {
             /** @enum {string} */
-            key: "shopId" | "baseUrl" | "partnerCode" | "username" | "password" | "token" | "apiKey" | "webhookSecret";
+            key: "shopId" | "baseUrl" | "partnerCode" | "username" | "token" | "password" | "apiKey" | "webhookSecret";
             label: string;
             /** @description Bí mật: không bao giờ trả giá trị, chỉ `hint`. */
             secret: boolean;
@@ -13311,6 +13713,19 @@ export interface components {
             /** @description Chỉ có khi dòng PACK cuối vừa đóng (`taskCompleted`) — null với PICK / PUT_AWAY / dòng giữa. */
             waybill: components["schemas"]["PdaWaybillDto"] | null;
         };
+        ReceiptPutAwayDefaultDto: {
+            idempotencyKey: string;
+        };
+        ReceiptPutAwayDefaultResultDto: {
+            /** @description Số việc PUT_AWAY của phiếu. */
+            taskDocNumber: string;
+            toLocation: components["schemas"]["PdaLocationRefDto"];
+            containersPlaced: number;
+            looseQtyPlaced: string;
+            /** @description Việc cất đã đóng → phiếu sang Chờ nhập giá / Hoàn thành. */
+            taskCompleted: boolean;
+            replayed: boolean;
+        };
         ReceiptListRowDto: {
             id: string;
             docNumber: string;
@@ -14076,7 +14491,7 @@ export interface components {
             previousFrom: string;
             previousTo: string;
             /** @enum {string} */
-            groupBy: "team" | "owner" | "owner_shop";
+            groupBy: "team" | "owner" | "owner_shop" | "shop";
             /**
              * @description Sắp doanh số như Pancake (grossRevenue) giảm dần ("Chưa gán" đứng sau khi bằng nhau). Gồm cả người / team chỉ có doanh
              *     số kỳ trước (số kỳ này 0). Nhân viên chỉ thấy dòng của mình; trưởng nhóm thấy team mình.
@@ -14117,6 +14532,63 @@ export interface components {
             rankBy: "customers" | "orders" | "qty" | "revenue" | "grossProfit";
             /** @description Tối đa `limit` SKU, hạng 1..n. Bằng nhau thì doanh thu cao hơn đứng trước. */
             items: components["schemas"]["SalesTopProductItemDto"][];
+            dataAsOf: string | null;
+        };
+        SalesDuplicatesTotalsDto: {
+            /** @description Số nhóm (SĐT × ngày) có ≥ 2 đơn. */
+            groupCount: number;
+            duplicateOrders: number;
+            duplicateReturned: number;
+            duplicateReturnRate: string | null;
+            /** @description Đơn KHÔNG trùng trong cùng kỳ / bộ lọc — để so sánh. */
+            otherOrders: number;
+            otherReturned: number;
+            otherReturnRate: string | null;
+        };
+        SalesDuplicateOrderDto: {
+            id: string;
+            docNumber: string;
+            /** @description ISO — giờ đặt đơn. */
+            orderDate: string;
+            /** @description Decimal(18,4) chuỗi. */
+            total: string;
+            returned: boolean;
+        };
+        SalesDuplicateGroupDto: {
+            /** @description SĐT chuẩn hoá (core.normalize_phone). */
+            phone: string;
+            /** @description `YYYY-MM-DD` — ngày VN. */
+            day: string;
+            customerName: string;
+            orderCount: number;
+            returnedCount: number;
+            returnRate: string | null;
+            /** @description Theo giờ đặt tăng dần. */
+            orders: components["schemas"]["SalesDuplicateOrderDto"][];
+        };
+        SalesDuplicatesDto: {
+            from: string;
+            to: string;
+            totals: components["schemas"]["SalesDuplicatesTotalsDto"];
+            items: components["schemas"]["SalesDuplicateGroupDto"][];
+            /** @description Tổng số nhóm sau lọc (phân trang). */
+            total: number;
+        };
+        SalesTopProductsMonthDto: {
+            month: number;
+            from: string;
+            to: string;
+            /** @description Top `limit` SKU của tháng — previous* so với tháng liền trước (cùng độ dài). */
+            items: components["schemas"]["SalesTopProductItemDto"][];
+        };
+        SalesTopProductsMonthlyDto: {
+            year: number;
+            /** @enum {string} */
+            rankBy: "customers" | "orders" | "qty" | "revenue" | "grossProfit";
+            /** @description Chỉ các tháng đã bắt đầu (năm hiện tại: tới tháng này). */
+            months: components["schemas"]["SalesTopProductsMonthDto"][];
+            /** @description Top `limit` SKU cả năm (01/01 → 31/12 hoặc hôm nay) — previous* so với năm trước cùng độ dài. */
+            yearItems: components["schemas"]["SalesTopProductItemDto"][];
             dataAsOf: string | null;
         };
         SalesBySupplierItemDto: {
@@ -14502,6 +14974,10 @@ export interface components {
             invoiceWithCode: boolean;
             isCashRegister: boolean;
             requireTwoPeople: boolean;
+            /** @description Người bán in trên bản xem trước — tên công ty, địa chỉ, số tài khoản + ngân hàng. */
+            sellerName: string | null;
+            sellerAddress: string | null;
+            sellerBank: string | null;
             lastVerifiedAt: string | null;
             lastVerifyError: string | null;
             updatedAt: string;
@@ -14519,6 +14995,9 @@ export interface components {
             invoiceWithCode?: boolean;
             isCashRegister?: boolean;
             requireTwoPeople?: boolean;
+            sellerName?: string | null;
+            sellerAddress?: string | null;
+            sellerBank?: string | null;
         };
         MisaTemplateDto: {
             templateId: string;
@@ -14590,11 +15069,13 @@ export interface components {
         };
         CollectDeliveredDto: {
             /** @description YYYY-MM-DD, giờ Việt Nam. */
-            from: string;
-            to: string;
+            from?: string;
+            to?: string;
         };
         CollectDeliveredResultDto: {
             added: number;
+            /** @description Đơn đã giao còn chờ thêm — worker thêm tiếp ở nền. */
+            remaining: number;
         };
         /** @enum {string} */
         EInvoiceStatus: "PENDING_REVIEW" | "APPROVED" | "PUSHED" | "ISSUED" | "FAILED" | "SKIPPED";
@@ -14625,6 +15106,8 @@ export interface components {
             invSeries: string | null;
             invNo: string | null;
             errorMessage: string | null;
+            /** @description Lần cuối xuất file Excel nhập meInvoice. */
+            exportedAt: string | null;
             version: number;
         };
         EInvoiceListResponseDto: {
@@ -14688,6 +15171,13 @@ export interface components {
             email: string | null;
             customerCode: string | null;
         };
+        EInvoiceSellerDto: {
+            name: string | null;
+            taxCode: string | null;
+            address: string | null;
+            bank: string | null;
+            invSeries: string | null;
+        };
         EInvoiceDetailDto: {
             status: components["schemas"]["EInvoiceStatus"];
             id: string;
@@ -14715,6 +15205,8 @@ export interface components {
             invSeries: string | null;
             invNo: string | null;
             errorMessage: string | null;
+            /** @description Lần cuối xuất file Excel nhập meInvoice. */
+            exportedAt: string | null;
             version: number;
             customerId: string | null;
             reconLineId: string | null;
@@ -14735,6 +15227,7 @@ export interface components {
             lastSyncedAt: string | null;
             createdAt: string;
             updatedAt: string;
+            seller: components["schemas"]["EInvoiceSellerDto"];
         };
         EditEInvoiceLineDto: {
             /** Format: uuid */
@@ -16741,6 +17234,239 @@ export interface operations {
                 content: {
                     "application/json": Record<string, never>;
                 };
+            };
+        };
+    };
+    ExportRequestController_list: {
+        parameters: {
+            query?: {
+                status?: "APPROVED" | "PENDING" | "REJECTED" | "FAILED" | "SENT";
+                /** @description `true` = chỉ yêu cầu của tôi (người duyệt mặc định thấy mọi yêu cầu). */
+                mine?: string;
+                skip?: number;
+                take?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ExportRequestListDto"];
+                };
+            };
+        };
+    };
+    ExportRequestController_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": {
+                    /** Format: binary */
+                    file: string;
+                    email: string;
+                    resource: string;
+                    title: string;
+                    rowCount?: number;
+                    filters?: string;
+                };
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ExportRequestDto"];
+                };
+            };
+        };
+    };
+    ExportRequestController_pendingCount: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ExportPendingCountDto"];
+                };
+            };
+        };
+    };
+    ExportRequestController_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ExportRequestDto"];
+                };
+            };
+        };
+    };
+    ExportRequestController_file: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    ExportRequestController_approve: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ExportRequestDto"];
+                };
+            };
+        };
+    };
+    ExportRequestController_reject: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RejectExportRequestDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ExportRequestDto"];
+                };
+            };
+        };
+    };
+    ExportRequestController_resend: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ExportRequestDto"];
+                };
+            };
+        };
+    };
+    ExcelLogController_list: {
+        parameters: {
+            query?: {
+                action?: "EXPORT" | "EXPORT_REQUEST" | "EXPORT_APPROVE" | "EXPORT_REJECT" | "EXPORT_SENT" | "EXPORT_FAILED" | "IMPORT";
+                /** @description Nhóm: `export` = mọi hành động xuất, `import` = nhập. */
+                kind?: string;
+                userId?: string;
+                resource?: string;
+                /** @description Ngày từ / đến (YYYY-MM-DD, giờ Việt Nam). */
+                from?: string;
+                to?: string;
+                skip?: number;
+                take?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ExcelLogListDto"];
+                };
+            };
+        };
+    };
+    ExcelLogController_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateExcelLogDto"];
+            };
+        };
+        responses: {
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };
@@ -18996,6 +19722,25 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["CustomerDto"];
+                };
+            };
+        };
+    };
+    CustomerController_cropOptions: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CropOptionsDto"];
                 };
             };
         };
@@ -21872,7 +22617,13 @@ export interface operations {
     };
     ExportController_downloadPancakeProducts: {
         parameters: {
-            query?: never;
+            query?: {
+                /**
+                 * @description Có email = không trả file mà tạo yêu cầu xuất chờ duyệt (trả `ExportRequestDto`). Bỏ trống = tải
+                 *     ngay, cần quyền `export.direct`.
+                 */
+                email?: string;
+            };
             header?: never;
             path?: never;
             cookie?: never;
@@ -21890,7 +22641,8 @@ export interface operations {
     ExportController_download: {
         parameters: {
             query?: {
-                format?: unknown;
+                format?: "csv" | "xlsx";
+                email?: string;
             };
             header?: never;
             path: {
@@ -22239,6 +22991,25 @@ export interface operations {
             };
         };
     };
+    SalesOrderController_teamFilterOptions: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OrderTeamFilterOptionDto"][];
+                };
+            };
+        };
+    };
     SalesOrderController_carrierStatusOptions: {
         parameters: {
             query?: never;
@@ -22350,7 +23121,7 @@ export interface operations {
                  * @description Tab của danh sách đơn (2026-10-12) — gộp trạng thái chứng từ + kho / giao hàng
                  *     (`flowOf` trong sales-order-flow.ts). Đếm từng tab: GET /sales-orders/flow-counts.
                  */
-                flow?: "NEW" | "PENDING_APPROVAL" | "WAREHOUSE" | "WAITING_STOCK" | "PICKING" | "PACKED" | "WAYBILL_ERROR" | "PICKED_UP" | "IN_TRANSIT" | "OUT_FOR_DELIVERY" | "DELIVERED" | "RETURNED" | "CARRIER_CANCELLED" | "CANCELLED";
+                flow?: "NEW" | "PENDING_APPROVAL" | "WAREHOUSE" | "WAITING_STOCK" | "PICKING" | "PACKED" | "NEEDS_FIX" | "PICKED_UP" | "IN_TRANSIT" | "OUT_FOR_DELIVERY" | "DELIVERED" | "RETURNED" | "CARRIER_CANCELLED" | "CANCELLED";
                 /**
                  * @description Đơn có sản phẩm KHÔNG phải hàng ERP (2026-10-22): `CUSTOM` = có món gõ tay trên Pancake
                  *     (`sales_order_external.custom_items`), `POS_SKU` = có dòng là SKU do đồng bộ Pancake tự tạo
@@ -22365,6 +23136,13 @@ export interface operations {
                 weightMin?: string;
                 /** @description Cận trên (≤), kg. Cùng giá trị với weightMin = lọc đúng một mức cân. */
                 weightMax?: string;
+                /**
+                 * @description Giá trị đơn (`total`, gồm phí ship / phụ thu / làm tròn) ≥ giá trị này — chuỗi decimal ≥ 0
+                 *     (2026-11-02). Lọc "= X" gửi totalMin = totalMax = X; "≤ X" chỉ gửi totalMax.
+                 */
+                totalMin?: string;
+                /** @description Giá trị đơn ≤ giá trị này — chuỗi decimal ≥ 0. Phải ≥ totalMin. */
+                totalMax?: string;
                 /** @description Chỉ đơn CHƯA chọn hãng (`true`) — gom đơn cần gán hãng. */
                 noCarrier?: string;
                 /** @description Đơn ĐÃ gán hãng này (wms.Carrier.id). Kết hợp được với from/to. */
@@ -22408,6 +23186,12 @@ export interface operations {
                  *     GET /sales-orders/care-team-options.
                  */
                 careTeamId?: string;
+                /**
+                 * @description Phòng ban lên đơn — nhiều phòng (team `DEPT-<mã>`, cách nhau dấu phẩy, tối đa 100), mỗi phòng
+                 *     gồm cả phòng con; bỏ trống = mọi phòng (2026-11-02). Danh sách: GET
+                 *     /sales-orders/team-filter-options (phòng CSKH + phòng Sale/MKT đã có đơn).
+                 */
+                teamIds?: string;
                 /**
                  * @description `true` = chỉ đơn có đơn trùng trong ngày (cùng SĐT khách, cùng ngày VN, chưa hủy, mọi nguồn —
                  *     CSKH-5). Theo from/to nếu có, không thì 7 ngày VN gần nhất.
@@ -22532,7 +23316,7 @@ export interface operations {
                  * @description Tab của danh sách đơn (2026-10-12) — gộp trạng thái chứng từ + kho / giao hàng
                  *     (`flowOf` trong sales-order-flow.ts). Đếm từng tab: GET /sales-orders/flow-counts.
                  */
-                flow?: "NEW" | "PENDING_APPROVAL" | "WAREHOUSE" | "WAITING_STOCK" | "PICKING" | "PACKED" | "WAYBILL_ERROR" | "PICKED_UP" | "IN_TRANSIT" | "OUT_FOR_DELIVERY" | "DELIVERED" | "RETURNED" | "CARRIER_CANCELLED" | "CANCELLED";
+                flow?: "NEW" | "PENDING_APPROVAL" | "WAREHOUSE" | "WAITING_STOCK" | "PICKING" | "PACKED" | "NEEDS_FIX" | "PICKED_UP" | "IN_TRANSIT" | "OUT_FOR_DELIVERY" | "DELIVERED" | "RETURNED" | "CARRIER_CANCELLED" | "CANCELLED";
                 /**
                  * @description Đơn có sản phẩm KHÔNG phải hàng ERP (2026-10-22): `CUSTOM` = có món gõ tay trên Pancake
                  *     (`sales_order_external.custom_items`), `POS_SKU` = có dòng là SKU do đồng bộ Pancake tự tạo
@@ -22547,6 +23331,13 @@ export interface operations {
                 weightMin?: string;
                 /** @description Cận trên (≤), kg. Cùng giá trị với weightMin = lọc đúng một mức cân. */
                 weightMax?: string;
+                /**
+                 * @description Giá trị đơn (`total`, gồm phí ship / phụ thu / làm tròn) ≥ giá trị này — chuỗi decimal ≥ 0
+                 *     (2026-11-02). Lọc "= X" gửi totalMin = totalMax = X; "≤ X" chỉ gửi totalMax.
+                 */
+                totalMin?: string;
+                /** @description Giá trị đơn ≤ giá trị này — chuỗi decimal ≥ 0. Phải ≥ totalMin. */
+                totalMax?: string;
                 /** @description Chỉ đơn CHƯA chọn hãng (`true`) — gom đơn cần gán hãng. */
                 noCarrier?: string;
                 /** @description Đơn ĐÃ gán hãng này (wms.Carrier.id). Kết hợp được với from/to. */
@@ -22590,6 +23381,12 @@ export interface operations {
                  *     GET /sales-orders/care-team-options.
                  */
                 careTeamId?: string;
+                /**
+                 * @description Phòng ban lên đơn — nhiều phòng (team `DEPT-<mã>`, cách nhau dấu phẩy, tối đa 100), mỗi phòng
+                 *     gồm cả phòng con; bỏ trống = mọi phòng (2026-11-02). Danh sách: GET
+                 *     /sales-orders/team-filter-options (phòng CSKH + phòng Sale/MKT đã có đơn).
+                 */
+                teamIds?: string;
                 /**
                  * @description `true` = chỉ đơn có đơn trùng trong ngày (cùng SĐT khách, cùng ngày VN, chưa hủy, mọi nguồn —
                  *     CSKH-5). Theo from/to nếu có, không thì 7 ngày VN gần nhất.
@@ -24060,6 +24857,31 @@ export interface operations {
             };
         };
     };
+    ReceiptPutAwayController_putAwayToDefault: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReceiptPutAwayDefaultDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReceiptPutAwayDefaultResultDto"];
+                };
+            };
+        };
+    };
     ReceivingController_list: {
         parameters: {
             query: {
@@ -24679,7 +25501,7 @@ export interface operations {
                 customerId?: string;
                 /** @description POS Pancake của đơn (shop_id, chuỗi số) — như `pancakeShopId` của GET /sales-orders. */
                 pancakeShopId?: string;
-                groupBy: "owner" | "team" | "owner_shop";
+                groupBy: "owner" | "team" | "owner_shop" | "shop";
             };
             header?: never;
             path?: never;
@@ -24746,6 +25568,93 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["SalesTopProductsDto"];
+                };
+            };
+        };
+    };
+    SalesReportController_duplicates: {
+        parameters: {
+            query: {
+                /**
+                 * @description Nguồn đơn: PANCAKE = đơn đồng bộ từ Pancake, ERP = đơn tạo trên hệ thống. Bỏ trống = mọi đơn.
+                 *     Có lọc → luôn tính sống (bảng tổng hợp không lưu).
+                 */
+                origin?: "PANCAKE" | "ERP";
+                /**
+                 * @description Tình trạng giao (lặp tham số cho nhiều giá trị: `?fulfilment=DELIVERED&fulfilment=SHIPPING`):
+                 *     DELIVERED thành công · SHIPPING đang giao · NOT_SHIPPED chưa gửi hãng · RETURNED hoàn (cả ĐVVC
+                 *     hoàn cả đơn). Bỏ trống = mọi đơn. Có lọc → luôn tính sống (bảng tổng hợp không lưu).
+                 */
+                fulfilment?: ("DELIVERED" | "SHIPPING" | "NOT_SHIPPED" | "RETURNED")[];
+                /** @description `YYYY-MM-DD` — ngày đầu (giờ VN). */
+                from: string;
+                /** @description `YYYY-MM-DD` — ngày cuối, lấy hết ngày đó. `to` = `from` → một ngày. */
+                to: string;
+                /** @description Kênh bán. */
+                channel?: "DIRECT" | "MARKETPLACE" | "WEBSITE" | "POS";
+                /** @description Snapshot `SalesOrder.teamId` lúc tạo đơn. */
+                teamId?: string;
+                /** @description Snapshot `SalesOrder.ownerId` lúc tạo đơn. */
+                ownerId?: string;
+                /** @description Kho lấy hàng chọn trên đơn (`SalesOrder.warehouseId`). */
+                warehouseId?: string;
+                customerId?: string;
+                /** @description POS Pancake của đơn (shop_id, chuỗi số) — như `pancakeShopId` của GET /sales-orders. */
+                pancakeShopId?: string;
+                /** @description `true` = chỉ nhóm có ≥ 1 đơn hoàn. */
+                onlyReturned?: "true" | "false";
+                /** @description Sắp nhóm: `day` (mới nhất trước, mặc định) · `orders` (nhiều đơn trước) · `returned` (nhiều đơn hoàn trước). */
+                sort?: "day" | "orders" | "returned";
+                /** @description Mặc định 50, tối đa 200. */
+                take?: number;
+                skip?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SalesDuplicatesDto"];
+                };
+            };
+        };
+    };
+    SalesReportController_topProductsMonthly: {
+        parameters: {
+            query: {
+                origin?: "PANCAKE" | "ERP";
+                /** @description Năm dương lịch, 2020–2100. */
+                year: number;
+                rankBy: "qty" | "revenue" | "grossProfit" | "orders" | "customers";
+                /** @description Số SKU mỗi tháng — mặc định 10, tối đa 50. */
+                limit?: number;
+                channel?: "DIRECT" | "MARKETPLACE" | "WEBSITE" | "POS";
+                teamId?: string;
+                ownerId?: string;
+                warehouseId?: string;
+                pancakeShopId?: string;
+                categoryId?: string;
+                brandId?: string;
+                supplierId?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SalesTopProductsMonthlyDto"];
                 };
             };
         };
@@ -25197,6 +26106,7 @@ export interface operations {
     StockExcelController_download: {
         parameters: {
             query: {
+                email?: string;
                 warehouseId: string;
             };
             header?: never;
@@ -25216,9 +26126,9 @@ export interface operations {
     StockExcelController_import: {
         parameters: {
             query: {
-                warehouseId: string;
                 /** @description `true` = chỉ kiểm tra + xem trước, không ghi. */
                 dryRun?: string;
+                warehouseId: string;
             };
             header: {
                 "idempotency-key": string;
@@ -25396,6 +26306,32 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["CollectDeliveredResultDto"];
                 };
+            };
+        };
+    };
+    EInvoiceController_export: {
+        parameters: {
+            query?: {
+                ids?: string;
+                /** @description Ngày hóa đơn YYYY-MM-DD (mặc định hôm nay, giờ Việt Nam). */
+                invDate?: string;
+                /**
+                 * @description Có email = không trả file mà tạo yêu cầu xuất chờ duyệt (202 + ExportRequestDto). Bỏ trống =
+                 *     tải ngay, cần quyền `export.direct` (2026-11-02).
+                 */
+                email?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };

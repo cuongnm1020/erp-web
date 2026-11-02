@@ -2,13 +2,19 @@
 
 import type { RowSelectionState } from '@tanstack/react-table';
 import Decimal from 'decimal.js';
-import { FileSpreadsheet, ReceiptText, Truck } from 'lucide-react';
+import { Download, FileSpreadsheet, ReceiptText, Truck } from 'lucide-react';
 import Link from 'next/link';
 import { useMemo, useState } from 'react';
+import { ServerExportButton } from '@/components/data/export-delivery';
 import { BulkActionBar } from '@/components/data/bulk-action-bar';
 import { Copyable } from '@/components/data/copy-button';
-import { DataTable, FilterBar, type ColumnDef } from '@/components/data/data-table';
-import { DateRangePicker } from '@/components/data/date-range-picker';
+import {
+  DataTable,
+  exportColumnsOf,
+  FilterBar,
+  type ColumnDef,
+} from '@/components/data/data-table';
+import { ExportExcelButton, takeSkip } from '@/components/data/export-excel-button';
 import { EmptyState, ListSkeleton, QueryState } from '@/components/data/states';
 import { StatusBadge } from '@/components/data/status-badge';
 import { PageHeader } from '@/components/layout/page-header';
@@ -26,14 +32,19 @@ import { Label } from '@/components/ui/label';
 import { toast } from '@/components/ui/toaster';
 import { cn } from '@/lib/cn';
 import { messageFor } from '@/lib/error-messages';
-import { formatDateTime, formatMoney, toLocalDateKey } from '@/lib/format';
+import { formatDateTime, formatMoney } from '@/lib/format';
 import { Can, useAbility } from '@/lib/permission';
 import { useListState } from '@/lib/url-state';
+import { decimalCell } from '@/lib/xlsx-writer';
 import {
+  einvoiceExportUrl,
+  requestEInvoiceExportByEmail,
+  fetchEInvoices,
   useCollectDelivered,
   useEInvoiceAction,
   useEInvoices,
   useImportReconciliation,
+  useInvalidateEInvoices,
   useSkipEInvoices,
   useSyncEInvoices,
   type CarrierReconImportResult,
@@ -52,6 +63,7 @@ import {
   RECON_OUTCOME,
   RECON_OUTCOMES,
 } from '../einvoice-labels';
+import { EInvoicePreviewDialog } from './einvoice-preview';
 
 /**
  * Hóa đơn điện tử (canvas CVnCtWbPyUCdn7pppHaRWX màn 1, docs/PLAN-einvoice-misa.md §12): hàng chờ
@@ -75,7 +87,7 @@ export function EInvoiceListScreen() {
   const { state, set, skipTake } = useListState<F>(DEFAULTS);
   const tab = (state.filters.tab as EInvoiceStatus | undefined) ?? 'PENDING_REVIEW';
   const [selected, setSelected] = useState<RowSelectionState>({});
-  const [dialog, setDialog] = useState<'import' | 'collect' | 'skip' | null>(null);
+  const [dialog, setDialog] = useState<'import' | 'preview' | 'skip' | null>(null);
   const ability = useAbility();
 
   const params = useMemo<EInvoiceListQuery>(
@@ -92,6 +104,10 @@ export function EInvoiceListScreen() {
   const query = useEInvoices(params);
   const action = useEInvoiceAction();
   const sync = useSyncEInvoices();
+  const collect = useCollectDelivered();
+  const invalidate = useInvalidateEInvoices();
+  // Server ghi mốc "Đã xuất file" khi trả file → làm mới danh sách sau khi trình duyệt tải xong.
+  const afterExport = () => window.setTimeout(invalidate, 1500);
 
   const rows = query.data?.items ?? [];
   const ids = Object.keys(selected).filter((k) => selected[k]);
@@ -99,6 +115,7 @@ export function EInvoiceListScreen() {
   const counts = query.data?.counts;
   const filtered = !!(state.q || state.filters.from || state.filters.issue);
   const columns = useMemo(() => buildColumns(tab), [tab]);
+  const exportColumns = useMemo(() => exportColumnsOf(columns), [columns]);
 
   const run = (a: EInvoiceAction, list: string[] = ids) =>
     action.mutate(
@@ -107,6 +124,7 @@ export function EInvoiceListScreen() {
         onSuccess: (r) => {
           reportResult(ACTION_DONE[a], r);
           setSelected({});
+          setDialog(null);
         },
         onError: (e) => toast.error(messageFor(e)),
       },
@@ -136,10 +154,43 @@ export function EInvoiceListScreen() {
         actions={
           <>
             <Can I="review" a="Einvoice">
-              <Button variant="outline" onClick={() => setDialog('collect')}>
-                <Truck aria-hidden /> Lấy đơn đã giao
+              <Button
+                variant="outline"
+                loading={collect.isPending}
+                onClick={() =>
+                  collect.mutate(
+                    {},
+                    {
+                      onSuccess: (r) =>
+                        toast.success(
+                          r.remaining > 0
+                            ? `Đã thêm ${r.added} đơn đã giao; ${r.remaining} đơn còn lại đang được thêm ở nền`
+                            : r.added > 0
+                              ? `Đã thêm ${r.added} đơn đã giao vào Chờ duyệt`
+                              : 'Mọi đơn giao thành công đã có trong danh sách',
+                        ),
+                      onError: (e) => toast.error(messageFor(e)),
+                    },
+                  )
+                }
+              >
+                <Truck aria-hidden /> Cập nhật đơn đã giao
               </Button>
             </Can>
+            {tab === 'APPROVED' && counts?.APPROVED ? (
+              <ServerExportButton
+                exp={{
+                  href: einvoiceExportUrl(),
+                  requestByEmail: requestEInvoiceExportByEmail(),
+                  resource: 'einvoice-misa',
+                  title: 'Hóa đơn điện tử (meInvoice)',
+                  rowCount: counts.APPROVED,
+                }}
+                onDone={afterExport}
+              >
+                <Download aria-hidden /> Xuất file meInvoice ({counts.APPROVED})
+              </ServerExportButton>
+            ) : null}
             <Can I="issue" a="Einvoice">
               <Button
                 variant="outline"
@@ -157,6 +208,12 @@ export function EInvoiceListScreen() {
                 Lấy kết quả từ MISA
               </Button>
             </Can>
+            <ExportExcelButton
+              fileName="hoa-don-dien-tu"
+              columns={exportColumns}
+              fetchPage={(page, size) => fetchEInvoices({ ...params, ...takeSkip(page, size) })}
+              disabled={!query.data?.total}
+            />
             <Can I="review" a="Einvoice">
               <Button onClick={() => setDialog('import')}>
                 <FileSpreadsheet aria-hidden /> Nhập đối soát hãng
@@ -221,10 +278,25 @@ export function EInvoiceListScreen() {
                 <Button size="sm" variant="outline" onClick={() => setDialog('skip')}>
                   Không xuất
                 </Button>
-                <Button size="sm" loading={action.isPending} onClick={() => run('approve')}>
-                  Duyệt {ids.length} hóa đơn
+                <Button size="sm" onClick={() => setDialog('preview')}>
+                  Xem trước và duyệt {ids.length} hóa đơn
                 </Button>
               </Can>
+            ) : null}
+            {tab === 'APPROVED' || tab === 'PUSHED' || tab === 'ISSUED' ? (
+              <ServerExportButton
+                size="sm"
+                exp={{
+                  href: einvoiceExportUrl(ids),
+                  requestByEmail: requestEInvoiceExportByEmail(ids),
+                  resource: 'einvoice-misa',
+                  title: 'Hóa đơn điện tử (meInvoice)',
+                  rowCount: ids.length,
+                }}
+                onDone={afterExport}
+              >
+                <Download aria-hidden /> Xuất file meInvoice
+              </ServerExportButton>
             ) : null}
             {tab === 'APPROVED' || tab === 'FAILED' ? (
               <>
@@ -307,7 +379,7 @@ export function EInvoiceListScreen() {
                   filtered
                     ? 'Thử bỏ bớt điều kiện lọc hoặc đổi tab.'
                     : tab === 'PENDING_REVIEW'
-                      ? 'Nhập file đối soát của hãng để đưa đơn giao thành công vào hàng chờ.'
+                      ? 'Đơn hãng báo giao thành công tự vào đây (10 phút một lần). Bấm "Cập nhật đơn đã giao" để lấy ngay.'
                       : 'Hóa đơn ở trạng thái này sẽ hiện ở đây.'
                 }
                 action={
@@ -348,9 +420,12 @@ export function EInvoiceListScreen() {
         open={dialog === 'import'}
         onOpenChange={(o) => setDialog(o ? 'import' : null)}
       />
-      <CollectDialog
-        open={dialog === 'collect'}
-        onOpenChange={(o) => setDialog(o ? 'collect' : null)}
+      <EInvoicePreviewDialog
+        ids={ids}
+        open={dialog === 'preview'}
+        onOpenChange={(o) => setDialog(o ? 'preview' : null)}
+        onApprove={() => run('approve')}
+        approving={action.isPending}
       />
       <SkipDialog
         open={dialog === 'skip'}
@@ -380,7 +455,7 @@ function buildColumns(tab: EInvoiceStatus): ColumnDef<EInvoiceListItem, unknown>
     {
       id: 'order',
       header: 'Mã đơn',
-      meta: { width: 150 },
+      meta: { width: 150, exportValue: (r) => r.orderDocNumber },
       cell: ({ row }) => (
         <Copyable value={row.original.orderDocNumber} label="Chép mã đơn">
           <Link
@@ -395,13 +470,22 @@ function buildColumns(tab: EInvoiceStatus): ColumnDef<EInvoiceListItem, unknown>
     {
       id: 'delivered',
       header: 'Giao thành công',
-      meta: { width: 130 },
+      meta: {
+        width: 130,
+        exportValue: (r) => (r.deliveredAt ? formatDateTime(r.deliveredAt) : null),
+      },
       cell: ({ row }) => formatDateTime(row.original.deliveredAt),
     },
     {
       id: 'carrier',
       header: 'Hãng · mã vận đơn',
-      meta: { width: 200 },
+      meta: {
+        width: 200,
+        exportValue: (r) =>
+          [CARRIER_NAME[r.carrierCode ?? ''] ?? r.carrierCode, r.trackingNo]
+            .filter(Boolean)
+            .join(' · ') || null,
+      },
       cell: ({ row }) => (
         <div className="leading-tight">
           <div>
@@ -422,6 +506,10 @@ function buildColumns(tab: EInvoiceStatus): ColumnDef<EInvoiceListItem, unknown>
     {
       id: 'buyer',
       header: 'Người mua',
+      meta: {
+        exportValue: (r) =>
+          `${r.buyerName ?? ''}${r.buyerTaxCode ? ` · MST ${r.buyerTaxCode}` : ' · Khách lẻ'}`,
+      },
       cell: ({ row }) => (
         <div className="leading-tight">
           <div className="truncate" title={row.original.buyerName ?? undefined}>
@@ -436,7 +524,11 @@ function buildColumns(tab: EInvoiceStatus): ColumnDef<EInvoiceListItem, unknown>
     {
       id: 'rates',
       header: 'Thuế suất',
-      meta: { width: 100 },
+      meta: {
+        width: 100,
+        exportValue: (r) =>
+          r.ratePercents.map((p) => (p === '?' ? 'Chưa gán' : `${p}%`)).join(', ') || null,
+      },
       cell: ({ row }) => (
         <span className="flex gap-1">
           {row.original.ratePercents.map((p) => (
@@ -450,7 +542,7 @@ function buildColumns(tab: EInvoiceStatus): ColumnDef<EInvoiceListItem, unknown>
     {
       id: 'collected',
       header: 'Hãng thu',
-      meta: { width: 110, align: 'right' },
+      meta: { width: 110, align: 'right', exportValue: (r) => decimalCell(r.collectedAmount) },
       cell: ({ row }) =>
         row.original.collectedAmount === null ? (
           <span className="text-muted-foreground">Chưa đối soát</span>
@@ -461,28 +553,37 @@ function buildColumns(tab: EInvoiceStatus): ColumnDef<EInvoiceListItem, unknown>
     {
       id: 'subtotal',
       header: 'Trước thuế',
-      meta: { width: 110, align: 'right' },
+      meta: { width: 110, align: 'right', exportValue: (r) => decimalCell(r.subtotal) },
       cell: ({ row }) => formatMoney(row.original.subtotal, { unit: '' }),
     },
     {
       id: 'vat',
       header: 'Thuế GTGT',
-      meta: { width: 100, align: 'right' },
+      meta: { width: 100, align: 'right', exportValue: (r) => decimalCell(r.vatAmount) },
       cell: ({ row }) => formatMoney(row.original.vatAmount, { unit: '' }),
     },
     {
       id: 'total',
       header: 'Tổng thanh toán',
-      meta: { width: 120, align: 'right' },
+      meta: { width: 120, align: 'right', exportValue: (r) => decimalCell(r.total) },
       cell: ({ row }) => <b>{formatMoney(row.original.total, { unit: '' })}</b>,
     },
     {
       id: 'state',
       header: tab === 'ISSUED' ? 'Số hóa đơn' : 'Tình trạng',
-      meta: { width: 220 },
+      meta: { width: 220, exportValue: stateText },
       cell: ({ row }) => <StateCell r={row.original} />,
     },
   ];
+}
+
+/** Chữ của cột Tình trạng / Số hóa đơn cho file Excel (cùng luật với StateCell). */
+function stateText(r: EInvoiceListItem): string {
+  if (r.status === 'ISSUED') return `${r.invSeries ?? ''} · ${r.invNo ?? ''}`;
+  if (r.status === 'FAILED') return r.errorMessage ?? 'MISA từ chối';
+  if (r.status === 'SKIPPED') return r.skipReason ?? '';
+  if (r.issues.length === 0) return 'Sẵn sàng';
+  return r.issues.map(issueLabel).join(' · ');
 }
 
 function StateCell({ r }: { r: EInvoiceListItem }) {
@@ -501,6 +602,13 @@ function StateCell({ r }: { r: EInvoiceListItem }) {
     );
   }
   if (r.status === 'SKIPPED') return <span className="text-muted-foreground">{r.skipReason}</span>;
+  if (r.status === 'APPROVED' && r.exportedAt) {
+    return (
+      <span title={`Đã xuất file meInvoice ${formatDateTime(r.exportedAt)}`}>
+        <StatusBadge tone="draft">Đã xuất file</StatusBadge>
+      </span>
+    );
+  }
   if (r.issues.length === 0) return <StatusBadge tone="ok">Sẵn sàng</StatusBadge>;
   const first = r.issues.find((i) => EINVOICE_ISSUE[i]?.block) ?? r.issues[0]!;
   return (
@@ -607,61 +715,6 @@ function ImportReconDialog({
               </Button>
             </>
           )}
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
-  );
-}
-
-function CollectDialog({
-  open,
-  onOpenChange,
-}: {
-  open: boolean;
-  onOpenChange: (o: boolean) => void;
-}) {
-  const today = toLocalDateKey(new Date()) ?? '';
-  const [range, setRange] = useState({ from: today, to: today });
-  const collect = useCollectDelivered();
-  return (
-    <Dialog open={open} onOpenChange={(o) => !collect.isPending && onOpenChange(o)}>
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>Lấy đơn đã giao</DialogTitle>
-          <DialogDescription>
-            Thêm vào hàng chờ các đơn hãng báo giao thành công trong khoảng ngày mà chưa có trong
-            danh sách. Đơn chưa có đối soát được đánh dấu để kế toán kiểm tiền trước khi duyệt.
-          </DialogDescription>
-        </DialogHeader>
-        <DateRangePicker
-          label="Ngày giao"
-          value={range}
-          onChange={setRange}
-          today={today}
-          maxDays={31}
-        />
-        <DialogFooter>
-          <Button
-            variant="outline"
-            disabled={collect.isPending}
-            onClick={() => onOpenChange(false)}
-          >
-            Hủy
-          </Button>
-          <Button
-            loading={collect.isPending}
-            onClick={() =>
-              collect.mutate(range, {
-                onSuccess: (r) => {
-                  toast.success(`Đã lấy ${r.added} đơn đã giao vào hàng chờ`);
-                  onOpenChange(false);
-                },
-                onError: (e) => toast.error(messageFor(e)),
-              })
-            }
-          >
-            Lấy đơn đã giao
-          </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

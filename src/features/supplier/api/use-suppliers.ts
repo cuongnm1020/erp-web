@@ -29,24 +29,28 @@ export const supplierKeys = {
   detail: (id: string) => [...supplierKeys.details(), id] as const,
 };
 
+/** Một lần gọi của `useSuppliers` — dùng lại cho "Xuất Excel" (kéo lần lượt mọi trang). */
+export function fetchSuppliers(params: SupplierListParams) {
+  return unwrap(
+    api.GET('/suppliers', {
+      params: {
+        query: {
+          q: params.q || undefined,
+          isActive: params.isActive,
+          sortBy: params.sortBy,
+          sortDir: params.sortDir,
+          take: params.take,
+          skip: params.skip,
+        },
+      },
+    }),
+  );
+}
+
 export function useSuppliers(params: SupplierListParams) {
   return useQuery({
     queryKey: supplierKeys.list(params),
-    queryFn: () =>
-      unwrap(
-        api.GET('/suppliers', {
-          params: {
-            query: {
-              q: params.q || undefined,
-              isActive: params.isActive,
-              sortBy: params.sortBy,
-              sortDir: params.sortDir,
-              take: params.take,
-              skip: params.skip,
-            },
-          },
-        }),
-      ),
+    queryFn: () => fetchSuppliers(params),
     placeholderData: keepPreviousData,
   });
 }

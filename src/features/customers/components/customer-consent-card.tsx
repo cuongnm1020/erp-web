@@ -259,6 +259,7 @@ export function CustomerConsentCard({ customerId }: { customerId: string }) {
                   onPageChange={(page) => set({ page })}
                   onSizeChange={(size) => set({ size })}
                   onSortChange={() => undefined}
+                  rowNumbers={false}
                 />
               )}
             </div>

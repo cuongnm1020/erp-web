@@ -1,7 +1,7 @@
 'use client';
 
 import Decimal from 'decimal.js';
-import { RotateCcw } from 'lucide-react';
+import { Eye, RotateCcw } from 'lucide-react';
 import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
 import { Copyable } from '@/components/data/copy-button';
@@ -37,6 +37,7 @@ import {
   type UpdateEInvoiceInput,
 } from '../api/use-einvoices';
 import { CARRIER_NAME, EINVOICE_ISSUE, EINVOICE_STATUS, issueLabel } from '../einvoice-labels';
+import { EInvoicePreviewDialog } from './einvoice-preview';
 
 /**
  * Xem trước / chi tiết hóa đơn điện tử (canvas CVnCtWbPyUCdn7pppHaRWX màn 2 + 3): người mua, dòng
@@ -87,6 +88,7 @@ function Detail({ inv }: { inv: EInvoiceDetail }) {
   const action = useEInvoiceAction();
 
   const [edits, setEdits] = useState<Record<string, Edit>>({});
+  const [preview, setPreview] = useState(false);
   const [buyer, setBuyer] = useState<Partial<Record<BuyerKey, string>>>({});
   // Bản mới từ server (sau lưu / người khác sửa) → bỏ phần nháp đang gõ.
   useEffect(() => {
@@ -224,16 +226,46 @@ function Detail({ inv }: { inv: EInvoiceDetail }) {
               </Button>
               <Button
                 disabled={dirty || blocking.length > 0}
-                loading={action.isPending}
-                onClick={() => run('approve', 'Đã duyệt hóa đơn')}
+                onClick={() => setPreview(true)}
+                title={dirty ? 'Lưu thay đổi trước khi duyệt' : undefined}
               >
-                Duyệt
+                Xem trước và duyệt
               </Button>
             </>
           ) : (
-            <StepActions inv={inv} run={run} pending={action.isPending} />
+            <>
+              <Button variant="outline" onClick={() => setPreview(true)}>
+                <Eye aria-hidden /> Xem trước
+              </Button>
+              <StepActions inv={inv} run={run} pending={action.isPending} />
+            </>
           )
         }
+      />
+      <EInvoicePreviewDialog
+        ids={[inv.id]}
+        open={preview}
+        onOpenChange={setPreview}
+        onApprove={
+          editable && !dirty && blocking.length === 0
+            ? () =>
+                action.mutate(
+                  { action: 'approve', ids: [inv.id] },
+                  {
+                    onSuccess: (r) => {
+                      if (r.failed.length) {
+                        toast.error(r.failed[0]!.message);
+                        return;
+                      }
+                      toast.success('Đã duyệt hóa đơn');
+                      setPreview(false);
+                    },
+                    onError: (e) => toast.error(messageFor(e)),
+                  },
+                )
+            : undefined
+        }
+        approving={action.isPending}
       />
 
       {blocking.length || warnings.length || inv.status === 'FAILED' ? (

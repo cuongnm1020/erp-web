@@ -199,6 +199,10 @@ export type StockExcelImportRow = StockExcelImportResult['rows'][number];
 export const stockExcelHref = (warehouseId: string) =>
   `/api/stock/excel?warehouseId=${encodeURIComponent(warehouseId)}`;
 
+/** Không có quyền xuất trực tiếp: GET /stock/excel?email= → yêu cầu chờ duyệt (2026-11-02). */
+export const requestStockExcelByEmail = (warehouseId: string) => (email: string) =>
+  unwrap(api.GET('/stock/excel', { params: { query: { warehouseId, email } } }));
+
 /**
  * POST /stock/excel/import — file Excel tồn kho đã điền. `dryRun` = chỉ xem trước; ghi thật kèm
  * Idempotency-Key sinh lúc bấm (luật 4). Không optimistic (luật 5): chờ server rồi mới tải lại tồn.

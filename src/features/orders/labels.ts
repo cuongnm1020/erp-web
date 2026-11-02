@@ -253,8 +253,9 @@ export const ORDER_FLOW_TABS: ReadonlyArray<{
   { flow: 'WAITING_STOCK', label: 'Chờ hàng', family: 'wait' },
   { flow: 'PICKING', label: 'Đang lấy hàng', family: 'fulfil' },
   { flow: 'PACKED', label: 'Chờ chuyển hàng', family: 'fulfil' },
-  // Lỗi vận đơn (2026-10-28): đã đóng gói mà hãng không cấp được mã — kho phải xử lý.
-  { flow: 'WAYBILL_ERROR', label: 'Lỗi vận đơn', family: 'issue' },
+  // Cần sửa (2026-11-02, thay tab Lỗi vận đơn): hãng không cấp được mã + đơn chưa đóng gói có SP
+  // ngoài hệ thống (món gõ tay / SP Pancake tự tạo) — không được Gửi sang ĐVVC tới khi sửa xong.
+  { flow: 'NEEDS_FIX', label: 'Cần sửa', family: 'issue' },
   { flow: 'PICKED_UP', label: 'Đã gửi hàng', family: 'ship' },
   { flow: 'IN_TRANSIT', label: 'Đang vận chuyển', family: 'ship' },
   { flow: 'OUT_FOR_DELIVERY', label: 'Đang giao hàng', family: 'ship' },
@@ -325,7 +326,7 @@ const FLOW_CLASS: Record<OrderFlow, string> = {
   WAITING_STOCK: 'bg-flow-wait-weak text-flow-wait',
   PICKING: 'bg-flow-picking-weak text-flow-picking',
   PACKED: 'bg-flow-packed-weak text-flow-packed',
-  WAYBILL_ERROR: 'bg-destructive-weak text-destructive',
+  NEEDS_FIX: 'bg-destructive-weak text-destructive',
   PICKED_UP: 'bg-flow-picked-up-weak text-flow-picked-up',
   IN_TRANSIT: 'bg-flow-in-transit-weak text-flow-in-transit',
   OUT_FOR_DELIVERY: 'bg-flow-out-for-delivery-weak text-flow-out-for-delivery',
@@ -354,6 +355,8 @@ export function telcoClass(name: string): string {
 }
 
 export function parseOrderFlow(v: string | undefined): OrderFlow | undefined {
+  // Link cũ ?flow=WAYBILL_ERROR (tab Lỗi vận đơn, nay gộp vào Cần sửa 2026-11-02).
+  if (v === 'WAYBILL_ERROR') return 'NEEDS_FIX';
   return ORDER_FLOW_TABS.find((t) => t.flow === v)?.flow;
 }
 

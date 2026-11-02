@@ -3,7 +3,13 @@
 import { Plus } from 'lucide-react';
 import Link from 'next/link';
 import { useMemo } from 'react';
-import { DataTable, FilterBar, type ColumnDef } from '@/components/data/data-table';
+import {
+  DataTable,
+  exportColumnsOf,
+  FilterBar,
+  type ColumnDef,
+} from '@/components/data/data-table';
+import { ExportExcelButton, takeSkip } from '@/components/data/export-excel-button';
 import { RowActions } from '@/components/data/row-actions';
 import { DraftInput } from '@/components/data/draft-input';
 import { EmptyState, ListSkeleton, QueryState } from '@/components/data/states';
@@ -16,8 +22,10 @@ import { formatDate, formatMoney, formatPhone } from '@/lib/format';
 import { Can, useAbility } from '@/lib/permission';
 import { useInvalidateOn } from '@/lib/realtime';
 import { useListState } from '@/lib/url-state';
+import { decimalCell } from '@/lib/xlsx-writer';
 import {
   customerKeys,
+  fetchCustomers,
   toCustomerSort,
   useCustomers,
   useDeleteCustomer,
@@ -140,7 +148,7 @@ const columns: ColumnDef<CustomerListItem, unknown>[] = [
     id: 'type',
     accessorKey: 'type',
     header: 'Loại khách',
-    meta: { width: 150, sortable: true },
+    meta: { width: 150, sortable: true, exportValue: (r) => customerTypeLabel(r.type) },
     cell: ({ row }) => (
       <StatusBadge tone={customerTypeTone(row.original.type)}>
         {customerTypeLabel(row.original.type)}
@@ -150,7 +158,10 @@ const columns: ColumnDef<CustomerListItem, unknown>[] = [
   {
     id: 'segment',
     header: 'Nhóm · cấp độ',
-    meta: { width: 170 },
+    meta: {
+      width: 170,
+      exportValue: (r) => [r.group?.name, r.tier?.name].filter(Boolean).join(' · ') || null,
+    },
     cell: ({ row }) => {
       const { group, tier } = row.original;
       if (!group && !tier) return <span className="text-muted-foreground">—</span>;
@@ -165,7 +176,7 @@ const columns: ColumnDef<CustomerListItem, unknown>[] = [
   {
     id: 'tags',
     header: 'Tag',
-    meta: { width: 200 },
+    meta: { width: 200, exportValue: (r) => r.tags.map((t) => t.name).join(', ') || null },
     cell: ({ row }) => {
       const tags = row.original.tags;
       if (tags.length === 0) return <span className="text-muted-foreground">—</span>;
@@ -193,7 +204,12 @@ const columns: ColumnDef<CustomerListItem, unknown>[] = [
     id: 'creditLimit',
     accessorKey: 'creditLimit',
     header: 'Hạn mức công nợ',
-    meta: { align: 'right', width: 150, sortable: true },
+    meta: {
+      align: 'right',
+      width: 150,
+      sortable: true,
+      exportValue: (r) => decimalCell(r.creditLimit),
+    },
     cell: ({ getValue }) => formatMoney(getValue() as string | null, { unit: '' }),
   },
   {
@@ -210,7 +226,7 @@ const columns: ColumnDef<CustomerListItem, unknown>[] = [
     id: 'isActive',
     accessorKey: 'isActive',
     header: 'Trạng thái',
-    meta: { width: 120 },
+    meta: { width: 120, exportValue: (r) => (r.isActive ? 'Hoạt động' : 'Ngừng') },
     cell: ({ getValue }) =>
       (getValue() as boolean) ? (
         <StatusBadge tone="ok">Hoạt động</StatusBadge>
@@ -222,7 +238,7 @@ const columns: ColumnDef<CustomerListItem, unknown>[] = [
     id: 'createdAt',
     accessorKey: 'createdAt',
     header: 'Khách từ',
-    meta: { width: 120, sortable: true },
+    meta: { width: 120, sortable: true, exportValue: (r) => formatDate(r.createdAt) },
     cell: ({ getValue }) => formatDate(getValue() as string),
   },
   {
@@ -232,6 +248,8 @@ const columns: ColumnDef<CustomerListItem, unknown>[] = [
     cell: ({ row }) => <CustomerRowActions customer={row.original} />,
   },
 ];
+
+const exportColumns = exportColumnsOf(columns);
 
 /** Xóa = soft delete phía API (KH chuyển Ngừng hợp tác, giữ lịch sử) — không optimistic (luật 5). */
 function CustomerRowActions({ customer }: { customer: CustomerListItem }) {
@@ -287,14 +305,23 @@ export function CustomerListScreen() {
         }
         breadcrumb={[{ label: 'Khách hàng', href: '/crm/customers' }, { label: 'Danh sách' }]}
         actions={
-          <Can I="create" a="Customer">
-            <Button size="sm" asChild>
-              <Link href="/crm/customers/new">
-                <Plus aria-hidden />
-                Tạo khách hàng
-              </Link>
-            </Button>
-          </Can>
+          <>
+            <ExportExcelButton
+              size="sm"
+              fileName="khach-hang"
+              columns={exportColumns}
+              fetchPage={(page, size) => fetchCustomers({ ...params, ...takeSkip(page, size) })}
+              disabled={!query.data?.total}
+            />
+            <Can I="create" a="Customer">
+              <Button size="sm" asChild>
+                <Link href="/crm/customers/new">
+                  <Plus aria-hidden />
+                  Tạo khách hàng
+                </Link>
+              </Button>
+            </Can>
+          </>
         }
       />
 

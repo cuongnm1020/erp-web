@@ -20,6 +20,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { BulkActionBar } from '@/components/data/bulk-action-bar';
 import { CopyButton } from '@/components/data/copy-button';
 import { CopyText } from '@/components/data/copy-text';
+import { ExportExcelButton, type ExportColumn } from '@/components/data/export-excel-button';
 import { pancakeShopLabel } from '@/components/data/pancake-shop-select';
 import { ColumnPicker, DataTable, FilterBar, type ColumnDef } from '@/components/data/data-table';
 import { RowActions, type RowActionItem } from '@/components/data/row-actions';
@@ -34,17 +35,24 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Input } from '@/components/ui/input';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { toast } from '@/components/ui/toaster';
 import { cn } from '@/lib/cn';
 import { messageFor, messageForCode } from '@/lib/error-messages';
 import {
+  formatDate,
   formatDateTime,
   formatMoney,
   formatPhone,
   groupVi,
   normalizePhone,
   formatQuantity,
-  formatWaited,
   formatRelative,
   phoneCarrier,
   toDecimal,
@@ -53,9 +61,11 @@ import { Can, useAbility } from '@/lib/permission';
 import { useInvalidateOn } from '@/lib/realtime';
 import { useHotkey } from '@/lib/use-hotkey';
 import { useListState, type SortState } from '@/lib/url-state';
+import { decimalCell } from '@/lib/xlsx-writer';
 import { useCarriers } from '@/features/wms/api/use-shipping';
 import { CarrierSelect } from '@/features/wms/components/carrier-select';
 import {
+  fetchOrdersPage,
   orderKeys,
   useOrderFlowCounts,
   useOrderListPrefs,
@@ -63,7 +73,7 @@ import {
   useRequestWaybill,
   useConfirmOrder,
   useSetOrdersWaitingStock,
-  useCareTeamOptions,
+  useTeamFilterOptions,
   useCarrierStatusOptions,
   useOrderCreatorOptions,
   useFacebookPageOptions,
@@ -81,6 +91,7 @@ import {
   FLOW_FAMILY_DOT,
   fulfilmentLabel,
   orderCancellable,
+  orderFlowLabel,
   ORDER_FLOW_TABS,
   parseOrderFlow,
   parseOrderStatus,
@@ -131,6 +142,9 @@ const DEFAULTS = {
     'customerId',
     'weightMin',
     'weightMax',
+    // Giá trị đơn ≥ / = / ≤ / khoảng (2026-11-02).
+    'totalMin',
+    'totalMax',
     'noCarrier',
     'carrierId',
     // Tài khoản hãng (ô chọn hãng dùng chung) + ai gán hãng (ERP / Pancake), 2026-10-25.
@@ -146,8 +160,9 @@ const DEFAULTS = {
     'duplicate',
     // Đơn có sản phẩm không phải hàng ERP (món gõ tay / SKU Pancake tự sinh), 2026-10-22.
     'itemOrigin',
-    // Team CSKH lên đơn (phòng ban loại CSKH), 2026-10-24.
-    'careTeamId',
+    // Phòng ban lên đơn (team phòng ban, id nối dấu phẩy, chọn nhiều — CSKH + Sale/MKT), 2026-11-02;
+    // thay ô "Phòng ban CSKH" một lựa chọn (careTeamId, 2026-10-24).
+    'team',
     // NV lên đơn = người bấm tạo đơn (2026-10-29).
     'creatorId',
     // Page Facebook (id nối dấu phẩy, chọn nhiều), 2026-10-26 — khoá `fbPage` vì `page` là số trang.
@@ -217,12 +232,10 @@ const SORT_FIELD: Record<string, OrderSortField> = {
 };
 
 /**
- * Cột ẩn khi người dùng chưa chọn lần nào. "Thực thu ĐVVC" gần như toàn "—" tới khi hãng đối
- * soát → ẩn mặc định, bật lại ở "Cột".
+ * Cột ẩn khi người dùng chưa chọn lần nào. Hàng thiếu / Chờ từ / Thực thu ĐVVC đã bỏ khỏi bảng
+ * (2026-11-02); Thực thu vẫn có trong file Excel xuất.
  */
-const DEFAULT_HIDDEN = ['orderDate', 'collected'];
-/** Cột chỉ hiện ở tab Chờ hàng. */
-const WAITING_ONLY_COLUMNS = ['shortage', 'waitingSince'];
+const DEFAULT_HIDDEN = ['orderDate'];
 
 type OrderFilter = (typeof DEFAULTS.filterKeys)[number];
 
@@ -256,7 +269,7 @@ interface RowActionContext {
 
 /**
  * Nút thao tác của một dòng đơn, đứng cạnh Xem nhanh, không "⋯" (user yêu cầu 2026-10-29): Sửa ·
- * Nhân bản (+ Xin lại vận đơn ở tab Lỗi vận đơn) · Hủy đơn (chữ đỏ, cuối cụm, qua hộp xác nhận —
+ * Nhân bản (+ Xin lại vận đơn ở tab Cần sửa khi lỗi vận đơn) · Hủy đơn (chữ đỏ, cuối cụm, qua hộp xác nhận —
  * mockup TmGafrdk3wiAxJu4cFY937). Mở chi tiết = bấm mã đơn.
  */
 /** Tab còn trước khi kho thao tác — người lên đơn còn sửa / hủy được (2026-10-31). */
@@ -278,10 +291,10 @@ function orderRowItems(o: SalesOrderListItem, ctx: RowActionContext): RowActionI
           },
         ]
       : []),
-    ...(ctx.canPack && o.flow === 'WAYBILL_ERROR' && o.shipment?.carrierCode
+    ...(ctx.canPack && o.flow === 'NEEDS_FIX' && o.waybillErrorCode && o.shipment?.carrierCode
       ? [
           {
-            // Lỗi vận đơn (2026-10-28): sửa đơn xong thì xin lại — thành công là rời tab.
+            // Lỗi vận đơn (2026-10-28, tab Cần sửa): sửa đơn xong thì xin lại — thành công là rời tab.
             label: 'Xin lại vận đơn',
             icon: <RefreshCw aria-hidden />,
             onSelect: () => ctx.onRetryWaybill(o),
@@ -389,7 +402,9 @@ const buildColumns = (
     header: 'Ngày đặt',
     meta: { width: 116, sortable: true },
     cell: ({ row }) => (
-      <span className="whitespace-nowrap text-xs">{formatDateTime(row.original.orderDate)}</span>
+      <span className="whitespace-nowrap text-xs" title={formatDateTime(row.original.orderDate)}>
+        {formatDate(row.original.orderDate)}
+      </span>
     ),
   },
   {
@@ -455,39 +470,42 @@ const buildColumns = (
           {p.moreCount > 0 ? (
             <span className="block text-xs text-primary">+{p.moreCount} sản phẩm khác</span>
           ) : null}
+          {row.original.flow === 'NEEDS_FIX' && row.original.nonErpItems ? (
+            // Cần sửa (2026-11-02): SP ngoài hệ thống — không Gửi sang ĐVVC được tới khi thay SP.
+            <span
+              className="block text-xs font-semibold text-destructive"
+              title="Đơn có món gõ tay / SP Pancake tự tạo — thay bằng sản phẩm trong hệ thống rồi mới gửi ĐVVC"
+              data-testid="order-non-erp-items"
+            >
+              Có SP ngoài hệ thống
+            </span>
+          ) : null}
         </div>
       );
     },
   },
   {
-    // Cột Kho luôn hiện (user chốt 2026-10-29) — kho lấy hàng của đơn, mã kho dòng dưới.
+    // Cột Kho luôn hiện (user chốt 2026-10-29). 2026-11-02: bỏ mã kho + gộp cột NV lên đơn vào
+    // đây — tên kho, dưới là NV lên đơn (người bấm tạo đơn, tên đầy đủ), dưới nữa page Facebook.
     id: 'warehouse',
     header: 'Kho',
-    meta: { width: 112 },
-    cell: ({ row }) => {
-      const o = row.original;
-      if (!o.warehouseName) return <span className="text-muted-foreground">—</span>;
-      return (
-        <div className="space-y-0.5">
-          <span className="block font-medium" data-testid="order-warehouse">
-            {o.warehouseName}
-          </span>
-          <span className="block font-mono text-xs text-muted-foreground">{o.warehouseCode}</span>
-        </div>
-      );
-    },
-  },
-  {
-    // NV lên đơn = người bấm tạo đơn (user chốt 2026-10-29): tên đầy đủ, dài thì xuống dòng;
-    // page Facebook dòng dưới.
-    id: 'creator',
-    header: 'NV lên đơn',
     meta: { width: 150 },
     cell: ({ row }) => {
       const o = row.original;
       return (
         <div className="space-y-0.5">
-          <span className="block break-words font-medium" data-testid="order-creator">
+          {o.warehouseName ? (
+            <span className="block font-medium" data-testid="order-warehouse">
+              {o.warehouseName}
+            </span>
+          ) : (
+            <span className="block text-muted-foreground">—</span>
+          )}
+          <span
+            className="block break-words text-xs text-muted-foreground"
+            title="NV lên đơn"
+            data-testid="order-creator"
+          >
             {o.creatorName ?? '—'}
           </span>
           {o.facebookPageName ? (
@@ -499,51 +517,6 @@ const buildColumns = (
             </span>
           ) : null}
         </div>
-      );
-    },
-  },
-  // Hai cột của tab Chờ hàng (màn lọc bỏ ở tab khác).
-  {
-    id: 'shortage',
-    header: 'Hàng thiếu',
-    meta: { width: 230 },
-    cell: ({ row }) => {
-      const items = row.original.shortage?.items ?? [];
-      const first = items[0];
-      if (!first) return <span className="text-muted-foreground">—</span>;
-      const name = `${first.skuName} × ${formatQuantity(first.qty)}`;
-      return (
-        <div className="space-y-1">
-          <span className="block max-w-56 truncate font-semibold text-warning" title={name}>
-            {name}
-          </span>
-          {items.length > 1 ? (
-            <span
-              className="block text-xs text-muted-foreground"
-              title={items
-                .slice(1)
-                .map((i) => `${i.skuName} × ${formatQuantity(i.qty)}`)
-                .join(', ')}
-            >
-              + {items.length - 1} SP thiếu khác
-            </span>
-          ) : null}
-        </div>
-      );
-    },
-  },
-  {
-    id: 'waitingSince',
-    header: 'Chờ từ',
-    meta: { width: 120, align: 'right' },
-    cell: ({ row }) => {
-      const since = row.original.shortage?.since;
-      return since ? (
-        <span className="whitespace-nowrap" title={formatDateTime(since)}>
-          {formatWaited(since)}
-        </span>
-      ) : (
-        <span className="text-muted-foreground">—</span>
       );
     },
   },
@@ -561,30 +534,6 @@ const buildColumns = (
     cell: ({ row }) => (
       <span className="block font-semibold">{formatMoney(row.original.total, { unit: '' })}</span>
     ),
-  },
-  {
-    id: 'collected',
-    // Header dạng hàm để giữ tooltip giải thích (meta.title của DataTable là CHỮ tiêu đề; ô
-    // chọn cột đọc meta.title).
-    header: () => (
-      <span
-        className="block text-right"
-        title="Ước tính: COD − phí VC khi giao thành công; − phí VC khi hoàn"
-      >
-        Thực thu ĐVVC
-      </span>
-    ),
-    meta: { align: 'right', width: 96, title: 'Thực thu ĐVVC' },
-    cell: ({ row }) => {
-      const v = row.original.shipment?.collectedAmount;
-      if (!v) return <span className="text-muted-foreground">—</span>;
-      const negative = toDecimal(v)?.isNegative() ?? false;
-      return (
-        <span className={cn('font-semibold', negative && 'text-destructive')}>
-          {formatMoney(v, { unit: '' })}
-        </span>
-      );
-    },
   },
   {
     // Trạng thái + thời gian gộp một cột (2026-10-22); id giữ 'time' để sắp xếp theo thời gian
@@ -624,7 +573,7 @@ const buildColumns = (
   {
     id: 'actions',
     header: () => <span className="sr-only">Thao tác</span>,
-    // Xem nhanh · Sửa · Nhân bản · Hủy (+ Xin lại vận đơn ở tab Lỗi vận đơn) — 28px mỗi nút.
+    // Xem nhanh · Sửa · Nhân bản · Hủy (+ Xin lại vận đơn ở tab Cần sửa khi lỗi vận đơn) — 28px mỗi nút.
     meta: { width: 136, title: 'Thao tác' },
     cell: ({ row }) => (
       <RowActions
@@ -645,6 +594,58 @@ interface CarrierRef {
   code: string;
   name: string;
 }
+
+/**
+ * Cột file "Xuất Excel" của danh sách đơn — cố định (không theo ô chọn cột): mã, ngày giờ đặt,
+ * khách, SĐT, sản phẩm, NV lên đơn, kho, tổng tiền, trạng thái, vận chuyển.
+ */
+const buildExportColumns = (
+  carrierOf: (id: string) => CarrierRef | null,
+): ExportColumn<SalesOrderListItem>[] => [
+  { header: 'Mã đơn', value: (o) => o.docNumber, width: 16 },
+  { header: 'Ngày đặt', value: (o) => formatDateTime(o.orderDate), width: 17 },
+  { header: 'Nguồn', value: (o) => (o.pancakeOrderId ? `Pancake #${o.pancakeOrderId}` : 'ERP') },
+  { header: 'Khách hàng', value: (o) => o.recipientName ?? o.customer.name, width: 24 },
+  {
+    header: 'SĐT',
+    value: (o) => (o.phone ? (normalizePhone(o.phone) ?? o.phone) : null),
+    width: 13,
+  },
+  { header: 'Địa chỉ nhận', value: (o) => o.addressLine ?? null, width: 36 },
+  { header: 'Tỉnh/TP', value: (o) => o.province ?? null, width: 16 },
+  {
+    header: 'Sản phẩm',
+    value: (o) => {
+      const p = o.product;
+      if (!p) return null;
+      const more = p.moreCount > 0 ? ` (+${p.moreCount} sản phẩm khác)` : '';
+      return `${p.name} × ${formatQuantity(p.qty)}${more}`;
+    },
+    width: 40,
+  },
+  { header: 'NV lên đơn', value: (o) => o.creatorName ?? null, width: 20 },
+  { header: 'Page', value: (o) => o.facebookPageName ?? null, width: 18 },
+  { header: 'Kho', value: (o) => o.warehouseName ?? null, width: 16 },
+  { header: 'Tổng tiền', value: (o) => decimalCell(o.total), width: 13 },
+  {
+    header: 'Trạng thái',
+    value: (o) =>
+      orderFlowLabel(o.flow) + (o.sameDayCount > 0 ? ` · Trùng ${o.sameDayCount + 1} đơn` : ''),
+    width: 18,
+  },
+  {
+    header: 'Hãng vận chuyển',
+    value: (o) => {
+      const picked = o.carrierId ? carrierOf(o.carrierId) : null;
+      return o.shipment?.carrierName ?? picked?.name ?? o.shipment?.carrierCode ?? null;
+    },
+    width: 18,
+  },
+  { header: 'Mã vận đơn', value: (o) => o.shipment?.trackingNo ?? null, width: 20 },
+  { header: 'Phí vận chuyển', value: (o) => decimalCell(o.shipment?.shipFee ?? null) },
+  { header: 'Thực thu ĐVVC', value: (o) => decimalCell(o.shipment?.collectedAmount ?? null) },
+  { header: 'Ghi chú', value: (o) => o.note ?? null, width: 30 },
+];
 
 /**
  * Hãng (viết tắt = mã hãng: GHTK, VTP…) + phí VC + mã vận đơn; chưa có phiếu giao thì hãng chọn
@@ -866,6 +867,120 @@ function WeightRangeFilter({
   );
 }
 
+type TotalOp = 'gte' | 'lte' | 'eq' | 'between';
+const TOTAL_OPS: ReadonlyArray<{ value: TotalOp; label: string }> = [
+  { value: 'gte', label: '≥' },
+  { value: 'lte', label: '≤' },
+  { value: 'eq', label: '=' },
+  { value: 'between', label: 'Từ … đến' },
+];
+
+/** Toán tử đang áp, suy từ URL: chỉ min = ≥, chỉ max = ≤, hai cận bằng nhau = "=", khác = khoảng. */
+export function totalOpOf(min: string | undefined, max: string | undefined): TotalOp {
+  if (min && max) return min === max ? 'eq' : 'between';
+  return max ? 'lte' : 'gte';
+}
+
+/** "1.500.000", "1 500 000 ₫" → "1500000"; không có chữ số → undefined. Tiền đồng, số nguyên. */
+export function parseVnd(s: string): string | undefined {
+  const d = s.replace(/[^\d]/g, '').replace(/^0+(?=\d)/, '');
+  return d === '' || d.length > 15 ? undefined : d;
+}
+
+/** Chuỗi tiền đồng nguyên → "1.500.000" để hiện trong ô (không tính toán, chỉ chèn dấu chấm). */
+const groupVnd = (d: string) => d.replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+
+/**
+ * Lọc giá trị đơn (tổng tiền) — chọn toán tử rồi gõ số, Enter / rời ô mới áp lên URL
+ * (totalMin / totalMax). "=" gửi hai cận bằng nhau.
+ */
+export function TotalValueFilter({
+  min,
+  max,
+  onChange,
+}: {
+  min: string | undefined;
+  max: string | undefined;
+  onChange: (next: { totalMin: string | undefined; totalMax: string | undefined }) => void;
+}) {
+  const [op, setOp] = useState<TotalOp>(totalOpOf(min, max));
+  const [a, setA] = useState(groupVnd((op === 'lte' ? max : min) ?? ''));
+  const [b, setB] = useState(groupVnd(max ?? ''));
+  useEffect(() => {
+    const o = totalOpOf(min, max);
+    setOp(o);
+    setA(groupVnd((o === 'lte' ? max : min) ?? ''));
+    setB(groupVnd(max ?? ''));
+  }, [min, max]);
+  const apply = (nextOp: TotalOp, rawA: string, rawB: string) => {
+    const va = parseVnd(rawA);
+    const vb = parseVnd(rawB);
+    const next =
+      nextOp === 'gte'
+        ? { totalMin: va, totalMax: undefined }
+        : nextOp === 'lte'
+          ? { totalMin: undefined, totalMax: va }
+          : nextOp === 'eq'
+            ? { totalMin: va, totalMax: va }
+            : { totalMin: va, totalMax: vb };
+    if (next.totalMin === min && next.totalMax === max) return;
+    onChange(next);
+  };
+  const onKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') apply(op, a, b);
+  };
+  return (
+    <div className="flex items-center gap-1 text-sm text-muted-foreground">
+      <span>Giá trị đơn</span>
+      <Select
+        value={op}
+        onValueChange={(v) => {
+          const o = v as TotalOp;
+          setOp(o);
+          if (a.trim() !== '') apply(o, a, b);
+        }}
+      >
+        <SelectTrigger className="h-9 w-24" aria-label="Toán tử giá trị đơn">
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          {TOTAL_OPS.map((o) => (
+            <SelectItem key={o.value} value={o.value}>
+              {o.label}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+      <Input
+        value={a}
+        onChange={(e) => setA(groupVnd(parseVnd(e.target.value) ?? ''))}
+        onBlur={() => apply(op, a, b)}
+        onKeyDown={onKeyDown}
+        inputMode="numeric"
+        placeholder={op === 'between' ? 'từ' : 'số tiền'}
+        aria-label={op === 'between' ? 'Giá trị đơn từ (₫)' : 'Giá trị đơn (₫)'}
+        className="h-9 w-28 text-right tabular-nums"
+      />
+      {op === 'between' ? (
+        <>
+          <span>–</span>
+          <Input
+            value={b}
+            onChange={(e) => setB(groupVnd(parseVnd(e.target.value) ?? ''))}
+            onBlur={() => apply(op, a, b)}
+            onKeyDown={onKeyDown}
+            inputMode="numeric"
+            placeholder="đến"
+            aria-label="Giá trị đơn đến (₫)"
+            className="h-9 w-28 text-right tabular-nums"
+          />
+        </>
+      ) : null}
+      <span>₫</span>
+    </div>
+  );
+}
+
 /**
  * Dải giải thích của tab Chờ hàng + chip "Đang lọc đơn thiếu <SP>" (từ màn Hàng chờ). Điều kiện
  * ghi đúng như API tính (apps/api docs/pick-pack-flow.md §3.6).
@@ -958,6 +1073,8 @@ export function OrderListScreen() {
   const customerId = state.filters.customerId ?? '';
   const weightMin = state.filters.weightMin ?? '';
   const weightMax = state.filters.weightMax ?? '';
+  const totalMin = state.filters.totalMin ?? '';
+  const totalMax = state.filters.totalMax ?? '';
   const noCarrier = state.filters.noCarrier === 'true';
   const carrierId = state.filters.carrierId ?? '';
   const carrierAccountId = state.filters.carrierAccountId ?? '';
@@ -979,13 +1096,16 @@ export function OrderListScreen() {
     : undefined;
   const duplicate = state.filters.duplicate === 'true';
   const itemOrigin = parseItemOrigin(state.filters.itemOrigin);
-  const careTeamId = state.filters.careTeamId ?? '';
-  const creatorId = state.filters.creatorId ?? '';
+  // Ô Phòng ban + NV lên đơn chỉ với người có `sales_order.filter_team` (2026-11-02) — không có
+  // quyền thì bỏ luôn giá trị trên URL (link dán từ đồng nghiệp) để không lọc ngầm.
+  const canFilterTeam = useAbility().can('filter_team', 'SalesOrder');
+  const team = canFilterTeam ? (state.filters.team ?? '') : '';
+  const creatorId = canFilterTeam ? (state.filters.creatorId ?? '') : '';
   const fbPage = state.filters.fbPage ?? '';
   const carrierStatus = state.filters.carrierStatus ?? '';
   const carrierStatusText = useMemo(() => decodeList(carrierStatus), [carrierStatus]);
   const carrierStatuses = useCarrierStatusOptions();
-  const careTeams = useCareTeamOptions();
+  const teamOptions = useTeamFilterOptions(canFilterTeam);
   const facebookPages = useFacebookPageOptions();
   // Cột ẩn + sắp xếp lưu theo người dùng ở server (đăng xuất / đổi máy vẫn giữ). Sắp xếp trên URL
   // (link dán cho đồng nghiệp) thắng; URL không có thì lấy lần sắp gần nhất của người dùng.
@@ -1012,6 +1132,8 @@ export function OrderListScreen() {
       customerId,
       weightMin,
       weightMax,
+      totalMin,
+      totalMax,
       noCarrier,
       carrierId,
       carrierAccountId,
@@ -1023,7 +1145,7 @@ export function OrderListScreen() {
       to,
       dateField,
       itemOrigin,
-      careTeamId,
+      teamIds: team || undefined,
       creatorId,
       facebookPageIds: fbPage || undefined,
       carrierStatusText,
@@ -1035,6 +1157,8 @@ export function OrderListScreen() {
       customerId,
       weightMin,
       weightMax,
+      totalMin,
+      totalMax,
       noCarrier,
       carrierId,
       carrierAccountId,
@@ -1046,7 +1170,7 @@ export function OrderListScreen() {
       to,
       dateField,
       itemOrigin,
-      careTeamId,
+      team,
       creatorId,
       fbPage,
       carrierStatusText,
@@ -1072,7 +1196,7 @@ export function OrderListScreen() {
   const canEditAny = ability.can('edit_all', 'SalesOrder');
   const canCancel = canCancelAny || canCreate;
   const confirmOrder = useConfirmOrder();
-  const creatorOptions = useOrderCreatorOptions();
+  const creatorOptions = useOrderCreatorOptions(canFilterTeam);
   const [peek, setPeek] = useState<SalesOrderListItem | null>(null);
   // Nút Hủy trên dòng → hộp xác nhận dùng chung với hủy hàng loạt (một đơn).
   const [cancelling, setCancelling] = useState<SalesOrderListItem | null>(null);
@@ -1107,13 +1231,10 @@ export function OrderListScreen() {
         );
       },
     });
-    // Cột Hàng thiếu / Chờ từ chỉ có nghĩa ở tab Chờ hàng.
-    return flow === 'WAITING_STOCK'
-      ? all
-      : all.filter((c) => !WAITING_ONLY_COLUMNS.includes(c.id ?? ''));
+    return all;
     // requestWaybill.mutate ổn định giữa các lần render (TanStack Query).
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [carriers.data, canUpdate, canCreate, canPack, canCancel, canCancelAny, canEditAny, flow]);
+  }, [carriers.data, canUpdate, canCreate, canPack, canCancel, canCancelAny, canEditAny]);
   const pickerColumns = useMemo(
     () =>
       columns
@@ -1127,6 +1248,20 @@ export function OrderListScreen() {
   );
   const query = useOrders(params);
   const counts = useOrderFlowCounts(filterParams);
+  // Xuất Excel = mọi trang của đúng bộ lọc + tab + sắp xếp đang xem.
+  const exportParams = useMemo(
+    () => ({
+      ...filterParams,
+      flow,
+      sortBy,
+      sortDir: sortBy ? (sort?.desc ? ('desc' as const) : ('asc' as const)) : undefined,
+    }),
+    [filterParams, flow, sortBy, sort?.desc],
+  );
+  const exportColumns = useMemo(() => {
+    const carrierById = new Map((carriers.data ?? []).map((c) => [c.id, c]));
+    return buildExportColumns((id) => carrierById.get(id) ?? null);
+  }, [carriers.data]);
   // Quét bằng camera: bỏ mọi lọc (đơn có thể ở tab khác) rồi tìm theo mã; ra đúng một đơn thì mở
   // xem nhanh luôn — mã vận đơn / số đơn gần như luôn khớp một đơn.
   const [scanned, setScanned] = useState<string | null>(null);
@@ -1155,6 +1290,8 @@ export function OrderListScreen() {
     customerId !== '' ||
     weightMin !== '' ||
     weightMax !== '' ||
+    totalMin !== '' ||
+    totalMax !== '' ||
     noCarrier ||
     carrierId !== '' ||
     carrierAccountId !== '' ||
@@ -1166,7 +1303,7 @@ export function OrderListScreen() {
     to !== '' ||
     duplicate ||
     itemOrigin !== undefined ||
-    careTeamId !== '' ||
+    team !== '' ||
     creatorId !== '';
   const customerName = query.data?.items[0]?.customer.name;
   const selectedRows = (query.data?.items ?? []).filter((r) => selected[r.id]);
@@ -1188,6 +1325,12 @@ export function OrderListScreen() {
             <Can I="map" a="Sync">
               <PancakeOrderResyncButton defaultShopId={posShopId} />
             </Can>
+            <ExportExcelButton
+              fileName="don-hang"
+              columns={exportColumns}
+              fetchPage={(page, size) => fetchOrdersPage(exportParams, page, size)}
+              disabled={!query.data?.total}
+            />
             <Can I="create" a="SalesOrder">
               <Button asChild shortcut="F2">
                 <Link href="/crm/orders/new">
@@ -1289,35 +1432,35 @@ export function OrderListScreen() {
               unit: 'trạng thái',
               options: carrierStatusOptions(carrierStatuses.data ?? []),
             },
-            // Phòng ban CSKH (2026-10-29): API trả danh sách theo người xem — toàn quyền mọi phòng,
-            // leader CSKH phòng mình làm leader, người khác rỗng → ẩn ô.
-            ...((careTeams.data ?? []).length > 0
+            // Phòng ban + NV lên đơn: chỉ người có `sales_order.filter_team` (2026-11-02). Phòng ban
+            // chọn nhiều — phòng CSKH + phòng Sale/MKT đã có đơn; chưa chọn = tất cả.
+            ...(canFilterTeam
               ? [
                   {
-                    key: 'careTeamId' as const,
-                    label: 'Phòng ban CSKH',
-                    type: 'select' as const,
-                    searchable: true,
-                    options: (careTeams.data ?? []).map((t) => ({
+                    key: 'team' as const,
+                    label: 'Phòng ban',
+                    type: 'multiSelect' as const,
+                    unit: 'phòng',
+                    options: (teamOptions.data ?? []).map((t) => ({
                       value: t.teamId,
                       label: t.isActive ? t.name : `${t.name} (ngừng hoạt động)`,
+                      hint: t.group === 'CSKH' ? 'CSKH' : 'Sale/MKT',
+                    })),
+                  },
+                  {
+                    // Danh sách theo người xem (2026-10-30): leader CSKH → nhân viên team, trưởng
+                    // nhóm → nhóm mình, nhân viên CSKH → mình; người khác mọi nhân viên.
+                    key: 'creatorId' as const,
+                    label: 'NV lên đơn',
+                    type: 'select' as const,
+                    searchable: true,
+                    options: (creatorOptions.data ?? []).map((s) => ({
+                      value: s.id,
+                      label: s.fullName,
                     })),
                   },
                 ]
               : []),
-            // Hiện hết bộ lọc, bỏ nút "Thêm lọc" (mockup 2026-10-29).
-            {
-              // Danh sách theo người xem (2026-10-30): leader CSKH → nhân viên team, trưởng nhóm →
-              // nhóm mình, nhân viên CSKH → mình; người khác mọi nhân viên.
-              key: 'creatorId',
-              label: 'NV lên đơn',
-              type: 'select',
-              searchable: true,
-              options: (creatorOptions.data ?? []).map((s) => ({
-                value: s.id,
-                label: s.fullName,
-              })),
-            },
             {
               key: 'duplicate',
               label: 'Trùng trong ngày',
@@ -1329,6 +1472,18 @@ export function OrderListScreen() {
               label: 'Sản phẩm ngoài ERP',
               type: 'select',
               options: ITEM_ORIGIN_OPTIONS,
+            },
+            {
+              key: 'totalMin',
+              label: 'Giá trị đơn',
+              type: 'custom',
+              render: () => (
+                <TotalValueFilter
+                  min={state.filters.totalMin}
+                  max={state.filters.totalMax}
+                  onChange={setFilter}
+                />
+              ),
             },
             {
               key: 'weightMin',
@@ -1349,6 +1504,8 @@ export function OrderListScreen() {
             customerId: state.filters.customerId,
             weightMin: state.filters.weightMin,
             weightMax: state.filters.weightMax,
+            totalMin: state.filters.totalMin,
+            totalMax: state.filters.totalMax,
             noCarrier: state.filters.noCarrier,
             carrierId: state.filters.carrierId,
             carrierAccountId: state.filters.carrierAccountId,
@@ -1359,8 +1516,8 @@ export function OrderListScreen() {
             dateField: state.filters.dateField,
             duplicate: state.filters.duplicate,
             itemOrigin: state.filters.itemOrigin,
-            careTeamId: state.filters.careTeamId,
-            creatorId: state.filters.creatorId,
+            team,
+            creatorId,
             fbPage: state.filters.fbPage,
             carrierStatus: state.filters.carrierStatus,
           }}

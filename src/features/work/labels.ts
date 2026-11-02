@@ -1,3 +1,4 @@
+import type { ExportColumn } from '@/components/data/export-excel-button';
 import type { StatusTone } from '@/components/data/status-badge';
 import { formatDateTime, formatTime, toLocalDateKey } from '@/lib/format';
 import type {
@@ -213,6 +214,31 @@ export function deadlineText(w: Pick<WorkItemSummary, 'kind' | 'deadline'>): {
       return { label: '—', tone };
   }
 }
+
+/** Cột file "Xuất Excel" dùng chung cho mọi danh sách việc (Hàng chờ, Việc của tôi, Việc của team). */
+export const WORK_EXPORT_COLUMNS: ExportColumn<WorkItemSummary>[] = [
+  { header: 'Mã', value: (w) => w.docNumber, width: 14 },
+  { header: 'Loại', value: (w) => KIND_LABEL[w.kind] },
+  { header: 'Tiêu đề', value: (w) => w.title, width: 40 },
+  { header: 'Phân loại', value: (w) => w.categoryName ?? null, width: 18 },
+  { header: 'Khách / liên hệ', value: (w) => w.customer?.name ?? w.contactName ?? null, width: 24 },
+  { header: 'SĐT', value: (w) => w.customer?.phone ?? w.contactPhone ?? null, width: 14 },
+  { header: 'Đơn', value: (w) => w.orderDocNumber ?? null, width: 16 },
+  { header: 'Phòng phụ trách', value: (w) => w.ownerDeptName ?? null, width: 18 },
+  { header: 'Người yêu cầu', value: (w) => w.requester.fullName, width: 20 },
+  { header: 'Người giao', value: (w) => w.assigner?.fullName ?? null, width: 20 },
+  { header: 'Người xử lý', value: (w) => w.assignee?.fullName ?? null, width: 20 },
+  { header: 'Ưu tiên', value: (w) => PRIORITY_LABEL[w.priority] },
+  { header: 'Trạng thái', value: (w) => statusLabel(w.kind, w.status), width: 16 },
+  { header: 'Hạn', value: (w) => (w.dueAt ? formatDateTime(w.dueAt) : null), width: 17 },
+  { header: 'SLA', value: (w) => deadlineText(w).label, width: 14 },
+  {
+    header: 'Tiến độ',
+    value: (w) => (w.checklistTotal ? `${w.checklistDone}/${w.checklistTotal}` : null),
+  },
+  { header: 'Tạo lúc', value: (w) => formatDateTime(w.createdAt), width: 17 },
+  { header: 'Cập nhật', value: (w) => formatDateTime(w.updatedAt), width: 17 },
+];
 
 /** Dòng phụ dưới hạn: "Phản hồi đầu · hạn 14:38" / "Xử lý · hạn T6 23/10 09:52" / "hạn 12:00". */
 export function deadlineSub(w: Pick<WorkItemSummary, 'kind' | 'deadline'>): string {

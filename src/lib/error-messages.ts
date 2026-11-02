@@ -103,6 +103,12 @@ const MESSAGES: Record<string, string> = {
     'Đã có đơn hàng dùng mức này nên không đổi được %. Thêm mức mới rồi gán cho sản phẩm.',
   TAX_RATE_DEFAULT_REQUIRED: 'Phải luôn có một mức mặc định — đặt mức khác làm mặc định trước.',
   TAX_RATE_CODE_TAKEN: 'Mã này đã có trong danh mục thuế suất — chọn mã khác.',
+  // Xuất Excel qua email chờ duyệt (2026-11-02)
+  EXPORT_APPROVAL_REQUIRED:
+    'Bạn chưa có quyền xuất Excel trực tiếp — nhập email để gửi yêu cầu, quản trị duyệt xong sẽ gửi file.',
+  EXPORT_FILE_INVALID:
+    'File xuất không hợp lệ hoặc quá lớn (tối đa 15 MB) — thu hẹp bộ lọc rồi xuất lại.',
+  EXPORT_REQUEST_STATE: 'Yêu cầu xuất vừa được người khác xử lý — tải lại để xem trạng thái mới.',
   // Hóa đơn điện tử MISA (2026-10-28)
   EINVOICE_NOT_CONFIGURED:
     'Chưa cấu hình đủ kết nối MISA — vào Hóa đơn điện tử › Cài đặt kết nối để nhập và chọn mẫu hóa đơn.',
@@ -145,6 +151,11 @@ const MESSAGES: Record<string, string> = {
   CARRIER_ACCOUNT_IN_USE:
     'Không xoá / tắt được tài khoản này: đang là mặc định hoặc đã cấp vận đơn. Đặt tài khoản khác làm mặc định, hoặc tắt thay vì xoá.',
   CARRIER_ACCOUNT_NAME_TAKEN: 'Hãng này đã có tài khoản cùng tên. Đặt tên khác.',
+  // Tab Cần sửa (2026-11-02) — không Gửi sang ĐVVC được tới khi sửa.
+  ORDER_NON_ERP_ITEMS:
+    'Đơn có sản phẩm ngoài hệ thống (món gõ tay / SP Pancake tự tạo). Sửa đơn thay bằng sản phẩm trong hệ thống rồi mới gửi ĐVVC.',
+  ORDER_WAYBILL_ERROR_UNRESOLVED:
+    'Đơn đang lỗi vận đơn. Sửa đơn rồi bấm "Xin lại vận đơn" (tab Cần sửa) thay vì gửi lại.',
   ORDER_WAYBILL_ACCOUNT_LOCKED:
     'Đơn đã có vận đơn ở tài khoản khác của hãng này. Hủy vận đơn trên phiếu giao rồi gửi lại.',
   PICKUP_WAREHOUSE_NOT_READY:
@@ -204,6 +215,7 @@ const MESSAGES: Record<string, string> = {
   PDA_RELOCATE_QTY_EXCEEDS:
     'Số hàng rời vượt phần chuyển được (phần còn lại đã quét lấy cho đơn hoặc nằm trong thùng). Giảm số lượng.',
   PDA_RELOCATE_EMPTY: 'Vị trí này không còn hàng nào chuyển được.',
+  RECEIPT_PUTAWAY_NOTHING: 'Phiếu không còn hàng chờ cất. Tải lại trang để xem tiến độ mới.',
   PDA_NO_DEFAULT_LOCATION: 'Kho chưa có vị trí DEFAULT đang dùng. Tạo ở màn Kho & vị trí.',
   PDA_LOCATION_OTHER_WAREHOUSE: 'Vị trí vừa quét thuộc kho khác. Quét vị trí trong kho của việc.',
   PDA_LOCATION_NOT_STORABLE:

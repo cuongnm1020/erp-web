@@ -3,6 +3,7 @@
 import Decimal from 'decimal.js';
 import Link from 'next/link';
 import { useMemo } from 'react';
+import { useCsvExport } from '@/components/data/export-delivery';
 import { ComparisonLineChart, type ComparisonPoint } from '@/components/data/charts';
 import { DataTable, type ColumnDef } from '@/components/data/data-table';
 import { daysBetween } from '@/components/data/date-range-picker';
@@ -11,7 +12,6 @@ import { KpiCard } from '@/components/data/kpi-card';
 import { EmptyState, ErrorState, ListSkeleton } from '@/components/data/states';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
-import { downloadCsv } from '@/lib/export-csv';
 import { formatMoney } from '@/lib/format';
 import {
   useSalesSummary,
@@ -150,6 +150,7 @@ export function SalesOverviewTab() {
     [gran],
   );
 
+  const downloadCsv = useCsvExport('Báo cáo doanh thu theo kỳ');
   if (summary.isPending || series.isPending) return <OverviewSkeleton />;
   if (summary.error)
     return <ErrorState error={summary.error} onRetry={() => void summary.refetch()} />;

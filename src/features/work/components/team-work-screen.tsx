@@ -7,6 +7,7 @@ import { useRouter } from 'next/navigation';
 import { useMemo, useState } from 'react';
 import { BulkActionBar } from '@/components/data/bulk-action-bar';
 import { DataTable, FilterBar, type ColumnDef } from '@/components/data/data-table';
+import { ExportExcelButton, takeSkip } from '@/components/data/export-excel-button';
 import { EmptyState, ListSkeleton, QueryState } from '@/components/data/states';
 import { PageHeader } from '@/components/layout/page-header';
 import { Button } from '@/components/ui/button';
@@ -24,8 +25,14 @@ import { formatDateTime } from '@/lib/format';
 import { useHotkey } from '@/lib/use-hotkey';
 import { useListState } from '@/lib/url-state';
 import type { WorkItemSummary, WorkListQuery, WorkWorkloadRow } from '../api/types';
-import { useWorkAction, useWorkCounts, useWorkList, useWorkWorkload } from '../api/use-work';
-import { KIND_LABEL } from '../labels';
+import {
+  fetchWorkList,
+  useWorkAction,
+  useWorkCounts,
+  useWorkList,
+  useWorkWorkload,
+} from '../api/use-work';
+import { KIND_LABEL, WORK_EXPORT_COLUMNS } from '../labels';
 import { ReassignDialog } from './work-dialogs';
 import {
   Card,
@@ -136,6 +143,12 @@ export function TeamWorkScreen() {
                 </SelectContent>
               </Select>
             ) : null}
+            <ExportExcelButton
+              fileName="viec-cua-team"
+              columns={WORK_EXPORT_COLUMNS}
+              fetchPage={(page, size) => fetchWorkList({ ...params, ...takeSkip(page, size) })}
+              disabled={!list.data?.total}
+            />
             <Button asChild shortcut="F2">
               <Link href="/work/new">
                 <Plus aria-hidden /> Giao việc

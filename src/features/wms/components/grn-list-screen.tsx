@@ -4,6 +4,11 @@ import { Plus } from 'lucide-react';
 import Link from 'next/link';
 import { useMemo } from 'react';
 import { DataTable, FilterBar, type ColumnDef } from '@/components/data/data-table';
+import {
+  ExportExcelButton,
+  takeSkip,
+  type ExportColumn,
+} from '@/components/data/export-excel-button';
 import { RowActions } from '@/components/data/row-actions';
 import { EmptyState, ListSkeleton, QueryState } from '@/components/data/states';
 import { StatusBadge } from '@/components/data/status-badge';
@@ -15,7 +20,9 @@ import { messageFor } from '@/lib/error-messages';
 import { formatDateTime, formatQuantity } from '@/lib/format';
 import { useAbility } from '@/lib/permission';
 import { toSkipTake, useListState } from '@/lib/url-state';
+import { decimalCell } from '@/lib/xlsx-writer';
 import {
+  fetchReceipts,
   useCancelReceipt,
   useReceipts,
   type ReceiptListRow,
@@ -47,6 +54,19 @@ const TABS: Array<{ key: TabKey; label: string }> = [
   { key: 'AWAITING_COST', label: GRN_STAGE.AWAITING_COST.label },
   { key: 'COMPLETED', label: GRN_STAGE.COMPLETED.label },
   { key: 'CANCELLED', label: GRN_STAGE.CANCELLED.label },
+];
+
+const EXPORT_COLUMNS: ExportColumn<ReceiptListRow>[] = [
+  { header: 'Số phiếu', value: (r) => r.docNumber, width: 16 },
+  { header: 'Loại', value: (r) => (r.poNumber ? 'Từ PO' : 'Nhập khác') },
+  { header: 'Nhà cung cấp', value: (r) => r.supplierName ?? null, width: 30 },
+  { header: 'Tham chiếu', value: (r) => r.poNumber ?? null, width: 16 },
+  { header: 'Kho', value: (r) => r.warehouseName },
+  { header: 'Số dòng', value: (r) => r.lineCount },
+  { header: 'Tổng SL', value: (r) => decimalCell(r.totalQty) },
+  { header: 'Trạng thái', value: (r) => GRN_STAGE[r.stage].label },
+  { header: 'Người tạo', value: (r) => r.createdByName ?? null, width: 20 },
+  { header: 'Ngày', value: (r) => formatDateTime(r.receivedAt), width: 17 },
 ];
 
 export function GrnListScreen() {
@@ -190,14 +210,23 @@ export function GrnListScreen() {
         description={query.data ? `${query.data.total} phiếu theo bộ lọc hiện tại` : 'Đang tải…'}
         breadcrumb={[{ label: 'Kho' }, { label: 'Nhập kho' }]}
         actions={
-          canReceive ? (
-            <Button size="sm" asChild>
-              <Link href="/wms/grn/new">
-                <Plus aria-hidden />
-                Tạo phiếu nhập
-              </Link>
-            </Button>
-          ) : undefined
+          <>
+            <ExportExcelButton
+              size="sm"
+              fileName="phieu-nhap-kho"
+              columns={EXPORT_COLUMNS}
+              fetchPage={(page, size) => fetchReceipts({ ...params, ...takeSkip(page, size) })}
+              disabled={!query.data?.total}
+            />
+            {canReceive ? (
+              <Button size="sm" asChild>
+                <Link href="/wms/grn/new">
+                  <Plus aria-hidden />
+                  Tạo phiếu nhập
+                </Link>
+              </Button>
+            ) : null}
+          </>
         }
       />
 

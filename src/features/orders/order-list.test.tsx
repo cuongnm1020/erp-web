@@ -86,7 +86,11 @@ describe('OrderListScreen — GET /sales-orders (P1-12)', () => {
     expect(within(row(full.docNumber)).getByTestId('order-warehouse')).toHaveTextContent(
       'Kho Tổng',
     );
-    expect(within(row(full.docNumber)).getByText('WH01')).toBeInTheDocument();
+    // 2026-11-02: bỏ mã kho, NV lên đơn nằm dưới tên kho (cùng ô).
+    expect(within(row(full.docNumber)).queryByText('WH01')).not.toBeInTheDocument();
+    expect(
+      within(row(full.docNumber)).getByTestId('order-warehouse').closest('td'),
+    ).toContainElement(creator);
     expect(within(row(bare.docNumber)).getByTestId('order-creator')).toHaveTextContent('—');
     expect(within(row(bare.docNumber)).queryByTestId('order-warehouse')).not.toBeInTheDocument();
     // Không còn tên sale (người phụ trách) dưới mã đơn.
@@ -283,6 +287,46 @@ describe('OrderListScreen — cân nặng gửi hãng + gán hãng hàng loạt'
     expect(url).toContain('weightMin=1.2');
     expect(url).toContain('weightMax=1.5');
     expect(url).toContain('noCarrier=true');
+  });
+
+  it('lọc giá trị đơn (2026-11-02): URL totalMin = totalMax → "=", ô hiện có dấu chấm; gõ + Enter ghi URL', async () => {
+    search = 'totalMin=500000&totalMax=500000';
+    const seen: URLSearchParams[] = [];
+    server.events.on('request:start', ({ request }) => {
+      const u = new URL(request.url);
+      if (u.pathname === '/api/sales-orders') seen.push(u.searchParams);
+    });
+    renderApp(<OrderListScreen />);
+    const box = await screen.findByLabelText('Giá trị đơn (₫)');
+    expect(box).toHaveValue('500.000');
+    expect(screen.getByRole('combobox', { name: 'Toán tử giá trị đơn' })).toHaveTextContent('=');
+    await waitFor(() =>
+      expect(
+        seen.some((q) => q.get('totalMin') === '500000' && q.get('totalMax') === '500000'),
+      ).toBe(true),
+    );
+    replace.mockClear();
+    fireEvent.change(box, { target: { value: '1.200.000 ₫' } });
+    expect(box).toHaveValue('1.200.000');
+    expect(replace).not.toHaveBeenCalled();
+    fireEvent.keyDown(box, { key: 'Enter' });
+    expect(replace).toHaveBeenCalledTimes(1);
+    const url = String(replace.mock.calls[0]![0]);
+    expect(url).toContain('totalMin=1200000');
+    expect(url).toContain('totalMax=1200000');
+    server.events.removeAllListeners();
+  });
+
+  it('lọc giá trị đơn: chỉ totalMax → "≤"; min ≠ max → "Từ … đến" hiện hai ô', async () => {
+    search = 'totalMax=300000';
+    renderApp(<OrderListScreen />);
+    expect(await screen.findByLabelText('Giá trị đơn (₫)')).toHaveValue('300.000');
+    expect(screen.getByRole('combobox', { name: 'Toán tử giá trị đơn' })).toHaveTextContent('≤');
+    cleanup();
+    search = 'totalMin=100000&totalMax=900000';
+    renderApp(<OrderListScreen />);
+    expect(await screen.findByLabelText('Giá trị đơn từ (₫)')).toHaveValue('100.000');
+    expect(screen.getByLabelText('Giá trị đơn đến (₫)')).toHaveValue('900.000');
   });
 
   it('chọn 2 đơn → "Gán hãng / cân nặng" → POST /sales-orders/bulk-update đúng orderIds + cân nặng + hãng, bỏ chọn sau khi xong', async () => {
@@ -889,42 +933,56 @@ describe('OrderListScreen — lọc theo hãng + thời gian (2026-09-19)', () =
     expect(decodeURIComponent(String(replace.mock.calls.at(-1)![0]))).toContain('source=POS:111');
   });
 
-  it('ô Phòng ban CSKH liệt kê phòng API trả theo người xem → chọn → URL + API careTeamId (2026-10-29)', async () => {
+  it('ô Phòng ban chọn nhiều (CSKH + Sale/MKT), chưa chọn = tất cả → URL team + API teamIds (2026-11-02)', async () => {
     search = '';
     const seen: string[] = [];
     server.use(
-      http.get('/api/sales-orders/care-team-options', () =>
+      http.get('/api/sales-orders/team-filter-options', () =>
         HttpResponse.json([
-          { teamId: 't-cskh-a', name: 'CSKH A', isActive: true },
-          { teamId: 't-cskh-b', name: 'CSKH B', isActive: false },
+          { teamId: 't-cskh-a', name: 'CSKH A', group: 'CSKH', isActive: true },
+          { teamId: 't-cskh-b', name: 'CSKH B', group: 'CSKH', isActive: false },
+          { teamId: 't-spy-sale', name: 'SPY · Sale FB', group: 'SALES', isActive: true },
         ]),
       ),
       http.get('/api/sales-orders', ({ request }) => {
-        seen.push(new URL(request.url).searchParams.get('careTeamId') ?? '');
+        seen.push(new URL(request.url).searchParams.get('teamIds') ?? '');
         return HttpResponse.json({ items: [], total: 0 });
       }),
     );
     renderApp(<OrderListScreen />);
-    fireEvent.click(await screen.findByRole('combobox', { name: 'Phòng ban CSKH' }));
+    const box = await screen.findByRole('combobox', { name: 'Phòng ban' });
+    expect(box).toHaveTextContent('Phòng ban: tất cả');
+    await waitFor(() => expect(seen.at(-1)).toBe(''));
+    fireEvent.click(box);
     expect(
-      await screen.findByRole('option', { name: 'CSKH B (ngừng hoạt động)' }),
+      await screen.findByRole('option', { name: /CSKH B \(ngừng hoạt động\)/ }),
     ).toBeInTheDocument();
     replace.mockClear();
-    fireEvent.click(screen.getByRole('option', { name: 'CSKH A' }));
+    fireEvent.click(screen.getByRole('option', { name: /SPY · Sale FB/ }));
     await waitFor(() => expect(replace).toHaveBeenCalled());
-    expect(String(replace.mock.calls.at(-1)![0])).toContain('careTeamId=t-cskh-a');
+    expect(String(replace.mock.calls.at(-1)![0])).toContain('team=t-spy-sale');
 
-    search = 'careTeamId=t-cskh-a';
+    cleanup();
+    search = 'team=t-cskh-a%2Ct-spy-sale';
     renderApp(<OrderListScreen />);
-    await waitFor(() => expect(seen).toContain('t-cskh-a'));
+    await waitFor(() => expect(seen).toContain('t-cskh-a,t-spy-sale'));
   });
 
-  it('API trả danh sách phòng rỗng (nhân viên CSKH / sale) → ẩn ô Phòng ban CSKH', async () => {
-    search = '';
-    server.use(http.get('/api/sales-orders/care-team-options', () => HttpResponse.json([])));
-    renderApp(<OrderListScreen />);
+  it('không có quyền sales_order.filter_team → ẩn ô Phòng ban + NV lên đơn, bỏ giá trị trên URL (2026-11-02)', async () => {
+    search = 'team=t-cskh-a&creatorId=u-1';
+    const seen: URLSearchParams[] = [];
+    server.use(
+      http.get('/api/sales-orders', ({ request }) => {
+        seen.push(new URL(request.url).searchParams);
+        return HttpResponse.json({ items: [FIRST], total: 1 });
+      }),
+    );
+    renderApp(<OrderListScreen />, { me: { ...ME_SALE, permissions: ['sales_order.read'] } });
     await screen.findByText(FIRST.docNumber);
-    expect(screen.queryByRole('combobox', { name: 'Phòng ban CSKH' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('combobox', { name: 'Phòng ban' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('combobox', { name: 'NV lên đơn' })).not.toBeInTheDocument();
+    expect(seen.at(-1)!.get('teamIds')).toBeNull();
+    expect(seen.at(-1)!.get('creatorId')).toBeNull();
   });
 
   it('ô Page chọn nhiều có ô tìm → URL fbPage + API facebookPageIds; tên page hiện dưới tên sale (2026-10-26)', async () => {
@@ -1143,11 +1201,11 @@ describe('OrderListScreen — sao chép SĐT / mã vận đơn, cột kho (2026-
     expect(screen.queryByRole('dialog')).toBeNull();
   });
 
-  it('cột Kho luôn hiện (thêm lại 2026-10-29, user chốt) — cạnh cột NV lên đơn', async () => {
+  it('cột Kho luôn hiện (thêm lại 2026-10-29, user chốt); cột NV lên đơn đã gộp vào Kho (2026-11-02)', async () => {
     setup();
     await screen.findByRole('columnheader', { name: /Khách hàng/ });
     expect(screen.getByRole('columnheader', { name: /^Kho$/ })).toBeInTheDocument();
-    expect(screen.getByRole('columnheader', { name: /NV lên đơn/ })).toBeInTheDocument();
+    expect(screen.queryByRole('columnheader', { name: /NV lên đơn/ })).not.toBeInTheDocument();
   });
 });
 
@@ -1201,7 +1259,7 @@ describe('OrderListScreen — chọn cột, sắp xếp theo cột, lọc SP ngo
       expect(screen.queryByRole('columnheader', { name: /Sản phẩm/ })).not.toBeInTheDocument(),
     );
     await waitFor(() =>
-      expect(puts.at(-1)).toEqual({ hidden: ['orderDate', 'collected', 'product'], sort: null }),
+      expect(puts.at(-1)).toEqual({ hidden: ['orderDate', 'product'], sort: null }),
     );
 
     replace.mockClear();
@@ -1210,7 +1268,7 @@ describe('OrderListScreen — chọn cột, sắp xếp theo cột, lọc SP ngo
     expect(String(replace.mock.calls.at(-1)![0])).toContain('sort=customer');
     await waitFor(() =>
       expect(puts.at(-1)).toEqual({
-        hidden: ['orderDate', 'collected', 'product'],
+        hidden: ['orderDate', 'product'],
         sort: { id: 'customer', desc: false },
       }),
     );
@@ -1277,7 +1335,7 @@ describe('OrderListScreen — redesign Bán hàng (2026-10-22)', () => {
   it('ô NV lên đơn lấy danh sách theo người xem (creator-options), không phải danh bạ tạo đơn', async () => {
     search = '';
     renderApp(<OrderListScreen />, {
-      me: { ...ME_SALE, permissions: ['sales_order.read'] },
+      me: { ...ME_SALE, permissions: ['sales_order.read', 'sales_order.filter_team'] },
     });
     await screen.findByText(FIRST.docNumber);
     fireEvent.click(screen.getByRole('combobox', { name: 'NV lên đơn' }));
@@ -1346,7 +1404,7 @@ describe('OrderListScreen — tab Chờ hàng (2026-10-25)', () => {
     },
   };
 
-  it('tab Chờ hàng: dải giải thích, cột Hàng thiếu + Chờ từ, chip lọc SKU (bỏ được); tab khác không có cột đó', async () => {
+  it('tab Chờ hàng: dải giải thích, chip lọc SKU (bỏ được); không còn cột Hàng thiếu / Chờ từ / Thực thu ĐVVC (2026-11-02)', async () => {
     search = 'flow=WAITING_STOCK&shortSkuId=sku-a';
     const asked: string[] = [];
     server.use(
@@ -1356,11 +1414,11 @@ describe('OrderListScreen — tab Chờ hàng (2026-10-25)', () => {
       }),
     );
     renderApp(<OrderListScreen />);
-    expect(await screen.findByText('Amino GA3 500ml × 3')).toBeInTheDocument();
-    expect(screen.getByText('+ 1 SP thiếu khác')).toBeInTheDocument();
-    expect(screen.getByText('1 ngày 6 giờ')).toBeInTheDocument();
-    expect(screen.getByRole('note')).toHaveTextContent('Đơn đã duyệt từ 24 giờ');
-    expect(screen.getByRole('columnheader', { name: /Hàng thiếu/ })).toBeInTheDocument();
+    expect(await screen.findByRole('note')).toHaveTextContent('Đơn đã duyệt từ 24 giờ');
+    await screen.findByText(waiting.docNumber);
+    expect(screen.queryByRole('columnheader', { name: /Hàng thiếu/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole('columnheader', { name: /Chờ từ/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole('columnheader', { name: /Thực thu/ })).not.toBeInTheDocument();
     const url = new URL(asked.at(-1)!);
     expect(url.searchParams.get('flow')).toBe('WAITING_STOCK');
     expect(url.searchParams.get('shortSkuId')).toBe('sku-a');
@@ -1379,10 +1437,10 @@ describe('OrderListScreen — tab Chờ hàng (2026-10-25)', () => {
   });
 });
 
-describe('OrderListScreen — Lỗi vận đơn + đơn TikTok (2026-10-28)', () => {
+describe('OrderListScreen — Lỗi vận đơn + đơn TikTok (2026-10-28, tab Cần sửa 2026-11-02)', () => {
   const errorRow = () => ({
     ...FIRST,
-    flow: 'WAYBILL_ERROR' as const,
+    flow: 'NEEDS_FIX' as const,
     fulfilmentStatus: 'PACKED' as const,
     phone: '+84387****30',
     phoneMasked: true,
@@ -1402,7 +1460,7 @@ describe('OrderListScreen — Lỗi vận đơn + đơn TikTok (2026-10-28)', ()
     },
   });
 
-  it('tab Lỗi vận đơn: dòng có chip TikTok + SĐT bị che + lý do hãng; nút "Xin lại vận đơn" trên dòng → POST /shipments/:id/waybill với hãng của phiếu', async () => {
+  it('link cũ ?flow=WAYBILL_ERROR mở tab Cần sửa: dòng có chip TikTok + SĐT bị che + lý do hãng; nút "Xin lại vận đơn" trên dòng → POST /shipments/:id/waybill với hãng của phiếu', async () => {
     search = 'flow=WAYBILL_ERROR';
     const seenFlow: (string | null)[] = [];
     const waybillBodies: unknown[] = [];
@@ -1429,8 +1487,9 @@ describe('OrderListScreen — Lỗi vận đơn + đơn TikTok (2026-10-28)', ()
     );
     renderApp(<OrderListScreen />);
     await screen.findByText(FIRST.docNumber);
-    expect(seenFlow).toContain('WAYBILL_ERROR');
-    expect(screen.getByRole('tab', { name: /Lỗi vận đơn/ })).toBeInTheDocument();
+    expect(seenFlow).toContain('NEEDS_FIX');
+    expect(screen.getByRole('tab', { name: /Cần sửa/ })).toBeInTheDocument();
+    expect(screen.queryByRole('tab', { name: /Lỗi vận đơn/ })).not.toBeInTheDocument();
     expect(screen.getByText('TikTok')).toBeInTheDocument();
     expect(screen.getByText('SĐT bị che')).toBeInTheDocument();
     expect(screen.getByTestId('waybill-error')).toHaveTextContent(
@@ -1448,8 +1507,24 @@ describe('OrderListScreen — Lỗi vận đơn + đơn TikTok (2026-10-28)', ()
     );
   });
 
+  it('đơn Cần sửa vì SP ngoài hệ thống (2026-11-02): nhãn "Có SP ngoài hệ thống", không có nút "Xin lại vận đơn"', async () => {
+    search = 'flow=NEEDS_FIX';
+    server.use(
+      http.get('/api/sales-orders', () =>
+        HttpResponse.json({
+          items: [{ ...FIRST, flow: 'NEEDS_FIX' as const, nonErpItems: true }],
+          total: 1,
+        }),
+      ),
+    );
+    renderApp(<OrderListScreen />);
+    await screen.findByText(FIRST.docNumber);
+    expect(screen.getByTestId('order-non-erp-items')).toHaveTextContent('Có SP ngoài hệ thống');
+    expect(screen.queryByRole('button', { name: 'Xin lại vận đơn' })).not.toBeInTheDocument();
+  });
+
   it('không có quyền shipment.pack → dòng không có nút "Xin lại vận đơn" (luật 7)', async () => {
-    search = 'flow=WAYBILL_ERROR';
+    search = 'flow=NEEDS_FIX';
     server.use(
       http.get('/api/sales-orders', () => HttpResponse.json({ items: [errorRow()], total: 1 })),
     );

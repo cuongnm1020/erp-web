@@ -4,6 +4,11 @@ import { Ban, FileSpreadsheet, Info, Plus, RotateCcw } from 'lucide-react';
 import Link from 'next/link';
 import { useMemo, useState } from 'react';
 import { DataTable, FilterBar, type ColumnDef } from '@/components/data/data-table';
+import {
+  ExportExcelButton,
+  takeSkip,
+  type ExportColumn,
+} from '@/components/data/export-excel-button';
 import { RowActions } from '@/components/data/row-actions';
 import { EmptyState, ListSkeleton, QueryState } from '@/components/data/states';
 import { StatusBadge } from '@/components/data/status-badge';
@@ -14,6 +19,7 @@ import { messageFor } from '@/lib/error-messages';
 import { useAbility } from '@/lib/permission';
 import { toSkipTake, useListState } from '@/lib/url-state';
 import {
+  fetchSuppliers,
   useDeactivateSupplier,
   useDeleteSupplier,
   useSuppliers,
@@ -45,6 +51,18 @@ type SupplierFilter = (typeof DEFAULTS.filterKeys)[number];
 export function termLabel(days: number | null): string {
   return days ? `Net ${days}` : 'Trả ngay';
 }
+
+const EXPORT_COLUMNS: ExportColumn<Supplier>[] = [
+  { header: 'Mã', value: (r) => r.code, width: 14 },
+  { header: 'Tên nhà cung cấp', value: (r) => r.name, width: 36 },
+  { header: 'Địa chỉ', value: (r) => r.address ?? null, width: 40 },
+  { header: 'MST', value: (r) => r.taxCode ?? null, width: 16 },
+  { header: 'SĐT', value: (r) => r.phone ?? null, width: 14 },
+  { header: 'Email', value: (r) => r.email ?? null, width: 24 },
+  { header: 'Điều khoản TT', value: (r) => termLabel(r.paymentTerm) },
+  { header: 'Lead time (ngày)', value: (r) => r.leadTimeDays ?? null },
+  { header: 'Trạng thái', value: (r) => (r.isActive ? 'Hoạt động' : 'Ngừng hợp tác') },
+];
 
 export function SupplierListScreen() {
   const { state, set } = useListState<SupplierFilter>(DEFAULTS);
@@ -238,16 +256,25 @@ export function SupplierListScreen() {
         description={query.data ? `${query.data.total} NCC theo bộ lọc hiện tại` : 'Đang tải…'}
         breadcrumb={[{ label: 'Sản phẩm', href: '/catalog/products' }, { label: 'Nhà cung cấp' }]}
         actions={
-          canCreate ? (
-            <>
+          <>
+            {canCreate ? (
               <Button size="sm" variant="outline" onClick={() => setImportOpen(true)}>
                 <FileSpreadsheet aria-hidden /> Nhập Excel
               </Button>
+            ) : null}
+            <ExportExcelButton
+              size="sm"
+              fileName="nha-cung-cap"
+              columns={EXPORT_COLUMNS}
+              fetchPage={(page, size) => fetchSuppliers({ ...params, ...takeSkip(page, size) })}
+              disabled={!query.data?.total}
+            />
+            {canCreate ? (
               <Button size="sm" onClick={() => setDialog({ open: true })}>
                 <Plus aria-hidden /> Thêm nhà cung cấp
               </Button>
-            </>
-          ) : undefined
+            ) : null}
+          </>
         }
       />
 

@@ -8,6 +8,7 @@ import { useMemo, useState } from 'react';
 import { BulkActionBar } from '@/components/data/bulk-action-bar';
 import { DataTable, FilterBar, type ColumnDef } from '@/components/data/data-table';
 import { RowActions } from '@/components/data/row-actions';
+import { ExportExcelButton, takeSkip } from '@/components/data/export-excel-button';
 import { EmptyState, ListSkeleton, QueryState } from '@/components/data/states';
 import { PageHeader } from '@/components/layout/page-header';
 import { Button } from '@/components/ui/button';
@@ -34,6 +35,7 @@ import { useHotkey } from '@/lib/use-hotkey';
 import { useListState } from '@/lib/url-state';
 import type { WorkItemSummary, WorkListQuery, WorkPriority } from '../api/types';
 import {
+  fetchWorkList,
   useBulkAssignWork,
   useWorkAction,
   useWorkAssignees,
@@ -42,7 +44,7 @@ import {
   useWorkCounts,
   useWorkList,
 } from '../api/use-work';
-import { PRIORITIES, PRIORITY_LABEL } from '../labels';
+import { PRIORITIES, PRIORITY_LABEL, WORK_EXPORT_COLUMNS } from '../labels';
 import { PeoplePicker } from './work-dialogs';
 import {
   DeadlineCell,
@@ -135,6 +137,12 @@ export function QueueScreen() {
             <Button variant="outline" asChild>
               <Link href="/reports/work">Báo cáo SLA</Link>
             </Button>
+            <ExportExcelButton
+              fileName="hang-cho-yeu-cau"
+              columns={WORK_EXPORT_COLUMNS}
+              fetchPage={(page, size) => fetchWorkList({ ...params, ...takeSkip(page, size) })}
+              disabled={!query.data?.total}
+            />
             <Button asChild shortcut="F2">
               <Link href="/work/new?kind=INTERNAL">
                 <Plus aria-hidden /> Tạo yêu cầu

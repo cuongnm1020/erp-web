@@ -4,6 +4,11 @@ import { CopyPlus, Plus } from 'lucide-react';
 import Link from 'next/link';
 import { useMemo } from 'react';
 import { DataTable, FilterBar, type ColumnDef, type FilterDef } from '@/components/data/data-table';
+import {
+  ExportExcelButton,
+  takeSkip,
+  type ExportColumn,
+} from '@/components/data/export-excel-button';
 import { RowActions } from '@/components/data/row-actions';
 import { EmptyState, ListSkeleton, QueryState } from '@/components/data/states';
 import { StatusBadge } from '@/components/data/status-badge';
@@ -15,7 +20,8 @@ import { messageFor } from '@/lib/error-messages';
 import { formatDate, formatMoney, formatQuantity } from '@/lib/format';
 import { Can, useAbility } from '@/lib/permission';
 import { useListState } from '@/lib/url-state';
-import { useCombos, useDeleteCombo, type ComboListItem } from '../api/use-combos';
+import { decimalCell } from '@/lib/xlsx-writer';
+import { fetchCombos, useCombos, useDeleteCombo, type ComboListItem } from '../api/use-combos';
 
 /**
  * Combo sản phẩm — GET /combos. Combo = một mã bán gộp nhiều SKU thành phần: KHÔNG có tồn
@@ -111,6 +117,17 @@ const columns: ColumnDef<ComboListItem, unknown>[] = [
   },
 ];
 
+const EXPORT_COLUMNS: ExportColumn<ComboListItem>[] = [
+  { header: 'Mã combo', value: (r) => r.code, width: 16 },
+  { header: 'Tên combo', value: (r) => r.name, width: 36 },
+  { header: 'Số SKU thành phần', value: (r) => r.componentCount },
+  { header: 'Giá bán', value: (r) => decimalCell(r.salePrice) },
+  { header: 'Còn bán được', value: (r) => decimalCell(r.available) },
+  { header: 'ĐVT', value: (r) => r.baseUomCode },
+  { header: 'Ngày tạo', value: (r) => formatDate(r.createdAt), width: 12 },
+  { header: 'Trạng thái', value: (r) => (r.isActive ? 'Đang bán' : 'Ngừng bán') },
+];
+
 function ComboRowActions({ combo }: { combo: ComboListItem }) {
   const ability = useAbility();
   const del = useDeleteCombo();
@@ -187,14 +204,23 @@ export function ComboListScreen() {
         description="Một mã bán gộp nhiều SKU — tồn và pick / đóng gói vẫn tính trên từng thành phần"
         breadcrumb={[{ label: 'Sản phẩm', href: '/catalog/products' }, { label: 'Combo sản phẩm' }]}
         actions={
-          <Can I="create" a="Combo">
-            <Button size="sm" asChild>
-              <Link href="/catalog/combos/new">
-                <Plus aria-hidden />
-                Tạo combo
-              </Link>
-            </Button>
-          </Can>
+          <>
+            <ExportExcelButton
+              size="sm"
+              fileName="combo-san-pham"
+              columns={EXPORT_COLUMNS}
+              fetchPage={(page, size) => fetchCombos({ ...params, ...takeSkip(page, size) })}
+              disabled={!query.data?.total}
+            />
+            <Can I="create" a="Combo">
+              <Button size="sm" asChild>
+                <Link href="/catalog/combos/new">
+                  <Plus aria-hidden />
+                  Tạo combo
+                </Link>
+              </Button>
+            </Can>
+          </>
         }
       />
 

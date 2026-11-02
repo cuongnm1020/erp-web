@@ -2,7 +2,13 @@
 
 import { AlertTriangle } from 'lucide-react';
 import { useMemo, useState } from 'react';
-import { DataTable, FilterBar, type ColumnDef } from '@/components/data/data-table';
+import {
+  DataTable,
+  exportColumnsOf,
+  FilterBar,
+  type ColumnDef,
+} from '@/components/data/data-table';
+import { ExportExcelButton, takeSkip } from '@/components/data/export-excel-button';
 import { KpiCard } from '@/components/data/kpi-card';
 import { EmptyState, ErrorState, ListSkeleton, QueryState } from '@/components/data/states';
 import { StatusBadge } from '@/components/data/status-badge';
@@ -37,6 +43,7 @@ import { formatDate, formatDateTime, toLocalDateKey } from '@/lib/format';
 import { useAbility } from '@/lib/permission';
 import { useListState } from '@/lib/url-state';
 import {
+  fetchShipmentMonitorList,
   useCarriers,
   useShipmentMonitorList,
   useShipmentMonitorSummary,
@@ -145,7 +152,7 @@ const columns: ColumnDef<ShipmentMonitorRow, unknown>[] = [
     id: 'status',
     accessorKey: 'status',
     header: 'Trạng thái',
-    meta: { width: 120 },
+    meta: { width: 120, exportValue: (r) => shipmentStatusBadge(r.status).label },
     cell: ({ getValue }) => statusBadge(getValue() as string),
   },
   {
@@ -170,14 +177,14 @@ const columns: ColumnDef<ShipmentMonitorRow, unknown>[] = [
     id: 'packedAt',
     accessorKey: 'packedAt',
     header: 'Đóng gói',
-    meta: { width: 140 },
+    meta: { width: 140, exportValue: (r) => (r.packedAt ? formatDateTime(r.packedAt) : null) },
     cell: ({ getValue }) => formatDateTime(getValue() as string | null),
   },
   {
     id: 'shippedAt',
     accessorKey: 'shippedAt',
     header: 'Bàn giao hãng',
-    meta: { width: 140 },
+    meta: { width: 140, exportValue: (r) => (r.shippedAt ? formatDateTime(r.shippedAt) : null) },
     cell: ({ getValue }) => formatDateTime(getValue() as string | null),
   },
   {
@@ -188,6 +195,8 @@ const columns: ColumnDef<ShipmentMonitorRow, unknown>[] = [
     cell: ({ getValue }) => mono(getValue() as string | null),
   },
 ];
+
+const exportColumns = exportColumnsOf(columns);
 
 const FILTER_KEYS = [
   'date',
@@ -366,6 +375,17 @@ export function ShippingMonitorScreen() {
         title="Theo dõi giao hàng"
         description={`Đóng gói & bàn giao ngày ${dayLabel} · hãng đang giữ tính tới hiện tại`}
         breadcrumb={[{ label: 'Kho' }, { label: 'Theo dõi giao hàng' }]}
+        actions={
+          <ExportExcelButton
+            size="sm"
+            fileName="theo-doi-giao-hang"
+            columns={exportColumns}
+            fetchPage={(page, size) =>
+              fetchShipmentMonitorList({ ...listParams, ...takeSkip(page, size) })
+            }
+            disabled={!list.data?.total}
+          />
+        }
       />
 
       <div className="flex flex-wrap items-end gap-2 rounded-md border bg-card px-3 py-2">

@@ -202,6 +202,16 @@ export function makeCustomers(n: number) {
     priceListId: null,
     creditLimit: String((i * 1_000_000) % 50_000_000),
     paymentTerm: i % 5 === 0 ? null : 30,
+    // Thông tin khai thác (2026-11-02) — khách thứ 7, 14… chưa khai (giống khách cũ / Pancake).
+    ...(i % 7 === 6
+      ? { farmArea: null, farmAreaUnit: null, crops: [], treeAge: null, diseaseHistory: null }
+      : {
+          farmArea: '2.50',
+          farmAreaUnit: 'SAO' as const,
+          crops: ['Lúa', 'Ngô'],
+          treeAge: '3 năm',
+          diseaseHistory: 'Đạo ôn năm 2025',
+        }),
     createdAt: new Date(Date.UTC(2026, 0, 1) + i * 86_400_000).toISOString(),
     updatedAt: new Date(Date.UTC(2026, 5, 1) + i * 3_600_000).toISOString(),
   }));
@@ -294,6 +304,11 @@ function compareItem(id: string) {
     priceListId: null,
     creditLimit: isA ? '50000000.0000' : null,
     paymentTerm: 30,
+    farmArea: null,
+    farmAreaUnit: null,
+    crops: [],
+    treeAge: null,
+    diseaseHistory: null,
     createdAt: '2026-01-02T03:00:00.000Z',
     updatedAt: '2026-09-02T03:00:00.000Z',
   };
@@ -529,6 +544,7 @@ function orderListExtras(i: number, status: (typeof ORDER_STATUSES)[number]) {
     waybillError: null,
     waybillErrorCode: null,
     waybillErrorAt: null,
+    nonErpItems: false,
     phone: FIXTURE_PHONES[i % FIXTURE_PHONES.length]!,
     recipientName: null,
     addressLine: `Thôn ${(i % 9) + 1}, X. Ea Kar`,
@@ -1674,6 +1690,9 @@ export const handlers = [
   http.get('/api/customers/merge-logs', () => HttpResponse.json(MERGE_LOGS)),
   http.post('/api/customers/merge', () => HttpResponse.json(MERGE_RESULT, { status: 201 })),
   http.post('/api/customers/merge/:logId/undo', () => HttpResponse.json(MERGE_UNDO_RESULT)),
+  http.get('/api/customers/crop-options', () =>
+    HttpResponse.json({ items: ['Lúa', 'Sầu riêng', 'Cà phê', 'Hồ tiêu', 'Ngô'] }),
+  ),
   http.get('/api/customers/:id', async ({ params }) => {
     await delay(50);
     const found = makeCustomers(237).find((c) => c.id === params.id);
@@ -1708,6 +1727,7 @@ export const handlers = [
       WAITING_STOCK: count('WAITING_STOCK'),
       PICKING: count('PICKING'),
       PACKED: count('PACKED'),
+      NEEDS_FIX: count('NEEDS_FIX'),
       PICKED_UP: count('PICKED_UP'),
       IN_TRANSIT: count('IN_TRANSIT'),
       OUT_FOR_DELIVERY: count('OUT_FOR_DELIVERY'),

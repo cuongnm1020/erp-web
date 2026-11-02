@@ -2,7 +2,11 @@ import Decimal from 'decimal.js';
 import { z } from 'zod';
 import {
   codeSchema,
+  customerFarmProfileSchema,
   customerGroupSchema,
+  FARM_AREA_RE,
+  FARM_AREA_UNITS,
+  type FarmAreaUnit,
   customerTagSchema,
   customerTierSchema,
   idSchema,
@@ -29,8 +33,30 @@ export const CUSTOMER_TYPE_VALUES = [
   'KEY_ACCOUNT',
 ] as const satisfies readonly Customer['type'][];
 
+/** Ô diện tích cho gõ dấu phẩy thập phân kiểu Việt: "2,5" → "2.5". */
+export const normalizeFarmArea = (v: string) => v.trim().replace(',', '.');
+
+/**
+ * Thông tin khai thác (2026-11-02) — luật ở lib/shared/customer-farm; form chỉ thêm định dạng nhập:
+ * diện tích gõ "2,5" thành "2.5", đơn vị '' (khách cũ chưa khai) báo "Chọn đơn vị".
+ */
+const farmFormSchema = customerFarmProfileSchema.extend({
+  farmArea: z
+    .string()
+    .trim()
+    .refine(
+      (v) => FARM_AREA_RE.test(normalizeFarmArea(v)),
+      'Diện tích phải là số > 0, tối đa 2 chữ số thập phân',
+    ),
+  farmAreaUnit: z
+    .enum(FARM_AREA_UNITS)
+    .or(z.literal(''))
+    // `: boolean` — để TS không suy ra type predicate làm output mất '' (lệch input/output của RHF).
+    .refine((v): boolean => v !== '', 'Chọn đơn vị'),
+});
+
 /** Các field sửa được qua UpdateCustomerDto (trừ isActive — đã có luồng Ngừng hợp tác riêng). */
-const customerBaseSchema = z.object({
+const customerBaseSchema = farmFormSchema.extend({
   name: z.string().trim().min(1, 'Nhập tên khách').max(300, 'Tối đa 300 ký tự'),
   taxCode: z.string().trim().max(20, 'Tối đa 20 ký tự'),
   phone: phoneSchema.or(z.literal('')),
@@ -75,7 +101,25 @@ export function toCreateCustomerBody(v: CustomerFormValues): CreateCustomerInput
     ...(v.creditLimit ? { creditLimit: v.creditLimit } : {}),
     // Số nguyên ngày (không phải tiền/số lượng) → Number.parseInt là đúng chỗ (luật 10).
     ...(v.paymentTerm ? { paymentTerm: Number.parseInt(v.paymentTerm, 10) } : {}),
+    ...farmBody(v),
   };
+}
+
+/** 5 trường khai thác của body — form đã validate nên đơn vị không còn ''. */
+function farmBody(v: CustomerFormValues) {
+  return {
+    farmArea: normalizeFarmArea(v.farmArea),
+    farmAreaUnit: v.farmAreaUnit as FarmAreaUnit,
+    crops: v.crops,
+    treeAge: v.treeAge,
+    diseaseHistory: v.diseaseHistory,
+  };
+}
+
+/** Diện tích từ API ("2.50") → ô nhập ("2.5"); null → ''. Chỉ bỏ số 0 thừa, không tính toán. */
+export function farmAreaInput(v: string | null): string {
+  if (v === null) return '';
+  return v.includes('.') ? v.replace(/0+$/, '').replace(/\.$/, '') : v;
 }
 
 /**
@@ -96,6 +140,12 @@ export function toUpdateCustomerBody(
     ...(dirty.paymentTerm && v.paymentTerm
       ? { paymentTerm: Number.parseInt(v.paymentTerm, 10) }
       : {}),
+    // API đòi khách SAU khi sửa đủ 4 mục — form đã bắt đủ, gửi mục nào người dùng đổi.
+    ...(dirty.farmArea ? { farmArea: normalizeFarmArea(v.farmArea) } : {}),
+    ...(dirty.farmAreaUnit ? { farmAreaUnit: v.farmAreaUnit as FarmAreaUnit } : {}),
+    ...(dirty.crops ? { crops: v.crops } : {}),
+    ...(dirty.treeAge ? { treeAge: v.treeAge } : {}),
+    ...(dirty.diseaseHistory ? { diseaseHistory: v.diseaseHistory } : {}),
   };
 }
 

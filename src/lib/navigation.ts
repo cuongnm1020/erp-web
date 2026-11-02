@@ -35,6 +35,7 @@ import {
   Repeat,
   ScanBarcode,
   ScrollText,
+  FileSpreadsheet,
   Settings,
   ShieldCheck,
   ShoppingCart,
@@ -586,6 +587,20 @@ export const NAV_MODULES: NavModule[] = [
         ability: { action: 'read', subject: 'User' },
       },
       {
+        label: 'Duyệt xuất Excel',
+        href: '/admin/export-requests',
+        icon: FileSpreadsheet,
+        // Xuất Excel qua email chờ duyệt + nhật ký xuất / nhập (2026-11-02) — export.approve.
+        ability: { action: 'approve', subject: 'Export' },
+      },
+      {
+        // Mọi người đăng nhập: yêu cầu xuất của mình — vào từ toast "Xem yêu cầu" sau khi gửi.
+        label: 'Yêu cầu xuất Excel của tôi',
+        href: '/exports',
+        icon: FileSpreadsheet,
+        hidden: true,
+      },
+      {
         label: 'Nhật ký audit',
         href: '/admin/audit',
         icon: ScrollText,
@@ -736,6 +751,8 @@ export const SEGMENT_LABELS: Record<string, string> = {
   roles: 'Vai trò & quyền',
   'pda-devices': 'Thiết bị PDA',
   'facebook-pages': 'Page Facebook',
+  'export-requests': 'Duyệt xuất Excel',
+  exports: 'Yêu cầu xuất Excel',
   audit: 'Nhật ký audit',
   settings: 'Cấu hình hệ thống',
   'approval-rules': 'Quy tắc duyệt',

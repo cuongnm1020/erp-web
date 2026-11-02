@@ -907,7 +907,7 @@ function SendResults({
       description={
         failed > 0 && result.sent.length > 0
           ? `${result.sent.length} đơn còn lại đã gửi xong. Sửa từng đơn theo lý do bên dưới rồi gửi lại.`
-          : 'Hệ thống đang xin mã vận đơn của hãng cho từng đơn. Đơn hãng không cấp được mã nằm ở tab Lỗi vận đơn.'
+          : 'Hệ thống đang xin mã vận đơn của hãng cho từng đơn. Đơn hãng không cấp được mã nằm ở tab Cần sửa.'
       }
       rows={rows}
       hints={{

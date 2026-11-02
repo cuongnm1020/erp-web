@@ -3,7 +3,18 @@
 import { Plus, UsersRound } from 'lucide-react';
 import Link from 'next/link';
 import { useMemo, useState } from 'react';
-import { DataTable, FilterBar, type ColumnDef, type FilterDef } from '@/components/data/data-table';
+import {
+  DataTable,
+  exportColumnsOf,
+  FilterBar,
+  type ColumnDef,
+  type FilterDef,
+} from '@/components/data/data-table';
+import {
+  ExportExcelButton,
+  takeSkip,
+  type ExportColumn,
+} from '@/components/data/export-excel-button';
 import { normalizeRange, shiftDay } from '@/components/data/date-range-picker';
 import { EntityPicker } from '@/components/data/form/entity-picker';
 import { EmptyState, ListSkeleton, QueryState } from '@/components/data/states';
@@ -13,8 +24,14 @@ import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/cn';
 import { formatDate, formatMoney, formatPhone, groupVi, toLocalDateKey } from '@/lib/format';
 import { useListState } from '@/lib/url-state';
+import { decimalCell } from '@/lib/xlsx-writer';
 import { usePurposes } from '../api/use-care';
-import { useTeamCustomers, useTeamSkuSearch, type TeamCustomer } from '../api/use-team-customers';
+import {
+  fetchTeamCustomers,
+  useTeamCustomers,
+  useTeamSkuSearch,
+  type TeamCustomer,
+} from '../api/use-team-customers';
 
 /**
  * Khách của team CSKH (2026-10-21 docs/PLAN-cskh.md §3.7; 2026-10-26 biên bản họp CSKH, mockup
@@ -44,7 +61,7 @@ const columns: ColumnDef<TeamCustomer, unknown>[] = [
   {
     id: 'rank',
     header: '#',
-    meta: { width: 48, align: 'right' },
+    meta: { width: 48, align: 'right', title: 'Hạng', exportValue: (r) => r.rank },
     cell: ({ row }) => (
       <span className="tabular-nums text-subtle-foreground">{row.original.rank}</span>
     ),
@@ -52,7 +69,7 @@ const columns: ColumnDef<TeamCustomer, unknown>[] = [
   {
     id: 'name',
     header: 'Khách',
-    meta: { width: 240 },
+    meta: { width: 240, exportValue: (r) => r.name },
     cell: ({ row }) => (
       <div className="min-w-0">
         <Link
@@ -70,7 +87,7 @@ const columns: ColumnDef<TeamCustomer, unknown>[] = [
   {
     id: 'purposes',
     header: 'Mục đích sử dụng',
-    meta: { width: 220 },
+    meta: { width: 220, exportValue: (r) => r.purposes.map((p) => p.name).join(', ') || null },
     cell: ({ row }) =>
       row.original.purposes.length ? (
         <div className="flex flex-wrap gap-1">
@@ -90,7 +107,7 @@ const columns: ColumnDef<TeamCustomer, unknown>[] = [
   {
     id: 'revenue',
     header: 'Doanh thu kỳ',
-    meta: { width: 130, align: 'right' },
+    meta: { width: 130, align: 'right', exportValue: (r) => decimalCell(r.revenue) },
     cell: ({ row }) => (
       <span className="font-semibold tabular-nums">{formatMoney(row.original.revenue)}</span>
     ),
@@ -98,13 +115,19 @@ const columns: ColumnDef<TeamCustomer, unknown>[] = [
   {
     id: 'orderCount',
     header: 'Số đơn',
-    meta: { width: 72, align: 'right' },
+    meta: { width: 72, align: 'right', exportValue: (r) => r.orderCount },
     cell: ({ row }) => <span className="tabular-nums">{row.original.orderCount}</span>,
   },
   {
     id: 'lastOrderAt',
     header: 'Đơn gần nhất',
-    meta: { width: 150 },
+    meta: {
+      width: 150,
+      exportValue: (r) =>
+        r.lastOrderAt
+          ? `${formatDate(r.lastOrderAt)}${r.lastOrderOwnerName ? ` · ${r.lastOrderOwnerName}` : ''}`
+          : null,
+    },
     cell: ({ row }) =>
       row.original.lastOrderAt ? (
         <span className="tabular-nums">
@@ -120,7 +143,13 @@ const columns: ColumnDef<TeamCustomer, unknown>[] = [
   {
     id: 'latestNote',
     header: 'Chăm sóc gần nhất',
-    meta: { width: 280 },
+    meta: {
+      width: 280,
+      exportValue: (r) =>
+        r.latestNote
+          ? `${formatDate(r.latestNote.createdAt)} ${r.latestNote.authorName}: ${r.latestNote.body}`
+          : null,
+    },
     cell: ({ row }) => {
       const n = row.original.latestNote;
       if (!n) return <span className="text-subtle-foreground">—</span>;
@@ -143,6 +172,17 @@ const columns: ColumnDef<TeamCustomer, unknown>[] = [
     ),
   },
 ];
+
+/** Cột file Excel = cột bảng, tách thêm Mã KH + SĐT cạnh tên khách. */
+const exportColumns: ExportColumn<TeamCustomer>[] = exportColumnsOf(columns).flatMap((c) =>
+  c.header === 'Khách'
+    ? [
+        { header: 'Mã KH', value: (r: TeamCustomer) => r.code },
+        c,
+        { header: 'SĐT', value: (r: TeamCustomer) => r.phone ?? null },
+      ]
+    : [c],
+);
 
 /** Tất cả / Top 10 / 50 / 100 + ô gõ số — một bộ lọc `top` trên URL. */
 function TopPicker({
@@ -316,12 +356,20 @@ export function TeamCustomersScreen() {
         }
         breadcrumb={[{ label: 'Khách hàng', href: '/crm/customers' }, { label: 'Khách của team' }]}
         actions={
-          <Button asChild>
-            <Link href="/crm/orders/new">
-              <Plus aria-hidden />
-              Tạo đơn
-            </Link>
-          </Button>
+          <>
+            <ExportExcelButton
+              fileName="khach-cua-team"
+              columns={exportColumns}
+              fetchPage={(page, size) => fetchTeamCustomers({ ...params, ...takeSkip(page, size) })}
+              disabled={!query.data?.total}
+            />
+            <Button asChild>
+              <Link href="/crm/orders/new">
+                <Plus aria-hidden />
+                Tạo đơn
+              </Link>
+            </Button>
+          </>
         }
       />
 
@@ -398,6 +446,8 @@ export function TeamCustomersScreen() {
             onPageChange={(page) => set({ page })}
             onSizeChange={(size) => set({ size })}
             onSortChange={() => undefined}
+            // Cột "#" (hạng) đã là số thứ tự của bảng xếp hạng.
+            rowNumbers={false}
           />
         )}
       </QueryState>

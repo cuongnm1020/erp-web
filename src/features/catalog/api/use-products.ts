@@ -548,3 +548,18 @@ export function useContainerTypes(enabled = true) {
     staleTime: 5 * 60_000,
   });
 }
+
+// ── Xuất danh mục do server tạo (2026-11-02) ──
+/** Link tải trực tiếp (người có export.direct) — anchor thật, cookie phiên đi kèm. */
+export const skuCsvHref = '/api/exports/skus?format=csv';
+export const pancakeProductsHref = '/api/exports/pancake-products';
+
+/** Không có quyền xuất trực tiếp: gửi yêu cầu kèm email, chờ quản trị duyệt. */
+export const requestSkuCsvByEmail = (email: string) =>
+  unwrap(
+    api.GET('/exports/{entity}', {
+      params: { path: { entity: 'skus' }, query: { format: 'csv', email } },
+    }),
+  );
+export const requestPancakeProductsByEmail = (email: string) =>
+  unwrap(api.GET('/exports/pancake-products', { params: { query: { email } } }));

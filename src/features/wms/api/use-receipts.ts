@@ -33,10 +33,15 @@ export const receiptKeys = {
 };
 
 /** GET /goods-receipts — danh sách + statusCounts cho dải tab; cần stock.read. */
+/** Một lần gọi của `useReceipts` — dùng lại cho "Xuất Excel" (kéo lần lượt mọi trang). */
+export function fetchReceipts(params: ReceiptListParams) {
+  return unwrap(api.GET('/goods-receipts', { params: { query: params } }));
+}
+
 export function useReceipts(params: ReceiptListParams) {
   return useQuery({
     queryKey: receiptKeys.list(params),
-    queryFn: () => unwrap(api.GET('/goods-receipts', { params: { query: params } })),
+    queryFn: () => fetchReceipts(params),
     placeholderData: (prev) => prev,
   });
 }
@@ -118,6 +123,29 @@ export function useSetReceiptCosts(id: string) {
       unwrap(api.POST('/goods-receipts/{id}/costs', { params: { path: { id } }, body })),
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: receiptKeys.lists() });
+      void qc.invalidateQueries({ queryKey: receiptKeys.detail(id) });
+    },
+  });
+}
+
+/**
+ * POST /goods-receipts/:id/putaway-default — cất mọi thùng / hàng rời CHƯA cất của phiếu vào vị
+ * trí DEFAULT của kho (2026-11-02), đóng việc cất → phiếu sang Chờ nhập giá / Hoàn thành.
+ * Idempotency-Key sinh LÚC BẤM (luật 4), truyền vào `key`.
+ */
+export function usePutAwayReceiptToDefault(id: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (key: string) =>
+      unwrap(
+        api.POST('/goods-receipts/{id}/putaway-default', {
+          params: { path: { id } },
+          body: { idempotencyKey: key },
+        }),
+      ),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: receiptKeys.lists() });
+      // Chi tiết + thùng + sổ cái cùng prefix detail.
       void qc.invalidateQueries({ queryKey: receiptKeys.detail(id) });
     },
   });

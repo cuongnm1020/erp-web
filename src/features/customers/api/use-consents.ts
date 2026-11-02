@@ -57,25 +57,29 @@ export function useCustomerConsents(customerId: string, params: CustomerConsentP
 }
 
 /** GET /consents — trạng thái mới nhất mỗi (khách, kênh) trong phạm vi người xem. */
+/** Một lần gọi của `useConsents` — dùng lại cho "Xuất Excel" (kéo lần lượt mọi trang). */
+export function fetchConsents(params: ConsentListParams) {
+  return unwrap(
+    api.GET('/consents', {
+      params: {
+        query: {
+          channel: params.channel,
+          granted: params.granted,
+          from: params.from,
+          to: params.to,
+          q: params.q || undefined,
+          take: params.take,
+          skip: params.skip,
+        },
+      },
+    }),
+  );
+}
+
 export function useConsents(params: ConsentListParams) {
   return useQuery({
     queryKey: consentKeys.list(params),
-    queryFn: () =>
-      unwrap(
-        api.GET('/consents', {
-          params: {
-            query: {
-              channel: params.channel,
-              granted: params.granted,
-              from: params.from,
-              to: params.to,
-              q: params.q || undefined,
-              take: params.take,
-              skip: params.skip,
-            },
-          },
-        }),
-      ),
+    queryFn: () => fetchConsents(params),
     placeholderData: keepPreviousData,
   });
 }

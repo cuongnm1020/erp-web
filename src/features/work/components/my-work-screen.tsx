@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation';
 import { useMemo, useState } from 'react';
 import { DataTable, FilterBar, type ColumnDef } from '@/components/data/data-table';
 import { shiftDay } from '@/components/data/date-range-picker';
+import { ExportExcelButton, takeSkip } from '@/components/data/export-excel-button';
 import { EmptyState, ListSkeleton, QueryState } from '@/components/data/states';
 import { PageHeader } from '@/components/layout/page-header';
 import { Button } from '@/components/ui/button';
@@ -25,8 +26,14 @@ import { Can } from '@/lib/permission';
 import { useHotkey } from '@/lib/use-hotkey';
 import { useListState } from '@/lib/url-state';
 import type { WorkItemSummary, WorkListQuery, WorkView } from '../api/types';
-import { useCreateWork, useWorkAction, useWorkCounts, useWorkList } from '../api/use-work';
-import { KIND_LABEL, PRIORITY_LABEL } from '../labels';
+import {
+  fetchWorkList,
+  useCreateWork,
+  useWorkAction,
+  useWorkCounts,
+  useWorkList,
+} from '../api/use-work';
+import { KIND_LABEL, PRIORITY_LABEL, WORK_EXPORT_COLUMNS } from '../labels';
 import {
   ChecklistProgress,
   DeadlineCell,
@@ -107,6 +114,12 @@ export function MyWorkScreen() {
                 Yêu cầu nội bộ
               </Link>
             </Button>
+            <ExportExcelButton
+              fileName="viec-cua-toi"
+              columns={WORK_EXPORT_COLUMNS}
+              fetchPage={(page, size) => fetchWorkList({ ...params, ...takeSkip(page, size) })}
+              disabled={!query.data?.total}
+            />
             <Button asChild shortcut="F2">
               <Link href="/work/new">
                 <Plus aria-hidden />

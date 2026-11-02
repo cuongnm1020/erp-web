@@ -42,6 +42,7 @@ import {
 import { useAssignCustomerTags, useSetCustomerSegment } from '../api/use-segments';
 import { useTeams } from '../api/use-teams';
 import { CustomerAddressSection } from './customer-address-section';
+import { CustomerFarmFields } from './customer-farm-fields';
 import {
   CustomerSegmentEditor,
   CustomerTagsEditor,
@@ -52,6 +53,7 @@ import { CUSTOMER_TYPE_OPTIONS } from '../labels';
 import {
   createCustomerSchema,
   editCustomerFormSchema,
+  farmAreaInput,
   toCreateCustomerBody,
   toUpdateCustomerBody,
   type CustomerFormValues,
@@ -87,6 +89,16 @@ const PENDING_API: Array<{ title: string; need: string }> = [
   { title: 'Người phụ trách', need: 'chưa có danh bạ user để chọn — server tự gán người tạo' },
 ];
 
+/** Thông tin khai thác (2026-11-02) — 422 của API trả path đúng các tên này. */
+const FARM_FIELDS = ['farmArea', 'farmAreaUnit', 'crops', 'treeAge', 'diseaseHistory'] as const;
+const FARM_NAMES = {
+  farmArea: 'farmArea',
+  farmAreaUnit: 'farmAreaUnit',
+  crops: 'crops',
+  treeAge: 'treeAge',
+  diseaseHistory: 'diseaseHistory',
+} as const;
+
 const CREATE_FIELDS = [
   'code',
   'name',
@@ -97,6 +109,7 @@ const CREATE_FIELDS = [
   'teamId',
   'creditLimit',
   'paymentTerm',
+  ...FARM_FIELDS,
 ] as const;
 
 const UPDATE_FIELDS = [
@@ -107,6 +120,7 @@ const UPDATE_FIELDS = [
   'type',
   'creditLimit',
   'paymentTerm',
+  ...FARM_FIELDS,
 ] as const;
 
 function initialValues(customer?: CustomerDetail): CustomerFormValues {
@@ -120,6 +134,11 @@ function initialValues(customer?: CustomerDetail): CustomerFormValues {
     teamId: customer?.teamIds[0] ?? '',
     creditLimit: customer?.creditLimit ?? '',
     paymentTerm: customer?.paymentTerm == null ? '' : String(customer.paymentTerm),
+    farmArea: farmAreaInput(customer?.farmArea ?? null),
+    farmAreaUnit: customer?.farmAreaUnit ?? '',
+    crops: customer?.crops ?? [],
+    treeAge: customer?.treeAge ?? '',
+    diseaseHistory: customer?.diseaseHistory ?? '',
   };
 }
 
@@ -374,6 +393,18 @@ function CustomerFormBody({ customer }: { customer?: CustomerDetail }) {
                   </FormItem>
                 )}
               />
+            </Section>
+
+            <Section title="Thông tin khai thác">
+              {editing && customer.crops.length === 0 && customer.farmArea === null ? (
+                <p
+                  role="note"
+                  className="col-span-2 rounded-md bg-info-weak px-3 py-2 text-sm text-info"
+                >
+                  Khách chưa khai thác — điền đủ 4 mục bên dưới mới lưu được thay đổi.
+                </p>
+              ) : null}
+              <CustomerFarmFields control={form.control} names={FARM_NAMES} />
             </Section>
 
             <Section title="Phân loại & bán hàng">

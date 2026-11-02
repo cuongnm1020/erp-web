@@ -51,6 +51,7 @@ const item = (over: Record<string, unknown>) => ({
   invSeries: null,
   invNo: null,
   errorMessage: null,
+  exportedAt: null,
   version: 1,
   ...over,
 });
@@ -120,6 +121,13 @@ const detail = (over: Record<string, unknown> = {}) => ({
   lastSyncedAt: null,
   createdAt: '2026-10-28T03:00:00Z',
   updatedAt: '2026-10-28T03:00:00Z',
+  seller: {
+    name: 'CÔNG TY CỔ PHẦN THIÊN NÔNG NAM VIỆT',
+    taxCode: '0111043552',
+    address: 'Số 1, Ngõ 46, Đường Kim Trung 1, Xã Thạch Thất, Hà Nội',
+    bank: '726809999 - MBBank',
+    invSeries: '1C26MAB',
+  },
   ...over,
 });
 
@@ -158,6 +166,9 @@ beforeEach(() => {
     http.post('/api/einvoices/:action', async ({ request, params }) => {
       actions.push({ path: String(params.action), body: await request.json().catch(() => null) });
       if (params.action === 'sync') return HttpResponse.json({ checked: 4, issued: 2 });
+      if (params.action === 'collect-delivered') {
+        return HttpResponse.json({ added: 2000, remaining: 59000 });
+      }
       return HttpResponse.json({ done: 1, failed: [] });
     }),
     http.get('/api/einvoices/:id', () => HttpResponse.json(detail())),
@@ -190,15 +201,49 @@ describe('EInvoiceListScreen — hàng chờ hóa đơn điện tử', () => {
     );
   });
 
-  it('chọn dòng → Duyệt gửi đúng id', async () => {
+  it('chọn dòng → xem trước theo mẫu hóa đơn GTGT → Duyệt gửi đúng id', async () => {
     renderApp(<EInvoiceListScreen />, { me: ME_ACCOUNTANT });
     await screen.findByText('SOP2610-00001');
     const rowCheckbox = screen.getAllByRole('checkbox', { name: /Chọn dòng/ })[0]!;
     fireEvent.click(rowCheckbox);
-    fireEvent.click(await screen.findByRole('button', { name: 'Duyệt 1 hóa đơn' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Xem trước và duyệt 1 hóa đơn' }));
+    const dialog = await screen.findByRole('dialog');
+    const paper = await within(dialog).findByRole('article');
+    expect(within(paper).getByText('Hóa đơn giá trị gia tăng')).toBeInTheDocument();
+    expect(within(paper).getByText('CÔNG TY CỔ PHẦN THIÊN NÔNG NAM VIỆT')).toBeInTheDocument();
+    expect(within(paper).getByText('Trần Thị Nhận')).toBeInTheDocument();
+    expect(within(paper).getByText('Phân vi lượng bón rễ KDI11 30g')).toBeInTheDocument();
+    expect(within(paper).getByText('63.492,06')).toBeInTheDocument();
+    expect(within(paper).getByText('Hai trăm nghìn đồng chẵn.')).toBeInTheDocument();
+    expect(actions).toHaveLength(0);
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Duyệt 1 hóa đơn' }));
     await waitFor(() => expect(actions).toHaveLength(1));
     expect(actions[0]).toEqual({ path: 'approve', body: { ids: ['ei-1'] } });
     await waitFor(() => expect(toastSuccess).toHaveBeenCalledWith('Đã duyệt 1 hóa đơn'));
+  });
+
+  it('Cập nhật đơn đã giao: không chọn ngày, báo phần còn thêm ở nền', async () => {
+    renderApp(<EInvoiceListScreen />, { me: ME_ACCOUNTANT });
+    await screen.findByText('SOP2610-00001');
+    fireEvent.click(screen.getByRole('button', { name: /Cập nhật đơn đã giao/ }));
+    await waitFor(() => expect(actions).toHaveLength(1));
+    expect(actions[0]).toEqual({ path: 'collect-delivered', body: {} });
+    await waitFor(() =>
+      expect(toastSuccess).toHaveBeenCalledWith(
+        'Đã thêm 2000 đơn đã giao; 59000 đơn còn lại đang được thêm ở nền',
+      ),
+    );
+  });
+
+  it('tab Đã duyệt: xuất file meInvoice cho dòng đã chọn và cho cả tab', async () => {
+    search = 'tab=APPROVED';
+    renderApp(<EInvoiceListScreen />, { me: ME_ACCOUNTANT });
+    await screen.findByText('SOP2610-00001');
+    fireEvent.click(screen.getAllByRole('checkbox', { name: /Chọn dòng/ })[0]!);
+    expect(await screen.findByRole('link', { name: /Xuất file meInvoice$/ })).toHaveAttribute(
+      'href',
+      '/api/einvoices/export?ids=ei-1',
+    );
   });
 
   it('chỉ có quyền xem: không có nút nhập đối soát / lấy kết quả', async () => {
@@ -224,7 +269,7 @@ describe('EInvoiceDetailScreen — giao một phần', () => {
   it('chặn duyệt tới khi sửa; sửa SL 2 + tiền 200.000 → PATCH đúng dòng + version', async () => {
     renderApp(<EInvoiceDetailScreen id="ei-2" />, { me: ME_ACCOUNTANT });
     expect(await screen.findByText(/Hãng thu thiếu — sửa số lượng khách nhận/)).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Duyệt' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Xem trước và duyệt' })).toBeDisabled();
     fireEvent.change(screen.getByLabelText('Số lượng dòng 1'), { target: { value: '2' } });
     fireEvent.change(screen.getByLabelText('Khách trả dòng 1'), { target: { value: '200.000' } });
     fireEvent.click(screen.getByRole('button', { name: /Lưu thay đổi/ }));

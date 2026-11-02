@@ -9,10 +9,12 @@ import {
   Coins,
   CopyPlus,
   Lock,
+  PackageCheck,
   Printer,
 } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { ConfirmDialog } from '@/components/data/confirm-dialog';
 import { MoneyInput } from '@/components/data/form';
 import { DetailSkeleton, QueryState } from '@/components/data/states';
 import { StatusBadge } from '@/components/data/status-badge';
@@ -39,6 +41,7 @@ import { GrnWaitingMatch } from './grn-waiting-match';
 import {
   useCancelReceipt,
   usePostReceipt,
+  usePutAwayReceiptToDefault,
   useReceipt,
   useReceiptMovements,
   useSetReceiptCosts,
@@ -560,6 +563,9 @@ export function GrnDetailScreen({ id }: { id: string }) {
   const post = usePostReceipt();
   const cancel = useCancelReceipt();
   const setCosts = useSetReceiptCosts(id);
+  const putAwayDefault = usePutAwayReceiptToDefault(id);
+  // Idempotency-Key sinh lúc bấm mở hộp xác nhận (luật 4); đóng hộp (xong / lỗi / hủy) thì bỏ key.
+  const [putAwayKey, setPutAwayKey] = useState<string | null>(null);
   const ability = useAbility();
   const canReceive = ability.can('receive', 'Stock');
   // Kế toán: thấy tiền + nhập giá. Kho (stock.receive) không thấy cột Đơn giá / Thành tiền.
@@ -666,6 +672,18 @@ export function GrnDetailScreen({ id }: { id: string }) {
                   Nhân bản
                 </Button>
               ) : null}
+              {/* Cất tất cả vào DEFAULT (2026-11-02): thùng / hàng rời chưa cất → vị trí mặc định. */}
+              {canReceive && receipt.stage === 'PUTTING_AWAY' ? (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={putAwayDefault.isPending}
+                  onClick={() => setPutAwayKey(crypto.randomUUID())}
+                >
+                  <PackageCheck aria-hidden />
+                  Cất tất cả vào vị trí mặc định
+                </Button>
+              ) : null}
               {canEnterCost && !editing ? (
                 <Button
                   variant={awaitingCost ? 'default' : 'outline'}
@@ -740,6 +758,32 @@ export function GrnDetailScreen({ id }: { id: string }) {
       <QueryState query={query} skeleton={<DetailSkeleton />}>
         {(r) => <DetailBody receipt={r} canCost={canCost} cost={costEntry} />}
       </QueryState>
+      <ConfirmDialog
+        open={putAwayKey !== null}
+        onOpenChange={(o) => {
+          if (!o) setPutAwayKey(null);
+        }}
+        title="Cất tất cả vào vị trí mặc định?"
+        description={`Mọi thùng và hàng rời chưa cất của phiếu ${receipt?.docNumber ?? ''} được ghi vào vị trí DEFAULT của kho, lấy hàng được ngay. Việc cất hàng của phiếu sẽ đóng.`}
+        confirmLabel="Cất tất cả"
+        destructive={false}
+        onConfirm={() =>
+          putAwayKey
+            ? putAwayDefault
+                .mutateAsync(putAwayKey)
+                .then((r) =>
+                  toast.success(
+                    `Đã cất ${r.containersPlaced} thùng${
+                      new Decimal(r.looseQtyPlaced).gt(0)
+                        ? ` + ${formatQuantity(r.looseQtyPlaced)} hàng rời`
+                        : ''
+                    } vào ${r.toLocation.code}`,
+                  ),
+                )
+                .catch((err) => toast.error(messageFor(err)))
+            : undefined
+        }
+      />
     </>
   );
 }

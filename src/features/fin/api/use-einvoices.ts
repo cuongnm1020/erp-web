@@ -34,18 +34,25 @@ export const einvoiceKeys = {
     ['fin', 'einvoices', 'reconciliations', id, 'lines', q] as const,
 };
 
+/** Một lần gọi của `useEInvoices` — dùng lại cho "Xuất Excel" (kéo lần lượt mọi trang). */
+export function fetchEInvoices(q: EInvoiceListQuery) {
+  return unwrap(api.GET('/einvoices', { params: { query: q } }));
+}
+
 export function useEInvoices(q: EInvoiceListQuery) {
   return useQuery({
     queryKey: einvoiceKeys.list(q),
-    queryFn: () => unwrap(api.GET('/einvoices', { params: { query: q } })),
+    queryFn: () => fetchEInvoices(q),
     placeholderData: keepPreviousData,
   });
 }
 
-export function useEInvoice(id: string) {
+/** `enabled = false` — chưa tải (hộp xem trước đang đóng). */
+export function useEInvoice(id: string, enabled = true) {
   return useQuery({
     queryKey: einvoiceKeys.detail(id),
     queryFn: () => unwrap(api.GET('/einvoices/{id}', { params: { path: { id } } })),
+    enabled: enabled && !!id,
   });
 }
 
@@ -113,13 +120,36 @@ export function useSyncEInvoices() {
   });
 }
 
+/** Bỏ trống from / to = mọi đơn đã giao chưa có trong hàng chờ (phần còn lại worker thêm tiếp). */
 export function useCollectDelivered() {
   const invalidate = useInvalidate();
   return useMutation({
-    mutationFn: (body: { from: string; to: string }) =>
+    mutationFn: (body: { from?: string; to?: string } = {}) =>
       unwrap(api.POST('/einvoices/collect-delivered', { body })),
     onSuccess: invalidate,
   });
+}
+
+/**
+ * Link tải file Excel nhập meInvoice (mẫu MISA "Hóa đơn GTGT") — GET /einvoices/export, anchor thật
+ * để cookie phiên đi kèm. Bỏ `ids` = mọi hóa đơn Đã duyệt.
+ */
+export const einvoiceExportUrl = (ids: string[] = []) =>
+  `/api/einvoices/export${ids.length ? `?ids=${encodeURIComponent(ids.join(','))}` : ''}`;
+
+/** Không có quyền xuất trực tiếp: GET /einvoices/export?email= → yêu cầu chờ duyệt (2026-11-02). */
+export const requestEInvoiceExportByEmail =
+  (ids: string[] = []) =>
+  (email: string) =>
+    unwrap(
+      api.GET('/einvoices/export', {
+        params: { query: { ...(ids.length ? { ids: ids.join(',') } : {}), email } },
+      }),
+    );
+
+/** Sau khi tải file: server đã ghi mốc "Đã xuất file" → làm mới danh sách. */
+export function useInvalidateEInvoices() {
+  return useInvalidate();
 }
 
 /** Tải file đối soát hãng (multipart "file"). */

@@ -4,6 +4,11 @@ import { Plus } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { CopyButton } from '@/components/data/copy-button';
 import { DataTable, FilterBar, type ColumnDef, type FilterDef } from '@/components/data/data-table';
+import {
+  ExportExcelButton,
+  takeSkip,
+  type ExportColumn,
+} from '@/components/data/export-excel-button';
 import { pancakeShopLabel } from '@/components/data/pancake-shop-select';
 import { RowActions } from '@/components/data/row-actions';
 import { EmptyState, ListSkeleton, QueryState } from '@/components/data/states';
@@ -18,6 +23,7 @@ import { useAbility } from '@/lib/permission';
 import { useHotkey } from '@/lib/use-hotkey';
 import { useListState } from '@/lib/url-state';
 import {
+  fetchFacebookPages,
   useDeleteFacebookPage,
   useFacebookPages,
   useFacebookPageShops,
@@ -72,6 +78,23 @@ export function FacebookPagesScreen() {
     const byId = new Map((shops.data ?? []).map((s) => [s.shopId, pancakeShopLabel(s)]));
     return (id: string) => byId.get(id) ?? `POS ${id}`;
   }, [shops.data]);
+
+  const exportColumns = useMemo<ExportColumn<FacebookPage>[]>(
+    () => [
+      { header: 'Tên page', value: (r) => r.name, width: 32 },
+      { header: 'Page ID', value: (r) => r.externalId ?? null, width: 20 },
+      {
+        header: 'POS kết nối',
+        value: (r) => r.shopIds.map(shopName).join(', ') || null,
+        width: 36,
+      },
+      { header: 'Số đơn', value: (r) => r.orderCount },
+      { header: 'Đơn gần nhất', value: (r) => (r.lastOrderAt ? formatDate(r.lastOrderAt) : null) },
+      { header: 'Cách thêm', value: (r) => ORIGIN_LABEL[r.origin] },
+      { header: 'Trạng thái', value: (r) => (r.isActive ? 'Đang dùng' : 'Ngưng') },
+    ],
+    [shopName],
+  );
 
   const columns = useMemo<ColumnDef<FacebookPage, unknown>[]>(
     () => [
@@ -243,12 +266,21 @@ export function FacebookPagesScreen() {
         }
         breadcrumb={[{ label: 'Quản trị' }, { label: 'Page Facebook' }]}
         actions={
-          canManage ? (
-            <Button size="sm" onClick={openCreate} shortcut="N">
-              <Plus aria-hidden />
-              Thêm page
-            </Button>
-          ) : null
+          <>
+            <ExportExcelButton
+              size="sm"
+              fileName="page-facebook"
+              columns={exportColumns}
+              fetchPage={(page, size) => fetchFacebookPages({ ...params, ...takeSkip(page, size) })}
+              disabled={!query.data?.total}
+            />
+            {canManage ? (
+              <Button size="sm" onClick={openCreate} shortcut="N">
+                <Plus aria-hidden />
+                Thêm page
+              </Button>
+            ) : null}
+          </>
         }
       />
 

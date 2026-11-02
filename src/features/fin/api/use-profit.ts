@@ -24,6 +24,24 @@ export const profitKeys = {
   detail: (p: ProfitParams) => [...profitKeys.all, p] as const,
 };
 
+/** Một lần gọi của `useProfitReport` — dùng lại cho "Xuất Excel" (kéo lần lượt mọi trang). */
+export function fetchProfitReport(params: ProfitParams) {
+  return unwrap(
+    api.GET('/reports/profit', {
+      params: {
+        query: {
+          from: params.from,
+          to: params.to,
+          groupBy: params.groupBy,
+          q: params.q || undefined,
+          take: params.take,
+          skip: params.skip,
+        },
+      },
+    }),
+  );
+}
+
 /**
  * GET /reports/profit — doanh thu − giá vốn FIFO. Giá vốn đơn đã đóng gói là snapshot lúc PACK
  * (đúng giá các lô nhập đã xuất); đơn chưa đóng gói tạm tính theo lô đang mở. Mọi con số do API
@@ -33,21 +51,7 @@ export function useProfitReport(params: ProfitParams, enabled = true) {
   return useQuery({
     enabled,
     queryKey: profitKeys.detail(params),
-    queryFn: () =>
-      unwrap(
-        api.GET('/reports/profit', {
-          params: {
-            query: {
-              from: params.from,
-              to: params.to,
-              groupBy: params.groupBy,
-              q: params.q || undefined,
-              take: params.take,
-              skip: params.skip,
-            },
-          },
-        }),
-      ),
+    queryFn: () => fetchProfitReport(params),
     placeholderData: keepPreviousData,
   });
 }

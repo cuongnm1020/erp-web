@@ -47,6 +47,13 @@ export const REPORT_FILTER_KEYS = [
   // Bán chạy
   'rank',
   'limit',
+  // Bán chạy theo tháng trong năm (2026-11-02): topView=year + topYear
+  'topView',
+  'topYear',
+  // Đơn trùng (2026-11-02): chỉ nhóm có hoàn + sắp xếp + trang
+  'dupReturned',
+  'dupSort',
+  'dupPage',
 ] as const;
 export type ReportFilterKey = (typeof REPORT_FILTER_KEYS)[number];
 

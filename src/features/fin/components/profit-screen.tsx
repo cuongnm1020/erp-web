@@ -4,6 +4,11 @@ import Link from 'next/link';
 import { useCallback, useMemo } from 'react';
 import { DataTable, type ColumnDef } from '@/components/data/data-table';
 import { DateRangePicker } from '@/components/data/date-range-picker';
+import {
+  ExportExcelButton,
+  takeSkip,
+  type ExportColumn,
+} from '@/components/data/export-excel-button';
 import { KpiCard } from '@/components/data/kpi-card';
 import { EmptyState, ForbiddenState, ListSkeleton, QueryState } from '@/components/data/states';
 import { StatusBadge, type StatusTone } from '@/components/data/status-badge';
@@ -16,7 +21,9 @@ import { messageFor } from '@/lib/error-messages';
 import { formatDate, formatMoney, formatQuantity, toLocalDateKey } from '@/lib/format';
 import { useAbility } from '@/lib/permission';
 import { useListState } from '@/lib/url-state';
+import { decimalCell } from '@/lib/xlsx-writer';
 import {
+  fetchProfitReport,
   useProfitBackfill,
   useProfitReport,
   type ProfitCostStatus,
@@ -93,6 +100,39 @@ const profitCell = (v: string) => (
     {formatMoney(v)}
   </span>
 );
+
+const ORDER_EXPORT: ExportColumn<ProfitOrderRow>[] = [
+  { header: 'Số đơn', value: (r) => r.docNumber, width: 16 },
+  { header: 'Ngày đặt', value: (r) => formatDate(r.orderDate), width: 12 },
+  { header: 'Mã KH', value: (r) => r.customerCode, width: 14 },
+  { header: 'Khách hàng', value: (r) => r.customerName, width: 26 },
+  { header: 'Doanh thu', value: (r) => decimalCell(r.revenue) },
+  { header: 'Hàng hoàn', value: (r) => decimalCell(r.returnedRevenue) },
+  { header: 'Giá vốn', value: (r) => decimalCell(r.cogs) },
+  { header: 'Lãi gộp', value: (r) => decimalCell(r.grossProfit) },
+  { header: '% lãi', value: (r) => decimalCell(r.marginPct) },
+  {
+    header: 'Cước ĐVVC',
+    value: (r) => (r.shippingCostMissing ? 'Chưa có cước' : decimalCell(r.shippingCost)),
+  },
+  { header: 'Thu khách phí VC', value: (r) => decimalCell(r.shippingCharged) },
+  { header: 'Lãi sau VC', value: (r) => decimalCell(r.netProfit) },
+  { header: 'Hoàn', value: (r) => RETURN_STATUS[r.returnStatus]?.label ?? null },
+  { header: 'Trạng thái giá vốn', value: (r) => COST_STATUS[r.costStatus].label },
+];
+
+const SKU_EXPORT: ExportColumn<ProfitSkuRow>[] = [
+  { header: 'SKU', value: (r) => r.skuCode, width: 16 },
+  { header: 'Tên SKU', value: (r) => r.skuName, width: 36 },
+  { header: 'SL bán', value: (r) => decimalCell(r.qtyBase) },
+  { header: 'SL hoàn', value: (r) => decimalCell(r.returnedQtyBase) },
+  { header: 'Doanh thu', value: (r) => decimalCell(r.revenue) },
+  { header: 'Giá vốn BQ', value: (r) => decimalCell(r.avgUnitCost) },
+  { header: 'Giá vốn', value: (r) => decimalCell(r.cogs) },
+  { header: 'Lãi gộp', value: (r) => decimalCell(r.grossProfit) },
+  { header: '% lãi', value: (r) => decimalCell(r.marginPct) },
+  { header: 'Trạng thái giá vốn', value: (r) => COST_STATUS[r.costStatus].label },
+];
 
 export function ProfitScreen() {
   const ability = useAbility();
@@ -329,15 +369,44 @@ export function ProfitScreen() {
         description={`Doanh thu − giá vốn FIFO theo từng lô nhập − cước vận chuyển · đơn đã chốt · ${rangeLabel}`}
         breadcrumb={[{ label: 'Tài chính' }, { label: 'Lợi nhuận' }]}
         actions={
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={runBackfill}
-            disabled={backfill.isPending}
-            title="Đơn đóng gói / giao trước khi có báo cáo này chưa có giá vốn, cước, trạng thái hoàn — chạy một lần cho khoảng ngày đang xem"
-          >
-            {backfill.isPending ? 'Đang chốt…' : 'Chốt giá vốn đơn cũ'}
-          </Button>
+          <>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={runBackfill}
+              disabled={backfill.isPending}
+              title="Đơn đóng gói / giao trước khi có báo cáo này chưa có giá vốn, cước, trạng thái hoàn — chạy một lần cho khoảng ngày đang xem"
+            >
+              {backfill.isPending ? 'Đang chốt…' : 'Chốt giá vốn đơn cũ'}
+            </Button>
+            {view === 'order' ? (
+              <ExportExcelButton
+                size="sm"
+                fileName={`loi-nhuan-theo-don_${from}_${to}`}
+                columns={ORDER_EXPORT}
+                fetchPage={(page, size) =>
+                  fetchProfitReport({ ...params, ...takeSkip(page, size) }).then((r) => ({
+                    items: r.orders,
+                    total: r.total,
+                  }))
+                }
+                disabled={!query.data?.total}
+              />
+            ) : (
+              <ExportExcelButton
+                size="sm"
+                fileName={`loi-nhuan-theo-sku_${from}_${to}`}
+                columns={SKU_EXPORT}
+                fetchPage={(page, size) =>
+                  fetchProfitReport({ ...params, ...takeSkip(page, size) }).then((r) => ({
+                    items: r.skus,
+                    total: r.total,
+                  }))
+                }
+                disabled={!query.data?.total}
+              />
+            )}
+          </>
         }
       />
 

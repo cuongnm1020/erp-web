@@ -1,13 +1,13 @@
 'use client';
 
 import { useMemo, type ReactNode } from 'react';
+import { useCsvExport } from '@/components/data/export-delivery';
 import { BarList } from '@/components/data/charts';
 import { DataTable, FilterBar, type ColumnDef } from '@/components/data/data-table';
 import { GrowthIndicator } from '@/components/data/growth-indicator';
 import { EmptyState, ListSkeleton, QueryState } from '@/components/data/states';
 import { Button } from '@/components/ui/button';
 import { toast } from '@/components/ui/toaster';
-import { downloadCsv } from '@/lib/export-csv';
 import { messageFor } from '@/lib/error-messages';
 import { formatMoney, formatQuantity, toDecimal } from '@/lib/format';
 import type { SortState } from '@/lib/url-state';
@@ -164,6 +164,7 @@ export function SalesProductTab() {
     [groupBy, fallback],
   );
 
+  const downloadCsv = useCsvExport('Báo cáo doanh thu theo sản phẩm');
   const runExport = () =>
     exporter.mutate(
       { filter, params },

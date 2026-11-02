@@ -14,13 +14,14 @@ export interface CopyButtonProps {
 
 /**
  * Nút icon 20×20 đứng ngay sau giá trị cần dán đi nơi khác (design system CopyButton): mã chứng từ,
- * SĐT, mã vận đơn. Phản hồi tại chỗ "Đã sao chép" 1,5 giây, không toast (toast che bảng). Chặn
- * click lan lên dòng bảng. Clipboard bị chặn (http) → bôi chọn sẵn giá trị đứng trước để Ctrl C.
+ * SĐT, mã vận đơn. Phản hồi bằng bong bóng nhỏ "Đã sao chép" nổi phía trên icon 1,5 giây (không
+ * chiếm chỗ trong dòng, không toast vì toast che bảng). Chặn click lan lên dòng bảng. Clipboard bị
+ * chặn (http) → bôi chọn sẵn giá trị đứng trước để Ctrl C.
  */
 export function CopyButton({ value, label, className }: CopyButtonProps) {
   const [done, setDone] = useState(false);
   const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
-  const ref = useRef<HTMLButtonElement>(null);
+  const ref = useRef<HTMLSpanElement>(null);
   useEffect(() => () => clearTimeout(timer.current), []);
 
   const selectPrevious = () => {
@@ -45,9 +46,8 @@ export function CopyButton({ value, label, className }: CopyButtonProps) {
   };
 
   return (
-    <>
+    <span ref={ref} className="relative ml-0.5 inline-grid shrink-0 align-middle">
       <button
-        ref={ref}
         type="button"
         title={`Sao chép ${label}`}
         aria-label={`Sao chép ${label} ${value}`}
@@ -58,7 +58,7 @@ export function CopyButton({ value, label, className }: CopyButtonProps) {
         }}
         onKeyDown={(e) => e.stopPropagation()}
         className={cn(
-          'ml-0.5 inline-grid h-5 w-5 shrink-0 place-items-center rounded-md align-middle text-subtle-foreground hover:bg-muted hover:text-primary',
+          'inline-grid h-5 w-5 place-items-center rounded-md text-subtle-foreground hover:bg-muted hover:text-primary',
           done && 'bg-muted text-primary',
           className,
         )}
@@ -70,11 +70,14 @@ export function CopyButton({ value, label, className }: CopyButtonProps) {
         )}
       </button>
       {done ? (
-        <span role="status" className="ml-0.5 text-xs font-semibold text-success">
+        <span
+          role="status"
+          className="pointer-events-none absolute bottom-full left-1/2 z-20 mb-1 -translate-x-1/2 whitespace-nowrap rounded-md bg-foreground px-1.5 py-0.5 text-xs font-medium text-background shadow-md"
+        >
           Đã sao chép
         </span>
       ) : null}
-    </>
+    </span>
   );
 }
 
