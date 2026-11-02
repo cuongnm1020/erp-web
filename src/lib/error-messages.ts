@@ -215,6 +215,7 @@ const MESSAGES: Record<string, string> = {
   PDA_RELOCATE_QTY_EXCEEDS:
     'Số hàng rời vượt phần chuyển được (phần còn lại đã quét lấy cho đơn hoặc nằm trong thùng). Giảm số lượng.',
   PDA_RELOCATE_EMPTY: 'Vị trí này không còn hàng nào chuyển được.',
+  RECEIPT_PUTAWAY_NOTHING: 'Phiếu không còn hàng chờ cất. Tải lại trang để xem tiến độ mới.',
   PDA_NO_DEFAULT_LOCATION: 'Kho chưa có vị trí DEFAULT đang dùng. Tạo ở màn Kho & vị trí.',
   PDA_LOCATION_OTHER_WAREHOUSE: 'Vị trí vừa quét thuộc kho khác. Quét vị trí trong kho của việc.',
   PDA_LOCATION_NOT_STORABLE:

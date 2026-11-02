@@ -128,6 +128,29 @@ export function useSetReceiptCosts(id: string) {
   });
 }
 
+/**
+ * POST /goods-receipts/:id/putaway-default — cất mọi thùng / hàng rời CHƯA cất của phiếu vào vị
+ * trí DEFAULT của kho (2026-11-02), đóng việc cất → phiếu sang Chờ nhập giá / Hoàn thành.
+ * Idempotency-Key sinh LÚC BẤM (luật 4), truyền vào `key`.
+ */
+export function usePutAwayReceiptToDefault(id: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (key: string) =>
+      unwrap(
+        api.POST('/goods-receipts/{id}/putaway-default', {
+          params: { path: { id } },
+          body: { idempotencyKey: key },
+        }),
+      ),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: receiptKeys.lists() });
+      // Chi tiết + thùng + sổ cái cùng prefix detail.
+      void qc.invalidateQueries({ queryKey: receiptKeys.detail(id) });
+    },
+  });
+}
+
 /** DELETE /goods-receipts/:id — hủy phiếu NHÁP; phiếu đã post trả 409. */
 export function useCancelReceipt() {
   const qc = useQueryClient();

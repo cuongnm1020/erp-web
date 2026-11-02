@@ -4898,6 +4898,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/goods-receipts/{id}/putaway-default": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Mọi thùng / hàng rời chưa cất của phiếu → vị trí DEFAULT của kho; đóng việc PUT_AWAY, phiếu đi
+         *     tiếp. Không còn hàng chờ cất → 409 `RECEIPT_PUTAWAY_NOTHING`. Idempotency-Key trong body.
+         */
+        post: operations["ReceiptPutAwayController_putAwayToDefault"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/goods-receipts": {
         parameters: {
             query?: never;
@@ -13692,6 +13712,19 @@ export interface components {
             replayed: boolean;
             /** @description Chỉ có khi dòng PACK cuối vừa đóng (`taskCompleted`) — null với PICK / PUT_AWAY / dòng giữa. */
             waybill: components["schemas"]["PdaWaybillDto"] | null;
+        };
+        ReceiptPutAwayDefaultDto: {
+            idempotencyKey: string;
+        };
+        ReceiptPutAwayDefaultResultDto: {
+            /** @description Số việc PUT_AWAY của phiếu. */
+            taskDocNumber: string;
+            toLocation: components["schemas"]["PdaLocationRefDto"];
+            containersPlaced: number;
+            looseQtyPlaced: string;
+            /** @description Việc cất đã đóng → phiếu sang Chờ nhập giá / Hoàn thành. */
+            taskCompleted: boolean;
+            replayed: boolean;
         };
         ReceiptListRowDto: {
             id: string;
@@ -24820,6 +24853,31 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["PdaCompleteResultDto"];
+                };
+            };
+        };
+    };
+    ReceiptPutAwayController_putAwayToDefault: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReceiptPutAwayDefaultDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReceiptPutAwayDefaultResultDto"];
                 };
             };
         };
