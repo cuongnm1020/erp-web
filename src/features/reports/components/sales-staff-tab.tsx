@@ -44,8 +44,9 @@ const rowKey = (r: SalesByStaffItem) => `${r.key.id ?? 'null'}|${r.key.shopId ??
  * được API scope (nhân viên chỉ thấy dòng mình, trưởng nhóm thấy team) — màn không lọc thêm (luật 7).
  * Bấm "Lọc" trên một dòng để xem mọi tab theo riêng người / team đó. "Nhân viên × POS": mỗi sale
  * tách một dòng cho từng POS Pancake đã bán (đơn tạo trên ERP thành dòng riêng).
- * Số chính là doanh số "như Pancake" (CHƯA trừ hàng hoàn, 2026-10-30); Hoàn và Thực thu (= doanh
- * số − hoàn) đứng ngay sau để tách; ô "Tình trạng giao" ở thanh lọc tách tiếp theo nhóm đơn.
+ * Số chính là doanh số "như Pancake" (CHƯA trừ hàng hoàn, 2026-10-30; gồm phí ship thu khách,
+ * 2026-11-02); Hoàn và Thực thu (= doanh số − hoàn − phí ship, tiền hàng) đứng ngay sau để tách;
+ * ô "Tình trạng giao" ở thanh lọc tách tiếp theo nhóm đơn.
  */
 export function SalesStaffTab() {
   const { state, setFilters, filter, range } = useSalesReportState();

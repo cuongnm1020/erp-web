@@ -14475,6 +14475,8 @@ export interface components {
             grossProfit: string;
             cogs: string;
             returnedRevenue: string;
+            /** @description Phí ship thu khách — đã cộng trong revenue, không vào lãi gộp. */
+            shippingFee: string;
             customerCount: number;
             newCustomerCount: number;
         };
@@ -14587,6 +14589,8 @@ export interface components {
             customerCount: number;
             newCustomerCount: number;
             returnedRevenue: string;
+            /** @description Phí ship thu khách — đã cộng trong grossRevenue, không vào revenue (thực thu) / lãi gộp. */
+            shippingFee: string;
             returnedOrderCount: number;
             returnRate: string | null;
             previousRevenue: string;
@@ -14603,6 +14607,8 @@ export interface components {
             customerCount: number;
             newCustomerCount: number;
             returnedRevenue: string;
+            /** @description Phí ship thu khách — đã cộng trong grossRevenue, không vào revenue (thực thu) / lãi gộp. */
+            shippingFee: string;
             returnedOrderCount: number;
             returnRate: string | null;
             previousRevenue: string;
