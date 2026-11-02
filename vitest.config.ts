@@ -18,6 +18,10 @@ export default defineConfig({
       NODE_ENV: 'test',
     },
     include: ['src/**/*.test.{ts,tsx}'],
+    // Màn nhiều bước (chọn nhiều → hộp thoại → gửi) chạy 3–5 s khi cả bộ chạy song song ngay ở máy
+    // dev; runner CI chậm hơn ~9× nên mặc định 5 s đỏ ngẫu nhiên (2026-11-02: order-list "Gán hãng /
+    // cân nặng" — máy dev 970 ms chạy riêng). Hạn chung 20 s; test chờ lâu hơn tự đặt riêng.
+    testTimeout: 20_000,
     css: false,
   },
 });
