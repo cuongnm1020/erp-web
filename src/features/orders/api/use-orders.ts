@@ -66,6 +66,11 @@ export interface OrderListParams {
   itemOrigin?: OrderItemOrigin;
   /** Team CSKH lên đơn (team phòng ban CSKH, gồm phòng con) — danh sách: useCareTeamOptions. */
   careTeamId?: string;
+  /**
+   * Phòng ban lên đơn — nhiều team phòng ban (id nối dấu phẩy, gồm phòng con), 2026-11-02; trống =
+   * mọi phòng. Danh sách: useTeamFilterOptions.
+   */
+  teamIds?: string;
   /** NV lên đơn = người bấm tạo đơn (ERP: người tạo, Pancake: người tạo trên Pancake), 2026-10-29. */
   creatorId?: string;
   /** Page Facebook (id, nối dấu phẩy) — đơn ERP chọn page + đơn Pancake theo Page ID. */
@@ -182,6 +187,7 @@ function listQuery(params: Omit<OrderListParams, 'take' | 'skip'>) {
     dateField: params.from || params.to ? params.dateField : undefined,
     itemOrigin: params.itemOrigin,
     careTeamId: params.careTeamId || undefined,
+    teamIds: params.teamIds || undefined,
     creatorId: params.creatorId || undefined,
     facebookPageIds: params.facebookPageIds || undefined,
   };
@@ -290,14 +296,28 @@ export function useCareTeamOptions() {
 }
 
 /**
+ * GET /sales-orders/team-filter-options — ô lọc "Phòng ban" (2026-11-02): phòng CSKH + phòng Sale/MKT
+ * đã có đơn; người không có `sales_order.filter_team` nhận rỗng.
+ */
+export function useTeamFilterOptions(enabled = true) {
+  return useQuery({
+    queryKey: [...orderKeys.all, 'team-filter-options'] as const,
+    queryFn: () => unwrap(api.GET('/sales-orders/team-filter-options')),
+    staleTime: 5 * 60_000,
+    enabled,
+  });
+}
+
+/**
  * GET /sales-orders/creator-options — ô lọc "NV lên đơn" theo người xem (2026-10-30): leader CSKH
  * thấy nhân viên team mình, trưởng nhóm thấy nhóm mình, nhân viên CSKH chỉ mình; người khác mọi NV.
  */
-export function useOrderCreatorOptions() {
+export function useOrderCreatorOptions(enabled = true) {
   return useQuery({
     queryKey: [...orderKeys.all, 'creator-options'] as const,
     queryFn: () => unwrap(api.GET('/sales-orders/creator-options')),
     staleTime: 5 * 60_000,
+    enabled,
   });
 }
 

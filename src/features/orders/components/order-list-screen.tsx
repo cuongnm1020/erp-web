@@ -46,13 +46,13 @@ import { toast } from '@/components/ui/toaster';
 import { cn } from '@/lib/cn';
 import { messageFor, messageForCode } from '@/lib/error-messages';
 import {
+  formatDate,
   formatDateTime,
   formatMoney,
   formatPhone,
   groupVi,
   normalizePhone,
   formatQuantity,
-  formatWaited,
   formatRelative,
   phoneCarrier,
   toDecimal,
@@ -73,7 +73,7 @@ import {
   useRequestWaybill,
   useConfirmOrder,
   useSetOrdersWaitingStock,
-  useCareTeamOptions,
+  useTeamFilterOptions,
   useCarrierStatusOptions,
   useOrderCreatorOptions,
   useFacebookPageOptions,
@@ -160,8 +160,9 @@ const DEFAULTS = {
     'duplicate',
     // Đơn có sản phẩm không phải hàng ERP (món gõ tay / SKU Pancake tự sinh), 2026-10-22.
     'itemOrigin',
-    // Team CSKH lên đơn (phòng ban loại CSKH), 2026-10-24.
-    'careTeamId',
+    // Phòng ban lên đơn (team phòng ban, id nối dấu phẩy, chọn nhiều — CSKH + Sale/MKT), 2026-11-02;
+    // thay ô "Phòng ban CSKH" một lựa chọn (careTeamId, 2026-10-24).
+    'team',
     // NV lên đơn = người bấm tạo đơn (2026-10-29).
     'creatorId',
     // Page Facebook (id nối dấu phẩy, chọn nhiều), 2026-10-26 — khoá `fbPage` vì `page` là số trang.
@@ -231,12 +232,10 @@ const SORT_FIELD: Record<string, OrderSortField> = {
 };
 
 /**
- * Cột ẩn khi người dùng chưa chọn lần nào. "Thực thu ĐVVC" gần như toàn "—" tới khi hãng đối
- * soát → ẩn mặc định, bật lại ở "Cột".
+ * Cột ẩn khi người dùng chưa chọn lần nào. Hàng thiếu / Chờ từ / Thực thu ĐVVC đã bỏ khỏi bảng
+ * (2026-11-02); Thực thu vẫn có trong file Excel xuất.
  */
-const DEFAULT_HIDDEN = ['orderDate', 'collected'];
-/** Cột chỉ hiện ở tab Chờ hàng. */
-const WAITING_ONLY_COLUMNS = ['shortage', 'waitingSince'];
+const DEFAULT_HIDDEN = ['orderDate'];
 
 type OrderFilter = (typeof DEFAULTS.filterKeys)[number];
 
@@ -403,7 +402,9 @@ const buildColumns = (
     header: 'Ngày đặt',
     meta: { width: 116, sortable: true },
     cell: ({ row }) => (
-      <span className="whitespace-nowrap text-xs">{formatDateTime(row.original.orderDate)}</span>
+      <span className="whitespace-nowrap text-xs" title={formatDateTime(row.original.orderDate)}>
+        {formatDate(row.original.orderDate)}
+      </span>
     ),
   },
   {
@@ -484,34 +485,27 @@ const buildColumns = (
     },
   },
   {
-    // Cột Kho luôn hiện (user chốt 2026-10-29) — kho lấy hàng của đơn, mã kho dòng dưới.
+    // Cột Kho luôn hiện (user chốt 2026-10-29). 2026-11-02: bỏ mã kho + gộp cột NV lên đơn vào
+    // đây — tên kho, dưới là NV lên đơn (người bấm tạo đơn, tên đầy đủ), dưới nữa page Facebook.
     id: 'warehouse',
     header: 'Kho',
-    meta: { width: 112 },
-    cell: ({ row }) => {
-      const o = row.original;
-      if (!o.warehouseName) return <span className="text-muted-foreground">—</span>;
-      return (
-        <div className="space-y-0.5">
-          <span className="block font-medium" data-testid="order-warehouse">
-            {o.warehouseName}
-          </span>
-          <span className="block font-mono text-xs text-muted-foreground">{o.warehouseCode}</span>
-        </div>
-      );
-    },
-  },
-  {
-    // NV lên đơn = người bấm tạo đơn (user chốt 2026-10-29): tên đầy đủ, dài thì xuống dòng;
-    // page Facebook dòng dưới.
-    id: 'creator',
-    header: 'NV lên đơn',
     meta: { width: 150 },
     cell: ({ row }) => {
       const o = row.original;
       return (
         <div className="space-y-0.5">
-          <span className="block break-words font-medium" data-testid="order-creator">
+          {o.warehouseName ? (
+            <span className="block font-medium" data-testid="order-warehouse">
+              {o.warehouseName}
+            </span>
+          ) : (
+            <span className="block text-muted-foreground">—</span>
+          )}
+          <span
+            className="block break-words text-xs text-muted-foreground"
+            title="NV lên đơn"
+            data-testid="order-creator"
+          >
             {o.creatorName ?? '—'}
           </span>
           {o.facebookPageName ? (
@@ -523,51 +517,6 @@ const buildColumns = (
             </span>
           ) : null}
         </div>
-      );
-    },
-  },
-  // Hai cột của tab Chờ hàng (màn lọc bỏ ở tab khác).
-  {
-    id: 'shortage',
-    header: 'Hàng thiếu',
-    meta: { width: 230 },
-    cell: ({ row }) => {
-      const items = row.original.shortage?.items ?? [];
-      const first = items[0];
-      if (!first) return <span className="text-muted-foreground">—</span>;
-      const name = `${first.skuName} × ${formatQuantity(first.qty)}`;
-      return (
-        <div className="space-y-1">
-          <span className="block max-w-56 truncate font-semibold text-warning" title={name}>
-            {name}
-          </span>
-          {items.length > 1 ? (
-            <span
-              className="block text-xs text-muted-foreground"
-              title={items
-                .slice(1)
-                .map((i) => `${i.skuName} × ${formatQuantity(i.qty)}`)
-                .join(', ')}
-            >
-              + {items.length - 1} SP thiếu khác
-            </span>
-          ) : null}
-        </div>
-      );
-    },
-  },
-  {
-    id: 'waitingSince',
-    header: 'Chờ từ',
-    meta: { width: 120, align: 'right' },
-    cell: ({ row }) => {
-      const since = row.original.shortage?.since;
-      return since ? (
-        <span className="whitespace-nowrap" title={formatDateTime(since)}>
-          {formatWaited(since)}
-        </span>
-      ) : (
-        <span className="text-muted-foreground">—</span>
       );
     },
   },
@@ -585,30 +534,6 @@ const buildColumns = (
     cell: ({ row }) => (
       <span className="block font-semibold">{formatMoney(row.original.total, { unit: '' })}</span>
     ),
-  },
-  {
-    id: 'collected',
-    // Header dạng hàm để giữ tooltip giải thích (meta.title của DataTable là CHỮ tiêu đề; ô
-    // chọn cột đọc meta.title).
-    header: () => (
-      <span
-        className="block text-right"
-        title="Ước tính: COD − phí VC khi giao thành công; − phí VC khi hoàn"
-      >
-        Thực thu ĐVVC
-      </span>
-    ),
-    meta: { align: 'right', width: 96, title: 'Thực thu ĐVVC' },
-    cell: ({ row }) => {
-      const v = row.original.shipment?.collectedAmount;
-      if (!v) return <span className="text-muted-foreground">—</span>;
-      const negative = toDecimal(v)?.isNegative() ?? false;
-      return (
-        <span className={cn('font-semibold', negative && 'text-destructive')}>
-          {formatMoney(v, { unit: '' })}
-        </span>
-      );
-    },
   },
   {
     // Trạng thái + thời gian gộp một cột (2026-10-22); id giữ 'time' để sắp xếp theo thời gian
@@ -1171,13 +1096,16 @@ export function OrderListScreen() {
     : undefined;
   const duplicate = state.filters.duplicate === 'true';
   const itemOrigin = parseItemOrigin(state.filters.itemOrigin);
-  const careTeamId = state.filters.careTeamId ?? '';
-  const creatorId = state.filters.creatorId ?? '';
+  // Ô Phòng ban + NV lên đơn chỉ với người có `sales_order.filter_team` (2026-11-02) — không có
+  // quyền thì bỏ luôn giá trị trên URL (link dán từ đồng nghiệp) để không lọc ngầm.
+  const canFilterTeam = useAbility().can('filter_team', 'SalesOrder');
+  const team = canFilterTeam ? (state.filters.team ?? '') : '';
+  const creatorId = canFilterTeam ? (state.filters.creatorId ?? '') : '';
   const fbPage = state.filters.fbPage ?? '';
   const carrierStatus = state.filters.carrierStatus ?? '';
   const carrierStatusText = useMemo(() => decodeList(carrierStatus), [carrierStatus]);
   const carrierStatuses = useCarrierStatusOptions();
-  const careTeams = useCareTeamOptions();
+  const teamOptions = useTeamFilterOptions(canFilterTeam);
   const facebookPages = useFacebookPageOptions();
   // Cột ẩn + sắp xếp lưu theo người dùng ở server (đăng xuất / đổi máy vẫn giữ). Sắp xếp trên URL
   // (link dán cho đồng nghiệp) thắng; URL không có thì lấy lần sắp gần nhất của người dùng.
@@ -1217,7 +1145,7 @@ export function OrderListScreen() {
       to,
       dateField,
       itemOrigin,
-      careTeamId,
+      teamIds: team || undefined,
       creatorId,
       facebookPageIds: fbPage || undefined,
       carrierStatusText,
@@ -1242,7 +1170,7 @@ export function OrderListScreen() {
       to,
       dateField,
       itemOrigin,
-      careTeamId,
+      team,
       creatorId,
       fbPage,
       carrierStatusText,
@@ -1268,7 +1196,7 @@ export function OrderListScreen() {
   const canEditAny = ability.can('edit_all', 'SalesOrder');
   const canCancel = canCancelAny || canCreate;
   const confirmOrder = useConfirmOrder();
-  const creatorOptions = useOrderCreatorOptions();
+  const creatorOptions = useOrderCreatorOptions(canFilterTeam);
   const [peek, setPeek] = useState<SalesOrderListItem | null>(null);
   // Nút Hủy trên dòng → hộp xác nhận dùng chung với hủy hàng loạt (một đơn).
   const [cancelling, setCancelling] = useState<SalesOrderListItem | null>(null);
@@ -1303,13 +1231,10 @@ export function OrderListScreen() {
         );
       },
     });
-    // Cột Hàng thiếu / Chờ từ chỉ có nghĩa ở tab Chờ hàng.
-    return flow === 'WAITING_STOCK'
-      ? all
-      : all.filter((c) => !WAITING_ONLY_COLUMNS.includes(c.id ?? ''));
+    return all;
     // requestWaybill.mutate ổn định giữa các lần render (TanStack Query).
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [carriers.data, canUpdate, canCreate, canPack, canCancel, canCancelAny, canEditAny, flow]);
+  }, [carriers.data, canUpdate, canCreate, canPack, canCancel, canCancelAny, canEditAny]);
   const pickerColumns = useMemo(
     () =>
       columns
@@ -1378,7 +1303,7 @@ export function OrderListScreen() {
     to !== '' ||
     duplicate ||
     itemOrigin !== undefined ||
-    careTeamId !== '' ||
+    team !== '' ||
     creatorId !== '';
   const customerName = query.data?.items[0]?.customer.name;
   const selectedRows = (query.data?.items ?? []).filter((r) => selected[r.id]);
@@ -1507,35 +1432,35 @@ export function OrderListScreen() {
               unit: 'trạng thái',
               options: carrierStatusOptions(carrierStatuses.data ?? []),
             },
-            // Phòng ban CSKH (2026-10-29): API trả danh sách theo người xem — toàn quyền mọi phòng,
-            // leader CSKH phòng mình làm leader, người khác rỗng → ẩn ô.
-            ...((careTeams.data ?? []).length > 0
+            // Phòng ban + NV lên đơn: chỉ người có `sales_order.filter_team` (2026-11-02). Phòng ban
+            // chọn nhiều — phòng CSKH + phòng Sale/MKT đã có đơn; chưa chọn = tất cả.
+            ...(canFilterTeam
               ? [
                   {
-                    key: 'careTeamId' as const,
-                    label: 'Phòng ban CSKH',
-                    type: 'select' as const,
-                    searchable: true,
-                    options: (careTeams.data ?? []).map((t) => ({
+                    key: 'team' as const,
+                    label: 'Phòng ban',
+                    type: 'multiSelect' as const,
+                    unit: 'phòng',
+                    options: (teamOptions.data ?? []).map((t) => ({
                       value: t.teamId,
                       label: t.isActive ? t.name : `${t.name} (ngừng hoạt động)`,
+                      hint: t.group === 'CSKH' ? 'CSKH' : 'Sale/MKT',
+                    })),
+                  },
+                  {
+                    // Danh sách theo người xem (2026-10-30): leader CSKH → nhân viên team, trưởng
+                    // nhóm → nhóm mình, nhân viên CSKH → mình; người khác mọi nhân viên.
+                    key: 'creatorId' as const,
+                    label: 'NV lên đơn',
+                    type: 'select' as const,
+                    searchable: true,
+                    options: (creatorOptions.data ?? []).map((s) => ({
+                      value: s.id,
+                      label: s.fullName,
                     })),
                   },
                 ]
               : []),
-            // Hiện hết bộ lọc, bỏ nút "Thêm lọc" (mockup 2026-10-29).
-            {
-              // Danh sách theo người xem (2026-10-30): leader CSKH → nhân viên team, trưởng nhóm →
-              // nhóm mình, nhân viên CSKH → mình; người khác mọi nhân viên.
-              key: 'creatorId',
-              label: 'NV lên đơn',
-              type: 'select',
-              searchable: true,
-              options: (creatorOptions.data ?? []).map((s) => ({
-                value: s.id,
-                label: s.fullName,
-              })),
-            },
             {
               key: 'duplicate',
               label: 'Trùng trong ngày',
@@ -1591,8 +1516,8 @@ export function OrderListScreen() {
             dateField: state.filters.dateField,
             duplicate: state.filters.duplicate,
             itemOrigin: state.filters.itemOrigin,
-            careTeamId: state.filters.careTeamId,
-            creatorId: state.filters.creatorId,
+            team,
+            creatorId,
             fbPage: state.filters.fbPage,
             carrierStatus: state.filters.carrierStatus,
           }}

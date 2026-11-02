@@ -3612,6 +3612,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/sales-orders/team-filter-options": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Ô lọc "Phòng ban" của danh sách đơn (2026-11-02): phòng CSKH + phòng Sale/MKT đã có đơn, chỉ
+         *     với người có `sales_order.filter_team` (người khác rỗng → màn ẩn ô) — khai TRƯỚC `:id`.
+         */
+        get: operations["SalesOrderController_teamFilterOptions"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/sales-orders/carrier-status-options": {
         parameters: {
             query?: never;
@@ -11326,6 +11346,18 @@ export interface components {
              *     làm `careTeamId` khi tạo đơn (phòng ghi doanh thu).
              */
             mine: boolean;
+        };
+        OrderTeamFilterOptionDto: {
+            /** @description Team phòng ban (`DEPT-<mã>`) — giá trị cho `teamIds` của GET /sales-orders. */
+            teamId: string;
+            /** @description Tên hiển thị: phòng CSKH = tên phòng; phòng Sale/MKT = "<phòng cha> · <tên phòng>". */
+            name: string;
+            /**
+             * @description Nhóm trong ô chọn.
+             * @enum {string}
+             */
+            group: "SALES" | "CSKH";
+            isActive: boolean;
         };
         OrderCarrierStatusOptionDto: {
             /** @description Giá trị cho `carrierStatusText` của GET /sales-orders (nguyên văn chữ hãng). */
@@ -22926,6 +22958,25 @@ export interface operations {
             };
         };
     };
+    SalesOrderController_teamFilterOptions: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OrderTeamFilterOptionDto"][];
+                };
+            };
+        };
+    };
     SalesOrderController_carrierStatusOptions: {
         parameters: {
             query?: never;
@@ -23102,6 +23153,12 @@ export interface operations {
                  *     GET /sales-orders/care-team-options.
                  */
                 careTeamId?: string;
+                /**
+                 * @description Phòng ban lên đơn — nhiều phòng (team `DEPT-<mã>`, cách nhau dấu phẩy, tối đa 100), mỗi phòng
+                 *     gồm cả phòng con; bỏ trống = mọi phòng (2026-11-02). Danh sách: GET
+                 *     /sales-orders/team-filter-options (phòng CSKH + phòng Sale/MKT đã có đơn).
+                 */
+                teamIds?: string;
                 /**
                  * @description `true` = chỉ đơn có đơn trùng trong ngày (cùng SĐT khách, cùng ngày VN, chưa hủy, mọi nguồn —
                  *     CSKH-5). Theo from/to nếu có, không thì 7 ngày VN gần nhất.
@@ -23291,6 +23348,12 @@ export interface operations {
                  *     GET /sales-orders/care-team-options.
                  */
                 careTeamId?: string;
+                /**
+                 * @description Phòng ban lên đơn — nhiều phòng (team `DEPT-<mã>`, cách nhau dấu phẩy, tối đa 100), mỗi phòng
+                 *     gồm cả phòng con; bỏ trống = mọi phòng (2026-11-02). Danh sách: GET
+                 *     /sales-orders/team-filter-options (phòng CSKH + phòng Sale/MKT đã có đơn).
+                 */
+                teamIds?: string;
                 /**
                  * @description `true` = chỉ đơn có đơn trùng trong ngày (cùng SĐT khách, cùng ngày VN, chưa hủy, mọi nguồn —
                  *     CSKH-5). Theo from/to nếu có, không thì 7 ngày VN gần nhất.
