@@ -1,5 +1,5 @@
 import { ApiError, NETWORK_ERROR } from './api/errors';
-import { formatQuantity } from './format';
+import { formatMoney, formatQuantity } from './format';
 
 /**
  * Bộ dịch lỗi DUY NHẤT (luật 6). Map `code` → câu tiếng Việt: nói chuyện gì xảy ra + làm gì tiếp.
@@ -81,6 +81,9 @@ const MESSAGES: Record<string, string> = {
   // Sửa sản phẩm đơn Pancake trên ERP rồi đẩy lên Pancake (2026-11-02).
   PANCAKE_ORDER_ITEMS_LOCKED:
     'Pancake không cho sửa sản phẩm đơn này nên ERP chưa sửa gì. Kiểm tra đơn trên Pancake rồi thử lại.',
+  // Pancake chỉ giữ đơn giá nguyên đồng × SL (sự cố SOP2610-107401, 2026-11-03).
+  PANCAKE_LINE_AMOUNT_INDIVISIBLE:
+    'Thành tiền không chia hết cho số lượng — Pancake chỉ nhận đơn giá nguyên đồng nên ERP chưa lưu. Sửa thành tiền thành số chia hết cho số lượng.',
   // Quyền theo kho (PLAN-warehouse-context)
   WAREHOUSE_FORBIDDEN:
     'Bạn chưa được cấp quyền làm việc ở kho này. Đổi kho làm việc ở góc trái, hoặc nhờ quản lý cấp thêm kho.',
@@ -465,6 +468,21 @@ export function messageFor(err: unknown): string {
       const d = err.details as { skuCode?: unknown; reserved?: unknown } | null;
       if (d && typeof d.skuCode === 'string') {
         return `${d.skuCode}: tồn thực tế thấp hơn phần đang giữ cho đơn (${String(d.reserved ?? '')}). Xử lý đơn đang giữ hàng rồi nhập lại.`;
+      }
+    }
+    if (err.code === 'PANCAKE_LINE_AMOUNT_INDIVISIBLE') {
+      // SKU, SL, mức gợi ý là dữ liệu (details.lines), không phải message thô của server.
+      const d = err.details as {
+        lines?: { code?: unknown; qty?: unknown; lower?: unknown; upper?: unknown }[];
+      } | null;
+      const parts = (d?.lines ?? [])
+        .filter((l) => typeof l.code === 'string' && typeof l.lower === 'string')
+        .map(
+          (l) =>
+            `${String(l.code)} ×${String(l.qty)}: chọn ${formatMoney(String(l.lower), { unit: '' })} hoặc ${formatMoney(String(l.upper), { unit: '' })}`,
+        );
+      if (parts.length) {
+        return `Pancake chỉ nhận đơn giá nguyên đồng nên ERP chưa lưu — thành tiền phải chia hết cho số lượng. ${parts.join('; ')}.`;
       }
     }
     if (err.code === 'PANCAKE_ORDER_ITEMS_LOCKED') {

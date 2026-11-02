@@ -11954,14 +11954,18 @@ export interface components {
             docNumber: string;
             /**
              * @description NOTHING_TO_RESTORE · ORDER_CANCELLED · NEEDS_CANCEL · HAS_COMBO · HAS_CUSTOM_ITEMS ·
-             *     DUPLICATE_SKU · SKU_NOT_FOUND
+             *     DUPLICATE_SKU · SKU_NOT_FOUND · AMOUNT_NOT_DIVISIBLE (thành tiền không chia hết cho SL —
+             *     Pancake chỉ giữ đơn giá nguyên đồng)
              */
             code: string;
         };
         PancakeOverwriteFailedDto: {
             orderId: string;
             docNumber: string;
-            /** @description Mã lỗi nghiệp vụ của Sửa đơn (ORDER_LINES_LOCKED, PANCAKE_ORDER_ITEMS_LOCKED…). */
+            /**
+             * @description Mã lỗi nghiệp vụ của Sửa đơn (ORDER_LINES_LOCKED, PANCAKE_ORDER_ITEMS_LOCKED,
+             *     PANCAKE_LINE_AMOUNT_INDIVISIBLE…).
+             */
             code: string;
         };
         PancakeOverwriteRestoreResultDto: {

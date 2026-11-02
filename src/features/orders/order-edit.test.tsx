@@ -836,6 +836,49 @@ describe('OrderEditScreen — sửa sản phẩm / người nhận, quyền sử
     error.mockRestore();
   });
 
+  it('đơn Pancake: thành tiền không chia hết cho SL → báo + gợi ý hai mức, chặn lưu; chọn mức gợi ý → PUT đơn giá nguyên (SOP2610-107401, 2026-11-03)', async () => {
+    withDetail({ linesLockedReason: null, pancakeOrderId: '46422' });
+    const puts: Array<Record<string, unknown>> = [];
+    server.use(
+      http.put('/api/sales-orders/:id/lines', async ({ request, params }) => {
+        puts.push((await request.json()) as Record<string, unknown>);
+        return HttpResponse.json({
+          orderId: params.id,
+          docNumber: ORDER.docNumber,
+          subtotal: '0.0000',
+          discount: '0.0000',
+          total: '100010.0000',
+          awaitingStock: false,
+          pick: 'replanned',
+        });
+      }),
+    );
+    const error = vi.spyOn(toast, 'error').mockImplementation(() => '' as never);
+    renderApp(<OrderEditScreen orderId={ORDER.id} />);
+    await screen.findByRole('heading', { level: 1 });
+    // Dòng 1: SL 10 → thành tiền 100.005 = 10.000,5/món — Pancake không giữ được.
+    const total = (await screen.findAllByRole('textbox', { name: 'Thành tiền' }))[0]!;
+    fireEvent.focus(total);
+    fireEvent.change(total, { target: { value: '100005' } });
+    fireEvent.blur(total);
+    const alert = await screen.findByText(/Pancake chỉ nhận đơn giá nguyên đồng/);
+    expect(alert).toHaveTextContent('100.000');
+    expect(alert).toHaveTextContent('100.010');
+    fireEvent.click(screen.getByRole('button', { name: /Lưu thay đổi/ }));
+    expect(error).toHaveBeenCalledWith(expect.stringContaining('chia hết cho số lượng'));
+    expect(puts).toHaveLength(0);
+
+    fireEvent.click(screen.getByRole('button', { name: '100.010' }));
+    await waitFor(() =>
+      expect(screen.queryByText(/Pancake chỉ nhận đơn giá nguyên đồng/)).not.toBeInTheDocument(),
+    );
+    fireEvent.click(screen.getByRole('button', { name: /Lưu thay đổi/ }));
+    await waitFor(() => expect(puts).toHaveLength(1));
+    const sent = (puts[0]!.lines as Array<Record<string, string>>)[0]!;
+    expect(sent.unitPrice).toBe('10001');
+    error.mockRestore();
+  });
+
   it('đơn chỉ có món gõ tay, không đổi sản phẩm → không PUT /lines (vẫn lưu được phần khác)', async () => {
     withDetail({
       linesLockedReason: null,
