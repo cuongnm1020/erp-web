@@ -365,6 +365,7 @@ function InfoTab({ product }: { product: ProductDetail }) {
       <TextRow label="Thành phần" value={product.ingredients} />
       <TextRow label="Cách dùng" value={product.usageInstructions} />
       <TextRow label="Lưu ý khi lên đơn" value={product.orderNote} />
+      <TextRow label="SĐT người gửi trên vận đơn" value={product.senderPhone} />
       <div className="col-span-full grid grid-cols-detail gap-2 text-sm">
         <span className="text-muted-foreground">Ghi chú nội bộ</span>
         <span

@@ -145,6 +145,7 @@ function initialValues(p?: ProductDetail): ProductFormValues {
     ingredients: p?.ingredients ?? '',
     usageInstructions: p?.usageInstructions ?? '',
     orderNote: p?.orderNote ?? '',
+    senderPhone: p?.senderPhone ?? '',
     internalNote: p?.internalNote ?? '',
     searchAliases: (p?.searchAliases ?? []).join(', '),
     allowNegativeStock: p?.allowNegativeStock ?? false,
@@ -342,6 +343,8 @@ function ProductFormBody({
         ...(v.ingredients || editing ? { ingredients: v.ingredients } : {}),
         ...(v.usageInstructions || editing ? { usageInstructions: v.usageInstructions } : {}),
         ...(v.orderNote || editing ? { orderNote: v.orderNote } : {}),
+        // SĐT người gửi: '' → null để sửa xóa được số cũ; tạo bỏ trống = không gửi.
+        ...(v.senderPhone ? { senderPhone: v.senderPhone } : editing ? { senderPhone: null } : {}),
         ...(v.internalNote ? { internalNote: v.internalNote } : {}),
         searchAliases: parseAliases(v.searchAliases),
         allowNegativeStock: v.allowNegativeStock,
@@ -361,6 +364,7 @@ function ProductFormBody({
               'code',
               'name',
               'invoiceName',
+              'senderPhone',
               'reorderLevel',
               'categoryId',
               'brandId',
@@ -390,6 +394,7 @@ function ProductFormBody({
               'code',
               'name',
               'invoiceName',
+              'senderPhone',
               'reorderLevel',
               'categoryId',
               'brandId',
@@ -825,6 +830,24 @@ function ProductFormBody({
                       {...field}
                     />
                   </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="senderPhone"
+              render={({ field }) => (
+                <FormItem className="sm:col-span-2 lg:col-span-2">
+                  <FormLabel>SĐT người gửi trên vận đơn</FormLabel>
+                  <FormControl>
+                    <Input inputMode="tel" placeholder="0912 345 678" {...field} />
+                  </FormControl>
+                  <FormDescription>
+                    Shipper gọi số này khi đơn có vấn đề, thay cho số của POS / kho. Đơn nhiều sản
+                    phẩm dùng số của sản phẩm có thành tiền cao nhất. Bỏ trống thì dùng số POS /
+                    kho.
+                  </FormDescription>
                   <FormMessage />
                 </FormItem>
               )}

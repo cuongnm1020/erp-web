@@ -34,6 +34,15 @@ export const createProductSchema = z.object({
   ingredients: z.string().trim().max(2000, 'Tối đa 2000 ký tự'),
   usageInstructions: z.string().trim().max(2000, 'Tối đa 2000 ký tự'),
   orderNote: z.string().trim().max(2000, 'Tối đa 2000 ký tự'),
+  /**
+   * SĐT người gửi trên vận đơn (2026-11-02) — shipper gọi về khi đơn có vấn đề; thắng SĐT POS / kho.
+   * '' = không đặt (sửa gửi null để xóa). Server chuẩn hoá về `0…` 10–11 số và báo lỗi số sai.
+   */
+  senderPhone: z
+    .string()
+    .trim()
+    .max(20, 'Tối đa 20 ký tự')
+    .regex(/^[0-9+\s().-]*$/, 'Chỉ nhập số điện thoại'),
   internalNote: z.string().trim().max(2000, 'Tối đa 2000 ký tự'),
   searchAliases: z.string().trim().max(500, 'Tối đa 500 ký tự'),
   allowNegativeStock: z.boolean(),
