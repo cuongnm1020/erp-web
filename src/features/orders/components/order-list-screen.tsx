@@ -44,7 +44,7 @@ import {
 } from '@/components/ui/select';
 import { toast } from '@/components/ui/toaster';
 import { cn } from '@/lib/cn';
-import { messageFor, messageForCode } from '@/lib/error-messages';
+import { messageFor, messageForCode, messageForItemCode } from '@/lib/error-messages';
 import {
   formatDate,
   formatDateTime,
@@ -56,6 +56,7 @@ import {
   formatRelative,
   phoneCarrier,
   toDecimal,
+  toLocalDateKey,
 } from '@/lib/format';
 import { Can, useAbility } from '@/lib/permission';
 import { useInvalidateOn } from '@/lib/realtime';
@@ -84,6 +85,7 @@ import {
   type OrderCarrierStatusOption,
   type OrderDateField,
   type OrderItemOrigin,
+  type OrderPrintStatus,
   type OrderSortField,
   type SalesOrderListItem,
 } from '../api/use-orders';
@@ -109,6 +111,8 @@ import { SendToCarrierMenu } from './send-to-carrier-menu';
 import { PancakeOrderLink } from './pancake-order-link';
 import { SameDayOrdersHover } from './same-day-orders-hover';
 import { MarketplaceBadge, MaskedPhoneBadge, waybillErrorText } from './waybill-error';
+import { EntityPicker } from '@/components/data/form';
+import { useSkuDetail, useSkuSearch } from '../api/use-line-entry';
 
 /**
  * D-03 Quản lý đơn hàng — GET /sales-orders + GET /sales-orders/flow-counts (thiết kế lại
@@ -172,6 +176,10 @@ const DEFAULTS = {
     'carrierStatus',
     // Đơn thiếu tồn một SKU (Chờ hàng, 2026-10-25) — "Xem đơn" từ màn Hàng chờ.
     'shortSkuId',
+    // Đơn đã gửi ĐVVC: đã in / chưa in / lỗi in tem (2026-11-02).
+    'printStatus',
+    // Đơn có sản phẩm (SKU) này, kể cả thành phần combo (2026-11-02).
+    'skuId',
   ] as const,
 };
 
@@ -190,6 +198,18 @@ const CARRIER_SOURCE_OPTIONS: { value: OrderCarrierSource; label: string }[] = [
 ];
 const parseCarrierSource = (v: string | undefined): OrderCarrierSource | undefined =>
   CARRIER_SOURCE_OPTIONS.find((o) => o.value === v)?.value;
+
+/**
+ * In tem của đơn ĐÃ gửi sang ĐVVC (2026-11-02): xem đơn đẩy sang hãng mà chưa in được tem + lý do.
+ * "Lỗi" = "Đóng gói + in" không đóng gói được, hoặc hãng không cấp vận đơn.
+ */
+const PRINT_STATUS_OPTIONS: { value: OrderPrintStatus; label: string }[] = [
+  { value: 'NOT_PRINTED', label: 'Đã gửi ĐVVC · chưa in tem' },
+  { value: 'ERROR', label: 'Đã gửi ĐVVC · lỗi, không in được' },
+  { value: 'PRINTED', label: 'Đã gửi ĐVVC · đã in tem' },
+];
+const parsePrintStatus = (v: string | undefined): OrderPrintStatus | undefined =>
+  PRINT_STATUS_OPTIONS.find((o) => o.value === v)?.value;
 
 /** Ô "Trạng thái hãng": giá trị URL = từng chữ encodeURIComponent nối dấu phẩy (chữ hãng có dấu phẩy). */
 const decodeList = (v: string): string[] =>
@@ -711,7 +731,59 @@ function ShippingCell({
             : 'Lỗi vận đơn'}
         </span>
       ) : null}
+      <PrintStatusNote order={order} />
     </div>
+  );
+}
+
+/**
+ * In tem (2026-11-02): lý do "Đóng gói + in" không đóng gói được (câu theo mã — luật 6), hoặc mốc
+ * in tem gần nhất / "Chưa in tem" khi đã có mã vận đơn. Bộ lọc tương ứng: ô "In tem".
+ */
+function PrintStatusNote({ order }: { order: SalesOrderListItem }) {
+  if (order.packErrorCode) {
+    const reason = messageForItemCode(order.packErrorCode);
+    return (
+      <span
+        className="block max-w-64 whitespace-normal font-semibold text-destructive"
+        title={`Không đóng gói được lúc ${formatDateTime(order.packErrorAt)}: ${reason}`}
+        data-testid="pack-error"
+      >
+        Không in được: {reason}
+      </span>
+    );
+  }
+  if (order.labelPrintedAt) {
+    return (
+      <span className="block text-muted-foreground" data-testid="label-printed">
+        Đã in tem {formatDateTime(order.labelPrintedAt)}
+      </span>
+    );
+  }
+  if (order.shipment?.trackingNo && order.status !== 'CANCELLED' && !order.waybillErrorCode) {
+    return (
+      <span className="block font-semibold text-warning" data-testid="label-not-printed">
+        Chưa in tem
+      </span>
+    );
+  }
+  return null;
+}
+
+/** Ô lọc "Sản phẩm" (2026-11-02): chọn một SKU — đơn có dòng SKU đó, kể cả thành phần combo. */
+function ProductFilter({ skuId, onChange }: { skuId: string; onChange: (v: string) => void }) {
+  const detail = useSkuDetail(skuId);
+  return (
+    <EntityPicker
+      className="h-9 w-64"
+      value={skuId}
+      onChange={(id) => onChange(id)}
+      useSearch={useSkuSearch}
+      selectedLabel={detail.data ? `${detail.data.code} · ${detail.data.name}` : undefined}
+      placeholder="Sản phẩm: tất cả"
+      searchPlaceholder="Gõ tên / mã sản phẩm…"
+      emptyText="Không tìm thấy sản phẩm"
+    />
   );
 }
 
@@ -1080,6 +1152,8 @@ export function OrderListScreen() {
   const carrierAccountId = state.filters.carrierAccountId ?? '';
   const carrierSource = parseCarrierSource(state.filters.carrierSource);
   const shortSkuId = state.filters.shortSkuId ?? '';
+  const printStatus = parsePrintStatus(state.filters.printStatus);
+  const skuId = state.filters.skuId ?? '';
   // Ô "Nguồn" gộp cả POS: `POS:<mã shop>` = đơn Pancake của đúng POS đó (URL giữ một khoá).
   const posShopId = /^POS:(\d+)$/.exec(state.filters.source ?? '')?.[1] ?? '';
   const source: 'PANCAKE' | 'ERP' | undefined =
@@ -1139,6 +1213,8 @@ export function OrderListScreen() {
       carrierAccountId,
       carrierSource,
       shortSkuId,
+      printStatus,
+      skuId,
       source,
       pancakeShopId: posShopId || undefined,
       from,
@@ -1164,6 +1240,8 @@ export function OrderListScreen() {
       carrierAccountId,
       carrierSource,
       shortSkuId,
+      printStatus,
+      skuId,
       source,
       posShopId,
       from,
@@ -1301,6 +1379,8 @@ export function OrderListScreen() {
     carrierSource !== undefined ||
     carrierStatus !== '' ||
     shortSkuId !== '' ||
+    printStatus !== undefined ||
+    skuId !== '' ||
     source !== undefined ||
     from !== '' ||
     to !== '' ||
@@ -1380,6 +1460,23 @@ export function OrderListScreen() {
               rememberKey: 'date.orders',
               fieldKey: 'dateField',
               fields: DATE_FIELDS,
+            },
+            {
+              key: 'printStatus',
+              label: 'In tem',
+              type: 'select',
+              options: PRINT_STATUS_OPTIONS,
+            },
+            {
+              key: 'skuId',
+              label: 'Sản phẩm',
+              type: 'custom',
+              render: () => (
+                <ProductFilter
+                  skuId={skuId}
+                  onChange={(v) => setFilter({ skuId: v || undefined })}
+                />
+              ),
             },
             {
               // Một ô cho cả "chưa gán hãng" lẫn "đã gán hãng X" — hai key URL (noCarrier / carrierId)
@@ -1523,8 +1620,23 @@ export function OrderListScreen() {
             creatorId,
             fbPage: state.filters.fbPage,
             carrierStatus: state.filters.carrierStatus,
+            printStatus: state.filters.printStatus,
+            skuId: state.filters.skuId,
           }}
-          onFilterChange={setFilter}
+          onFilterChange={(patch) =>
+            // Chọn "In tem" khi chưa lọc ngày → mặc định đơn gán ĐVVC HÔM NAY (2026-11-02); đổi
+            // khoảng ngày / trường ngày ở ô ngày như thường.
+            setFilter(
+              patch.printStatus && !from && !to
+                ? {
+                    ...patch,
+                    dateField: 'sentToCarrierAt',
+                    from: toLocalDateKey(new Date()) ?? undefined,
+                    to: toLocalDateKey(new Date()) ?? undefined,
+                  }
+                : patch,
+            )
+          }
           searchPlaceholder="Mã đơn, mã Pancake, SĐT, tên khách, tên sản phẩm, mã vận đơn"
           right={
             <>

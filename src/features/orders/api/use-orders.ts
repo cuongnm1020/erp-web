@@ -57,6 +57,13 @@ export interface OrderListParams {
   carrierStatusText?: string[];
   /** Đơn đang thiếu tồn SKU này (Chờ hàng — "Xem đơn" từ màn Hàng chờ). */
   shortSkuId?: string;
+  /**
+   * In tem của đơn ĐÃ gửi sang ĐVVC (2026-11-02): đã in / chưa in / lỗi (đóng gói + in không được
+   * hoặc lỗi vận đơn).
+   */
+  printStatus?: OrderPrintStatus;
+  /** Đơn có sản phẩm (SKU) này — kể cả thành phần combo. */
+  skuId?: string;
   /** true = chỉ đơn có đơn trùng trong ngày (cùng SĐT, cùng ngày VN, chưa hủy — CSKH-5). */
   duplicate?: boolean;
   /** Khoảng orderDate — ngày `YYYY-MM-DD` (server lấy trọn ngày VN) hoặc ISO datetime. */
@@ -85,6 +92,7 @@ export interface OrderListParams {
 type OrderListQuery = NonNullable<paths['/sales-orders']['get']['parameters']['query']>;
 export type OrderItemOrigin = NonNullable<OrderListQuery['itemOrigin']>;
 export type OrderCarrierSource = NonNullable<OrderListQuery['carrierSource']>;
+export type OrderPrintStatus = NonNullable<OrderListQuery['printStatus']>;
 export type OrderSortField = NonNullable<OrderListQuery['sortBy']>;
 
 /** Query key theo phễu (luật 3): ['crm','orders','list', params] / ['crm','orders','detail', id]. */
@@ -185,6 +193,8 @@ function listQuery(params: Omit<OrderListParams, 'take' | 'skip'>) {
     carrierSource: params.carrierSource,
     carrierStatusText: params.carrierStatusText?.length ? params.carrierStatusText : undefined,
     shortSkuId: params.shortSkuId || undefined,
+    printStatus: params.printStatus,
+    skuId: params.skuId || undefined,
     duplicate: params.duplicate ? ('true' as const) : undefined,
     from: params.from || undefined,
     to: params.to || undefined,

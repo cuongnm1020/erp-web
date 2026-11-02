@@ -1,7 +1,7 @@
 'use client';
 
 import { Printer, RefreshCw } from 'lucide-react';
-import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
@@ -26,6 +26,7 @@ import {
   labelUrl,
   useRequestWaybill,
   useShipment,
+  useMarkLabelsPrinted,
   useShipmentLabelData,
   type PdaWaybill,
 } from '../api/use-pda';
@@ -271,7 +272,17 @@ function ErpLabel({
   const printer = usePrint();
   const [printedAt, setPrintedAt] = useState(() => new Date());
   const autoPrinted = useRef(false);
-  const print = printer.print;
+  const markPrinted = useMarkLabelsPrinted();
+  const markRef = useRef(markPrinted.mutate);
+  markRef.current = markPrinted.mutate;
+  const hasTracking = !!label.data?.trackingNo;
+  // Mỗi lần in tem ERP ghi nhận "đã in" cho bộ lọc "In tem" của danh sách đơn (2026-11-02); lỗi
+  // ghi nhận không chặn việc in.
+  const openPrint = printer.print;
+  const print = useCallback(() => {
+    openPrint();
+    if (hasTracking) markRef.current([shipmentId], { onError: () => undefined });
+  }, [openPrint, hasTracking, shipmentId]);
 
   useEffect(() => {
     if (label.data && !autoPrinted.current) {

@@ -3858,6 +3858,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/sales-orders/labels-printed": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Ghi nhận đã in tem ERP 100×75 (2026-11-02) — web gọi ngay khi mở lệnh in (Đóng gói + in, In lại
+         *     vận đơn, trạm đóng gói). Bộ lọc "In tem" của danh sách đơn dựa vào mốc này. Chỉ phiếu đã có mã.
+         */
+        post: operations["SalesOrderController_labelsPrinted"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/sales-orders/{id}/shipping-quote": {
         parameters: {
             query?: never;
@@ -3884,8 +3904,10 @@ export interface paths {
         get?: never;
         /**
          * Sửa sản phẩm (2026-10-29): THAY toàn bộ dòng — thêm / bỏ / đổi số lượng, định giá lại, giữ
-         *     chỗ lại, lập lại PICK chờ. Chỉ người được sửa đơn (403 FORBIDDEN), đơn ERP không khuyến mãi,
-         *     kho chưa bắt đầu lấy hàng (409 ORDER_LINES_LOCKED). Ghi lịch sử sửa đơn.
+         *     chỗ lại, lập lại PICK chờ. Chỉ người được sửa đơn (403 FORBIDDEN), đơn không khuyến mãi,
+         *     kho chưa bắt đầu lấy hàng (409 ORDER_LINES_LOCKED). Đơn Pancake (2026-11-02): đẩy dòng mới lên
+         *     Pancake cùng lúc, bỏ món gõ tay — Pancake đã đóng gói / có vận đơn / SKU chưa có trên shop /
+         *     Pancake từ chối → 409 PANCAKE_ORDER_ITEMS_LOCKED, ERP không đổi. Ghi lịch sử sửa đơn.
          */
         put: operations["SalesOrderController_replaceLines"];
         post?: never;
@@ -11526,6 +11548,17 @@ export interface components {
             waybillErrorCode: string | null;
             /** @description ISO — lúc ghi lỗi vận đơn. */
             waybillErrorAt: string | null;
+            /** @description ISO — lần in tem vận đơn gần nhất (tem hãng / tem ERP 100×75); null = chưa in (2026-11-02). */
+            labelPrintedAt: string | null;
+            /**
+             * @description Lý do "Đóng gói + in vận đơn" lần gần nhất KHÔNG đóng gói được (lời lỗi nghiệp vụ của API,
+             *     2026-11-02); null = không lỗi / đã đóng gói. Lỗi sau khi đóng gói là `waybillError`.
+             */
+            packError: string | null;
+            /** @description Mã lỗi của `packError` (SHIPMENT_ALREADY_DISPATCHED, PACK_LINE_NO_RESERVATION, …). */
+            packErrorCode: string | null;
+            /** @description ISO — lúc ghi `packError`. */
+            packErrorAt: string | null;
             /**
              * @description Số đơn KHÁC chưa hủy cùng SĐT khách, cùng ngày VN, mọi nguồn / mọi team (CSKH-5) — > 0 = nhãn
              *     "Trùng trong ngày".
@@ -12079,6 +12112,12 @@ export interface components {
         BulkFulfilOrdersResultDto: {
             done: components["schemas"]["BulkFulfilDoneItemDto"][];
             failed: components["schemas"]["BulkFulfilFailedItemDto"][];
+        };
+        LabelsPrintedDto: {
+            shipmentIds: string[];
+        };
+        LabelsPrintedResultDto: {
+            orderIds: string[];
         };
         ShippingQuoteResultDto: {
             orderId: string;
@@ -23115,6 +23154,12 @@ export interface operations {
                  *     GET /sales-orders/carrier-status-options.
                  */
                 carrierStatusText?: string[];
+                /**
+                 * @description Bộ lọc "Đã gửi ĐVVC — in tem" (2026-11-02), chỉ đơn ĐÃ gửi sang ĐVVC (`sentToCarrierAt`):
+                 *     `PRINTED` đã in tem (phiếu giao mới nhất có `labelPrintedAt`); `NOT_PRINTED` chưa in, không lỗi;
+                 *     `ERROR` có lỗi — "Đóng gói + in" không đóng gói được (`packError`) hoặc lỗi vận đơn.
+                 */
+                printStatus?: "PRINTED" | "NOT_PRINTED" | "ERROR";
                 /** @description Trường ngày mà from/to lọc — xem ORDER_DATE_FIELDS. Bỏ trống = `orderDate`. */
                 dateField?: "orderDate" | "createdAt" | "updatedAt" | "sentToCarrierAt";
                 /**
@@ -23152,6 +23197,8 @@ export interface operations {
                  *     (`carrierAccountId` null) tính là tài khoản mặc định của hãng. Thay được cho `carrierId`.
                  */
                 carrierAccountId?: string;
+                /** @description Đơn có dòng SKU này (core.Sku.id) — kể cả dòng thành phần của combo SKU này (2026-11-02). */
+                skuId?: string;
                 /** @description Đơn đang thiếu tồn SKU này (core.Sku.id) — "Xem đơn" từ màn Hàng chờ (2026-10-25). */
                 shortSkuId?: string;
                 /**
@@ -23310,6 +23357,12 @@ export interface operations {
                  *     GET /sales-orders/carrier-status-options.
                  */
                 carrierStatusText?: string[];
+                /**
+                 * @description Bộ lọc "Đã gửi ĐVVC — in tem" (2026-11-02), chỉ đơn ĐÃ gửi sang ĐVVC (`sentToCarrierAt`):
+                 *     `PRINTED` đã in tem (phiếu giao mới nhất có `labelPrintedAt`); `NOT_PRINTED` chưa in, không lỗi;
+                 *     `ERROR` có lỗi — "Đóng gói + in" không đóng gói được (`packError`) hoặc lỗi vận đơn.
+                 */
+                printStatus?: "PRINTED" | "NOT_PRINTED" | "ERROR";
                 /** @description Trường ngày mà from/to lọc — xem ORDER_DATE_FIELDS. Bỏ trống = `orderDate`. */
                 dateField?: "orderDate" | "createdAt" | "updatedAt" | "sentToCarrierAt";
                 /**
@@ -23347,6 +23400,8 @@ export interface operations {
                  *     (`carrierAccountId` null) tính là tài khoản mặc định của hãng. Thay được cho `carrierId`.
                  */
                 carrierAccountId?: string;
+                /** @description Đơn có dòng SKU này (core.Sku.id) — kể cả dòng thành phần của combo SKU này (2026-11-02). */
+                skuId?: string;
                 /** @description Đơn đang thiếu tồn SKU này (core.Sku.id) — "Xem đơn" từ màn Hàng chờ (2026-10-25). */
                 shortSkuId?: string;
                 /**
@@ -23508,6 +23563,29 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["BulkFulfilOrdersResultDto"];
+                };
+            };
+        };
+    };
+    SalesOrderController_labelsPrinted: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["LabelsPrintedDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LabelsPrintedResultDto"];
                 };
             };
         };

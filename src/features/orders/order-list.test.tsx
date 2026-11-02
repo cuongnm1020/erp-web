@@ -1602,3 +1602,71 @@ describe('OrderListScreen — Đơn mới / Xác nhận / Chờ hàng (2026-10-3
     await waitFor(() => expect(toastSuccess).toHaveBeenCalledWith('Đã chuyển Chờ hàng 1 đơn'));
   });
 });
+
+describe('OrderListScreen — bộ lọc "In tem" của đơn đã gửi ĐVVC (2026-11-02)', () => {
+  const ship = {
+    id: 'ship-p-1',
+    status: 'PENDING' as const,
+    carrierCode: 'GHTK',
+    carrierName: 'Giao Hàng Tiết Kiệm',
+    trackingNo: 'S1.BO.1',
+    shipFee: null,
+    codAmount: '290000.0000',
+    collectedAmount: null,
+  };
+  const [a, b, c] = makeOrders(3);
+
+  it('URL printStatus=ERROR → gửi đúng tham số; dòng hiện lý do cụ thể theo mã, chưa in / đã in', async () => {
+    search = 'printStatus=ERROR&skuId=11111111-1111-4111-8111-111111111111';
+    const seen: URLSearchParams[] = [];
+    server.use(
+      http.get('/api/sales-orders', ({ request }) => {
+        seen.push(new URL(request.url).searchParams);
+        return HttpResponse.json({
+          items: [
+            {
+              ...a!,
+              packError: 'Không tìm được reservation',
+              packErrorCode: 'PACK_LINE_NO_RESERVATION',
+              packErrorAt: '2026-11-02T02:00:00.000Z',
+            },
+            { ...b!, shipment: ship },
+            {
+              ...c!,
+              shipment: { ...ship, id: 'ship-p-2' },
+              labelPrintedAt: '2026-11-02T03:00:00Z',
+            },
+          ],
+          total: 3,
+        });
+      }),
+    );
+    renderApp(<OrderListScreen />);
+    await screen.findByText(a!.docNumber);
+    const last = seen[seen.length - 1]!;
+    expect(last.get('printStatus')).toBe('ERROR');
+    expect(last.get('skuId')).toBe('11111111-1111-4111-8111-111111111111');
+    // Lý do theo mã (luật 6) — không phải câu chung "Yêu cầu không hợp lệ", không phải lời thô API.
+    const err = screen.getByTestId('pack-error');
+    expect(err).toHaveTextContent('không còn được giữ chỗ');
+    expect(err).not.toHaveTextContent('reservation');
+    expect(screen.getByTestId('label-not-printed')).toHaveTextContent('Chưa in tem');
+    expect(screen.getByTestId('label-printed')).toHaveTextContent('Đã in tem');
+  });
+
+  it('mã lỗi chưa có câu dịch → nói rõ mã, không rơi về câu chung', async () => {
+    search = 'printStatus=ERROR';
+    server.use(
+      http.get('/api/sales-orders', () =>
+        HttpResponse.json({
+          items: [{ ...a!, packErrorCode: 'SOME_NEW_CODE', packError: 'x', packErrorAt: null }],
+          total: 1,
+        }),
+      ),
+    );
+    renderApp(<OrderListScreen />);
+    await screen.findByText(a!.docNumber);
+    expect(screen.getByTestId('pack-error')).toHaveTextContent('Lỗi SOME_NEW_CODE');
+    expect(screen.getByTestId('pack-error')).not.toHaveTextContent('Yêu cầu không hợp lệ');
+  });
+});

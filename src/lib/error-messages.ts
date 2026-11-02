@@ -77,6 +77,9 @@ const MESSAGES: Record<string, string> = {
   MOVE_TARGET_WAREHOUSE_INVALID: 'Kho chuyển tới đã ngừng dùng. Chọn kho khác.',
   PANCAKE_ORDER_WAREHOUSE_LOCKED:
     'Pancake không cho đổi kho đơn này (đơn trên Pancake đã qua bước đóng gói, đã có vận đơn, hoặc Pancake từ chối) nên ERP không chuyển. Kiểm tra đơn trên Pancake rồi thử lại.',
+  // Sửa sản phẩm đơn Pancake trên ERP rồi đẩy lên Pancake (2026-11-02).
+  PANCAKE_ORDER_ITEMS_LOCKED:
+    'Pancake không cho sửa sản phẩm đơn này nên ERP chưa sửa gì. Kiểm tra đơn trên Pancake rồi thử lại.',
   // Quyền theo kho (PLAN-warehouse-context)
   WAREHOUSE_FORBIDDEN:
     'Bạn chưa được cấp quyền làm việc ở kho này. Đổi kho làm việc ở góc trái, hoặc nhờ quản lý cấp thêm kho.',
@@ -182,6 +185,31 @@ const MESSAGES: Record<string, string> = {
     'Đơn đã đóng gói, hàng đã trừ kho — không hủy được. Xử lý bằng hoàn hàng / nhập lại kho.',
   SHIPMENT_CANCELLED: 'Phiếu giao này đã hủy theo đơn — không đóng gói / giao hãng được nữa.',
   SHIPMENT_CANCEL_VIA_ORDER: 'Muốn hủy phiếu giao thì hủy đơn bán, không đổi tay trạng thái phiếu.',
+  // "Đóng gói + in vận đơn" (bulk-fulfil) — mã trước đây rơi về câu chung "Yêu cầu không hợp lệ"
+  // (2026-11-02, đơn SOP2611-1827xx).
+  ORDER_NOT_EDITABLE: 'Đơn đã kết thúc (đã chốt hoặc đã hủy) — không đóng gói được nữa.',
+  SHIPMENT_ALREADY_DISPATCHED:
+    'Hãng đã lấy hàng / phiếu giao đã rời kho — không đóng gói lại được. Kiểm tra tồn với quản lý kho.',
+  SHIPMENT_INVALID_TRANSITION:
+    'Phiếu giao không ở trạng thái đóng gói được (đã hủy / hãng đã xử lý). Mở đơn xem trạng thái phiếu giao.',
+  SHIPMENT_NOT_FOUND: 'Không tìm thấy phiếu giao của đơn. Tải lại danh sách rồi thử lại.',
+  SHIPMENT_NOT_PACKED: 'Phiếu giao chưa đóng gói — đóng gói trước rồi mới xin vận đơn / in tem.',
+  PACK_TASK_NOT_FOUND:
+    'Đơn chưa có việc đóng gói (PACK) — việc pick chưa xong hoặc chưa sinh. Thử lại sau ít phút.',
+  PACK_LINE_NO_RESERVATION:
+    'Hàng của đơn không còn được giữ chỗ trong kho (giữ chỗ đã nhả / tồn đã chuyển vị trí). Báo quản lý kho kiểm tồn và giữ chỗ lại cho đơn.',
+  RESERVATION_NOT_ACTIVE:
+    'Chỗ giữ hàng của đơn không còn hiệu lực (đã nhả hoặc đã dùng). Báo quản lý kho kiểm tồn của đơn.',
+  INSUFFICIENT_COST_LAYERS:
+    'Tồn của sản phẩm chưa có giá vốn (nhập tồn không qua phiếu nhập) — không trừ kho được. Báo kế toán / kho nhập giá vốn cho sản phẩm.',
+  BALANCE_INCONSISTENT: 'Số tồn của sản phẩm đang lệch sổ — báo IT số đơn để kiểm tra.',
+  TASK_INVALID_TRANSITION:
+    'Việc lấy hàng / đóng gói đang ở trạng thái không đóng được (sự cố / đã hủy). Mở bảng điều phối xử lý việc đó trước.',
+  INVALID_TASK_INPUT: 'Dữ liệu việc kho của đơn không hợp lệ. Báo IT số đơn.',
+  INVALID_SHIPPING_INPUT:
+    'Thông tin gửi hãng của đơn chưa hợp lệ (cân nặng / COD). Sửa đơn rồi thử lại.',
+  RECIPIENT_ADDRESS_MISSING:
+    'Đơn thiếu địa chỉ người nhận. Bổ sung địa chỉ ở màn sửa đơn rồi thử lại.',
   // Luồng đơn ERP (2026-10-31).
   ORDER_STAGE_LOCKED:
     'Kho đã xử lý đơn này (gửi hãng / chờ hàng / đang lấy hàng) — không sửa hay hủy được nữa. Liên hệ kho hoặc quản lý.',
@@ -343,6 +371,14 @@ export function messageForCode(code: string, status?: number): string {
   );
 }
 
+/**
+ * Câu cho lỗi TỪNG ĐƠN trong lô (bulk-fulfil, gửi hãng…, 2026-11-02): mã chưa có câu dịch thì nói rõ
+ * mã lỗi để kho báo IT — không rơi về câu chung "Yêu cầu không hợp lệ" (vô nghĩa với từng đơn).
+ */
+export function messageForItemCode(code: string): string {
+  return MESSAGES[code] ?? `Lỗi ${code} khi xử lý đơn này. Báo IT số đơn và mã lỗi.`;
+}
+
 /** Câu hiển thị cho mọi lỗi — ApiError hoặc lỗi JS bất kỳ. Không bao giờ trả message thô. */
 export function messageFor(err: unknown): string {
   if (err instanceof ApiError) {
@@ -389,6 +425,30 @@ export function messageFor(err: unknown): string {
       const d = err.details as { skuCode?: unknown; reserved?: unknown } | null;
       if (d && typeof d.skuCode === 'string') {
         return `${d.skuCode}: tồn thực tế thấp hơn phần đang giữ cho đơn (${String(d.reserved ?? '')}). Xử lý đơn đang giữ hàng rồi nhập lại.`;
+      }
+    }
+    if (err.code === 'PANCAKE_ORDER_ITEMS_LOCKED') {
+      // SKU thiếu / trạng thái / vận đơn / lời Pancake là dữ liệu (details), không phải message thô.
+      const d = err.details as {
+        missingSkus?: { code?: unknown; name?: unknown }[];
+        pancakeStatus?: unknown;
+        waybill?: unknown;
+        pancakeSaid?: unknown;
+      } | null;
+      const skus = (d?.missingSkus ?? [])
+        .filter((s) => typeof s.code === 'string')
+        .map((s) => `${String(s.code)}${typeof s.name === 'string' ? ` ${s.name}` : ''}`);
+      if (skus.length) {
+        return `Sản phẩm chưa có trên shop Pancake của đơn: ${skus.join(', ')}. Đẩy sản phẩm lên Pancake (Danh mục) hoặc chọn sản phẩm khác — ERP chưa sửa gì.`;
+      }
+      if (typeof d?.waybill === 'string') {
+        return `Đơn đã có vận đơn ${d.waybill} trên Pancake — không sửa sản phẩm được nữa.`;
+      }
+      if (typeof d?.pancakeStatus === 'string') {
+        return `Đơn đang ở trạng thái "${d.pancakeStatus}" trên Pancake — hàng đã đóng gói / đi, không sửa sản phẩm được nữa.`;
+      }
+      if (typeof d?.pancakeSaid === 'string') {
+        return `Pancake từ chối sửa sản phẩm, ERP chưa sửa gì. Pancake báo: "${d.pancakeSaid}".`;
       }
     }
     const base = messageForCode(err.code, err.status);
