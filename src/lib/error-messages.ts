@@ -1,4 +1,5 @@
 import { ApiError, NETWORK_ERROR } from './api/errors';
+import { formatQuantity } from './format';
 
 /**
  * Bộ dịch lỗi DUY NHẤT (luật 6). Map `code` → câu tiếng Việt: nói chuyện gì xảy ra + làm gì tiếp.
@@ -253,6 +254,13 @@ const MESSAGES: Record<string, string> = {
     'Số hàng rời vượt phần chuyển được (phần còn lại đã quét lấy cho đơn hoặc nằm trong thùng). Giảm số lượng.',
   PDA_RELOCATE_EMPTY: 'Vị trí này không còn hàng nào chuyển được.',
   RECEIPT_PUTAWAY_NOTHING: 'Phiếu không còn hàng chờ cất. Tải lại trang để xem tiến độ mới.',
+  RECEIPT_CANCELLED: 'Phiếu nhập đã hủy — không sửa được. Tạo phiếu mới nếu cần.',
+  RECEIPT_PUTAWAY_OPEN:
+    'Phiếu đang cất hàng. Cất xong (hoặc "Cất tất cả vào vị trí mặc định") rồi sửa số lượng.',
+  RECEIPT_LINE_PACKED:
+    'Dòng nhập theo thùng — số lượng nằm trong từng thùng, không sửa trên phiếu. Sửa bằng kiểm kê vị trí.',
+  RECEIPT_QTY_NOT_REDUCIBLE:
+    'Không bớt được số lượng này — phần hàng của phiếu đã giữ chỗ cho đơn hoặc đã bán. Nhập số lớn hơn.',
   PDA_NO_DEFAULT_LOCATION: 'Kho chưa có vị trí DEFAULT đang dùng. Tạo ở màn Kho & vị trí.',
   PDA_LOCATION_OTHER_WAREHOUSE: 'Vị trí vừa quét thuộc kho khác. Quét vị trí trong kho của việc.',
   PDA_LOCATION_NOT_STORABLE:
@@ -410,6 +418,17 @@ export function messageFor(err: unknown): string {
       const d = err.details as { fileWarehouseCode?: unknown; warehouseName?: unknown } | null;
       if (d && typeof d.fileWarehouseCode === 'string') {
         return `File này là tồn của kho ${d.fileWarehouseCode}, đang nhập vào ${typeof d.warehouseName === 'string' ? d.warehouseName : 'kho khác'}. Chọn đúng kho đã xuất file, hoặc xuất lại file của kho này.`;
+      }
+    }
+    if (err.code === 'RECEIPT_QTY_NOT_REDUCIBLE') {
+      // Số tối đa + lý do là dữ liệu (details), không phải message thô (luật 6).
+      const d = err.details as { lineNo?: unknown; max?: unknown; reason?: unknown } | null;
+      if (d && typeof d.max === 'string' && typeof d.lineNo === 'number') {
+        const why =
+          d.reason === 'SOLD'
+            ? 'phần còn lại của phiếu đã bán / xuất'
+            : 'phần còn lại đang giữ chỗ cho đơn';
+        return `Dòng ${d.lineNo} chỉ bớt được tối đa ${formatQuantity(d.max)} — ${why}. Nhập số lớn hơn.`;
       }
     }
     if (err.code === 'SKU_CODE_TAKEN') {

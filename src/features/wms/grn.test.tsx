@@ -620,7 +620,7 @@ describe('GrnDetailScreen — GET /goods-receipts/:id', () => {
       ),
     );
     renderApp(<GrnDetailScreen id="r-1" />);
-    expect(await screen.findByText(/Chứng từ bất biến/)).toBeInTheDocument();
+    expect(await screen.findByText(/Sai số lượng → "Sửa số lượng"/)).toBeInTheDocument();
     expect(await screen.findByText('B-01-01-A')).toBeInTheDocument();
     // 2 thùng cùng lần ghi ở NHAN gom một dòng "2 thùng · +60"; mở ra mới thấy từng thùng.
     expect(screen.getAllByText('+ Nhập')).toHaveLength(2);
@@ -804,6 +804,114 @@ describe('Giá nhập theo quyền stock.cost + tiến độ Chờ nhập giá �
     expect(screen.queryByLabelText('Đơn giá dòng 1')).toBeNull();
     fireEvent.click(screen.getByRole('button', { name: /Sửa giá nhập/ }));
     expect(screen.getByLabelText('Đơn giá dòng 1')).toHaveValue('340.000');
+  });
+});
+
+/**
+ * 2026-11-02 — sửa số lượng phiếu nhập (stock.adjust): ô SL cho dòng hàng rời → POST :id/quantities;
+ * phiếu đã ghi sổ hỏi xác nhận chênh lệch trước, phiếu nháp lưu thẳng; dòng theo thùng chỉ đọc.
+ */
+describe('Sửa số lượng phiếu nhập — 2026-11-02', () => {
+  const WAREHOUSE_ME = {
+    permissions: ['stock.read', 'stock.receive', 'stock.adjust'],
+    hasGlobalAccess: false,
+  };
+  const DETAIL_DONE = {
+    ...DETAIL_DRAFT,
+    status: 'POSTED',
+    stage: 'AWAITING_COST',
+    postedAt: '2026-08-23T10:12:00.000Z',
+    putAwayDoneAt: '2026-08-23T11:00:00.000Z',
+  };
+  const posts: unknown[] = [];
+
+  beforeEach(() => {
+    posts.length = 0;
+    toastError.mockClear();
+    server.use(
+      http.get('/api/goods-receipts/:id/movements', () => HttpResponse.json([])),
+      http.post('/api/goods-receipts/:id/quantities', async ({ request }) => {
+        posts.push(await request.json());
+        return HttpResponse.json({
+          receiptId: 'r-1',
+          lines: [
+            { lineId: 'l-1', lineNo: 1, fromQtyBase: '50', toQtyBase: '46', movementCount: 1 },
+          ],
+        });
+      }),
+    );
+  });
+
+  it('phiếu đã cất xong: Sửa số lượng → nhập 46 → hộp xác nhận nêu chênh lệch → POST :id/quantities', async () => {
+    server.use(http.get('/api/goods-receipts/:id', () => HttpResponse.json(DETAIL_DONE)));
+    renderApp(<GrnDetailScreen id="r-1" />, { me: WAREHOUSE_ME });
+    fireEvent.click(await screen.findByRole('button', { name: /Sửa số lượng/ }));
+    const input = screen.getByLabelText('Số lượng dòng 1');
+    expect(input).toHaveValue('50');
+    fireEvent.change(input, { target: { value: '46' } });
+    fireEvent.click(screen.getByRole('button', { name: /^Lưu số lượng/ }));
+    const dialog = await screen.findByRole('dialog');
+    expect(within(dialog).getByText(/Dòng 1 DA-A4-80: 50 → 46 \(−4 REAM\)/)).toBeInTheDocument();
+    expect(posts).toHaveLength(0);
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Ghi điều chỉnh' }));
+    await waitFor(() => expect(posts).toHaveLength(1));
+    expect(posts[0]).toEqual({ lines: [{ lineId: 'l-1', qtyBase: '46' }] });
+  });
+
+  it('bớt quá phần giữ chỗ → câu lỗi nêu số tối đa từ details (không hiện message thô)', async () => {
+    server.use(
+      http.get('/api/goods-receipts/:id', () => HttpResponse.json(DETAIL_DONE)),
+      http.post('/api/goods-receipts/:id/quantities', () =>
+        HttpResponse.json(
+          {
+            code: 'RECEIPT_QTY_NOT_REDUCIBLE',
+            message: 'raw',
+            details: { lineNo: 1, max: '3', reason: 'RESERVED' },
+          },
+          { status: 422 },
+        ),
+      ),
+    );
+    renderApp(<GrnDetailScreen id="r-1" />, { me: WAREHOUSE_ME });
+    fireEvent.click(await screen.findByRole('button', { name: /Sửa số lượng/ }));
+    fireEvent.change(screen.getByLabelText('Số lượng dòng 1'), { target: { value: '40' } });
+    fireEvent.click(screen.getByRole('button', { name: /^Lưu số lượng/ }));
+    fireEvent.click(
+      within(await screen.findByRole('dialog')).getByRole('button', {
+        name: 'Ghi điều chỉnh',
+      }),
+    );
+    await waitFor(() =>
+      expect(toastError).toHaveBeenCalledWith(
+        'Dòng 1 chỉ bớt được tối đa 3 — phần còn lại đang giữ chỗ cho đơn. Nhập số lớn hơn.',
+      ),
+    );
+  });
+
+  it('phiếu nháp lưu thẳng không hỏi; không có stock.adjust / đang cất / chỉ dòng theo thùng → không có nút', async () => {
+    server.use(http.get('/api/goods-receipts/:id', () => HttpResponse.json(DETAIL_DRAFT)));
+    const { unmount } = renderApp(<GrnDetailScreen id="r-1" />, { me: WAREHOUSE_ME });
+    fireEvent.click(await screen.findByRole('button', { name: /Sửa số lượng/ }));
+    fireEvent.change(screen.getByLabelText('Số lượng dòng 1'), { target: { value: '55' } });
+    fireEvent.click(screen.getByRole('button', { name: /^Lưu số lượng/ }));
+    await waitFor(() => expect(posts).toEqual([{ lines: [{ lineId: 'l-1', qtyBase: '55' }] }]));
+    expect(screen.queryByRole('dialog')).toBeNull();
+    unmount();
+
+    const cases: Array<
+      [Record<string, unknown>, { permissions: string[]; hasGlobalAccess: boolean }]
+    > = [
+      [DETAIL_DONE, { permissions: ['stock.read', 'stock.receive'], hasGlobalAccess: false }],
+      [{ ...DETAIL_DONE, stage: 'PUTTING_AWAY', putAwayDoneAt: null }, WAREHOUSE_ME],
+      [{ ...DETAIL_PACKED, status: 'POSTED', stage: 'COMPLETED' }, WAREHOUSE_ME],
+    ];
+    for (const [detail, me] of cases) {
+      server.use(http.get('/api/goods-receipts/:id', () => HttpResponse.json(detail)));
+      const r = renderApp(<GrnDetailScreen id="r-1" />, { me });
+      expect(await screen.findByText('Giấy A4 Double A 80gsm')).toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: /Sửa số lượng/ })).toBeNull();
+      r.unmount();
+    }
   });
 });
 

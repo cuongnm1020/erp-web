@@ -5133,6 +5133,27 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/goods-receipts/{id}/quantities": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Sửa số lượng dòng nhập sai (2026-11-02, quyền `stock.adjust`). Phiếu nháp → đổi thẳng; phiếu đã
+         *     ghi sổ → chênh lệch ghi movement ADJUSTMENT (nhập thêm vào vị trí đã cất / bớt từ hàng khả
+         *     dụng, lớp giá vốn của dòng). Dòng nhập theo thùng, phiếu đang cất, chuyển kho → 422; hủy → 409.
+         */
+        post: operations["ReceivingController_correctQuantities"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/waiting-stock/summary": {
         parameters: {
             query?: never;
@@ -14196,6 +14217,35 @@ export interface components {
             layerCount: number;
             /** @description Đơn bán đã tiêu thụ hàng của phiếu trước khi có giá → giá vốn được tính lại (worker). */
             affectedOrderCount: number;
+        };
+        ReceiptQtyLineDto: {
+            /**
+             * Format: uuid
+             * @description `ReceiptLineDto.id` — dòng của chính phiếu này.
+             */
+            lineId: string;
+            /** @description Số lượng ĐÚNG (không phải chênh lệch) theo ĐVT cơ sở, Decimal(18,6) dạng chuỗi, > 0. */
+            qtyBase: string;
+        };
+        CorrectReceiptQuantitiesDto: {
+            lines: components["schemas"]["ReceiptQtyLineDto"][];
+            /** @description Lý do sửa (ghi vào dấu vết sự kiện). */
+            reason?: string;
+        };
+        CorrectedReceiptLineDto: {
+            lineId: string;
+            lineNo: number;
+            /** @description SL cơ sở trước khi sửa, Decimal(18,6) dạng chuỗi. */
+            fromQtyBase: string;
+            /** @description SL cơ sở sau khi sửa. */
+            toQtyBase: string;
+            /** @description Số movement ADJUSTMENT đã ghi (0 với phiếu nháp). */
+            movementCount: number;
+        };
+        CorrectReceiptQuantitiesResultDto: {
+            receiptId: string;
+            /** @description Dòng thực sự đổi (dòng gửi lên trùng SL cũ bị bỏ qua). */
+            lines: components["schemas"]["CorrectedReceiptLineDto"][];
         };
         WaitingStockSkuDto: {
             skuId: string;
@@ -25317,6 +25367,31 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["SetReceiptCostsResultDto"];
+                };
+            };
+        };
+    };
+    ReceivingController_correctQuantities: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CorrectReceiptQuantitiesDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CorrectReceiptQuantitiesResultDto"];
                 };
             };
         };
