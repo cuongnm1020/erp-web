@@ -308,7 +308,7 @@ function Editor({ order }: { order: SalesOrderDetail }) {
     );
   };
 
-  /** Xin lại vận đơn cho phiếu lỗi (tab Lỗi vận đơn) rồi về chi tiết đơn. */
+  /** Xin lại vận đơn cho phiếu lỗi (tab Cần sửa) rồi về chi tiết đơn. */
   const runRetryWaybill = () => {
     retryAfterSave.current = false;
     if (!waybillError?.carrierCode) return;
@@ -320,7 +320,7 @@ function Editor({ order }: { order: SalesOrderDetail }) {
             toast.warning('Hãng chưa phản hồi — hệ thống tự xin lại vận đơn.');
           } else {
             toast.success(`Đã cấp vận đơn ${r.trackingNo ?? ''}`, {
-              description: `${order.docNumber} · rời tab Lỗi vận đơn`,
+              description: `${order.docNumber} · rời tab Cần sửa`,
             });
           }
           router.push(r.trackingNo ? `${detailHref}?printLabel=1` : detailHref);

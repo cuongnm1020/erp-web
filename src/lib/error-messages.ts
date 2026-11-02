@@ -145,6 +145,11 @@ const MESSAGES: Record<string, string> = {
   CARRIER_ACCOUNT_IN_USE:
     'Không xoá / tắt được tài khoản này: đang là mặc định hoặc đã cấp vận đơn. Đặt tài khoản khác làm mặc định, hoặc tắt thay vì xoá.',
   CARRIER_ACCOUNT_NAME_TAKEN: 'Hãng này đã có tài khoản cùng tên. Đặt tên khác.',
+  // Tab Cần sửa (2026-11-02) — không Gửi sang ĐVVC được tới khi sửa.
+  ORDER_NON_ERP_ITEMS:
+    'Đơn có sản phẩm ngoài hệ thống (món gõ tay / SP Pancake tự tạo). Sửa đơn thay bằng sản phẩm trong hệ thống rồi mới gửi ĐVVC.',
+  ORDER_WAYBILL_ERROR_UNRESOLVED:
+    'Đơn đang lỗi vận đơn. Sửa đơn rồi bấm "Xin lại vận đơn" (tab Cần sửa) thay vì gửi lại.',
   ORDER_WAYBILL_ACCOUNT_LOCKED:
     'Đơn đã có vận đơn ở tài khoản khác của hãng này. Hủy vận đơn trên phiếu giao rồi gửi lại.',
   PICKUP_WAREHOUSE_NOT_READY:

@@ -11236,10 +11236,10 @@ export interface components {
         };
         SalesOrderListItemDto: {
             /**
-             * @description Tab của đơn — `flowOf(status, fulfilmentStatus, chờ hàng, lỗi vận đơn)`.
+             * @description Tab của đơn — `flowOf(status, fulfilmentStatus, chờ hàng, lỗi vận đơn, SP ngoài hệ thống)`.
              * @enum {string}
              */
-            flow: "PENDING_APPROVAL" | "CANCELLED" | "WAREHOUSE" | "NEW" | "PICKING" | "PACKED" | "IN_TRANSIT" | "OUT_FOR_DELIVERY" | "DELIVERED" | "RETURNED" | "CARRIER_CANCELLED" | "PICKED_UP" | "WAITING_STOCK" | "WAYBILL_ERROR";
+            flow: "PENDING_APPROVAL" | "CANCELLED" | "WAREHOUSE" | "NEW" | "PICKING" | "PACKED" | "IN_TRANSIT" | "OUT_FOR_DELIVERY" | "DELIVERED" | "RETURNED" | "CARRIER_CANCELLED" | "PICKED_UP" | "WAITING_STOCK" | "NEEDS_FIX";
             /**
              * @description Trạng thái kho / giao hàng chi tiết (snapshot) — null = chưa tính (coi như NOT_STARTED).
              * @enum {string|null}
@@ -11256,8 +11256,13 @@ export interface components {
              * @enum {string|null}
              */
             marketplace: "TIKTOK" | "SHOPEE" | "LAZADA" | null;
-            /** @description Lỗi vận đơn cuối (tab Lỗi vận đơn): câu của hãng khi `waybillErrorCode` = CARRIER_REJECTED. */
+            /** @description Lỗi vận đơn cuối (tab Cần sửa): câu của hãng khi `waybillErrorCode` = CARRIER_REJECTED. */
             waybillError: string | null;
+            /**
+             * @description Đơn có sản phẩm ngoài hệ thống — món gõ tay Pancake / SP Pancake tự tạo (2026-11-02). Chưa đóng
+             *     gói thì đơn nằm tab Cần sửa và không được "Gửi sang ĐVVC".
+             */
+            nonErpItems: boolean;
             /** @description Mã lỗi vận đơn (CARRIER_REJECTED, …) — web dịch theo mã; null = không lỗi. */
             waybillErrorCode: string | null;
             /** @description ISO — lúc ghi lỗi vận đơn. */
@@ -11397,6 +11402,8 @@ export interface components {
             WAITING_STOCK: number;
             PICKING: number;
             PACKED: number;
+            /** @description Cần sửa (2026-11-02) — lỗi vận đơn + đơn chưa đóng gói có SP ngoài hệ thống. */
+            NEEDS_FIX: number;
             PICKED_UP: number;
             IN_TRANSIT: number;
             OUT_FOR_DELIVERY: number;
@@ -22583,7 +22590,7 @@ export interface operations {
                  * @description Tab của danh sách đơn (2026-10-12) — gộp trạng thái chứng từ + kho / giao hàng
                  *     (`flowOf` trong sales-order-flow.ts). Đếm từng tab: GET /sales-orders/flow-counts.
                  */
-                flow?: "NEW" | "PENDING_APPROVAL" | "WAREHOUSE" | "WAITING_STOCK" | "PICKING" | "PACKED" | "WAYBILL_ERROR" | "PICKED_UP" | "IN_TRANSIT" | "OUT_FOR_DELIVERY" | "DELIVERED" | "RETURNED" | "CARRIER_CANCELLED" | "CANCELLED";
+                flow?: "NEW" | "PENDING_APPROVAL" | "WAREHOUSE" | "WAITING_STOCK" | "PICKING" | "PACKED" | "NEEDS_FIX" | "PICKED_UP" | "IN_TRANSIT" | "OUT_FOR_DELIVERY" | "DELIVERED" | "RETURNED" | "CARRIER_CANCELLED" | "CANCELLED";
                 /**
                  * @description Đơn có sản phẩm KHÔNG phải hàng ERP (2026-10-22): `CUSTOM` = có món gõ tay trên Pancake
                  *     (`sales_order_external.custom_items`), `POS_SKU` = có dòng là SKU do đồng bộ Pancake tự tạo
@@ -22772,7 +22779,7 @@ export interface operations {
                  * @description Tab của danh sách đơn (2026-10-12) — gộp trạng thái chứng từ + kho / giao hàng
                  *     (`flowOf` trong sales-order-flow.ts). Đếm từng tab: GET /sales-orders/flow-counts.
                  */
-                flow?: "NEW" | "PENDING_APPROVAL" | "WAREHOUSE" | "WAITING_STOCK" | "PICKING" | "PACKED" | "WAYBILL_ERROR" | "PICKED_UP" | "IN_TRANSIT" | "OUT_FOR_DELIVERY" | "DELIVERED" | "RETURNED" | "CARRIER_CANCELLED" | "CANCELLED";
+                flow?: "NEW" | "PENDING_APPROVAL" | "WAREHOUSE" | "WAITING_STOCK" | "PICKING" | "PACKED" | "NEEDS_FIX" | "PICKED_UP" | "IN_TRANSIT" | "OUT_FOR_DELIVERY" | "DELIVERED" | "RETURNED" | "CARRIER_CANCELLED" | "CANCELLED";
                 /**
                  * @description Đơn có sản phẩm KHÔNG phải hàng ERP (2026-10-22): `CUSTOM` = có món gõ tay trên Pancake
                  *     (`sales_order_external.custom_items`), `POS_SKU` = có dòng là SKU do đồng bộ Pancake tự tạo

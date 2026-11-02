@@ -1419,10 +1419,10 @@ describe('OrderListScreen — tab Chờ hàng (2026-10-25)', () => {
   });
 });
 
-describe('OrderListScreen — Lỗi vận đơn + đơn TikTok (2026-10-28)', () => {
+describe('OrderListScreen — Lỗi vận đơn + đơn TikTok (2026-10-28, tab Cần sửa 2026-11-02)', () => {
   const errorRow = () => ({
     ...FIRST,
-    flow: 'WAYBILL_ERROR' as const,
+    flow: 'NEEDS_FIX' as const,
     fulfilmentStatus: 'PACKED' as const,
     phone: '+84387****30',
     phoneMasked: true,
@@ -1442,7 +1442,7 @@ describe('OrderListScreen — Lỗi vận đơn + đơn TikTok (2026-10-28)', ()
     },
   });
 
-  it('tab Lỗi vận đơn: dòng có chip TikTok + SĐT bị che + lý do hãng; nút "Xin lại vận đơn" trên dòng → POST /shipments/:id/waybill với hãng của phiếu', async () => {
+  it('link cũ ?flow=WAYBILL_ERROR mở tab Cần sửa: dòng có chip TikTok + SĐT bị che + lý do hãng; nút "Xin lại vận đơn" trên dòng → POST /shipments/:id/waybill với hãng của phiếu', async () => {
     search = 'flow=WAYBILL_ERROR';
     const seenFlow: (string | null)[] = [];
     const waybillBodies: unknown[] = [];
@@ -1469,8 +1469,9 @@ describe('OrderListScreen — Lỗi vận đơn + đơn TikTok (2026-10-28)', ()
     );
     renderApp(<OrderListScreen />);
     await screen.findByText(FIRST.docNumber);
-    expect(seenFlow).toContain('WAYBILL_ERROR');
-    expect(screen.getByRole('tab', { name: /Lỗi vận đơn/ })).toBeInTheDocument();
+    expect(seenFlow).toContain('NEEDS_FIX');
+    expect(screen.getByRole('tab', { name: /Cần sửa/ })).toBeInTheDocument();
+    expect(screen.queryByRole('tab', { name: /Lỗi vận đơn/ })).not.toBeInTheDocument();
     expect(screen.getByText('TikTok')).toBeInTheDocument();
     expect(screen.getByText('SĐT bị che')).toBeInTheDocument();
     expect(screen.getByTestId('waybill-error')).toHaveTextContent(
@@ -1488,8 +1489,24 @@ describe('OrderListScreen — Lỗi vận đơn + đơn TikTok (2026-10-28)', ()
     );
   });
 
+  it('đơn Cần sửa vì SP ngoài hệ thống (2026-11-02): nhãn "Có SP ngoài hệ thống", không có nút "Xin lại vận đơn"', async () => {
+    search = 'flow=NEEDS_FIX';
+    server.use(
+      http.get('/api/sales-orders', () =>
+        HttpResponse.json({
+          items: [{ ...FIRST, flow: 'NEEDS_FIX' as const, nonErpItems: true }],
+          total: 1,
+        }),
+      ),
+    );
+    renderApp(<OrderListScreen />);
+    await screen.findByText(FIRST.docNumber);
+    expect(screen.getByTestId('order-non-erp-items')).toHaveTextContent('Có SP ngoài hệ thống');
+    expect(screen.queryByRole('button', { name: 'Xin lại vận đơn' })).not.toBeInTheDocument();
+  });
+
   it('không có quyền shipment.pack → dòng không có nút "Xin lại vận đơn" (luật 7)', async () => {
-    search = 'flow=WAYBILL_ERROR';
+    search = 'flow=NEEDS_FIX';
     server.use(
       http.get('/api/sales-orders', () => HttpResponse.json({ items: [errorRow()], total: 1 })),
     );

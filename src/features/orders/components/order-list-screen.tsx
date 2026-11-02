@@ -270,7 +270,7 @@ interface RowActionContext {
 
 /**
  * Nút thao tác của một dòng đơn, đứng cạnh Xem nhanh, không "⋯" (user yêu cầu 2026-10-29): Sửa ·
- * Nhân bản (+ Xin lại vận đơn ở tab Lỗi vận đơn) · Hủy đơn (chữ đỏ, cuối cụm, qua hộp xác nhận —
+ * Nhân bản (+ Xin lại vận đơn ở tab Cần sửa khi lỗi vận đơn) · Hủy đơn (chữ đỏ, cuối cụm, qua hộp xác nhận —
  * mockup TmGafrdk3wiAxJu4cFY937). Mở chi tiết = bấm mã đơn.
  */
 /** Tab còn trước khi kho thao tác — người lên đơn còn sửa / hủy được (2026-10-31). */
@@ -292,10 +292,10 @@ function orderRowItems(o: SalesOrderListItem, ctx: RowActionContext): RowActionI
           },
         ]
       : []),
-    ...(ctx.canPack && o.flow === 'WAYBILL_ERROR' && o.shipment?.carrierCode
+    ...(ctx.canPack && o.flow === 'NEEDS_FIX' && o.waybillErrorCode && o.shipment?.carrierCode
       ? [
           {
-            // Lỗi vận đơn (2026-10-28): sửa đơn xong thì xin lại — thành công là rời tab.
+            // Lỗi vận đơn (2026-10-28, tab Cần sửa): sửa đơn xong thì xin lại — thành công là rời tab.
             label: 'Xin lại vận đơn',
             icon: <RefreshCw aria-hidden />,
             onSelect: () => ctx.onRetryWaybill(o),
@@ -469,6 +469,16 @@ const buildColumns = (
           {p.moreCount > 0 ? (
             <span className="block text-xs text-primary">+{p.moreCount} sản phẩm khác</span>
           ) : null}
+          {row.original.flow === 'NEEDS_FIX' && row.original.nonErpItems ? (
+            // Cần sửa (2026-11-02): SP ngoài hệ thống — không Gửi sang ĐVVC được tới khi thay SP.
+            <span
+              className="block text-xs font-semibold text-destructive"
+              title="Đơn có món gõ tay / SP Pancake tự tạo — thay bằng sản phẩm trong hệ thống rồi mới gửi ĐVVC"
+              data-testid="order-non-erp-items"
+            >
+              Có SP ngoài hệ thống
+            </span>
+          ) : null}
         </div>
       );
     },
@@ -638,7 +648,7 @@ const buildColumns = (
   {
     id: 'actions',
     header: () => <span className="sr-only">Thao tác</span>,
-    // Xem nhanh · Sửa · Nhân bản · Hủy (+ Xin lại vận đơn ở tab Lỗi vận đơn) — 28px mỗi nút.
+    // Xem nhanh · Sửa · Nhân bản · Hủy (+ Xin lại vận đơn ở tab Cần sửa khi lỗi vận đơn) — 28px mỗi nút.
     meta: { width: 136, title: 'Thao tác' },
     cell: ({ row }) => (
       <RowActions
