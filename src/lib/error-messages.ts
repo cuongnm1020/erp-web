@@ -197,7 +197,7 @@ const MESSAGES: Record<string, string> = {
   PACK_TASK_NOT_FOUND:
     'Đơn chưa có việc đóng gói (PACK) — việc pick chưa xong hoặc chưa sinh. Thử lại sau ít phút.',
   PACK_LINE_NO_RESERVATION:
-    'Hàng của đơn không còn được giữ chỗ trong kho (giữ chỗ đã nhả / tồn đã chuyển vị trí). Báo quản lý kho kiểm tồn và giữ chỗ lại cho đơn.',
+    'Phần hàng đang giữ chỗ cho đơn ít hơn số cần đóng gói (giữ chỗ đã bị nhả). Hủy rồi lên lại đơn, hoặc báo IT số đơn để giữ chỗ lại.',
   RESERVATION_NOT_ACTIVE:
     'Chỗ giữ hàng của đơn không còn hiệu lực (đã nhả hoặc đã dùng). Báo quản lý kho kiểm tồn của đơn.',
   INSUFFICIENT_COST_LAYERS:
@@ -255,7 +255,8 @@ const MESSAGES: Record<string, string> = {
   PDA_LINE_NOT_FULLY_SCANNED: 'Dòng chưa quét đủ số lượng. Quét đủ rồi mới hoàn thành được.',
   PDA_LINE_WITHOUT_LOCATION:
     'Dòng này chưa có vị trí lấy hàng (thiếu tồn). Điều phối phải xử lý trước.',
-  PDA_NO_RESERVATION: 'Không tìm thấy giữ chỗ khớp dòng này. Báo điều phối kiểm tra lại đơn nguồn.',
+  PDA_NO_RESERVATION:
+    'Phần hàng đang giữ chỗ cho đơn ít hơn số cần đóng gói (giữ chỗ đã bị nhả). Báo điều phối kiểm tra lại đơn nguồn.',
   PDA_WAVE_SKU_NOT_FOUND: 'Sản phẩm này không có trong lượt hoặc đã lấy đủ. Kiểm tra lại kệ.',
   // Đơn mới + giao người đóng gói (2026-10-12, apps/api/docs/pick-pack-flow.md §7, §10)
   PDA_NEW_ORDERS_TAKEN:

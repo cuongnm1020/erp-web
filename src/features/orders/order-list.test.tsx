@@ -1648,7 +1648,7 @@ describe('OrderListScreen — bộ lọc "In tem" của đơn đã gửi ĐVVC (
     expect(last.get('skuId')).toBe('11111111-1111-4111-8111-111111111111');
     // Lý do theo mã (luật 6) — không phải câu chung "Yêu cầu không hợp lệ", không phải lời thô API.
     const err = screen.getByTestId('pack-error');
-    expect(err).toHaveTextContent('không còn được giữ chỗ');
+    expect(err).toHaveTextContent('giữ chỗ đã bị nhả');
     expect(err).not.toHaveTextContent('reservation');
     expect(screen.getByTestId('label-not-printed')).toHaveTextContent('Chưa in tem');
     expect(screen.getByTestId('label-printed')).toHaveTextContent('Đã in tem');
