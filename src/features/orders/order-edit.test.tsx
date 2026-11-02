@@ -823,7 +823,9 @@ describe('OrderEditScreen — sửa sản phẩm / người nhận, quyền sử
     expect((puts[0]!.lines as unknown[]).length).toBeGreaterThan(0);
     await waitFor(() =>
       expect(error).toHaveBeenCalledWith(
-        expect.stringContaining('Sản phẩm chưa có trên shop Pancake của đơn: SP-0999 Kali trắng'),
+        expect.stringContaining(
+          'Không tự đưa được sản phẩm lên shop Pancake của đơn: SP-0999 Kali trắng',
+        ),
       ),
     );
     expect(error).not.toHaveBeenCalledWith(expect.stringContaining('raw server text'));

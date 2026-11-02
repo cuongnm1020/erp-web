@@ -440,7 +440,7 @@ export function messageFor(err: unknown): string {
         .filter((s) => typeof s.code === 'string')
         .map((s) => `${String(s.code)}${typeof s.name === 'string' ? ` ${s.name}` : ''}`);
       if (skus.length) {
-        return `Sản phẩm chưa có trên shop Pancake của đơn: ${skus.join(', ')}. Đẩy sản phẩm lên Pancake (Danh mục) hoặc chọn sản phẩm khác — ERP chưa sửa gì.`;
+        return `Không tự đưa được sản phẩm lên shop Pancake của đơn: ${skus.join(', ')}. Chọn sản phẩm khác hoặc báo quản trị kiểm tra đồng bộ Pancake — ERP chưa sửa gì.`;
       }
       if (typeof d?.waybill === 'string') {
         return `Đơn đã có vận đơn ${d.waybill} trên Pancake — không sửa sản phẩm được nữa.`;
