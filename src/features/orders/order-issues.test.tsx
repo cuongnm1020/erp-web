@@ -36,6 +36,38 @@ const COUNTS = {
   unsentOld: 3282,
   unsentShort: 3110,
   olderThanDays: 2,
+  pancakeOverwrite: 34,
+  pancakeOverwriteRestorable: 16,
+  pancakeOverwriteCheckedAt: '2026-11-02T15:30:00.000Z',
+};
+
+const OVERWRITE_ORDER = {
+  orderId: '00000001-0000-4000-8000-000000000001',
+  docNumber: 'SOP2610-58794',
+  status: 'APPROVED',
+  customerName: 'Khách A',
+  warehouseId: null,
+  total: '1534000',
+  fulfilmentStatus: 'NOT_STARTED',
+  fix: 'RESTORE_LINES',
+  lastOverwrittenAt: '2026-11-02T04:46:30.000Z',
+  changes: [
+    {
+      kind: 'LINE',
+      key: 'SP-0147',
+      action: 'Sửa',
+      editorName: 'Nguyễn Thu Trang',
+      editedAt: '2026-11-02T04:46:28.000Z',
+      overwrittenAt: '2026-11-02T04:46:29.000Z',
+      setValue: null,
+      pancakeValue: null,
+      qtySet: '5',
+      amountSet: '730000',
+      pcQty: '5',
+      pcAmount: '750000',
+      pcVia: 'webhook',
+    },
+  ],
 };
 
 function setup() {
@@ -125,5 +157,42 @@ describe('OrderIssuesScreen', () => {
     });
     expect(superadmin.can(req!.action, req!.subject)).toBe(true);
     expect(admin.can(req!.action, req!.subject)).toBe(false);
+  });
+
+  it('tab Bị Pancake ghi đè: ô đếm, danh sách NV đặt → Pancake đè, khôi phục gửi đúng đơn', async () => {
+    search = 'issue=PANCAKE_OVERWRITE';
+    setup();
+    const restoreBodies: unknown[] = [];
+    server.use(
+      http.get('/api/sales-orders/pancake-overwrites', () =>
+        HttpResponse.json({
+          items: [OVERWRITE_ORDER],
+          total: 1,
+          checkedAt: '2026-11-02T15:30:00.000Z',
+        }),
+      ),
+      http.get('/api/warehouses', () => HttpResponse.json([])),
+      http.post('/api/sales-orders/pancake-overwrites/restore', async ({ request }) => {
+        restoreBodies.push(await request.json());
+        return HttpResponse.json({
+          restored: [{ orderId: OVERWRITE_ORDER.orderId, docNumber: OVERWRITE_ORDER.docNumber }],
+          skipped: [],
+          failed: [],
+        });
+      }),
+    );
+    renderApp(<OrderIssuesScreen />);
+    const tile = await screen.findByTestId('issue-tile-PANCAKE_OVERWRITE');
+    await waitFor(() => expect(within(tile).getByText('34')).toBeInTheDocument());
+    expect(within(tile).getByText('16 đơn khôi phục được')).toBeInTheDocument();
+    expect(await screen.findByText('SOP2610-58794')).toBeInTheDocument();
+    expect(screen.getByText(/SP-0147 ×5: 730\.000/)).toBeInTheDocument();
+    expect(screen.getByText(/×5 · 750\.000/)).toBeInTheDocument();
+    fireEvent.click(screen.getAllByRole('checkbox')[1]!);
+    fireEvent.click(await screen.findByRole('button', { name: /Khôi phục bản ERP \(1\)/ }));
+    const dialog = await screen.findByRole('dialog');
+    fireEvent.click(within(dialog).getByRole('button', { name: /Khôi phục 1 đơn/ }));
+    await waitFor(() => expect(restoreBodies).toEqual([{ orderIds: [OVERWRITE_ORDER.orderId] }]));
+    expect((await within(dialog).findAllByText('Đã khôi phục')).length).toBeGreaterThan(0);
   });
 });
