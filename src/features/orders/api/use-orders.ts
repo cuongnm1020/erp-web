@@ -124,8 +124,12 @@ export function useSameDayOfOrder(id: string, enabled: boolean) {
  * GET /sales-orders — đã scope sẵn theo khách hàng ở API (bất biến 8, luật 7). Sắp xếp ở server
  * theo `sortBy` / `sortDir` (2026-10-22); chỉ cột có trường sắp tương ứng mới được `sortable`.
  */
-export function useOrders(params: OrderListParams) {
-  return useQuery({ ...orderListQuery(params), placeholderData: keepPreviousData });
+export function useOrders(params: OrderListParams, opts: { enabled?: boolean } = {}) {
+  return useQuery({
+    ...orderListQuery(params),
+    placeholderData: keepPreviousData,
+    enabled: opts.enabled ?? true,
+  });
 }
 
 /** Key + fetcher của GET /sales-orders — dùng chung cho useOrders và tra cứu một lần (quét mã). */

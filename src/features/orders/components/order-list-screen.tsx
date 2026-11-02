@@ -1246,7 +1246,10 @@ export function OrderListScreen() {
         })),
     [columns],
   );
-  const query = useOrders(params);
+  // Chờ sắp xếp đã lưu của người dùng (trừ khi URL có sẵn sort) rồi mới tải danh sách — trước đây
+  // tải 2 lần (lần đầu chưa có sort, lần sau có), mỗi lần ~5 s trên prod (sự cố pool 2026-11-02).
+  // Đọc prefs lỗi thì vẫn tải (isPending = false).
+  const query = useOrders(params, { enabled: state.sort != null || !prefs.isPending });
   const counts = useOrderFlowCounts(filterParams);
   // Xuất Excel = mọi trang của đúng bộ lọc + tab + sắp xếp đang xem.
   const exportParams = useMemo(
