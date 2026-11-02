@@ -1,5 +1,7 @@
 import { ExternalLink } from 'lucide-react';
+import { StatusBadge } from '@/components/data/status-badge';
 import { cn } from '@/lib/cn';
+import { formatDateTime } from '@/lib/format';
 
 /**
  * Mã đơn Pancake bấm được → mở đúng đơn trên POS tương ứng ở tab mới (2026-10-19). Link là
@@ -31,5 +33,21 @@ export function PancakeOrderLink({
       {label}
       <ExternalLink className="h-3 w-3" aria-hidden />
     </a>
+  );
+}
+
+/**
+ * Đơn Pancake "ERP giữ" (2026-11-03): đã sửa trên ERP → không nhận cập nhật từ Pancake nữa, chỉ
+ * đẩy ERP → Pancake. Hiện cạnh mã Pancake ở danh sách và chi tiết đơn.
+ */
+export function PancakeErpLockedBadge({ lockedAt }: { lockedAt: string | null }) {
+  if (!lockedAt) return null;
+  return (
+    <span
+      className="inline-flex"
+      title={`Sửa trên ERP lúc ${formatDateTime(lockedAt)} — không nhận cập nhật từ Pancake, chỉ đẩy ERP → Pancake`}
+    >
+      <StatusBadge tone="warn">Sửa trên ERP</StatusBadge>
+    </span>
   );
 }
