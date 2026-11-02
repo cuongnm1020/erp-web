@@ -29,6 +29,7 @@ import {
   useSetOrdersWaitingStock,
   type OrderIssue,
   type OrderIssueCounts,
+  type PancakeOverwriteFix,
   type SalesOrderListItem,
 } from '../api/use-orders';
 import { fulfilmentLabel, orderFlowLabel } from '../labels';
@@ -38,6 +39,7 @@ import { BulkRetryWaybillDialog } from './bulk-retry-waybill-dialog';
 import { BulkShippingDialog } from './bulk-shipping-dialog';
 import { CancelWaybillDialog } from './cancel-waybill-dialog';
 import { SendToCarrierMenu } from './send-to-carrier-menu';
+import { PancakeOverwriteTab } from './pancake-overwrite-tab';
 import { waybillErrorText } from './waybill-error';
 
 /**
@@ -47,8 +49,11 @@ import { waybillErrorText } from './waybill-error';
  * Nhóm, lọc, trang nằm trên URL (luật 8).
  */
 
-type FilterKey = 'issue' | 'from' | 'to' | 'old' | 'ready';
-const FILTER_KEYS: readonly FilterKey[] = ['issue', 'from', 'to', 'old', 'ready'];
+type FilterKey = 'issue' | 'from' | 'to' | 'old' | 'ready' | 'fix';
+const FILTER_KEYS: readonly FilterKey[] = ['issue', 'from', 'to', 'old', 'ready', 'fix'];
+/** Tab thứ 6 (2026-11-02): đơn bị Pancake ghi đè — nguồn riêng, không phải bộ lọc `issue` của API. */
+const OVERWRITE = 'PANCAKE_OVERWRITE';
+type TabKey = OrderIssue | typeof OVERWRITE;
 const LIST_DEFAULTS = { filterKeys: FILTER_KEYS };
 const OLDER_DAYS = 2;
 
@@ -63,7 +68,7 @@ const WAYBILL_CODE_SHORT: Record<string, string> = {
 
 type Level = 'block' | 'warn' | 'info';
 interface IssueTab {
-  issue: OrderIssue;
+  issue: TabKey;
   label: string;
   level: Level;
   hint: string;
@@ -117,6 +122,14 @@ const ISSUE_TABS: IssueTab[] = [
     note: (c) =>
       `${c.unsentOld} đơn quá ${c.olderThanDays} ngày · ${c.unsentShort} đang thiếu hàng`,
   },
+  {
+    issue: OVERWRITE,
+    label: 'Bị Pancake ghi đè',
+    level: 'block',
+    hint: 'Webhook Pancake ghi đè giá trị nhân viên vừa sửa trên ERP. Khôi phục đặt lại dòng hàng theo lịch sử sửa đơn và đẩy lên Pancake như Sửa đơn. Worker quét lại mỗi 30 phút; đơn tự đúng lại tự rời danh sách.',
+    count: (c) => c.pancakeOverwrite,
+    note: (c) => `${c.pancakeOverwriteRestorable} đơn khôi phục được`,
+  },
 ];
 
 const LEVEL_TEXT: Record<Level, string> = {
@@ -130,7 +143,7 @@ const LEVEL_DOT: Record<Level, string> = {
   info: 'bg-info',
 };
 
-function parseIssue(v: string | undefined): OrderIssue {
+function parseTab(v: string | undefined): TabKey {
   return ISSUE_TABS.find((t) => t.issue === v)?.issue ?? 'WAYBILL_ERROR';
 }
 
@@ -142,23 +155,29 @@ function ageText(iso: string): { text: string; old: boolean } {
 
 export function OrderIssuesScreen() {
   const { state, set } = useListState<FilterKey>(LIST_DEFAULTS);
-  const issue = parseIssue(state.filters.issue);
-  const tab = ISSUE_TABS.find((t) => t.issue === issue)!;
+  const tabKey = parseTab(state.filters.issue);
+  const tab = ISSUE_TABS.find((t) => t.issue === tabKey)!;
+  const overwrite = tabKey === OVERWRITE;
+  // Tab ghi đè không gọi danh sách đơn — nhóm API mặc định để hook giữ thứ tự gọi.
+  const issue: OrderIssue = overwrite ? 'WAYBILL_ERROR' : (tabKey as OrderIssue);
   const common = {
     q: state.q,
     from: state.filters.from,
     to: state.filters.to,
   };
   const counts = useOrderIssueCounts({ ...common, olderThanDays: OLDER_DAYS });
-  const query = useOrders({
-    ...common,
-    issue,
-    olderThanDays: state.filters.old === '1' ? OLDER_DAYS : undefined,
-    stockReady:
-      issue === 'PACK_ERROR' && state.filters.ready ? state.filters.ready === 'true' : undefined,
-    take: state.size,
-    skip: (state.page - 1) * state.size,
-  });
+  const query = useOrders(
+    {
+      ...common,
+      issue,
+      olderThanDays: state.filters.old === '1' ? OLDER_DAYS : undefined,
+      stockReady:
+        issue === 'PACK_ERROR' && state.filters.ready ? state.filters.ready === 'true' : undefined,
+      take: state.size,
+      skip: (state.page - 1) * state.size,
+    },
+    { enabled: !overwrite },
+  );
   const carriers = useCarriers();
   const carrierCode = useMemo(() => {
     const byId = new Map((carriers.data ?? []).map((c) => [c.id, c.code]));
@@ -171,9 +190,9 @@ export function OrderIssuesScreen() {
   const [retryRows, setRetryRows] = useState<SalesOrderListItem[] | null>(null);
   const selectedRows = (query.data?.items ?? []).filter((r) => selected[r.id]);
 
-  const switchTab = (next: OrderIssue) => {
+  const switchTab = (next: TabKey) => {
     clearSelection();
-    set({ filters: { ...state.filters, issue: next, ready: undefined } });
+    set({ filters: { ...state.filters, issue: next, ready: undefined, fix: undefined } });
   };
 
   const columns = useMemo(
@@ -229,7 +248,7 @@ export function OrderIssuesScreen() {
       <div
         role="tablist"
         aria-label="Cần xử lý"
-        className="mb-3 grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-5"
+        className="mb-3 grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6"
       >
         {ISSUE_TABS.map((t) => {
           const on = t.issue === issue;
@@ -267,58 +286,73 @@ export function OrderIssuesScreen() {
         {tab.hint}
       </p>
 
-      {selectedRows.length > 0 ? (
-        <IssueBulkBar issue={issue} rows={selectedRows} onClear={clearSelection} />
-      ) : (
-        <FilterBar
-          q={state.q}
-          onQChange={(q) => set({ q })}
-          filters={filters}
-          values={state.filters}
-          onFilterChange={(patch) => set({ filters: { ...state.filters, ...patch } })}
-          searchPlaceholder="Mã đơn, SĐT, tên khách, mã vận đơn"
+      {overwrite ? (
+        <PancakeOverwriteTab
+          fix={(state.filters.fix as PancakeOverwriteFix | undefined) || undefined}
+          page={state.page}
+          size={state.size}
+          onFixChange={(fix) => set({ filters: { ...state.filters, fix } })}
+          onPageChange={(page) => set({ page })}
+          onSizeChange={(size) => set({ size })}
         />
-      )}
+      ) : (
+        <>
+          {selectedRows.length > 0 ? (
+            <IssueBulkBar issue={issue} rows={selectedRows} onClear={clearSelection} />
+          ) : (
+            <FilterBar
+              q={state.q}
+              onQChange={(q) => set({ q })}
+              filters={filters}
+              values={state.filters}
+              onFilterChange={(patch) => set({ filters: { ...state.filters, ...patch } })}
+              searchPlaceholder="Mã đơn, SĐT, tên khách, mã vận đơn"
+            />
+          )}
 
-      <QueryState
-        query={query}
-        skeleton={<ListSkeleton rows={10} columns={6} />}
-        isEmpty={(d) => d.items.length === 0}
-        empty={
-          <EmptyState
-            title={hasFilter ? 'Không có đơn nào khớp' : `Không còn đơn ${tab.label.toLowerCase()}`}
-            description={
-              hasFilter ? 'Thử bỏ bớt bộ lọc.' : 'Nhóm này đã xử lý hết. Chọn nhóm khác ở trên.'
+          <QueryState
+            query={query}
+            skeleton={<ListSkeleton rows={10} columns={6} />}
+            isEmpty={(d) => d.items.length === 0}
+            empty={
+              <EmptyState
+                title={
+                  hasFilter ? 'Không có đơn nào khớp' : `Không còn đơn ${tab.label.toLowerCase()}`
+                }
+                description={
+                  hasFilter ? 'Thử bỏ bớt bộ lọc.' : 'Nhóm này đã xử lý hết. Chọn nhóm khác ở trên.'
+                }
+                action={
+                  hasFilter ? (
+                    <Button
+                      variant="outline"
+                      onClick={() => set({ q: '', filters: { issue: state.filters.issue } })}
+                    >
+                      Xóa lọc
+                    </Button>
+                  ) : undefined
+                }
+              />
             }
-            action={
-              hasFilter ? (
-                <Button
-                  variant="outline"
-                  onClick={() => set({ q: '', filters: { issue: state.filters.issue } })}
-                >
-                  Xóa lọc
-                </Button>
-              ) : undefined
-            }
-          />
-        }
-      >
-        {(data) => (
-          <DataTable
-            columns={columns}
-            rows={data.items}
-            getRowId={(r) => r.id}
-            total={data.total}
-            page={state.page}
-            size={state.size}
-            sort={null}
-            onSortChange={() => undefined}
-            onPageChange={(page) => set({ page })}
-            onSizeChange={(size) => set({ size })}
-            selection={{ selected, onChange: setSelected }}
-          />
-        )}
-      </QueryState>
+          >
+            {(data) => (
+              <DataTable
+                columns={columns}
+                rows={data.items}
+                getRowId={(r) => r.id}
+                total={data.total}
+                page={state.page}
+                size={state.size}
+                sort={null}
+                onSortChange={() => undefined}
+                onPageChange={(page) => set({ page })}
+                onSizeChange={(size) => set({ size })}
+                selection={{ selected, onChange: setSelected }}
+              />
+            )}
+          </QueryState>
+        </>
+      )}
 
       <BulkRetryWaybillDialog
         rows={retryRows ?? []}

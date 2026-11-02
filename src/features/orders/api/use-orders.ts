@@ -102,6 +102,11 @@ export type OrderPrintStatus = NonNullable<OrderListQuery['printStatus']>;
 export type OrderSortField = NonNullable<OrderListQuery['sortBy']>;
 export type OrderIssue = NonNullable<OrderListQuery['issue']>;
 export type OrderIssueCounts = components['schemas']['SalesOrderIssueCountsDto'];
+export type PancakeOverwriteOrder = components['schemas']['PancakeOverwriteOrderDto'];
+export type PancakeOverwriteChange = components['schemas']['PancakeOverwriteChangeDto'];
+export type PancakeOverwriteFix = PancakeOverwriteOrder['fix'];
+export type PancakeOverwriteRestoreResult =
+  components['schemas']['PancakeOverwriteRestoreResultDto'];
 
 /** Query key theo phễu (luật 3): ['crm','orders','list', params] / ['crm','orders','detail', id]. */
 export const orderKeys = {
@@ -113,6 +118,8 @@ export const orderKeys = {
     [...orderKeys.lists(), 'flow-counts', p] as const,
   issueCounts: (p: Omit<OrderListParams, 'issue' | 'stockReady' | 'take' | 'skip'>) =>
     [...orderKeys.lists(), 'issue-counts', p] as const,
+  pancakeOverwrites: (p: { fix?: PancakeOverwriteFix; take: number; skip: number }) =>
+    [...orderKeys.lists(), 'pancake-overwrites', p] as const,
   details: () => [...orderKeys.all, 'detail'] as const,
   detail: (id: string) => [...orderKeys.details(), id] as const,
   shippingQuote: (
@@ -411,6 +418,53 @@ export function useOrderIssueCounts(
         }),
       ),
     placeholderData: keepPreviousData,
+  });
+}
+
+/**
+ * GET /sales-orders/pancake-overwrites — đơn bị Pancake ghi đè sau khi NV sửa (2026-11-02, CHỈ
+ * superadmin). Worker quét 30 phút/lần; dưới prefix `lists` nên Sửa đơn / hủy đơn làm tươi luôn.
+ */
+export function usePancakeOverwrites(p: { fix?: PancakeOverwriteFix; take: number; skip: number }) {
+  return useQuery({
+    queryKey: orderKeys.pancakeOverwrites(p),
+    queryFn: () => unwrap(api.GET('/sales-orders/pancake-overwrites', { params: { query: p } })),
+    placeholderData: keepPreviousData,
+  });
+}
+
+/** POST …/pancake-overwrites/scan — quét lại ngay rồi làm tươi danh sách + đếm. */
+export function useScanPancakeOverwrites() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () => unwrap(api.POST('/sales-orders/pancake-overwrites/scan')),
+    onSuccess: () => void qc.invalidateQueries({ queryKey: orderKeys.lists() }),
+  });
+}
+
+/**
+ * POST …/pancake-overwrites/restore — Khôi phục bản ERP (= Sửa đơn từng đơn, đẩy Pancake). Không
+ * optimistic (luật 5): chờ kết quả từng đơn rồi mới làm tươi.
+ */
+export function useRestorePancakeOverwrites() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (orderIds: string[]) =>
+      unwrap(api.POST('/sales-orders/pancake-overwrites/restore', { body: { orderIds } })),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: orderKeys.lists() });
+      void qc.invalidateQueries({ queryKey: orderKeys.details() });
+    },
+  });
+}
+
+/** POST …/pancake-overwrites/dismiss — Đánh dấu đã xử lý (ẩn khỏi danh sách). */
+export function useDismissPancakeOverwrites() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (orderIds: string[]) =>
+      unwrap(api.POST('/sales-orders/pancake-overwrites/dismiss', { body: { orderIds } })),
+    onSuccess: () => void qc.invalidateQueries({ queryKey: orderKeys.lists() }),
   });
 }
 

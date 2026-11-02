@@ -3813,6 +3813,81 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/sales-orders/pancake-overwrites": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Đơn bị Pancake ghi đè sau khi NV sửa trên ERP (2026-11-02, tab của màn Xử lý đơn lỗi) — CHỈ
+         *     superadmin (403 ORDER_ISSUES_SUPERADMIN_ONLY). Mỗi đơn kèm các trường / SKU bị đè và cách xử
+         *     lý (`fix`). Khai TRƯỚC `:id`.
+         */
+        get: operations["SalesOrderController_pancakeOverwrites"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/sales-orders/pancake-overwrites/scan": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Quét lại ngay (worker vẫn quét 30 phút/lần) — chỉ superadmin. */
+        post: operations["SalesOrderController_scanPancakeOverwrites"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/sales-orders/pancake-overwrites/restore": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Khôi phục bản ERP: đặt lại dòng hàng theo lịch sử sửa đơn + đẩy Pancake (= Sửa đơn, từng đơn)
+         *     — chỉ superadmin. Đơn không khôi phục được ra `skipped` / `failed` kèm mã.
+         */
+        post: operations["SalesOrderController_restorePancakeOverwrites"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/sales-orders/pancake-overwrites/dismiss": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Đánh dấu đã xử lý (ẩn khỏi danh sách, ghi người + lúc) — chỉ superadmin. */
+        post: operations["SalesOrderController_dismissPancakeOverwrites"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/sales-orders/{id}": {
         parameters: {
             query?: never;
@@ -11813,6 +11888,86 @@ export interface components {
             unsentShort: number;
             /** @description Mốc "quá N ngày" đã dùng (mặc định 2). */
             olderThanDays: number;
+            /** @description Đơn bị Pancake ghi đè sau khi NV sửa, còn sai, chưa xử lý (không lọc theo ngày / kho). */
+            pancakeOverwrite: number;
+            /** @description Trong `pancakeOverwrite`: khôi phục tự động được. */
+            pancakeOverwriteRestorable: number;
+            /** @description Lần quét ghi đè gần nhất (ISO); null = chưa quét. */
+            pancakeOverwriteCheckedAt: string | null;
+        };
+        PancakeOverwriteChangeDto: {
+            /** @enum {string} */
+            kind: "FIELD" | "LINE";
+            /** @description FIELD: tên cột (total, status…); LINE: mã SKU. */
+            key: string;
+            /** @description LINE: Thêm | Sửa | Bỏ. */
+            action: string | null;
+            editorName: string | null;
+            editedAt: string;
+            overwrittenAt: string;
+            /** @description FIELD: giá trị NV đặt / Pancake ghi đè (chuỗi thô: tiền, mã trạng thái…). */
+            setValue: string | null;
+            pancakeValue: string | null;
+            /** @description LINE: SL / thành tiền NV đặt và bản Pancake — Decimal chuỗi. */
+            qtySet: string | null;
+            amountSet: string | null;
+            pcQty: string | null;
+            pcAmount: string | null;
+            /** @description webhook | poll */
+            pcVia: string | null;
+        };
+        PancakeOverwriteOrderDto: {
+            /** @enum {string} */
+            fix: "RESTORE_LINES" | "CANCEL_AGAIN" | "LOCKED" | "MANUAL";
+            orderId: string;
+            docNumber: string;
+            status: string;
+            customerName: string;
+            warehouseId: string | null;
+            /** @description Tổng tiền hiện tại — Decimal chuỗi. */
+            total: string;
+            /** @description Trạng thái kho (snapshot); null = chưa tính. */
+            fulfilmentStatus: string | null;
+            lastOverwrittenAt: string;
+            changes: components["schemas"]["PancakeOverwriteChangeDto"][];
+        };
+        PancakeOverwriteListDto: {
+            items: components["schemas"]["PancakeOverwriteOrderDto"][];
+            total: number;
+            /** @description Lần quét gần nhất (ISO); null = chưa quét lần nào. */
+            checkedAt: string | null;
+        };
+        PancakeOverwriteScanResultDto: {
+            since: string;
+            upserted: number;
+            ms: number;
+        };
+        PancakeOverwriteOrderIdsDto: {
+            orderIds: string[];
+        };
+        PancakeOverwriteOrderRefDto: {
+            orderId: string;
+            docNumber: string;
+        };
+        PancakeOverwriteSkippedDto: {
+            orderId: string;
+            docNumber: string;
+            /**
+             * @description NOTHING_TO_RESTORE · ORDER_CANCELLED · NEEDS_CANCEL · HAS_COMBO · HAS_CUSTOM_ITEMS ·
+             *     DUPLICATE_SKU · SKU_NOT_FOUND
+             */
+            code: string;
+        };
+        PancakeOverwriteFailedDto: {
+            orderId: string;
+            docNumber: string;
+            /** @description Mã lỗi nghiệp vụ của Sửa đơn (ORDER_LINES_LOCKED, PANCAKE_ORDER_ITEMS_LOCKED…). */
+            code: string;
+        };
+        PancakeOverwriteRestoreResultDto: {
+            restored: components["schemas"]["PancakeOverwriteOrderRefDto"][];
+            skipped: components["schemas"]["PancakeOverwriteSkippedDto"][];
+            failed: components["schemas"]["PancakeOverwriteFailedDto"][];
         };
         OrderTimelineDto: {
             /** @description Lần đầu đơn sang Đã duyệt (audit `status.after = APPROVED`); đơn tạo thẳng Đã duyệt = giờ tạo. */
@@ -23833,6 +23988,92 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["SalesOrderIssueCountsDto"];
                 };
+            };
+        };
+    };
+    SalesOrderController_pancakeOverwrites: {
+        parameters: {
+            query: {
+                fix?: "RESTORE_LINES" | "CANCEL_AGAIN" | "LOCKED" | "MANUAL";
+                take: number;
+                skip: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PancakeOverwriteListDto"];
+                };
+            };
+        };
+    };
+    SalesOrderController_scanPancakeOverwrites: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PancakeOverwriteScanResultDto"];
+                };
+            };
+        };
+    };
+    SalesOrderController_restorePancakeOverwrites: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PancakeOverwriteOrderIdsDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PancakeOverwriteRestoreResultDto"];
+                };
+            };
+        };
+    };
+    SalesOrderController_dismissPancakeOverwrites: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PancakeOverwriteOrderIdsDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };
