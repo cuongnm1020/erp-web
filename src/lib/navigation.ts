@@ -46,6 +46,7 @@ import {
   Table2,
   Tag,
   Tags,
+  TriangleAlert,
   TicketPercent,
   TrendingDown,
   TrendingUp,
@@ -579,6 +580,14 @@ export const NAV_MODULES: NavModule[] = [
         href: '/admin/roles',
         icon: ShieldCheck,
         ability: { action: 'read', subject: 'Role' },
+      },
+      {
+        label: 'Xử lý đơn lỗi',
+        href: '/admin/order-issues',
+        icon: TriangleAlert,
+        // CHỈ superadmin (2026-11-02): không mã quyền nào cấp `manage OrderIssue`, chỉ
+        // hasGlobalAccess (manage all) — API cũng 403 ORDER_ISSUES_SUPERADMIN_ONLY.
+        ability: { action: 'manage', subject: 'OrderIssue' },
       },
       {
         label: 'Thiết bị PDA',

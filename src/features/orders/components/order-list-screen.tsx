@@ -103,6 +103,7 @@ import { CancelWaybillDialog } from './cancel-waybill-dialog';
 import { BulkMoveWarehouseDialog } from './bulk-move-warehouse-dialog';
 import { BulkFulfilPrintDialog } from './bulk-fulfil-print-dialog';
 import { BulkReprintWaybillDialog } from './bulk-reprint-waybill-dialog';
+import { BulkRetryWaybillDialog, retryableWaybill } from './bulk-retry-waybill-dialog';
 import { BulkShippingDialog } from './bulk-shipping-dialog';
 import { FlowBadge, OrderQuickView, TelcoBadge } from './order-quick-view';
 import { OrderSavedViews } from './order-saved-views';
@@ -1738,11 +1739,11 @@ export function OrderListScreen() {
   );
 }
 
-type BulkDialog = 'shipping' | 'reprint' | 'cancel-waybill' | null;
+type BulkDialog = 'shipping' | 'reprint' | 'retry-waybill' | 'cancel-waybill' | null;
 
 /**
  * Thanh chọn nhiều (design system BulkActionBar, thay chỗ thanh lọc): tổng tiền / COD của các đơn
- * đã chọn; nút phụ Hủy đơn · Chuyển kho · Đóng gói + in vận đơn; "Khác" gom Gán hãng / cân nặng ·
+ * đã chọn; nút phụ Hủy đơn · Chuyển kho · Đóng gói + in vận đơn; "Khác" gom Gán hãng / cân nặng · Xin lại vận đơn ·
  * In lại vận đơn; nút chính "Gửi sang ĐVVC" ở mép phải. Hộp thoại mở từ "Khác" sống ngoài menu
  * (menu đóng là gỡ nội dung). Hủy đơn (2026-10-29) hiện cho cả người lên đơn — người lên đơn hủy
  * đơn mình, trưởng phòng / trưởng nhóm CSKH hủy đơn nhân viên; server kiểm từng đơn, đơn không
@@ -1779,6 +1780,8 @@ function OrderBulkBar({ rows, onClear }: { rows: SalesOrderListItem[]; onClear: 
   // Hủy vận đơn (2026-11-02) — đi cùng Gửi sang ĐVVC: chỉ người chọn hãng (kho / admin).
   const canCancelWaybill = canUpdate;
   const withWaybill = rows.filter((r) => r.shipment?.trackingNo);
+  // Xin lại vận đơn hàng loạt (2026-11-02) — cùng quyền với nút trên dòng (`pack` Shipment).
+  const retryable = rows.filter(retryableWaybill);
   const canCancel =
     ability.can('cancel', 'SalesOrder') ||
     ability.can('cancel_after_carrier', 'SalesOrder') ||
@@ -1836,6 +1839,14 @@ function OrderBulkBar({ rows, onClear }: { rows: SalesOrderListItem[]; onClear: 
                   In lại vận đơn
                 </DropdownMenuItem>
               ) : null}
+              {canReprint ? (
+                <DropdownMenuItem
+                  disabled={retryable.length === 0}
+                  onSelect={() => setDialog('retry-waybill')}
+                >
+                  Xin lại vận đơn{retryable.length > 0 ? ` (${retryable.length})` : ''}
+                </DropdownMenuItem>
+              ) : null}
               {canCancelWaybill ? (
                 <DropdownMenuItem
                   danger
@@ -1875,6 +1886,14 @@ function OrderBulkBar({ rows, onClear }: { rows: SalesOrderListItem[]; onClear: 
           rows={rows}
           open={dialog === 'reprint'}
           onOpenChange={openChange('reprint')}
+        />
+      ) : null}
+      {canReprint ? (
+        <BulkRetryWaybillDialog
+          rows={rows}
+          open={dialog === 'retry-waybill'}
+          onOpenChange={openChange('retry-waybill')}
+          onDone={onClear}
         />
       ) : null}
     </div>

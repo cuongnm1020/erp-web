@@ -1,0 +1,129 @@
+import { fireEvent, screen, waitFor, within } from '@testing-library/react';
+import { http, HttpResponse } from 'msw';
+import { describe, expect, it, vi } from 'vitest';
+import { makeOrders } from '@/test/msw/handlers';
+import { server } from '@/test/msw/server';
+import { renderApp } from '@/test/render';
+import { OrderIssuesScreen } from './components/order-issues-screen';
+import { requiredAbilityFor } from '@/lib/navigation';
+import { buildAbility } from '@/lib/permission/ability';
+
+/** Quản trị › Xử lý đơn lỗi (2026-11-02, chỉ superadmin). */
+
+const replace = vi.fn();
+let search = '';
+vi.mock('next/navigation', () => ({
+  usePathname: () => '/admin/order-issues',
+  useRouter: () => ({ push: vi.fn(), replace, refresh: vi.fn() }),
+  useSearchParams: () => new URLSearchParams(search),
+}));
+vi.mock('@/components/ui/toaster', () => ({
+  toast: { success: vi.fn(), error: vi.fn(), info: vi.fn(), warning: vi.fn() },
+}));
+
+const COUNTS = {
+  waybillError: 78,
+  waybillErrorCodes: [
+    { code: 'PICKUP_WAREHOUSE_NOT_READY', count: 55 },
+    { code: 'CARRIER_REJECTED', count: 21 },
+  ],
+  carrierCancelled: 2,
+  packError: 174,
+  packErrorStockReady: 51,
+  awaitingPickup: 2281,
+  awaitingPickupOld: 752,
+  unsent: 7479,
+  unsentOld: 3282,
+  unsentShort: 3110,
+  olderThanDays: 2,
+};
+
+function setup() {
+  const listQueries: URLSearchParams[] = [];
+  const rows = makeOrders(2).map((o) => ({
+    ...o,
+    status: 'APPROVED',
+    waybillErrorCode: 'PICKUP_WAREHOUSE_NOT_READY',
+    waybillError: 'Kho KHO-LA-01 chưa khai điểm lấy hàng',
+    waybillErrorAt: '2026-11-02T08:31:00.000Z',
+    shipment: { ...(o.shipment ?? {}), id: `shp-${o.id}`, carrierCode: 'VTP', trackingNo: null },
+  }));
+  server.use(
+    http.get('/api/sales-orders/issue-counts', () => HttpResponse.json(COUNTS)),
+    http.get('/api/sales-orders', ({ request }) => {
+      listQueries.push(new URL(request.url).searchParams);
+      return HttpResponse.json({ items: rows, total: rows.length });
+    }),
+  );
+  return { listQueries, rows };
+}
+
+describe('OrderIssuesScreen', () => {
+  it('5 ô Cần xử lý hiện số từ issue-counts; mặc định nhóm Lỗi vận đơn', async () => {
+    search = '';
+    const { listQueries, rows } = setup();
+    renderApp(<OrderIssuesScreen />);
+    const tile = await screen.findByTestId('issue-tile-WAYBILL_ERROR');
+    await waitFor(() => expect(within(tile).getByText('78')).toBeInTheDocument());
+    expect(
+      within(tile).getByText('55 kho chưa khai điểm lấy · 21 hãng từ chối'),
+    ).toBeInTheDocument();
+    expect(tile).toHaveAttribute('aria-selected', 'true');
+    expect(
+      within(screen.getByTestId('issue-tile-PACK_ERROR')).getByText(
+        '51 đơn nay đã đủ hàng — đóng gói lại được',
+      ),
+    ).toBeInTheDocument();
+    expect(
+      within(screen.getByTestId('issue-tile-AWAITING_PICKUP')).getByText('2.281'),
+    ).toBeInTheDocument();
+    expect(await screen.findByText(rows[0]!.docNumber)).toBeInTheDocument();
+    expect(listQueries.at(-1)!.get('issue')).toBe('WAYBILL_ERROR');
+  });
+
+  it('nhóm + lọc từ URL đi lên API (issue, olderThanDays, stockReady)', async () => {
+    search = 'issue=PACK_ERROR&old=1&ready=true';
+    const { listQueries } = setup();
+    renderApp(<OrderIssuesScreen />);
+    await waitFor(() => expect(listQueries.length).toBeGreaterThan(0));
+    const q = listQueries.at(-1)!;
+    expect(q.get('issue')).toBe('PACK_ERROR');
+    expect(q.get('olderThanDays')).toBe('2');
+    expect(q.get('stockReady')).toBe('true');
+  });
+
+  it('bấm ô khác → đổi nhóm trên URL', async () => {
+    search = '';
+    setup();
+    replace.mockClear();
+    renderApp(<OrderIssuesScreen />);
+    fireEvent.click(await screen.findByTestId('issue-tile-UNSENT'));
+    await waitFor(() => expect(replace).toHaveBeenCalled());
+    expect(String(replace.mock.calls.at(-1)![0])).toContain('issue=UNSENT');
+  });
+
+  it('tick đơn ở Lỗi vận đơn → thanh hàng loạt có "Xin lại vận đơn (n)" làm việc chính', async () => {
+    search = '';
+    const { rows } = setup();
+    renderApp(<OrderIssuesScreen />);
+    await screen.findByText(rows[0]!.docNumber);
+    const boxes = screen.getAllByRole('checkbox');
+    fireEvent.click(boxes[1]!);
+    expect(
+      await screen.findByRole('button', { name: /Xin lại vận đơn \(1\)/ }),
+    ).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Gán hãng / cân nặng' })).toBeInTheDocument();
+  });
+
+  it('chỉ superadmin: route gate đòi manage OrderIssue — admin thường (có mọi mã quyền) không có', () => {
+    const req = requiredAbilityFor('/admin/order-issues');
+    expect(req).toEqual({ action: 'manage', subject: 'OrderIssue' });
+    const superadmin = buildAbility({ permissions: [], hasGlobalAccess: true });
+    const admin = buildAbility({
+      permissions: ['sales_order.read', 'sales_order.send_carrier', 'shipment.pack', 'user.read'],
+      hasGlobalAccess: false,
+    });
+    expect(superadmin.can(req!.action, req!.subject)).toBe(true);
+    expect(admin.can(req!.action, req!.subject)).toBe(false);
+  });
+});
