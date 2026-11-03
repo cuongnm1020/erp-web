@@ -3801,8 +3801,9 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * Số đơn từng nhóm của màn Quản trị › Xử lý đơn lỗi (2026-11-02) — CHỈ superadmin (403
-         *     ORDER_ISSUES_SUPERADMIN_ONLY). Cùng bộ lọc với GET /sales-orders — khai TRƯỚC `:id`.
+         * Số đơn từng nhóm của màn Quản trị › Xử lý đơn lỗi (2026-11-02) — quyền `sales_order.issues`
+         *     hoặc superadmin (403 ORDER_ISSUES_FORBIDDEN, 2026-11-03). Số "Bị Pancake ghi đè" chỉ superadmin.
+         *     Cùng bộ lọc với GET /sales-orders — khai TRƯỚC `:id`.
          */
         get: operations["SalesOrderController_issueCounts"];
         put?: never;
@@ -23571,7 +23572,7 @@ export interface operations {
                  */
                 printStatus?: "PRINTED" | "NOT_PRINTED" | "ERROR";
                 /**
-                 * @description Nhóm đơn lỗi (2026-11-02, CHỈ superadmin — người khác 403 ORDER_ISSUES_SUPERADMIN_ONLY), đơn
+                 * @description Nhóm đơn lỗi (2026-11-02; quyền `sales_order.issues` từ 2026-11-03 — thiếu thì 403 ORDER_ISSUES_FORBIDDEN), đơn
                  *     chưa hủy: `WAYBILL_ERROR` phiếu giao mới nhất lỗi vận đơn · `CARRIER_CANCELLED` hãng hủy mã,
                  *     chưa xin lại · `PACK_ERROR` "Đóng gói + in" lần trước không đóng gói được · `AWAITING_PICKUP`
                  *     có mã vận đơn, hãng chưa lấy hàng · `UNSENT` đã xác nhận, chưa Gửi sang ĐVVC.
@@ -23788,7 +23789,7 @@ export interface operations {
                  */
                 printStatus?: "PRINTED" | "NOT_PRINTED" | "ERROR";
                 /**
-                 * @description Nhóm đơn lỗi (2026-11-02, CHỈ superadmin — người khác 403 ORDER_ISSUES_SUPERADMIN_ONLY), đơn
+                 * @description Nhóm đơn lỗi (2026-11-02; quyền `sales_order.issues` từ 2026-11-03 — thiếu thì 403 ORDER_ISSUES_FORBIDDEN), đơn
                  *     chưa hủy: `WAYBILL_ERROR` phiếu giao mới nhất lỗi vận đơn · `CARRIER_CANCELLED` hãng hủy mã,
                  *     chưa xin lại · `PACK_ERROR` "Đóng gói + in" lần trước không đóng gói được · `AWAITING_PICKUP`
                  *     có mã vận đơn, hãng chưa lấy hàng · `UNSENT` đã xác nhận, chưa Gửi sang ĐVVC.
@@ -23933,7 +23934,7 @@ export interface operations {
                  */
                 printStatus?: "PRINTED" | "NOT_PRINTED" | "ERROR";
                 /**
-                 * @description Nhóm đơn lỗi (2026-11-02, CHỈ superadmin — người khác 403 ORDER_ISSUES_SUPERADMIN_ONLY), đơn
+                 * @description Nhóm đơn lỗi (2026-11-02; quyền `sales_order.issues` từ 2026-11-03 — thiếu thì 403 ORDER_ISSUES_FORBIDDEN), đơn
                  *     chưa hủy: `WAYBILL_ERROR` phiếu giao mới nhất lỗi vận đơn · `CARRIER_CANCELLED` hãng hủy mã,
                  *     chưa xin lại · `PACK_ERROR` "Đóng gói + in" lần trước không đóng gói được · `AWAITING_PICKUP`
                  *     có mã vận đơn, hãng chưa lấy hàng · `UNSENT` đã xác nhận, chưa Gửi sang ĐVVC.

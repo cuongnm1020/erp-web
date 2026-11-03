@@ -328,6 +328,8 @@ const MESSAGES: Record<string, string> = {
   PANCAKE_UNLOCK_SUPERADMIN_ONLY:
     'Chỉ quản trị hệ thống được cho đơn nhận lại dữ liệu từ Pancake. Nhờ quản trị hệ thống xử lý giúp.',
   ORDER_NOT_FROM_PANCAKE: 'Đơn này không đồng bộ từ Pancake.',
+  ORDER_ISSUES_FORBIDDEN:
+    'Bạn chưa có quyền "Xử lý đơn lỗi". Nhờ quản trị hệ thống gán quyền này cho vai trò của bạn.',
   ORDER_ISSUES_SUPERADMIN_ONLY:
     'Chỉ quản trị hệ thống được xem màn Xử lý đơn lỗi. Nhờ quản trị hệ thống xử lý giúp.',
   USER_PERMISSIONS_SUPERADMIN_ONLY:
