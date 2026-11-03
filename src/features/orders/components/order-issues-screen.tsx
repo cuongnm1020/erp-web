@@ -118,7 +118,7 @@ const ISSUE_TABS: IssueTab[] = [
     issue: 'UNSENT',
     label: 'Chưa gửi ĐVVC',
     level: 'info',
-    hint: 'Đơn đã xác nhận nhưng chưa Gửi sang ĐVVC. Đơn đang thiếu hàng thì Chuyển Chờ hàng thay vì gửi.',
+    hint: 'Đơn đã xác nhận nhưng chưa Gửi sang ĐVVC. Lọc "Hiện tại: Đã đủ hàng" để gửi; đơn đang thiếu hàng thì Chuyển Chờ hàng thay vì gửi.',
     count: (c) => c.unsent,
     note: (c) =>
       `${c.unsentOld} đơn quá ${c.olderThanDays} ngày · ${c.unsentShort} đang thiếu hàng`,
@@ -143,6 +143,12 @@ const LEVEL_DOT: Record<Level, string> = {
   warn: 'bg-warning',
   info: 'bg-info',
 };
+
+/**
+ * Nhóm có lọc "Hiện tại: Đã đủ hàng / Vẫn thiếu" (`stockReady`). Chưa gửi ĐVVC thêm 2026-11-03:
+ * lọc đơn đủ hàng để Gửi sang ĐVVC hàng loạt, đơn thiếu để Chuyển Chờ hàng.
+ */
+const STOCK_FILTER_ISSUES: ReadonlySet<OrderIssue> = new Set(['PACK_ERROR', 'UNSENT']);
 
 function parseTab(v: string | undefined): TabKey {
   return ISSUE_TABS.find((t) => t.issue === v)?.issue ?? 'WAYBILL_ERROR';
@@ -178,7 +184,9 @@ export function OrderIssuesScreen() {
       issue,
       olderThanDays: state.filters.old === '1' ? OLDER_DAYS : undefined,
       stockReady:
-        issue === 'PACK_ERROR' && state.filters.ready ? state.filters.ready === 'true' : undefined,
+        STOCK_FILTER_ISSUES.has(issue) && state.filters.ready
+          ? state.filters.ready === 'true'
+          : undefined,
       take: state.size,
       skip: (state.page - 1) * state.size,
     },
@@ -214,7 +222,7 @@ export function OrderIssuesScreen() {
       type: 'select',
       options: [{ value: '1', label: `Quá ${OLDER_DAYS} ngày` }],
     },
-    ...(issue === 'PACK_ERROR'
+    ...(STOCK_FILTER_ISSUES.has(issue)
       ? [
           {
             key: 'ready' as const,
