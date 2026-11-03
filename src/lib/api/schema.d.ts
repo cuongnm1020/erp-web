@@ -11691,6 +11691,14 @@ export interface components {
             heightCm?: number | null;
             note?: string | null;
         };
+        PancakeMirrorRefDto: {
+            /** @description POS (shop Pancake) giữ đơn gương. */
+            shopId: string;
+            /** @description Id đơn gương bên Pancake (theo shop); null = chưa biết (đang đẩy / Pancake chưa trả). */
+            externalId: string | null;
+            /** @description ISO datetime — lúc ERP bắt đầu đẩy. */
+            createdAt: string;
+        };
         SalesOrderListItemDto: {
             /**
              * @description Tab của đơn — `flowOf(status, fulfilmentStatus, chờ hàng, lỗi vận đơn, SP ngoài hệ thống)`.
@@ -11826,6 +11834,12 @@ export interface components {
              *     Pancake nữa, chỉ đẩy ERP → Pancake. null = Pancake vẫn là nguồn / không phải đơn Pancake.
              */
             pancakeErpLockedAt: string | null;
+            /**
+             * @description Đơn TẠO TRÊN ERP đã đẩy lên Pancake thành đơn gương (2026-11-03): id đơn bên Pancake (null khi
+             *     đang chờ Pancake trả id). Đơn gương chỉ đẩy ERP → Pancake, không nhận cập nhật ngược. null =
+             *     chưa đẩy / không phải đơn ERP.
+             */
+            pancakeMirror: components["schemas"]["PancakeMirrorRefDto"] | null;
             /** @description ISO datetime — chỉ có khi đơn POSTED. */
             postedAt: string | null;
             createdAt: string;
@@ -12339,6 +12353,12 @@ export interface components {
              *     Pancake nữa, chỉ đẩy ERP → Pancake. null = Pancake vẫn là nguồn / không phải đơn Pancake.
              */
             pancakeErpLockedAt: string | null;
+            /**
+             * @description Đơn TẠO TRÊN ERP đã đẩy lên Pancake thành đơn gương (2026-11-03): id đơn bên Pancake (null khi
+             *     đang chờ Pancake trả id). Đơn gương chỉ đẩy ERP → Pancake, không nhận cập nhật ngược. null =
+             *     chưa đẩy / không phải đơn ERP.
+             */
+            pancakeMirror: components["schemas"]["PancakeMirrorRefDto"] | null;
             /** @description ISO datetime — chỉ có khi đơn POSTED. */
             postedAt: string | null;
             createdAt: string;

@@ -51,3 +51,26 @@ export function PancakeErpLockedBadge({ lockedAt }: { lockedAt: string | null })
     </span>
   );
 }
+
+/**
+ * Đơn tạo trên ERP đã đẩy lên Pancake thành đơn gương (2026-11-03): chỉ đẩy ERP → Pancake, Pancake
+ * sửa / hủy bản gương thì ERP không nhận.
+ */
+export function PancakeMirrorBadge({
+  mirror,
+}: {
+  mirror: { shopId: string; externalId: string | null } | null;
+}) {
+  if (!mirror) return null;
+  const where = mirror.externalId
+    ? `đơn #${mirror.externalId} POS ${mirror.shopId}`
+    : `POS ${mirror.shopId} (đang chờ Pancake trả mã)`;
+  return (
+    <span
+      className="inline-flex"
+      title={`Đã đẩy lên Pancake (${where}) — chỉ đẩy ERP → Pancake, không nhận cập nhật từ Pancake`}
+    >
+      <StatusBadge tone="brand">Đã đẩy Pancake</StatusBadge>
+    </span>
+  );
+}

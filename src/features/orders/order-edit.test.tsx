@@ -836,7 +836,7 @@ describe('OrderEditScreen — sửa sản phẩm / người nhận, quyền sử
     error.mockRestore();
   });
 
-  it('đơn Pancake: thành tiền không chia hết cho SL → báo + gợi ý hai mức, chặn lưu; chọn mức gợi ý → PUT đơn giá nguyên (SOP2610-107401, 2026-11-03)', async () => {
+  it('đơn Pancake: thành tiền không chia hết cho SL → báo số Pancake sẽ ghi, vẫn lưu được với thành tiền đã nhập (2026-11-03)', async () => {
     withDetail({ linesLockedReason: null, pancakeOrderId: '46422' });
     const puts: Array<Record<string, unknown>> = [];
     server.use(
@@ -861,21 +861,14 @@ describe('OrderEditScreen — sửa sản phẩm / người nhận, quyền sử
     fireEvent.focus(total);
     fireEvent.change(total, { target: { value: '100005' } });
     fireEvent.blur(total);
-    const alert = await screen.findByText(/Pancake chỉ nhận đơn giá nguyên đồng/);
-    expect(alert).toHaveTextContent('100.000');
-    expect(alert).toHaveTextContent('100.010');
-    fireEvent.click(screen.getByRole('button', { name: /Lưu thay đổi/ }));
-    expect(error).toHaveBeenCalledWith(expect.stringContaining('chia hết cho số lượng'));
-    expect(puts).toHaveLength(0);
-
-    fireEvent.click(screen.getByRole('button', { name: '100.010' }));
-    await waitFor(() =>
-      expect(screen.queryByText(/Pancake chỉ nhận đơn giá nguyên đồng/)).not.toBeInTheDocument(),
-    );
+    const note = await screen.findByText(/Pancake chỉ nhận đơn giá nguyên đồng/);
+    expect(note).toHaveTextContent('10.001');
+    expect(note).toHaveTextContent('100.010');
     fireEvent.click(screen.getByRole('button', { name: /Lưu thay đổi/ }));
     await waitFor(() => expect(puts).toHaveLength(1));
+    expect(error).not.toHaveBeenCalledWith(expect.stringContaining('chia hết cho số lượng'));
     const sent = (puts[0]!.lines as Array<Record<string, string>>)[0]!;
-    expect(sent.unitPrice).toBe('10001');
+    expect(sent.unitPrice).toBe('10000.5');
     error.mockRestore();
   });
 
