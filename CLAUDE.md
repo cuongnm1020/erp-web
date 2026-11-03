@@ -204,6 +204,10 @@ Màn hình trống là lời mời hành động, không phải lời than.
 ## Quy tắc làm việc với Claude Code trong repo này
 
 - **Cấm heredoc** (`cat > file <<'EOF'`) để tạo/sửa file — dùng Write/Edit tool.
+- **CẤM TUYỆT ĐỐI python heredoc** (`python3 - <<'EOF'`, `python3 <<EOF`) và mọi script inline
+  (`python3 -c`, `node -e`, `perl -pi`, `sed -i`) để tạo/sửa file — không ngoại lệ, kể cả sửa
+  nhiều chỗ một lúc hay file test. Sửa file CHỈ bằng Edit / Write tool (nhiều chỗ → nhiều lần Edit).
+  Vi phạm 2026-11-03 (sửa `order-list-screen.tsx` bằng python heredoc) — đã bị nhắc.
 - Không gộp lệnh bằng `&&`; chạy từng lệnh riêng.
 - Làm việc trên nhánh `develop` — checkout trước khi code. Một màn hình một phiên, một task = một commit trên `develop`; KHÔNG tự merge vào `main` (chỉ merge `develop` → `main` khi được yêu cầu).
 - Trước khi viết code màn hình: đọc `SCREEN-SPEC` của màn đó. Không có spec thì hỏi, không tự bịa.
