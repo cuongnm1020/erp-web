@@ -64,6 +64,8 @@ export interface OrderListParams {
    * hoặc lỗi vận đơn).
    */
   printStatus?: OrderPrintStatus;
+  /** Hãng đã lấy hàng chưa — đơn đã gửi ĐVVC (2026-11-03, màn Theo dõi đơn). */
+  pickupStatus?: OrderPickupStatus;
   /** Đơn có sản phẩm (SKU) này — kể cả thành phần combo. */
   skuId?: string;
   /** true = chỉ đơn có đơn trùng trong ngày (cùng SĐT, cùng ngày VN, chưa hủy — CSKH-5). */
@@ -101,6 +103,7 @@ type OrderListQuery = NonNullable<paths['/sales-orders']['get']['parameters']['q
 export type OrderItemOrigin = NonNullable<OrderListQuery['itemOrigin']>;
 export type OrderCarrierSource = NonNullable<OrderListQuery['carrierSource']>;
 export type OrderPrintStatus = NonNullable<OrderListQuery['printStatus']>;
+export type OrderPickupStatus = NonNullable<OrderListQuery['pickupStatus']>;
 export type OrderSortField = NonNullable<OrderListQuery['sortBy']>;
 export type OrderIssue = NonNullable<OrderListQuery['issue']>;
 export type OrderIssueCounts = components['schemas']['SalesOrderIssueCountsDto'];
@@ -214,6 +217,7 @@ function listQuery(params: Omit<OrderListParams, 'take' | 'skip'>) {
     carrierStatusText: params.carrierStatusText?.length ? params.carrierStatusText : undefined,
     shortSkuId: params.shortSkuId || undefined,
     printStatus: params.printStatus,
+    pickupStatus: params.pickupStatus,
     skuId: params.skuId || undefined,
     duplicate: params.duplicate ? ('true' as const) : undefined,
     from: params.from || undefined,

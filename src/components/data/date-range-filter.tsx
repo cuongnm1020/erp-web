@@ -488,7 +488,7 @@ export function DateRangeFilter({
  * primary chữ trắng đậm, giữa khoảng một dải nền secondary liền nhau; ngày ngoài tháng chữ nhạt,
  * không bấm. Mũi tên ←→↑↓ đi giữa các ngày (cùng tháng).
  */
-function MonthGrid({
+export function MonthGrid({
   month,
   from,
   to,
@@ -496,6 +496,7 @@ function MonthGrid({
   onPick,
   onPrev,
   onNext,
+  isDisabled,
 }: {
   month: string;
   from: string;
@@ -504,6 +505,8 @@ function MonthGrid({
   onPick: (key: string) => void;
   onPrev?: () => void;
   onNext?: () => void;
+  /** Ngày không cho chọn (ô chọn một ngày có giới hạn, 2026-11-03) — chữ nhạt, không bấm. */
+  isDisabled?: (key: string) => boolean;
 }) {
   const cells = monthCells(month);
   const title = `Tháng ${Number.parseInt(month.slice(5, 7), 10)} / ${month.slice(0, 4)}`;
@@ -585,9 +588,10 @@ function MonthGrid({
                 aria-label={show(key)}
                 aria-pressed={isStart || isEnd || inside}
                 aria-current={key === today ? 'date' : undefined}
+                disabled={isDisabled?.(key)}
                 onClick={() => onPick(key)}
                 className={cn(
-                  'relative z-10 flex h-7 w-8 items-center justify-center rounded-md text-sm tabular-nums',
+                  'relative z-10 flex h-7 w-8 items-center justify-center rounded-md text-sm tabular-nums disabled:pointer-events-none disabled:text-input',
                   isStart || isEnd
                     ? 'bg-primary font-semibold text-primary-foreground'
                     : 'text-foreground hover:bg-muted',

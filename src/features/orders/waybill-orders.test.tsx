@@ -29,6 +29,8 @@ function setup() {
     posShopId: '715130909',
     teamName: 'CSKH LA',
     labelPrintedAt: i === 0 ? '2026-11-03T03:00:00.000Z' : null,
+    fulfilmentStatus: i === 0 ? 'PACKED' : 'SHIPPED',
+    carrierStatusText: i === 0 ? null : 'Đã lấy hàng/Đã nhập kho',
     shipment: {
       ...(o.shipment ?? {}),
       id: `shp-${o.id}`,
@@ -61,6 +63,21 @@ describe('WaybillOrdersScreen', () => {
     expect(screen.getAllByText('CSKH LA').length).toBe(2);
     expect(screen.getByText('S23-0')).toBeInTheDocument();
     expect(screen.getByText('Chưa in')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Theo dõi đơn' })).toBeInTheDocument();
+    // Hãng lấy hàng: đơn 1 chưa lấy, đơn 2 đã lấy + chữ trạng thái hãng.
+    expect(screen.getByText('Chưa lấy hàng')).toBeInTheDocument();
+    expect(screen.getByText('Đã lấy hàng')).toBeInTheDocument();
+    expect(screen.getByText('Đã lấy hàng/Đã nhập kho')).toBeInTheDocument();
+  });
+
+  it('lọc hãng chưa lấy hàng + chưa in tem từ URL đi lên API', async () => {
+    search = 'pickup=AWAITING&printStatus=NOT_PRINTED';
+    const { listQueries } = setup();
+    renderApp(<WaybillOrdersScreen />);
+    await waitFor(() => expect(listQueries.length).toBeGreaterThan(0));
+    const q = listQueries.at(-1)!;
+    expect(q.get('pickupStatus')).toBe('AWAITING');
+    expect(q.get('printStatus')).toBe('NOT_PRINTED');
   });
 
   it('lọc từ URL đi lên API: ngày gán, POS, sản phẩm, hãng', async () => {

@@ -50,6 +50,11 @@ export const orderLineSchema = z.object({
    * phẩm sale đang thấy (server tra giá theo khách mới có thể khác). Không nhập tay.
    */
   previewPrice: z.string().optional(),
+  /**
+   * Sản phẩm khuyến mãi (2026-11-03): đơn giá / thành tiền = 0, gửi API `isGift` (không gửi giá);
+   * vẫn giữ tồn, in đơn cộng SL với dòng bán cùng SKU.
+   */
+  isGift: z.boolean().optional(),
 });
 
 /** Nguồn đơn — khách tìm đến qua đâu (khớp enum OrderSource của API). */
@@ -393,7 +398,7 @@ export function toCreateOrderBody(v: CreateOrderValues) {
       skuId: l.skuId,
       uomId: l.uomId,
       qty: l.qty,
-      ...linePriceBody(l, v.customerId),
+      ...(l.isGift ? { isGift: true } : linePriceBody(l, v.customerId)),
     })),
   };
 }

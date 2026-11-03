@@ -51,6 +51,7 @@ describe('groupOrderLines / collapseComboLines', () => {
         qty: '3',
         listPrice: DETAIL.lines[0]!.combo!.listPrice,
         unitPrice: DETAIL.lines[0]!.combo!.unitPrice,
+        isGift: false,
       },
       {
         skuId: DETAIL.lines[2]!.skuId,
@@ -58,6 +59,7 @@ describe('groupOrderLines / collapseComboLines', () => {
         qty: '1',
         listPrice: DETAIL.lines[2]!.listPrice,
         unitPrice: DETAIL.lines[2]!.unitPrice,
+        isGift: false,
       },
     ]);
   });

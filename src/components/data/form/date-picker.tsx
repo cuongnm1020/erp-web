@@ -2,9 +2,8 @@
 
 import { CalendarIcon, X } from 'lucide-react';
 import * as React from 'react';
-import { DateRangeFilter } from '../date-range-filter';
+import { DateRangeFilter, MonthGrid } from '../date-range-filter';
 import { Button } from '@/components/ui/button';
-import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { cn } from '@/lib/cn';
 import { formatDate } from '@/lib/format';
@@ -65,7 +64,6 @@ export const DatePicker = React.forwardRef<HTMLButtonElement, DatePickerProps>(
     ref,
   ) => {
     const [open, setOpen] = React.useState(false);
-    const selected = keyToDate(value);
     return (
       <Popover open={open} onOpenChange={setOpen}>
         <div className={cn('relative', className)}>
@@ -97,19 +95,13 @@ export const DatePicker = React.forwardRef<HTMLButtonElement, DatePickerProps>(
             </button>
           ) : null}
         </div>
-        <PopoverContent className="w-auto p-0" align="start">
-          <Calendar
-            mode="single"
-            selected={selected}
-            defaultMonth={selected}
-            startMonth={fromDate}
-            endMonth={toDate}
-            disabled={[
-              ...(fromDate ? [{ before: fromDate }] : []),
-              ...(toDate ? [{ after: toDate }] : []),
-            ]}
-            onSelect={(d) => {
-              onChange(d ? dateToKey(d) : '');
+        <PopoverContent className="w-auto p-3" align="start">
+          <SingleMonth
+            value={value}
+            minKey={fromDate ? dateToKey(fromDate) : ''}
+            maxKey={toDate ? dateToKey(toDate) : ''}
+            onPick={(k) => {
+              onChange(k);
               setOpen(false);
             }}
           />
@@ -119,6 +111,45 @@ export const DatePicker = React.forwardRef<HTMLButtonElement, DatePickerProps>(
   },
 );
 DatePicker.displayName = 'DatePicker';
+
+const monthStart = (key: DateKey) => `${key.slice(0, 8)}01`;
+const plusMonths = (month: DateKey, n: number): DateKey => {
+  const d = keyToDate(month)!;
+  return dateToKey(new Date(d.getFullYear(), d.getMonth() + n, 1));
+};
+
+/**
+ * Lịch một tháng của ô chọn ngày (2026-11-03): dùng chung lưới "Tháng 11 / 2026", T2…CN với bộ lọc
+ * khoảng ngày — không còn lịch react-day-picker khác giao diện. Ngày ngoài [minKey, maxKey] không bấm.
+ */
+function SingleMonth({
+  value,
+  minKey,
+  maxKey,
+  onPick,
+}: {
+  value: DateKey | '';
+  minKey: DateKey | '';
+  maxKey: DateKey | '';
+  onPick: (key: DateKey) => void;
+}) {
+  const today = dateToKey(new Date());
+  const [month, setMonth] = React.useState(() => monthStart(value || today));
+  const canPrev = !minKey || plusMonths(month, -1) >= monthStart(minKey);
+  const canNext = !maxKey || plusMonths(month, 1) <= monthStart(maxKey);
+  return (
+    <MonthGrid
+      month={month}
+      from={value}
+      to={value}
+      today={today}
+      onPick={onPick}
+      onPrev={canPrev ? () => setMonth((m) => plusMonths(m, -1)) : undefined}
+      onNext={canNext ? () => setMonth((m) => plusMonths(m, 1)) : undefined}
+      isDisabled={(k) => (!!minKey && k < minKey) || (!!maxKey && k > maxKey)}
+    />
+  );
+}
 
 export interface DateRangeValue {
   from: DateKey | '';

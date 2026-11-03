@@ -7,6 +7,7 @@ import { formatDate, formatQuantity } from '@/lib/format';
 import type { PrintController } from '@/lib/print';
 import type { SalesOrderDetail } from '../api/use-orders';
 import { orderChannelLabel } from '../labels';
+import { mergePrintLines } from '../print-lines';
 
 // Khổ A5 dọc — lề và cỡ chữ vật lý khai bằng inline style (khổ giấy, không phải spacing UI).
 const SHEET_STYLE: CSSProperties = { padding: '8mm 10mm', fontSize: '10pt', lineHeight: 1.3 };
@@ -93,21 +94,26 @@ export function OrderPrintSheet({
             </tr>
           </thead>
           <tbody>
-            {order.lines.map((l) => (
-              <tr key={l.id} className="border-b align-top">
-                <td className="py-1 pr-1">{l.lineNo}</td>
+            {/* Cùng SKU (bán + khuyến mãi) cộng thành một dòng (2026-11-03). */}
+            {mergePrintLines(order.lines).map(({ key, no, line: l, qty, giftQty }) => (
+              <tr key={key} className="border-b align-top">
+                <td className="py-1 pr-1">{no}</td>
                 <td className="py-1 pr-2">
                   <div>{l.skuName}</div>
                   <div className="font-mono" style={SMALL}>
                     {l.skuCode}
-                    {l.isGift ? ' · tặng' : ''}
+                    {giftQty !== '0'
+                      ? qty === giftQty
+                        ? ' · tặng'
+                        : ` · gồm ${formatQuantity(giftQty)} tặng`
+                      : ''}
                   </div>
                   {l.pancakeName && l.pancakeName !== l.skuName ? (
                     <div style={SMALL}>Pancake: {l.pancakeName}</div>
                   ) : null}
                 </td>
                 <td className="py-1 text-right font-semibold tabular-nums">
-                  {formatQuantity(l.qty)}
+                  {formatQuantity(qty)}
                 </td>
                 <td className="py-1 pl-2">{l.uomCode}</td>
                 <td className="py-1 pl-2">

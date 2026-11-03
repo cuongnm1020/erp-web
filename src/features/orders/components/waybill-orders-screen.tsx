@@ -23,6 +23,8 @@ import {
   usePancakeShops,
   useOrders,
   useTeamFilterOptions,
+  type OrderPickupStatus,
+  type OrderPrintStatus,
   type SalesOrderListItem,
 } from '../api/use-orders';
 import { BulkReprintWaybillDialog } from './bulk-reprint-waybill-dialog';
@@ -36,15 +38,40 @@ const FILTER_KEYS = [
   'skuId',
   'carrierId',
   'carrierAccountId',
+  'pickup',
+  'printStatus',
 ] as const;
 type FilterKey = (typeof FILTER_KEYS)[number];
+
+/** Hãng đã lấy hàng chưa (2026-11-03) — "Chưa lấy" = đã gán ĐVVC nhưng hãng chưa tới bắn mã. */
+const PICKUP_OPTIONS: { value: OrderPickupStatus; label: string }[] = [
+  { value: 'AWAITING', label: 'Hãng chưa lấy hàng' },
+  { value: 'PICKED_UP', label: 'Hãng đã lấy hàng' },
+];
+const PRINT_OPTIONS: { value: OrderPrintStatus; label: string }[] = [
+  { value: 'NOT_PRINTED', label: 'Chưa in tem' },
+  { value: 'PRINTED', label: 'Đã in tem' },
+  { value: 'ERROR', label: 'Lỗi, không in được' },
+];
+const pick = <T extends string>(opts: { value: T }[], v: string | undefined): T | undefined =>
+  opts.find((o) => o.value === v)?.value;
+
+/** Trạng thái kho sau khi hãng đã lấy hàng (báo lấy → giao / hoàn). */
+const PICKED_UP_STATUSES: ReadonlySet<string> = new Set([
+  'SHIPPED',
+  'IN_TRANSIT',
+  'OUT_FOR_DELIVERY',
+  'FAILED',
+  'DELIVERED',
+  'RETURNED',
+]);
 
 /** Mặc định: mới gán trước (user 2026-11-03 — sắp theo thời gian gán). */
 const DEFAULT_SORT: SortState = { id: 'sentAt', desc: true };
 const LIST_DEFAULTS = { filterKeys: FILTER_KEYS, sort: DEFAULT_SORT };
 
 /**
- * Đơn đã gán vận chuyển (2026-11-03): mọi đơn đã Gửi sang ĐVVC (`sentToCarrierAt`) — tìm theo ngày
+ * Theo dõi đơn (2026-11-03, trước tên "Đơn đã gán vận chuyển"): mọi đơn đã Gửi sang ĐVVC (`sentToCarrierAt`) — tìm theo ngày
  * gán, sắp theo giờ gán, lọc POS / phòng ban / sản phẩm / hãng, chọn nhiều để in lại tem vận đơn.
  * Dữ liệu = GET /sales-orders?sentToCarrier=true, scope theo người xem ở API (luật 7).
  */
@@ -70,6 +97,8 @@ export function WaybillOrdersScreen() {
     skuId: f.skuId,
     carrierId: f.carrierId,
     carrierAccountId: f.carrierAccountId,
+    pickupStatus: pick(PICKUP_OPTIONS, f.pickup),
+    printStatus: pick(PRINT_OPTIONS, f.printStatus),
     sortBy: 'sentToCarrierAt',
     sortDir: sort.desc ? 'desc' : 'asc',
     ...skipTake,
@@ -93,14 +122,16 @@ export function WaybillOrdersScreen() {
     team ||
     f.skuId ||
     f.carrierId ||
-    f.carrierAccountId
+    f.carrierAccountId ||
+    f.pickup ||
+    f.printStatus
   );
 
   return (
     <>
       <PageHeader
-        breadcrumb={[{ label: 'Kho' }, { label: 'Đơn đã gán vận chuyển' }]}
-        title="Đơn đã gán vận chuyển"
+        breadcrumb={[{ label: 'Kho' }, { label: 'Theo dõi đơn' }]}
+        title="Theo dõi đơn"
         description={
           query.data
             ? `${groupVi(String(query.data.total))} đơn đã gửi sang đơn vị vận chuyển`
@@ -139,6 +170,8 @@ export function WaybillOrdersScreen() {
               type: 'dateRange',
               rememberKey: 'date.waybills',
             },
+            { key: 'pickup', label: 'Hãng lấy hàng', type: 'select', options: PICKUP_OPTIONS },
+            { key: 'printStatus', label: 'In tem', type: 'select', options: PRINT_OPTIONS },
             {
               key: 'pos',
               label: 'POS',
@@ -202,7 +235,7 @@ export function WaybillOrdersScreen() {
 
       <QueryState
         query={query}
-        skeleton={<ListSkeleton rows={12} columns={7} />}
+        skeleton={<ListSkeleton rows={12} columns={8} />}
         isEmpty={(d) => d.items.length === 0}
         empty={
           <EmptyState
@@ -318,6 +351,43 @@ function buildColumns(
             ) : (
               <span className="text-xs text-muted-foreground">Chưa có mã</span>
             )}
+          </div>
+        );
+      },
+    },
+    {
+      id: 'pickup',
+      header: 'Hãng lấy hàng',
+      meta: { width: 170 },
+      cell: ({ row }) => {
+        const o = row.original;
+        const st = o.fulfilmentStatus;
+        const text = o.carrierStatusText ? (
+          <span
+            className="block truncate text-xs text-muted-foreground"
+            title={o.carrierStatusText}
+          >
+            {o.carrierStatusText}
+          </span>
+        ) : null;
+        if (o.status === 'CANCELLED' || st === 'CANCELLED') {
+          return <StatusBadge tone="neutral">Đơn đã hủy</StatusBadge>;
+        }
+        if (st === 'CARRIER_CANCELLED') {
+          return (
+            <div className="space-y-0.5">
+              <StatusBadge tone="err">Hãng hủy mã</StatusBadge>
+              {text}
+            </div>
+          );
+        }
+        const picked = st !== null && PICKED_UP_STATUSES.has(st);
+        return (
+          <div className="space-y-0.5">
+            <StatusBadge tone={picked ? 'ok' : 'warn'}>
+              {picked ? 'Đã lấy hàng' : 'Chưa lấy hàng'}
+            </StatusBadge>
+            {text}
           </div>
         );
       },

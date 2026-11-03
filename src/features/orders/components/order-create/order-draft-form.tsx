@@ -55,7 +55,6 @@ import {
 import { orderChannelLabel, orderSourceLabel } from '../../labels';
 import {
   createOrderSchema,
-  EMPTY_LINE,
   ORDER_CHANNELS,
   ORDER_SOURCES,
   previewManualDiscount,
@@ -73,6 +72,7 @@ import {
   StaffField,
   TagPicker,
 } from './order-side-cards';
+import { addCartSku, GiftLines } from './gift-lines';
 import { ProductSearch } from './product-search';
 import { SameDayDialog } from './same-day-dialog';
 
@@ -237,22 +237,20 @@ export const OrderDraftForm = forwardRef<
   const cod = total !== null ? Decimal.max(total.minus(prepaid), 0).toFixed(4) : null;
   const prepaidTooBig = total !== null && prepaid.greaterThan(total);
 
-  /** Chọn sản phẩm từ ô tìm / máy quét: đã có trong giỏ (ĐVT cơ sở) thì +1, chưa có thì thêm dòng. */
+  /**
+   * Chọn sản phẩm từ ô tìm / máy quét: đã có trong giỏ (cùng loại bán / khuyến mãi) thì +1, chưa có
+   * thì thêm dòng. ĐVT cơ sở có sẵn từ ô tìm — dòng hợp lệ ngay, quét rồi F10 liền không bị chặn.
+   */
   const addSku = useCallback(
-    ({ skuId, baseUomId }: SkuQuickRow) => {
-      const cur = form.getValues('lines');
-      const idx = cur.findIndex((l) => l.skuId === skuId);
-      if (idx >= 0) {
-        const q = cur[idx]!.qty;
-        const next = /^\d/.test(q) ? new Decimal(q).plus(1).toString() : '1';
-        form.setValue(`lines.${idx}.qty`, next, { shouldDirty: true, shouldValidate: true });
-      } else {
-        // ĐVT cơ sở có sẵn từ ô tìm — dòng hợp lệ ngay, quét rồi F10 liền không bị chặn.
-        lines.append({ ...EMPTY_LINE, skuId, uomId: baseUomId });
-      }
-    },
-    [form, lines],
+    (row: SkuQuickRow) => addCartSku(form, lines.append, row, false),
+    [form, lines.append],
   );
+  const addGift = useCallback(
+    (row: SkuQuickRow) => addCartSku(form, lines.append, row, true),
+    [form, lines.append],
+  );
+  const saleFields = lines.fields.flatMap((f, index) => (f.isGift ? [] : [{ id: f.id, index }]));
+  const giftFields = lines.fields.flatMap((f, index) => (f.isGift ? [{ id: f.id, index }] : []));
 
   const onError = (err: unknown, values: CreateOrderValues) => {
     if (isApiError(err)) {
@@ -384,7 +382,7 @@ export const OrderDraftForm = forwardRef<
             >
               <div className="overflow-x-auto rounded-md border">
                 <div className="min-w-[680px]">
-                  {lines.fields.length === 0 ? (
+                  {saleFields.length === 0 ? (
                     <div className="flex flex-col items-center gap-1.5 px-4 py-4 text-center">
                       <Inbox className="h-8 w-8 text-muted-foreground/60" aria-hidden />
                       <p className="text-sm text-muted-foreground">Chưa có sản phẩm trong giỏ</p>
@@ -413,17 +411,18 @@ export const OrderDraftForm = forwardRef<
                         <span />
                       </div>
                       <div className="divide-y">
-                        {lines.fields.map((f, i) => (
+                        {saleFields.map((f, i) => (
                           <CartLine
                             key={f.id}
                             fieldId={f.id}
                             form={form}
-                            index={i}
+                            index={f.index}
+                            no={i + 1}
                             customerId={customerId}
                             channel={channel}
                             warehouseId={warehouseId}
                             onMetrics={onMetrics}
-                            onRemove={() => lines.remove(i)}
+                            onRemove={() => lines.remove(f.index)}
                           />
                         ))}
                       </div>
@@ -448,6 +447,16 @@ export const OrderDraftForm = forwardRef<
                   )}
                 </div>
               </div>
+              <GiftLines
+                form={form}
+                fields={giftFields}
+                customerId={customerId}
+                channel={channel}
+                warehouseId={warehouseId}
+                onMetrics={onMetrics}
+                onRemove={(i) => lines.remove(i)}
+                onPick={addGift}
+              />
               {form.formState.errors.lines?.root?.message ||
               form.formState.errors.lines?.message ? (
                 <p className="text-sm text-destructive">

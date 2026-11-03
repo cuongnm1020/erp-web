@@ -554,6 +554,7 @@ function orderListExtras(i: number, status: (typeof ORDER_STATUSES)[number]) {
     waybillErrorCode: null,
     waybillErrorAt: null,
     labelPrintedAt: null,
+    carrierStatusText: null,
     packError: null,
     packErrorCode: null,
     packErrorAt: null,

@@ -12,6 +12,7 @@ import {
   FormMessage,
   MoneyInput,
 } from '@/components/data/form';
+import { StatusBadge } from '@/components/data/status-badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
@@ -80,7 +81,10 @@ export function CartLine({
   onMetrics,
   onRemove,
   wholeUnitPrice = false,
+  no,
 }: {
+  /** Số thứ tự hiện trên dòng; mặc định index + 1 (khu SP khuyến mãi đánh số riêng). */
+  no?: number;
   fieldId: string;
   form: UseFormReturn<CreateOrderValues>;
   index: number;
@@ -101,6 +105,8 @@ export function CartLine({
   const uomId = useWatch({ control: form.control, name: `lines.${index}.uomId` });
   const qty = useWatch({ control: form.control, name: `lines.${index}.qty` });
   const manualPrice = useWatch({ control: form.control, name: `lines.${index}.unitPrice` }) ?? '';
+  // Sản phẩm khuyến mãi (2026-11-03): đơn giá / thành tiền khoá 0, chỉ sửa số lượng.
+  const isGift = useWatch({ control: form.control, name: `lines.${index}.isGift` }) === true;
   const sku = useSkuDetail(skuId);
   const combo = sku.data?.isCombo ? (sku.data.combo ?? null) : null;
   // Combo không có tồn riêng — khả dụng lấy từ thành phần (GET /skus/{id}.combo), không hỏi /stock.
@@ -138,7 +144,7 @@ export function CartLine({
   // Đơn giá hiệu lực = giá sửa tay, không thì giá niêm yết; thành tiền = đơn giá × SL (làm tròn 4
   // lẻ như server).
   const listPrice = price.data?.listPrice ?? null;
-  const unitPrice = manualPrice !== '' ? manualPrice : listPrice;
+  const unitPrice = isGift ? '0' : manualPrice !== '' ? manualPrice : listPrice;
   const lineTotal =
     unitPrice !== null && qtyValid
       ? new Decimal(unitPrice).mul(qty).toDecimalPlaces(4).toFixed(4)
@@ -149,9 +155,9 @@ export function CartLine({
       ? sku.data.baseUom.code
       : (sku.data.uomConversions.find((c) => c.uomId === uomId)?.uom.code ?? null)
     : null;
-  const priceRatio = suspiciousPriceRatio(unitPrice, listPrice);
+  const priceRatio = isGift ? null : suspiciousPriceRatio(unitPrice, listPrice);
   const amountFix =
-    wholeUnitPrice && !combo && lineTotal !== null && qtyBase
+    wholeUnitPrice && !isGift && !combo && lineTotal !== null && qtyBase
       ? pancakeAmountFix(lineTotal, qtyBase)
       : null;
   useEffect(() => {
@@ -190,7 +196,7 @@ export function CartLine({
 
   return (
     <div className={CART_GRID}>
-      <div className="pt-2 text-xs tabular-nums text-muted-foreground">{index + 1}</div>
+      <div className="pt-2 text-xs tabular-nums text-muted-foreground">{no ?? index + 1}</div>
 
       <div className="min-w-0">
         <div className="flex items-center gap-2">
@@ -203,6 +209,7 @@ export function CartLine({
               Combo
             </span>
           ) : null}
+          {isGift ? <StatusBadge tone="ok">Khuyến mãi</StatusBadge> : null}
         </div>
         <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
           <span className="tabular-nums">{sku.data?.code}</span>
@@ -319,6 +326,7 @@ export function CartLine({
                 value={unitPrice ?? ''}
                 placeholder={price.isFetching ? '…' : 'Nhập giá'}
                 onChange={(v) => field.onChange(v === listPrice ? '' : v)}
+                disabled={isGift}
               />
             </FormControl>
             <FormLabel className="sr-only">Đơn giá</FormLabel>
@@ -328,7 +336,7 @@ export function CartLine({
                 {formatMoney(listPrice, { unit: '' })}
                 {uomCode ? `/${uomCode}` : ''} — kiểm tra lại đơn vị tính
               </p>
-            ) : manualPrice !== '' && listPrice !== null ? (
+            ) : !isGift && manualPrice !== '' && listPrice !== null ? (
               <p className="text-right text-xs text-muted-foreground">
                 Niêm yết {formatMoney(listPrice, { unit: '' })}
               </p>
@@ -345,7 +353,7 @@ export function CartLine({
           value={lineTotal ?? ''}
           placeholder="—"
           onChange={setLineTotal}
-          disabled={!qtyValid}
+          disabled={!qtyValid || isGift}
           className="font-semibold"
         />
         {amountFix ? (
