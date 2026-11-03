@@ -1446,9 +1446,7 @@ describe('OrderListScreen — chọn cột, sắp xếp theo cột, lọc SP ngo
     await waitFor(() =>
       expect(screen.queryByRole('columnheader', { name: /Sản phẩm/ })).not.toBeInTheDocument(),
     );
-    await waitFor(() =>
-      expect(puts.at(-1)).toEqual({ hidden: ['orderDate', 'product'], sort: null }),
-    );
+    await waitFor(() => expect(puts.at(-1)).toEqual({ hidden: ['product'], sort: null }));
 
     replace.mockClear();
     fireEvent.click(screen.getByRole('button', { name: 'Sắp xếp theo Khách hàng' }));
@@ -1456,7 +1454,7 @@ describe('OrderListScreen — chọn cột, sắp xếp theo cột, lọc SP ngo
     expect(String(replace.mock.calls.at(-1)![0])).toContain('sort=customer');
     await waitFor(() =>
       expect(puts.at(-1)).toEqual({
-        hidden: ['orderDate', 'product'],
+        hidden: ['product'],
         sort: { id: 'customer', desc: false },
       }),
     );
@@ -1756,27 +1754,14 @@ describe('OrderListScreen — Lỗi vận đơn + đơn TikTok (2026-10-28, tab 
 });
 
 describe('OrderListScreen — Đơn mới / Xác nhận / Chờ hàng (2026-10-31)', () => {
-  it('tab "Đơn mới" đứng đầu; dòng đơn mới có "Xác nhận" → POST /sales-orders/{id}/confirm', async () => {
+  it('tab "Đơn mới" đứng đầu; dòng đơn mới KHÔNG còn nút "Xác nhận" (bỏ 2026-11-03 — xác nhận ở màn chi tiết)', async () => {
     search = '';
-    const confirmed: string[] = [];
-    server.use(
-      http.post('/api/sales-orders/:id/confirm', ({ params }) => {
-        confirmed.push(params.id as string);
-        return HttpResponse.json(
-          { orderId: params.id, docNumber: FIRST.docNumber, status: 'APPROVED', completed: true },
-          { status: 201 },
-        );
-      }),
-    );
     renderApp(<OrderListScreen />, { me: ME_SALE });
     await screen.findByText(FIRST.docNumber);
     expect(screen.getByRole('tab', { name: /^Đơn mới/ })).toBeInTheDocument();
     const row = screen.getAllByRole('row').find((r) => r.textContent?.includes(FIRST.docNumber))!;
-    fireEvent.click(within(row).getByRole('button', { name: 'Xác nhận' }));
-    await waitFor(() => expect(confirmed).toEqual([FIRST.id]));
-    await waitFor(() =>
-      expect(toastSuccess).toHaveBeenCalledWith(`Đã xác nhận đơn ${FIRST.docNumber}`),
-    );
+    expect(within(row).queryByRole('button', { name: 'Xác nhận' })).not.toBeInTheDocument();
+    expect(within(row).getByRole('button', { name: 'Xem nhanh' })).toBeInTheDocument();
   });
 
   it('sale không có send_carrier → thanh chọn không có "Gửi sang ĐVVC" / "Khác"', async () => {
