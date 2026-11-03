@@ -11725,6 +11725,11 @@ export interface components {
             /** @description Lỗi vận đơn cuối (tab Cần sửa): câu của hãng khi `waybillErrorCode` = CARRIER_REJECTED. */
             waybillError: string | null;
             /**
+             * @description Người xem sửa được đơn cả khi kho đã thao tác (edit_all / superadmin / trưởng nhóm của đơn,
+             *     2026-11-03) — web không khóa nút Sửa theo tab.
+             */
+            editPastStage: boolean;
+            /**
              * @description Đơn có sản phẩm ngoài hệ thống — món gõ tay Pancake / SP Pancake tự tạo (2026-11-02). Chưa đóng
              *     gói thì đơn nằm tab Cần sửa và không được "Gửi sang ĐVVC".
              */

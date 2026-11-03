@@ -334,7 +334,7 @@ function orderRowItems(o: SalesOrderListItem, ctx: RowActionContext): RowActionI
             disabledReason:
               o.status === 'CANCELLED'
                 ? 'Đơn đã hủy'
-                : !stageOpen && !ctx.canEditAny
+                : !stageOpen && !o.editPastStage && !ctx.canEditAny
                   ? STAGE_LOCKED
                   : undefined,
           },

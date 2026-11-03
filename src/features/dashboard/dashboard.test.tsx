@@ -180,6 +180,7 @@ const ORDERS: SalesOrderList = {
       packErrorCode: null,
       packErrorAt: null,
       nonErpItems: false,
+      editPastStage: false,
       phone: null,
       recipientName: null,
       addressLine: null,
