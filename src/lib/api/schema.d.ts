@@ -11839,10 +11839,11 @@ export interface components {
         };
         SalesOrderListItemDto: {
             /**
-             * @description Tab của đơn — `flowOf(status, fulfilmentStatus, chờ hàng, lỗi vận đơn, SP ngoài hệ thống)`.
+             * @description Tab của đơn — cột `SalesOrderFulfilment.flow`, DB tính bằng `core.sales_order_flow_of` (cùng
+             *     luật `flowOf`: chứng từ, trạng thái kho, Chờ hàng tay, lỗi vận đơn, SP ngoài hệ thống, Pancake 11).
              * @enum {string}
              */
-            flow: "PENDING_APPROVAL" | "CANCELLED" | "WAREHOUSE" | "NEW" | "PICKING" | "PACKED" | "IN_TRANSIT" | "OUT_FOR_DELIVERY" | "DELIVERED" | "RETURNED" | "CARRIER_CANCELLED" | "PICKED_UP" | "WAITING_STOCK" | "NEEDS_FIX";
+            flow: "PENDING_APPROVAL" | "CANCELLED" | "WAREHOUSE" | "NEW" | "PICKING" | "PACKED" | "IN_TRANSIT" | "OUT_FOR_DELIVERY" | "DELIVERED" | "RETURNED" | "CARRIER_CANCELLED" | "WAITING_STOCK" | "NEEDS_FIX" | "PICKED_UP";
             /**
              * @description Trạng thái kho / giao hàng chi tiết (snapshot) — null = chưa tính (coi như NOT_STARTED).
              * @enum {string|null}
@@ -11930,7 +11931,10 @@ export interface components {
             teamName: string | null;
             /** @description Ghi chú gửi hãng / ghi chú in trên đơn (shippingOptions.note). */
             note: string | null;
-            /** @description Hàng đang thiếu tồn (mọi tab); null = không thiếu. Tab Chờ hàng = thiếu ≥ 24h + chưa gửi hãng. */
+            /**
+             * @description Hàng đang thiếu tồn (mọi tab); null = không thiếu. Chỉ thông tin — không tự đưa đơn vào tab Chờ
+             *     hàng (luật ≥ 24h bỏ 2026-11-03): tab đó chỉ gồm đơn kho chuyển tay / sale để Chờ hàng trên Pancake.
+             */
             shortage: components["schemas"]["SalesOrderShortageDto"] | null;
             id: string;
             docNumber: string;
