@@ -407,3 +407,32 @@ describe('OrderDetailScreen — thẻ hãng trên thẻ Vận đơn (2026-10-28)
     expect(list).not.toHaveTextContent('45');
   });
 });
+
+describe('OrderDetailScreen — Đóng gói + in vận đơn thay In phiếu đơn (2026-11-03)', () => {
+  const withOrder = (over: Record<string, unknown>) =>
+    server.use(http.get('/api/sales-orders/:id', () => HttpResponse.json({ ...DETAIL, ...over })));
+
+  it('đơn đã duyệt + đã gán hãng → nút đầu màn mở hộp đóng gói + in; In phiếu đơn vào menu ⋯', async () => {
+    withOrder({ status: 'APPROVED', carrierId: '00000000-0000-4000-8000-0000000000c1' });
+    renderApp(<OrderDetailScreen orderId={ORDER.id} />);
+    await screen.findByRole('heading', { level: 1 });
+    expect(screen.queryByRole('button', { name: 'In phiếu đơn' })).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Đóng gói + in vận đơn' }));
+    expect(
+      await screen.findByRole('heading', { name: 'Đóng gói và in vận đơn 1 đơn?' }),
+    ).toBeInTheDocument();
+    fireEvent.keyDown(document.activeElement ?? document.body, { key: 'Escape' });
+    await waitFor(() =>
+      expect(screen.queryByRole('heading', { name: 'Đóng gói và in vận đơn 1 đơn?' })).toBeNull(),
+    );
+    openMoreMenu();
+    expect(await screen.findByRole('menuitem', { name: 'In phiếu đơn' })).toBeInTheDocument();
+  });
+
+  it('đơn chưa gán hãng → không có nút đóng gói + in', async () => {
+    withOrder({ status: 'APPROVED', carrierId: null });
+    renderApp(<OrderDetailScreen orderId={ORDER.id} />);
+    await screen.findByRole('heading', { level: 1 });
+    expect(screen.queryByRole('button', { name: 'Đóng gói + in vận đơn' })).toBeNull();
+  });
+});

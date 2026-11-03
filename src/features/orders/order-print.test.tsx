@@ -18,7 +18,7 @@ describe('Phiếu đơn hàng — In phiếu đơn (PLAN-barcode-pick-pack A3)',
     window.print = vi.fn();
   });
 
-  it('bấm In phiếu đơn → tờ in A5 có mã vạch CODE128 của docNumber và mã quét từng dòng', async () => {
+  it('menu ⋯ › In phiếu đơn → tờ in A5 có mã vạch CODE128 của docNumber và mã quét từng dòng', async () => {
     let snapshot: { root: number; docBarcode: number; lineBarcodes: number; size: string | null } =
       {
         root: 0,
@@ -40,7 +40,9 @@ describe('Phiếu đơn hàng — In phiếu đơn (PLAN-barcode-pick-pack A3)',
     });
     renderApp(<OrderDetailScreen orderId={ORDER.id} />);
     await screen.findAllByText(DETAIL.docNumber);
-    fireEvent.click(screen.getByRole('button', { name: 'In phiếu đơn' }));
+    // "In phiếu đơn" nằm trong menu ⋯ từ 2026-11-03 (đầu màn là "Đóng gói + in vận đơn").
+    fireEvent.keyDown(screen.getByRole('button', { name: 'Thao tác khác' }), { key: 'ArrowDown' });
+    fireEvent.click(await screen.findByRole('menuitem', { name: 'In phiếu đơn' }));
     await waitFor(() => expect(window.print).toHaveBeenCalledTimes(1));
     expect(snapshot.root).toBe(1);
     expect(snapshot.size).toBe('A5');

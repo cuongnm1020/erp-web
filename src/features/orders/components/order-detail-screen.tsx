@@ -82,6 +82,7 @@ import {
 } from '../labels';
 import { groupOrderLines } from '../combo-lines';
 import { cancelOutcomeNotes } from './bulk-cancel-dialog';
+import { BulkFulfilPrintDialog } from './bulk-fulfil-print-dialog';
 import { CancelWaybillDialog } from './cancel-waybill-dialog';
 import { CarrierStatusCard } from './carrier-status-card';
 import { OrderEditHistory } from './order-edit-history';
@@ -108,7 +109,7 @@ import { PancakeErpLockedBadge, PancakeMirrorBadge, PancakeOrderLink } from './p
  *   dòng thời gian chứng từ. Luật 2 cấm tự khai shape ở frontend nên màn nói thẳng là
  *   chưa nối được, thay vì hiện số bịa cạnh một đơn thật.
  * - "Tạo phiếu xuất": chưa nối mutation. "Hủy đơn" đã nối POST /:id/cancel.
- * - "In phiếu đơn": in A5 qua trình duyệt với mã vạch docNumber (`OrderPrintSheet`,
+ * - "Đóng gói + in vận đơn" thay "In phiếu đơn" ở đầu màn (2026-11-03); "In phiếu đơn" trong menu ⋯: in A5 qua trình duyệt với mã vạch docNumber (`OrderPrintSheet`,
  *   PLAN-barcode-pick-pack A3).
  * - Thẻ "Vận đơn": `order.shipment` (phiếu giao sinh khi pick xong) — hãng, mã vận đơn, lần in
  *   nhãn; "In nhãn" mở PDF `GET /shipments/:id/label` (PLAN-barcode-pick-pack C4).
@@ -784,6 +785,11 @@ function Detail({ order }: { order: SalesOrderDetail }) {
     RETURNABLE_FULFILMENT.has(order.fulfilment.status) && ability.can('receive', 'Stock');
   // Module Công việc (2026-10-22): CSKH tạo yêu cầu hỗ trợ từ đơn; ai đọc được việc thấy dải nhắc.
   const canWorkCustomer = ability.can('create_customer', 'Work');
+  // Đóng gói + in vận đơn (như thanh chọn ở danh sách đơn): đơn đã duyệt, đã gán hãng; quyền kho.
+  const canFulfilPrint =
+    order.status === 'APPROVED' &&
+    order.carrierId !== null &&
+    ability.can('fulfil_manual', 'SalesOrder');
   // "Nhận lại từ Pancake" — chỉ superadmin (không mã quyền nào cấp `manage OrderIssue`).
   const canPancakeUnlock = order.pancakeErpLockedAt !== null && ability.can('manage', 'OrderIssue');
   const openWork = useOrderOpenWork(order.id, ability.can('read', 'Work'));
@@ -839,10 +845,11 @@ function Detail({ order }: { order: SalesOrderDetail }) {
         }
         actions={
           <>
-            <Button variant="outline" onClick={printer.print}>
-              <Printer aria-hidden />
-              In phiếu đơn
-            </Button>
+            {canFulfilPrint ? (
+              // Thay "In phiếu đơn" (2026-11-03): đóng gói (trừ tồn) + xin / in tem vận đơn — đơn đã
+              // có vận đơn thì chỉ in lại tem. "In phiếu đơn" chuyển vào menu ⋯.
+              <BulkFulfilPrintDialog rows={[order]} onDone={() => undefined} trigger="header" />
+            ) : null}
             {canCreate ? (
               <Button variant="outline" asChild shortcut="D">
                 <Link href={`/crm/orders/new?from=${order.id}`}>
@@ -851,12 +858,8 @@ function Detail({ order }: { order: SalesOrderDetail }) {
                 </Link>
               </Button>
             ) : null}
-            {canRecreate ||
-            canReturn ||
-            canCancel ||
-            canWorkCustomer ||
-            canCancelWaybill ||
-            canPancakeUnlock ? (
+            {
+              // Menu luôn có "In phiếu đơn" (2026-11-03).
               <DropdownMenu modal={false}>
                 <DropdownMenuTrigger asChild>
                   <Button variant="outline" size="icon" aria-label="Thao tác khác">
@@ -864,6 +867,13 @@ function Detail({ order }: { order: SalesOrderDetail }) {
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end">
+                  <DropdownMenuItem onSelect={printer.print}>
+                    <Printer aria-hidden />
+                    In phiếu đơn
+                  </DropdownMenuItem>
+                  {canRecreate || canReturn || canWorkCustomer || canPancakeUnlock ? (
+                    <DropdownMenuSeparator />
+                  ) : null}
                   {canRecreate ? (
                     <DropdownMenuItem onSelect={() => setDialog('recreate')}>
                       Sửa (hủy &amp; tạo lại)
@@ -911,7 +921,7 @@ function Detail({ order }: { order: SalesOrderDetail }) {
                   ) : null}
                 </DropdownMenuContent>
               </DropdownMenu>
-            ) : null}
+            }
             {canEdit ? (
               <Button asChild shortcut="E" variant={order.canConfirm ? 'outline' : 'default'}>
                 <Link href={`/crm/orders/${order.id}/edit`}>Sửa đơn</Link>
