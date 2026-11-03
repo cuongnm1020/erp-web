@@ -98,7 +98,9 @@ export function SalesReportScreen() {
   const teamId = state.filters.teamId;
   const ownerId = state.filters.ownerId;
   const isCareTeam = !!teamId && careTeamOptions.some((t) => t.teamId === teamId);
-  const showTeamChip = !!teamId && !isCareTeam && !teamOptions.some((t) => t.id === teamId);
+  const showTeamChip = !!teamId && !isCareTeam;
+  const teamChipName =
+    state.filters.teamName ?? teamOptions.find((t) => t.id === teamId)?.name ?? 'đã chọn';
   const showOwnerChip = !!ownerId && !ownerOptions.some((u) => u.id === ownerId);
   const shopOptions = shops.data ?? [];
   const shopId = state.filters.pancakeShopId;
@@ -147,16 +149,9 @@ export function SalesReportScreen() {
           options={CHANNELS}
           onChange={(v) => setFilters({ channel: v })}
         />
-        {teamPicker ? (
-          <FilterSelect
-            label="Team"
-            value={showTeamChip ? undefined : teamId}
-            options={teamOptions.map((t) => ({ value: t.id, label: t.name }))}
-            onChange={(v) => setFilters({ teamId: v, teamName: undefined })}
-          />
-        ) : null}
+        {/* Ô "Team" (team sale) đã bỏ theo user 2026-11-03 — team đặt từ nơi khác (link) hiện chip. */}
         {careTeamOptions.length > 0 ? (
-          // Cùng tham số teamId với ô Team (sale) — chọn phòng CSKH thay cho team đang chọn.
+          // Cùng tham số teamId — chọn phòng CSKH thay cho team đang chọn.
           <FilterSelect
             label="Phòng ban CSKH"
             value={isCareTeam ? teamId : undefined}
@@ -209,7 +204,7 @@ export function SalesReportScreen() {
         </label>
         {showTeamChip ? (
           <FilterChip
-            label={`Team: ${state.filters.teamName ?? 'đã chọn'}`}
+            label={`Team: ${teamChipName}`}
             onClear={() => clearKeys('teamId', 'teamName')}
           />
         ) : null}

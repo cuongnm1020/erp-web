@@ -326,9 +326,11 @@ describe('SalesReportScreen — quyền + bộ lọc chung', () => {
     unmount();
 
     renderApp(<SalesReportScreen />);
-    // Admin có ô chọn team (chỉ team bán hàng) + nhân viên
-    expect(await screen.findByRole('combobox', { name: 'Team' })).toBeInTheDocument();
-    expect(screen.getByRole('combobox', { name: 'Nhân viên phụ trách' })).toBeInTheDocument();
+    // Admin có ô nhân viên; ô Team (team sale) đã bỏ (user 2026-11-03).
+    expect(
+      await screen.findByRole('combobox', { name: 'Nhân viên phụ trách' }),
+    ).toBeInTheDocument();
+    expect(screen.queryByRole('combobox', { name: 'Team' })).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: /Tính lại số liệu/ }));
     await waitFor(() => expect(body).toEqual(RANGE));
   });
