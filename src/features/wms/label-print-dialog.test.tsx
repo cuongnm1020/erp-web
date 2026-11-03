@@ -118,7 +118,9 @@ describe('Popup nhãn — tem ERP 100×75 mm (2026-10-13)', () => {
     // Bố cục theo nhãn Pancake (2026-10-14): mã hãng + số kiện, COD, bảng Sản phẩm / SL
     expect(label.getByText('VTP')).toBeTruthy();
     expect(label.getByText('1/1')).toBeTruthy();
-    expect(label.getByText(/COD: 215\.000/)).toBeTruthy();
+    // Số tiền thu hộ che trên tem (2026-11-03): chỉ "Thu *** đ", không lộ 215.000.
+    expect(label.getByText('Thu *** đ')).toBeTruthy();
+    expect(label.queryByText(/215\.000/)).toBeNull();
     // "+N sản phẩm khác" nằm ở tiêu đề cột để không bị cắt khi tên hàng dài (2026-10-14)
     expect(
       label.getByRole('columnheader', { name: /^Sản phẩm · \+3 sản phẩm khác$/ }),
@@ -263,6 +265,9 @@ describe('Popup nhãn — tem ERP 100×75 mm (2026-10-13)', () => {
     expect(label.getByText(/Không cho xem hàng/)).toBeTruthy();
     // SĐT đầy đủ của người nhận không được in
     expect(label.queryByText(/0901/)).toBeNull();
+    // Thu hộ che số tiền (2026-11-03)
+    expect(label.getByText('*** đ')).toBeTruthy();
+    expect(label.queryByText(/215\.000/)).toBeNull();
   });
 
   it('đơn GHTK, tem dọc → cùng khung tem dọc chung: mã vạch số cuối, mã phân loại, QR mã đầy đủ', async () => {

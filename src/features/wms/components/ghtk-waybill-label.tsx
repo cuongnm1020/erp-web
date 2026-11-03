@@ -3,7 +3,7 @@
 import type { CSSProperties, ReactNode } from 'react';
 import { Barcode } from '@/components/data/barcode';
 import { cn } from '@/lib/cn';
-import { formatDate, formatMoney, formatQuantity, formatTime } from '@/lib/format';
+import { formatDate, formatQuantity, formatTime } from '@/lib/format';
 import { LABEL_SIZES } from '@/lib/print';
 import type { ShipmentLabelData } from '../api/use-pda';
 import { type GhtkTracking, hidePhone, maskedAddress, printNote, routeLabel } from '../ghtk-label';
@@ -226,9 +226,8 @@ export function GhtkWaybillLabel({
             </div>
             <div className="whitespace-nowrap" style={{ lineHeight: 1.3 }}>
               <Caption>Thu hộ </Caption>
-              <b className="tabular-nums" style={{ fontSize: f(11) }}>
-                {formatMoney(data.codAmount, { unit: 'đ' })}
-              </b>
+              {/* Che số tiền thu hộ trên tem (2026-11-03, user chốt). */}
+              <b style={{ fontSize: f(11) }}>*** đ</b>
             </div>
           </div>
         </div>
