@@ -87,7 +87,7 @@ export function useFulfilPrint() {
   /** null = lỗi cả lô (đã báo toast). */
   const run = async (
     orderIds: string[],
-    byId: Map<string, SalesOrder>,
+    byId: Map<string, FulfilRow>,
   ): Promise<FulfilPrintOutcome | null> => {
     // Gửi từng nhóm nhỏ (2026-10-31): biết đã xong bao nhiêu đơn để hiện thanh tiến độ "x/N".
     // Server xin vận đơn song song trong mỗi nhóm. Một nhóm lỗi mạng → dừng, vẫn in phần đã xong
@@ -341,12 +341,21 @@ export function FulfilResultsPanel({
  * chưa duyệt / chưa gán hãng bị bỏ qua ngay ở client; đơn server từ chối được liệt kê trong hộp
  * thoại. Lõi ở {@link useFulfilPrint}.
  */
+/** Trường đơn hộp thoại cần — dòng danh sách hoặc chi tiết đơn (2026-11-03). */
+export type FulfilRow = Pick<
+  SalesOrder,
+  'id' | 'docNumber' | 'status' | 'carrierId' | 'marketplace' | 'customer'
+>;
+
 export function BulkFulfilPrintDialog({
   rows,
   onDone,
+  trigger = 'bar',
 }: {
-  rows: SalesOrder[];
+  rows: FulfilRow[];
   onDone: () => void;
+  /** `bar` = nút nhỏ trên thanh chọn đơn; `header` = nút cỡ thường ở đầu chi tiết đơn. */
+  trigger?: 'bar' | 'header';
 }) {
   const [open, setOpen] = useState(false);
   /** Kết quả từng đơn của lần bấm vừa rồi (2026-10-28) — null = chưa bấm / không cần xem. */
@@ -387,15 +396,22 @@ export function BulkFulfilPrintDialog({
 
   return (
     <>
-      <Button
-        size="sm"
-        variant="outline"
-        className="h-7 px-2 text-xs"
-        onClick={() => setOpen(true)}
-      >
-        <PackageCheck aria-hidden />
-        Đóng gói + in vận đơn
-      </Button>
+      {trigger === 'header' ? (
+        <Button variant="outline" onClick={() => setOpen(true)}>
+          <PackageCheck aria-hidden />
+          Đóng gói + in vận đơn
+        </Button>
+      ) : (
+        <Button
+          size="sm"
+          variant="outline"
+          className="h-7 px-2 text-xs"
+          onClick={() => setOpen(true)}
+        >
+          <PackageCheck aria-hidden />
+          Đóng gói + in vận đơn
+        </Button>
+      )}
       <Dialog open={open} onOpenChange={close}>
         <DialogContent>
           {outcome ? (
@@ -440,7 +456,7 @@ export function BulkFulfilPrintDialog({
 /** Kết quả từng đơn: có mã → in được; chưa có mã (hãng chưa phản hồi) → chờ; lỗi → cần sửa. */
 function resultRows(
   r: { done: BulkFulfilOrdersResult['done']; failed: Failed[] },
-  byId: Map<string, SalesOrder>,
+  byId: Map<string, FulfilRow>,
 ): OrderResultRow[] {
   return [
     ...r.failed.map((f): OrderResultRow => ({
