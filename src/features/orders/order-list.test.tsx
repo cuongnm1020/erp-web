@@ -366,12 +366,11 @@ describe('OrderListScreen — cân nặng gửi hãng + gán hãng hàng loạt'
       'Hãng VC: Chưa gán hãng',
     );
     expect(screen.getByRole('button', { name: 'Bỏ lọc Cân nặng' })).toBeInTheDocument();
-    const panel = await openMoreFilters();
-    expect(panel.getByLabelText('Cân nặng từ (kg)')).toHaveValue('1');
-    expect(panel.getByLabelText('Cân nặng đến (kg)')).toHaveValue('1.5');
+    expect(screen.getByLabelText('Cân nặng từ (kg)')).toHaveValue('1');
+    expect(screen.getByLabelText('Cân nặng đến (kg)')).toHaveValue('1.5');
     // Gõ khoảng mới + Enter → chỉ khi Enter mới ghi URL (không bắn theo từng phím)
     replace.mockClear();
-    const min = panel.getByLabelText('Cân nặng từ (kg)');
+    const min = screen.getByLabelText('Cân nặng từ (kg)');
     fireEvent.change(min, { target: { value: '1,2' } });
     expect(replace).not.toHaveBeenCalled();
     fireEvent.keyDown(min, { key: 'Enter' });
@@ -390,10 +389,9 @@ describe('OrderListScreen — cân nặng gửi hãng + gán hãng hàng loạt'
       if (u.pathname === '/api/sales-orders') seen.push(u.searchParams);
     });
     renderApp(<OrderListScreen />);
-    const panel = await openMoreFilters();
-    const box = await panel.findByLabelText('Giá trị đơn (₫)');
+    const box = await screen.findByLabelText('Giá trị đơn (₫)');
     expect(box).toHaveValue('500.000');
-    expect(panel.getByRole('combobox', { name: 'Toán tử giá trị đơn' })).toHaveTextContent('=');
+    expect(screen.getByRole('combobox', { name: 'Toán tử giá trị đơn' })).toHaveTextContent('=');
     await waitFor(() =>
       expect(
         seen.some((q) => q.get('totalMin') === '500000' && q.get('totalMax') === '500000'),
@@ -416,15 +414,13 @@ describe('OrderListScreen — cân nặng gửi hãng + gán hãng hàng loạt'
     renderApp(<OrderListScreen />);
     // Chip "Đang lọc" ghi toán tử + số tiền.
     expect(await screen.findByText(/≤ 300\.000/)).toBeInTheDocument();
-    let panel = await openMoreFilters();
-    expect(await panel.findByLabelText('Giá trị đơn (₫)')).toHaveValue('300.000');
-    expect(panel.getByRole('combobox', { name: 'Toán tử giá trị đơn' })).toHaveTextContent('≤');
+    expect(await screen.findByLabelText('Giá trị đơn (₫)')).toHaveValue('300.000');
+    expect(screen.getByRole('combobox', { name: 'Toán tử giá trị đơn' })).toHaveTextContent('≤');
     cleanup();
     search = 'totalMin=100000&totalMax=900000';
     renderApp(<OrderListScreen />);
-    panel = await openMoreFilters();
-    expect(await panel.findByLabelText('Giá trị đơn từ (₫)')).toHaveValue('100.000');
-    expect(panel.getByLabelText('Giá trị đơn đến (₫)')).toHaveValue('900.000');
+    expect(await screen.findByLabelText('Giá trị đơn từ (₫)')).toHaveValue('100.000');
+    expect(screen.getByLabelText('Giá trị đơn đến (₫)')).toHaveValue('900.000');
   });
 
   it('chọn 2 đơn → "Gán hãng / cân nặng" → POST /sales-orders/bulk-update đúng orderIds + cân nặng + hãng, bỏ chọn sau khi xong', async () => {
@@ -1507,6 +1503,10 @@ describe('OrderListScreen — redesign Bán hàng (2026-10-22)', () => {
     for (const title of ['Vận chuyển', 'Nguồn & người', 'Đơn']) {
       expect(panel.getByText(title)).toBeInTheDocument();
     }
+    // Giá trị đơn + cân nặng ở hàng thứ hai của thanh, không trong panel.
+    expect(panel.queryByLabelText('Cân nặng từ (kg)')).not.toBeInTheDocument();
+    expect(screen.getByLabelText('Cân nặng từ (kg)')).toBeInTheDocument();
+    expect(screen.getByRole('combobox', { name: 'Toán tử giá trị đơn' })).toBeInTheDocument();
   });
 
   it('ô NV lên đơn lấy danh sách theo người xem (creator-options), không phải danh bạ tạo đơn', async () => {
