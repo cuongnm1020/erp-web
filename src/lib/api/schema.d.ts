@@ -18728,16 +18728,20 @@ export interface operations {
     ShipmentMonitorController_summary: {
         parameters: {
             query: {
+                /** @description ShipmentStatus nối dấu phẩy */
+                statuses?: string;
                 /** @description Ngày theo giờ Việt Nam `YYYY-MM-DD` cho số đóng gói / bàn giao; bỏ trống = hôm nay. */
                 date?: string;
                 carrierId?: string;
                 /** @description Phiếu do MỘT tài khoản hãng cấp vận đơn (wms.CarrierAccount.id, 2026-10-25). */
                 carrierAccountId?: string;
                 /**
-                 * @description Phiếu giao của đơn do MỘT phòng ban CSKH lên (team `DEPT-<mã>`, `SalesOrder.teamId`) — ô lọc
-                 *     "Phòng ban CSKH" (2026-10-29). Giao với phạm vi người xem, không nới.
+                 * @description Phiếu giao của đơn do các phòng ban lên (`SalesOrder.teamId`, team `DEPT-<mã>` nối dấu phẩy,
+                 *     tối đa 100, mỗi phòng gồm cả phòng con) — ô "Phòng ban" dùng chung với danh sách đơn
+                 *     (2026-11-04, thay `careTeamId` một phòng). Danh sách: GET /sales-orders/team-filter-options.
+                 *     Giao với phạm vi người xem, không nới.
                  */
-                careTeamId?: string;
+                teamIds?: string;
                 /** @description Hãng giữ quá N ngày kể từ lúc rời kho → cảnh báo. */
                 holdDays: number;
             };
@@ -18760,16 +18764,20 @@ export interface operations {
     ShipmentMonitorController_list: {
         parameters: {
             query: {
+                /** @description ShipmentStatus nối dấu phẩy */
+                statuses?: string;
                 /** @description Ngày theo giờ Việt Nam `YYYY-MM-DD` cho số đóng gói / bàn giao; bỏ trống = hôm nay. */
                 date?: string;
                 carrierId?: string;
                 /** @description Phiếu do MỘT tài khoản hãng cấp vận đơn (wms.CarrierAccount.id, 2026-10-25). */
                 carrierAccountId?: string;
                 /**
-                 * @description Phiếu giao của đơn do MỘT phòng ban CSKH lên (team `DEPT-<mã>`, `SalesOrder.teamId`) — ô lọc
-                 *     "Phòng ban CSKH" (2026-10-29). Giao với phạm vi người xem, không nới.
+                 * @description Phiếu giao của đơn do các phòng ban lên (`SalesOrder.teamId`, team `DEPT-<mã>` nối dấu phẩy,
+                 *     tối đa 100, mỗi phòng gồm cả phòng con) — ô "Phòng ban" dùng chung với danh sách đơn
+                 *     (2026-11-04, thay `careTeamId` một phòng). Danh sách: GET /sales-orders/team-filter-options.
+                 *     Giao với phạm vi người xem, không nới.
                  */
-                careTeamId?: string;
+                teamIds?: string;
                 /** @description Hãng giữ quá N ngày kể từ lúc rời kho → cảnh báo. */
                 holdDays: number;
                 /**
@@ -18780,6 +18788,9 @@ export interface operations {
                 view: "PACKED" | "HANDED_OVER" | "HOLDING" | "OVERDUE";
                 /** @description Mã phiếu giao / mã vận đơn (chứa chuỗi) hoặc đúng số đơn bán. */
                 q?: string;
+                /** @description Sắp theo cột (2026-11-04): `shippedAt` = mốc bàn giao hãng. Bỏ trống = mặc định của góc nhìn. */
+                sortBy?: "shippedAt";
+                sortDir?: "asc" | "desc";
                 take: number;
                 skip: number;
             };

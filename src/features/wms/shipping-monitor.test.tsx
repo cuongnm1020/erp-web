@@ -1,4 +1,4 @@
-import { fireEvent, screen, within } from '@testing-library/react';
+import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import { HttpResponse, http } from 'msw';
 import { describe, expect, it, vi, beforeEach } from 'vitest';
 import { makeMonitorRows, makeMonitorSummary } from '@/test/msw/handlers';
@@ -111,29 +111,71 @@ describe('ShippingMonitorScreen — đóng gói / bàn giao / hãng giữ + cả
     expect(screen.queryByRole('alert')).not.toBeInTheDocument();
   });
 
-  it('ô Phòng ban CSKH (2026-10-29): có danh sách → chọn ghi URL, careTeamId vào API; rỗng → ẩn', async () => {
+  it('ô Phòng ban dùng chung với danh sách đơn (2026-11-04): chọn nhiều → URL team, API teamIds; danh sách rỗng → ẩn', async () => {
     const seen: string[] = [];
     server.use(
-      http.get('/api/sales-orders/care-team-options', () =>
-        HttpResponse.json([{ teamId: 't-cskh-a', name: 'CSKH A', isActive: true }]),
+      http.get('/api/sales-orders/team-filter-options', () =>
+        HttpResponse.json([
+          { teamId: 't-cskh-a', name: 'CSKH A', group: 'CSKH', isActive: true },
+          { teamId: 't-sale-1', name: 'Kinh doanh · Sale 1', group: 'SALES', isActive: true },
+        ]),
       ),
       http.get('/api/shipment-monitor/summary', ({ request }) => {
-        seen.push(new URL(request.url).searchParams.get('careTeamId') ?? '');
+        seen.push(new URL(request.url).searchParams.get('teamIds') ?? '');
         return HttpResponse.json(makeMonitorSummary());
       }),
     );
-    search = 'careTeamId=t-cskh-a';
+    search = 'team=t-cskh-a,t-sale-1';
     const { unmount } = renderApp(<ShippingMonitorScreen />);
-    const box = await screen.findByRole('combobox', { name: 'Phòng ban CSKH' });
-    expect(box).toHaveTextContent('CSKH A');
-    expect(seen).toContain('t-cskh-a');
+    const box = await screen.findByRole('combobox', { name: 'Phòng ban' });
+    expect(box).toHaveTextContent('Phòng ban: 2 phòng');
+    expect(seen).toContain('t-cskh-a,t-sale-1');
     unmount();
 
-    server.use(http.get('/api/sales-orders/care-team-options', () => HttpResponse.json([])));
+    server.use(http.get('/api/sales-orders/team-filter-options', () => HttpResponse.json([])));
     search = '';
     renderApp(<ShippingMonitorScreen />);
     await screen.findByRole('button', { name: /Hãng đang giữ/ });
-    expect(screen.queryByRole('combobox', { name: 'Phòng ban CSKH' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('combobox', { name: 'Phòng ban' })).not.toBeInTheDocument();
+  });
+
+  it('ô Trạng thái (2026-11-04): URL status → API statuses; chọn thêm ghi URL', async () => {
+    const seen: string[] = [];
+    server.use(
+      http.get('/api/shipment-monitor', ({ request }) => {
+        seen.push(new URL(request.url).searchParams.get('statuses') ?? '');
+        return HttpResponse.json({ view: 'OVERDUE', items: makeMonitorRows(1), total: 1 });
+      }),
+    );
+    search = 'status=IN_TRANSIT';
+    renderApp(<ShippingMonitorScreen />);
+    const box = await screen.findByRole('combobox', { name: 'Trạng thái' });
+    expect(box).toHaveTextContent('Đang vận chuyển');
+    expect(seen).toContain('IN_TRANSIT');
+    fireEvent.click(box);
+    fireEvent.click(await screen.findByRole('option', { name: /Đang giao hàng/ }));
+    await waitFor(() => expect(lastUrl()).toContain('status=IN_TRANSIT%2COUT_FOR_DELIVERY'));
+  });
+
+  it('sắp theo cột Bàn giao hãng (2026-11-04): bấm tiêu đề → URL sort, API sortBy/sortDir', async () => {
+    const seen: string[] = [];
+    server.use(
+      http.get('/api/shipment-monitor', ({ request }) => {
+        const p = new URL(request.url).searchParams;
+        seen.push(`${p.get('sortBy') ?? ''}:${p.get('sortDir') ?? ''}`);
+        return HttpResponse.json({ view: 'OVERDUE', items: makeMonitorRows(1), total: 1 });
+      }),
+    );
+    search = 'sort=shippedAt:desc';
+    renderApp(<ShippingMonitorScreen />);
+    await screen.findByText(makeMonitorRows(1)[0]!.docNumber);
+    expect(seen).toContain('shippedAt:desc');
+    expect(seen).not.toContain(':');
+    // desc → bấm nữa = bỏ sắp (none → asc → desc → none): URL không còn `sort`.
+    replace.mockClear();
+    fireEvent.click(screen.getByRole('button', { name: /Bàn giao hãng \(đang giảm dần\)/ }));
+    await waitFor(() => expect(replace).toHaveBeenCalled());
+    expect(lastUrl()).not.toContain('sort=');
   });
 
   it('lỗi server → màn lỗi có nút thử lại', async () => {

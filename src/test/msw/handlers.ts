@@ -1633,6 +1633,9 @@ export const handlers = [
       { id: '00000000-0000-4000-8000-0000000000a2', code: 'packer.01', fullName: 'Trần Thị Đóng' },
     ]),
   ),
+  // Ô "Phòng ban" dùng chung (đơn hàng, theo dõi giao hàng) — mặc định rỗng = ẩn ô; test cần thì
+  // `server.use` đè.
+  http.get('/api/sales-orders/team-filter-options', () => HttpResponse.json([])),
   // Ô lọc NV lên đơn: danh sách theo người xem (API lọc theo leader / trưởng nhóm CSKH).
   http.get('/api/sales-orders/creator-options', () =>
     HttpResponse.json([

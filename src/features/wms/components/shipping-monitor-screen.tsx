@@ -12,6 +12,7 @@ import { ExportExcelButton, takeSkip } from '@/components/data/export-excel-butt
 import { KpiCard } from '@/components/data/kpi-card';
 import { EmptyState, ErrorState, ListSkeleton, QueryState } from '@/components/data/states';
 import { StatusBadge } from '@/components/data/status-badge';
+import { SearchableMultiSelect } from '@/components/data/searchable-multi-select';
 import { PageHeader } from '@/components/layout/page-header';
 import { Button } from '@/components/ui/button';
 import {
@@ -41,19 +42,25 @@ import {
 import { cn } from '@/lib/cn';
 import { formatDate, formatDateTime, toLocalDateKey } from '@/lib/format';
 import { useAbility } from '@/lib/permission';
-import { useListState } from '@/lib/url-state';
+import { useListState, type SortState } from '@/lib/url-state';
 import {
   fetchShipmentMonitorList,
   useCarriers,
   useShipmentMonitorList,
   useShipmentMonitorSummary,
   useShipmentStatusLog,
-  useShippingCareTeams,
+  useShippingTeamOptions,
   type ShipmentMonitorRow,
+  type ShipmentMonitorSort,
   type ShipmentMonitorSummary,
   type ShipmentMonitorView,
 } from '../api/use-shipping';
-import { carrierOutcome, carrierSource, shipmentStatusBadge } from '../labels';
+import {
+  carrierOutcome,
+  carrierSource,
+  SHIPMENT_STATUS_BADGE,
+  shipmentStatusBadge,
+} from '../labels';
 import { CarrierSelect } from './carrier-select';
 
 const statusBadge = (s: string) => {
@@ -204,10 +211,15 @@ const columns: ColumnDef<ShipmentMonitorRow, unknown>[] = [
     cell: ({ getValue }) => formatDateTime(getValue() as string | null),
   },
   {
+    // Sắp được (2026-11-04): id cột = `sortBy` của API.
     id: 'shippedAt',
     accessorKey: 'shippedAt',
     header: 'Bàn giao hãng',
-    meta: { width: 140, exportValue: (r) => (r.shippedAt ? formatDateTime(r.shippedAt) : null) },
+    meta: {
+      width: 140,
+      sortable: true,
+      exportValue: (r) => (r.shippedAt ? formatDateTime(r.shippedAt) : null),
+    },
     cell: ({ getValue }) => formatDateTime(getValue() as string | null),
   },
   {
@@ -225,14 +237,22 @@ const FILTER_KEYS = [
   'date',
   'carrierId',
   'carrierAccountId',
-  'careTeamId',
+  'team',
+  'status',
   'days',
   'view',
 ] as const;
 type Filter = (typeof FILTER_KEYS)[number];
 const DEFAULTS = { size: 50, sort: null, filterKeys: FILTER_KEYS };
-/** Giá trị "Tất cả" của ô Phòng ban CSKH (Radix Select không nhận value rỗng). */
-const ALL_CARE_TEAMS = '__all__';
+/** Cột sắp được — id cột = `sortBy` API; cột khác trên URL (link cũ) coi như không sắp. */
+const SORTABLE: readonly ShipmentMonitorSort[] = ['shippedAt'];
+/** Ô "Trạng thái" (2026-11-04): mọi trạng thái phiếu giao, nhãn như cột Trạng thái. */
+const STATUS_OPTIONS = Object.entries(SHIPMENT_STATUS_BADGE).map(([value, m]) => ({
+  value,
+  label: m.label,
+}));
+/** URL giữ danh sách nối dấu phẩy (như ô multiSelect của FilterBar). */
+const decodeList = (v: string | undefined): string[] => (v ? v.split(',').filter(Boolean) : []);
 const DAY_OPTIONS = ['3', '5', '7', '14'] as const;
 const DEFAULT_DAYS = 5;
 const ALL = '__all__';
@@ -367,20 +387,38 @@ export function ShippingMonitorScreen() {
   const [selected, setSelected] = useState<ShipmentMonitorRow | null>(null);
 
   const carrierAccountId = state.filters.carrierAccountId;
-  // Phòng ban CSKH: chỉ Admin + kế toán (`report.sales_all`, user 2026-11-03) — người khác ẩn ô
-  // và bỏ giá trị trên URL để không lọc ngầm.
+  // Phòng ban (dùng chung ô + danh sách với màn Đơn hàng, 2026-11-04): chỉ Admin + kế toán
+  // (`report.sales_all`, user 2026-11-03) — người khác ẩn ô và bỏ giá trị trên URL để không lọc ngầm.
   const ability = useAbility();
   const canFilterDept = ability.can('sales_all', 'Report');
-  const careTeamId = canFilterDept ? state.filters.careTeamId : undefined;
-  const careTeams = useShippingCareTeams(canFilterDept && ability.can('read', 'SalesOrder'));
-  const careTeamOptions = careTeams.data ?? [];
+  const team = canFilterDept ? (state.filters.team ?? '') : '';
+  const teamOptions = useShippingTeamOptions(canFilterDept && ability.can('read', 'SalesOrder'));
+  const teamOptionList = teamOptions.data ?? [];
+  const status = state.filters.status ?? '';
+  // Sắp theo cột bấm (chỉ cột API hỗ trợ); không bấm = thứ tự mặc định của góc nhìn.
+  const sort: SortState | null =
+    state.sort && SORTABLE.includes(state.sort.id as ShipmentMonitorSort) ? state.sort : null;
   const filter = useMemo(
-    () => ({ date, carrierId, carrierAccountId, careTeamId, holdDays }),
-    [date, carrierId, carrierAccountId, careTeamId, holdDays],
+    () => ({
+      date,
+      carrierId,
+      carrierAccountId,
+      teamIds: team || undefined,
+      statuses: status || undefined,
+      holdDays,
+    }),
+    [date, carrierId, carrierAccountId, team, status, holdDays],
   );
   const listParams = useMemo(
-    () => ({ ...filter, view, q: state.q, ...skipTake }),
-    [filter, view, state.q, skipTake],
+    () => ({
+      ...filter,
+      view,
+      q: state.q,
+      sortBy: sort ? (sort.id as ShipmentMonitorSort) : undefined,
+      sortDir: sort ? (sort.desc ? ('desc' as const) : ('asc' as const)) : undefined,
+      ...skipTake,
+    }),
+    [filter, view, state.q, sort, skipTake],
   );
   const summary = useShipmentMonitorSummary(filter);
   const list = useShipmentMonitorList(listParams);
@@ -468,29 +506,32 @@ export function ShippingMonitorScreen() {
             }
           />
         </label>
-        {careTeamOptions.length > 0 ? (
-          <label className="flex flex-col gap-0.5 text-xs text-muted-foreground">
-            Phòng ban CSKH
-            <Select
-              value={careTeamId ?? ALL_CARE_TEAMS}
-              onValueChange={(v) =>
-                setFilters({ careTeamId: v === ALL_CARE_TEAMS ? undefined : v })
-              }
-            >
-              <SelectTrigger className="h-8 w-56" aria-label="Phòng ban CSKH">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value={ALL_CARE_TEAMS}>Tất cả</SelectItem>
-                {careTeamOptions.map((t) => (
-                  <SelectItem key={t.teamId} value={t.teamId}>
-                    {t.isActive ? t.name : `${t.name} (ngừng hoạt động)`}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </label>
+        {teamOptionList.length > 0 ? (
+          <div className="flex flex-col gap-0.5 text-xs text-muted-foreground">
+            Phòng ban
+            <SearchableMultiSelect
+              label="Phòng ban"
+              unit="phòng"
+              values={decodeList(team)}
+              options={teamOptionList.map((t) => ({
+                value: t.teamId,
+                label: t.isActive ? t.name : `${t.name} (ngừng hoạt động)`,
+                hint: t.group === 'CSKH' ? 'CSKH' : 'Sale/MKT',
+              }))}
+              onChange={(vs) => setFilters({ team: vs.length ? vs.join(',') : undefined })}
+            />
+          </div>
         ) : null}
+        <div className="flex flex-col gap-0.5 text-xs text-muted-foreground">
+          Trạng thái
+          <SearchableMultiSelect
+            label="Trạng thái"
+            unit="trạng thái"
+            values={decodeList(status)}
+            options={STATUS_OPTIONS}
+            onChange={(vs) => setFilters({ status: vs.length ? vs.join(',') : undefined })}
+          />
+        </div>
         <label className="flex flex-col gap-0.5 text-xs text-muted-foreground">
           Cảnh báo khi hãng giữ quá
           <Select
@@ -614,10 +655,10 @@ export function ShippingMonitorScreen() {
               total={data.total}
               page={state.page}
               size={state.size}
-              sort={null}
+              sort={sort}
               onPageChange={(page) => set({ page })}
               onSizeChange={(size) => set({ size })}
-              onSortChange={() => undefined}
+              onSortChange={(next) => set({ sort: next })}
               onRowClick={(row) => setSelected(row)}
             />
           )}
