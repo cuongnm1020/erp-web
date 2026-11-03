@@ -320,16 +320,6 @@ export function OrderEditLines({
                 ))}
               </div>
             )}
-            <GiftLines
-              form={form}
-              fields={giftFields}
-              customerId={order.customer.id}
-              channel={order.channel}
-              warehouseId={warehouseId}
-              onMetrics={onMetrics}
-              onRemove={(i) => lines.remove(i)}
-              onPick={addGift}
-            />
             <div className="flex flex-wrap items-center justify-between gap-2 border-t px-3 py-2 text-sm text-muted-foreground">
               <span>{lines.fields.length + custom.length} dòng</span>
               <span>
@@ -343,6 +333,18 @@ export function OrderEditLines({
               </span>
             </div>
           </div>
+        </div>
+        <div className="mt-3">
+          <GiftLines
+            form={form}
+            fields={giftFields}
+            customerId={order.customer.id}
+            channel={order.channel}
+            warehouseId={warehouseId}
+            onMetrics={onMetrics}
+            onRemove={(i) => lines.remove(i)}
+            onPick={addGift}
+          />
         </div>
       </Form>
     </Card>

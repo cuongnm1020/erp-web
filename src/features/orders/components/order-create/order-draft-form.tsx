@@ -445,18 +445,18 @@ export const OrderDraftForm = forwardRef<
                       </div>
                     </>
                   )}
-                  <GiftLines
-                    form={form}
-                    fields={giftFields}
-                    customerId={customerId}
-                    channel={channel}
-                    warehouseId={warehouseId}
-                    onMetrics={onMetrics}
-                    onRemove={(i) => lines.remove(i)}
-                    onPick={addGift}
-                  />
                 </div>
               </div>
+              <GiftLines
+                form={form}
+                fields={giftFields}
+                customerId={customerId}
+                channel={channel}
+                warehouseId={warehouseId}
+                onMetrics={onMetrics}
+                onRemove={(i) => lines.remove(i)}
+                onPick={addGift}
+              />
               {form.formState.errors.lines?.root?.message ||
               form.formState.errors.lines?.message ? (
                 <p className="text-sm text-destructive">

@@ -57,8 +57,10 @@ export function GiftLines({
   onPick: (row: SkuQuickRow) => void;
 }) {
   return (
-    <section aria-label="Sản phẩm khuyến mãi" className="border-t">
-      <div className="flex flex-wrap items-center justify-between gap-2 bg-muted/40 px-3 py-2">
+    // Nằm NGOÀI khung cuộn ngang của giỏ: khung `overflow-x-auto` cũng cắt theo chiều dọc, danh sách
+    // gợi ý của ô tìm bị che mất (lỗi 2026-11-03) — chỉ phần dòng hàng cuộn ngang.
+    <section aria-label="Sản phẩm khuyến mãi" className="rounded-md border">
+      <div className="flex flex-wrap items-center justify-between gap-2 rounded-t-md bg-muted/40 px-3 py-2">
         <h3 className="flex items-center gap-1.5 text-sm font-semibold">
           <Gift className="h-4 w-4 text-primary" aria-hidden />
           Sản phẩm khuyến mãi
@@ -69,21 +71,23 @@ export function GiftLines({
         <ProductSearch warehouseId={warehouseId} onPick={onPick} label="Tìm sản phẩm khuyến mãi" />
       </div>
       {fields.length > 0 ? (
-        <div className="divide-y">
-          {fields.map((f, i) => (
-            <CartLine
-              key={f.id}
-              fieldId={f.id}
-              form={form}
-              index={f.index}
-              no={i + 1}
-              customerId={customerId}
-              channel={channel}
-              warehouseId={warehouseId}
-              onMetrics={onMetrics}
-              onRemove={() => onRemove(f.index)}
-            />
-          ))}
+        <div className="overflow-x-auto border-t">
+          <div className="min-w-[680px] divide-y">
+            {fields.map((f, i) => (
+              <CartLine
+                key={f.id}
+                fieldId={f.id}
+                form={form}
+                index={f.index}
+                no={i + 1}
+                customerId={customerId}
+                channel={channel}
+                warehouseId={warehouseId}
+                onMetrics={onMetrics}
+                onRemove={() => onRemove(f.index)}
+              />
+            ))}
+          </div>
         </div>
       ) : null}
     </section>
