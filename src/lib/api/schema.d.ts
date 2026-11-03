@@ -3842,6 +3842,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/sales-orders/count": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Tổng mọi đơn người xem thấy (không bộ lọc, theo kho đang chọn) — khai TRƯỚC `:id`. */
+        get: operations["SalesOrderController_count"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/sales-orders/flow-counts": {
         parameters: {
             query?: never;
@@ -12046,6 +12063,9 @@ export interface components {
             total: number;
             hiddenCount: number;
             orders: components["schemas"]["SameDayOrderDto"][];
+        };
+        SalesOrderCountDto: {
+            total: number;
         };
         SalesOrderFlowCountsDto: {
             total?: number;
@@ -24144,6 +24164,25 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["SameDayOrdersDto"];
+                };
+            };
+        };
+    };
+    SalesOrderController_count: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SalesOrderCountDto"];
                 };
             };
         };

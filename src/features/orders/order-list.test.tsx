@@ -53,8 +53,12 @@ describe('OrderListScreen — GET /sales-orders (P1-12)', () => {
     renderApp(<OrderListScreen />);
     expect(screen.getByRole('status', { name: 'Đang tải danh sách' })).toBeInTheDocument();
     expect(await screen.findByText(FIRST.docNumber)).toBeInTheDocument();
-    expect(screen.getByText('Đơn khớp bộ lọc')).toBeInTheDocument();
+    expect(screen.getByText('Đơn khớp bộ lọc / tổng số đơn')).toBeInTheDocument();
     expect(screen.getByTestId('order-count')).toHaveTextContent('60');
+    // Mẫu số = GET /sales-orders/count (mọi đơn, không bộ lọc), định dạng nghìn.
+    await waitFor(() =>
+      expect(screen.getByTestId('order-count')).toHaveTextContent('60 / 108.000'),
+    );
     expect(screen.getByText('1–50 / 60 dòng')).toBeInTheDocument();
   });
 
