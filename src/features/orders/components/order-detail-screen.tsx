@@ -89,7 +89,7 @@ import { OrderPrintSheet } from './order-print-sheet';
 import { OrderProgress } from './order-progress';
 import { TelcoBadge } from './order-quick-view';
 import { ReprintWaybillDialog } from './bulk-reprint-waybill-dialog';
-import { PancakeErpLockedBadge, PancakeOrderLink } from './pancake-order-link';
+import { PancakeErpLockedBadge, PancakeMirrorBadge, PancakeOrderLink } from './pancake-order-link';
 
 /**
  * D-04 Chi tiết đơn hàng — GET /sales-orders/{id}.
@@ -814,6 +814,7 @@ function Detail({ order }: { order: SalesOrderDetail }) {
               </StatusBadge>
             ) : null}
             <PancakeErpLockedBadge lockedAt={order.pancakeErpLockedAt} />
+            <PancakeMirrorBadge mirror={order.pancakeMirror} />
           </>
         }
         description={

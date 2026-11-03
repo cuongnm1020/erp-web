@@ -162,6 +162,7 @@ const ORDERS: SalesOrderList = {
       pancakeOrderId: null,
       pancakeOrderLink: null,
       pancakeErpLockedAt: null,
+      pancakeMirror: null,
       postedAt: null,
       createdAt: '2026-10-05T02:00:00.000Z',
       updatedAt: '2026-10-05T02:00:00.000Z',
