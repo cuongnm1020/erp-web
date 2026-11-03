@@ -118,6 +118,7 @@ const PRODUCT = {
   internalNote: null,
   allowNegativeStock: false,
   searchAliases: ['bút thiên long', 'tl08'],
+  tags: [],
   version: 5,
   createdAt: '2026-09-01T03:00:00.000Z',
   updatedAt: '2026-09-02T03:00:00.000Z',

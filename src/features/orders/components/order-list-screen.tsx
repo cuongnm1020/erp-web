@@ -251,6 +251,8 @@ const SORT_FIELD: Record<string, OrderSortField> = {
   customer: 'customer',
   total: 'total',
   time: 'time',
+  // Cột Vận chuyển sắp theo lúc gửi sang ĐVVC (2026-11-03); đơn chưa gửi luôn cuối.
+  shipping: 'sentToCarrierAt',
 };
 
 /**
@@ -554,7 +556,7 @@ const buildColumns = (
   {
     id: 'shipping',
     header: 'Vận chuyển',
-    meta: { width: 96 },
+    meta: { width: 96, sortable: true },
     cell: ({ row }) => <ShippingCell order={row.original} carrierOf={carrierOf} />,
   },
   {
@@ -740,6 +742,14 @@ function ShippingCell({
           {order.waybillErrorCode === 'CARRIER_REJECTED' && order.waybillError
             ? order.waybillError
             : 'Lỗi vận đơn'}
+        </span>
+      ) : null}
+      {order.sentToCarrierAt ? (
+        <span
+          className="block whitespace-nowrap text-muted-foreground"
+          title="Lúc gửi sang đơn vị vận chuyển"
+        >
+          Gửi {formatDateTime(order.sentToCarrierAt)}
         </span>
       ) : null}
       <PrintStatusNote order={order} />
@@ -1197,7 +1207,13 @@ export function OrderListScreen() {
   const prefs = useOrderListPrefs();
   const savePrefs = useSaveOrderListPrefs();
   const hidden = prefs.data?.hidden ?? DEFAULT_HIDDEN;
-  const sort: SortState | null = state.sort ?? prefs.data?.sort ?? null;
+  // Lọc theo Ngày gán ĐVVC mà URL chưa chọn cột sắp → sắp theo giờ gửi hãng, mới nhất trước
+  // (2026-11-03) — thắng lần sắp đã lưu của người dùng.
+  const sort: SortState | null =
+    state.sort ??
+    (dateField === 'sentToCarrierAt' ? { id: 'shipping', desc: true } : null) ??
+    prefs.data?.sort ??
+    null;
   const sortBy = sort && !hidden.includes(sort.id) ? SORT_FIELD[sort.id] : undefined;
   const changeSort = (next: SortState | null) => {
     set({ sort: next });

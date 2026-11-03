@@ -50,6 +50,9 @@ export const REPORT_FILTER_KEYS = [
   // Bán chạy theo tháng trong năm (2026-11-02): topView=year + topYear
   'topView',
   'topYear',
+  // Tag sản phẩm (2026-11-03): xem theo tag / tag × nhân viên + tag đang lọc (id nối dấu phẩy)
+  'tagGroup',
+  'tagIds',
   // Đơn trùng (2026-11-02): chỉ nhóm có hoàn + sắp xếp + trang
   'dupReturned',
   'dupSort',

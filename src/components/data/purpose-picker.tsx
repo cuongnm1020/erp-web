@@ -35,6 +35,9 @@ export function PurposePicker({
   onCreate,
   creating,
   disabled,
+  noun = 'mục đích',
+  groupLabel = 'Mục đích sử dụng',
+  example = 'Thanh long',
 }: {
   options: readonly PurposeOption[];
   selected: readonly string[];
@@ -44,6 +47,12 @@ export function PurposePicker({
   onCreate: (name: string) => void | Promise<void>;
   creating?: boolean;
   disabled?: boolean;
+  /** Tên loại mục trong câu chữ ("mục đích", "tag") — picker dùng lại cho tag sản phẩm. */
+  noun?: string;
+  /** Nhãn trợ năng của hàng chip. */
+  groupLabel?: string;
+  /** Ví dụ trong ô gõ ("vd. Thanh long"). */
+  example?: string;
 }) {
   const [draft, setDraft] = useState('');
   const typed = draft.trim().replace(/\s+/g, ' ');
@@ -145,7 +154,7 @@ export function PurposePicker({
         ref={rowRef}
         className="flex max-h-16 flex-wrap gap-1.5 overflow-hidden"
         role="group"
-        aria-label="Mục đích sử dụng"
+        aria-label={groupLabel}
       >
         {ranked.map((o, i) => chip(o, i >= visible))}
       </div>
@@ -164,8 +173,8 @@ export function PurposePicker({
           }}
           disabled={disabled}
           maxLength={60}
-          placeholder="Tìm hoặc tạo mục đích, vd. Thanh long"
-          aria-label="Tìm hoặc tạo mục đích"
+          placeholder={`Tìm hoặc tạo ${noun}, vd. ${example}`}
+          aria-label={`Tìm hoặc tạo ${noun}`}
           className="h-7 flex-1"
         />
         <Button
@@ -182,7 +191,7 @@ export function PurposePicker({
       </div>
       {typed ? (
         suggestions.length > 0 ? (
-          <div className="flex flex-wrap gap-1.5" role="group" aria-label="Gợi ý mục đích">
+          <div className="flex flex-wrap gap-1.5" role="group" aria-label={`Gợi ý ${noun}`}>
             {suggestions.map((o) => (
               <button
                 key={o.id}

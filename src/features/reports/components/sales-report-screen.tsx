@@ -39,10 +39,11 @@ import { SalesOverviewTab } from './sales-overview-tab';
 import { SalesProductTab } from './sales-product-tab';
 import { SalesStaffTab } from './sales-staff-tab';
 import { SalesSupplierTab } from './sales-supplier-tab';
+import { SalesTagTab } from './sales-tag-tab';
 import { SalesTopTab } from './sales-top-tab';
 import { SalesDuplicatesTab } from './sales-duplicates-tab';
 
-type TabKey = 'overview' | 'product' | 'staff' | 'supplier' | 'top' | 'duplicates';
+type TabKey = 'overview' | 'product' | 'staff' | 'supplier' | 'tag' | 'top' | 'duplicates';
 
 /** Tab của màn. Chỉ tab đang mở mới gọi API (component tab khác không mount). */
 const TABS: ReadonlyArray<{ key: TabKey; label: string }> = [
@@ -50,6 +51,8 @@ const TABS: ReadonlyArray<{ key: TabKey; label: string }> = [
   { key: 'product', label: 'Sản phẩm' },
   { key: 'staff', label: 'Nhân viên' },
   { key: 'supplier', label: 'Nhà cung cấp' },
+  // Tag sản phẩm (2026-11-03) — theo tag / tag × nhân viên lên đơn.
+  { key: 'tag', label: 'Tag sản phẩm' },
   { key: 'top', label: 'Bán chạy' },
   // Đơn trùng trong ngày + tỉ lệ hoàn (2026-11-02).
   { key: 'duplicates', label: 'Đơn trùng' },
@@ -278,6 +281,7 @@ export function SalesReportScreen() {
         {tab === 'product' ? <SalesProductTab /> : null}
         {tab === 'staff' ? <SalesStaffTab /> : null}
         {tab === 'supplier' ? <SalesSupplierTab /> : null}
+        {tab === 'tag' ? <SalesTagTab /> : null}
         {tab === 'top' ? <SalesTopTab /> : null}
         {tab === 'duplicates' ? <SalesDuplicatesTab /> : null}
       </div>

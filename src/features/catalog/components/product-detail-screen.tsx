@@ -171,6 +171,19 @@ function DetailBody({ product }: { product: ProductDetail }) {
                   <span className="text-muted-foreground">Chưa gán</span>
                 )}
               </InfoRow>
+              <InfoRow label="Tag">
+                {product.tags.length ? (
+                  <span className="flex flex-wrap gap-1">
+                    {product.tags.map((t) => (
+                      <Link key={t.id} href={`/catalog/products?tag=${t.id}`}>
+                        <StatusBadge tone="neutral">{t.name}</StatusBadge>
+                      </Link>
+                    ))}
+                  </span>
+                ) : (
+                  <span className="text-muted-foreground">Chưa gắn tag</span>
+                )}
+              </InfoRow>
               <InfoRow label="ĐVT cơ bản">{skus[0]?.baseUom.code ?? '—'}</InfoRow>
               <InfoRow label="Theo dõi lô">
                 {TRACKING_LABEL[product.trackingMode]}

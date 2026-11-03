@@ -1251,6 +1251,35 @@ describe('OrderListScreen — chọn cột, sắp xếp theo cột, lọc SP ngo
     );
   });
 
+  it('lọc theo Ngày gán ĐVVC (2026-11-03): mặc định sắp sortBy=sentToCarrierAt desc (thắng sắp đã lưu), cột Vận chuyển hiện giờ gửi', async () => {
+    search = 'from=2026-11-03&to=2026-11-03&dateField=sentToCarrierAt';
+    const seen: URLSearchParams[] = [];
+    server.use(
+      http.get('/api/me/preferences/:key', () =>
+        HttpResponse.json({
+          key: 'orders.list',
+          value: { hidden: [], sort: { id: 'total', desc: true } },
+        }),
+      ),
+      http.get('/api/sales-orders', ({ request }) => {
+        seen.push(new URL(request.url).searchParams);
+        return HttpResponse.json({
+          items: makeOrders(1).map((o) => ({ ...o, sentToCarrierAt: '2026-11-03T02:17:17.000Z' })),
+          total: 1,
+        });
+      }),
+    );
+    renderApp(<OrderListScreen />);
+    await screen.findByText(FIRST.docNumber);
+    await waitFor(() => expect(seen.at(-1)!.get('sortBy')).toBe('sentToCarrierAt'));
+    expect(seen.at(-1)!.get('sortDir')).toBe('desc');
+    expect(screen.getByRole('columnheader', { name: /Vận chuyển/ })).toHaveAttribute(
+      'aria-sort',
+      'descending',
+    );
+    expect(screen.getByText(/^Gửi 03\/11\/2026/)).toBeInTheDocument();
+  });
+
   it('bỏ tick cột trong "Cột" → cột ẩn + lưu lên server; bấm tiêu đề cột → sắp + lưu', async () => {
     search = '';
     const puts: unknown[] = [];
