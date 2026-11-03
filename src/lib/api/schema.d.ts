@@ -11841,6 +11841,8 @@ export interface components {
              *     2026-11-03) — web không khóa nút Sửa theo tab.
              */
             editPastStage: boolean;
+            /** @description ISO — lúc "Gửi sang ĐVVC" (vận đơn cấp / lưu hãng); null = chưa gửi hãng. */
+            sentToCarrierAt: string | null;
             /**
              * @description Đơn có sản phẩm ngoài hệ thống — món gõ tay Pancake / SP Pancake tự tạo (2026-11-02). Chưa đóng
              *     gói thì đơn nằm tab Cần sửa và không được "Gửi sang ĐVVC".
@@ -23876,7 +23878,7 @@ export interface operations {
                  */
                 itemOrigin?: "CUSTOM" | "POS_SKU" | "NON_ERP";
                 /** @description Sắp xếp theo cột (2026-10-22); mặc định ngày đặt mới nhất trước. */
-                sortBy?: "orderDate" | "docNumber" | "customer" | "total" | "time" | "statusChangedAt";
+                sortBy?: "orderDate" | "docNumber" | "customer" | "total" | "time" | "statusChangedAt" | "sentToCarrierAt";
                 customerId?: string;
                 status?: "DRAFT" | "PENDING_APPROVAL" | "APPROVED" | "POSTED" | "CANCELLED";
                 /** @description Lọc theo cân nặng gửi hãng HIỆU LỰC (đặt tay, không thì Σ dòng) — kg, chuỗi decimal, cận dưới (≥). */
@@ -24093,7 +24095,7 @@ export interface operations {
                  */
                 itemOrigin?: "CUSTOM" | "POS_SKU" | "NON_ERP";
                 /** @description Sắp xếp theo cột (2026-10-22); mặc định ngày đặt mới nhất trước. */
-                sortBy?: "orderDate" | "docNumber" | "customer" | "total" | "time" | "statusChangedAt";
+                sortBy?: "orderDate" | "docNumber" | "customer" | "total" | "time" | "statusChangedAt" | "sentToCarrierAt";
                 customerId?: string;
                 status?: "DRAFT" | "PENDING_APPROVAL" | "APPROVED" | "POSTED" | "CANCELLED";
                 /** @description Lọc theo cân nặng gửi hãng HIỆU LỰC (đặt tay, không thì Σ dòng) — kg, chuỗi decimal, cận dưới (≥). */
@@ -24238,7 +24240,7 @@ export interface operations {
                  */
                 itemOrigin?: "CUSTOM" | "POS_SKU" | "NON_ERP";
                 /** @description Sắp xếp theo cột (2026-10-22); mặc định ngày đặt mới nhất trước. */
-                sortBy?: "orderDate" | "docNumber" | "customer" | "total" | "time" | "statusChangedAt";
+                sortBy?: "orderDate" | "docNumber" | "customer" | "total" | "time" | "statusChangedAt" | "sentToCarrierAt";
                 customerId?: string;
                 status?: "DRAFT" | "PENDING_APPROVAL" | "APPROVED" | "POSTED" | "CANCELLED";
                 /** @description Lọc theo cân nặng gửi hãng HIỆU LỰC (đặt tay, không thì Σ dòng) — kg, chuỗi decimal, cận dưới (≥). */

@@ -559,6 +559,7 @@ function orderListExtras(i: number, status: (typeof ORDER_STATUSES)[number]) {
     packErrorAt: null,
     nonErpItems: false,
     editPastStage: false,
+    sentToCarrierAt: null,
     phone: FIXTURE_PHONES[i % FIXTURE_PHONES.length]!,
     recipientName: null,
     addressLine: `Thôn ${(i % 9) + 1}, X. Ea Kar`,
