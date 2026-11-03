@@ -133,6 +133,7 @@ export function DateRangeFilter({
   field,
   onFieldChange,
   rememberKey,
+  defaultPreset,
   today: todayProp,
   className,
 }: {
@@ -152,6 +153,11 @@ export function DateRangeFilter({
   onFieldChange?: (field: string) => void;
   /** Có → hiện "Ghi nhớ khoảng ngày cho lần sau", khôi phục khi mở màn chưa chọn ngày. */
   rememberKey?: string;
+  /**
+   * Khoảng chọn sẵn (`key` trong {@link rangePresetOptions}, vd `last30`) áp khi mở màn chưa có
+   * ngày và chưa ghi nhớ gì (2026-11-03). Khoảng ghi nhớ (kể cả "Mọi lúc") thắng.
+   */
+  defaultPreset?: string;
   today?: string;
   className?: string;
 }) {
@@ -178,18 +184,26 @@ export function DateRangeFilter({
   };
 
   // Khôi phục khoảng đã ghi nhớ — một lần, chỉ khi màn mở ra chưa có ngày (URL dán sẵn thì thắng).
+  // Không ghi nhớ gì → khoảng mặc định của màn (`defaultPreset`), nếu có.
   const restored = useRef(false);
   useEffect(() => {
-    if (restored.current || !rememberKey || remembered.isPending) return;
+    if (restored.current || (rememberKey && remembered.isPending)) return;
     restored.current = true;
-    if (from || !remembered.data) return;
+    if (from) return;
+    if (!remembered.data) {
+      if (defaultPreset) {
+        const d = resolve({ preset: defaultPreset });
+        if (d && (d.from || d.to)) onChange(d);
+      }
+      return;
+    }
     const r = resolve(remembered.data);
     if (r && (r.from || r.to)) onChange(r);
     if (remembered.data.field && onFieldChange && remembered.data.field !== field) {
       onFieldChange(remembered.data.field);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps -- chạy đúng một lần khi tuỳ chọn về
-  }, [rememberKey, remembered.isPending, remembered.data]);
+  }, [rememberKey, remembered.isPending, remembered.data, defaultPreset]);
 
   const [open, setOpen] = useState(false);
   const [draft, setDraft] = useState({ from, to });

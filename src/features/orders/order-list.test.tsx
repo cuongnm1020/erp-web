@@ -53,7 +53,8 @@ describe('OrderListScreen — GET /sales-orders (P1-12)', () => {
     renderApp(<OrderListScreen />);
     expect(screen.getByRole('status', { name: 'Đang tải danh sách' })).toBeInTheDocument();
     expect(await screen.findByText(FIRST.docNumber)).toBeInTheDocument();
-    expect(screen.getByText('60 đơn khớp bộ lọc')).toBeInTheDocument();
+    expect(screen.getByText('Đơn khớp bộ lọc')).toBeInTheDocument();
+    expect(screen.getByTestId('order-count')).toHaveTextContent('60');
     expect(screen.getByText('1–50 / 60 dòng')).toBeInTheDocument();
   });
 
@@ -68,7 +69,7 @@ describe('OrderListScreen — GET /sales-orders (P1-12)', () => {
     const pancake = makeOrders(60).find((o) => o.pancakeOrderId === '103')!;
     search = 'q=%23103';
     renderApp(<OrderListScreen />);
-    await screen.findByText('1 đơn khớp bộ lọc');
+    await waitFor(() => expect(screen.getByTestId('order-count')).toHaveTextContent('1'));
     const link = screen.getByRole('link', { name: pancake.docNumber });
     expect(link).toHaveAttribute('href', `/crm/orders/${pancake.id}`);
     // Mã Pancake bấm được → mở đúng đơn trên POS ở tab mới (2026-10-19).
@@ -111,7 +112,9 @@ describe('OrderListScreen — GET /sales-orders (P1-12)', () => {
     const n = (f: string) => all.filter((o) => o.flow === f).length;
     search = 'flow=DELIVERED';
     renderApp(<OrderListScreen />);
-    await screen.findByText(`${n('DELIVERED')} đơn khớp bộ lọc`);
+    await waitFor(() =>
+      expect(screen.getByTestId('order-count')).toHaveTextContent(String(n('DELIVERED'))),
+    );
     // flow=DELIVERED → tab cha Vận chuyển + chip Thành công (sau "Đã xong").
     expect(screen.getByRole('tab', { name: /^Vận chuyển/ })).toHaveAttribute(
       'aria-selected',
@@ -357,7 +360,9 @@ describe('OrderListScreen — cân nặng gửi hãng + gán hãng hàng loạt'
       (o) => Number(o.weightKg) >= 1 && Number(o.weightKg) <= 1.5 && o.carrierId === null,
     ).length;
     renderApp(<OrderListScreen />);
-    await screen.findByText(`${expected} đơn khớp bộ lọc`);
+    await waitFor(() =>
+      expect(screen.getByTestId('order-count')).toHaveTextContent(String(expected)),
+    );
     expect(screen.getByRole('combobox', { name: 'Hãng vận chuyển' })).toHaveTextContent(
       'Chưa gán hãng',
     );
@@ -966,7 +971,9 @@ describe('OrderListScreen — lọc theo hãng + thời gian (2026-09-19)', () =
     ).length;
     expect(expected).toBeGreaterThan(0);
     renderApp(<OrderListScreen />);
-    await screen.findByText(`${expected} đơn khớp bộ lọc`);
+    await waitFor(() =>
+      expect(screen.getByTestId('order-count')).toHaveTextContent(String(expected)),
+    );
     await waitFor(() =>
       expect(screen.getByRole('combobox', { name: 'Hãng vận chuyển' })).toHaveTextContent(
         'Giao Hàng Tiết Kiệm',
@@ -1446,9 +1453,7 @@ describe('OrderListScreen — chọn cột, sắp xếp theo cột, lọc SP ngo
     await waitFor(() =>
       expect(screen.queryByRole('columnheader', { name: /Sản phẩm/ })).not.toBeInTheDocument(),
     );
-    await waitFor(() =>
-      expect(puts.at(-1)).toEqual({ hidden: ['orderDate', 'product'], sort: null }),
-    );
+    await waitFor(() => expect(puts.at(-1)).toEqual({ hidden: ['product'], sort: null }));
 
     replace.mockClear();
     fireEvent.click(screen.getByRole('button', { name: 'Sắp xếp theo Khách hàng' }));
@@ -1456,7 +1461,7 @@ describe('OrderListScreen — chọn cột, sắp xếp theo cột, lọc SP ngo
     expect(String(replace.mock.calls.at(-1)![0])).toContain('sort=customer');
     await waitFor(() =>
       expect(puts.at(-1)).toEqual({
-        hidden: ['orderDate', 'product'],
+        hidden: ['product'],
         sort: { id: 'customer', desc: false },
       }),
     );
@@ -1756,27 +1761,14 @@ describe('OrderListScreen — Lỗi vận đơn + đơn TikTok (2026-10-28, tab 
 });
 
 describe('OrderListScreen — Đơn mới / Xác nhận / Chờ hàng (2026-10-31)', () => {
-  it('tab "Đơn mới" đứng đầu; dòng đơn mới có "Xác nhận" → POST /sales-orders/{id}/confirm', async () => {
+  it('tab "Đơn mới" đứng đầu; dòng đơn mới KHÔNG còn nút "Xác nhận" (bỏ 2026-11-03 — xác nhận ở màn chi tiết)', async () => {
     search = '';
-    const confirmed: string[] = [];
-    server.use(
-      http.post('/api/sales-orders/:id/confirm', ({ params }) => {
-        confirmed.push(params.id as string);
-        return HttpResponse.json(
-          { orderId: params.id, docNumber: FIRST.docNumber, status: 'APPROVED', completed: true },
-          { status: 201 },
-        );
-      }),
-    );
     renderApp(<OrderListScreen />, { me: ME_SALE });
     await screen.findByText(FIRST.docNumber);
     expect(screen.getByRole('tab', { name: /^Đơn mới/ })).toBeInTheDocument();
     const row = screen.getAllByRole('row').find((r) => r.textContent?.includes(FIRST.docNumber))!;
-    fireEvent.click(within(row).getByRole('button', { name: 'Xác nhận' }));
-    await waitFor(() => expect(confirmed).toEqual([FIRST.id]));
-    await waitFor(() =>
-      expect(toastSuccess).toHaveBeenCalledWith(`Đã xác nhận đơn ${FIRST.docNumber}`),
-    );
+    expect(within(row).queryByRole('button', { name: 'Xác nhận' })).not.toBeInTheDocument();
+    expect(within(row).getByRole('button', { name: 'Xem nhanh' })).toBeInTheDocument();
   });
 
   it('sale không có send_carrier → thanh chọn không có "Gửi sang ĐVVC" / "Khác"', async () => {

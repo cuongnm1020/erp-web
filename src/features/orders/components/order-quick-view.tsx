@@ -5,6 +5,7 @@ import Decimal from 'decimal.js';
 import { Copy, X } from 'lucide-react';
 import Link from 'next/link';
 import { CopyButton } from '@/components/data/copy-button';
+import { TrackingLink } from '@/components/data/tracking-link';
 import { Button } from '@/components/ui/button';
 import { DialogOverlay, DialogPortal } from '@/components/ui/dialog';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -182,7 +183,12 @@ function Body({ row }: { row: SalesOrderListItem }) {
           )}
           {tracking ? (
             <p className="flex items-center gap-1.5">
-              <span className="truncate font-mono text-xs">{tracking}</span>
+              <TrackingLink
+                trackingNo={tracking}
+                url={row.shipment?.trackingUrl ?? null}
+                prefilled={row.shipment?.trackingUrlPrefilled ?? false}
+                className="truncate font-mono text-xs"
+              />
               <CopyButton value={tracking} label="mã vận đơn" />
             </p>
           ) : (

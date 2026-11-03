@@ -20,6 +20,7 @@ import { formatDateTime, formatQuantity, groupVi } from '@/lib/format';
 import { useAbility } from '@/lib/permission';
 import { useListState, type SortState } from '@/lib/url-state';
 import {
+  useCarrierStatusOptions,
   useLabelPrinterOptions,
   usePancakeShops,
   useOrders,
@@ -29,7 +30,12 @@ import {
   type SalesOrderListItem,
 } from '../api/use-orders';
 import { BulkReprintWaybillDialog } from './bulk-reprint-waybill-dialog';
-import { CarrierFilter, ProductFilter } from './order-list-screen';
+import {
+  CarrierFilter,
+  carrierStatusOptions,
+  decodeList,
+  ProductFilter,
+} from './order-list-screen';
 
 const FILTER_KEYS = [
   'from',
@@ -42,6 +48,8 @@ const FILTER_KEYS = [
   'pickup',
   'printStatus',
   'printedBy',
+  // Chữ "Trạng thái VC" hãng gửi (chọn nhiều, user 2026-11-03) — cùng ô với danh sách đơn.
+  'carrierStatus',
 ] as const;
 type FilterKey = (typeof FILTER_KEYS)[number];
 
@@ -86,8 +94,10 @@ export function WaybillOrdersScreen() {
   const shops = usePancakeShops();
   const teamOptions = useTeamFilterOptions(canFilterTeam);
   const printers = useLabelPrinterOptions();
+  const carrierStatuses = useCarrierStatusOptions();
   const f = state.filters;
   const team = canFilterTeam ? (f.team ?? '') : '';
+  const carrierStatusText = useMemo(() => decodeList(f.carrierStatus ?? ''), [f.carrierStatus]);
   const sort = state.sort ?? DEFAULT_SORT;
 
   const query = useOrders({
@@ -104,6 +114,7 @@ export function WaybillOrdersScreen() {
     pickupStatus: pick(PICKUP_OPTIONS, f.pickup),
     printStatus: pick(PRINT_OPTIONS, f.printStatus),
     labelPrintedBy: f.printedBy,
+    carrierStatusText,
     sortBy: 'sentToCarrierAt',
     sortDir: sort.desc ? 'desc' : 'asc',
     ...skipTake,
@@ -130,7 +141,8 @@ export function WaybillOrdersScreen() {
     f.carrierAccountId ||
     f.pickup ||
     f.printStatus ||
-    f.printedBy
+    f.printedBy ||
+    f.carrierStatus
   );
 
   return (
@@ -177,6 +189,13 @@ export function WaybillOrdersScreen() {
               rememberKey: 'date.waybills',
             },
             { key: 'pickup', label: 'Hãng lấy hàng', type: 'select', options: PICKUP_OPTIONS },
+            {
+              key: 'carrierStatus',
+              label: 'Trạng thái hãng',
+              type: 'multiSelect',
+              unit: 'trạng thái',
+              options: carrierStatusOptions(carrierStatuses.data ?? []),
+            },
             { key: 'printStatus', label: 'In tem', type: 'select', options: PRINT_OPTIONS },
             {
               // Người in tem lần gần nhất (2026-11-03) — danh sách = người đã từng in.
@@ -233,6 +252,8 @@ export function WaybillOrdersScreen() {
               render: () => (
                 <CarrierFilter
                   withNone={false}
+                  // Màn này chỉ đơn gửi hãng thật — bỏ Giao thủ công (user 2026-11-03).
+                  filter={(o) => o.carrier.code !== 'MANUAL'}
                   noCarrier={false}
                   carrierId={f.carrierId ?? ''}
                   carrierAccountId={f.carrierAccountId ?? ''}

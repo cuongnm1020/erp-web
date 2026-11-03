@@ -4,7 +4,6 @@ import type { RowSelectionState } from '@tanstack/react-table';
 import Decimal from 'decimal.js';
 import {
   Ban,
-  CheckCircle2,
   ChevronDown,
   Copy,
   Eye,
@@ -26,6 +25,7 @@ import { ColumnPicker, DataTable, FilterBar, type ColumnDef } from '@/components
 import { RowActions, type RowActionItem } from '@/components/data/row-actions';
 import { EmptyState, ListSkeleton, QueryState } from '@/components/data/states';
 import { StatusBadge } from '@/components/data/status-badge';
+import { TrackingLink } from '@/components/data/tracking-link';
 import { PageHeader } from '@/components/layout/page-header';
 import { Button } from '@/components/ui/button';
 import {
@@ -43,6 +43,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { toast } from '@/components/ui/toaster';
+import { cn } from '@/lib/cn';
 import { messageFor, messageForCode, messageForItemCode } from '@/lib/error-messages';
 import {
   formatDate,
@@ -62,7 +63,11 @@ import { useInvalidateOn } from '@/lib/realtime';
 import { useHotkey } from '@/lib/use-hotkey';
 import { useListState, type SortState } from '@/lib/url-state';
 import { decimalCell } from '@/lib/xlsx-writer';
-import { carrierAccountLabel, useCarriers } from '@/features/wms/api/use-shipping';
+import {
+  carrierAccountLabel,
+  useCarriers,
+  type CarrierAccountOption,
+} from '@/features/wms/api/use-shipping';
 import { CarrierSelect } from '@/features/wms/components/carrier-select';
 import {
   fetchOrdersPage,
@@ -71,7 +76,6 @@ import {
   useOrderListPrefs,
   useOrders,
   useRequestWaybill,
-  useConfirmOrder,
   useSetOrdersWaitingStock,
   useTeamFilterOptions,
   useCarrierStatusOptions,
@@ -106,6 +110,7 @@ import { BulkFulfilPrintDialog } from './bulk-fulfil-print-dialog';
 import { BulkReprintWaybillDialog } from './bulk-reprint-waybill-dialog';
 import { BulkRetryWaybillDialog, retryableWaybill } from './bulk-retry-waybill-dialog';
 import { BulkShippingDialog } from './bulk-shipping-dialog';
+import { carrierTone } from './carrier-status-card';
 import { OrderFlowTabs } from './order-flow-tabs';
 import { FlowBadge, OrderQuickView, TelcoBadge } from './order-quick-view';
 import { OrderSavedViews } from './order-saved-views';
@@ -219,7 +224,7 @@ const parsePrintStatus = (v: string | undefined): OrderPrintStatus | undefined =
   PRINT_STATUS_OPTIONS.find((o) => o.value === v)?.value;
 
 /** Ô "Trạng thái hãng": giá trị URL = từng chữ encodeURIComponent nối dấu phẩy (chữ hãng có dấu phẩy). */
-const decodeList = (v: string): string[] =>
+export const decodeList = (v: string): string[] =>
   v
     .split(',')
     .filter(Boolean)
@@ -232,7 +237,7 @@ const decodeList = (v: string): string[] =>
     });
 
 /** Mỗi chữ một lựa chọn; cùng chữ ở nhiều hãng gộp một dòng, gợi ý ghi tên các hãng. */
-const carrierStatusOptions = (rows: OrderCarrierStatusOption[]) => {
+export const carrierStatusOptions = (rows: OrderCarrierStatusOption[]) => {
   const byText = new Map<string, Set<string>>();
   for (const r of rows) {
     const set = byText.get(r.statusText) ?? new Set<string>();
@@ -255,16 +260,19 @@ const SORT_FIELD: Record<string, OrderSortField> = {
   orderDate: 'orderDate',
   customer: 'customer',
   total: 'total',
-  time: 'time',
+  // Cột Trạng thái hiện "đổi trạng thái … trước" → sắp theo đúng mốc đó (2026-11-03, user: sắp
+  // theo ngày tạo đơn là sai).
+  time: 'statusChangedAt',
   // Cột Vận chuyển sắp theo lúc gửi sang ĐVVC (2026-11-03); đơn chưa gửi luôn cuối.
   shipping: 'sentToCarrierAt',
 };
 
 /**
  * Cột ẩn khi người dùng chưa chọn lần nào. Hàng thiếu / Chờ từ / Thực thu ĐVVC đã bỏ khỏi bảng
- * (2026-11-02); Thực thu vẫn có trong file Excel xuất.
+ * (2026-11-02); Thực thu vẫn có trong file Excel xuất. Ngày đặt hiện mặc định từ 2026-11-03 (bỏ
+ * dòng ngày dưới mã đơn).
  */
-const DEFAULT_HIDDEN = ['orderDate'];
+const DEFAULT_HIDDEN: string[] = [];
 
 type OrderFilter = (typeof DEFAULTS.filterKeys)[number];
 
@@ -292,7 +300,6 @@ interface RowActionContext {
   /** `sales_order.cancel_after_carrier` — hủy cả đơn đã đóng gói mà hãng chưa lấy (2026-11-02). */
   canCancelAfterCarrier: boolean;
   canEditAny: boolean;
-  onConfirm: (row: SalesOrderListItem) => void;
   onPeek: (row: SalesOrderListItem) => void;
   onRetryWaybill: (row: SalesOrderListItem) => void;
   onCancel: (row: SalesOrderListItem) => void;
@@ -312,19 +319,8 @@ const STAGE_LOCKED = 'Kho đã xử lý đơn — không sửa / hủy được 
 function orderRowItems(o: SalesOrderListItem, ctx: RowActionContext): RowActionItem[] {
   const stageOpen = OPEN_FLOWS.includes(o.flow);
   const editOpen = EDIT_OPEN_FLOWS.includes(o.flow);
+  // Nút "Xác nhận" trên dòng đã bỏ (user 2026-11-03) — xác nhận ở màn chi tiết / sửa đơn.
   return [
-    ...(ctx.canCreate &&
-    ((o.flow === 'NEW' && o.status === 'DRAFT') || o.status === 'PENDING_APPROVAL')
-      ? [
-          {
-            // Đơn mới / Chờ duyệt → Đã xác nhận, không qua duyệt kể cả bán dưới trần (2026-10-31);
-            // server kiểm người tạo / đơn Pancake.
-            label: 'Xác nhận',
-            icon: <CheckCircle2 aria-hidden />,
-            onSelect: () => ctx.onConfirm(o),
-          },
-        ]
-      : []),
     ...(ctx.canPack && o.flow === 'NEEDS_FIX' && o.waybillErrorCode && o.shipment?.carrierCode
       ? [
           {
@@ -415,10 +411,9 @@ const buildColumns = (
               </span>
             ) : null}
           </div>
-          {/* Ngày đặt nằm dưới mã đơn (mockup 2026-10-29) — cột Ngày đặt riêng ẩn mặc định. */}
-          <span className="block whitespace-nowrap text-xs text-muted-foreground">
-            {formatDateTime(o.orderDate)}
-          </span>
+          {/* Dòng 2 (2026-11-03, user): badge "Sửa trên ERP" thay chỗ ngày đặt — ngày đặt xem ở cột
+              Ngày đặt (hiện mặc định). Không có badge thì dòng trống không chiếm chỗ. */}
+          <PancakeErpLockedBadge lockedAt={o.pancakeErpLockedAt} />
           <div className="flex min-w-0 items-center gap-1 text-xs text-muted-foreground">
             <span className="shrink-0">
               {o.pancakeOrderId ? (
@@ -427,7 +422,6 @@ const buildColumns = (
                 'ERP'
               )}
             </span>
-            <PancakeErpLockedBadge lockedAt={o.pancakeErpLockedAt} />
             <PancakeMirrorBadge mirror={o.pancakeMirror} />
             {o.marketplace ? <MarketplaceBadge marketplace={o.marketplace} /> : null}
           </div>
@@ -702,18 +696,29 @@ function ShippingCell({
   const code = s?.carrierCode ?? picked?.code ?? null;
   const fullName = s?.carrierName ?? picked?.name ?? code;
   const short = code ?? (order.carrierId ? 'Đã chọn hãng' : null);
+  // Nhãn hãng tô nền màu riêng từng hãng (2026-11-03, user) — cùng bảng màu thẻ hãng màn đơn.
+  const tone = carrierTone(code);
+  const chip = (
+    <span
+      title={fullName ?? undefined}
+      className={cn(
+        'inline-flex rounded-sm px-1 font-semibold',
+        code ? cn(tone.bg, 'text-primary-foreground') : '',
+      )}
+    >
+      {short}
+    </span>
+  );
   return (
     <div className="space-y-1 text-xs">
       {short ? (
         <span className="block whitespace-nowrap">
           {s?.trackingNo ? (
-            <CopyText value={s.trackingNo} what="mã vận đơn" className="font-semibold">
-              <span title={fullName ?? undefined}>{short}</span>
+            <CopyText value={s.trackingNo} what="mã vận đơn" className="hover:no-underline">
+              {chip}
             </CopyText>
           ) : (
-            <span className="font-semibold" title={fullName ?? undefined}>
-              {short}
-            </span>
+            chip
           )}
           {s?.shipFee ? (
             <span className="text-muted-foreground">
@@ -729,10 +734,12 @@ function ShippingCell({
         </span>
       )}
       {s?.trackingNo ? (
-        <CopyText
-          value={s.trackingNo}
-          what="mã vận đơn"
-          className="block max-w-48 truncate font-mono text-muted-foreground"
+        // Bấm mã → tab tra cứu của hãng (2026-11-03); hãng không có link → sao chép như cũ.
+        <TrackingLink
+          trackingNo={s.trackingNo}
+          url={s.trackingUrl}
+          prefilled={s.trackingUrlPrefilled}
+          className="max-w-48 truncate font-mono text-muted-foreground"
         />
       ) : (
         <WeightNote order={order} />
@@ -1070,9 +1077,12 @@ export function CarrierFilter({
   carrierAccountId,
   onChange,
   withNone = true,
+  filter,
 }: {
   /** false = bỏ lựa chọn "Chưa gán hãng" (màn Đơn đã gán vận chuyển). */
   withNone?: boolean;
+  /** Lọc bớt dòng hãng (vd màn Theo dõi đơn bỏ Giao thủ công, user 2026-11-03). */
+  filter?: (o: CarrierAccountOption) => boolean;
   noCarrier: boolean;
   carrierId: string;
   carrierAccountId: string;
@@ -1096,6 +1106,7 @@ export function CarrierFilter({
     <CarrierSelect
       className="h-9 w-64"
       value={value}
+      filter={filter}
       specials={[
         { value: ANY, label: 'Hãng VC: tất cả' },
         ...(withNone ? [{ value: NO_CARRIER, label: 'Chưa gán hãng' }] : []),
@@ -1295,7 +1306,6 @@ export function OrderListScreen() {
   const canCancelAfterCarrier = ability.can('cancel_after_carrier', 'SalesOrder');
   const canEditAny = ability.can('edit_all', 'SalesOrder');
   const canCancel = canCancelAny || canCancelAfterCarrier || canCreate;
-  const confirmOrder = useConfirmOrder();
   const creatorOptions = useOrderCreatorOptions(canFilterTeam);
   const [peek, setPeek] = useState<SalesOrderListItem | null>(null);
   // Nút Hủy trên dòng → hộp xác nhận dùng chung với hủy hàng loạt (một đơn).
@@ -1313,11 +1323,6 @@ export function OrderListScreen() {
       canEditAny,
       onPeek: setPeek,
       onCancel: setCancelling,
-      onConfirm: (o) =>
-        confirmOrder.mutate(o.id, {
-          onSuccess: () => toast.success(`Đã xác nhận đơn ${o.docNumber}`),
-          onError: (err) => toast.error(`Đơn ${o.docNumber}: ${messageFor(err)}`),
-        }),
       onRetryWaybill: (o) => {
         if (!o.shipment?.carrierCode) return;
         requestWaybill.mutate(
@@ -1430,9 +1435,18 @@ export function OrderListScreen() {
       <PageHeader
         title="Đơn hàng"
         description={
-          query.data
-            ? `${groupVi(String(query.data.total))} đơn khớp bộ lọc`
-            : 'Đang đếm số đơn khớp bộ lọc…'
+          // Số đơn khớp bộ lọc to, đậm, màu chữ chính dưới dòng mô tả (user 2026-11-03).
+          <span className="block">
+            <span>{query.data ? 'Đơn khớp bộ lọc' : 'Đang đếm số đơn khớp bộ lọc…'}</span>
+            {query.data ? (
+              <span
+                data-testid="order-count"
+                className="block text-2xl font-bold leading-tight text-foreground"
+              >
+                {groupVi(String(query.data.total))}
+              </span>
+            ) : null}
+          </span>
         }
         breadcrumb={[{ label: 'Bán hàng' }, { label: 'Đơn hàng' }]}
         actions={
@@ -1506,6 +1520,8 @@ export function OrderListScreen() {
               label: 'Ngày đặt',
               type: 'dateRange',
               rememberKey: 'date.orders',
+              // Mở màn lần đầu (chưa ghi nhớ, URL không có ngày) → 30 ngày qua (user 2026-11-03).
+              defaultPreset: 'last30',
               fieldKey: 'dateField',
               fields: DATE_FIELDS,
             },

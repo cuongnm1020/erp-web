@@ -46,6 +46,11 @@ export type FilterDef<F extends string = string> = FilterDefCommon<F> &
         type: 'dateRange';
         /** Lưu "Ghi nhớ khoảng ngày" theo tài khoản dưới khoá này. */
         rememberKey?: string;
+        /**
+         * Khoảng chọn sẵn áp khi mở màn chưa có ngày trên URL và chưa ghi nhớ gì (vd `last30`,
+         * 2026-11-03). Người dùng xóa ngày → "tất cả" cho tới khi mở lại màn.
+         */
+        defaultPreset?: string;
         maxDays?: number;
         /**
          * Lọc theo trường ngày nào (ô "Theo" trong popover, ≥ 2 trường mới hiện): khoá URL giữ
@@ -196,6 +201,7 @@ export function FilterBar<F extends string = string>({
           key={f.key}
           label={f.label}
           rememberKey={f.rememberKey}
+          defaultPreset={f.defaultPreset}
           maxDays={f.maxDays}
           {...(f.fieldKey && f.fields
             ? {

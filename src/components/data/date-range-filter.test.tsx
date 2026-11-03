@@ -16,10 +16,12 @@ function Harness({
   initial = {},
   required,
   rememberKey,
+  defaultPreset,
 }: {
   initial?: DateRangeFilterValue;
   required?: boolean;
   rememberKey?: string;
+  defaultPreset?: string;
 }) {
   const [v, setV] = useState<DateRangeFilterValue>(initial);
   return (
@@ -31,6 +33,7 @@ function Harness({
         onChange={setV}
         required={required}
         rememberKey={rememberKey}
+        defaultPreset={defaultPreset}
       />
       <output data-testid="v">{`${v.from ?? ''}|${v.to ?? ''}`}</output>
     </>
@@ -117,6 +120,27 @@ describe('DateRangeFilter (2026-10-22)', () => {
 
     renderApp(<Harness rememberKey="date.orders" />);
     await waitFor(() => expect(screen.getByTestId('v')).toHaveTextContent('2026-09-23|2026-10-22'));
+  });
+
+  it('defaultPreset (2026-11-03): chưa ghi nhớ, URL không có ngày → áp 30 ngày qua; URL có ngày / đã ghi nhớ "Mọi lúc" thì thôi', async () => {
+    renderApp(<Harness rememberKey="date.orders" defaultPreset="last30" />);
+    await waitFor(() => expect(screen.getByTestId('v')).toHaveTextContent('2026-09-23|2026-10-22'));
+    expect(screen.getByRole('button', { name: /Ngày đặt: 30 ngày qua/ })).toBeInTheDocument();
+
+    const withUrl = renderApp(
+      <Harness rememberKey="date.orders" defaultPreset="last30" initial={{ from: '2026-10-01' }} />,
+    );
+    await waitFor(() => expect(screen.getAllByTestId('v').at(-1)).toHaveTextContent('2026-10-01|'));
+    withUrl.unmount();
+
+    server.use(
+      http.get('/api/me/preferences/:key', ({ params }) =>
+        HttpResponse.json({ key: params.key, value: { preset: 'all' } }),
+      ),
+    );
+    renderApp(<Harness rememberKey="date.other" defaultPreset="last30" />);
+    await waitFor(() => expect(screen.getAllByTestId('v').at(-1)).toHaveTextContent('|'));
+    expect(screen.getAllByTestId('v').at(-1)).not.toHaveTextContent('2026-09-23');
   });
 
   it('lịch 2 tháng theo thiết kế: tháng trái = tháng của ngày cuối, "Tháng 10 / 2026", T2…CN; bấm 2 ngày = khoảng', async () => {

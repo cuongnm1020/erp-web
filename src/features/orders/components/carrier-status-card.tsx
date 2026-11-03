@@ -4,6 +4,7 @@ import { AlertTriangle, ArrowLeftRight, Clock, ShoppingCart } from 'lucide-react
 import { useState, type ReactNode } from 'react';
 import { CopyButton } from '@/components/data/copy-button';
 import { StatusBadge } from '@/components/data/status-badge';
+import { TrackingLink } from '@/components/data/tracking-link';
 import { cn } from '@/lib/cn';
 import { messageFor } from '@/lib/error-messages';
 import { formatDate, formatMoney, formatTime, toLocalDateKey } from '@/lib/format';
@@ -14,7 +15,13 @@ import type { SalesOrderDetail } from '../api/use-orders';
 type Shipment = NonNullable<SalesOrderDetail['shipment']>;
 
 /** Màu nhận diện từng hãng (token `carrier-*`) — viền, tiêu đề, nền mã vận đơn. */
-const CARRIER_TONE: Record<string, { border: string; text: string; bg: string; label: string }> = {
+export interface CarrierTone {
+  border: string;
+  text: string;
+  bg: string;
+  label: string;
+}
+const CARRIER_TONE: Record<string, CarrierTone> = {
   VTP: {
     border: 'border-carrier-vtp',
     text: 'text-carrier-vtp',
@@ -41,12 +48,18 @@ const CARRIER_TONE: Record<string, { border: string; text: string; bg: string; l
   },
   JT: { border: 'border-carrier-jt', text: 'text-carrier-jt', bg: 'bg-carrier-jt', label: 'J&T' },
 };
-const OTHER_TONE = {
+const OTHER_TONE: CarrierTone = {
   border: 'border-carrier-other',
   text: 'text-carrier-other',
   bg: 'bg-carrier-other',
   label: '',
 };
+
+/** Màu hãng theo mã (`wms.Carrier.code`); hãng lạ → màu chung, nhãn = chính mã. Dùng chung với cột Vận chuyển. */
+export function carrierTone(code: string | null | undefined): CarrierTone {
+  const c = code ?? '';
+  return CARRIER_TONE[c] ?? { ...OTHER_TONE, label: c || 'Hãng' };
+}
 
 const CARRIER_PAYER: Record<string, string> = { VNPOST: 'VNPost', JT: 'J&T' };
 
@@ -181,7 +194,7 @@ export function CarrierStatusCard({ order }: { order: SalesOrderDetail }) {
   const [journey, setJourney] = useState(false);
   if (!s?.trackingNo) return null;
   const code = s.carrierCode ?? '';
-  const tone = CARRIER_TONE[code] ?? { ...OTHER_TONE, label: code || 'Hãng' };
+  const tone = carrierTone(code);
   const badge = shipmentStatusBadge(s.status);
   const last = s.lastCarrierEvent;
   const opt = order.shippingOptions;
@@ -234,7 +247,13 @@ export function CarrierStatusCard({ order }: { order: SalesOrderDetail }) {
               tone.bg,
             )}
           >
-            <span className="truncate">{s.trackingNo}</span>
+            {/* Bấm mã → tab tra cứu của hãng (2026-11-03); VTP / VNPost chỉ mở trang + chép mã. */}
+            <TrackingLink
+              trackingNo={s.trackingNo}
+              url={s.trackingUrl}
+              prefilled={s.trackingUrlPrefilled}
+              className="truncate text-primary-foreground"
+            />
             <CopyButton
               value={s.trackingNo}
               label="mã vận đơn"
