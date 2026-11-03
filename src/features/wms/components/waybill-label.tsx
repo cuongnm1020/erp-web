@@ -5,7 +5,7 @@ import { Barcode } from '@/components/data/barcode';
 import { PrintSheet } from '@/components/data/print-sheet';
 import { cn } from '@/lib/cn';
 import { MapPin, Phone, Store, User } from 'lucide-react';
-import { formatDate, formatMoney, formatQuantity, formatTime } from '@/lib/format';
+import { formatDate, formatQuantity, formatTime } from '@/lib/format';
 import { LABEL_SIZES, type PrintController } from '@/lib/print';
 import type { ShipmentLabelData } from '../api/use-pda';
 import { DEFAULT_PRINT_NOTE, hidePhone, parseGhtkTracking, routeLabel } from '../ghtk-label';
@@ -280,7 +280,9 @@ export function WaybillLabel({
         className="flex items-baseline justify-between font-bold leading-none"
         style={{ fontSize: f(11), gap: u(1) }}
       >
-        <span className="tabular-nums">COD: {formatMoney(data.codAmount, { unit: 'đ' })}</span>
+        {/* Che số tiền thu hộ trên tem (2026-11-03, user chốt) — shipper / hãng đã có COD trong
+            vận đơn; tem dán ngoài kiện không lộ giá trị hàng. */}
+        <span>Thu *** đ</span>
         {route ? <span className="shrink-0 font-extrabold">{route}</span> : null}
       </div>
       {data.carrierCode === 'VNPOST' ? (
