@@ -12665,6 +12665,11 @@ export interface components {
              *     dòng vẫn lưu giá niêm yết. Thấp hơn niêm yết × (1 − trần CK) → đơn Chờ duyệt.
              */
             unitPrice?: string;
+            /**
+             * @description Sản phẩm khuyến mãi (2026-11-03): đơn giá / thành tiền = 0, bỏ qua `unitPrice` /
+             *     `discountPercent`, không vào duyệt giá; vẫn giữ tồn, xuất kho, in cộng số lượng cùng SKU.
+             */
+            isGift?: boolean;
         };
         CreateOrderDto: {
             /**
@@ -12946,6 +12951,8 @@ export interface components {
              *     bỏ trống = giá bảng hiện tại (core.resolve_price).
              */
             unitPrice?: string;
+            /** @description Sản phẩm khuyến mãi (2026-11-03) — đơn giá 0, như dòng tạo đơn. */
+            isGift?: boolean;
         };
         ReplaceOrderLinesDto: {
             lines: components["schemas"]["EditOrderLineDto"][];

@@ -22,8 +22,13 @@ function availableIn(row: SkuQuickRow, warehouseId: string): string {
  */
 export const ProductSearch = forwardRef<
   HTMLInputElement,
-  { warehouseId: string; onPick: (row: SkuQuickRow) => void }
->(function ProductSearch({ warehouseId, onPick }, ref) {
+  {
+    warehouseId: string;
+    onPick: (row: SkuQuickRow) => void;
+    /** Tên ô cho trình đọc màn hình — ô thứ hai "Tìm sản phẩm khuyến mãi" (2026-11-03). */
+    label?: string;
+  }
+>(function ProductSearch({ warehouseId, onPick, label = 'Tìm sản phẩm' }, ref) {
   const listId = useId();
   const [isCombo, setIsCombo] = useState(false);
   const [q, setQ] = useState('');
@@ -88,7 +93,11 @@ export const ProductSearch = forwardRef<
 
   return (
     <div className="flex w-full max-w-2xl flex-wrap items-center gap-2">
-      <div role="tablist" aria-label="Loại hàng" className="inline-flex rounded-md bg-muted p-0.5">
+      <div
+        role="tablist"
+        aria-label={label === 'Tìm sản phẩm' ? 'Loại hàng' : `Loại hàng — ${label}`}
+        className="inline-flex rounded-md bg-muted p-0.5"
+      >
         {[
           { v: false, label: 'Sản phẩm' },
           { v: true, label: 'Combo' },
@@ -120,7 +129,7 @@ export const ProductSearch = forwardRef<
             aria-expanded={showList}
             aria-controls={listId}
             aria-autocomplete="list"
-            aria-label="Tìm sản phẩm"
+            aria-label={label}
             placeholder={isCombo ? 'Tìm combo theo tên, mã…' : 'Tìm tên, mã SKU, barcode…'}
             value={q}
             onChange={(e) => {

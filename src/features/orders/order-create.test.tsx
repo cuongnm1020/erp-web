@@ -619,6 +619,50 @@ describe('OrderCreateScreen — màn tạo đơn mới', () => {
     ]);
   }, 15_000);
 
+  it('sản phẩm khuyến mãi (2026-11-03): ô tìm riêng, dòng 0 ₫ khoá giá, chỉnh SL; trùng SKU vẫn là dòng riêng; gửi isGift không gửi giá', async () => {
+    const bodies: Record<string, unknown>[] = [];
+    server.use(
+      http.get('/api/prices/resolve', () =>
+        HttpResponse.json({ priceListId: 'pl-1', listPrice: '250000', maxDiscount: '0.1' }),
+      ),
+      ...skuHandlers(),
+      http.post('/api/sales-orders', async ({ request }) => {
+        bodies.push((await request.json()) as Record<string, unknown>);
+        return HttpResponse.json(CREATED, { status: 201 });
+      }),
+    );
+    renderApp(<OrderCreateScreen />);
+    const box = await screen.findByRole('combobox', { name: 'Tìm sản phẩm' });
+    fireEvent.change(box, { target: { value: 'amino' } });
+    fireEvent.click(await screen.findByRole('option', { name: /Amino GA3 500ml/ }));
+    await waitFor(() => expect(screen.getAllByLabelText('Số lượng')).toHaveLength(1));
+    fireEvent.change(screen.getByLabelText('Số lượng'), { target: { value: '10' } });
+
+    const giftBox = screen.getByRole('combobox', { name: 'Tìm sản phẩm khuyến mãi' });
+    fireEvent.change(giftBox, { target: { value: 'amino' } });
+    fireEvent.click(await screen.findByRole('option', { name: /Amino GA3 500ml/ }));
+    const gift = within(screen.getByRole('region', { name: 'Sản phẩm khuyến mãi' }));
+    await waitFor(() => expect(gift.getByLabelText('Số lượng')).toHaveValue('1'));
+    expect(screen.getAllByLabelText('Số lượng')).toHaveLength(2);
+    expect(gift.getByText('Khuyến mãi')).toBeInTheDocument();
+    expect(gift.getByLabelText('Đơn giá')).toBeDisabled();
+    expect(gift.getByLabelText('Thành tiền')).toBeDisabled();
+    fireEvent.click(gift.getByRole('button', { name: 'Tăng số lượng' }));
+    await waitFor(() => expect(gift.getByLabelText('Số lượng')).toHaveValue('2'));
+
+    fireEvent.change(screen.getByLabelText('Số điện thoại khách'), {
+      target: { value: '0912000111' },
+    });
+    fireEvent.change(screen.getByLabelText('Tên khách hàng'), { target: { value: 'Khách lẻ' } });
+    fireEvent.click(screen.getByRole('button', { name: /^Chốt đơn F10/ }));
+    await waitFor(() => expect(bodies).toHaveLength(1));
+    const sent = bodies[0]!.lines as Record<string, unknown>[];
+    expect(sent).toHaveLength(2);
+    expect(sent[0]).toMatchObject({ skuId: SKU.id, qty: '10' });
+    expect(sent[0]).not.toHaveProperty('isGift');
+    expect(sent[1]).toEqual({ skuId: SKU.id, uomId: expect.any(String), qty: '2', isGift: true });
+  }, 15_000);
+
   it('Nguồn · POS · Page là ba ô độc lập, không bắt buộc (2026-10-26); NV đóng hàng / NV chăm sóc / Marketer ẩn', async () => {
     server.use(...skuHandlers());
     renderApp(<OrderCreateScreen />);
@@ -1242,7 +1286,11 @@ describe('OrderCreateScreen — màn tạo đơn mới', () => {
     const box = await screen.findByRole('combobox', { name: 'Tìm sản phẩm' });
     fireEvent.change(box, { target: { value: 'amino' } });
     await waitFor(() => expect(urls).toHaveLength(1));
-    fireEvent.click(screen.getByRole('tab', { name: 'Combo' }));
+    fireEvent.click(
+      within(screen.getByRole('tablist', { name: 'Loại hàng' })).getByRole('tab', {
+        name: 'Combo',
+      }),
+    );
     await waitFor(() => expect(urls).toHaveLength(2));
     expect(urls.map((u) => u.searchParams.get('erpOnly'))).toEqual(['true', 'true']);
     expect(urls.map((u) => u.searchParams.get('isCombo'))).toEqual(['false', 'true']);

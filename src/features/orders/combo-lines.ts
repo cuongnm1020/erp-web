@@ -71,6 +71,8 @@ export interface CollapsedLine {
   qty: string;
   listPrice: string;
   unitPrice: string;
+  /** Sản phẩm khuyến mãi (2026-11-03). */
+  isGift: boolean;
 }
 
 export function collapseComboLines(lines: readonly SalesOrderLine[]): CollapsedLine[] {
@@ -84,6 +86,7 @@ export function collapseComboLines(lines: readonly SalesOrderLine[]): CollapsedL
         qty: l.qty,
         listPrice: l.listPrice,
         unitPrice: l.unitPrice,
+        isGift: l.isGift,
       });
       continue;
     }
@@ -95,6 +98,7 @@ export function collapseComboLines(lines: readonly SalesOrderLine[]): CollapsedL
       qty: l.combo.qty,
       listPrice: l.combo.listPrice,
       unitPrice: l.combo.unitPrice,
+      isGift: l.isGift,
     });
   }
   return out;

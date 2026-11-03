@@ -14,6 +14,7 @@ import { collapseComboLines } from '../combo-lines';
 import { EMPTY_LINE, emptyOrderValues, type CreateOrderValues } from '../schema';
 import { CART_GRID, CartLine, type LineMetrics } from './order-create/cart-line';
 import { Card } from './order-create/order-side-cards';
+import { addCartSku, GiftLines } from './order-create/gift-lines';
 import { ProductSearch } from './order-create/product-search';
 
 type LinesForm = UseFormReturn<CreateOrderValues>;
@@ -29,6 +30,7 @@ function initialLines(order: SalesOrderDetail): CreateOrderValues['lines'] {
     uomId: l.uomId,
     qty: new Decimal(l.qty).toString(),
     unitPrice: new Decimal(l.unitPrice).toString(),
+    ...(l.isGift ? { isGift: true } : {}),
   }));
 }
 
@@ -114,7 +116,8 @@ export function linesChange(
         l.skuId !== b.skuId ||
         (l.uomId !== '' && b.uomId !== '' && l.uomId !== b.uomId) ||
         !same(l.qty, b.qty) ||
-        !same(l.unitPrice ?? '', b.unitPrice ?? '')
+        (l.isGift === true) !== (b.isGift === true) ||
+        (!l.isGift && !same(l.unitPrice ?? '', b.unitPrice ?? ''))
       );
     });
   if (!changed) return { body: null, changed, invalid: null };
@@ -135,7 +138,8 @@ export function linesChange(
         skuId: l.skuId,
         ...(l.uomId ? { uomId: l.uomId } : {}),
         qty: l.qty,
-        ...(l.unitPrice ? { unitPrice: l.unitPrice } : {}),
+        // Sản phẩm khuyến mãi (2026-11-03): server đặt giá 0, không gửi đơn giá.
+        ...(l.isGift ? { isGift: true } : l.unitPrice ? { unitPrice: l.unitPrice } : {}),
       })),
     },
   };
@@ -183,19 +187,15 @@ export function OrderEditLines({
   const custom = customRows(order).filter((r) => !removedCustom.includes(r.key));
 
   const addSku = useCallback(
-    ({ skuId, baseUomId }: SkuQuickRow) => {
-      const cur = form.getValues('lines');
-      const idx = cur.findIndex((l) => l.skuId === skuId);
-      if (idx >= 0) {
-        const q = cur[idx]!.qty;
-        const next = /^\d/.test(q) ? new Decimal(q).plus(1).toString() : '1';
-        form.setValue(`lines.${idx}.qty`, next, { shouldDirty: true });
-      } else {
-        lines.append({ ...EMPTY_LINE, skuId, uomId: baseUomId });
-      }
-    },
-    [form, lines],
+    (row: SkuQuickRow) => addCartSku(form, lines.append, row, false),
+    [form, lines.append],
   );
+  const addGift = useCallback(
+    (row: SkuQuickRow) => addCartSku(form, lines.append, row, true),
+    [form, lines.append],
+  );
+  const saleFields = lines.fields.flatMap((f, index) => (f.isGift ? [] : [{ id: f.id, index }]));
+  const giftFields = lines.fields.flatMap((f, index) => (f.isGift ? [{ id: f.id, index }] : []));
 
   const subtotal = useMemo(() => {
     const ids = new Set(lines.fields.map((f) => f.id));
@@ -295,30 +295,41 @@ export function OrderEditLines({
                 ))}
               </div>
             ) : null}
-            {lines.fields.length === 0 ? (
-              custom.length > 0 ? null : (
+            {saleFields.length === 0 ? (
+              custom.length > 0 || giftFields.length > 0 ? null : (
                 <p className="px-3 py-4 text-center text-sm text-destructive">
                   Đơn phải có ít nhất một sản phẩm — tìm và thêm sản phẩm ở ô phía trên.
                 </p>
               )
             ) : (
               <div className={cn('divide-y', dirty && 'bg-warning-weak')}>
-                {lines.fields.map((f, i) => (
+                {saleFields.map((f, i) => (
                   <CartLine
                     key={f.id}
                     fieldId={f.id}
                     form={form}
-                    index={i}
+                    index={f.index}
+                    no={custom.length + i + 1}
                     customerId={order.customer.id}
                     channel={order.channel}
                     warehouseId={warehouseId}
                     onMetrics={onMetrics}
-                    onRemove={() => lines.remove(i)}
+                    onRemove={() => lines.remove(f.index)}
                     wholeUnitPrice={order.pancakeOrderId != null}
                   />
                 ))}
               </div>
             )}
+            <GiftLines
+              form={form}
+              fields={giftFields}
+              customerId={order.customer.id}
+              channel={order.channel}
+              warehouseId={warehouseId}
+              onMetrics={onMetrics}
+              onRemove={(i) => lines.remove(i)}
+              onPick={addGift}
+            />
             <div className="flex flex-wrap items-center justify-between gap-2 border-t px-3 py-2 text-sm text-muted-foreground">
               <span>{lines.fields.length + custom.length} dòng</span>
               <span>
