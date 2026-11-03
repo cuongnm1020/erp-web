@@ -155,7 +155,6 @@ export function OrderEditLines({
   onRemoveCustom,
   readOnly,
   onSubtotal,
-  onIndivisible,
 }: {
   form: LinesForm;
   order: SalesOrderDetail;
@@ -168,8 +167,6 @@ export function OrderEditLines({
   readOnly: React.ReactNode;
   /** Tạm tính giỏ đang sửa (null = còn dòng chưa có giá) — màn cha tính lại thẻ Giá trị đơn hàng. */
   onSubtotal?: (subtotal: string | null) => void;
-  /** Đơn Pancake: số dòng có thành tiền không chia hết cho SL (Pancake chỉ giữ đơn giá nguyên). */
-  onIndivisible?: (count: number) => void;
 }) {
   const lines = useFieldArray({ control: form.control, name: 'lines' });
   const searchRef = useRef<HTMLInputElement>(null);
@@ -177,9 +174,7 @@ export function OrderEditLines({
   const [metrics, setMetrics] = useState<Record<string, LineMetrics>>({});
   const onMetrics = useCallback((fieldId: string, m: LineMetrics) => {
     setMetrics((prev) =>
-      prev[fieldId]?.total === m.total &&
-      prev[fieldId]?.weightKg === m.weightKg &&
-      !!prev[fieldId]?.indivisible === !!m.indivisible
+      prev[fieldId]?.total === m.total && prev[fieldId]?.weightKg === m.weightKg
         ? prev
         : { ...prev, [fieldId]: m },
     );
@@ -211,13 +206,6 @@ export function OrderEditLines({
   useEffect(() => {
     onSubtotal?.(subtotal);
   }, [onSubtotal, subtotal]);
-  const indivisible = useMemo(() => {
-    const ids = new Set(lines.fields.map((f) => f.id));
-    return Object.entries(metrics).filter(([k, m]) => ids.has(k) && m.indivisible).length;
-  }, [metrics, lines.fields]);
-  useEffect(() => {
-    onIndivisible?.(indivisible);
-  }, [onIndivisible, indivisible]);
 
   if (lockedReason) {
     return (
