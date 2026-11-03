@@ -420,12 +420,15 @@ function buildColumns(
   const shortage: ColumnDef<SalesOrderListItem, unknown> = {
     id: 'stock',
     header: 'Hiện tại',
-    meta: { width: 170 },
+    // Tên sản phẩm thay mã (2026-11-03) — rộng hơn mã.
+    meta: { width: 260 },
     cell: ({ row }) => {
       const s = row.original.shortage;
       return s && s.items.length > 0 ? (
         <span title={s.items.map((i) => `${i.skuCode} ${i.skuName}`).join(', ')}>
-          <StatusBadge tone="err">Thiếu {s.items.map((i) => i.skuCode).join(', ')}</StatusBadge>
+          <StatusBadge tone="err">
+            Thiếu {s.items.map((i) => i.skuName || i.skuCode).join(', ')}
+          </StatusBadge>
         </span>
       ) : (
         <StatusBadge tone="ok">Đã đủ hàng</StatusBadge>

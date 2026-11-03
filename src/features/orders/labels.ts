@@ -247,6 +247,26 @@ export function manualDiscountNote(
   return `giảm tay ${pct}% = ${amount}`;
 }
 
+/**
+ * Tạm tính / giảm giá để HIỂN THỊ (2026-11-03, SOP2610-107393). Đơn Pancake lưu `subtotal` theo GIÁ
+ * NIÊM YẾT và `discount` = chiết khấu từng dòng (niêm yết − giá bán, kể cả hàng tặng 0 đ) + giảm cấp
+ * đơn → màn thấy "Tạm tính 1.596.000, Giảm giá −171.000" dù không ai giảm thêm. Hiện như đơn ERP:
+ * tạm tính = Σ thành tiền, giảm giá = chỉ phần cấp đơn. Tổng tiền không đổi.
+ */
+export function shownAmounts(
+  o: Pick<SalesOrderDetail, 'pancakeOrderId' | 'subtotal' | 'discount'> & {
+    lines: ReadonlyArray<Pick<SalesOrderDetail['lines'][number], 'discount' | 'lineTotal'>>;
+  },
+): { subtotal: string; discount: string } {
+  if (o.pancakeOrderId == null) return { subtotal: o.subtotal, discount: o.discount };
+  const lines = o.lines.reduce((s, l) => s.plus(l.lineTotal), new Decimal(0));
+  const lineDiscount = o.lines.reduce((s, l) => s.plus(l.discount), new Decimal(0));
+  return {
+    subtotal: lines.toFixed(4),
+    discount: Decimal.max(new Decimal(o.discount).minus(lineDiscount), 0).toFixed(4),
+  };
+}
+
 // ── Tab danh sách đơn (2026-10-12) — luồng chung, docs/carrier-status-mapping.md ở apps/api ──
 
 /**

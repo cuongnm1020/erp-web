@@ -64,6 +64,7 @@ import {
   orderStatusTone,
   type FulfilTarget,
   manualDiscountNote,
+  shownAmounts,
 } from '../labels';
 import { CarrierStatusCard } from './carrier-status-card';
 import { MarketplaceBadge, waybillErrorText } from './waybill-error';
@@ -1570,9 +1571,11 @@ export function previewAmounts(
 ): { subtotal: string; discount: string; roundingAmount: string; total: string } {
   const savedLines = order.lines.reduce((s, l) => s.plus(l.lineTotal), new Decimal(0));
   if (draftSubtotal === null || new Decimal(draftSubtotal).eq(savedLines)) {
+    // Đơn Pancake: tạm tính = Σ thành tiền, giảm giá chỉ phần cấp đơn — như đơn ERP (2026-11-03).
+    const shown = shownAmounts(order);
     return {
-      subtotal: order.subtotal,
-      discount: order.discount,
+      subtotal: shown.subtotal,
+      discount: shown.discount,
       roundingAmount: order.roundingAmount,
       total: order.total,
     };
