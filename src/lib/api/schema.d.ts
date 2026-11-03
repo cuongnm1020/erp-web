@@ -11801,11 +11801,12 @@ export interface components {
             carrierName: string | null;
             trackingNo: string | null;
             /**
-             * @description Link tra cứu vận đơn công khai của hãng (2026-11-03): GHTK / GHN / J&T mang sẵn mã; Viettel
-             *     Post / VNPost chỉ là trang tra cứu (web sao chép mã để dán); null = hãng không có / chưa có mã.
+             * @description Link xem chi tiết vận đơn trên app của hãng (2026-11-04): GHTK (Vận hành › Đơn hàng, cần đăng
+             *     nhập shop) / Viettel Post (Thông tin đơn hàng, cần đăng nhập) / GHN / J&T mang sẵn mã; VNPost chỉ
+             *     là trang chủ (web sao chép mã để dán); null = hãng không có / chưa có mã.
              */
             trackingUrl: string | null;
-            /** @description true = `trackingUrl` mở ra đúng đơn; false = phải dán mã vào trang tra cứu. */
+            /** @description true = `trackingUrl` mở ra đúng đơn (chưa đăng nhập thì hãng đòi đăng nhập); false = phải dán mã vào trang tra cứu. */
             trackingUrlPrefilled: boolean;
             /** @description Phí VC = cước + phụ phí + phí COD hãng tính (chi phí của shop) — Decimal(18,4) chuỗi; null = hãng chưa báo cước. */
             shipFee: string | null;
@@ -12299,7 +12300,7 @@ export interface components {
             carrierAccountName: string | null;
             /** @description Mã vận đơn hãng cấp — null = chưa cấp (chưa đóng gói, hoặc hãng lỗi đang chờ). */
             trackingNo: string | null;
-            /** @description Link tra cứu vận đơn công khai của hãng — xem `SalesOrderListShipmentDto.trackingUrl`. */
+            /** @description Link xem chi tiết vận đơn trên app của hãng — xem `SalesOrderListShipmentDto.trackingUrl`. */
             trackingUrl: string | null;
             trackingUrlPrefilled: boolean;
             /** @description ISO — lần in nhãn gần nhất; null = chưa in. */
