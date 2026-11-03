@@ -68,6 +68,8 @@ export interface OrderListParams {
   printStatus?: OrderPrintStatus;
   /** Hãng đã lấy hàng chưa — đơn đã gửi ĐVVC (2026-11-03, màn Theo dõi đơn). */
   pickupStatus?: OrderPickupStatus;
+  /** NV in đơn — người in tem lần gần nhất (2026-11-03, màn Theo dõi đơn). */
+  labelPrintedBy?: string;
   /** Đơn có sản phẩm (SKU) này — kể cả thành phần combo. */
   skuId?: string;
   /** true = chỉ đơn có đơn trùng trong ngày (cùng SĐT, cùng ngày VN, chưa hủy — CSKH-5). */
@@ -223,6 +225,7 @@ function listQuery(params: Omit<OrderListParams, 'take' | 'skip'>) {
     shortSkuId: params.shortSkuId || undefined,
     printStatus: params.printStatus,
     pickupStatus: params.pickupStatus,
+    labelPrintedBy: params.labelPrintedBy || undefined,
     skuId: params.skuId || undefined,
     duplicate: params.duplicate ? ('true' as const) : undefined,
     from: params.from || undefined,
@@ -339,6 +342,15 @@ export function useCarrierStatusOptions() {
   return useQuery({
     queryKey: [...orderKeys.all, 'carrier-status-options'] as const,
     queryFn: () => unwrap(api.GET('/sales-orders/carrier-status-options')),
+    staleTime: 60_000,
+  });
+}
+
+/** GET /sales-orders/label-printer-options — người đã in tem, ô lọc "NV in đơn" (2026-11-03). */
+export function useLabelPrinterOptions() {
+  return useQuery({
+    queryKey: [...orderKeys.all, 'label-printer-options'] as const,
+    queryFn: () => unwrap(api.GET('/sales-orders/label-printer-options')),
     staleTime: 60_000,
   });
 }
