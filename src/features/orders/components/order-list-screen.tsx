@@ -298,10 +298,13 @@ interface RowActionContext {
  */
 /** Tab còn trước khi kho thao tác — người lên đơn còn sửa / hủy được (2026-10-31). */
 const OPEN_FLOWS: readonly string[] = ['NEW', 'PENDING_APPROVAL', 'WAREHOUSE'];
+/** Sửa đơn còn được thêm ở Chờ hàng — kho chưa lấy hàng thật (2026-11-03; hủy vẫn khóa). */
+const EDIT_OPEN_FLOWS: readonly string[] = [...OPEN_FLOWS, 'WAITING_STOCK'];
 const STAGE_LOCKED = 'Kho đã xử lý đơn — không sửa / hủy được nữa';
 
 function orderRowItems(o: SalesOrderListItem, ctx: RowActionContext): RowActionItem[] {
   const stageOpen = OPEN_FLOWS.includes(o.flow);
+  const editOpen = EDIT_OPEN_FLOWS.includes(o.flow);
   return [
     ...(ctx.canCreate &&
     ((o.flow === 'NEW' && o.status === 'DRAFT') || o.status === 'PENDING_APPROVAL')
@@ -334,7 +337,7 @@ function orderRowItems(o: SalesOrderListItem, ctx: RowActionContext): RowActionI
             disabledReason:
               o.status === 'CANCELLED'
                 ? 'Đơn đã hủy'
-                : !stageOpen && !o.editPastStage && !ctx.canEditAny
+                : !editOpen && !o.editPastStage && !ctx.canEditAny
                   ? STAGE_LOCKED
                   : undefined,
           },
