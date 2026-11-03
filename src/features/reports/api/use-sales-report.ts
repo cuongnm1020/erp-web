@@ -102,6 +102,7 @@ export const salesReportKeys = {
     [...salesReportKeys.all, 'top-products', f, rankBy, limit, supplierId ?? null] as const,
   teams: () => [...salesReportKeys.all, 'options', 'teams'] as const,
   careTeams: () => [...salesReportKeys.all, 'options', 'care-teams'] as const,
+  depts: () => [...salesReportKeys.all, 'options', 'depts'] as const,
   owners: () => [...salesReportKeys.all, 'options', 'owners'] as const,
   shops: () => [...salesReportKeys.all, 'options', 'pancake-shops'] as const,
 };
@@ -443,6 +444,19 @@ export function useReportCareTeams(enabled: boolean) {
     enabled,
     queryKey: salesReportKeys.careTeams(),
     queryFn: () => unwrap(api.GET('/sales-orders/care-team-options')),
+    staleTime: 300_000,
+  });
+}
+
+/**
+ * GET /sales-orders/team-filter-options — mọi phòng ban ĐÃ CÓ đơn (CSKH + Sale/MKT: Sàn TMĐT, SPY…)
+ * cho ô "Phòng ban" của người xem doanh thu toàn công ty (2026-11-03). Không quyền → rỗng.
+ */
+export function useReportDepartments(enabled: boolean) {
+  return useQuery({
+    enabled,
+    queryKey: salesReportKeys.depts(),
+    queryFn: () => unwrap(api.GET('/sales-orders/team-filter-options')),
     staleTime: 300_000,
   });
 }
