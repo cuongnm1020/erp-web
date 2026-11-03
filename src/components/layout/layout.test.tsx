@@ -65,7 +65,7 @@ describe('visibleModules', () => {
     });
   });
 
-  it('Danh mục / In tem barcode / Đồng ý marketing (2026-10-22): sale có read Product + Customer không thấy; cấp riêng thì thấy', () => {
+  it('Danh mục (2026-10-22): sale có read Product + Customer không thấy; cấp riêng thì thấy. In tem barcode / Đồng ý marketing ẩn hẳn (2026-11-03)', () => {
     const base = ['read:Product', 'read:Customer', 'read:SalesOrder'];
     const labels = (extra: string[]) => {
       const ab = new Set([...base, ...extra]);
@@ -83,9 +83,9 @@ describe('visibleModules', () => {
       'barcode_print:Product',
       'consent_view:Customer',
     ]);
-    expect(granted).toEqual(
-      expect.arrayContaining(['Danh mục · thương hiệu', 'In tem barcode', 'Đồng ý marketing']),
-    );
+    expect(granted).toContain('Danh mục · thương hiệu');
+    expect(granted).not.toContain('In tem barcode');
+    expect(granted).not.toContain('Đồng ý marketing');
     expect(requiredAbilityFor('/crm/customers/consent')).toEqual({
       action: 'consent_view',
       subject: 'Customer',
@@ -103,8 +103,29 @@ describe('visibleModules', () => {
     expect(labels).toContain('Tài chính');
     const children = mods.flatMap((m) => m.children ?? []).map((c) => c.label);
     expect(children).not.toContain('Phân công');
-    // CRM-10: mục hiện với customer.merge (ở đây ability = true).
-    expect(children).toContain('Gộp khách trùng');
+    // Ẩn khỏi menu dù có quyền (user 2026-11-03) — URL vẫn gate theo quyền cũ.
+    for (const label of [
+      'Gộp khách trùng',
+      'Đồng ý marketing',
+      'Nhân viên Pancake',
+      'In tem barcode',
+      'Lô & hạn dùng',
+      'Phải thu (tuổi nợ)',
+      'Phải trả NCC',
+      'Công việc & SLA',
+    ]) {
+      expect(children).not.toContain(label);
+    }
+    expect(mods.find((m) => m.label === 'Tài chính')?.children?.map((c) => c.label)).toEqual([
+      'Hóa đơn',
+      'Hóa đơn điện tử',
+    ]);
+    // Công việc nằm dưới Báo cáo (2026-11-03).
+    expect(labels.indexOf('Công việc')).toBe(labels.indexOf('Báo cáo') + 1);
+    expect(requiredAbilityFor('/crm/pancake-staff')).toEqual({
+      action: 'staff_read',
+      subject: 'Sync',
+    });
     expect(requiredAbilityFor('/crm/customers/duplicates')).toEqual({
       action: 'merge',
       subject: 'Customer',
@@ -119,13 +140,12 @@ describe('visibleModules', () => {
     expect(requiredAbilityFor('/fin/invoices')).toEqual({ action: 'create', subject: 'Invoice' });
   });
 
-  it('Tài chính chỉ kế toán + Admin (invoice.create, 2026-10-26); trưởng nhóm KD có invoice.read + report.work vẫn thấy Công việc & SLA ở Báo cáo', () => {
+  it('Tài chính chỉ kế toán + Admin (invoice.create, 2026-10-26); Công việc & SLA ẩn khỏi Báo cáo (2026-11-03)', () => {
     const leaderPerms = new Set(['read:Invoice', 'read:Payment', 'work:Report', 'sales:Report']);
     const leader = visibleModules((a, s) => leaderPerms.has(`${a}:${s}`));
     expect(leader.map((m) => m.label)).not.toContain('Tài chính');
     expect(leader.find((m) => m.label === 'Báo cáo')?.children?.map((c) => c.label)).toEqual([
       'Doanh thu bán hàng',
-      'Công việc & SLA',
     ]);
     for (const path of ['/fin/invoices', '/fin/receivables', '/fin/payables']) {
       expect(requiredAbilityFor(path)).toEqual({ action: 'create', subject: 'Invoice' });
@@ -135,8 +155,6 @@ describe('visibleModules', () => {
     const accountant = visibleModules((a, s) => a === 'create' && s === 'Invoice');
     expect(accountant.find((m) => m.label === 'Tài chính')?.children?.map((c) => c.label)).toEqual([
       'Hóa đơn',
-      'Phải thu (tuổi nợ)',
-      'Phải trả NCC',
     ]);
   });
 

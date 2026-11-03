@@ -109,44 +109,6 @@ export const NAV_MODULES: NavModule[] = [
     shortcut: 'g o',
   },
   {
-    // Module Công việc (2026-10-22, docs/PLAN-ticket-sla.md §6): yêu cầu của khách, yêu cầu nội bộ,
-    // giao việc. Chưa có token màu mod-work trong design system → không gắn tone (dùng màu brand
-    // như Tổng quan) cho tới khi token được duyệt.
-    label: 'Công việc',
-    href: '/work',
-    icon: ListChecks,
-    ability: { action: 'read', subject: 'Work' },
-    shortcut: 'g v',
-    children: [
-      {
-        label: 'Việc của tôi',
-        href: '/work',
-        icon: ListTodo,
-        ability: { action: 'read', subject: 'Work' },
-      },
-      {
-        label: 'Việc của team',
-        href: '/work/team',
-        icon: UsersRound,
-        // Trưởng phòng / cấp trên (phụ trách phòng ban) — API tự lọc theo nhánh phụ trách.
-        ability: { action: 'view', subject: 'WorkTeam' },
-      },
-      {
-        label: 'Hàng chờ yêu cầu',
-        href: '/work/queue',
-        icon: Inbox,
-        ability: { action: 'read', subject: 'Work' },
-      },
-      {
-        label: 'Tạo việc',
-        href: '/work/new',
-        icon: Plus,
-        hidden: true,
-        ability: { action: 'create', subject: 'Work' },
-      },
-    ],
-  },
-  {
     label: 'Bán hàng',
     href: '/crm/orders',
     icon: ShoppingCart,
@@ -231,6 +193,7 @@ export const NAV_MODULES: NavModule[] = [
         label: 'Gộp khách trùng',
         href: '/crm/customers/duplicates',
         icon: GitMerge,
+        hidden: true, // ẩn khỏi menu (user 2026-11-03), URL vẫn gate theo quyền
         // CRM-10: chỉ quản trị (customer.merge) — người khác không thấy mục, URL bị chặn.
         ability: { action: 'merge', subject: 'Customer' },
       },
@@ -238,6 +201,7 @@ export const NAV_MODULES: NavModule[] = [
         label: 'Đồng ý marketing',
         href: '/crm/customers/consent',
         icon: MailCheck,
+        hidden: true, // ẩn khỏi menu (user 2026-11-03)
         // CRM-13: GET /consents cần customer.read — dữ liệu đã scope theo khách người xem phụ trách.
         // Menu (2026-10-22): chỉ Admin / vai trò được cấp riêng customer.consent_view.
         ability: { action: 'consent_view', subject: 'Customer' },
@@ -246,6 +210,7 @@ export const NAV_MODULES: NavModule[] = [
         label: 'Nhân viên Pancake',
         href: '/crm/pancake-staff',
         icon: UserCog,
+        hidden: true, // ẩn khỏi menu (user 2026-11-03)
         // 2026-10-20: trưởng nhóm kinh doanh (sync.staff_read) thấy người chốt đơn Pancake chưa có
         // tài khoản thật và gắn họ vào nhân sự phòng mình.
         ability: { action: 'staff_read', subject: 'Sync' },
@@ -289,12 +254,14 @@ export const NAV_MODULES: NavModule[] = [
         label: 'In tem barcode',
         href: '/catalog/barcode-print',
         icon: Barcode,
+        hidden: true, // ẩn khỏi menu (user 2026-11-03)
         ability: { action: 'barcode_print', subject: 'Product' },
       },
       {
         label: 'Lô & hạn dùng',
         href: '/catalog/lots',
         icon: CalendarClock,
+        hidden: true, // ẩn khỏi menu (user 2026-11-03)
         ability: { action: 'read', subject: 'Stock' },
       },
       {
@@ -508,18 +475,21 @@ export const NAV_MODULES: NavModule[] = [
         label: 'Phải thu (tuổi nợ)',
         href: '/fin/receivables',
         icon: TrendingUp,
+        hidden: true, // ẩn khỏi menu (user 2026-11-03)
         ability: { action: 'create', subject: 'Invoice' },
       },
       {
         label: 'Phải trả NCC',
         href: '/fin/payables',
         icon: TrendingDown,
+        hidden: true, // ẩn khỏi menu (user 2026-11-03)
         ability: { action: 'create', subject: 'Invoice' },
       },
       {
         label: 'Lợi nhuận',
         href: '/fin/profit',
         icon: Percent,
+        hidden: true, // ẩn khỏi Tài chính (user 2026-11-03) — vẫn ở nhóm Báo cáo
         ability: { action: 'profit', subject: 'Report' },
       },
       //{ label: 'Giá vốn & giá trị tồn', href: '/fin/valuation', icon: Coins },
@@ -552,8 +522,48 @@ export const NAV_MODULES: NavModule[] = [
         label: 'Công việc & SLA',
         href: '/reports/work',
         icon: ClipboardList,
+        // Ẩn khỏi menu (user 2026-11-03) — URL vẫn gate theo quyền.
+        hidden: true,
         // report.work: quản lý (trưởng phòng / quản lý kho) — số liệu chỉ nhánh mình phụ trách.
         ability: { action: 'work', subject: 'Report' },
+      },
+    ],
+  },
+  {
+    // Module Công việc (2026-10-22, docs/PLAN-ticket-sla.md §6): yêu cầu của khách, yêu cầu nội bộ,
+    // giao việc. Chưa có token màu mod-work trong design system → không gắn tone (dùng màu brand
+    // như Tổng quan) cho tới khi token được duyệt. Nằm dưới Báo cáo (user 2026-11-03).
+    label: 'Công việc',
+    href: '/work',
+    icon: ListChecks,
+    ability: { action: 'read', subject: 'Work' },
+    shortcut: 'g v',
+    children: [
+      {
+        label: 'Việc của tôi',
+        href: '/work',
+        icon: ListTodo,
+        ability: { action: 'read', subject: 'Work' },
+      },
+      {
+        label: 'Việc của team',
+        href: '/work/team',
+        icon: UsersRound,
+        // Trưởng phòng / cấp trên (phụ trách phòng ban) — API tự lọc theo nhánh phụ trách.
+        ability: { action: 'view', subject: 'WorkTeam' },
+      },
+      {
+        label: 'Hàng chờ yêu cầu',
+        href: '/work/queue',
+        icon: Inbox,
+        ability: { action: 'read', subject: 'Work' },
+      },
+      {
+        label: 'Tạo việc',
+        href: '/work/new',
+        icon: Plus,
+        hidden: true,
+        ability: { action: 'create', subject: 'Work' },
       },
     ],
   },
