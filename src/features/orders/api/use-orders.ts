@@ -253,6 +253,19 @@ export type PancakeShopOption = components['schemas']['PancakeShopOptionDto'];
  * GET /pancake-sync/shops — POS Pancake để lọc đơn (mã + tên, không khoá). Quyền xem đơn là đủ;
  * danh mục ít đổi nên giữ 5 phút.
  */
+/**
+ * GET /sales-orders/count — tổng mọi đơn người xem thấy (không bộ lọc, theo kho đang chọn): mẫu
+ * số "544 / 108.000" dưới tiêu đề màn Đơn hàng (2026-11-03). Nằm dưới phễu lists() để đơn mới /
+ * đổi kho làm mới cùng danh sách.
+ */
+export function useOrderGrandTotal() {
+  return useQuery({
+    queryKey: [...orderKeys.lists(), 'count'] as const,
+    queryFn: () => unwrap(api.GET('/sales-orders/count')),
+    staleTime: 60_000,
+  });
+}
+
 export function usePancakeShops() {
   return useQuery({
     queryKey: [...orderKeys.all, 'pancake-shops'] as const,

@@ -73,6 +73,7 @@ import {
   fetchOrdersPage,
   orderKeys,
   useOrderFlowCounts,
+  useOrderGrandTotal,
   useOrderListPrefs,
   useOrders,
   useRequestWaybill,
@@ -1366,6 +1367,7 @@ export function OrderListScreen() {
   // Đọc prefs lỗi thì vẫn tải (isPending = false).
   const query = useOrders(params, { enabled: state.sort != null || !prefs.isPending });
   const counts = useOrderFlowCounts(filterParams, countFlows);
+  const grandTotal = useOrderGrandTotal();
   // Xuất Excel = mọi trang của đúng bộ lọc + tab + sắp xếp đang xem.
   const exportParams = useMemo(
     () => ({
@@ -1435,15 +1437,23 @@ export function OrderListScreen() {
       <PageHeader
         title="Đơn hàng"
         description={
-          // Số đơn khớp bộ lọc to, đậm, màu chữ chính dưới dòng mô tả (user 2026-11-03).
+          // "544 / 108.000" = đơn khớp bộ lọc / tổng mọi đơn, to, đậm (user 2026-11-03).
           <span className="block">
-            <span>{query.data ? 'Đơn khớp bộ lọc' : 'Đang đếm số đơn khớp bộ lọc…'}</span>
+            <span>
+              {query.data ? 'Đơn khớp bộ lọc / tổng số đơn' : 'Đang đếm số đơn khớp bộ lọc…'}
+            </span>
             {query.data ? (
               <span
                 data-testid="order-count"
                 className="block text-2xl font-bold leading-tight text-foreground"
               >
                 {groupVi(String(query.data.total))}
+                {grandTotal.data ? (
+                  <span className="text-muted-foreground">
+                    {' / '}
+                    {groupVi(String(grandTotal.data.total))}
+                  </span>
+                ) : null}
               </span>
             ) : null}
           </span>
