@@ -792,7 +792,13 @@ function PrintStatusNote({ order }: { order: SalesOrderListItem }) {
 }
 
 /** Ô lọc "Sản phẩm" (2026-11-02): chọn một SKU — đơn có dòng SKU đó, kể cả thành phần combo. */
-function ProductFilter({ skuId, onChange }: { skuId: string; onChange: (v: string) => void }) {
+export function ProductFilter({
+  skuId,
+  onChange,
+}: {
+  skuId: string;
+  onChange: (v: string) => void;
+}) {
   const detail = useSkuDetail(skuId);
   return (
     <EntityPicker
@@ -1114,12 +1120,15 @@ const ANY = '__all__';
  * Ba key URL loại trừ nhau: `noCarrier`, `carrierAccountId` (hãng có tài khoản), `carrierId` (hãng
  * không tài khoản như giao thủ công — và link cũ lọc theo hãng).
  */
-function CarrierFilter({
+export function CarrierFilter({
   noCarrier,
   carrierId,
   carrierAccountId,
   onChange,
+  withNone = true,
 }: {
+  /** false = bỏ lựa chọn "Chưa gán hãng" (màn Đơn đã gán vận chuyển). */
+  withNone?: boolean;
   noCarrier: boolean;
   carrierId: string;
   carrierAccountId: string;
@@ -1145,7 +1154,7 @@ function CarrierFilter({
       value={value}
       specials={[
         { value: ANY, label: 'Hãng VC: tất cả' },
-        { value: NO_CARRIER, label: 'Chưa gán hãng' },
+        ...(withNone ? [{ value: NO_CARRIER, label: 'Chưa gán hãng' }] : []),
       ]}
       onChange={(v, option) => {
         if (v === NO_CARRIER) onChange({ ...clear, noCarrier: 'true' });

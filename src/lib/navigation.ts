@@ -342,6 +342,15 @@ export const NAV_MODULES: NavModule[] = [
         ability: { action: 'read', subject: 'Shipment' },
       },
       {
+        // Đơn đã gán vận chuyển (2026-11-03): đơn đã Gửi sang ĐVVC — lọc ngày gán / POS / phòng ban /
+        // sản phẩm / hãng, in lại tem hàng loạt.
+        label: 'Đơn đã gán vận chuyển',
+        href: '/wms/waybills',
+        icon: Truck,
+        section: 'Vận hành',
+        ability: { action: 'read', subject: 'Shipment' },
+      },
+      {
         // Chờ hàng (2026-10-25): SKU thiếu cho đơn chờ hàng / tổng đơn chờ. API cần sales_order.read
         // (sale chỉ thấy đơn mình); menu Kho hiện theo quyền xem tồn.
         label: 'Hàng chờ',

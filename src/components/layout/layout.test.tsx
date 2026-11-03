@@ -140,10 +140,11 @@ describe('visibleModules', () => {
     ]);
   });
 
-  it('chỉ có shipment.read → module Kho chỉ hiện Theo dõi giao hàng (bật lại 2026-10-05)', () => {
+  it('chỉ có shipment.read → module Kho chỉ hiện Theo dõi giao hàng + Đơn đã gán vận chuyển', () => {
     const mods = visibleModules((a, s) => a === 'read' && s === 'Shipment');
     expect(mods.find((m) => m.label === 'Kho')?.children?.map((c) => c.label)).toEqual([
       'Theo dõi giao hàng',
+      'Đơn đã gán vận chuyển',
     ]);
   });
 
