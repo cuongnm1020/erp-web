@@ -16,7 +16,7 @@ import {
 } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { BulkActionBar } from '@/components/data/bulk-action-bar';
 import { CopyButton } from '@/components/data/copy-button';
 import { CopyText } from '@/components/data/copy-text';
@@ -943,8 +943,13 @@ export function TotalValueFilter({
   const [op, setOp] = useState<TotalOp>(totalOpOf(min, max));
   const [a, setA] = useState(groupVnd((op === 'lte' ? max : min) ?? ''));
   const [b, setB] = useState(groupVnd(max ?? ''));
+  // Toán tử người dùng đang chọn — đọc trong effect mà không đưa vào deps.
+  const opRef = useRef(op);
+  opRef.current = op;
   useEffect(() => {
-    const o = totalOpOf(min, max);
+    // Đang chọn "Từ … đến" thì GIỮ hai ô (user 2026-11-03): mới nhập một cận (URL chỉ có min hoặc
+    // max) hay hai cận bằng nhau không được tự nhảy sang "≥" / "≤" / "=". Toán tử khác suy từ URL.
+    const o = opRef.current === 'between' ? 'between' : totalOpOf(min, max);
     setOp(o);
     setA(groupVnd((o === 'lte' ? max : min) ?? ''));
     setB(groupVnd(max ?? ''));

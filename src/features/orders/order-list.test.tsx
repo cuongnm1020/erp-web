@@ -11,7 +11,7 @@ import {
 } from '@/test/msw/handlers';
 import { server } from '@/test/msw/server';
 import { renderApp } from '@/test/render';
-import { OrderListScreen } from './components/order-list-screen';
+import { OrderListScreen, TotalValueFilter } from './components/order-list-screen';
 
 const replace = vi.fn();
 let search = '';
@@ -421,6 +421,28 @@ describe('OrderListScreen — cân nặng gửi hãng + gán hãng hàng loạt'
     renderApp(<OrderListScreen />);
     expect(await screen.findByLabelText('Giá trị đơn từ (₫)')).toHaveValue('100.000');
     expect(screen.getByLabelText('Giá trị đơn đến (₫)')).toHaveValue('900.000');
+  });
+
+  it('"Từ … đến" giữ hai ô khi mới nhập ô từ / hai cận bằng nhau — không nhảy sang ≥ / = (2026-11-03)', async () => {
+    const onChange = vi.fn();
+    const { rerender } = renderApp(
+      <TotalValueFilter min="100000" max="900000" onChange={onChange} />,
+    );
+    const op = () => screen.getByRole('combobox', { name: 'Toán tử giá trị đơn' });
+    expect(op()).toHaveTextContent('Từ … đến');
+    // Xoá ô đến, rời ô → URL chỉ còn totalMin.
+    const to = screen.getByLabelText('Giá trị đơn đến (₫)');
+    fireEvent.change(to, { target: { value: '' } });
+    fireEvent.blur(to);
+    expect(onChange).toHaveBeenLastCalledWith({ totalMin: '100000', totalMax: undefined });
+    rerender(<TotalValueFilter min="100000" max={undefined} onChange={onChange} />);
+    expect(op()).toHaveTextContent('Từ … đến');
+    expect(screen.getByLabelText('Giá trị đơn từ (₫)')).toHaveValue('100.000');
+    expect(screen.getByLabelText('Giá trị đơn đến (₫)')).toHaveValue('');
+    // Hai cận bằng nhau vẫn giữ "Từ … đến".
+    rerender(<TotalValueFilter min="500000" max="500000" onChange={onChange} />);
+    expect(op()).toHaveTextContent('Từ … đến');
+    expect(screen.getByLabelText('Giá trị đơn đến (₫)')).toHaveValue('500.000');
   });
 
   it('chọn 2 đơn → "Gán hãng / cân nặng" → POST /sales-orders/bulk-update đúng orderIds + cân nặng + hãng, bỏ chọn sau khi xong', async () => {
