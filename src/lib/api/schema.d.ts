@@ -11854,6 +11854,8 @@ export interface components {
             waybillErrorAt: string | null;
             /** @description ISO — lần in tem vận đơn gần nhất (tem hãng / tem ERP 100×75); null = chưa in (2026-11-02). */
             labelPrintedAt: string | null;
+            /** @description Chữ trạng thái hãng gửi gần nhất (nguyên văn, 2026-11-03); null = hãng chưa báo gì. */
+            carrierStatusText: string | null;
             /**
              * @description Lý do "Đóng gói + in vận đơn" lần gần nhất KHÔNG đóng gói được (lời lỗi nghiệp vụ của API,
              *     2026-11-02); null = không lỗi / đã đóng gói. Lỗi sau khi đóng gói là `waybillError`.
@@ -23872,6 +23874,12 @@ export interface operations {
                  */
                 printStatus?: "PRINTED" | "NOT_PRINTED" | "ERROR";
                 /**
+                 * @description Hãng đã lấy hàng chưa (2026-11-03, màn Theo dõi đơn), chỉ đơn ĐÃ gửi sang ĐVVC chưa hủy:
+                 *     `AWAITING` hãng chưa tới bắn mã lấy hàng (trạng thái kho tới Đã đóng gói); `PICKED_UP` hãng đã
+                 *     lấy (Đã lấy hàng → Thành công / Hoàn). Hãng hủy mã không thuộc nhóm nào.
+                 */
+                pickupStatus?: "AWAITING" | "PICKED_UP";
+                /**
                  * @description Nhóm đơn lỗi (2026-11-02; quyền `sales_order.issues` từ 2026-11-03 — thiếu thì 403 ORDER_ISSUES_FORBIDDEN), đơn
                  *     chưa hủy: `WAYBILL_ERROR` phiếu giao mới nhất lỗi vận đơn · `CARRIER_CANCELLED` hãng hủy mã,
                  *     chưa xin lại · `PACK_ERROR` "Đóng gói + in" lần trước không đóng gói được · `AWAITING_PICKUP`
@@ -24091,6 +24099,12 @@ export interface operations {
                  */
                 printStatus?: "PRINTED" | "NOT_PRINTED" | "ERROR";
                 /**
+                 * @description Hãng đã lấy hàng chưa (2026-11-03, màn Theo dõi đơn), chỉ đơn ĐÃ gửi sang ĐVVC chưa hủy:
+                 *     `AWAITING` hãng chưa tới bắn mã lấy hàng (trạng thái kho tới Đã đóng gói); `PICKED_UP` hãng đã
+                 *     lấy (Đã lấy hàng → Thành công / Hoàn). Hãng hủy mã không thuộc nhóm nào.
+                 */
+                pickupStatus?: "AWAITING" | "PICKED_UP";
+                /**
                  * @description Nhóm đơn lỗi (2026-11-02; quyền `sales_order.issues` từ 2026-11-03 — thiếu thì 403 ORDER_ISSUES_FORBIDDEN), đơn
                  *     chưa hủy: `WAYBILL_ERROR` phiếu giao mới nhất lỗi vận đơn · `CARRIER_CANCELLED` hãng hủy mã,
                  *     chưa xin lại · `PACK_ERROR` "Đóng gói + in" lần trước không đóng gói được · `AWAITING_PICKUP`
@@ -24237,6 +24251,12 @@ export interface operations {
                  *     `ERROR` có lỗi — "Đóng gói + in" không đóng gói được (`packError`) hoặc lỗi vận đơn.
                  */
                 printStatus?: "PRINTED" | "NOT_PRINTED" | "ERROR";
+                /**
+                 * @description Hãng đã lấy hàng chưa (2026-11-03, màn Theo dõi đơn), chỉ đơn ĐÃ gửi sang ĐVVC chưa hủy:
+                 *     `AWAITING` hãng chưa tới bắn mã lấy hàng (trạng thái kho tới Đã đóng gói); `PICKED_UP` hãng đã
+                 *     lấy (Đã lấy hàng → Thành công / Hoàn). Hãng hủy mã không thuộc nhóm nào.
+                 */
+                pickupStatus?: "AWAITING" | "PICKED_UP";
                 /**
                  * @description Nhóm đơn lỗi (2026-11-02; quyền `sales_order.issues` từ 2026-11-03 — thiếu thì 403 ORDER_ISSUES_FORBIDDEN), đơn
                  *     chưa hủy: `WAYBILL_ERROR` phiếu giao mới nhất lỗi vận đơn · `CARRIER_CANCELLED` hãng hủy mã,

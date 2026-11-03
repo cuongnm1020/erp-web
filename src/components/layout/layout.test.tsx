@@ -144,7 +144,7 @@ describe('visibleModules', () => {
     const mods = visibleModules((a, s) => a === 'read' && s === 'Shipment');
     expect(mods.find((m) => m.label === 'Kho')?.children?.map((c) => c.label)).toEqual([
       'Theo dõi giao hàng',
-      'Đơn đã gán vận chuyển',
+      'Theo dõi đơn',
     ]);
   });
 

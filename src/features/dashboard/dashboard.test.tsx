@@ -176,6 +176,7 @@ const ORDERS: SalesOrderList = {
       waybillErrorCode: null,
       waybillErrorAt: null,
       labelPrintedAt: null,
+      carrierStatusText: null,
       packError: null,
       packErrorCode: null,
       packErrorAt: null,

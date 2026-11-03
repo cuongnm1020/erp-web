@@ -343,8 +343,8 @@ export const NAV_MODULES: NavModule[] = [
       },
       {
         // Đơn đã gán vận chuyển (2026-11-03): đơn đã Gửi sang ĐVVC — lọc ngày gán / POS / phòng ban /
-        // sản phẩm / hãng, in lại tem hàng loạt.
-        label: 'Đơn đã gán vận chuyển',
+        // sản phẩm / hãng, in lại tem hàng loạt. Đổi tên "Theo dõi đơn" (user 2026-11-03).
+        label: 'Theo dõi đơn',
         href: '/wms/waybills',
         icon: Truck,
         section: 'Vận hành',
