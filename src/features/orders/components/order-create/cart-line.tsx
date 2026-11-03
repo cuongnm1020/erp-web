@@ -33,6 +33,26 @@ import type { CreateOrderValues } from '../../schema';
 
 const QTY_RE = /^\d{1,12}(\.\d{1,6})?$/;
 
+/**
+ * Đơn giá dưới tỉ lệ này của giá niêm yết (cùng đơn vị) → nhiều khả năng chọn nhầm đơn vị tính
+ * (sự cố SO2610-00255 2026-11-03: 40 THÙNG × 95.000 ₫ — giá một chai — nên giữ 1.600 chai, 720 kg).
+ * Chỉ cảnh báo, không chặn; giá 0 (tặng) bỏ qua.
+ */
+const SUSPECT_PRICE_RATIO = new Decimal('0.1');
+
+/** Cảnh báo đơn giá thấp bất thường so với niêm yết; null = không có gì đáng ngờ. */
+export function suspiciousPriceRatio(
+  unitPrice: string | null,
+  listPrice: string | null,
+): Decimal | null {
+  if (!unitPrice || !listPrice) return null;
+  const unit = new Decimal(unitPrice);
+  const list = new Decimal(listPrice);
+  if (unit.lte(0) || list.lte(0)) return null;
+  const ratio = unit.div(list);
+  return ratio.lessThan(SUSPECT_PRICE_RATIO) ? ratio : null;
+}
+
 export interface LineMetrics {
   /** Thành tiền xem trước, Decimal(18,4) chuỗi; null = chưa có giá. */
   total: string | null;
@@ -124,6 +144,12 @@ export function CartLine({
       ? new Decimal(unitPrice).mul(qty).toDecimalPlaces(4).toFixed(4)
       : null;
   const weightKg = qtyBase && sku.data?.weightKg ? qtyBase.mul(sku.data.weightKg).toFixed(4) : null;
+  const uomCode = sku.data
+    ? uomId === sku.data.baseUomId
+      ? sku.data.baseUom.code
+      : (sku.data.uomConversions.find((c) => c.uomId === uomId)?.uom.code ?? null)
+    : null;
+  const priceRatio = suspiciousPriceRatio(unitPrice, listPrice);
   const amountFix =
     wholeUnitPrice && !combo && lineTotal !== null && qtyBase
       ? pancakeAmountFix(lineTotal, qtyBase)
@@ -296,7 +322,13 @@ export function CartLine({
               />
             </FormControl>
             <FormLabel className="sr-only">Đơn giá</FormLabel>
-            {manualPrice !== '' && listPrice !== null ? (
+            {priceRatio && listPrice !== null ? (
+              <p role="alert" className="text-right text-xs font-semibold text-warning">
+                Chỉ bằng {priceRatio.mul(100).toDecimalPlaces(1).toString()}% giá niêm yết{' '}
+                {formatMoney(listPrice, { unit: '' })}
+                {uomCode ? `/${uomCode}` : ''} — kiểm tra lại đơn vị tính
+              </p>
+            ) : manualPrice !== '' && listPrice !== null ? (
               <p className="text-right text-xs text-muted-foreground">
                 Niêm yết {formatMoney(listPrice, { unit: '' })}
               </p>
