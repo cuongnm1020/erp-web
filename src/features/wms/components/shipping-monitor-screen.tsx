@@ -367,10 +367,12 @@ export function ShippingMonitorScreen() {
   const [selected, setSelected] = useState<ShipmentMonitorRow | null>(null);
 
   const carrierAccountId = state.filters.carrierAccountId;
-  const careTeamId = state.filters.careTeamId;
-  // Phòng ban CSKH (2026-10-29): danh sách theo người xem từ API — rỗng thì ẩn ô.
+  // Phòng ban CSKH: chỉ Admin + kế toán (`report.sales_all`, user 2026-11-03) — người khác ẩn ô
+  // và bỏ giá trị trên URL để không lọc ngầm.
   const ability = useAbility();
-  const careTeams = useShippingCareTeams(ability.can('read', 'SalesOrder'));
+  const canFilterDept = ability.can('sales_all', 'Report');
+  const careTeamId = canFilterDept ? state.filters.careTeamId : undefined;
+  const careTeams = useShippingCareTeams(canFilterDept && ability.can('read', 'SalesOrder'));
   const careTeamOptions = careTeams.data ?? [];
   const filter = useMemo(
     () => ({ date, carrierId, carrierAccountId, careTeamId, holdDays }),

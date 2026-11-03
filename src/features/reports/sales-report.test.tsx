@@ -277,36 +277,26 @@ describe('SalesReportScreen — quyền + bộ lọc chung', () => {
     expect(lastUrl().get('channel')).toBe('MARKETPLACE');
   });
 
-  it('leader CSKH: ô Phòng ban (danh sách API theo người xem) → teamId vào query; danh sách rỗng → ẩn ô (2026-10-29)', async () => {
-    search = `from=${RANGE.from}&to=${RANGE.to}&teamId=t-cskh-a`;
-    const calls: URLSearchParams[] = [];
+  it('leader CSKH không có ô Phòng ban — chỉ Admin + kế toán (user 2026-11-03)', async () => {
+    search = `from=${RANGE.from}&to=${RANGE.to}`;
+    let asked = 0;
     server.use(
-      http.get('/api/sales-orders/care-team-options', () =>
-        HttpResponse.json([
-          { teamId: 't-cskh-a', name: 'CSKH A', isActive: true },
-          { teamId: 't-cskh-b', name: 'CSKH B', isActive: true },
-        ]),
-      ),
-      http.get('/api/reports/sales/summary', ({ request }) => {
-        calls.push(new URL(request.url).searchParams);
-        return HttpResponse.json(SUMMARY);
+      http.get('/api/sales-orders/care-team-options', () => {
+        asked += 1;
+        return HttpResponse.json([{ teamId: 't-cskh-a', name: 'CSKH A', isActive: true }]);
       }),
+      http.get('/api/sales-orders/team-filter-options', () => {
+        asked += 1;
+        return HttpResponse.json([]);
+      }),
+      http.get('/api/reports/sales/summary', () => HttpResponse.json(SUMMARY)),
       http.get('/api/reports/sales/timeseries', () => HttpResponse.json(SERIES)),
     );
     const me = { ...ME_LEADER, permissions: [...ME_LEADER.permissions, 'sales_order.read'] };
-    const { unmount } = renderApp(<SalesReportScreen />, { me });
-    const box = await screen.findByRole('combobox', { name: 'Phòng ban' });
-    expect(box).toHaveTextContent('CSKH A');
-    expect(calls[0]!.get('teamId')).toBe('t-cskh-a');
-    // Phòng CSKH đang chọn không hiện thành chip "Team: đã chọn".
-    expect(screen.queryByRole('button', { name: /Bỏ lọc Team/ })).not.toBeInTheDocument();
-    unmount();
-
-    server.use(http.get('/api/sales-orders/care-team-options', () => HttpResponse.json([])));
-    search = `from=${RANGE.from}&to=${RANGE.to}`;
     renderApp(<SalesReportScreen />, { me });
     await screen.findByText('Doanh thu theo thời gian');
     expect(screen.queryByRole('combobox', { name: 'Phòng ban' })).not.toBeInTheDocument();
+    expect(asked).toBe(0);
   });
 
   it('xem toàn công ty: ô Phòng ban gồm mọi phòng đã có đơn (CSKH + Sale/MKT) → teamId vào query (2026-11-03)', async () => {

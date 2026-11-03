@@ -1163,16 +1163,19 @@ export function OrderListScreen() {
     : undefined;
   const duplicate = state.filters.duplicate === 'true';
   const itemOrigin = parseItemOrigin(state.filters.itemOrigin);
-  // Ô Phòng ban + NV lên đơn chỉ với người có `sales_order.filter_team` (2026-11-02) — không có
-  // quyền thì bỏ luôn giá trị trên URL (link dán từ đồng nghiệp) để không lọc ngầm.
-  const canFilterTeam = useAbility().can('filter_team', 'SalesOrder');
-  const team = canFilterTeam ? (state.filters.team ?? '') : '';
+  // Ô NV lên đơn chỉ với người có `sales_order.filter_team` (2026-11-02); ô Phòng ban chỉ Admin + kế
+  // toán (`report.sales_all`, user 2026-11-03). Không có quyền thì bỏ luôn giá trị trên URL (link
+  // dán từ đồng nghiệp) để không lọc ngầm.
+  const ability = useAbility();
+  const canFilterTeam = ability.can('filter_team', 'SalesOrder');
+  const canFilterDept = ability.can('sales_all', 'Report');
+  const team = canFilterDept ? (state.filters.team ?? '') : '';
   const creatorId = canFilterTeam ? (state.filters.creatorId ?? '') : '';
   const fbPage = state.filters.fbPage ?? '';
   const carrierStatus = state.filters.carrierStatus ?? '';
   const carrierStatusText = useMemo(() => decodeList(carrierStatus), [carrierStatus]);
   const carrierStatuses = useCarrierStatusOptions();
-  const teamOptions = useTeamFilterOptions(canFilterTeam);
+  const teamOptions = useTeamFilterOptions(canFilterDept);
   const facebookPages = useFacebookPageOptions();
   // Cột ẩn + sắp xếp lưu theo người dùng ở server (đăng xuất / đổi máy vẫn giữ). Sắp xếp trên URL
   // (link dán cho đồng nghiệp) thắng; URL không có thì lấy lần sắp gần nhất của người dùng.
@@ -1279,7 +1282,6 @@ export function OrderListScreen() {
     return null;
   }, [noCarrier, carrierAccountId, carrierId, carriers.data]);
   const router = useRouter();
-  const ability = useAbility();
   const canUpdate = ability.can('update', 'SalesOrder');
   const canCreate = ability.can('create', 'SalesOrder');
   const canPack = ability.can('pack', 'Shipment');
@@ -1580,9 +1582,9 @@ export function OrderListScreen() {
               unit: 'trạng thái',
               options: carrierStatusOptions(carrierStatuses.data ?? []),
             },
-            // Phòng ban + NV lên đơn: chỉ người có `sales_order.filter_team` (2026-11-02). Phòng ban
-            // chọn nhiều — phòng CSKH + phòng Sale/MKT đã có đơn; chưa chọn = tất cả.
-            ...(canFilterTeam
+            // Phòng ban: chỉ Admin + kế toán (2026-11-03), chọn nhiều — phòng CSKH + phòng Sale/MKT
+            // đã có đơn; chưa chọn = tất cả.
+            ...(canFilterDept
               ? [
                   {
                     key: 'team' as const,
@@ -1596,6 +1598,11 @@ export function OrderListScreen() {
                       hint: t.group === 'CSKH' ? 'CSKH' : 'Sale/MKT',
                     })),
                   },
+                ]
+              : []),
+            // NV lên đơn: chỉ người có `sales_order.filter_team` (2026-11-02).
+            ...(canFilterTeam
+              ? [
                   {
                     // Danh sách theo người xem (2026-10-30): leader CSKH → nhân viên team, trưởng
                     // nhóm → nhóm mình, nhân viên CSKH → mình; người khác mọi nhân viên.
@@ -1694,6 +1701,7 @@ export function OrderListScreen() {
             )
           }
           pinned={['carrierId', 'creatorId', 'skuId']}
+          secondRow={['totalMin', 'weightMin']}
           searchPlaceholder="Mã đơn, mã Pancake, SĐT, tên khách, tên sản phẩm, mã vận đơn"
           right={
             <>

@@ -1099,6 +1099,24 @@ describe('OrderListScreen — lọc theo hãng + thời gian (2026-09-19)', () =
     expect(seen.at(-1)!.get('creatorId')).toBeNull();
   });
 
+  it('leader có filter_team nhưng không report.sales_all → có NV lên đơn, KHÔNG có Phòng ban (2026-11-03)', async () => {
+    search = 'team=t-cskh-a';
+    const seen: URLSearchParams[] = [];
+    server.use(
+      http.get('/api/sales-orders', ({ request }) => {
+        seen.push(new URL(request.url).searchParams);
+        return HttpResponse.json({ items: [FIRST], total: 1 });
+      }),
+    );
+    renderApp(<OrderListScreen />, {
+      me: { ...ME_SALE, permissions: ['sales_order.read', 'sales_order.filter_team'] },
+    });
+    await screen.findByText(FIRST.docNumber);
+    const panel = await openMoreFilters();
+    expect(panel.queryByRole('combobox', { name: 'Phòng ban' })).not.toBeInTheDocument();
+    expect(seen.at(-1)!.get('teamIds')).toBeNull();
+  });
+
   it('ô Page chọn nhiều có ô tìm → URL fbPage + API facebookPageIds; tên page hiện dưới tên sale (2026-10-26)', async () => {
     search = '';
     const seen: string[] = [];

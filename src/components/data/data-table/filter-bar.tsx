@@ -95,6 +95,7 @@ export function FilterBar<F extends string = string>({
   after,
   right,
   pinned,
+  secondRow,
 }: {
   q: string;
   onQChange: (q: string) => void;
@@ -111,6 +112,11 @@ export function FilterBar<F extends string = string>({
    * Bỏ trống = bày mọi ô như cũ.
    */
   pinned?: F[];
+  /**
+   * Chỉ dùng cùng `pinned` (2026-11-03): các ô này luôn hiện ở hàng thứ hai của thanh (mọi bề
+   * rộng), không vào panel — ô nhập khoảng giá trị / cân nặng cần thấy ngay.
+   */
+  secondRow?: F[];
 }) {
   const active =
     Object.entries(values).filter(
@@ -255,6 +261,7 @@ export function FilterBar<F extends string = string>({
         <PinnedFilters
           filters={filters ?? []}
           pinned={pinned}
+          secondRow={secondRow ?? []}
           values={values}
           renderFilter={renderFilter}
           onClear={clearAll}
@@ -269,6 +276,11 @@ export function FilterBar<F extends string = string>({
         </Button>
       ) : null}
       {right ? <div className="ml-auto flex items-center gap-2">{right}</div> : null}
+      {pinned && secondRow?.length ? (
+        <div className="flex w-full flex-wrap items-center gap-2">
+          {(filters ?? []).filter((f) => secondRow.includes(f.key)).map(renderFilter)}
+        </div>
+      ) : null}
       {pinned ? (
         <ActiveFilterChips
           filters={filters ?? []}
@@ -283,18 +295,22 @@ export function FilterBar<F extends string = string>({
 
 /** Ô ghim trên thanh (từ `lg`) + nút "Bộ lọc khác (n)" mở panel chứa phần còn lại. */
 function PinnedFilters<F extends string>({
-  filters,
+  filters: all,
   pinned,
+  secondRow,
   values,
   renderFilter,
   onClear,
 }: {
   filters: FilterDef<F>[];
   pinned: F[];
+  secondRow: F[];
   values: Partial<Record<F, string>>;
   renderFilter: (f: FilterDef<F>) => ReactNode;
   onClear: () => void;
 }) {
+  // Ô hàng hai do FilterBar vẽ riêng — không lên hàng một, không vào panel.
+  const filters = all.filter((f) => !secondRow.includes(f.key));
   const onBar = (f: FilterDef<F>) => f.type === 'dateRange' || pinned.includes(f.key);
   const dates = filters.filter((f) => f.type === 'dateRange');
   const pins = filters.filter((f) => f.type !== 'dateRange' && pinned.includes(f.key));

@@ -101,7 +101,6 @@ export const salesReportKeys = {
   top: (f: SalesFilter, rankBy: TopRankBy, limit: number, supplierId?: string) =>
     [...salesReportKeys.all, 'top-products', f, rankBy, limit, supplierId ?? null] as const,
   teams: () => [...salesReportKeys.all, 'options', 'teams'] as const,
-  careTeams: () => [...salesReportKeys.all, 'options', 'care-teams'] as const,
   depts: () => [...salesReportKeys.all, 'options', 'depts'] as const,
   owners: () => [...salesReportKeys.all, 'options', 'owners'] as const,
   shops: () => [...salesReportKeys.all, 'options', 'pancake-shops'] as const,
@@ -431,19 +430,6 @@ export function useReportTeams(enabled: boolean) {
     enabled,
     queryKey: salesReportKeys.teams(),
     queryFn: () => unwrap(api.GET('/teams')),
-    staleTime: 300_000,
-  });
-}
-
-/**
- * GET /sales-orders/care-team-options — ô "Phòng ban CSKH" (2026-10-29). API trả theo người xem:
- * toàn quyền → mọi phòng CSKH, leader CSKH → phòng mình làm leader, người khác → rỗng (ẩn ô).
- */
-export function useReportCareTeams(enabled: boolean) {
-  return useQuery({
-    enabled,
-    queryKey: salesReportKeys.careTeams(),
-    queryFn: () => unwrap(api.GET('/sales-orders/care-team-options')),
     staleTime: 300_000,
   });
 }
