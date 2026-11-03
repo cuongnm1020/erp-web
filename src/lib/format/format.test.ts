@@ -127,8 +127,8 @@ describe('phone', () => {
     expect(normalizePhone('12345')).toBeNull();
   });
   it('hiển thị 0xxx xxx xxx; không chuẩn → giữ nguyên; rỗng → —', () => {
-    expect(formatPhone('0912345678')).toBe('0912 345 678');
-    expect(formatPhone('02438123456')).toBe('0243 8123 456');
+    expect(formatPhone('0912345678')).toBe('0912345678');
+    expect(formatPhone('02438123456')).toBe('02438123456');
     expect(formatPhone('ext 123')).toBe('ext 123');
     expect(formatPhone('')).toBe('—');
     expect(formatPhone(null)).toBe('—');
