@@ -1,7 +1,7 @@
 'use client';
 
 import Decimal from 'decimal.js';
-import { Check, ChevronDown, ChevronUp, MapPin, MoreHorizontal, Plus, X } from 'lucide-react';
+import { Check, MapPin, MoreHorizontal, Plus, X } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useWatch, type UseFormReturn } from 'react-hook-form';
 import {
@@ -264,81 +264,26 @@ export function TagPicker({ form }: { form: Form }) {
 }
 
 /**
- * Giờ tạo đơn (ghi lùi) + NV phụ (đang ẩn). NV xử lý và Thẻ đã lên dải "Thông tin đơn" đầu màn
- * (redesign 2026-10-22) — card này đóng sẵn vì hiếm dùng.
+ * NV phụ (NV đóng hàng / NV chăm sóc / Marketer) — tạm ẩn (user yêu cầu 2026-10-21), bật lại bằng
+ * cờ. Ngày tạo đơn đã lên dải "Thông tin đơn" đầu màn (2026-11-03).
  */
 export function InfoCard({ form }: { form: Form }) {
-  const orderDate = useWatch({ control: form.control, name: 'orderDate' });
-  const [open, setOpen] = useState(Boolean(orderDate));
+  if (!SHOW_EXTRA_STAFF) return null;
   return (
-    <Card
-      title={
-        <button
-          type="button"
-          aria-expanded={open}
-          onClick={() => setOpen((o) => !o)}
-          className="inline-flex items-center gap-1.5"
-        >
-          Giờ tạo đơn
-          {open ? (
-            <ChevronUp className="h-4 w-4" aria-hidden />
-          ) : (
-            <ChevronDown className="h-4 w-4" aria-hidden />
-          )}
-        </button>
-      }
-    >
-      {open ? (
-        <>
-          <FormField
-            control={form.control}
-            name="orderDate"
-            render={({ field }) => (
-              <FormItem>
-                <Row label="Tạo lúc" htmlFor="order-created-at">
-                  <FormControl>
-                    <Input
-                      id="order-created-at"
-                      type="datetime-local"
-                      className="tabular-nums"
-                      {...field}
-                    />
-                  </FormControl>
-                </Row>
-                <p className="text-right text-xs text-muted-foreground">
-                  {field.value
-                    ? 'Ghi lùi giờ tạo đơn — kỳ kế toán phải đang mở'
-                    : 'Để trống = lúc chốt đơn'}
-                </p>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-          {/* Tạm ẩn NV đóng hàng / NV chăm sóc / Marketer (user yêu cầu 2026-10-21) — bật lại bằng cờ. */}
-          {SHOW_EXTRA_STAFF ? (
-            <>
-              <StaffField
-                form={form}
-                name="packerId"
-                label="NV đóng hàng"
-                placeholder="Chọn NV đóng hàng"
-              />
-              <StaffField
-                form={form}
-                name="careStaffId"
-                label="NV chăm sóc"
-                placeholder="Chọn NV chăm sóc"
-              />
-              <StaffField
-                form={form}
-                name="marketerId"
-                label="Marketer"
-                placeholder="Chọn Marketer"
-              />
-            </>
-          ) : null}
-        </>
-      ) : null}
+    <Card title="Nhân viên phụ">
+      <StaffField
+        form={form}
+        name="packerId"
+        label="NV đóng hàng"
+        placeholder="Chọn NV đóng hàng"
+      />
+      <StaffField
+        form={form}
+        name="careStaffId"
+        label="NV chăm sóc"
+        placeholder="Chọn NV chăm sóc"
+      />
+      <StaffField form={form} name="marketerId" label="Marketer" placeholder="Chọn Marketer" />
     </Card>
   );
 }
