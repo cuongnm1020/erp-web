@@ -78,7 +78,8 @@ const LIST_DEFAULTS = { filterKeys: FILTER_KEYS, sort: DEFAULT_SORT };
 export function WaybillOrdersScreen() {
   const { state, set, skipTake } = useListState<FilterKey>(LIST_DEFAULTS);
   const ability = useAbility();
-  const canFilterTeam = ability.can('filter_team', 'SalesOrder');
+  // Ô Phòng ban chỉ Admin + kế toán (`report.sales_all`, user 2026-11-03).
+  const canFilterTeam = ability.can('sales_all', 'Report');
   const canReprint = ability.can('pack', 'Shipment');
   const shops = usePancakeShops();
   const teamOptions = useTeamFilterOptions(canFilterTeam);

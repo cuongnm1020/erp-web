@@ -25,7 +25,7 @@ export const HOLD_DAYS = 5;
 
 const DENSE_HEAD = 'h-8 px-3.5 text-xs';
 const DENSE_CELL = 'whitespace-nowrap px-3.5 py-1.5';
-const PENDING_HREF = '/crm/orders?status=PENDING_APPROVAL';
+const PENDING_HREF = '/crm/orders?group=all&status=PENDING_APPROVAL';
 const count = (n: number) => formatMoney(String(n), { unit: '' });
 
 /**

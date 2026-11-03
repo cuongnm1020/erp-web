@@ -371,7 +371,7 @@ describe('DashboardScreen — số thật theo quyền (RPT-08)', () => {
     );
     expect(within(pending).getByRole('link', { name: 'Xem tất cả' })).toHaveAttribute(
       'href',
-      '/crm/orders?status=PENDING_APPROVAL',
+      '/crm/orders?group=all&status=PENDING_APPROVAL',
     );
     expect(within(pending).getByText('3 đơn')).toBeInTheDocument();
     expect(screen.queryByRole('region', { name: 'Doanh số' })).not.toBeInTheDocument();
@@ -482,7 +482,7 @@ describe('DashboardScreen — số thật theo quyền (RPT-08)', () => {
     const today = await screen.findByRole('region', { name: 'Đơn hôm nay' });
     expect(await within(today).findByRole('link', { name: '1.240' })).toHaveAttribute(
       'href',
-      `/crm/orders?from=${TODAY}&to=${TODAY}`,
+      `/crm/orders?group=all&from=${TODAY}&to=${TODAY}`,
     );
     expect(
       await within(today).findByText(/so với hôm qua cùng giờ \(1\.000\)/),

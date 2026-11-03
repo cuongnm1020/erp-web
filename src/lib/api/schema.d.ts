@@ -3671,9 +3671,9 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * Ô lọc "Phòng ban" của danh sách đơn (2026-11-02): phòng CSKH + phòng Sale/MKT đã có đơn, chỉ
-         *     với người có `sales_order.filter_team` hoặc `report.sales_all` (ô Phòng ban của báo cáo doanh
-         *     thu, 2026-11-03); người khác rỗng → màn ẩn ô — khai TRƯỚC `:id`.
+         * Ô lọc "Phòng ban" (danh sách đơn, Theo dõi đơn, báo cáo doanh thu): phòng CSKH + phòng Sale/MKT
+         *     đã có đơn (trừ Kho, Vận đơn, R&D). Chỉ Admin và kế toán (`report.sales_all`, 2026-11-03);
+         *     người khác rỗng → màn ẩn ô — khai TRƯỚC `:id`.
          */
         get: operations["SalesOrderController_teamFilterOptions"];
         put?: never;
@@ -3833,8 +3833,8 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * Số đơn từng tab của danh sách (cùng bộ lọc với GET /sales-orders, bỏ qua `flow`, `take`,
-         *     `skip`) — khai TRƯỚC `:id`.
+         * Số đơn từng tab của danh sách (cùng bộ lọc với GET /sales-orders, bỏ qua `flow`, `flows`,
+         *     `take`, `skip`; `countFlows` = chỉ đếm các tab đó) — khai TRƯỚC `:id`.
          */
         get: operations["SalesOrderController_flowCounts"];
         put?: never;
@@ -12009,25 +12009,24 @@ export interface components {
             orders: components["schemas"]["SameDayOrderDto"][];
         };
         SalesOrderFlowCountsDto: {
-            /** @description Tất cả (khớp tab "Tất cả"). */
-            total: number;
+            total?: number;
             /** @description Đơn mới (2026-10-31) — đơn nháp chờ người tạo "Xác nhận" / đơn Pancake 0 "Mới". */
-            NEW: number;
-            PENDING_APPROVAL: number;
-            WAREHOUSE: number;
+            NEW?: number;
+            PENDING_APPROVAL?: number;
+            WAREHOUSE?: number;
             /** @description Chờ hàng (2026-10-25) — không tính vào WAREHOUSE / PICKING. */
-            WAITING_STOCK: number;
-            PICKING: number;
-            PACKED: number;
+            WAITING_STOCK?: number;
+            PICKING?: number;
+            PACKED?: number;
             /** @description Cần sửa (2026-11-02) — lỗi vận đơn + đơn chưa đóng gói có SP ngoài hệ thống. */
-            NEEDS_FIX: number;
-            PICKED_UP: number;
-            IN_TRANSIT: number;
-            OUT_FOR_DELIVERY: number;
-            DELIVERED: number;
-            RETURNED: number;
-            CARRIER_CANCELLED: number;
-            CANCELLED: number;
+            NEEDS_FIX?: number;
+            PICKED_UP?: number;
+            IN_TRANSIT?: number;
+            OUT_FOR_DELIVERY?: number;
+            DELIVERED?: number;
+            RETURNED?: number;
+            CARRIER_CANCELLED?: number;
+            CANCELLED?: number;
         };
         OrderIssueCodeCountDto: {
             /** @description PICKUP_WAREHOUSE_NOT_READY, CARRIER_REJECTED, CARRIER_WAYBILL_DATA… */
@@ -23895,6 +23894,11 @@ export interface operations {
                  */
                 flow?: "NEW" | "PENDING_APPROVAL" | "WAREHOUSE" | "WAITING_STOCK" | "PICKING" | "PACKED" | "NEEDS_FIX" | "PICKED_UP" | "IN_TRANSIT" | "OUT_FOR_DELIVERY" | "DELIVERED" | "RETURNED" | "CARRIER_CANCELLED" | "CANCELLED";
                 /**
+                 * @description Nhiều tab cùng lúc (2026-11-03, tab cha "Tất cả kho"…): đơn thuộc MỘT trong các tab (lặp tham
+                 *     số: `?flows=WAREHOUSE&flows=PICKING`). Bỏ qua khi có `flow`.
+                 */
+                flows?: ("NEW" | "PENDING_APPROVAL" | "WAREHOUSE" | "WAITING_STOCK" | "PICKING" | "PACKED" | "NEEDS_FIX" | "PICKED_UP" | "IN_TRANSIT" | "OUT_FOR_DELIVERY" | "DELIVERED" | "RETURNED" | "CARRIER_CANCELLED" | "CANCELLED")[];
+                /**
                  * @description Đơn có sản phẩm KHÔNG phải hàng ERP (2026-10-22): `CUSTOM` = có món gõ tay trên Pancake
                  *     (`sales_order_external.custom_items`), `POS_SKU` = có dòng là SKU do đồng bộ Pancake tự tạo
                  *     (liên kết sản phẩm `auto`), `NON_ERP` = một trong hai.
@@ -24120,6 +24124,11 @@ export interface operations {
                  */
                 flow?: "NEW" | "PENDING_APPROVAL" | "WAREHOUSE" | "WAITING_STOCK" | "PICKING" | "PACKED" | "NEEDS_FIX" | "PICKED_UP" | "IN_TRANSIT" | "OUT_FOR_DELIVERY" | "DELIVERED" | "RETURNED" | "CARRIER_CANCELLED" | "CANCELLED";
                 /**
+                 * @description Nhiều tab cùng lúc (2026-11-03, tab cha "Tất cả kho"…): đơn thuộc MỘT trong các tab (lặp tham
+                 *     số: `?flows=WAREHOUSE&flows=PICKING`). Bỏ qua khi có `flow`.
+                 */
+                flows?: ("NEW" | "PENDING_APPROVAL" | "WAREHOUSE" | "WAITING_STOCK" | "PICKING" | "PACKED" | "NEEDS_FIX" | "PICKED_UP" | "IN_TRANSIT" | "OUT_FOR_DELIVERY" | "DELIVERED" | "RETURNED" | "CARRIER_CANCELLED" | "CANCELLED")[];
+                /**
                  * @description Đơn có sản phẩm KHÔNG phải hàng ERP (2026-10-22): `CUSTOM` = có món gõ tay trên Pancake
                  *     (`sales_order_external.custom_items`), `POS_SKU` = có dòng là SKU do đồng bộ Pancake tự tạo
                  *     (liên kết sản phẩm `auto`), `NON_ERP` = một trong hai.
@@ -24127,6 +24136,12 @@ export interface operations {
                 itemOrigin?: "CUSTOM" | "POS_SKU" | "NON_ERP";
                 /** @description Sắp xếp theo cột (2026-10-22); mặc định ngày đặt mới nhất trước. */
                 sortBy?: "orderDate" | "docNumber" | "customer" | "total" | "time" | "statusChangedAt" | "sentToCarrierAt";
+                /**
+                 * @description Chỉ đếm các tab này (2026-11-03, tab cha + chip con màn Đơn hàng — bỏ các tab đã xong khi nhóm
+                 *     của chúng đang đóng). Bỏ trống = mọi tab + `total`; có giá trị thì tab không đếm và `total`
+                 *     vắng mặt trong kết quả.
+                 */
+                countFlows?: ("NEW" | "PENDING_APPROVAL" | "WAREHOUSE" | "WAITING_STOCK" | "PICKING" | "PACKED" | "NEEDS_FIX" | "PICKED_UP" | "IN_TRANSIT" | "OUT_FOR_DELIVERY" | "DELIVERED" | "RETURNED" | "CARRIER_CANCELLED" | "CANCELLED")[];
                 customerId?: string;
                 status?: "DRAFT" | "PENDING_APPROVAL" | "APPROVED" | "POSTED" | "CANCELLED";
                 /** @description Lọc theo cân nặng gửi hãng HIỆU LỰC (đặt tay, không thì Σ dòng) — kg, chuỗi decimal, cận dưới (≥). */
@@ -24272,6 +24287,11 @@ export interface operations {
                  *     (`flowOf` trong sales-order-flow.ts). Đếm từng tab: GET /sales-orders/flow-counts.
                  */
                 flow?: "NEW" | "PENDING_APPROVAL" | "WAREHOUSE" | "WAITING_STOCK" | "PICKING" | "PACKED" | "NEEDS_FIX" | "PICKED_UP" | "IN_TRANSIT" | "OUT_FOR_DELIVERY" | "DELIVERED" | "RETURNED" | "CARRIER_CANCELLED" | "CANCELLED";
+                /**
+                 * @description Nhiều tab cùng lúc (2026-11-03, tab cha "Tất cả kho"…): đơn thuộc MỘT trong các tab (lặp tham
+                 *     số: `?flows=WAREHOUSE&flows=PICKING`). Bỏ qua khi có `flow`.
+                 */
+                flows?: ("NEW" | "PENDING_APPROVAL" | "WAREHOUSE" | "WAITING_STOCK" | "PICKING" | "PACKED" | "NEEDS_FIX" | "PICKED_UP" | "IN_TRANSIT" | "OUT_FOR_DELIVERY" | "DELIVERED" | "RETURNED" | "CARRIER_CANCELLED" | "CANCELLED")[];
                 /**
                  * @description Đơn có sản phẩm KHÔNG phải hàng ERP (2026-10-22): `CUSTOM` = có món gõ tay trên Pancake
                  *     (`sales_order_external.custom_items`), `POS_SKU` = có dòng là SKU do đồng bộ Pancake tự tạo
