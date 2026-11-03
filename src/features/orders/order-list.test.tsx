@@ -1600,7 +1600,9 @@ describe('OrderListScreen — tab Chờ hàng (2026-10-25)', () => {
       }),
     );
     renderApp(<OrderListScreen />);
-    expect(await screen.findByRole('note')).toHaveTextContent('Đơn đã duyệt từ 24 giờ');
+    expect(await screen.findByRole('note')).toHaveTextContent(
+      'kho chọn đơn rồi bấm Chuyển Chờ hàng',
+    );
     await screen.findByText(waiting.docNumber);
     expect(screen.queryByRole('columnheader', { name: /Hàng thiếu/ })).not.toBeInTheDocument();
     expect(screen.queryByRole('columnheader', { name: /Chờ từ/ })).not.toBeInTheDocument();
