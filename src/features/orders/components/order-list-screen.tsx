@@ -16,7 +16,7 @@ import {
 } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { BulkActionBar } from '@/components/data/bulk-action-bar';
 import { CopyButton } from '@/components/data/copy-button';
 import { CopyText } from '@/components/data/copy-text';
@@ -943,8 +943,13 @@ export function TotalValueFilter({
   const [op, setOp] = useState<TotalOp>(totalOpOf(min, max));
   const [a, setA] = useState(groupVnd((op === 'lte' ? max : min) ?? ''));
   const [b, setB] = useState(groupVnd(max ?? ''));
+  // Toán tử người dùng đang chọn — đọc trong effect mà không đưa vào deps.
+  const opRef = useRef(op);
+  opRef.current = op;
   useEffect(() => {
-    const o = totalOpOf(min, max);
+    // Đang chọn "Từ … đến" thì GIỮ hai ô (user 2026-11-03): mới nhập một cận (URL chỉ có min hoặc
+    // max) hay hai cận bằng nhau không được tự nhảy sang "≥" / "≤" / "=". Toán tử khác suy từ URL.
+    const o = opRef.current === 'between' ? 'between' : totalOpOf(min, max);
     setOp(o);
     setA(groupVnd((o === 'lte' ? max : min) ?? ''));
     setB(groupVnd(max ?? ''));
@@ -1032,9 +1037,10 @@ function WaitingStockNote({
   return (
     <div className="flex flex-wrap items-center gap-2 px-5 pt-3">
       <p role="note" className="flex-1 rounded-lg bg-info-weak px-3 py-2 text-sm text-info">
-        Đơn đã duyệt từ 24 giờ, chưa <strong>Gửi sang ĐVVC</strong> và còn sản phẩm thiếu tồn tự vào
-        tab này, cùng đơn sale để <strong>Chờ hàng</strong> trên Pancake. Gửi sang ĐVVC, hàng về đủ
-        hoặc sale xác nhận lại trên Pancake thì đơn tự rời tab.{' '}
+        Đơn vào tab này khi kho chọn đơn rồi bấm <strong>Chuyển Chờ hàng</strong>, hoặc sale để{' '}
+        <strong>Chờ hàng</strong> trên Pancake. Đơn rời tab khi <strong>Gửi sang ĐVVC</strong>, kho
+        bấm <strong>Đưa lại Đã xác nhận</strong>, hoặc sale xác nhận lại trên Pancake. Hàng về đủ
+        không tự chuyển — kho tự quyết.{' '}
         <Link href="/wms/waiting-stock" className="font-semibold text-primary hover:underline">
           Xem tổng hàng thiếu
         </Link>

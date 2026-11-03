@@ -285,7 +285,7 @@ export const ORDER_FLOW_TABS: ReadonlyArray<{
   { flow: 'NEW', label: 'Đơn mới', family: 'wait' },
   { flow: 'PENDING_APPROVAL', label: 'Chờ duyệt', family: 'wait' },
   { flow: 'WAREHOUSE', label: 'Đã xác nhận', family: 'fulfil' },
-  // Chờ hàng (2026-10-25): thiếu tồn ≥ 24h, chưa Gửi sang ĐVVC — cần người xử lý → họ "chờ".
+  // Chờ hàng (2026-10-25; luật ≥ 24h bỏ 2026-11-03): kho chuyển tay / Pancake 11 — cần người xử lý → họ "chờ".
   { flow: 'WAITING_STOCK', label: 'Chờ hàng', family: 'wait' },
   { flow: 'PICKING', label: 'Đang lấy hàng', family: 'fulfil' },
   { flow: 'PACKED', label: 'Chờ chuyển hàng', family: 'fulfil' },

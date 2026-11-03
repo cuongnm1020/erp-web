@@ -82,7 +82,7 @@ export function WaitingStockScreen() {
                 <EmptyState
                   icon={PackageSearch}
                   title="Không có đơn chờ hàng"
-                  description="Đơn thiếu hàng quá 24 giờ chưa gửi hãng sẽ hiện ở đây."
+                  description="Đơn kho đã chuyển Chờ hàng mà còn thiếu hàng sẽ hiện ở đây."
                   action={
                     <Button asChild variant="outline">
                       <Link href="/crm/orders">Mở danh sách đơn</Link>

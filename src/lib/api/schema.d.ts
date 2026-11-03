@@ -3701,6 +3701,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/sales-orders/label-printer-options": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Người đã in tem cho ô lọc "NV in đơn" màn Theo dõi đơn (2026-11-03) — khai TRƯỚC `:id`. */
+        get: operations["SalesOrderController_labelPrinterOptions"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/sales-orders/shipping-quote-preview": {
         parameters: {
             query?: never;
@@ -11698,6 +11715,13 @@ export interface components {
             carrierId: string | null;
             carrierCode: string | null;
         };
+        OrderLabelPrinterOptionDto: {
+            /** @description Giá trị cho `labelPrintedBy` của GET /sales-orders (core.User.id). */
+            userId: string;
+            fullName: string;
+            /** @description Mã / tài khoản nhân viên. */
+            code: string;
+        };
         ShippingQuotePreviewDto: {
             /** Format: uuid */
             carrierId: string;
@@ -11815,10 +11839,11 @@ export interface components {
         };
         SalesOrderListItemDto: {
             /**
-             * @description Tab của đơn — `flowOf(status, fulfilmentStatus, chờ hàng, lỗi vận đơn, SP ngoài hệ thống)`.
+             * @description Tab của đơn — cột `SalesOrderFulfilment.flow`, DB tính bằng `core.sales_order_flow_of` (cùng
+             *     luật `flowOf`: chứng từ, trạng thái kho, Chờ hàng tay, lỗi vận đơn, SP ngoài hệ thống, Pancake 11).
              * @enum {string}
              */
-            flow: "PENDING_APPROVAL" | "CANCELLED" | "WAREHOUSE" | "NEW" | "PICKING" | "PACKED" | "IN_TRANSIT" | "OUT_FOR_DELIVERY" | "DELIVERED" | "RETURNED" | "CARRIER_CANCELLED" | "PICKED_UP" | "WAITING_STOCK" | "NEEDS_FIX";
+            flow: "PENDING_APPROVAL" | "CANCELLED" | "WAREHOUSE" | "NEW" | "PICKING" | "PACKED" | "IN_TRANSIT" | "OUT_FOR_DELIVERY" | "DELIVERED" | "RETURNED" | "CARRIER_CANCELLED" | "WAITING_STOCK" | "NEEDS_FIX" | "PICKED_UP";
             /**
              * @description Trạng thái kho / giao hàng chi tiết (snapshot) — null = chưa tính (coi như NOT_STARTED).
              * @enum {string|null}
@@ -11855,6 +11880,10 @@ export interface components {
             waybillErrorAt: string | null;
             /** @description ISO — lần in tem vận đơn gần nhất (tem hãng / tem ERP 100×75); null = chưa in (2026-11-02). */
             labelPrintedAt: string | null;
+            /** @description Người in tem lần gần nhất (core.User.id, 2026-11-03); null = chưa in / in trước 2026-11-03. */
+            labelPrintedById: string | null;
+            /** @description Tên người in tem lần gần nhất — cột "NV in đơn" màn Theo dõi đơn (2026-11-03). */
+            labelPrintedByName: string | null;
             /** @description Chữ trạng thái hãng gửi gần nhất (nguyên văn, 2026-11-03); null = hãng chưa báo gì. */
             carrierStatusText: string | null;
             /**
@@ -11902,7 +11931,10 @@ export interface components {
             teamName: string | null;
             /** @description Ghi chú gửi hãng / ghi chú in trên đơn (shippingOptions.note). */
             note: string | null;
-            /** @description Hàng đang thiếu tồn (mọi tab); null = không thiếu. Tab Chờ hàng = thiếu ≥ 24h + chưa gửi hãng. */
+            /**
+             * @description Hàng đang thiếu tồn (mọi tab); null = không thiếu. Chỉ thông tin — không tự đưa đơn vào tab Chờ
+             *     hàng (luật ≥ 24h bỏ 2026-11-03): tab đó chỉ gồm đơn kho chuyển tay / sale để Chờ hàng trên Pancake.
+             */
             shortage: components["schemas"]["SalesOrderShortageDto"] | null;
             id: string;
             docNumber: string;
@@ -23781,6 +23813,25 @@ export interface operations {
             };
         };
     };
+    SalesOrderController_labelPrinterOptions: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OrderLabelPrinterOptionDto"][];
+                };
+            };
+        };
+    };
     SalesOrderController_shippingQuotePreview: {
         parameters: {
             query?: never;
@@ -23968,6 +24019,11 @@ export interface operations {
                  *     Pancake (`external.creatorUserId`) — cùng nguồn với cột `creatorName`.
                  */
                 creatorId?: string;
+                /**
+                 * @description NV in đơn (2026-11-03, màn Theo dõi đơn): người in tem vận đơn lần gần nhất của phiếu giao mới
+                 *     nhất. Lần in trước 2026-11-03 không ghi người in nên không khớp bộ lọc này.
+                 */
+                labelPrintedBy?: string;
                 /**
                  * @description Team CSKH lên đơn (SalesOrder.teamId) — team phòng ban CSKH, gồm cả phòng ban con. Danh sách:
                  *     GET /sales-orders/care-team-options.
@@ -24205,6 +24261,11 @@ export interface operations {
                  */
                 creatorId?: string;
                 /**
+                 * @description NV in đơn (2026-11-03, màn Theo dõi đơn): người in tem vận đơn lần gần nhất của phiếu giao mới
+                 *     nhất. Lần in trước 2026-11-03 không ghi người in nên không khớp bộ lọc này.
+                 */
+                labelPrintedBy?: string;
+                /**
                  * @description Team CSKH lên đơn (SalesOrder.teamId) — team phòng ban CSKH, gồm cả phòng ban con. Danh sách:
                  *     GET /sales-orders/care-team-options.
                  */
@@ -24362,6 +24423,11 @@ export interface operations {
                  *     Pancake (`external.creatorUserId`) — cùng nguồn với cột `creatorName`.
                  */
                 creatorId?: string;
+                /**
+                 * @description NV in đơn (2026-11-03, màn Theo dõi đơn): người in tem vận đơn lần gần nhất của phiếu giao mới
+                 *     nhất. Lần in trước 2026-11-03 không ghi người in nên không khớp bộ lọc này.
+                 */
+                labelPrintedBy?: string;
                 /**
                  * @description Team CSKH lên đơn (SalesOrder.teamId) — team phòng ban CSKH, gồm cả phòng ban con. Danh sách:
                  *     GET /sales-orders/care-team-options.

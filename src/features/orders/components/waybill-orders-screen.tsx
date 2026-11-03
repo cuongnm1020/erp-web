@@ -20,6 +20,7 @@ import { formatDateTime, formatQuantity, groupVi } from '@/lib/format';
 import { useAbility } from '@/lib/permission';
 import { useListState, type SortState } from '@/lib/url-state';
 import {
+  useLabelPrinterOptions,
   usePancakeShops,
   useOrders,
   useTeamFilterOptions,
@@ -40,6 +41,7 @@ const FILTER_KEYS = [
   'carrierAccountId',
   'pickup',
   'printStatus',
+  'printedBy',
 ] as const;
 type FilterKey = (typeof FILTER_KEYS)[number];
 
@@ -83,6 +85,7 @@ export function WaybillOrdersScreen() {
   const canReprint = ability.can('pack', 'Shipment');
   const shops = usePancakeShops();
   const teamOptions = useTeamFilterOptions(canFilterTeam);
+  const printers = useLabelPrinterOptions();
   const f = state.filters;
   const team = canFilterTeam ? (f.team ?? '') : '';
   const sort = state.sort ?? DEFAULT_SORT;
@@ -100,6 +103,7 @@ export function WaybillOrdersScreen() {
     carrierAccountId: f.carrierAccountId,
     pickupStatus: pick(PICKUP_OPTIONS, f.pickup),
     printStatus: pick(PRINT_OPTIONS, f.printStatus),
+    labelPrintedBy: f.printedBy,
     sortBy: 'sentToCarrierAt',
     sortDir: sort.desc ? 'desc' : 'asc',
     ...skipTake,
@@ -125,7 +129,8 @@ export function WaybillOrdersScreen() {
     f.carrierId ||
     f.carrierAccountId ||
     f.pickup ||
-    f.printStatus
+    f.printStatus ||
+    f.printedBy
   );
 
   return (
@@ -173,6 +178,18 @@ export function WaybillOrdersScreen() {
             },
             { key: 'pickup', label: 'Hãng lấy hàng', type: 'select', options: PICKUP_OPTIONS },
             { key: 'printStatus', label: 'In tem', type: 'select', options: PRINT_OPTIONS },
+            {
+              // Người in tem lần gần nhất (2026-11-03) — danh sách = người đã từng in.
+              key: 'printedBy',
+              label: 'NV in đơn',
+              type: 'select',
+              searchable: true,
+              options: (printers.data ?? []).map((p) => ({
+                value: p.userId,
+                label: p.fullName,
+                hint: p.code,
+              })),
+            },
             {
               key: 'pos',
               label: 'POS',
@@ -236,7 +253,7 @@ export function WaybillOrdersScreen() {
 
       <QueryState
         query={query}
-        skeleton={<ListSkeleton rows={12} columns={8} />}
+        skeleton={<ListSkeleton rows={12} columns={9} />}
         isEmpty={(d) => d.items.length === 0}
         empty={
           <EmptyState
@@ -413,6 +430,20 @@ function buildColumns(
           <StatusBadge tone="ok">Đã in {formatDateTime(row.original.labelPrintedAt)}</StatusBadge>
         ) : (
           <StatusBadge tone="warn">Chưa in</StatusBadge>
+        ),
+    },
+    {
+      // Người in tem lần gần nhất (2026-11-03). Đã in mà không có tên = in trước khi ghi người in.
+      id: 'printedBy',
+      header: 'NV in đơn',
+      meta: { width: 150 },
+      cell: ({ row }) =>
+        row.original.labelPrintedByName ? (
+          <span className="block truncate" title={row.original.labelPrintedByName}>
+            {row.original.labelPrintedByName}
+          </span>
+        ) : (
+          muted
         ),
     },
   ];

@@ -29,6 +29,8 @@ function setup() {
     posShopId: '715130909',
     teamName: 'CSKH LA',
     labelPrintedAt: i === 0 ? '2026-11-03T03:00:00.000Z' : null,
+    labelPrintedById: i === 0 ? '00000000-0000-4000-8000-0000000000cc' : null,
+    labelPrintedByName: i === 0 ? 'Nguyễn Văn Kho' : null,
     fulfilmentStatus: i === 0 ? 'PACKED' : 'SHIPPED',
     carrierStatusText: i === 0 ? null : 'Đã lấy hàng/Đã nhập kho',
     shipment: {
@@ -78,6 +80,33 @@ describe('WaybillOrdersScreen', () => {
     const q = listQueries.at(-1)!;
     expect(q.get('pickupStatus')).toBe('AWAITING');
     expect(q.get('printStatus')).toBe('NOT_PRINTED');
+  });
+
+  it('NV in đơn (2026-11-03): cột tên người in; chọn ở ô lọc → URL printedBy → API labelPrintedBy', async () => {
+    search = '';
+    const { listQueries } = setup();
+    server.use(
+      http.get('/api/sales-orders/label-printer-options', () =>
+        HttpResponse.json([
+          {
+            userId: '00000000-0000-4000-8000-0000000000cc',
+            fullName: 'Nguyễn Văn Kho',
+            code: 'wh.1',
+          },
+        ]),
+      ),
+    );
+    renderApp(<WaybillOrdersScreen />);
+    expect(await screen.findByText('NV in đơn', { selector: 'th *, th' })).toBeInTheDocument();
+    expect(screen.getAllByText('Nguyễn Văn Kho').length).toBeGreaterThan(0);
+
+    search = 'printedBy=00000000-0000-4000-8000-0000000000cc';
+    renderApp(<WaybillOrdersScreen />);
+    await waitFor(() =>
+      expect(listQueries.at(-1)!.get('labelPrintedBy')).toBe(
+        '00000000-0000-4000-8000-0000000000cc',
+      ),
+    );
   });
 
   it('lọc từ URL đi lên API: ngày gán, POS, sản phẩm, hãng', async () => {
