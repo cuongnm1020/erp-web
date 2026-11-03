@@ -24,7 +24,7 @@ import { useShipmentStatusLog } from '@/features/wms/api/use-shipping';
 import { shipmentStatusBadge } from '@/features/wms/labels';
 import { cn } from '@/lib/cn';
 import { useOrder, type OrderFlow, type SalesOrderListItem } from '../api/use-orders';
-import { orderFlowClass, orderFlowLabel, telcoClass } from '../labels';
+import { orderFlowClass, orderFlowLabel, shownAmounts, telcoClass } from '../labels';
 import { OrderProgress } from './order-progress';
 import { PancakeOrderLink } from './pancake-order-link';
 
@@ -144,7 +144,16 @@ function Body({ row }: { row: SalesOrderListItem }) {
             </ul>
           )}
           <dl className="mt-2 space-y-0.5 border-t pt-2 tabular-nums">
-            <Money label="Tạm tính" value={formatMoney(row.subtotal, { unit: '' })} />
+            <Money
+              label="Tạm tính"
+              value={formatMoney(d ? shownAmounts(d).subtotal : row.subtotal, { unit: '' })}
+            />
+            {d && !new Decimal(shownAmounts(d).discount).isZero() ? (
+              <Money
+                label="Giảm giá"
+                value={`−${formatMoney(shownAmounts(d).discount, { unit: '' })}`}
+              />
+            ) : null}
             <Money label="Phí ship thu khách" value={formatMoney(row.shippingFee, { unit: '' })} />
             {d && !prepaid.isZero() ? (
               <Money label="Đã chuyển khoản" value={formatMoney(prepaid.toFixed(), { unit: '' })} />

@@ -78,6 +78,7 @@ import {
   orderStatusLabel,
   orderStatusTone,
   manualDiscountNote,
+  shownAmounts,
 } from '../labels';
 import { groupOrderLines } from '../combo-lines';
 import { cancelOutcomeNotes } from './bulk-cancel-dialog';
@@ -688,6 +689,7 @@ function OrderTotals({ order }: { order: SalesOrderDetail }) {
   const prepaid = new Decimal(order.prepaidAmount || 0);
   const cod = Decimal.max(new Decimal(order.total).minus(prepaid), 0).toFixed();
   const manual = manualDiscountNote(order);
+  const shown = shownAmounts(order);
   const Row = ({ label, value, hint }: { label: string; value: string; hint?: string }) => (
     <>
       <dt className="text-muted-foreground">
@@ -700,9 +702,9 @@ function OrderTotals({ order }: { order: SalesOrderDetail }) {
   return (
     <div className="flex justify-end border-t px-3.5 py-3">
       <dl className="grid w-full max-w-sm grid-cols-[1fr_auto] gap-x-6 gap-y-1 text-right text-sm">
-        <Row label="Tạm tính" value={money(order.subtotal)} />
-        {nonZero(order.discount) ? (
-          <Row label="Chiết khấu" value={`−${money(order.discount)}`} hint={manual ?? undefined} />
+        <Row label="Tạm tính" value={money(shown.subtotal)} />
+        {nonZero(shown.discount) ? (
+          <Row label="Chiết khấu" value={`−${money(shown.discount)}`} hint={manual ?? undefined} />
         ) : null}
         {nonZero(order.taxAmount) ? <Row label="Thuế" value={money(order.taxAmount)} /> : null}
         <Row

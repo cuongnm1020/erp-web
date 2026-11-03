@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { previewAmounts } from './components/order-edit-screen';
+import { shownAmounts } from './labels';
 
 const base = {
   subtotal: '410000.0000',
@@ -109,5 +110,34 @@ describe('previewAmounts — thẻ Giá trị đơn hàng tính lại khi sửa 
     );
     expect(r.discount).toBe('10000.0000');
     expect(r.total).toBe('390000.0000');
+  });
+});
+
+describe('shownAmounts — đơn Pancake hiện tạm tính = Σ thành tiền (2026-11-03, SOP2610-107393)', () => {
+  const pc = {
+    ...base,
+    pancakeOrderId: '46422',
+    // 10 × niêm yết 150.000 + 3 × 32.000 (tặng) = 1.596.000; bán 142.500 + 0 đ.
+    subtotal: '1596000.0000',
+    discount: '171000.0000',
+    total: '1425000.0000',
+    lines: [
+      { discount: '75000.0000', lineTotal: '1425000.0000' },
+      { discount: '96000.0000', lineTotal: '0.0000' },
+    ],
+  };
+
+  it('chiết khấu so với niêm yết không hiện thành "Giảm giá"', () => {
+    expect(shownAmounts(pc)).toEqual({ subtotal: '1425000.0000', discount: '0.0000' });
+    expect(previewAmounts(pc, null)).toMatchObject({
+      subtotal: '1425000.0000',
+      discount: '0.0000',
+      total: '1425000.0000',
+    });
+  });
+
+  it('giảm giá cấp đơn vẫn hiện; đơn ERP giữ nguyên số đã lưu', () => {
+    expect(shownAmounts({ ...pc, discount: '191000.0000' }).discount).toBe('20000.0000');
+    expect(shownAmounts(base)).toEqual({ subtotal: base.subtotal, discount: base.discount });
   });
 });
