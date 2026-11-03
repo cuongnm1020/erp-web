@@ -71,6 +71,8 @@ import {
   type RowPack,
 } from '../schema';
 import { useTaxRates, type TaxRate } from '../api/use-tax-rates';
+import { useCreateProductTag, useProductTags } from '../api/use-product-tags';
+import { PurposePicker } from '@/components/data/purpose-picker';
 import { ImageDropzone, ProductGallery } from './product-images';
 import { UomManagerDialog } from './uom-manager-dialog';
 
@@ -148,6 +150,7 @@ function initialValues(p?: ProductDetail): ProductFormValues {
     senderPhone: p?.senderPhone ?? '',
     internalNote: p?.internalNote ?? '',
     searchAliases: (p?.searchAliases ?? []).join(', '),
+    tagIds: (p?.tags ?? []).map((t) => t.id),
     allowNegativeStock: p?.allowNegativeStock ?? false,
     // Sản phẩm mới mặc định là sản phẩm đơn; sửa thì theo cờ API. Dữ liệu cũ chưa có cờ:
     // nhiều SKU, hoặc một SKU mang tên khác tên sản phẩm (nhập như biến thể) → có biến thể.
@@ -347,6 +350,7 @@ function ProductFormBody({
         ...(v.senderPhone ? { senderPhone: v.senderPhone } : editing ? { senderPhone: null } : {}),
         ...(v.internalNote ? { internalNote: v.internalNote } : {}),
         searchAliases: parseAliases(v.searchAliases),
+        tagIds: v.tagIds,
         allowNegativeStock: v.allowNegativeStock,
       };
       if (!pid) {
@@ -771,6 +775,23 @@ function ProductFormBody({
                   <FormDescription>
                     Tên khách / sale hay gọi khi lên đơn, phân tách bằng dấu phẩy — ô tìm sản phẩm
                     ăn cả các tên này
+                  </FormDescription>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="tagIds"
+              render={({ field }) => (
+                <FormItem className="sm:col-span-2 lg:col-span-4">
+                  <FormLabel>Tag</FormLabel>
+                  <FormControl>
+                    <ProductTagField value={field.value} onChange={field.onChange} />
+                  </FormControl>
+                  <FormDescription>
+                    Một sản phẩm gắn được nhiều tag — lọc danh sách sản phẩm và xem doanh thu theo
+                    tag ở Báo cáo doanh thu
                   </FormDescription>
                   <FormMessage />
                 </FormItem>
@@ -1828,6 +1849,46 @@ function TaxRateField({
             <FormMessage />
           </FormItem>
         );
+      }}
+    />
+  );
+}
+
+/**
+ * Chọn tag sản phẩm (2026-11-03): chip bật / tắt, gõ tên để tìm hoặc "Tạo & gắn" tag mới (quyền
+ * sửa sản phẩm — form này đã yêu cầu). Dùng PurposePicker chung (chip + gợi ý + tạo mới).
+ */
+function ProductTagField({
+  value,
+  onChange,
+}: {
+  value: string[];
+  onChange: (ids: string[]) => void;
+}) {
+  const tags = useProductTags();
+  const create = useCreateProductTag();
+  return (
+    <PurposePicker
+      options={(tags.data ?? []).map((t) => ({
+        id: t.id,
+        name: t.name,
+        customerCount: t.productCount,
+      }))}
+      selected={value}
+      onToggle={(id) =>
+        onChange(value.includes(id) ? value.filter((x) => x !== id) : [...value, id])
+      }
+      creating={create.isPending}
+      noun="tag"
+      groupLabel="Tag sản phẩm"
+      example="Hàng chủ lực"
+      onCreate={async (name) => {
+        try {
+          const t = await create.mutateAsync({ name });
+          onChange([...value, t.id]);
+        } catch (err) {
+          toast.error(messageFor(err));
+        }
       }}
     />
   );

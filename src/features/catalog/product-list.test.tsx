@@ -129,6 +129,7 @@ const PRODUCTS = [
     skuCount: 3,
     hasVariants: true,
     searchAliases: ['bút thiên long', 'tl08'],
+    tags: [{ id: uuid(601), name: 'Hàng chủ lực', color: null }],
     onHand: '120',
     reserved: '135',
     available: '-15',
@@ -155,6 +156,7 @@ const PRODUCTS = [
     skuCount: 1,
     hasVariants: false,
     searchAliases: [],
+    tags: [],
     onHand: '40',
     reserved: '0',
     available: '40',
@@ -326,6 +328,24 @@ describe('ProductListScreen — góc nhìn Sản phẩm (mặc định, GET /pro
     await screen.findByText(FIRST_PRODUCT.code);
     await waitFor(() => expect(productCalls.at(-1)!.get('hasSupplier')).toBe('false'));
     expect(productCalls.at(-1)!.get('supplierId')).toBeNull();
+  });
+
+  it('tag sản phẩm (2026-11-03): cột Tag; ?tag=<id>,none → tagIds; ?tag=none → hasTag=false', async () => {
+    const first = renderApp(<ProductListScreen />);
+    expect(await screen.findByText('Hàng chủ lực')).toBeInTheDocument();
+    expect(productCalls.at(-1)!.getAll('tagIds')).toEqual([]);
+    first.unmount();
+    search = `tag=${uuid(601)},none`;
+    const second = renderApp(<ProductListScreen />);
+    await screen.findByText(FIRST_PRODUCT.code);
+    await waitFor(() => expect(productCalls.at(-1)!.getAll('tagIds')).toEqual([uuid(601)]));
+    expect(productCalls.at(-1)!.get('hasTag')).toBeNull();
+    second.unmount();
+    search = 'tag=none';
+    renderApp(<ProductListScreen />);
+    await screen.findByText(FIRST_PRODUCT.code);
+    await waitFor(() => expect(productCalls.at(-1)!.get('hasTag')).toBe('false'));
+    expect(productCalls.at(-1)!.getAll('tagIds')).toEqual([]);
   });
 
   it('sort trên URL → sortBy/sortDir gửi lên API (?sort=createdAt:desc)', async () => {

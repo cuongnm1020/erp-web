@@ -45,6 +45,8 @@ export const createProductSchema = z.object({
     .regex(/^[0-9+\s().-]*$/, 'Chỉ nhập số điện thoại'),
   internalNote: z.string().trim().max(2000, 'Tối đa 2000 ký tự'),
   searchAliases: z.string().trim().max(500, 'Tối đa 500 ký tự'),
+  /** Tag sản phẩm (2026-11-03) — id ProductTag, tối đa 50 (khớp DTO); sửa luôn gửi đủ danh sách. */
+  tagIds: z.array(z.string()).max(50, 'Tối đa 50 tag'),
   allowNegativeStock: z.boolean(),
   /**
    * Mức tồn kho cảnh báo nhập hàng — Decimal(18,6) chuỗi theo ĐVT cơ sở (luật 10), '' = không

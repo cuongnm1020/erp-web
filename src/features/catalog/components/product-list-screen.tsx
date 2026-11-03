@@ -13,6 +13,7 @@ import {
 import { ServerExportButton } from '@/components/data/export-delivery';
 import { ConfirmDialog } from '@/components/data/confirm-dialog';
 import { RowActions } from '@/components/data/row-actions';
+import { SearchableMultiSelect } from '@/components/data/searchable-multi-select';
 import { EmptyState, ListSkeleton, QueryState } from '@/components/data/states';
 import { StatusBadge } from '@/components/data/status-badge';
 import { PageHeader } from '@/components/layout/page-header';
@@ -48,6 +49,7 @@ import {
   type TrackingMode,
 } from '../api/use-products';
 import { useAssignTaxRate, useTaxRates } from '../api/use-tax-rates';
+import { useBulkProductTags, useProductTags } from '../api/use-product-tags';
 import { PancakeSyncButton } from './pancake-sync-button';
 
 /**
@@ -78,6 +80,8 @@ const DEFAULTS = {
     'brandId',
     'supplier',
     'taxRate',
+    // Tag sản phẩm (2026-11-03) — id nối dấu phẩy; `none` = chưa gắn tag.
+    'tag',
     'trackingMode',
     'stock',
   ] as const,
@@ -104,6 +108,16 @@ const TRACKING_LABELS: Record<TrackingMode, string> = {
 const SUPPLIER_NONE = 'none';
 /** Giá trị URL `?taxRate=none` = sản phẩm CHƯA gán thuế suất (hasTaxRate=false). */
 const TAX_RATE_NONE = 'none';
+/** Giá trị trong `?tag=` = sản phẩm CHƯA gắn tag nào (hasTag=false). */
+const TAG_NONE = 'none';
+
+/** `?tag=a,b,none` → tham số API: có ít nhất một tag đã chọn; chỉ "Chưa gắn tag" → hasTag=false. */
+function tagParams(raw: string | undefined): { tagIds?: string[]; hasTag?: boolean } {
+  const picked = raw ? raw.split(',').filter(Boolean) : [];
+  const tagIds = picked.filter((v) => v !== TAG_NONE);
+  if (tagIds.length) return { tagIds };
+  return picked.includes(TAG_NONE) ? { hasTag: false } : {};
+}
 
 /** Cột được sort phía server trên GET /products — id cột = sortBy gửi lên API. */
 const PRODUCT_SORTABLE = new Set(['code', 'name', 'createdAt']);
@@ -151,6 +165,23 @@ const productColumns: ColumnDef<ProductListItem, unknown>[] = [
     cell: ({ row }) => (
       <span className="text-muted-foreground">{row.original.category?.name ?? '—'}</span>
     ),
+  },
+  {
+    id: 'tags',
+    header: 'Tag',
+    meta: { width: 180 },
+    cell: ({ row }) =>
+      row.original.tags.length ? (
+        <span className="flex max-w-[180px] flex-wrap gap-1">
+          {row.original.tags.map((t) => (
+            <StatusBadge key={t.id} tone="neutral">
+              {t.name}
+            </StatusBadge>
+          ))}
+        </span>
+      ) : (
+        <span className="text-muted-foreground">—</span>
+      ),
   },
   {
     id: 'brand',
@@ -302,6 +333,65 @@ function BulkAssignTaxRate({ ids, onDone }: { ids: string[]; onDone: () => void 
         }}
       >
         Gán thuế suất
+      </Button>
+    </div>
+  );
+}
+
+/**
+ * Gắn / gỡ tag cho các sản phẩm đã chọn (POST /products/bulk-tags, 2026-11-03). Đảo ngược được nên
+ * không hỏi xác nhận.
+ */
+function BulkAssignTags({ ids, onDone }: { ids: string[]; onDone: () => void }) {
+  const tags = useProductTags();
+  const bulk = useBulkProductTags();
+  const [tagIds, setTagIds] = useState<string[]>([]);
+  const run = async (mode: 'add' | 'remove') => {
+    try {
+      const res = await bulk.mutateAsync({
+        productIds: ids,
+        ...(mode === 'add' ? { addTagIds: tagIds } : { removeTagIds: tagIds }),
+      });
+      toast.success(
+        mode === 'add'
+          ? `Đã gắn tag cho ${res.products} sản phẩm`
+          : `Đã gỡ tag khỏi ${res.products} sản phẩm`,
+      );
+      setTagIds([]);
+      onDone();
+    } catch (err) {
+      toast.error(messageFor(err));
+    }
+  };
+  return (
+    <div className="flex items-center gap-2">
+      <SearchableMultiSelect
+        label="Tag"
+        unit="tag"
+        values={tagIds}
+        options={(tags.data ?? []).map((t) => ({
+          value: t.id,
+          label: t.name,
+          hint: `${t.productCount} SP`,
+        }))}
+        onChange={setTagIds}
+      />
+      <Button
+        size="sm"
+        disabled={tagIds.length === 0}
+        loading={bulk.isPending}
+        loadingText="Đang lưu…"
+        onClick={() => void run('add')}
+      >
+        Gắn tag
+      </Button>
+      <Button
+        size="sm"
+        variant="outline"
+        disabled={tagIds.length === 0 || bulk.isPending}
+        onClick={() => void run('remove')}
+      >
+        Gỡ tag
       </Button>
     </div>
   );
@@ -807,8 +897,10 @@ function ProductView({
   const brands = useBrands();
   const suppliers = useSupplierFilterOptions();
   const taxRates = useTaxRates(true);
+  const productTags = useProductTags();
   const ability = useAbility();
   const canAssignTax = ability.can('manage', 'TaxRate') || ability.can('update', 'Product');
+  const canTag = ability.can('update', 'Product');
   const supplierFilter = state.filters.supplier;
   // Chỉ cột nằm trong whitelist sort của API mới gửi lên — cột khác bấm không có tác dụng.
   const sort = state.sort && PRODUCT_SORTABLE.has(state.sort.id) ? state.sort : null;
@@ -824,6 +916,7 @@ function ProductView({
           ? state.filters.taxRate
           : undefined,
       hasTaxRate: state.filters.taxRate === TAX_RATE_NONE ? false : undefined,
+      ...tagParams(state.filters.tag),
       isActive: status === undefined ? undefined : status === 'active',
       trackingMode: parseTracking(state.filters.trackingMode),
       hasStock: state.filters.stock === 'in' ? true : undefined,
@@ -874,6 +967,20 @@ function ProductView({
       ],
     },
     {
+      key: 'tag',
+      label: 'Tag',
+      type: 'multiSelect',
+      unit: 'tag',
+      options: [
+        { value: TAG_NONE, label: 'Chưa gắn tag' },
+        ...(productTags.data ?? []).map((t) => ({
+          value: t.id,
+          label: t.name,
+          hint: `${t.productCount} SP`,
+        })),
+      ],
+    },
+    {
       key: 'trackingMode',
       label: 'Theo dõi',
       type: 'select',
@@ -903,6 +1010,7 @@ function ProductView({
           brandId: state.filters.brandId,
           supplier: state.filters.supplier,
           taxRate: state.filters.taxRate,
+          tag: state.filters.tag,
           trackingMode: state.filters.trackingMode,
           stock: state.filters.stock,
         }}
@@ -956,8 +1064,17 @@ function ProductView({
               onSortChange={(s) => set({ sort: s })}
               selection={selection}
               bulkActions={
-                canAssignTax
-                  ? (ids) => <BulkAssignTaxRate ids={ids} onDone={() => selection.onChange({})} />
+                canAssignTax || canTag
+                  ? (ids) => (
+                      <div className="flex flex-wrap items-center gap-3">
+                        {canTag ? (
+                          <BulkAssignTags ids={ids} onDone={() => selection.onChange({})} />
+                        ) : null}
+                        {canAssignTax ? (
+                          <BulkAssignTaxRate ids={ids} onDone={() => selection.onChange({})} />
+                        ) : null}
+                      </div>
+                    )
                   : undefined
               }
             />

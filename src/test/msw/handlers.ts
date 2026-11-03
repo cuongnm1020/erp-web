@@ -1571,6 +1571,8 @@ export const FACEBOOK_PAGE_OPTIONS = [
 ];
 
 export const handlers = [
+  // Tag sản phẩm (2026-11-03) — danh mục rỗng mặc định; test cần tag thì tự override.
+  http.get('/api/product-tags', () => HttpResponse.json([])),
   http.get('/api/goods-receipts/:id/containers', () => HttpResponse.json(RECEIPT_CONTAINERS_EMPTY)),
   http.get('/api/waiting-stock/summary', () => HttpResponse.json(WAITING_SUMMARY)),
   http.get('/api/goods-receipts/:id/waiting-match', () => HttpResponse.json(WAITING_MATCH_EMPTY)),

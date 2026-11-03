@@ -16,11 +16,15 @@ export type SalesTopProductItem = components['schemas']['SalesTopProductItemDto'
 export type SalesBySupplier = components['schemas']['SalesBySupplierDto'];
 export type SalesBySupplierItem = components['schemas']['SalesBySupplierItemDto'];
 export type ReportPancakeShop = components['schemas']['PancakeShopOptionDto'];
+export type SalesByTag = components['schemas']['SalesByTagDto'];
+export type SalesByTagItem = components['schemas']['SalesByTagItemDto'];
+export type ReportProductTag = components['schemas']['ProductTagDto'];
 
 type SummaryQuery = paths['/reports/sales/summary']['get']['parameters']['query'];
 type ByProductQuery = paths['/reports/sales/by-product']['get']['parameters']['query'];
 type TopQuery = paths['/reports/sales/top-products']['get']['parameters']['query'];
 type BySupplierQuery = paths['/reports/sales/by-supplier']['get']['parameters']['query'];
+type ByTagQuery = paths['/reports/sales/by-tag']['get']['parameters']['query'];
 
 export type SalesChannel = NonNullable<SummaryQuery['channel']>;
 export type Granularity = SalesTimeseries['granularity'];
@@ -29,6 +33,8 @@ export type ProductSort = NonNullable<ByProductQuery['sort']>;
 export type StaffGroupBy = SalesByStaff['groupBy'];
 export type TopRankBy = TopQuery['rankBy'];
 export type SupplierSort = NonNullable<BySupplierQuery['sort']>;
+export type TagSort = NonNullable<ByTagQuery['sort']>;
+export type TagGroupBy = SalesByTag['groupBy'];
 export type FulfilmentGroup = NonNullable<SummaryQuery['fulfilment']>[number];
 /** Nguồn đơn: PANCAKE = đồng bộ từ Pancake, ERP = tạo trên hệ thống. */
 export type OrderOrigin = NonNullable<SummaryQuery['origin']>;
@@ -68,6 +74,17 @@ export interface BySupplierParams {
   skip: number;
 }
 
+/** RPT-TAG — tham số riêng tab Tag sản phẩm. */
+export interface ByTagParams {
+  groupBy: TagGroupBy;
+  /** Chỉ các tag này; rỗng = mọi tag + "Chưa gắn tag". */
+  tagIds: string[];
+  sort: TagSort;
+  order: 'asc' | 'desc';
+  take: number;
+  skip: number;
+}
+
 /** Phễu key (luật 3): ['reports','sales', <loại>, params] — invalidate theo prefix ['reports','sales']. */
 export const salesReportKeys = {
   all: ['reports', 'sales'] as const,
@@ -79,6 +96,8 @@ export const salesReportKeys = {
   byStaff: (f: SalesFilter, g: StaffGroupBy) => [...salesReportKeys.all, 'by-staff', f, g] as const,
   bySupplier: (f: SalesFilter, p: BySupplierParams) =>
     [...salesReportKeys.all, 'by-supplier', f, p] as const,
+  byTag: (f: SalesFilter, p: ByTagParams) => [...salesReportKeys.all, 'by-tag', f, p] as const,
+  productTags: () => [...salesReportKeys.all, 'options', 'product-tags'] as const,
   top: (f: SalesFilter, rankBy: TopRankBy, limit: number, supplierId?: string) =>
     [...salesReportKeys.all, 'top-products', f, rankBy, limit, supplierId ?? null] as const,
   teams: () => [...salesReportKeys.all, 'options', 'teams'] as const,
@@ -214,6 +233,60 @@ export function useExportSalesBySupplier() {
       }
       return { items, total: Number.isFinite(total) ? total : items.length };
     },
+  });
+}
+
+const byTagQuery = (f: SalesFilter, p: ByTagParams) => ({
+  ...filterQuery(f),
+  groupBy: p.groupBy,
+  tagIds: p.tagIds.length ? p.tagIds : undefined,
+  sort: p.sort,
+  order: p.order,
+  take: p.take,
+  skip: p.skip,
+});
+
+/**
+ * GET /reports/sales/by-tag (RPT-TAG, 2026-11-03) — theo tag sản phẩm HIỆN TẠI, hoặc tag × nhân viên
+ * lên đơn. SP nhiều tag tính ở mọi tag; `totals` mỗi dòng đơn một lần.
+ */
+export function useSalesByTag(f: SalesFilter, p: ByTagParams, enabled = true) {
+  return useQuery({
+    enabled,
+    queryKey: salesReportKeys.byTag(f, p),
+    queryFn: () =>
+      unwrap(api.GET('/reports/sales/by-tag', { params: { query: byTagQuery(f, p) } })),
+    placeholderData: keepPreviousData,
+  });
+}
+
+/** Xuất báo cáo theo tag — như useExportSalesBySupplier. */
+export function useExportSalesByTag() {
+  return useMutation({
+    mutationFn: async ({ filter, params }: { filter: SalesFilter; params: ByTagParams }) => {
+      const items: SalesByTagItem[] = [];
+      let total = Number.POSITIVE_INFINITY;
+      for (let skip = 0; skip < Math.min(total, EXPORT_MAX_ROWS); skip += EXPORT_PAGE) {
+        const page = await unwrap(
+          api.GET('/reports/sales/by-tag', {
+            params: { query: byTagQuery(filter, { ...params, take: EXPORT_PAGE, skip }) },
+          }),
+        );
+        total = page.total;
+        items.push(...page.items);
+        if (page.items.length < EXPORT_PAGE) break;
+      }
+      return { items, total: Number.isFinite(total) ? total : items.length };
+    },
+  });
+}
+
+/** GET /product-tags — ô lọc tag của báo cáo (danh mục nhỏ, cache 60s). */
+export function useReportProductTags() {
+  return useQuery({
+    queryKey: salesReportKeys.productTags(),
+    queryFn: () => unwrap(api.GET('/product-tags')),
+    staleTime: 60 * 1000,
   });
 }
 

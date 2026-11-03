@@ -35,6 +35,10 @@ export interface ProductListParams {
   taxRateId?: string;
   /** false = chỉ sản phẩm CHƯA gán thuế suất. */
   hasTaxRate?: boolean;
+  /** Tag sản phẩm (2026-11-03): có ít nhất một tag trong danh sách. */
+  tagIds?: string[];
+  /** false = chỉ sản phẩm chưa gắn tag nào. */
+  hasTag?: boolean;
   isActive?: boolean;
   trackingMode?: TrackingMode;
   /** true = chỉ sản phẩm còn ít nhất một SKU có tồn (onHand > 0). */
@@ -378,6 +382,8 @@ export function useProducts(params: ProductListParams, opts: { enabled?: boolean
               hasSupplier: params.hasSupplier,
               taxRateId: params.taxRateId,
               hasTaxRate: params.hasTaxRate,
+              tagIds: params.tagIds?.length ? params.tagIds : undefined,
+              hasTag: params.hasTag,
               isActive: params.isActive,
               trackingMode: params.trackingMode,
               hasStock: params.hasStock,

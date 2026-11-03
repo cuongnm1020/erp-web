@@ -1984,6 +1984,57 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/product-tags": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Tag sản phẩm (2026-11-03) — danh mục + số sản phẩm đang gắn. */
+        get: operations["ProductController_listProductTags"];
+        put?: never;
+        post: operations["ProductController_createProductTag"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/product-tags/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Xóa tag → gỡ khỏi mọi sản phẩm. */
+        delete: operations["ProductController_deleteProductTag"];
+        options?: never;
+        head?: never;
+        patch: operations["ProductController_updateProductTag"];
+        trace?: never;
+    };
+    "/products/bulk-tags": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Gắn / gỡ tag cho nhiều sản phẩm (chọn dòng ở danh sách sản phẩm). */
+        post: operations["ProductController_bulkProductTags"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/brands": {
         parameters: {
             query?: never;
@@ -5513,6 +5564,27 @@ export interface paths {
          *     niêm phong lúc đóng gói). Phân trang take ≤ 200.
          */
         get: operations["SalesReportController_bySupplier"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/reports/sales/by-tag": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * RPT-TAG (2026-11-03) — doanh thu / SL / giá vốn / lãi gộp / số đơn theo tag sản phẩm HIỆN TẠI,
+         *     hoặc tag × nhân viên lên đơn (`groupBy=tag_owner`), kèm doanh thu kỳ trước. Sản phẩm nhiều tag
+         *     tính ở mọi tag; `totals` đếm mỗi dòng đơn một lần. Cùng phạm vi xem như mọi báo cáo bán hàng.
+         */
+        get: operations["SalesReportController_byTag"];
         put?: never;
         post?: never;
         delete?: never;
@@ -9924,6 +9996,33 @@ export interface components {
             province: string;
             isDefault?: boolean;
         };
+        ProductTagDto: {
+            id: string;
+            name: string;
+            /** @description `#rrggbb`; null = màu mặc định. */
+            color: string | null;
+            productCount: number;
+        };
+        CreateProductTagDto: {
+            /** @description Trùng tên không dấu với tag đã có → 409 PRODUCT_TAG_NAME_TAKEN. */
+            name: string;
+            color?: string | null;
+        };
+        UpdateProductTagDto: {
+            name?: string;
+            color?: string | null;
+        };
+        BulkProductTagsDto: {
+            productIds: string[];
+            addTagIds?: string[];
+            removeTagIds?: string[];
+        };
+        BulkProductTagsResultDto: {
+            /** @description Số sản phẩm được gắn / gỡ (sản phẩm không tồn tại / đã xóa bỏ qua). */
+            products: number;
+            added: number;
+            removed: number;
+        };
         BrandDto: {
             id: string;
             code: string;
@@ -9996,6 +10095,11 @@ export interface components {
             code: string;
             name: string;
         };
+        ProductTagRefDto: {
+            id: string;
+            name: string;
+            color: string | null;
+        };
         UomCodeDto: {
             code: string;
         };
@@ -10022,6 +10126,8 @@ export interface components {
             category: components["schemas"]["ProductCategoryDto"] | null;
             brand: components["schemas"]["BrandDto"] | null;
             supplier: components["schemas"]["ProductSupplierRefDto"] | null;
+            /** @description Tag sản phẩm (2026-11-03), sắp theo tên. */
+            tags: components["schemas"]["ProductTagRefDto"][];
             /** @description Chỉ SKU đang active. */
             skus: components["schemas"]["ProductListSkuDto"][];
             /** @description Tổng số SKU (kể cả ngừng bán) — `skus` ở trên chỉ chứa SKU active. */
@@ -10135,6 +10241,8 @@ export interface components {
             category: components["schemas"]["ProductCategoryDto"] | null;
             brand: components["schemas"]["BrandDto"] | null;
             supplier: components["schemas"]["ProductSupplierRefDto"] | null;
+            /** @description Tag sản phẩm (2026-11-03), sắp theo tên. */
+            tags: components["schemas"]["ProductTagRefDto"][];
             defaultWarehouseId: string | null;
             description: string | null;
             ingredients: string | null;
@@ -10221,6 +10329,8 @@ export interface components {
             senderPhone?: string | null;
             /** @description Tên dân dã / viết tắt / tên cũ cho search. */
             searchAliases?: string[];
+            /** @description Tag sản phẩm (2026-11-03) — đặt ĐÚNG danh sách này (PATCH: bỏ trống = giữ nguyên, [] = gỡ hết). */
+            tagIds?: string[];
             /** @description Attribute value MÔ TẢ (isVariant=false) — value sinh biến thể bị từ chối 422. */
             attributes?: components["schemas"]["AttributeLinkDto"][];
         };
@@ -10313,6 +10423,8 @@ export interface components {
              */
             senderPhone?: string | null;
             searchAliases?: string[];
+            /** @description Tag sản phẩm (2026-11-03) — có mặt = đặt ĐÚNG danh sách này ([] = gỡ hết); bỏ trống = giữ. */
+            tagIds?: string[];
             /** @description Có mặt = THAY TOÀN BỘ danh sách link attribute mô tả. */
             attributes?: components["schemas"]["AttributeLinkDto"][];
         };
@@ -15081,6 +15193,57 @@ export interface components {
             /** @description Tổng mọi dòng sau lọc (không chỉ trang hiện tại). */
             totals: components["schemas"]["SalesBySupplierTotalsDto"];
             /** @description Như {@link SalesSummaryDto.dataAsOf}. */
+            dataAsOf: string | null;
+        };
+        SalesTagKeyDto: {
+            /** @description null = sản phẩm chưa gắn tag. */
+            tagId: string | null;
+            /** @description Tên tag / "Chưa gắn tag". */
+            tagName: string;
+            /** @description `#rrggbb`; null = mặc định. */
+            tagColor: string | null;
+            /** @description Chỉ có khi `groupBy=tag_owner`; null = đơn chưa gán nhân viên. */
+            ownerId?: string | null;
+            /** @description Tên nhân viên lên đơn / "Chưa gán". */
+            ownerName?: string;
+        };
+        SalesByTagItemDto: {
+            key: components["schemas"]["SalesTagKeyDto"];
+            qty: string;
+            revenue: string;
+            returnedRevenue: string;
+            netRevenue: string;
+            cogs: string;
+            grossProfit: string;
+            marginPct: string | null;
+            sharePct: string | null;
+            skuCount: number;
+            orderCount: number;
+            previousRevenue: string;
+            growthPct: string | null;
+        };
+        SalesByTagTotalsDto: {
+            qty: string;
+            revenue: string;
+            returnedRevenue: string;
+            netRevenue: string;
+            cogs: string;
+            grossProfit: string;
+            marginPct: string | null;
+            orderCount: number;
+            previousRevenue: string;
+            growthPct: string | null;
+        };
+        SalesByTagDto: {
+            from: string;
+            to: string;
+            previousFrom: string;
+            previousTo: string;
+            /** @enum {string} */
+            groupBy: "tag" | "tag_owner";
+            items: components["schemas"]["SalesByTagItemDto"][];
+            total: number;
+            totals: components["schemas"]["SalesByTagTotalsDto"];
             dataAsOf: string | null;
         };
         SalesRollupRebuildDto: {
@@ -20497,6 +20660,115 @@ export interface operations {
             };
         };
     };
+    ProductController_listProductTags: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProductTagDto"][];
+                };
+            };
+        };
+    };
+    ProductController_createProductTag: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateProductTagDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProductTagDto"];
+                };
+            };
+        };
+    };
+    ProductController_deleteProductTag: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    ProductController_updateProductTag: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateProductTagDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProductTagDto"];
+                };
+            };
+        };
+    };
+    ProductController_bulkProductTags: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BulkProductTagsDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BulkProductTagsResultDto"];
+                };
+            };
+        };
+    };
     ProductController_listBrands: {
         parameters: {
             query?: never;
@@ -20769,6 +21041,13 @@ export interface operations {
                 taxRateId?: string;
                 /** @description false = chỉ sản phẩm CHƯA gán thuế suất (kế toán gán bù), true = đã gán. */
                 hasTaxRate?: boolean;
+                /**
+                 * @description Tag sản phẩm (2026-11-03) — lặp tham số cho nhiều tag (`?tagIds=a&tagIds=b`): sản phẩm có ÍT
+                 *     NHẤT MỘT tag trong danh sách.
+                 */
+                tagIds?: string[];
+                /** @description false = chỉ sản phẩm CHƯA gắn tag nào, true = có ít nhất một tag. */
+                hasTag?: boolean;
                 isActive?: boolean;
                 trackingMode?: "NONE" | "LOT" | "SERIAL";
                 /** @description true = chỉ product có ít nhất một SKU còn tồn (onHand > 0). */
@@ -26532,6 +26811,66 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["SalesBySupplierDto"];
+                };
+            };
+        };
+    };
+    SalesReportController_byTag: {
+        parameters: {
+            query: {
+                /**
+                 * @description Nguồn đơn: PANCAKE = đơn đồng bộ từ Pancake, ERP = đơn tạo trên hệ thống. Bỏ trống = mọi đơn.
+                 *     Có lọc → luôn tính sống (bảng tổng hợp không lưu).
+                 */
+                origin?: "PANCAKE" | "ERP";
+                /**
+                 * @description Tình trạng giao (lặp tham số cho nhiều giá trị: `?fulfilment=DELIVERED&fulfilment=SHIPPING`):
+                 *     DELIVERED thành công · SHIPPING đang giao · NOT_SHIPPED chưa gửi hãng · RETURNED hoàn (cả ĐVVC
+                 *     hoàn cả đơn). Bỏ trống = mọi đơn. Có lọc → luôn tính sống (bảng tổng hợp không lưu).
+                 */
+                fulfilment?: ("DELIVERED" | "SHIPPING" | "NOT_SHIPPED" | "RETURNED")[];
+                /** @description `YYYY-MM-DD` — ngày đầu (giờ VN). */
+                from: string;
+                /** @description `YYYY-MM-DD` — ngày cuối, lấy hết ngày đó. `to` = `from` → một ngày. */
+                to: string;
+                /** @description Kênh bán. */
+                channel?: "DIRECT" | "MARKETPLACE" | "WEBSITE" | "POS";
+                /** @description Snapshot `SalesOrder.teamId` lúc tạo đơn. */
+                teamId?: string;
+                /** @description Snapshot `SalesOrder.ownerId` lúc tạo đơn. */
+                ownerId?: string;
+                /** @description Kho lấy hàng chọn trên đơn (`SalesOrder.warehouseId`). */
+                warehouseId?: string;
+                customerId?: string;
+                /** @description POS Pancake của đơn (shop_id, chuỗi số) — như `pancakeShopId` của GET /sales-orders. */
+                pancakeShopId?: string;
+                /** @description `tag` = theo tag; `tag_owner` = tag × nhân viên lên đơn. Mặc định `tag`. */
+                groupBy?: "tag" | "tag_owner";
+                /**
+                 * @description Chỉ các tag này (lặp tham số `?tagIds=a&tagIds=b`) — dòng "Chưa gắn tag" bị loại; totals chỉ
+                 *     gồm dòng đơn của sản phẩm có ít nhất một tag đã chọn.
+                 */
+                tagIds?: string[];
+                /** @description Sắp xếp theo — mặc định `revenue`. */
+                sort?: "revenue" | "grossProfit" | "qty";
+                /** @description Mặc định `desc`. */
+                order?: "asc" | "desc";
+                /** @description Mặc định 50, tối đa 200. */
+                take?: number;
+                skip?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SalesByTagDto"];
                 };
             };
         };

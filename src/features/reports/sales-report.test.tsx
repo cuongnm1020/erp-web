@@ -1147,3 +1147,108 @@ describe('Tab Nhà cung cấp (RPT-05c)', () => {
     expect(lastUrl().get('supplierId')).toBeNull();
   });
 });
+
+describe('Tab Tag sản phẩm (RPT-TAG, 2026-11-03)', () => {
+  afterEach(() => {
+    search = '';
+  });
+
+  const tagRow = (
+    tagId: string | null,
+    tagName: string,
+    owner?: { ownerId: string | null; ownerName: string },
+  ) => ({
+    key: { tagId, tagName, tagColor: null, ...(owner ?? {}) },
+    qty: '3.000000',
+    revenue: '300000.0000',
+    returnedRevenue: '0.0000',
+    netRevenue: '300000.0000',
+    cogs: '100000.0000',
+    grossProfit: '200000.0000',
+    marginPct: '66.67',
+    sharePct: '50.00',
+    skuCount: 1,
+    orderCount: 2,
+    previousRevenue: '0.0000',
+    growthPct: null,
+  });
+  const body = (groupBy: 'tag' | 'tag_owner', items: ReturnType<typeof tagRow>[]) => ({
+    from: RANGE.from,
+    to: RANGE.to,
+    previousFrom: '2026-09-28',
+    previousTo: '2026-09-30',
+    groupBy,
+    items,
+    total: items.length,
+    totals: {
+      qty: '3.000000',
+      revenue: '600000.0000',
+      returnedRevenue: '0.0000',
+      netRevenue: '600000.0000',
+      cogs: '200000.0000',
+      grossProfit: '400000.0000',
+      marginPct: '66.67',
+      orderCount: 4,
+      previousRevenue: '0.0000',
+      growthPct: null,
+    },
+    dataAsOf: null,
+  });
+
+  it('theo tag: dòng "Chưa gắn tag" in nghiêng, groupBy + tagIds vào query; bấm Tag × nhân viên ghi tagGroup lên URL', async () => {
+    search = `tab=tag&tagIds=t1,t2&from=${RANGE.from}&to=${RANGE.to}`;
+    const calls: URLSearchParams[] = [];
+    server.use(
+      http.get('/api/product-tags', () =>
+        HttpResponse.json([
+          { id: 't1', name: 'Phân bón', color: null, productCount: 3 },
+          { id: 't2', name: 'Chủ lực', color: null, productCount: 1 },
+        ]),
+      ),
+      http.get('/api/reports/sales/by-tag', ({ request }) => {
+        calls.push(new URL(request.url).searchParams);
+        return HttpResponse.json(
+          body('tag', [tagRow('t1', 'Phân bón'), tagRow(null, 'Chưa gắn tag')]),
+        );
+      }),
+    );
+    renderApp(<SalesReportScreen />, { me: ME_LEADER });
+    await screen.findByRole('cell', { name: 'Phân bón' });
+    expect(screen.getByRole('tab', { name: 'Tag sản phẩm' })).toHaveAttribute(
+      'aria-selected',
+      'true',
+    );
+    expect(calls[0]!.get('groupBy')).toBe('tag');
+    expect(calls[0]!.getAll('tagIds')).toEqual(['t1', 't2']);
+    const none = screen.getAllByText('Chưa gắn tag').find((el) => el.closest('td'))!;
+    expect(none).toHaveClass('italic');
+    expect(screen.getByText(/tag hiện tại/)).toBeInTheDocument();
+    expect(screen.getByText('Tổng 4 đơn · 2 dòng')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Tag × nhân viên lên đơn' }));
+    expect(lastUrl().get('tagGroup')).toBe('tag_owner');
+  });
+
+  it('tagGroup=tag_owner trên URL → cột Nhân viên lên đơn; rỗng → EmptyState bỏ lọc tag', async () => {
+    search = `tab=tag&tagGroup=tag_owner&from=${RANGE.from}&to=${RANGE.to}`;
+    server.use(
+      http.get('/api/reports/sales/by-tag', () =>
+        HttpResponse.json(
+          body('tag_owner', [
+            tagRow('t1', 'Phân bón', { ownerId: 'u1', ownerName: 'Nguyễn Văn A' }),
+          ]),
+        ),
+      ),
+    );
+    const first = renderApp(<SalesReportScreen />, { me: ME_LEADER });
+    expect(await screen.findByRole('cell', { name: 'Nguyễn Văn A' })).toBeInTheDocument();
+    expect(screen.getByRole('columnheader', { name: 'Nhân viên lên đơn' })).toBeInTheDocument();
+    first.unmount();
+
+    search = `tab=tag&tagIds=t9&from=${RANGE.from}&to=${RANGE.to}`;
+    server.use(http.get('/api/reports/sales/by-tag', () => HttpResponse.json(body('tag', []))));
+    renderApp(<SalesReportScreen />, { me: ME_LEADER });
+    fireEvent.click(await screen.findByRole('button', { name: 'Bỏ lọc tag' }));
+    await waitFor(() => expect(lastUrl().get('tagIds')).toBeNull());
+  });
+});
