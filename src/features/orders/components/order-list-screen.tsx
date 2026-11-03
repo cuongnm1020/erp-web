@@ -1435,9 +1435,18 @@ export function OrderListScreen() {
       <PageHeader
         title="Đơn hàng"
         description={
-          query.data
-            ? `${groupVi(String(query.data.total))} đơn khớp bộ lọc`
-            : 'Đang đếm số đơn khớp bộ lọc…'
+          // Số đơn khớp bộ lọc to, đậm, màu chữ chính dưới dòng mô tả (user 2026-11-03).
+          <span className="block">
+            <span>{query.data ? 'Đơn khớp bộ lọc' : 'Đang đếm số đơn khớp bộ lọc…'}</span>
+            {query.data ? (
+              <span
+                data-testid="order-count"
+                className="block text-2xl font-bold leading-tight text-foreground"
+              >
+                {groupVi(String(query.data.total))}
+              </span>
+            ) : null}
+          </span>
         }
         breadcrumb={[{ label: 'Bán hàng' }, { label: 'Đơn hàng' }]}
         actions={

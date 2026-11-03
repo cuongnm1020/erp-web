@@ -53,7 +53,8 @@ describe('OrderListScreen — GET /sales-orders (P1-12)', () => {
     renderApp(<OrderListScreen />);
     expect(screen.getByRole('status', { name: 'Đang tải danh sách' })).toBeInTheDocument();
     expect(await screen.findByText(FIRST.docNumber)).toBeInTheDocument();
-    expect(screen.getByText('60 đơn khớp bộ lọc')).toBeInTheDocument();
+    expect(screen.getByText('Đơn khớp bộ lọc')).toBeInTheDocument();
+    expect(screen.getByTestId('order-count')).toHaveTextContent('60');
     expect(screen.getByText('1–50 / 60 dòng')).toBeInTheDocument();
   });
 
@@ -68,7 +69,7 @@ describe('OrderListScreen — GET /sales-orders (P1-12)', () => {
     const pancake = makeOrders(60).find((o) => o.pancakeOrderId === '103')!;
     search = 'q=%23103';
     renderApp(<OrderListScreen />);
-    await screen.findByText('1 đơn khớp bộ lọc');
+    await waitFor(() => expect(screen.getByTestId('order-count')).toHaveTextContent('1'));
     const link = screen.getByRole('link', { name: pancake.docNumber });
     expect(link).toHaveAttribute('href', `/crm/orders/${pancake.id}`);
     // Mã Pancake bấm được → mở đúng đơn trên POS ở tab mới (2026-10-19).
@@ -111,7 +112,9 @@ describe('OrderListScreen — GET /sales-orders (P1-12)', () => {
     const n = (f: string) => all.filter((o) => o.flow === f).length;
     search = 'flow=DELIVERED';
     renderApp(<OrderListScreen />);
-    await screen.findByText(`${n('DELIVERED')} đơn khớp bộ lọc`);
+    await waitFor(() =>
+      expect(screen.getByTestId('order-count')).toHaveTextContent(String(n('DELIVERED'))),
+    );
     // flow=DELIVERED → tab cha Vận chuyển + chip Thành công (sau "Đã xong").
     expect(screen.getByRole('tab', { name: /^Vận chuyển/ })).toHaveAttribute(
       'aria-selected',
@@ -357,7 +360,9 @@ describe('OrderListScreen — cân nặng gửi hãng + gán hãng hàng loạt'
       (o) => Number(o.weightKg) >= 1 && Number(o.weightKg) <= 1.5 && o.carrierId === null,
     ).length;
     renderApp(<OrderListScreen />);
-    await screen.findByText(`${expected} đơn khớp bộ lọc`);
+    await waitFor(() =>
+      expect(screen.getByTestId('order-count')).toHaveTextContent(String(expected)),
+    );
     expect(screen.getByRole('combobox', { name: 'Hãng vận chuyển' })).toHaveTextContent(
       'Chưa gán hãng',
     );
@@ -966,7 +971,9 @@ describe('OrderListScreen — lọc theo hãng + thời gian (2026-09-19)', () =
     ).length;
     expect(expected).toBeGreaterThan(0);
     renderApp(<OrderListScreen />);
-    await screen.findByText(`${expected} đơn khớp bộ lọc`);
+    await waitFor(() =>
+      expect(screen.getByTestId('order-count')).toHaveTextContent(String(expected)),
+    );
     await waitFor(() =>
       expect(screen.getByRole('combobox', { name: 'Hãng vận chuyển' })).toHaveTextContent(
         'Giao Hàng Tiết Kiệm',
