@@ -11890,6 +11890,13 @@ export interface components {
              *     page chọn lúc tạo. null = đơn không gắn page (2026-10-26).
              */
             facebookPageName: string | null;
+            /**
+             * @description POS của đơn (mã shop Pancake, chuỗi số): đơn Pancake theo shop đồng bộ, đơn ERP theo POS chọn
+             *     lúc tạo; null = không gắn POS (2026-11-03).
+             */
+            posShopId: string | null;
+            /** @description Tên phòng ban / team lên đơn (SalesOrder.teamId); null = đơn không gắn team (2026-11-03). */
+            teamName: string | null;
             /** @description Ghi chú gửi hãng / ghi chú in trên đơn (shippingOptions.note). */
             note: string | null;
             /** @description Hàng đang thiếu tồn (mọi tab); null = không thiếu. Tab Chờ hàng = thiếu ≥ 24h + chưa gửi hãng. */
@@ -23894,6 +23901,8 @@ export interface operations {
                 totalMax?: string;
                 /** @description Chỉ đơn CHƯA chọn hãng (`true`) — gom đơn cần gán hãng. */
                 noCarrier?: string;
+                /** @description Chỉ đơn ĐÃ gán (gửi sang) ĐVVC — `sentToCarrierAt` có giá trị (`true`, 2026-11-03). */
+                sentToCarrier?: string;
                 /** @description Đơn ĐÃ gán hãng này (wms.Carrier.id). Kết hợp được với from/to. */
                 carrierId?: string;
                 /**
@@ -24111,6 +24120,8 @@ export interface operations {
                 totalMax?: string;
                 /** @description Chỉ đơn CHƯA chọn hãng (`true`) — gom đơn cần gán hãng. */
                 noCarrier?: string;
+                /** @description Chỉ đơn ĐÃ gán (gửi sang) ĐVVC — `sentToCarrierAt` có giá trị (`true`, 2026-11-03). */
+                sentToCarrier?: string;
                 /** @description Đơn ĐÃ gán hãng này (wms.Carrier.id). Kết hợp được với from/to. */
                 carrierId?: string;
                 /**
@@ -24256,6 +24267,8 @@ export interface operations {
                 totalMax?: string;
                 /** @description Chỉ đơn CHƯA chọn hãng (`true`) — gom đơn cần gán hãng. */
                 noCarrier?: string;
+                /** @description Chỉ đơn ĐÃ gán (gửi sang) ĐVVC — `sentToCarrierAt` có giá trị (`true`, 2026-11-03). */
+                sentToCarrier?: string;
                 /** @description Đơn ĐÃ gán hãng này (wms.Carrier.id). Kết hợp được với from/to. */
                 carrierId?: string;
                 /**

@@ -94,7 +94,7 @@ describe('Gộp khách trùng — danh sách nhóm (CRM-10)', () => {
     expect(within(list).getByText(/47 đơn · 184\.250\.000/)).toBeInTheDocument();
     expect(screen.getByText('Chọn 2 hồ sơ trong một nhóm để so sánh')).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole('button', { name: 'Chọn nhóm 0987 445 020' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Chọn nhóm 0987445020' }));
     const q = lastUrl();
     expect(q.get('phone')).toBe('0987445020');
     expect(q.get('ids')).toBe(`${DUP_D},${DUP_C}`);
@@ -235,7 +235,7 @@ describe('Gộp khách trùng — so sánh + gộp (CRM-10)', () => {
       within(await screen.findByRole('dialog')).getByRole('button', { name: 'Gộp khách' }),
     );
     expect(await screen.findByText('Hai khách khác số điện thoại')).toBeInTheDocument();
-    expect(screen.getByText(/0988 000 111/)).toBeInTheDocument();
+    expect(screen.getByText(/0988000111/)).toBeInTheDocument();
     expect(toastError).not.toHaveBeenCalled();
     fireEvent.click(screen.getByRole('button', { name: 'Vẫn gộp' }));
     const res = await screen.findByRole('region', { name: 'Kết quả gộp' });

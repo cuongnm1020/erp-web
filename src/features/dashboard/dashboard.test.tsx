@@ -181,6 +181,8 @@ const ORDERS: SalesOrderList = {
       packErrorAt: null,
       nonErpItems: false,
       editPastStage: false,
+      posShopId: null,
+      teamName: null,
       sentToCarrierAt: null,
       phone: null,
       recipientName: null,

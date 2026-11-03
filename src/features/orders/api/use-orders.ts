@@ -47,6 +47,8 @@ export interface OrderListParams {
   dateField?: OrderDateField;
   /** true = chỉ đơn chưa chọn hãng. */
   noCarrier?: boolean;
+  /** true = chỉ đơn ĐÃ gán (gửi sang) ĐVVC — màn Đơn đã gán vận chuyển (2026-11-03). */
+  sentToCarrier?: boolean;
   /** Đơn đã gán hãng này (wms.Carrier.id). */
   carrierId?: string;
   /** Đơn gán tài khoản hãng này (mặc định gồm cả đơn chưa chọn tài khoản). */
@@ -205,6 +207,7 @@ function listQuery(params: Omit<OrderListParams, 'take' | 'skip'>) {
     totalMin: params.totalMin || undefined,
     totalMax: params.totalMax || undefined,
     noCarrier: params.noCarrier ? ('true' as const) : undefined,
+    sentToCarrier: params.sentToCarrier ? ('true' as const) : undefined,
     carrierId: params.carrierId || undefined,
     carrierAccountId: params.carrierAccountId || undefined,
     carrierSource: params.carrierSource,

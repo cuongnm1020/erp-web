@@ -16,6 +16,7 @@ import {
 import { useFieldArray, useForm, useWatch, type Path, type UseFormReturn } from 'react-hook-form';
 import {
   applyServerErrors,
+  DatePicker,
   EntityPicker,
   Form,
   FormControl,
@@ -108,7 +109,7 @@ const SERVER_PATHS: Record<string, { field: Path<CreateOrderValues>; message: st
   addressId: { field: 'addressId', message: 'Địa chỉ không thuộc khách hàng này' },
   prepaidAmount: { field: 'prepaidAmount', message: 'Tiền chuyển khoản vượt tổng đơn' },
   surcharge: { field: 'surcharge', message: 'Phụ thu không hợp lệ' },
-  orderDate: { field: 'orderDate', message: 'Giờ tạo đơn không được ở tương lai' },
+  orderDate: { field: 'orderDate', message: 'Ngày tạo đơn không được ở tương lai' },
   ownerId: { field: 'ownerId', message: 'Nhân viên không tồn tại hoặc đã nghỉ' },
   packerId: { field: 'packerId', message: 'Nhân viên không tồn tại hoặc đã nghỉ' },
   careStaffId: { field: 'careStaffId', message: 'Nhân viên không tồn tại hoặc đã nghỉ' },
@@ -625,7 +626,7 @@ function HeaderSelects({
   const careTeams = useCareTeamOptions();
   const myCareTeams = (careTeams.data ?? []).filter((t) => t.mine);
   return (
-    <div className="grid grid-cols-2 gap-x-2.5 gap-y-2 sm:grid-cols-4 xl:grid-cols-7">
+    <div className="grid grid-cols-2 gap-x-2.5 gap-y-2 sm:grid-cols-4 xl:grid-cols-8">
       <HeaderField label="Kênh">
         <FormField
           control={form.control}
@@ -795,6 +796,27 @@ function HeaderSelects({
           />
         </HeaderField>
       ) : null}
+      {/* Ngày tạo đơn (2026-11-03): doanh số tính theo ngày này. Trống = hôm nay; chỉ chọn lùi. */}
+      <HeaderField label="Ngày tạo đơn">
+        <FormField
+          control={form.control}
+          name="orderDate"
+          render={({ field }) => (
+            <FormItem>
+              <FormControl>
+                <DatePicker
+                  value={field.value}
+                  onChange={field.onChange}
+                  placeholder="Hôm nay"
+                  toDate={new Date()}
+                  aria-label="Ngày tạo đơn"
+                />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+      </HeaderField>
       <HeaderField label="NV xử lý">
         <StaffField
           form={form}

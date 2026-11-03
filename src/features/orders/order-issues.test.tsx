@@ -136,6 +136,16 @@ describe('OrderIssuesScreen', () => {
     expect(q.get('stockReady')).toBe('true');
   });
 
+  it('Chưa gửi ĐVVC lọc được "Hiện tại: Đã đủ hàng" (stockReady)', async () => {
+    search = 'issue=UNSENT&ready=true';
+    const { listQueries } = setup();
+    renderApp(<OrderIssuesScreen />);
+    await waitFor(() => expect(listQueries.length).toBeGreaterThan(0));
+    const q = listQueries.at(-1)!;
+    expect(q.get('issue')).toBe('UNSENT');
+    expect(q.get('stockReady')).toBe('true');
+  });
+
   it('bấm ô khác → đổi nhóm trên URL', async () => {
     search = '';
     setup();

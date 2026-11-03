@@ -143,8 +143,8 @@ export const createOrderSchema = z
     manualDiscountType: z.enum(MANUAL_DISCOUNT_TYPES),
     manualDiscountValue: z.string().trim().optional().or(z.literal('')),
     couponCode: z.string().trim().max(50, 'Tối đa 50 ký tự'),
-    /** Giờ tạo đơn `YYYY-MM-DDTHH:mm` (giờ máy); '' = lúc bấm chốt. */
-    orderDate: z.string().trim(),
+    /** Ngày tạo đơn `yyyy-mm-dd` (ngày máy) — doanh số tính theo ngày này; '' = lúc bấm chốt. */
+    orderDate: dateKeySchema.or(z.literal('')),
     ownerId: optionalId,
     packerId: optionalId,
     careStaffId: optionalId,
@@ -287,6 +287,19 @@ export function emptyOrderValues(warehouseId = '', posShopId = ''): CreateOrderV
 const nonZero = (v: string | undefined): v is string => !!v && !new Decimal(v).isZero();
 const cm = (v: string): number | undefined => (v === '' ? undefined : Number.parseInt(v, 10));
 
+/**
+ * Ngày tạo đơn chọn tay (`yyyy-mm-dd`, ngày máy) → ISO gửi API. Doanh số tính theo ngày này
+ * (`orderDate`, 2026-11-03). Trống hoặc hôm nay → không gửi (server lấy lúc chốt). Ngày lùi →
+ * giờ:phút:giây hiện tại trên ngày đó, để đơn ghi lùi vẫn xếp theo thứ tự lên đơn.
+ */
+export function orderDateIso(key: string, now: Date = new Date()): string | undefined {
+  const [y, m, d] = key.split('-').map(Number);
+  if (!y || !m || !d) return undefined;
+  const at = new Date(y, m - 1, d, now.getHours(), now.getMinutes(), now.getSeconds());
+  if (at.toDateString() === now.toDateString()) return undefined;
+  return at.toISOString();
+}
+
 /** Form values → body POST /sales-orders. CK% "5" → "0.05" qua decimal.js. */
 export function toCreateOrderBody(v: CreateOrderValues) {
   const customer = v.customerId
@@ -361,7 +374,7 @@ export function toCreateOrderBody(v: CreateOrderValues) {
     ...(nonZero(v.prepaidAmount) ? { prepaidAmount: v.prepaidAmount } : {}),
     ...manualDiscountBody(v),
     ...(v.couponCode ? { couponCode: v.couponCode } : {}),
-    ...(v.orderDate ? { orderDate: new Date(v.orderDate).toISOString() } : {}),
+    ...(orderDateIso(v.orderDate) ? { orderDate: orderDateIso(v.orderDate) } : {}),
     ...(v.ownerId ? { ownerId: v.ownerId } : {}),
     ...(v.packerId ? { packerId: v.packerId } : {}),
     ...(v.careStaffId ? { careStaffId: v.careStaffId } : {}),

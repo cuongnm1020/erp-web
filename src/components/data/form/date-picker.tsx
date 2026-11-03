@@ -44,6 +44,7 @@ export interface DatePickerProps {
   clearable?: boolean;
   className?: string;
   id?: string;
+  'aria-label'?: string;
   'aria-invalid'?: boolean;
   'aria-describedby'?: string;
 }
