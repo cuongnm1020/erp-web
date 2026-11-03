@@ -21,6 +21,7 @@ import { toast } from '@/components/ui/toaster';
 import { cn } from '@/lib/cn';
 import { messageFor, messageForCode, messageForItemCode } from '@/lib/error-messages';
 import { formatDate, formatDateTime } from '@/lib/format';
+import { useAbility } from '@/lib/permission';
 import { useListState } from '@/lib/url-state';
 import { useCarriers } from '@/features/wms/api/use-shipping';
 import {
@@ -155,7 +156,12 @@ function ageText(iso: string): { text: string; old: boolean } {
 
 export function OrderIssuesScreen() {
   const { state, set } = useListState<FilterKey>(LIST_DEFAULTS);
-  const tabKey = parseTab(state.filters.issue);
+  // Màn mở cho quyền sales_order.issues (kho, 2026-11-03); tab "Bị Pancake ghi đè" chỉ superadmin.
+  const ability = useAbility();
+  const canOverwrite = ability.can('manage', 'OrderIssue');
+  const tabs = canOverwrite ? ISSUE_TABS : ISSUE_TABS.filter((t) => t.issue !== OVERWRITE);
+  const parsed = parseTab(state.filters.issue);
+  const tabKey: TabKey = parsed === OVERWRITE && !canOverwrite ? 'WAYBILL_ERROR' : parsed;
   const tab = ISSUE_TABS.find((t) => t.issue === tabKey)!;
   const overwrite = tabKey === OVERWRITE;
   // Tab ghi đè không gọi danh sách đơn — nhóm API mặc định để hook giữ thứ tự gọi.
@@ -250,7 +256,7 @@ export function OrderIssuesScreen() {
         aria-label="Cần xử lý"
         className="mb-3 grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6"
       >
-        {ISSUE_TABS.map((t) => {
+        {tabs.map((t) => {
           const on = t.issue === issue;
           const c = counts.data;
           return (

@@ -585,9 +585,9 @@ export const NAV_MODULES: NavModule[] = [
         label: 'Xử lý đơn lỗi',
         href: '/admin/order-issues',
         icon: TriangleAlert,
-        // CHỈ superadmin (2026-11-02): không mã quyền nào cấp `manage OrderIssue`, chỉ
-        // hasGlobalAccess (manage all) — API cũng 403 ORDER_ISSUES_SUPERADMIN_ONLY.
-        ability: { action: 'manage', subject: 'OrderIssue' },
+        // Quyền sales_order.issues (2026-11-03, gán cho nhân viên kho ở màn Vai trò; superadmin
+        // luôn có). Tab "Bị Pancake ghi đè" bên trong vẫn chỉ superadmin (manage OrderIssue).
+        ability: { action: 'issues', subject: 'SalesOrder' },
       },
       {
         label: 'Thiết bị PDA',

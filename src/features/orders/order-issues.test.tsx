@@ -113,6 +113,18 @@ describe('OrderIssuesScreen', () => {
     expect(listQueries.at(-1)!.get('issue')).toBe('WAYBILL_ERROR');
   });
 
+  it('nhân viên kho có quyền sales_order.issues: thấy 5 nhóm, không có ô "Bị Pancake ghi đè"; URL tab đó → về Lỗi vận đơn', async () => {
+    search = 'issue=PANCAKE_OVERWRITE';
+    const { listQueries } = setup();
+    renderApp(<OrderIssuesScreen />, {
+      me: { permissions: ['sales_order.read', 'sales_order.issues'], hasGlobalAccess: false },
+    });
+    const tile = await screen.findByTestId('issue-tile-WAYBILL_ERROR');
+    expect(tile).toHaveAttribute('aria-selected', 'true');
+    expect(screen.queryByTestId('issue-tile-PANCAKE_OVERWRITE')).toBeNull();
+    await waitFor(() => expect(listQueries.at(-1)!.get('issue')).toBe('WAYBILL_ERROR'));
+  });
+
   it('nhóm + lọc từ URL đi lên API (issue, olderThanDays, stockReady)', async () => {
     search = 'issue=PACK_ERROR&old=1&ready=true';
     const { listQueries } = setup();
@@ -147,16 +159,23 @@ describe('OrderIssuesScreen', () => {
     expect(screen.getByRole('button', { name: 'Gán hãng / cân nặng' })).toBeInTheDocument();
   });
 
-  it('chỉ superadmin: route gate đòi manage OrderIssue — admin thường (có mọi mã quyền) không có', () => {
+  it('route gate: quyền sales_order.issues (kho, 2026-11-03) hoặc superadmin; thiếu quyền thì không thấy', () => {
     const req = requiredAbilityFor('/admin/order-issues');
-    expect(req).toEqual({ action: 'manage', subject: 'OrderIssue' });
+    expect(req).toEqual({ action: 'issues', subject: 'SalesOrder' });
     const superadmin = buildAbility({ permissions: [], hasGlobalAccess: true });
-    const admin = buildAbility({
-      permissions: ['sales_order.read', 'sales_order.send_carrier', 'shipment.pack', 'user.read'],
+    const warehouse = buildAbility({
+      permissions: ['sales_order.read', 'sales_order.issues'],
+      hasGlobalAccess: false,
+    });
+    const sale = buildAbility({
+      permissions: ['sales_order.read', 'sales_order.send_carrier'],
       hasGlobalAccess: false,
     });
     expect(superadmin.can(req!.action, req!.subject)).toBe(true);
-    expect(admin.can(req!.action, req!.subject)).toBe(false);
+    expect(warehouse.can(req!.action, req!.subject)).toBe(true);
+    expect(sale.can(req!.action, req!.subject)).toBe(false);
+    // Tab "Bị Pancake ghi đè" vẫn chỉ superadmin.
+    expect(warehouse.can('manage', 'OrderIssue')).toBe(false);
   });
 
   it('tab Bị Pancake ghi đè: ô đếm, danh sách NV đặt → Pancake đè, khôi phục gửi đúng đơn', async () => {

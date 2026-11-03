@@ -56,6 +56,7 @@ const PERMISSION_LABELS: Record<string, string> = {
   'sales_order.read_all': 'Xem mọi đơn (kho in phiếu)',
   'sales_order.fulfil_manual': 'Đóng pick / gói tay',
   'sales_order.send_carrier': 'Gửi sang ĐVVC (kho)',
+  'sales_order.issues': 'Xử lý đơn lỗi (màn Quản trị)',
   'sales_order.filter_team': 'Lọc đơn theo phòng ban / NV lên đơn',
   'task.read': 'Xem việc của mình',
   'task.read_all': 'Xem mọi việc (điều phối)',
