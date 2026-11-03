@@ -277,7 +277,7 @@ describe('SalesReportScreen — quyền + bộ lọc chung', () => {
     expect(lastUrl().get('channel')).toBe('MARKETPLACE');
   });
 
-  it('leader CSKH: ô Phòng ban CSKH (danh sách API theo người xem) → teamId vào query; danh sách rỗng → ẩn ô (2026-10-29)', async () => {
+  it('leader CSKH: ô Phòng ban (danh sách API theo người xem) → teamId vào query; danh sách rỗng → ẩn ô (2026-10-29)', async () => {
     search = `from=${RANGE.from}&to=${RANGE.to}&teamId=t-cskh-a`;
     const calls: URLSearchParams[] = [];
     server.use(
@@ -295,7 +295,7 @@ describe('SalesReportScreen — quyền + bộ lọc chung', () => {
     );
     const me = { ...ME_LEADER, permissions: [...ME_LEADER.permissions, 'sales_order.read'] };
     const { unmount } = renderApp(<SalesReportScreen />, { me });
-    const box = await screen.findByRole('combobox', { name: 'Phòng ban CSKH' });
+    const box = await screen.findByRole('combobox', { name: 'Phòng ban' });
     expect(box).toHaveTextContent('CSKH A');
     expect(calls[0]!.get('teamId')).toBe('t-cskh-a');
     // Phòng CSKH đang chọn không hiện thành chip "Team: đã chọn".
@@ -306,7 +306,30 @@ describe('SalesReportScreen — quyền + bộ lọc chung', () => {
     search = `from=${RANGE.from}&to=${RANGE.to}`;
     renderApp(<SalesReportScreen />, { me });
     await screen.findByText('Doanh thu theo thời gian');
-    expect(screen.queryByRole('combobox', { name: 'Phòng ban CSKH' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('combobox', { name: 'Phòng ban' })).not.toBeInTheDocument();
+  });
+
+  it('xem toàn công ty: ô Phòng ban gồm mọi phòng đã có đơn (CSKH + Sale/MKT) → teamId vào query (2026-11-03)', async () => {
+    search = `from=${RANGE.from}&to=${RANGE.to}`;
+    const calls: URLSearchParams[] = [];
+    server.use(
+      http.get('/api/sales-orders/team-filter-options', () =>
+        HttpResponse.json([
+          { teamId: 't-cskh-a', name: 'CSKH A', group: 'CSKH', isActive: true },
+          { teamId: 't-spy-sale', name: 'SPY · Sale FB', group: 'SALES', isActive: true },
+        ]),
+      ),
+      http.get('/api/reports/sales/summary', ({ request }) => {
+        calls.push(new URL(request.url).searchParams);
+        return HttpResponse.json(SUMMARY);
+      }),
+      http.get('/api/reports/sales/timeseries', () => HttpResponse.json(SERIES)),
+    );
+    renderApp(<SalesReportScreen />);
+    const box = await screen.findByRole('combobox', { name: 'Phòng ban' });
+    fireEvent.click(box);
+    fireEvent.click(await screen.findByRole('option', { name: 'SPY · Sale FB' }));
+    await waitFor(() => expect(lastUrl().get('teamId')).toBe('t-spy-sale'));
   });
 
   it('"Tính lại số liệu" chỉ cho report.sales_all: POST khoảng đang xem → toast', async () => {

@@ -23,6 +23,7 @@ import {
   useReportOwners,
   useReportPancakeShops,
   useReportCareTeams,
+  useReportDepartments,
   useReportTeams,
   useSalesRollupRebuild,
 } from '../api/use-sales-report';
@@ -85,6 +86,8 @@ export function SalesReportScreen() {
   const teams = useReportTeams(teamPicker);
   // Phòng ban CSKH (2026-10-29): danh sách theo người xem từ API — rỗng thì ẩn ô.
   const careTeams = useReportCareTeams(canView && ability.can('read', 'SalesOrder'));
+  // Người xem toàn công ty: mọi phòng ban đã có đơn — CSKH + Sale/MKT (2026-11-03).
+  const depts = useReportDepartments(canView && canAll && ability.can('read', 'SalesOrder'));
   const owners = useReportOwners(ownerPicker);
   // POS Pancake: ai xem được đơn là chọn được; lỗi (vd 403) thì ẩn bộ lọc.
   const shops = useReportPancakeShops(canView && ability.can('read', 'SalesOrder'));
@@ -94,7 +97,8 @@ export function SalesReportScreen() {
 
   const teamOptions = (teams.data ?? []).filter((t) => t.type === 'SALES');
   const ownerOptions = owners.data?.items ?? [];
-  const careTeamOptions = careTeams.data ?? [];
+  const careTeamOptions: { teamId: string; name: string; isActive: boolean }[] =
+    canAll && depts.data?.length ? depts.data : (careTeams.data ?? []);
   const teamId = state.filters.teamId;
   const ownerId = state.filters.ownerId;
   const isCareTeam = !!teamId && careTeamOptions.some((t) => t.teamId === teamId);
@@ -151,9 +155,9 @@ export function SalesReportScreen() {
         />
         {/* Ô "Team" (team sale) đã bỏ theo user 2026-11-03 — team đặt từ nơi khác (link) hiện chip. */}
         {careTeamOptions.length > 0 ? (
-          // Cùng tham số teamId — chọn phòng CSKH thay cho team đang chọn.
+          // Cùng tham số teamId — chọn phòng ban thay cho team đang chọn.
           <FilterSelect
-            label="Phòng ban CSKH"
+            label="Phòng ban"
             value={isCareTeam ? teamId : undefined}
             options={careTeamOptions.map((t) => ({
               value: t.teamId,
