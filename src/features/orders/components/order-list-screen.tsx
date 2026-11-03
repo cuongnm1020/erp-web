@@ -43,7 +43,6 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { toast } from '@/components/ui/toaster';
-import { cn } from '@/lib/cn';
 import { messageFor, messageForCode, messageForItemCode } from '@/lib/error-messages';
 import {
   formatDate,
@@ -63,7 +62,7 @@ import { useInvalidateOn } from '@/lib/realtime';
 import { useHotkey } from '@/lib/use-hotkey';
 import { useListState, type SortState } from '@/lib/url-state';
 import { decimalCell } from '@/lib/xlsx-writer';
-import { useCarriers } from '@/features/wms/api/use-shipping';
+import { carrierAccountLabel, useCarriers } from '@/features/wms/api/use-shipping';
 import { CarrierSelect } from '@/features/wms/components/carrier-select';
 import {
   fetchOrdersPage,
@@ -80,7 +79,6 @@ import {
   useFacebookPageOptions,
   usePancakeShops,
   useSaveOrderListPrefs,
-  type OrderFlow,
   type OrderCarrierSource,
   type OrderCarrierStatusOption,
   type OrderDateField,
@@ -90,11 +88,14 @@ import {
   type SalesOrderListItem,
 } from '../api/use-orders';
 import {
-  FLOW_FAMILY_DOT,
   fulfilmentLabel,
   orderCancellable,
   orderFlowLabel,
-  ORDER_FLOW_TABS,
+  DEFAULT_FLOW_GROUP,
+  flowGroupOf,
+  ORDER_FLOW_GROUPS,
+  type OrderFlowGroup,
+  parseFlowGroup,
   parseOrderFlow,
   parseOrderStatus,
 } from '../labels';
@@ -105,6 +106,7 @@ import { BulkFulfilPrintDialog } from './bulk-fulfil-print-dialog';
 import { BulkReprintWaybillDialog } from './bulk-reprint-waybill-dialog';
 import { BulkRetryWaybillDialog, retryableWaybill } from './bulk-retry-waybill-dialog';
 import { BulkShippingDialog } from './bulk-shipping-dialog';
+import { OrderFlowTabs } from './order-flow-tabs';
 import { FlowBadge, OrderQuickView, TelcoBadge } from './order-quick-view';
 import { OrderSavedViews } from './order-saved-views';
 import { OrderScanButton } from './order-scan-button';
@@ -144,6 +146,9 @@ const DEFAULTS = {
   size: 50,
   filterKeys: [
     'flow',
+    // Tab cha (2026-11-03): wait / fulfil / issue / ship, `all` = mọi trạng thái (link từ màn khác).
+    // Có `flow` thì nhóm suy từ flow.
+    'group',
     'status',
     'customerId',
     'weightMin',
@@ -841,73 +846,6 @@ function WeightNote({ order }: { order: SalesOrderListItem }) {
 }
 
 /**
- * Tab luồng đơn + số đếm (API). Tab cùng họ màu (design system `flow-*`) đứng cạnh nhau, vạch
- * dọc tách họ, chấm màu ở tab đầu họ; tab đang 0 đơn chữ mờ (vẫn bấm được).
- */
-function FlowTabs({
-  value,
-  counts,
-  onChange,
-}: {
-  value: OrderFlow | undefined;
-  counts: Record<string, number> | undefined;
-  onChange: (v: OrderFlow | undefined) => void;
-}) {
-  const tabs = [
-    { key: undefined as OrderFlow | undefined, label: 'Tất cả', divider: false, dot: null },
-    ...ORDER_FLOW_TABS.map((t, i) => {
-      const first = i === 0 || ORDER_FLOW_TABS[i - 1]!.family !== t.family;
-      return {
-        key: t.flow as OrderFlow | undefined,
-        label: t.label,
-        divider: first,
-        dot: first ? FLOW_FAMILY_DOT[t.family] : null,
-      };
-    }),
-  ];
-  return (
-    <div
-      className="mb-3 flex overflow-x-auto border-b"
-      role="tablist"
-      aria-label="Trạng thái đơn hàng"
-    >
-      {tabs.map((t) => {
-        const active = value === t.key;
-        const n = counts?.[t.key ?? 'total'];
-        const zero = n === 0;
-        return (
-          <div key={t.key ?? '__all__'} className="flex flex-none items-stretch">
-            {t.divider ? <span aria-hidden className="mx-1 my-3 w-px bg-input-soft" /> : null}
-            <button
-              type="button"
-              role="tab"
-              aria-selected={active}
-              onClick={() => onChange(t.key)}
-              className={cn(
-                '-mb-px flex h-10 items-center gap-1.5 whitespace-nowrap border-b-2 px-2.5 text-sm',
-                active
-                  ? 'border-primary font-semibold text-foreground'
-                  : zero
-                    ? 'border-transparent text-subtle-foreground hover:text-foreground'
-                    : 'border-transparent font-semibold text-muted-foreground hover:text-foreground',
-              )}
-            >
-              {t.dot ? (
-                <span aria-hidden className={cn('h-1.5 w-1.5 rounded-full', t.dot)} />
-              ) : null}
-              {t.label}
-              <span className="font-normal tabular-nums text-subtle-foreground">
-                {n === undefined ? '…' : groupVi(String(n))}
-              </span>
-            </button>
-          </div>
-        );
-      })}
-    </div>
-  );
-}
-
-/**
  * Khoảng cân nặng (kg): gõ xong rồi Enter / rời ô mới áp lên URL — không bắn request theo
  * từng phím. Cùng giá trị hai ô = lọc đúng một mức cân (vd tất cả đơn 1,2 kg).
  */
@@ -1168,9 +1106,34 @@ export function CarrierFilter({
   );
 }
 
+/** Chip khoảng giá trị / cân nặng: "≥ a", "≤ b", "= a", "a – b"; không cận nào = không chip. */
+function rangeChip(min: string, max: string, fmt: (v: string) => string): string | null {
+  if (min && max) return min === max ? `= ${fmt(min)}` : `${fmt(min)} – ${fmt(max)}`;
+  if (min) return `≥ ${fmt(min)}`;
+  if (max) return `≤ ${fmt(max)}`;
+  return null;
+}
+
 export function OrderListScreen() {
   const { state, set, skipTake } = useListState<OrderFilter>(DEFAULTS);
-  const flow = parseOrderFlow(state.filters.flow);
+  const urlFlow = parseOrderFlow(state.filters.flow);
+  const groupParam = parseFlowGroup(state.filters.group);
+  // Ô tìm có chữ / link `group=all` → xem mọi trạng thái (tìm đơn đã giao không ra 0 vì đang ở
+  // tab khác). Ngoài ra luôn đứng trong một nhóm: theo flow, theo `group`, mặc định Chờ xử lý.
+  const searching = state.q !== '' || groupParam === 'all';
+  const group: OrderFlowGroup = urlFlow
+    ? flowGroupOf(urlFlow)
+    : groupParam && groupParam !== 'all'
+      ? groupParam
+      : DEFAULT_FLOW_GROUP;
+  const groupDef = ORDER_FLOW_GROUPS.find((g) => g.group === group)!;
+  const flow = searching ? undefined : urlFlow;
+  const flows = searching || urlFlow ? undefined : groupDef.flows;
+  // Đếm mọi tab còn mở (số 4 tab cha) + tab đã xong của nhóm đang mở.
+  const countFlows = useMemo(
+    () => [...ORDER_FLOW_GROUPS.flatMap((g) => g.flows), ...(searching ? [] : groupDef.done)],
+    [searching, groupDef],
+  );
   const status = parseOrderStatus(state.filters.status);
   const customerId = state.filters.customerId ?? '';
   const weightMin = state.filters.weightMin ?? '';
@@ -1294,13 +1257,27 @@ export function OrderListScreen() {
     () => ({
       ...filterParams,
       flow,
+      flows,
       sortBy,
       sortDir: sortBy ? (sort?.desc ? ('desc' as const) : ('asc' as const)) : undefined,
       ...skipTake,
     }),
-    [filterParams, flow, sortBy, sort?.desc, skipTake],
+    [filterParams, flow, flows, sortBy, sort?.desc, skipTake],
   );
   const carriers = useCarriers();
+  // Chữ chip "Đang lọc" của hai ô tự vẽ (sản phẩm, hãng) — cùng nguồn dữ liệu với ô chọn.
+  const skuChip = useSkuDetail(skuId);
+  const carrierChip = useMemo(() => {
+    if (noCarrier) return 'Chưa gán hãng';
+    const list = carriers.data ?? [];
+    if (carrierAccountId) {
+      const c = list.find((x) => x.accounts.some((a) => a.id === carrierAccountId));
+      const a = c?.accounts.find((x) => x.id === carrierAccountId);
+      return c && a ? `${c.code} ${carrierAccountLabel(c, a)}` : 'đã chọn';
+    }
+    if (carrierId) return list.find((x) => x.id === carrierId)?.name ?? 'đã chọn';
+    return null;
+  }, [noCarrier, carrierAccountId, carrierId, carriers.data]);
   const router = useRouter();
   const ability = useAbility();
   const canUpdate = ability.can('update', 'SalesOrder');
@@ -1375,16 +1352,17 @@ export function OrderListScreen() {
   // tải 2 lần (lần đầu chưa có sort, lần sau có), mỗi lần ~5 s trên prod (sự cố pool 2026-11-02).
   // Đọc prefs lỗi thì vẫn tải (isPending = false).
   const query = useOrders(params, { enabled: state.sort != null || !prefs.isPending });
-  const counts = useOrderFlowCounts(filterParams);
+  const counts = useOrderFlowCounts(filterParams, countFlows);
   // Xuất Excel = mọi trang của đúng bộ lọc + tab + sắp xếp đang xem.
   const exportParams = useMemo(
     () => ({
       ...filterParams,
       flow,
+      flows,
       sortBy,
       sortDir: sortBy ? (sort?.desc ? ('desc' as const) : ('asc' as const)) : undefined,
     }),
-    [filterParams, flow, sortBy, sort?.desc],
+    [filterParams, flow, flows, sortBy, sort?.desc],
   );
   const exportColumns = useMemo(() => {
     const carrierById = new Map((carriers.data ?? []).map((c) => [c.id, c]));
@@ -1473,10 +1451,25 @@ export function OrderListScreen() {
         }
       />
 
-      <FlowTabs
-        value={flow}
-        counts={counts.data as Record<string, number> | undefined}
-        onChange={(v) => setFilter({ flow: v })}
+      <OrderFlowTabs
+        group={group}
+        flow={flow}
+        counts={counts.data}
+        searching={searching}
+        searchingLabel={state.q}
+        onGroupChange={(g) =>
+          set({ q: '', filters: { ...state.filters, group: g, flow: undefined } })
+        }
+        onFlowChange={(f) => setFilter({ group, flow: f })}
+        onExitSearch={() =>
+          set({
+            q: '',
+            filters: {
+              ...state.filters,
+              group: groupParam === 'all' ? DEFAULT_FLOW_GROUP : state.filters.group,
+            },
+          })
+        }
       />
 
       {flow === 'WAITING_STOCK' || shortSkuId ? (
@@ -1512,12 +1505,14 @@ export function OrderListScreen() {
               key: 'printStatus',
               label: 'In tem',
               type: 'select',
+              group: 'Vận chuyển',
               options: PRINT_STATUS_OPTIONS,
             },
             {
               key: 'skuId',
               label: 'Sản phẩm',
               type: 'custom',
+              chip: skuId ? (skuChip.data?.name ?? 'đã chọn') : null,
               render: () => (
                 <ProductFilter
                   skuId={skuId}
@@ -1529,8 +1524,10 @@ export function OrderListScreen() {
               // Một ô cho cả "chưa gán hãng" lẫn "đã gán hãng X" — hai key URL (noCarrier / carrierId)
               // loại trừ nhau.
               key: 'carrierId',
-              label: 'Hãng vận chuyển',
+              label: 'Hãng VC',
               type: 'custom',
+              chip: carrierChip,
+              clearKeys: ['noCarrier', 'carrierAccountId'],
               render: () => (
                 <CarrierFilter
                   noCarrier={noCarrier}
@@ -1544,12 +1541,14 @@ export function OrderListScreen() {
               key: 'carrierSource',
               label: 'Gán hãng',
               type: 'select',
+              group: 'Vận chuyển',
               options: CARRIER_SOURCE_OPTIONS,
             },
             {
               key: 'source',
               label: 'Nguồn',
               type: 'select',
+              group: 'Nguồn & người',
               // Hàng chục POS Pancake — gõ tìm theo tên shop.
               searchable: true,
               options: [
@@ -1565,6 +1564,7 @@ export function OrderListScreen() {
               key: 'fbPage',
               label: 'Page',
               type: 'multiSelect',
+              group: 'Nguồn & người',
               unit: 'page',
               options: (facebookPages.data ?? []).map((p) => ({
                 value: p.id,
@@ -1576,6 +1576,7 @@ export function OrderListScreen() {
               key: 'carrierStatus',
               label: 'Trạng thái hãng',
               type: 'multiSelect',
+              group: 'Vận chuyển',
               unit: 'trạng thái',
               options: carrierStatusOptions(carrierStatuses.data ?? []),
             },
@@ -1587,6 +1588,7 @@ export function OrderListScreen() {
                     key: 'team' as const,
                     label: 'Phòng ban',
                     type: 'multiSelect' as const,
+                    group: 'Nguồn & người',
                     unit: 'phòng',
                     options: (teamOptions.data ?? []).map((t) => ({
                       value: t.teamId,
@@ -1612,18 +1614,23 @@ export function OrderListScreen() {
               key: 'duplicate',
               label: 'Trùng trong ngày',
               type: 'select',
+              group: 'Đơn',
               options: [{ value: 'true', label: 'Chỉ đơn trùng trong ngày' }],
             },
             {
               key: 'itemOrigin',
               label: 'Sản phẩm ngoài ERP',
               type: 'select',
+              group: 'Đơn',
               options: ITEM_ORIGIN_OPTIONS,
             },
             {
               key: 'totalMin',
               label: 'Giá trị đơn',
               type: 'custom',
+              group: 'Đơn',
+              chip: rangeChip(totalMin, totalMax, (v) => formatMoney(v)),
+              clearKeys: ['totalMax'],
               render: () => (
                 <TotalValueFilter
                   min={state.filters.totalMin}
@@ -1636,6 +1643,9 @@ export function OrderListScreen() {
               key: 'weightMin',
               label: 'Cân nặng',
               type: 'custom',
+              group: 'Đơn',
+              chip: rangeChip(weightMin, weightMax, (v) => `${v} kg`),
+              clearKeys: ['weightMax'],
               render: () => (
                 <WeightRangeFilter
                   min={state.filters.weightMin}
@@ -1646,7 +1656,6 @@ export function OrderListScreen() {
             },
           ]}
           values={{
-            flow: state.filters.flow,
             status: state.filters.status,
             customerId: state.filters.customerId,
             weightMin: state.filters.weightMin,
@@ -1684,6 +1693,7 @@ export function OrderListScreen() {
                 : patch,
             )
           }
+          pinned={['carrierId', 'creatorId', 'skuId']}
           searchPlaceholder="Mã đơn, mã Pancake, SĐT, tên khách, tên sản phẩm, mã vận đơn"
           right={
             <>

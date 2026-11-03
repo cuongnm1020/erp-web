@@ -96,7 +96,7 @@ function TodayTotal({ today }: { today: string }) {
       ) : t ? (
         <>
           <Link
-            href={`/crm/orders?from=${today}&to=${today}`}
+            href={`/crm/orders?group=all&from=${today}&to=${today}`}
             className="w-fit text-4xl font-semibold leading-tight text-primary hover:underline"
           >
             {count(t.total)}
@@ -295,7 +295,7 @@ export function NeedsActionStrip({
         label: 'Chưa gán ĐVVC',
         icon: Truck,
         tone: 'info',
-        href: '/crm/orders?noCarrier=true',
+        href: '/crm/orders?group=all&noCarrier=true',
         // Đơn còn ở kho (chờ kho / đang pick / đã đóng gói) mà chưa chọn hãng.
         value: nc ? nc.WAREHOUSE + nc.PICKING + nc.PACKED : undefined,
         pending: qNoCarrier.isPending,

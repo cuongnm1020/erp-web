@@ -302,6 +302,66 @@ export const ORDER_FLOW_TABS: ReadonlyArray<{
 ];
 
 /**
+ * 4 tab cha của danh sách đơn (2026-11-03, design system FlowTabs): mỗi nhóm một họ màu, chip con
+ * `flows` là trạng thái còn mở (số tab cha = tổng của chúng), `done` là trạng thái kết thúc đứng
+ * sau vạch "Đã xong" — không cộng vào số tab cha, chỉ đếm khi nhóm đang mở.
+ */
+export type OrderFlowGroup = 'wait' | 'fulfil' | 'issue' | 'ship';
+
+export const ORDER_FLOW_GROUPS: ReadonlyArray<{
+  group: OrderFlowGroup;
+  label: string;
+  family: OrderFlowFamily;
+  flows: readonly OrderFlow[];
+  done: readonly OrderFlow[];
+}> = [
+  {
+    group: 'wait',
+    label: 'Chờ xử lý',
+    family: 'wait',
+    flows: ['NEW', 'PENDING_APPROVAL', 'WAITING_STOCK'],
+    done: [],
+  },
+  {
+    group: 'fulfil',
+    label: 'Kho',
+    family: 'fulfil',
+    flows: ['WAREHOUSE', 'PICKING', 'PACKED'],
+    done: [],
+  },
+  {
+    group: 'issue',
+    label: 'Cần xử lý',
+    family: 'issue',
+    flows: ['NEEDS_FIX', 'RETURNED', 'CARRIER_CANCELLED'],
+    done: ['CANCELLED'],
+  },
+  {
+    group: 'ship',
+    label: 'Vận chuyển',
+    family: 'ship',
+    flows: ['PICKED_UP', 'IN_TRANSIT', 'OUT_FOR_DELIVERY'],
+    done: ['DELIVERED'],
+  },
+];
+
+/** Nhóm mặc định khi URL không có `group` / `flow`. */
+export const DEFAULT_FLOW_GROUP: OrderFlowGroup = 'wait';
+
+export function flowGroupOf(flow: OrderFlow): OrderFlowGroup {
+  return (
+    ORDER_FLOW_GROUPS.find((g) => g.flows.includes(flow) || g.done.includes(flow))?.group ??
+    DEFAULT_FLOW_GROUP
+  );
+}
+
+/** `?group=` trên URL: một nhóm, `all` = xem mọi trạng thái (link từ màn khác), còn lại bỏ qua. */
+export function parseFlowGroup(v: string | undefined): OrderFlowGroup | 'all' | undefined {
+  if (v === 'all') return 'all';
+  return ORDER_FLOW_GROUPS.find((g) => g.group === v)?.group;
+}
+
+/**
  * Luồng chung của một đơn ở màn chi tiết (DTO chi tiết không có `flow` như dòng danh sách): suy từ
  * trạng thái chứng từ + trạng thái kho/giao. `null` = không xếp được vào luồng (việc kho bị hủy
  * trong khi đơn còn sống) — màn không vẽ thanh tiến độ.

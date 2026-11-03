@@ -137,8 +137,9 @@ export function useDashboardFlowCounts(p: FlowCountParams, enabled: boolean) {
   return useQuery({
     enabled,
     queryKey: dashboardKeys.flowCounts(p),
-    queryFn: () =>
-      unwrap(
+    queryFn: async () =>
+      // Không gửi `countFlows` → API đếm MỌI tab + `total` (trường chỉ optional khi đếm một phần).
+      (await unwrap(
         api.GET('/sales-orders/flow-counts', {
           params: {
             // take / skip vô nghĩa với đếm — spec vẫn đòi vì dùng chung DTO lọc với danh sách.
@@ -151,7 +152,7 @@ export function useDashboardFlowCounts(p: FlowCountParams, enabled: boolean) {
             },
           },
         }),
-      ),
+      )) as Required<OrderFlowCounts>,
     staleTime: STALE_MS,
     refetchInterval: COUNTS_REFRESH_MS,
     placeholderData: keepPreviousData,

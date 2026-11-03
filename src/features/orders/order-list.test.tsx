@@ -38,6 +38,15 @@ const FIRST = makeOrders(1)[0]!;
 const openMoreMenu = () =>
   fireEvent.keyDown(screen.getByRole('button', { name: /^Khác/ }), { key: 'ArrowDown' });
 
+/**
+ * Panel "Bộ lọc khác" (2026-11-03): ô lọc ngoài khoảng ngày + 3 ô ghim (Hãng VC, NV lên đơn, Sản
+ * phẩm) nằm trong đó. Trả `within(panel)` — jsdom không áp CSS nên ô ghim có ở cả thanh lẫn panel.
+ */
+const openMoreFilters = async () => {
+  fireEvent.click(await screen.findByRole('button', { name: 'Bộ lọc khác' }));
+  return within(await screen.findByRole('dialog'));
+};
+
 describe('OrderListScreen — GET /sales-orders (P1-12)', () => {
   it('loading → bảng dữ liệu thật, tổng hiện trên tiêu đề', async () => {
     search = '';
@@ -99,23 +108,101 @@ describe('OrderListScreen — GET /sales-orders (P1-12)', () => {
 
   it('tab theo luồng đơn đọc ?flow= từ URL, lọc phía server; mỗi tab có số đếm từ API (luật 8)', async () => {
     const all = makeOrders(60);
-    const delivered = all.filter((o) => o.flow === 'DELIVERED').length;
+    const n = (f: string) => all.filter((o) => o.flow === f).length;
     search = 'flow=DELIVERED';
     renderApp(<OrderListScreen />);
-    await screen.findByText(`${delivered} đơn khớp bộ lọc`);
-    const tab = screen.getByRole('tab', { name: new RegExp(`^Thành công\\s*${delivered}$`) });
-    expect(tab).toHaveAttribute('aria-selected', 'true');
-    // Số đếm của tab khác + tab Tất cả cũng có (GET /sales-orders/flow-counts).
-    const pending = all.filter((o) => o.flow === 'PENDING_APPROVAL').length;
+    await screen.findByText(`${n('DELIVERED')} đơn khớp bộ lọc`);
+    // flow=DELIVERED → tab cha Vận chuyển + chip Thành công (sau "Đã xong").
+    expect(screen.getByRole('tab', { name: /^Vận chuyển/ })).toHaveAttribute(
+      'aria-selected',
+      'true',
+    );
+    const chip = await screen.findByRole('tab', {
+      name: new RegExp(`^Thành công\\s*${n('DELIVERED')}$`),
+    });
+    expect(chip).toHaveAttribute('aria-selected', 'true');
+    expect(screen.getByText('Đã xong')).toBeInTheDocument();
+    // Số tab cha = tổng trạng thái còn mở của nhóm (không gồm Thành công).
+    const ship = n('PICKED_UP') + n('IN_TRANSIT') + n('OUT_FOR_DELIVERY');
+    expect(screen.getByRole('tab', { name: /^Vận chuyển/ })).toHaveTextContent(
+      new RegExp(`${ship}$`),
+    );
     expect(
-      await screen.findByRole('tab', { name: new RegExp(`^Chờ duyệt\\s*${pending}$`) }),
+      screen.getByRole('tab', { name: new RegExp(`^Tất cả vận chuyển\\s*${ship}$`) }),
     ).toHaveAttribute('aria-selected', 'false');
-    expect(screen.getByRole('tab', { name: /^Tất cả\s*60$/ })).toBeInTheDocument();
-    // Bấm tab → ghi ?flow= lên URL.
+    // Không còn tab "Tất cả" tầng cha.
+    expect(screen.queryByRole('tab', { name: /^Tất cả\s*60$/ })).not.toBeInTheDocument();
+    // Bấm chip → ?flow=; bấm tab cha → ?group= và bỏ flow.
     replace.mockClear();
-    fireEvent.click(screen.getByRole('tab', { name: /^Sự cố hoàn/ }));
+    fireEvent.click(screen.getByRole('tab', { name: /^Đang vận chuyển/ }));
     await waitFor(() => expect(replace).toHaveBeenCalled());
-    expect(String(replace.mock.calls.at(-1)![0])).toContain('flow=RETURNED');
+    expect(String(replace.mock.calls.at(-1)![0])).toContain('flow=IN_TRANSIT');
+    replace.mockClear();
+    fireEvent.click(screen.getByRole('tab', { name: /^Cần xử lý/ }));
+    await waitFor(() => expect(replace).toHaveBeenCalled());
+    const url = String(replace.mock.calls.at(-1)![0]);
+    expect(url).toContain('group=issue');
+    expect(url).not.toContain('flow=');
+  });
+
+  it('tab cha (2026-11-03): mặc định Chờ xử lý gửi ?flows= của nhóm, đếm countFlows; ô tìm → mọi trạng thái', async () => {
+    const lists: URLSearchParams[] = [];
+    const counts: URLSearchParams[] = [];
+    const onRequest = ({ request }: { request: Request }) => {
+      const u = new URL(request.url);
+      if (u.pathname === '/api/sales-orders') lists.push(u.searchParams);
+      if (u.pathname === '/api/sales-orders/flow-counts') counts.push(u.searchParams);
+    };
+    server.events.on('request:start', onRequest);
+    try {
+      search = '';
+      renderApp(<OrderListScreen />);
+      await screen.findByText(FIRST.docNumber);
+      expect(screen.getByRole('tab', { name: /^Chờ xử lý/ })).toHaveAttribute(
+        'aria-selected',
+        'true',
+      );
+      expect(lists.at(-1)!.getAll('flows')).toEqual(['NEW', 'PENDING_APPROVAL', 'WAITING_STOCK']);
+      expect(lists.at(-1)!.get('flow')).toBeNull();
+      // Đếm mọi tab còn mở, KHÔNG đếm Thành công / Đã hủy khi nhóm của chúng đóng.
+      const cf = counts.at(-1)!.getAll('countFlows');
+      expect(cf).toContain('IN_TRANSIT');
+      expect(cf).not.toContain('DELIVERED');
+      expect(cf).not.toContain('CANCELLED');
+
+      cleanup();
+      search = 'group=ship';
+      renderApp(<OrderListScreen />);
+      await screen.findByText(FIRST.docNumber);
+      await waitFor(() =>
+        expect(lists.at(-1)!.getAll('flows')).toEqual([
+          'PICKED_UP',
+          'IN_TRANSIT',
+          'OUT_FOR_DELIVERY',
+        ]),
+      );
+      expect(counts.at(-1)!.getAll('countFlows')).toContain('DELIVERED');
+
+      // Ô tìm có chữ → không gửi flow / flows, tab cha không chọn, có "Quay lại tab".
+      cleanup();
+      search = 'q=0386&group=ship';
+      renderApp(<OrderListScreen />);
+      await screen.findByText(/Đang tìm/);
+      await waitFor(() => expect(lists.at(-1)!.get('q')).toBe('0386'));
+      expect(lists.at(-1)!.getAll('flows')).toEqual([]);
+      expect(screen.getByRole('tab', { name: /^Vận chuyển/ })).toHaveAttribute(
+        'aria-selected',
+        'false',
+      );
+      replace.mockClear();
+      fireEvent.click(screen.getByRole('button', { name: 'Quay lại tab Vận chuyển' }));
+      await waitFor(() => expect(replace).toHaveBeenCalled());
+      const url = String(replace.mock.calls.at(-1)![0]);
+      expect(url).not.toContain('q=');
+      expect(url).toContain('group=ship');
+    } finally {
+      server.events.removeListener('request:start', onRequest);
+    }
   });
 
   it('đơn trùng trong ngày: chip "Trùng · N đơn" ở cột trạng thái; ?duplicate=true gửi lên server', async () => {
@@ -271,14 +358,20 @@ describe('OrderListScreen — cân nặng gửi hãng + gán hãng hàng loạt'
     ).length;
     renderApp(<OrderListScreen />);
     await screen.findByText(`${expected} đơn khớp bộ lọc`);
-    expect(screen.getByLabelText('Cân nặng từ (kg)')).toHaveValue('1');
-    expect(screen.getByLabelText('Cân nặng đến (kg)')).toHaveValue('1.5');
     expect(screen.getByRole('combobox', { name: 'Hãng vận chuyển' })).toHaveTextContent(
       'Chưa gán hãng',
     );
+    // Chip "Đang lọc" cho cả hai lọc.
+    expect(screen.getByRole('button', { name: 'Bỏ lọc Hãng VC' }).parentElement).toHaveTextContent(
+      'Hãng VC: Chưa gán hãng',
+    );
+    expect(screen.getByRole('button', { name: 'Bỏ lọc Cân nặng' })).toBeInTheDocument();
+    const panel = await openMoreFilters();
+    expect(panel.getByLabelText('Cân nặng từ (kg)')).toHaveValue('1');
+    expect(panel.getByLabelText('Cân nặng đến (kg)')).toHaveValue('1.5');
     // Gõ khoảng mới + Enter → chỉ khi Enter mới ghi URL (không bắn theo từng phím)
     replace.mockClear();
-    const min = screen.getByLabelText('Cân nặng từ (kg)');
+    const min = panel.getByLabelText('Cân nặng từ (kg)');
     fireEvent.change(min, { target: { value: '1,2' } });
     expect(replace).not.toHaveBeenCalled();
     fireEvent.keyDown(min, { key: 'Enter' });
@@ -297,9 +390,10 @@ describe('OrderListScreen — cân nặng gửi hãng + gán hãng hàng loạt'
       if (u.pathname === '/api/sales-orders') seen.push(u.searchParams);
     });
     renderApp(<OrderListScreen />);
-    const box = await screen.findByLabelText('Giá trị đơn (₫)');
+    const panel = await openMoreFilters();
+    const box = await panel.findByLabelText('Giá trị đơn (₫)');
     expect(box).toHaveValue('500.000');
-    expect(screen.getByRole('combobox', { name: 'Toán tử giá trị đơn' })).toHaveTextContent('=');
+    expect(panel.getByRole('combobox', { name: 'Toán tử giá trị đơn' })).toHaveTextContent('=');
     await waitFor(() =>
       expect(
         seen.some((q) => q.get('totalMin') === '500000' && q.get('totalMax') === '500000'),
@@ -320,13 +414,17 @@ describe('OrderListScreen — cân nặng gửi hãng + gán hãng hàng loạt'
   it('lọc giá trị đơn: chỉ totalMax → "≤"; min ≠ max → "Từ … đến" hiện hai ô', async () => {
     search = 'totalMax=300000';
     renderApp(<OrderListScreen />);
-    expect(await screen.findByLabelText('Giá trị đơn (₫)')).toHaveValue('300.000');
-    expect(screen.getByRole('combobox', { name: 'Toán tử giá trị đơn' })).toHaveTextContent('≤');
+    // Chip "Đang lọc" ghi toán tử + số tiền.
+    expect(await screen.findByText(/≤ 300\.000/)).toBeInTheDocument();
+    let panel = await openMoreFilters();
+    expect(await panel.findByLabelText('Giá trị đơn (₫)')).toHaveValue('300.000');
+    expect(panel.getByRole('combobox', { name: 'Toán tử giá trị đơn' })).toHaveTextContent('≤');
     cleanup();
     search = 'totalMin=100000&totalMax=900000';
     renderApp(<OrderListScreen />);
-    expect(await screen.findByLabelText('Giá trị đơn từ (₫)')).toHaveValue('100.000');
-    expect(screen.getByLabelText('Giá trị đơn đến (₫)')).toHaveValue('900.000');
+    panel = await openMoreFilters();
+    expect(await panel.findByLabelText('Giá trị đơn từ (₫)')).toHaveValue('100.000');
+    expect(panel.getByLabelText('Giá trị đơn đến (₫)')).toHaveValue('900.000');
   });
 
   it('chọn 2 đơn → "Gán hãng / cân nặng" → POST /sales-orders/bulk-update đúng orderIds + cân nặng + hãng, bỏ chọn sau khi xong', async () => {
@@ -896,7 +994,7 @@ describe('OrderListScreen — lọc theo hãng + thời gian (2026-09-19)', () =
     server.events.on('request:start', onRequest);
     try {
       renderApp(<OrderListScreen />);
-      const box = await screen.findByRole('combobox', { name: 'Nguồn' });
+      const box = await (await openMoreFilters()).findByRole('combobox', { name: 'Nguồn' });
       await waitFor(() => expect(box).toHaveTextContent('Pancake · Thiên Nông chính'));
       await waitFor(() => expect(seen.length).toBeGreaterThanOrEqual(2));
       const list = seen.find((u) => new URL(u).pathname === '/api/sales-orders')!;
@@ -934,7 +1032,7 @@ describe('OrderListScreen — lọc theo hãng + thời gian (2026-09-19)', () =
       ),
     );
     renderApp(<OrderListScreen />);
-    fireEvent.click(await screen.findByRole('combobox', { name: 'Nguồn' }));
+    fireEvent.click(await (await openMoreFilters()).findByRole('combobox', { name: 'Nguồn' }));
     const input = await screen.findByPlaceholderText('Tìm nguồn…');
     await screen.findByRole('option', { name: 'Pancake · 71-TikTok Shop' });
     fireEvent.change(input, { target: { value: 'cskh duong noi' } });
@@ -965,7 +1063,7 @@ describe('OrderListScreen — lọc theo hãng + thời gian (2026-09-19)', () =
       }),
     );
     renderApp(<OrderListScreen />);
-    const box = await screen.findByRole('combobox', { name: 'Phòng ban' });
+    const box = await (await openMoreFilters()).findByRole('combobox', { name: 'Phòng ban' });
     expect(box).toHaveTextContent('Phòng ban: tất cả');
     await waitFor(() => expect(seen.at(-1)).toBe(''));
     fireEvent.click(box);
@@ -994,8 +1092,9 @@ describe('OrderListScreen — lọc theo hãng + thời gian (2026-09-19)', () =
     );
     renderApp(<OrderListScreen />, { me: { ...ME_SALE, permissions: ['sales_order.read'] } });
     await screen.findByText(FIRST.docNumber);
-    expect(screen.queryByRole('combobox', { name: 'Phòng ban' })).not.toBeInTheDocument();
     expect(screen.queryByRole('combobox', { name: 'NV lên đơn' })).not.toBeInTheDocument();
+    const panel = await openMoreFilters();
+    expect(panel.queryByRole('combobox', { name: 'Phòng ban' })).not.toBeInTheDocument();
     expect(seen.at(-1)!.get('teamIds')).toBeNull();
     expect(seen.at(-1)!.get('creatorId')).toBeNull();
   });
@@ -1013,7 +1112,7 @@ describe('OrderListScreen — lọc theo hãng + thời gian (2026-09-19)', () =
     renderApp(<OrderListScreen />);
     expect(await screen.findByTestId('order-page')).toHaveTextContent('Đất Phương Nam - CS4');
 
-    fireEvent.click(screen.getByRole('combobox', { name: 'Page' }));
+    fireEvent.click((await openMoreFilters()).getByRole('combobox', { name: 'Page' }));
     const input = await screen.findByPlaceholderText('Tìm page…');
     expect(
       await screen.findByRole('option', { name: /Vật Tư Nông Nghiệp CS3 \(ngưng\)/ }),
@@ -1032,7 +1131,13 @@ describe('OrderListScreen — lọc theo hãng + thời gian (2026-09-19)', () =
     search = `fbPage=${a!.id}%2C${c!.id}`;
     renderApp(<OrderListScreen />);
     await waitFor(() => expect(seen).toContain(`${a!.id},${c!.id}`));
-    expect(screen.getByRole('combobox', { name: 'Page' })).toHaveTextContent('Page: 2 page');
+    // Chip "Đang lọc" + ô trong panel cùng ghi số page.
+    expect(screen.getByRole('button', { name: 'Bỏ lọc Page' }).parentElement).toHaveTextContent(
+      'Page: 2 page',
+    );
+    expect((await openMoreFilters()).getByRole('combobox', { name: 'Page' })).toHaveTextContent(
+      'Page: 2 page',
+    );
   });
 
   it('ô Trạng thái hãng chọn nhiều → URL carrierStatus (chữ có dấu phẩy vẫn nguyên) + API carrierStatusText lặp tham số (2026-10-28)', async () => {
@@ -1053,7 +1158,9 @@ describe('OrderListScreen — lọc theo hãng + thời gian (2026-09-19)', () =
       }),
     );
     renderApp(<OrderListScreen />);
-    fireEvent.click(await screen.findByRole('combobox', { name: 'Trạng thái hãng' }));
+    fireEvent.click(
+      await (await openMoreFilters()).findByRole('combobox', { name: 'Trạng thái hãng' }),
+    );
     replace.mockClear();
     fireEvent.click(await screen.findByRole('option', { name: new RegExp(tồn) }));
     await waitFor(() => expect(replace).toHaveBeenCalled());
@@ -1070,7 +1177,7 @@ describe('OrderListScreen — lọc theo hãng + thời gian (2026-09-19)', () =
   it('ô Nguồn: "Tạo trong ERP" đứng đầu danh sách', async () => {
     search = '';
     renderApp(<OrderListScreen />);
-    fireEvent.click(await screen.findByRole('combobox', { name: 'Nguồn' }));
+    fireEvent.click(await (await openMoreFilters()).findByRole('combobox', { name: 'Nguồn' }));
     const options = await screen.findAllByRole('option');
     expect(options.map((o) => o.textContent)).toContain('Tạo trong ERP');
     expect(
@@ -1115,10 +1222,11 @@ describe('OrderListScreen — lọc theo hãng + thời gian (2026-09-19)', () =
     try {
       cleanup();
       renderApp(<OrderListScreen />);
-      const source = await screen.findByRole('combobox', { name: 'Gán hãng' });
+      await screen.findByRole('button', { name: 'Bỏ lọc Gán hãng' });
+      const source = await (await openMoreFilters()).findByRole('combobox', { name: 'Gán hãng' });
       expect(source).toHaveTextContent('Pancake gán hãng');
       await waitFor(() =>
-        expect(screen.getByRole('combobox', { name: 'Hãng vận chuyển' })).toHaveTextContent(
+        expect(screen.getAllByRole('combobox', { name: 'Hãng vận chuyển' })[0]).toHaveTextContent(
           'VTP Viettel Post',
         ),
       );
@@ -1366,13 +1474,20 @@ describe('OrderListScreen — redesign Bán hàng (2026-10-22)', () => {
     expect(screen.queryByRole('link', { name: 'Nhân bản đơn' })).not.toBeInTheDocument();
   });
 
-  it('hiện hết bộ lọc ngay trên thanh, không còn "Thêm lọc" (2026-10-29)', async () => {
+  it('thanh lọc một hàng (2026-11-03): ô ghim trên thanh, phần còn lại trong "Bộ lọc khác" theo nhóm', async () => {
     search = '';
     renderApp(<OrderListScreen />);
     await screen.findByText(FIRST.docNumber);
     expect(screen.queryByRole('button', { name: /Thêm lọc/ })).not.toBeInTheDocument();
-    for (const name of ['Trùng trong ngày', 'Sản phẩm ngoài ERP', 'NV lên đơn']) {
-      expect(screen.getByRole('combobox', { name })).toBeInTheDocument();
+    expect(screen.getByRole('combobox', { name: 'NV lên đơn' })).toBeInTheDocument();
+    expect(screen.getByRole('combobox', { name: 'Hãng vận chuyển' })).toBeInTheDocument();
+    expect(screen.queryByRole('combobox', { name: 'Trùng trong ngày' })).not.toBeInTheDocument();
+    const panel = await openMoreFilters();
+    for (const name of ['Trùng trong ngày', 'Sản phẩm ngoài ERP', 'Nguồn', 'In tem']) {
+      expect(panel.getByRole('combobox', { name })).toBeInTheDocument();
+    }
+    for (const title of ['Vận chuyển', 'Nguồn & người', 'Đơn']) {
+      expect(panel.getByText(title)).toBeInTheDocument();
     }
   });
 
@@ -1392,7 +1507,16 @@ describe('OrderListScreen — redesign Bán hàng (2026-10-22)', () => {
     search = 'duplicate=true';
     renderApp(<OrderListScreen />);
     await screen.findByText(FIRST.docNumber);
-    expect(screen.getByRole('combobox', { name: 'Trùng trong ngày' })).toBeInTheDocument();
+    // Lọc trong panel đang bật: số trên nút + chip "Đang lọc"; × bỏ đúng lọc đó.
+    expect(screen.getByRole('button', { name: 'Bộ lọc khác' })).toHaveTextContent('1');
+    const remove = screen.getByRole('button', { name: 'Bỏ lọc Trùng trong ngày' });
+    expect(remove.parentElement).toHaveTextContent('Trùng trong ngày: Chỉ đơn trùng trong ngày');
+    const panel = await openMoreFilters();
+    expect(panel.getByRole('combobox', { name: 'Trùng trong ngày' })).toBeInTheDocument();
+    replace.mockClear();
+    fireEvent.click(remove);
+    await waitFor(() => expect(replace).toHaveBeenCalled());
+    expect(String(replace.mock.calls.at(-1)![0])).not.toContain('duplicate=');
   });
 
   it('chọn dòng → thanh chọn nhiều thay thanh lọc, có tổng tiền; Esc / "Bỏ chọn" trả lại thanh lọc', async () => {
@@ -1532,7 +1656,11 @@ describe('OrderListScreen — Lỗi vận đơn + đơn TikTok (2026-10-28, tab 
     renderApp(<OrderListScreen />);
     await screen.findByText(FIRST.docNumber);
     expect(seenFlow).toContain('NEEDS_FIX');
-    expect(screen.getByRole('tab', { name: /Cần sửa/ })).toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: /^Cần sửa/ })).toHaveAttribute('aria-selected', 'true');
+    expect(screen.getByRole('tab', { name: /^Cần xử lý/ })).toHaveAttribute(
+      'aria-selected',
+      'true',
+    );
     expect(screen.queryByRole('tab', { name: /Lỗi vận đơn/ })).not.toBeInTheDocument();
     expect(screen.getByText('TikTok')).toBeInTheDocument();
     expect(screen.getByText('SĐT bị che')).toBeInTheDocument();
@@ -1600,7 +1728,7 @@ describe('OrderListScreen — Đơn mới / Xác nhận / Chờ hàng (2026-10-3
     );
     renderApp(<OrderListScreen />, { me: ME_SALE });
     await screen.findByText(FIRST.docNumber);
-    expect(screen.getByRole('tab', { name: /Đơn mới/ })).toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: /^Đơn mới/ })).toBeInTheDocument();
     const row = screen.getAllByRole('row').find((r) => r.textContent?.includes(FIRST.docNumber))!;
     fireEvent.click(within(row).getByRole('button', { name: 'Xác nhận' }));
     await waitFor(() => expect(confirmed).toEqual([FIRST.id]));

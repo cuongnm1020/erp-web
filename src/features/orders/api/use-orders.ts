@@ -29,6 +29,8 @@ export interface OrderListParams {
   q?: string;
   /** Tab của danh sách (gộp trạng thái chứng từ + kho / giao hàng). */
   flow?: OrderFlow;
+  /** Nhiều tab — đơn thuộc một trong các tab (tab cha "Tất cả kho"…, 2026-11-03). `flow` thắng. */
+  flows?: readonly OrderFlow[];
   /** Kho lấy hàng chọn trên đơn. */
   warehouseId?: string;
   /** Nguồn: PANCAKE = đồng bộ từ Pancake, ERP = tạo trong ERP. */
@@ -119,8 +121,10 @@ export const orderKeys = {
   lists: () => [...orderKeys.all, 'list'] as const,
   list: (p: OrderListParams) => [...orderKeys.lists(), p] as const,
   /** Đếm tab nằm dưới prefix `lists` — invalidate danh sách là đếm lại luôn. */
-  flowCounts: (p: Omit<OrderListParams, 'flow' | 'take' | 'skip'>) =>
-    [...orderKeys.lists(), 'flow-counts', p] as const,
+  flowCounts: (
+    p: Omit<OrderListParams, 'flow' | 'flows' | 'take' | 'skip'>,
+    countFlows: readonly OrderFlow[],
+  ) => [...orderKeys.lists(), 'flow-counts', p, countFlows] as const,
   issueCounts: (p: Omit<OrderListParams, 'issue' | 'stockReady' | 'take' | 'skip'>) =>
     [...orderKeys.lists(), 'issue-counts', p] as const,
   pancakeOverwrites: (p: { fix?: PancakeOverwriteFix; take: number; skip: number }) =>
@@ -200,6 +204,7 @@ function listQuery(params: Omit<OrderListParams, 'take' | 'skip'>) {
   return {
     q: params.q || undefined,
     flow: params.flow,
+    flows: params.flows?.length ? [...params.flows] : undefined,
     warehouseId: params.warehouseId || undefined,
     source: params.source,
     pancakeShopId: params.pancakeShopId || undefined,
@@ -395,14 +400,23 @@ export function usePosShopSearch(q: string): EntitySearchResult {
   };
 }
 
-export function useOrderFlowCounts(params: Omit<OrderListParams, 'flow' | 'take' | 'skip'>) {
+/**
+ * `countFlows`: chỉ đếm các tab này (2026-11-03) — tab cha cần mọi tab còn mở, Thành công / Đã hủy
+ * chỉ khi nhóm của chúng đang mở. Tab không đếm vắng mặt trong kết quả.
+ */
+export function useOrderFlowCounts(
+  params: Omit<OrderListParams, 'flow' | 'flows' | 'take' | 'skip'>,
+  countFlows: readonly OrderFlow[],
+) {
   return useQuery({
-    queryKey: orderKeys.flowCounts(params),
+    queryKey: orderKeys.flowCounts(params, countFlows),
     queryFn: () =>
       unwrap(
         api.GET('/sales-orders/flow-counts', {
           // take / skip vô nghĩa với đếm — spec vẫn đòi vì dùng chung DTO lọc với danh sách.
-          params: { query: { ...listQuery(params), take: 1, skip: 0 } },
+          params: {
+            query: { ...listQuery(params), countFlows: [...countFlows], take: 1, skip: 0 },
+          },
         }),
       ),
     placeholderData: keepPreviousData,
