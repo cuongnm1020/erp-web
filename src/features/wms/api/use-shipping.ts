@@ -226,7 +226,7 @@ export function useShipmentMonitorList(params: ShipmentMonitorListParams) {
 
 /**
  * GET /sales-orders/team-filter-options — ô "Phòng ban" dùng chung với danh sách đơn (2026-11-04):
- * phòng CSKH + phòng Sale/MKT đã có đơn, chỉ Admin + kế toán (`report.sales_all`); người khác → rỗng
+ * phòng CSKH + phòng Sale/MKT đã có đơn, chỉ người có `sales_order.filter_dept` / `report.sales_all`; người khác → rỗng
  * (ẩn ô). Cùng endpoint với `useTeamFilterOptions` của orders — luật 12 không cho import chéo.
  */
 export function useShippingTeamOptions(enabled: boolean) {

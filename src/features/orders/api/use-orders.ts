@@ -125,8 +125,8 @@ export const orderKeys = {
   /** Đếm tab nằm dưới prefix `lists` — invalidate danh sách là đếm lại luôn. */
   flowCounts: (
     p: Omit<OrderListParams, 'flow' | 'flows' | 'take' | 'skip'>,
-    countFlows: readonly OrderFlow[],
-  ) => [...orderKeys.lists(), 'flow-counts', p, countFlows] as const,
+    countFlows?: readonly OrderFlow[],
+  ) => [...orderKeys.lists(), 'flow-counts', p, countFlows ?? 'all'] as const,
   issueCounts: (p: Omit<OrderListParams, 'issue' | 'stockReady' | 'take' | 'skip'>) =>
     [...orderKeys.lists(), 'issue-counts', p] as const,
   pancakeOverwrites: (p: { fix?: PancakeOverwriteFix; take: number; skip: number }) =>
@@ -431,7 +431,8 @@ export function usePosShopSearch(q: string): EntitySearchResult {
  */
 export function useOrderFlowCounts(
   params: Omit<OrderListParams, 'flow' | 'flows' | 'take' | 'skip'>,
-  countFlows: readonly OrderFlow[],
+  /** Chỉ đếm các trạng thái này; bỏ trống = đếm hết (kèm `total`). */
+  countFlows?: readonly OrderFlow[],
 ) {
   return useQuery({
     queryKey: orderKeys.flowCounts(params, countFlows),
@@ -440,7 +441,12 @@ export function useOrderFlowCounts(
         api.GET('/sales-orders/flow-counts', {
           // take / skip vô nghĩa với đếm — spec vẫn đòi vì dùng chung DTO lọc với danh sách.
           params: {
-            query: { ...listQuery(params), countFlows: [...countFlows], take: 1, skip: 0 },
+            query: {
+              ...listQuery(params),
+              ...(countFlows ? { countFlows: [...countFlows] } : {}),
+              take: 1,
+              skip: 0,
+            },
           },
         }),
       ),

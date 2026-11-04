@@ -88,8 +88,10 @@ const LIST_DEFAULTS = { filterKeys: FILTER_KEYS, sort: DEFAULT_SORT };
 export function WaybillOrdersScreen() {
   const { state, set, skipTake } = useListState<FilterKey>(LIST_DEFAULTS);
   const ability = useAbility();
-  // Ô Phòng ban chỉ Admin + kế toán (`report.sales_all`, user 2026-11-03).
-  const canFilterTeam = ability.can('sales_all', 'Report');
+  // Ô Phòng ban: quyền `sales_order.filter_dept` (Admin, kế toán, kho — user 2026-11-04) hoặc
+  // `report.sales_all`.
+  const canFilterTeam =
+    ability.can('filter_dept', 'SalesOrder') || ability.can('sales_all', 'Report');
   const canReprint = ability.can('pack', 'Shipment');
   const shops = usePancakeShops();
   const teamOptions = useTeamFilterOptions(canFilterTeam);

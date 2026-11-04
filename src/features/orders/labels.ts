@@ -302,9 +302,10 @@ export const ORDER_FLOW_TABS: ReadonlyArray<{
 ];
 
 /**
- * 4 tab cha của danh sách đơn (2026-11-03, design system FlowTabs): mỗi nhóm một họ màu, chip con
- * `flows` là trạng thái còn mở (số tab cha = tổng của chúng), `done` là trạng thái kết thúc đứng
- * sau vạch "Đã xong" — không cộng vào số tab cha, chỉ đếm khi nhóm đang mở.
+ * 4 khối trạng thái của danh sách đơn (design system FlowTabs v3, 2026-11-04): mỗi khối một họ
+ * màu, 14 trạng thái hiện cùng lúc. `flows` là trạng thái còn mở, `done` là trạng thái kết thúc
+ * đứng cuối khối (Đã hủy, Thành công). Khối không có tên / tổng số trên màn — `label` chỉ để đọc
+ * màn hình (aria-label).
  */
 export type OrderFlowGroup = 'wait' | 'fulfil' | 'issue' | 'ship';
 
@@ -345,21 +346,8 @@ export const ORDER_FLOW_GROUPS: ReadonlyArray<{
   },
 ];
 
-/** Nhóm mặc định khi URL không có `group` / `flow`. */
-export const DEFAULT_FLOW_GROUP: OrderFlowGroup = 'wait';
-
-export function flowGroupOf(flow: OrderFlow): OrderFlowGroup {
-  return (
-    ORDER_FLOW_GROUPS.find((g) => g.flows.includes(flow) || g.done.includes(flow))?.group ??
-    DEFAULT_FLOW_GROUP
-  );
-}
-
-/** `?group=` trên URL: một nhóm, `all` = xem mọi trạng thái (link từ màn khác), còn lại bỏ qua. */
-export function parseFlowGroup(v: string | undefined): OrderFlowGroup | 'all' | undefined {
-  if (v === 'all') return 'all';
-  return ORDER_FLOW_GROUPS.find((g) => g.group === v)?.group;
-}
+/** Trạng thái chọn sẵn khi URL không có `flow` (2026-11-04: Đơn mới). */
+export const DEFAULT_ORDER_FLOW: OrderFlow = 'NEW';
 
 /**
  * Luồng chung của một đơn ở màn chi tiết (DTO chi tiết không có `flow` như dòng danh sách): suy từ
