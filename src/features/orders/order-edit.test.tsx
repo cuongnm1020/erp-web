@@ -15,7 +15,7 @@ import {
 import { server } from '@/test/msw/server';
 import { toast } from '@/components/ui/toaster';
 import { renderApp } from '@/test/render';
-import { OrderEditScreen } from './components/order-edit-screen';
+import { movedOrderDateIso, OrderEditScreen } from './components/order-edit-screen';
 
 const push = vi.fn();
 
@@ -27,6 +27,31 @@ vi.mock('next/navigation', () => ({
 
 const ORDER = makeOrders(1)[0]!; // i=0 → DRAFT
 const DETAIL = makeOrderDetail(ORDER.id)!;
+
+describe('Ngày tạo đơn trên màn Sửa đơn (2026-11-04)', () => {
+  it('movedOrderDateIso: giữ giờ, chỉ dời ngày; dời về hôm nay mà giờ chưa tới → giờ hiện tại', () => {
+    const orig = '2026-11-02T01:42:00.000Z'; // 08:42 giờ VN
+    expect(movedOrderDateIso(orig, '2026-11-02', '2026-10-30')).toBe('2026-10-30T01:42:00.000Z');
+    const now = new Date('2026-11-04T00:30:00.000Z');
+    expect(movedOrderDateIso(orig, '2026-11-02', '2026-11-04', now)).toBe(now.toISOString());
+  });
+
+  it('có quyền set_order_date → ô chọn ngày; chỉ sales_order.update → chỉ đọc "Tạo lúc"', async () => {
+    const { unmount } = renderApp(<OrderEditScreen orderId={ORDER.id} />, {
+      me: {
+        ...ME_SALE,
+        permissions: ['sales_order.read', 'sales_order.update', 'sales_order.set_order_date'],
+      },
+    });
+    expect(await screen.findByRole('button', { name: 'Ngày tạo đơn' })).toBeInTheDocument();
+    unmount();
+    renderApp(<OrderEditScreen orderId={ORDER.id} />, {
+      me: { ...ME_SALE, permissions: ['sales_order.read', 'sales_order.update'] },
+    });
+    expect(await screen.findByText('Tạo lúc')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Ngày tạo đơn' })).not.toBeInTheDocument();
+  });
+});
 
 describe('OrderEditScreen — trang sửa đơn (D-05, PATCH /sales-orders/{id})', () => {
   it('loading → hai cột: sản phẩm + giá trị đơn (chỉ đọc) và thông tin / khách hàng / vận chuyển', async () => {

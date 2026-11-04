@@ -24,8 +24,10 @@ import { toast } from '@/components/ui/toaster';
 import { cn } from '@/lib/cn';
 import { carrierSaid, messageFor, messageForItemCode } from '@/lib/error-messages';
 import { usePrint } from '@/lib/print';
+import { StaffSelect } from '@/components/data/form/staff-select';
 import {
   useMarkLabelsPrinted,
+  usePdaPackers,
   useShipmentLabelDataMany,
   type ShipmentLabelData,
 } from '@/features/wms/api/use-pda';
@@ -36,6 +38,7 @@ import {
 } from '@/features/wms/components/waybill-label';
 import {
   useBulkFulfilOrders,
+  useBulkUpdateOrders,
   type BulkFulfilOrdersResult,
   type SalesOrder,
 } from '../api/use-orders';
@@ -351,19 +354,33 @@ export function BulkFulfilPrintDialog({
   rows,
   onDone,
   trigger = 'bar',
+  askPacker = false,
 }: {
-  rows: FulfilRow[];
+  rows: (FulfilRow & { warehouseId?: string | null })[];
   onDone: () => void;
   /** `bar` = nút nhỏ trên thanh chọn đơn; `header` = nút cỡ thường ở đầu chi tiết đơn. */
   trigger?: 'bar' | 'header';
+  /**
+   * Màn In đơn (2026-11-04, user chốt): bắt chọn NV đóng hàng (cùng kho các đơn) trước khi in —
+   * gán `packerId` cho các đơn (POST /sales-orders/bulk-update) rồi mới đóng gói + in.
+   */
+  askPacker?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   /** Kết quả từng đơn của lần bấm vừa rồi (2026-10-28) — null = chưa bấm / không cần xem. */
   const [outcome, setOutcome] = useState<FulfilPrintOutcome | null>(null);
   const fp = useFulfilPrint();
+  const [packerId, setPackerId] = useState('');
+  const assignPacker = useBulkUpdateOrders();
 
   const ready = rows.filter((r) => r.status === 'APPROVED' && r.carrierId);
   const skipped = rows.length - ready.length;
+  // NV đóng hàng chọn theo kho của các đơn — đơn nhiều kho thì phải chọn lại theo từng kho.
+  const readyWarehouses = [...new Set(ready.map((r) => r.warehouseId ?? ''))];
+  const packerWarehouse =
+    askPacker && readyWarehouses.length === 1 && readyWarehouses[0] ? readyWarehouses[0] : null;
+  const packers = usePdaPackers(open ? packerWarehouse : null);
+  const packerBlocked = askPacker && (packerWarehouse === null || packerId === '');
 
   // Bỏ chọn (onDone) gỡ cả nút này lẫn tờ in khỏi thanh chọn → chỉ gọi khi tờ in đã in xong và
   // hộp thoại đã đóng.
@@ -382,11 +399,26 @@ export function BulkFulfilPrintDialog({
   };
 
   const submit = async () => {
-    if (ready.length === 0 || fp.pending) return;
-    const r = await fp.run(
-      ready.map((o) => o.id),
-      new Map(rows.map((o) => [o.id, o])),
-    );
+    if (ready.length === 0 || fp.pending || assignPacker.isPending || packerBlocked) return;
+    let ids = ready.map((o) => o.id);
+    if (askPacker) {
+      // Gán NV đóng hàng TRƯỚC khi in; đơn nào không gán được thì không đóng gói đơn đó.
+      try {
+        const res = await assignPacker.mutateAsync({ orderIds: ids, packerId });
+        if (res.failed.length > 0) {
+          toast.error(
+            `${res.failed.length} đơn không gán được NV đóng hàng: ${messageForItemCode(res.failed[0]!.code)}`,
+          );
+        }
+        const assigned = new Set(res.updated.map((u) => u.orderId));
+        ids = ids.filter((id) => assigned.has(id));
+      } catch (err) {
+        toast.error(messageFor(err));
+        return;
+      }
+      if (ids.length === 0) return;
+    }
+    const r = await fp.run(ids, new Map(rows.map((o) => [o.id, o])));
     if (!r) return;
     // Nhiều đơn / có lỗi / hãng chưa phản hồi → giữ hộp thoại với kết quả TỪNG đơn (2026-10-28).
     if (r.failed.length > 0 || r.rows.length > 1 || r.queued > 0) setOutcome(r);
@@ -429,6 +461,36 @@ export function BulkFulfilPrintDialog({
                   {skipped > 0 ? ` ${skipped} đơn chưa duyệt hoặc chưa gán hãng sẽ bị bỏ qua.` : ''}
                 </DialogDescription>
               </DialogHeader>
+              {askPacker ? (
+                <div className="space-y-1.5">
+                  <Label htmlFor="bulk-fulfil-packer">NV đóng hàng</Label>
+                  {packerWarehouse === null ? (
+                    <p className="text-sm text-destructive" data-testid="packer-multi-warehouse">
+                      {ready.length === 0
+                        ? 'Chưa có đơn nào đóng gói được.'
+                        : 'Các đơn thuộc nhiều kho (hoặc chưa chọn kho) — chọn đơn cùng một kho để gán NV đóng hàng.'}
+                    </p>
+                  ) : (
+                    <>
+                      <StaffSelect
+                        id="bulk-fulfil-packer"
+                        className="h-9 w-full"
+                        staff={packers.data ?? []}
+                        value={packerId}
+                        onChange={(v) => setPackerId(v)}
+                        placeholder={packers.isPending ? 'Đang tải…' : 'Chọn NV đóng hàng'}
+                        aria-label="NV đóng hàng"
+                      />
+                      {packers.data && packers.data.length === 0 ? (
+                        <p className="text-xs text-muted-foreground">
+                          Kho này chưa có NV đóng hàng — gán kho làm việc cho nhân viên ở Quản trị ›
+                          Người dùng.
+                        </p>
+                      ) : null}
+                    </>
+                  )}
+                </div>
+              ) : null}
               <WaybillOrientationField
                 id="bulk-fulfil-orientation"
                 value={fp.orientation}
@@ -436,10 +498,19 @@ export function BulkFulfilPrintDialog({
               />
               {fp.progressBar}
               <DialogFooter>
-                <Button variant="outline" disabled={fp.pending} onClick={() => close(false)}>
+                <Button
+                  variant="outline"
+                  disabled={fp.pending || assignPacker.isPending}
+                  onClick={() => close(false)}
+                >
                   Đóng
                 </Button>
-                <Button disabled={fp.pending || ready.length === 0} onClick={() => void submit()}>
+                <Button
+                  disabled={
+                    fp.pending || assignPacker.isPending || ready.length === 0 || packerBlocked
+                  }
+                  onClick={() => void submit()}
+                >
                   <PackageCheck aria-hidden />
                   {fp.busyLabel ?? `Đóng gói + in ${ready.length} đơn`}
                 </Button>

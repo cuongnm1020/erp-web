@@ -11828,6 +11828,13 @@ export interface components {
             /** @description Số dòng sản phẩm khác ngoài dòng này. */
             moreCount: number;
         };
+        SalesOrderListLineDto: {
+            /** @description Tên hiển thị — đơn Pancake là "Tên lên đơn Pancake". */
+            name: string;
+            /** @description Số lượng theo đơn vị bán của dòng — Decimal(18,6) chuỗi. */
+            qty: string;
+            uomCode: string | null;
+        };
         SalesOrderListShipmentDto: {
             /** @description `wms.Shipment.id` — in lại tem vận đơn từ danh sách (POST /shipments/label-data). */
             id: string;
@@ -11966,9 +11973,13 @@ export interface components {
             addressLine: string | null;
             province: string | null;
             product: components["schemas"]["SalesOrderListProductDto"] | null;
+            /** @description Mọi dòng sản phẩm của đơn theo số dòng (2026-11-04, màn In đơn hiện hết). */
+            items: components["schemas"]["SalesOrderListLineDto"][];
             shipment: components["schemas"]["SalesOrderListShipmentDto"] | null;
             /** @description Tên người phụ trách (core.User.fullName của ownerId). */
             ownerName: string | null;
+            /** @description NV đóng hàng (core.User.fullName của packerId) — null = chưa gán. */
+            packerName: string | null;
             /**
              * @description Người bấm tạo đơn (2026-10-29): đơn ERP = `createdBy`, đơn Pancake = người tạo trên Pancake
              *     (`external.creatorUserId`; null khi chưa khớp được nhân viên).
@@ -13015,6 +13026,12 @@ export interface components {
             marketerId?: string | null;
             /** @description Ngày hẹn nhận hàng `YYYY-MM-DD`; `null` = bỏ hẹn. */
             expectedDeliveryDate?: string | null;
+            /**
+             * @description Ngày tạo đơn (ISO) — doanh số tính theo ngày này. Chỉ admin / người có
+             *     `sales_order.set_order_date` (2026-11-04, màn Sửa đơn); người khác 403. Không ở tương lai,
+             *     kỳ kế toán cũ và mới đều phải mở.
+             */
+            orderDate?: string;
             /** @description Lý do (khi hủy) — ghi vào event OrderCancelled. */
             reason?: string;
         };
@@ -13109,6 +13126,12 @@ export interface components {
             carrierAccountId?: string;
             /** @description Cân nặng gửi hãng (kg) cho TẤT CẢ đơn đã chọn; `null` = về cân nặng tính từ dòng. */
             shippingWeightKg?: string | null;
+            /**
+             * Format: uuid
+             * @description NV đóng hàng (core.User.id đang hoạt động) cho TẤT CẢ đơn đã chọn — chọn trong hộp "Đóng gói +
+             *     in vận đơn" (2026-11-04); `null` = bỏ gán; bỏ trống = giữ nguyên.
+             */
+            packerId?: string | null;
         };
         BulkUpdateFailedItemDto: {
             orderId: string;
@@ -15212,7 +15235,7 @@ export interface components {
             previousFrom: string;
             previousTo: string;
             /** @enum {string} */
-            rankBy: "customers" | "orders" | "qty" | "revenue" | "grossProfit";
+            rankBy: "qty" | "customers" | "orders" | "revenue" | "grossProfit";
             /** @description Tối đa `limit` SKU, hạng 1..n. Bằng nhau thì doanh thu cao hơn đứng trước. */
             items: components["schemas"]["SalesTopProductItemDto"][];
             dataAsOf: string | null;
@@ -15267,7 +15290,7 @@ export interface components {
         SalesTopProductsMonthlyDto: {
             year: number;
             /** @enum {string} */
-            rankBy: "customers" | "orders" | "qty" | "revenue" | "grossProfit";
+            rankBy: "qty" | "customers" | "orders" | "revenue" | "grossProfit";
             /** @description Chỉ các tháng đã bắt đầu (năm hiện tại: tới tháng này). */
             months: components["schemas"]["SalesTopProductsMonthDto"][];
             /** @description Top `limit` SKU cả năm (01/01 → 31/12 hoặc hôm nay) — previous* so với năm trước cùng độ dài. */
@@ -24092,6 +24115,11 @@ export interface operations {
                 stockReady?: "true" | "false";
                 /** @description Đơn có dòng SKU này (core.Sku.id) — kể cả dòng thành phần của combo SKU này (2026-11-02). */
                 skuId?: string;
+                /**
+                 * @description Với `skuId`: `true` = chỉ đơn mà MỌI dòng đều là SKU đó (hoặc thành phần của combo SKU đó) —
+                 *     "lọc sản phẩm duy nhất" màn In đơn (2026-11-04). Không có `skuId` thì bỏ qua.
+                 */
+                skuOnly?: "true" | "false";
                 /** @description Đơn đang thiếu tồn SKU này (core.Sku.id) — "Xem đơn" từ màn Hàng chờ (2026-10-25). */
                 shortSkuId?: string;
                 /**
@@ -24353,6 +24381,11 @@ export interface operations {
                 stockReady?: "true" | "false";
                 /** @description Đơn có dòng SKU này (core.Sku.id) — kể cả dòng thành phần của combo SKU này (2026-11-02). */
                 skuId?: string;
+                /**
+                 * @description Với `skuId`: `true` = chỉ đơn mà MỌI dòng đều là SKU đó (hoặc thành phần của combo SKU đó) —
+                 *     "lọc sản phẩm duy nhất" màn In đơn (2026-11-04). Không có `skuId` thì bỏ qua.
+                 */
+                skuOnly?: "true" | "false";
                 /** @description Đơn đang thiếu tồn SKU này (core.Sku.id) — "Xem đơn" từ màn Hàng chờ (2026-10-25). */
                 shortSkuId?: string;
                 /**
@@ -24517,6 +24550,11 @@ export interface operations {
                 stockReady?: "true" | "false";
                 /** @description Đơn có dòng SKU này (core.Sku.id) — kể cả dòng thành phần của combo SKU này (2026-11-02). */
                 skuId?: string;
+                /**
+                 * @description Với `skuId`: `true` = chỉ đơn mà MỌI dòng đều là SKU đó (hoặc thành phần của combo SKU đó) —
+                 *     "lọc sản phẩm duy nhất" màn In đơn (2026-11-04). Không có `skuId` thì bỏ qua.
+                 */
+                skuOnly?: "true" | "false";
                 /** @description Đơn đang thiếu tồn SKU này (core.Sku.id) — "Xem đơn" từ màn Hàng chờ (2026-10-25). */
                 shortSkuId?: string;
                 /**

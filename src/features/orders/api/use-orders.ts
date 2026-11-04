@@ -72,6 +72,8 @@ export interface OrderListParams {
   labelPrintedBy?: string;
   /** Đơn có sản phẩm (SKU) này — kể cả thành phần combo. */
   skuId?: string;
+  /** Với `skuId`: true = chỉ đơn mà mọi dòng đều là SKU đó (màn In đơn, 2026-11-04). */
+  skuOnly?: boolean;
   /** true = chỉ đơn có đơn trùng trong ngày (cùng SĐT, cùng ngày VN, chưa hủy — CSKH-5). */
   duplicate?: boolean;
   /** Khoảng orderDate — ngày `YYYY-MM-DD` (server lấy trọn ngày VN) hoặc ISO datetime. */
@@ -227,6 +229,7 @@ function listQuery(params: Omit<OrderListParams, 'take' | 'skip'>) {
     pickupStatus: params.pickupStatus,
     labelPrintedBy: params.labelPrintedBy || undefined,
     skuId: params.skuId || undefined,
+    skuOnly: params.skuId && params.skuOnly ? ('true' as const) : undefined,
     duplicate: params.duplicate ? ('true' as const) : undefined,
     from: params.from || undefined,
     to: params.to || undefined,
@@ -975,17 +978,19 @@ export interface OrderListPrefs {
   sort?: { id: string; desc: boolean } | null;
 }
 
-const ORDER_LIST_PREFS_KEY = 'orders.list';
-const orderListPrefsKey = ['me', 'preferences', ORDER_LIST_PREFS_KEY] as const;
+/**
+ * Khoá tuỳ chọn bảng đơn: `orders.list` (Đơn hàng), `orders.print` (In đơn, 2026-11-04) — mỗi
+ * màn lưu cột ẩn + sắp xếp riêng.
+ */
+export type OrderListPrefsKey = 'orders.list' | 'orders.print';
+const orderListPrefsKey = (key: OrderListPrefsKey) => ['me', 'preferences', key] as const;
 
-/** GET /me/preferences/orders.list — null = chưa lưu lần nào (dùng mặc định). */
-export function useOrderListPrefs() {
+/** GET /me/preferences/:key — null = chưa lưu lần nào (dùng mặc định). */
+export function useOrderListPrefs(key: OrderListPrefsKey = 'orders.list') {
   return useQuery({
-    queryKey: orderListPrefsKey,
+    queryKey: orderListPrefsKey(key),
     queryFn: async () => {
-      const r = await unwrap(
-        api.GET('/me/preferences/{key}', { params: { path: { key: ORDER_LIST_PREFS_KEY } } }),
-      );
+      const r = await unwrap(api.GET('/me/preferences/{key}', { params: { path: { key } } }));
       return (r.value ?? null) as OrderListPrefs | null;
     },
     staleTime: Infinity,
@@ -996,17 +1001,17 @@ export function useOrderListPrefs() {
  * PUT /me/preferences/orders.list — ghi trọn object. Tuỳ chọn cá nhân nên cập nhật cache ngay
  * (luật 5 cho phép optimistic với "sắp xếp cá nhân"); lỗi thì nạp lại bản server.
  */
-export function useSaveOrderListPrefs() {
+export function useSaveOrderListPrefs(key: OrderListPrefsKey = 'orders.list') {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (value: OrderListPrefs) =>
       unwrap(
         api.PUT('/me/preferences/{key}', {
-          params: { path: { key: ORDER_LIST_PREFS_KEY } },
+          params: { path: { key } },
           body: { value: value as Record<string, unknown> },
         }),
       ),
-    onMutate: (value) => qc.setQueryData(orderListPrefsKey, value),
-    onError: () => qc.invalidateQueries({ queryKey: orderListPrefsKey }),
+    onMutate: (value) => qc.setQueryData(orderListPrefsKey(key), value),
+    onError: () => qc.invalidateQueries({ queryKey: orderListPrefsKey(key) }),
   });
 }

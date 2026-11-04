@@ -37,6 +37,7 @@ import {
   ScrollText,
   FileSpreadsheet,
   Settings,
+  Printer,
   ShieldCheck,
   ShoppingCart,
   SlidersHorizontal,
@@ -314,6 +315,16 @@ export const NAV_MODULES: NavModule[] = [
         label: 'Theo dõi đơn',
         href: '/wms/waybills',
         icon: Truck,
+        section: 'Vận hành',
+        ability: { action: 'read', subject: 'Shipment' },
+      },
+      {
+        // In đơn (2026-11-04): clone màn Đơn hàng để tuỳ biến cho kho in đơn. Menu theo quyền kho
+        // như "Theo dõi đơn" (shipment.read) — sale chỉ có sales_order.read không thấy module Kho.
+        // Dữ liệu vẫn GET /sales-orders, API scope theo người xem.
+        label: 'In đơn',
+        href: '/wms/print-orders',
+        icon: Printer,
         section: 'Vận hành',
         ability: { action: 'read', subject: 'Shipment' },
       },
