@@ -10,19 +10,96 @@ import { LABEL_SIZES, type PrintController } from '@/lib/print';
 import type { ShipmentLabelData } from '../api/use-pda';
 import { DEFAULT_PRINT_NOTE, hidePhone, parseGhtkTracking, routeLabel } from '../ghtk-label';
 import { f, labelInner, labelOuter, u, WAYBILL_EDGE } from '../label-scale';
+import { chunkItems, estimateLines, fitItems } from '../label-text';
 import { sortLabelsForPrint } from '../waybill-sort';
 import { LandscapeWaybillLabel } from './landscape-waybill-label';
 
 export type WaybillOrientation = 'landscape' | 'portrait';
-
-/** Số dòng hàng in ra; còn lại gom thành "+N sản phẩm khác" để chữ không bị thu nhỏ. */
-const MAX_ITEMS = 2;
 
 /** Khổ tem dọc (mm). */
 const SIZE = {
   w: LABEL_SIZES.WAYBILL_75x100.labelWidthMm ?? 75,
   h: LABEL_SIZES.WAYBILL_75x100.labelHeightMm ?? 100,
 } as const;
+
+/**
+ * Chiều cao (mm thiết kế) các khối cố định trên tem dọc — để tính số dòng hàng vừa ô Sản phẩm.
+ * Đo bằng getBoundingClientRect trên tem dựng ở Chrome 2026-11-04 (khớp kích thước khai trong
+ * JSX bên dưới); đổi padding / gap / cỡ chữ ở JSX thì đo và sửa lại số ở đây. Tem in ẩn
+ * (`display: none`) nên lúc in không đo DOM được — phải tính trước.
+ */
+const PORTRAIT_MM = {
+  /** Trong viền đứt: tem − lề ngoài (trên bù WAYBILL_EDGE) − viền + padding khung. */
+  content: SIZE.h - (1.5 + WAYBILL_EDGE.top) - 1.5 - 0.6 - 3,
+  /** 3 khoảng cách 1,5 mm: trên–lưới, lưới–ghi chú, người nhận–sản phẩm. */
+  gaps: 4.5,
+  /** Khối trên mã ngắn: hãng + QR 15 mm + giờ in; mã dài: dòng hãng + mã vạch 14 mm + mã 2 dòng. */
+  topShort: 22.2,
+  topLong: 27,
+  /** "#x/N" dưới giờ in (chỉ bố cục mã ngắn; mã dài in chung dòng hãng). */
+  seq: 3.95,
+  /** Hàng người gửi + khoảng cách. */
+  sender: 5.6 + 1.5,
+  /** Ô người nhận với địa chỉ 1 dòng; mỗi dòng địa chỉ thêm. */
+  recipient: 13.7,
+  addressLine: 3.45,
+  /** Ô ghi chú cuối tem (2 dòng). */
+  note: 9.05,
+  /** Ô sản phẩm trừ các dòng hàng: viền + padding + "Thu *** đ" + tiêu đề bảng. */
+  goodsHead: 9.5,
+  /** Dòng "Mã đơn hàng" VNPost. */
+  vnpost: 3.3,
+  /** Một dòng chữ 7,5 pt × line-height 1,3 (tên sản phẩm, địa chỉ). */
+  line: 3.45,
+  /** Phần cố định mỗi hàng sản phẩm ngoài chữ: padding + viền (hàng 1 dòng = 4,5 mm). */
+  rowExtra: 1.05,
+  /** Bề ngang chữ cột tên sản phẩm (cột 55,3 mm trừ padding). */
+  nameWidth: 54,
+  /** Bề ngang chữ địa chỉ người nhận (ô 63,4 mm trừ padding + biểu tượng). */
+  addressWidth: 59,
+  /** Dự phòng làm tròn để viền dòng cuối không bị xén. */
+  slack: 0.5,
+} as const;
+
+/**
+ * Chỗ trống (mm) dành cho các dòng hàng trên tem dọc (2026-11-04). Trước đây khóa cứng 2 dòng →
+ * đơn 4–5 món bị gom "+N sản phẩm khác" dù nửa dưới tem trống (kho báo lỗi nghiêm trọng: không
+ * in hết danh sách). Ô Sản phẩm là phần co giãn (grid 1fr) nên chỗ trống = chiều cao trong
+ * viền đứt − các khối cố định. Số món in được: `fitItems` (tên in đủ, mỗi tên có thể nhiều
+ * dòng); vượt quá vẫn báo "+N sản phẩm khác" ở tiêu đề bảng.
+ */
+export function portraitGoodsMm(opts: {
+  longCode: boolean;
+  seq: boolean;
+  sender: boolean;
+  vnpost: boolean;
+  addressLines: number;
+}): number {
+  const m = PORTRAIT_MM;
+  let used = m.gaps + m.note + m.goodsHead + m.recipient + m.slack;
+  used += opts.longCode ? m.topLong : m.topShort + (opts.seq ? m.seq : 0);
+  if (opts.sender) used += m.sender;
+  if (opts.vnpost) used += m.vnpost;
+  used += Math.max(0, Math.min(3, opts.addressLines) - 1) * m.addressLine;
+  return m.content - used;
+}
+
+/** Số món in được trên tem dọc với chỗ trống `availableMm` — tên in đủ, không cắt. */
+export function portraitItemCount(items: { name: string }[], availableMm: number): number {
+  const m = PORTRAIT_MM;
+  return fitItems(items, {
+    availableMm,
+    lineMm: m.line,
+    rowExtraMm: m.rowExtra,
+    pt: SENDER_PT,
+    widthMm: m.nameWidth,
+  });
+}
+
+/** Ước lượng số dòng địa chỉ người nhận (cắt 3 dòng ở JSX). */
+export function estimateAddressLines(address: string): number {
+  return estimateLines(address, SENDER_PT, PORTRAIT_MM.addressWidth);
+}
 
 /**
  * Mã dài hơn mức này (GHTK ~35 ký tự) cần CẢ chiều ngang tem để mỗi vạch còn ≥ ~2 chấm in
@@ -99,10 +176,16 @@ export function WaybillLabel({
   const long = barValue.length > LONG_CODE;
   // Tuyến GHTK (NỘI TỈNH / NỘI MIỀN / LIÊN MIỀN) in cạnh COD — ERP tự suy từ tỉnh.
   const route = ghtk ? routeLabel(data.sender?.province, data.recipient?.province) : null;
-  // Mã dài: khối mã chiếm thêm chỗ → bớt một dòng hàng.
-  const max = MAX_ITEMS - (long ? 1 : 0);
-  const shown = data.items.slice(0, max);
-  const more = data.items.length - shown.length;
+  // Tên in đủ không cắt; hết chỗ ô Sản phẩm thì in tiếp sang tờ mới (user chốt 2026-11-04) —
+  // mỗi tờ vẫn đủ mã vạch / người nhận, tiêu đề bảng ghi "Tờ x/N". Xem `portraitGoodsMm`.
+  const goodsMm = portraitGoodsMm({
+    longCode: long,
+    seq: seq != null,
+    sender: !!data.facebookPageName,
+    vnpost: data.carrierCode === 'VNPOST',
+    addressLines: data.recipient ? estimateAddressLines(fromDistrictAddress(data.recipient)) : 1,
+  });
+  const pages = chunkItems(data.items, (rest) => portraitItemCount(rest, goodsMm));
   const carrier = data.carrierName ?? data.carrierCode ?? 'Vận đơn';
   const printed = `${formatTime(printedAt)} ${formatDate(printedAt)}`;
   const note = data.note?.trim() || null;
@@ -262,7 +345,7 @@ export function WaybillLabel({
     </div>
   );
 
-  const goods = (
+  const goods = (pageItems: ShipmentLabelData['items'], pageNo: number) => (
     <div
       className="flex min-h-0 min-w-0 flex-col overflow-hidden"
       style={{ border: BORDER, padding: `${u(1)} ${u(1.2)}`, gap: u(0.6) }}
@@ -294,15 +377,7 @@ export function WaybillLabel({
           <tr>
             <th className="text-center font-bold" style={{ border: BORDER, padding: u(0.4) }}>
               Sản phẩm
-              {/* Ở tiêu đề để luôn thấy — dưới bảng thì bị cắt khi hàng dài */}
-              {more > 0 ? (
-                <>
-                  {' · '}
-                  <span className="italic" style={{ fontSize: f(SENDER_PT) }}>
-                    +{more} sản phẩm khác
-                  </span>
-                </>
-              ) : null}
+              {pages.length > 1 ? ` · Tờ ${pageNo}/${pages.length}` : null}
             </th>
             <th className="text-center font-bold" style={{ border: BORDER, padding: u(0.4) }}>
               SL
@@ -310,13 +385,14 @@ export function WaybillLabel({
           </tr>
         </thead>
         <tbody>
-          {shown.map((it, i) => (
+          {pageItems.map((it, i) => (
             <tr key={i}>
+              {/* Tên in đủ, xuống dòng (user chốt 2026-11-04) — số món đã tính theo số dòng */}
               <td
-                className="font-bold leading-tight"
-                style={{ border: BORDER, padding: `${u(0.4)} ${u(0.6)}` }}
+                className="font-bold"
+                style={{ border: BORDER, padding: `${u(0.4)} ${u(0.6)}`, lineHeight: 1.3 }}
               >
-                <span style={clamp(shown.length > 1 ? 1 : 2)}>{it.name}</span>
+                {it.name}
               </td>
               <td
                 className="text-center font-bold tabular-nums"
@@ -331,39 +407,49 @@ export function WaybillLabel({
     </div>
   );
 
+  // Mỗi tờ một [data-print-page] (ngắt trang khi in) — tờ in không bọc thêm.
   return (
-    <div
-      data-waybill-label={code}
-      className="overflow-hidden bg-card text-foreground"
-      style={labelOuter(size.w, size.h)}
-    >
-      <div
-        style={{
-          ...labelInner(size.w, size.h),
-          padding: `${u(1.5 + WAYBILL_EDGE.top)} ${u(1.5 + WAYBILL_EDGE.right)} ${u(1.5)} ${u(1.5)}`,
-        }}
-      >
+    <>
+      {pages.map((pageItems, i) => (
         <div
-          className="flex h-full flex-col overflow-hidden"
-          style={{ border: `${u(0.3)} dashed currentColor`, padding: u(1.5), gap: u(1.5) }}
+          key={i}
+          data-print-page
+          data-waybill-label={code}
+          className="overflow-hidden bg-card text-foreground"
+          style={labelOuter(size.w, size.h)}
         >
-          {top}
-          {sender}
           <div
-            className="grid min-h-0 flex-1 overflow-hidden"
-            style={{ gridTemplateRows: 'auto 1fr', gap: u(1.5) }}
+            style={{
+              ...labelInner(size.w, size.h),
+              padding: `${u(1.5 + WAYBILL_EDGE.top)} ${u(1.5 + WAYBILL_EDGE.right)} ${u(1.5)} ${u(1.5)}`,
+            }}
           >
-            {recipient}
-            {goods}
+            <div
+              className="flex h-full flex-col overflow-hidden"
+              style={{ border: `${u(0.3)} dashed currentColor`, padding: u(1.5), gap: u(1.5) }}
+            >
+              {top}
+              {sender}
+              <div
+                className="grid min-h-0 flex-1 overflow-hidden"
+                style={{ gridTemplateRows: 'auto 1fr', gap: u(1.5) }}
+              >
+                {recipient}
+                {goods(pageItems, i + 1)}
+              </div>
+              {bottomNote}
+            </div>
           </div>
-          {bottomNote}
         </div>
-      </div>
-    </div>
+      ))}
+    </>
   );
 }
 
-/** Tờ in một nhãn vận đơn 100×75 — `@page` theo hướng đã chọn. */
+/**
+ * Tờ in một nhãn vận đơn 100×75 — `@page` theo hướng đã chọn. `WaybillLabel` tự đánh dấu
+ * từng tờ `[data-print-page]` (đơn nhiều món in nhiều tờ — 2026-11-04).
+ */
 export function WaybillLabelPrintSheet({
   data,
   orientation,
@@ -381,9 +467,7 @@ export function WaybillLabelPrintSheet({
       onDone={printer.done}
       size={orientation === 'landscape' ? 'WAYBILL_100x75' : 'WAYBILL_75x100'}
     >
-      <div data-print-page>
-        <WaybillLabel data={data} orientation={orientation} printedAt={printedAt} />
-      </div>
+      <WaybillLabel data={data} orientation={orientation} printedAt={printedAt} />
     </PrintSheet>
   );
 }
@@ -410,15 +494,14 @@ export function WaybillLabelBatchPrintSheet({
       size={orientation === 'landscape' ? 'WAYBILL_100x75' : 'WAYBILL_75x100'}
     >
       {sortLabelsForPrint(labels).map((data, i, all) => (
-        <div key={data.shipmentId} data-print-page>
-          <WaybillLabel
-            data={data}
-            orientation={orientation}
-            printedAt={printedAt}
-            // Lô từ 2 tem: in số thứ tự "x/N" theo đúng thứ tự in (2026-10-31).
-            seq={all.length > 1 ? { index: i + 1, total: all.length } : undefined}
-          />
-        </div>
+        <WaybillLabel
+          key={data.shipmentId}
+          data={data}
+          orientation={orientation}
+          printedAt={printedAt}
+          // Lô từ 2 tem: in số thứ tự "x/N" theo đúng thứ tự in (2026-10-31).
+          seq={all.length > 1 ? { index: i + 1, total: all.length } : undefined}
+        />
       ))}
     </PrintSheet>
   );

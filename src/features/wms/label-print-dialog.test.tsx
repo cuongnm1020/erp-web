@@ -76,6 +76,13 @@ const LABEL_DATA = {
 /** Tờ in chỉ tồn tại trong lúc window.print() chạy (gỡ khi hộp thoại đóng) → chụp lại lúc đó. */
 let printed: HTMLElement[] = [];
 const lastPrinted = () => printed[printed.length - 1]!;
+/**
+ * Các tờ của tem vừa in — đơn 5 món mẫu in 2 tờ (4 + 1) ở cả ngang lẫn dọc (2026-11-04: hết
+ * chỗ ô Sản phẩm thì sang tờ mới, mỗi tờ đủ mã vạch / người nhận) → soi từng tờ để getBy*
+ * không gặp trùng.
+ */
+const pagesOf = (root: HTMLElement) => [...root.querySelectorAll<HTMLElement>('[data-print-page]')];
+const firstPage = () => pagesOf(lastPrinted())[0]!;
 
 describe('Popup nhãn — tem ERP 100×75 mm (2026-10-13)', () => {
   const print = vi.fn(() => {
@@ -103,7 +110,7 @@ describe('Popup nhãn — tem ERP 100×75 mm (2026-10-13)', () => {
     expect(root.getAttribute('data-print-size')).toBe('WAYBILL_100x75');
     expect(root.querySelector('style')!.textContent).toContain('size: 100mm 75mm');
     // Bản chụp đã tách khỏi document → getBy* (ném khi không thấy) thay cho toBeInTheDocument.
-    const label = within(root);
+    const label = within(firstPage());
     // Tem ngang mọi hãng theo bố cục tem GHTK (2026-11-04): hãng | giờ in | số kiện; mã vạch +
     // số; mã hãng nền đen; người gửi / người nhận | thu hộ | kho lấy / giao tới; Mã đơn KH;
     // Sản phẩm / SL; ghi chú một hàng; QR.
@@ -129,12 +136,19 @@ describe('Popup nhãn — tem ERP 100×75 mm (2026-10-13)', () => {
     expect(label.queryByText(/215\.000/)).toBeNull();
     // Mã đơn KH = mã phiếu giao
     expect(label.getByText('DN2610-00001')).toBeTruthy();
-    // Tối đa 4 dòng hàng; phần không in báo ở tiêu đề để luôn thấy
-    expect(label.getByText(/Sản phẩm \(5\)/)).toBeTruthy();
-    expect(label.getByText(/\+1 sản phẩm khác không in/)).toBeTruthy();
+    // Ô hàng chứa 4 dòng 7 pt; món thứ 5 sang tờ 2 (không còn "+N không in" — 2026-11-04)
+    const pages = pagesOf(root);
+    expect(pages).toHaveLength(2);
+    expect(label.getByText('Sản phẩm (5) · Tờ 1/2')).toBeTruthy();
     expect(label.getByText('COMBO 3 CHAI CANXI BO ORGANIC 500ML')).toBeTruthy();
     expect(label.getByText('Phân bón C')).toBeTruthy();
     expect(label.queryByText('Phân bón D')).toBeNull();
+    const page2 = within(pages[1]!);
+    expect(page2.getByText('Sản phẩm (5) · Tờ 2/2')).toBeTruthy();
+    expect(page2.getByText('Phân bón D')).toBeTruthy();
+    expect(page2.getByText('PKE1545655255')).toBeTruthy();
+    expect(page2.getByRole('img', { name: 'Mã vận đơn PKE1545655255' })).toBeTruthy();
+    expect(screen.queryByText(/không in/)).toBeNull();
     // Ghi chú một hàng: ghi chú đơn · tuỳ chọn gửi hãng
     expect(
       label.getByText(/Quý khách vui lòng quay video khi bóc hàng · Không cho xem hàng/),
@@ -158,15 +172,29 @@ describe('Popup nhãn — tem ERP 100×75 mm (2026-10-13)', () => {
     const root = lastPrinted();
     expect(root.getAttribute('data-print-size')).toBe('WAYBILL_75x100');
     expect(root.querySelector('style')!.textContent).toContain('size: 75mm 100mm');
-    // Dọc in tối đa 2 dòng hàng (thêm hàng người gửi + ghi chú cuối tem 2026-10-15)
-    expect(within(root).getByText('+3 sản phẩm khác')).toBeTruthy();
+    // Dọc: số món theo chỗ trống, tên in đủ không cắt (2026-11-04) — VTP có page, địa chỉ 1
+    // dòng còn ~25 mm; tên toàn hoa 35 ký tự ước lượng 2 dòng (8 mm) + 3 tên ngắn (4,5 mm) →
+    // 4 món tờ 1, món thứ 5 sang tờ 2 (mỗi tờ đủ mã vạch + người nhận).
+    const pages = pagesOf(root);
+    expect(pages).toHaveLength(2);
+    const page1 = within(pages[0]!);
+    expect(page1.getByText('Sản phẩm · Tờ 1/2')).toBeTruthy();
+    expect(page1.getByText('COMBO 3 CHAI CANXI BO ORGANIC 500ML')).toBeTruthy();
+    expect(page1.getByText('Phân bón C')).toBeTruthy();
+    expect(page1.queryByText('Phân bón D')).toBeNull();
+    const page2 = within(pages[1]!);
+    expect(page2.getByText('Sản phẩm · Tờ 2/2')).toBeTruthy();
+    expect(page2.getByText('Phân bón D')).toBeTruthy();
+    expect(page2.getByText('Nguyễn Công Quân')).toBeTruthy();
+    expect(page2.getByRole('img', { name: 'Mã vận đơn PKE1545655255' })).toBeTruthy();
+    expect(screen.queryByText(/sản phẩm khác/)).toBeNull();
   });
 
   it('tem chung dọc (VTP): hàng người gửi, SĐT người nhận 4 số cuối, ghi chú cuối tem / mặc định', async () => {
     localStorage.setItem('erp.pack.labelOrientation', 'portrait');
     renderApp(<LabelPrintDialog open waybill={WAYBILL('VTP')} orderId={null} onClose={() => {}} />);
     await waitFor(() => expect(print).toHaveBeenCalledTimes(1));
-    const label = within(lastPrinted());
+    const label = within(firstPage());
     expect(label.queryByText(/Mã đơn hàng/)).toBeNull();
     // 2026-10-28: người gửi chỉ còn tên page Facebook — ẩn tên POS, SĐT, địa chỉ
     expect(label.getByText('Người gửi:')).toBeTruthy();
@@ -207,7 +235,7 @@ describe('Popup nhãn — tem ERP 100×75 mm (2026-10-13)', () => {
     await waitFor(() => expect(print).toHaveBeenCalledTimes(1));
     const root = lastPrinted();
     expect(root.getAttribute('data-print-size')).toBe('WAYBILL_75x100');
-    const label = within(root);
+    const label = within(firstPage());
     expect(label.getByRole('img', { name: `Mã vận đơn ${code}` })).toBeTruthy();
     expect(label.getByRole('img', { name: `QR ${code}` })).toBeTruthy();
     expect(label.getByText(code)).toBeTruthy();
@@ -232,7 +260,7 @@ describe('Popup nhãn — tem ERP 100×75 mm (2026-10-13)', () => {
     );
     renderApp(<LabelPrintDialog open waybill={WAYBILL('VTP')} orderId={null} onClose={() => {}} />);
     await waitFor(() => expect(print).toHaveBeenCalledTimes(1));
-    const label = within(lastPrinted());
+    const label = within(firstPage());
     expect(
       label.getByText('Quý Khách Vui Lòng Quay video khi bóc hàng để được hỗ trợ đơn hàng'),
     ).toBeTruthy();
@@ -254,7 +282,7 @@ describe('Popup nhãn — tem ERP 100×75 mm (2026-10-13)', () => {
       />,
     );
     await waitFor(() => expect(print).toHaveBeenCalledTimes(1));
-    const label = within(lastPrinted());
+    const label = within(firstPage());
     expect(label.getByRole('img', { name: `Mã vận đơn ${long}` })).toBeTruthy();
     expect(label.getByRole('img', { name: `QR ${long}` })).toBeTruthy();
     expect(label.getByText('1763110086')).toBeTruthy();
@@ -310,7 +338,7 @@ describe('Popup nhãn — tem ERP 100×75 mm (2026-10-13)', () => {
     await waitFor(() => expect(print).toHaveBeenCalledTimes(1));
     const root = lastPrinted();
     expect(root.getAttribute('data-print-size')).toBe('WAYBILL_75x100');
-    const label = within(root);
+    const label = within(firstPage());
     // 2026-10-16: GHTK dọc dùng khung tem dọc chung (giống Viettel)
     expect(label.getByRole('img', { name: `Mã vận đơn ${long}` })).toBeTruthy();
     expect(label.getByRole('img', { name: `QR ${long}` })).toBeTruthy();
@@ -354,7 +382,7 @@ describe('Popup nhãn — tem ERP 100×75 mm (2026-10-13)', () => {
     );
     await waitFor(() => expect(print).toHaveBeenCalledTimes(1));
     expect(
-      within(lastPrinted()).getByText(
+      within(firstPage()).getByText(
         'Quý Khách Vui Lòng Quay video khi bóc hàng để được hỗ trợ đơn hàng',
       ),
     ).toBeTruthy();

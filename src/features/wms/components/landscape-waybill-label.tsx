@@ -1,6 +1,6 @@
 'use client';
 
-import type { CSSProperties, ReactNode } from 'react';
+import { Fragment, type CSSProperties, type ReactNode } from 'react';
 import { Barcode } from '@/components/data/barcode';
 import { cn } from '@/lib/cn';
 import { formatDate, formatQuantity, formatTime } from '@/lib/format';
@@ -16,6 +16,7 @@ import {
 } from '../ghtk-label';
 // Dựng ×2 rồi thu về — chống cài đặt "cỡ chữ tối thiểu" của Chrome (xem label-scale.ts).
 import { f, labelInner, labelOuter, u, WAYBILL_EDGE } from '../label-scale';
+import { chunkItems, fitItems } from '../label-text';
 
 /** Ô mã vạch: SVG của bwip-js giãn theo ô (giữ tỉ lệ), không theo kích thước gốc. */
 const FILL_SVG = '[&>svg]:!h-full [&>svg]:!w-full [&>svg]:!max-w-none';
@@ -23,12 +24,44 @@ const FILL_SVG = '[&>svg]:!h-full [&>svg]:!w-full [&>svg]:!max-w-none';
 const LINE = `${u(0.35)} solid currentColor`;
 
 /**
- * Số dòng hàng in ra; còn lại báo "+N sản phẩm khác không in" ở tiêu đề. Ô sản phẩm cao ~15 mm
- * (sau hàng Mã đơn KH và hàng ghi chú): 4 dòng tên 1 dòng vừa khít.
+ * Ô sản phẩm (sau hàng Mã đơn KH, trước hàng ghi chú) đo 16,5 mm trên Chrome 2026-11-04: đo
+ * thực tế còn 12,78 mm cho các hàng sau tiêu đề 3,2 mm (padding dọc 0 — trước 0,5 mm làm 4
+ * hàng 7 pt bị xén 1 mm). 4 hàng 7 pt = 4 × 3,21 = 12,84 → lấy 12,85 (lệch 0,06 mm không thấy).
+ * Tên in ĐỦ không cắt (user chốt 2026-11-04): số món mỗi tờ tính theo số dòng mỗi tên
+ * (`fitItems`); hết chỗ thì in tiếp sang tờ mới (`chunkItems`).
  */
-const MAX_ITEMS = 4;
-/** Tới chừng này dòng hàng thì tên được in 2 dòng. */
-const FULL_NAME_ITEMS = 2;
+const GOODS_MM = { rows: 12.85, nameWidth: 55 } as const;
+/** Cả danh sách vừa MỘT tờ ở 8 pt (tên 2 dòng được) thì in 8 pt, cách hàng 0,5 mm; không thì 7 pt sát. */
+const FONT = {
+  large: { pt: 8, lineMm: 3.67, gapMm: 0.5 },
+  small: { pt: 7, lineMm: 3.21, gapMm: 0 },
+} as const;
+
+/** Chia món ra các tờ và chọn cỡ chữ cho ô sản phẩm tem ngang. */
+export function landscapePages<T extends { name: string }>(
+  items: T[],
+): { pages: T[][]; pt: 7 | 8 } {
+  const large = fitItems(items, {
+    availableMm: GOODS_MM.rows + FONT.large.gapMm,
+    lineMm: FONT.large.lineMm,
+    rowExtraMm: FONT.large.gapMm,
+    pt: FONT.large.pt,
+    widthMm: GOODS_MM.nameWidth,
+  });
+  if (large >= items.length) return { pages: [items], pt: 8 };
+  return {
+    pages: chunkItems(items, (rest) =>
+      fitItems(rest, {
+        availableMm: GOODS_MM.rows,
+        lineMm: FONT.small.lineMm,
+        rowExtraMm: FONT.small.gapMm,
+        pt: FONT.small.pt,
+        widthMm: GOODS_MM.nameWidth,
+      }),
+    ),
+    pt: 7,
+  };
+}
 
 const clamp = (lines: number): CSSProperties => ({
   lineHeight: 1.3,
@@ -75,17 +108,18 @@ export function LandscapeWaybillLabel({
   const code = data.trackingNo ?? data.shipmentDocNumber;
   const barValue = ghtk?.shortCode ?? code;
   const note = (printNote(data) ?? DEFAULT_PRINT_NOTE).split('\n').join(' · ');
-  const shown = data.items.slice(0, MAX_ITEMS);
-  const more = data.items.length - shown.length;
-  // Nhiều hàng → mỗi tên 1 dòng, chữ nhỏ hơn một chút — đủ chỗ cho cả danh sách.
-  const many = data.items.length > FULL_NAME_ITEMS;
+  // Tên in đủ (xuống dòng); hết chỗ ô sản phẩm thì sang tờ mới — xem `landscapePages`.
+  const { pages, pt } = landscapePages(data.items);
+  const many = pt === 7;
   const route = ghtk ? routeLabel(data.sender?.province, data.recipient?.province) : null;
   const printed = `${formatDate(printedAt)} ${formatTime(printedAt).replace(':', 'h')}`;
   const carrier = ghtk ? 'GHTK' : (data.carrierName ?? data.carrierCode ?? 'Vận đơn');
   const destination = data.recipient?.fromDistrict || data.recipient?.province || null;
 
-  return (
+  // Mỗi tờ một [data-print-page] (ngắt trang khi in) — tờ in không bọc thêm.
+  const page = (pageItems: ShipmentLabelData['items'], pageNo: number) => (
     <div
+      data-print-page
       data-waybill-label={code}
       className="overflow-hidden bg-card text-foreground"
       style={labelOuter(W, H)}
@@ -270,27 +304,25 @@ export function LandscapeWaybillLabel({
             <div
               className="flex min-h-0 flex-col overflow-hidden"
               style={{
-                padding: `${u(0.5)} ${u(1.5)}`,
+                padding: `0 ${u(1.5)}`,
                 fontSize: f(many ? 7 : 8),
                 gap: u(many ? 0 : 0.5),
               }}
             >
-              {/* Số loại + phần không in nằm ở dòng tiêu đề — luôn thấy dù danh sách bị cắt */}
+              {/* Số loại cả đơn + số tờ ở dòng tiêu đề */}
               <div
                 className="flex shrink-0 justify-between font-bold"
                 style={{ fontSize: f(7), lineHeight: 1.3 }}
               >
                 <span>
                   Sản phẩm ({data.items.length})
-                  {more > 0 ? (
-                    <span className="italic"> · +{more} sản phẩm khác không in</span>
-                  ) : null}
+                  {pages.length > 1 ? ` · Tờ ${pageNo}/${pages.length}` : null}
                 </span>
                 <span>SL</span>
               </div>
-              {shown.map((it, i) => (
+              {pageItems.map((it, i) => (
                 <div key={i} className="flex shrink-0 items-start" style={{ gap: u(2) }}>
-                  <span className="min-w-0 flex-1 font-semibold" style={clamp(many ? 1 : 2)}>
+                  <span className="min-w-0 flex-1 font-semibold" style={{ lineHeight: 1.3 }}>
                     {it.name}
                   </span>
                   <span className="shrink-0 font-bold tabular-nums" style={{ lineHeight: 1.3 }}>
@@ -325,5 +357,13 @@ export function LandscapeWaybillLabel({
         </div>
       </div>
     </div>
+  );
+
+  return (
+    <>
+      {pages.map((pageItems, i) => (
+        <Fragment key={i}>{page(pageItems, i + 1)}</Fragment>
+      ))}
+    </>
   );
 }

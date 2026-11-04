@@ -24081,7 +24081,7 @@ export interface operations {
                  */
                 itemOrigin?: "CUSTOM" | "POS_SKU" | "NON_ERP";
                 /** @description Sắp xếp theo cột (2026-10-22); mặc định ngày đặt mới nhất trước. */
-                sortBy?: "orderDate" | "docNumber" | "customer" | "total" | "time" | "statusChangedAt" | "sentToCarrierAt";
+                sortBy?: "orderDate" | "docNumber" | "customer" | "total" | "time" | "statusChangedAt" | "sentToCarrierAt" | "items";
                 customerId?: string;
                 status?: "DRAFT" | "PENDING_APPROVAL" | "APPROVED" | "POSTED" | "CANCELLED";
                 /** @description Lọc theo cân nặng gửi hãng HIỆU LỰC (đặt tay, không thì Σ dòng) — kg, chuỗi decimal, cận dưới (≥). */
@@ -24133,8 +24133,9 @@ export interface operations {
                 /** @description Nguồn đơn: `PANCAKE` = đồng bộ từ Pancake, `ERP` = tạo trong ERP. */
                 source?: "PANCAKE" | "ERP";
                 /**
-                 * @description Chỉ đơn đồng bộ từ MỘT shop (POS) Pancake — mã shop Pancake (số nguyên dương, chuỗi). Danh
-                 *     sách POS: GET /pancake-sync/shops. Kèm `source=ERP` thì không đơn nào khớp.
+                 * @description Chỉ đơn của các shop (POS) Pancake này — mã shop Pancake (số nguyên dương, chuỗi), nhiều mã
+                 *     cách nhau dấu phẩy (tối đa 100, 2026-11-04). Danh sách POS: GET /pancake-sync/shops. Đơn ERP
+                 *     chọn POS khi tạo cũng thuộc POS đó. Kèm `source=ERP` thì không đơn nào khớp.
                  */
                 pancakeShopId?: string;
                 /**
@@ -24341,7 +24342,7 @@ export interface operations {
                  */
                 itemOrigin?: "CUSTOM" | "POS_SKU" | "NON_ERP";
                 /** @description Sắp xếp theo cột (2026-10-22); mặc định ngày đặt mới nhất trước. */
-                sortBy?: "orderDate" | "docNumber" | "customer" | "total" | "time" | "statusChangedAt" | "sentToCarrierAt";
+                sortBy?: "orderDate" | "docNumber" | "customer" | "total" | "time" | "statusChangedAt" | "sentToCarrierAt" | "items";
                 /**
                  * @description Chỉ đếm các tab này (2026-11-03, tab cha + chip con màn Đơn hàng — bỏ các tab đã xong khi nhóm
                  *     của chúng đang đóng). Bỏ trống = mọi tab + `total`; có giá trị thì tab không đếm và `total`
@@ -24399,8 +24400,9 @@ export interface operations {
                 /** @description Nguồn đơn: `PANCAKE` = đồng bộ từ Pancake, `ERP` = tạo trong ERP. */
                 source?: "PANCAKE" | "ERP";
                 /**
-                 * @description Chỉ đơn đồng bộ từ MỘT shop (POS) Pancake — mã shop Pancake (số nguyên dương, chuỗi). Danh
-                 *     sách POS: GET /pancake-sync/shops. Kèm `source=ERP` thì không đơn nào khớp.
+                 * @description Chỉ đơn của các shop (POS) Pancake này — mã shop Pancake (số nguyên dương, chuỗi), nhiều mã
+                 *     cách nhau dấu phẩy (tối đa 100, 2026-11-04). Danh sách POS: GET /pancake-sync/shops. Đơn ERP
+                 *     chọn POS khi tạo cũng thuộc POS đó. Kèm `source=ERP` thì không đơn nào khớp.
                  */
                 pancakeShopId?: string;
                 /**
@@ -24516,7 +24518,7 @@ export interface operations {
                  */
                 itemOrigin?: "CUSTOM" | "POS_SKU" | "NON_ERP";
                 /** @description Sắp xếp theo cột (2026-10-22); mặc định ngày đặt mới nhất trước. */
-                sortBy?: "orderDate" | "docNumber" | "customer" | "total" | "time" | "statusChangedAt" | "sentToCarrierAt";
+                sortBy?: "orderDate" | "docNumber" | "customer" | "total" | "time" | "statusChangedAt" | "sentToCarrierAt" | "items";
                 customerId?: string;
                 status?: "DRAFT" | "PENDING_APPROVAL" | "APPROVED" | "POSTED" | "CANCELLED";
                 /** @description Lọc theo cân nặng gửi hãng HIỆU LỰC (đặt tay, không thì Σ dòng) — kg, chuỗi decimal, cận dưới (≥). */
@@ -24568,8 +24570,9 @@ export interface operations {
                 /** @description Nguồn đơn: `PANCAKE` = đồng bộ từ Pancake, `ERP` = tạo trong ERP. */
                 source?: "PANCAKE" | "ERP";
                 /**
-                 * @description Chỉ đơn đồng bộ từ MỘT shop (POS) Pancake — mã shop Pancake (số nguyên dương, chuỗi). Danh
-                 *     sách POS: GET /pancake-sync/shops. Kèm `source=ERP` thì không đơn nào khớp.
+                 * @description Chỉ đơn của các shop (POS) Pancake này — mã shop Pancake (số nguyên dương, chuỗi), nhiều mã
+                 *     cách nhau dấu phẩy (tối đa 100, 2026-11-04). Danh sách POS: GET /pancake-sync/shops. Đơn ERP
+                 *     chọn POS khi tạo cũng thuộc POS đó. Kèm `source=ERP` thì không đơn nào khớp.
                  */
                 pancakeShopId?: string;
                 /**

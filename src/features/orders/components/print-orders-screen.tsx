@@ -151,7 +151,8 @@ const DEFAULTS = {
     'carrierAccountId',
     'carrierSource',
     // Kho: ô chọn kho làm việc ở sidebar (header X-Warehouse-Id) — không còn bộ lọc kho riêng.
-    'source',
+    // POS Pancake (mã shop nối dấu phẩy, chọn nhiều) thay ô Nguồn (2026-11-04).
+    'pos',
     'from',
     'to',
     // Lọc from/to theo trường ngày nào (2026-10-28) — trống = ngày đặt.
@@ -195,6 +196,9 @@ const SORT_FIELD: Record<string, OrderSortField> = {
   time: 'statusChangedAt',
   // Cột Vận chuyển sắp theo lúc gửi sang ĐVVC (2026-11-03); đơn chưa gửi luôn cuối.
   shipping: 'sentToCarrierAt',
+  // Cột Sản phẩm (2026-11-04): abc tên sản phẩm, cùng tên thì ít mặt hàng trước — cùng luật xếp
+  // tem in hàng loạt; server sắp trong bộ nhớ (tối đa 20.000 đơn khớp).
+  product: 'items',
 };
 
 /**
@@ -425,7 +429,8 @@ const buildColumns = (
   {
     id: 'product',
     header: 'Sản phẩm',
-    // Không đặt width — xem cột Địa chỉ nhận.
+    // Không đặt width — xem cột Địa chỉ nhận. Sắp được (2026-11-04): ít mặt hàng trước + abc.
+    meta: { sortable: true },
     cell: ({ row }) => {
       // Màn In đơn hiện HẾT sản phẩm của đơn (2026-11-04) — mỗi dòng một hàng, không "+N khác".
       const items = row.original.items;
@@ -869,14 +874,12 @@ export function PrintOrdersScreen() {
   const shortSkuId = state.filters.shortSkuId ?? '';
   const skuId = state.filters.skuId ?? '';
   const skuOnly = skuId !== '' && state.filters.skuOnly === 'true';
-  // Ô "Nguồn" gộp cả POS: `POS:<mã shop>` = đơn Pancake của đúng POS đó (URL giữ một khoá).
-  const posShopId = /^POS:(\d+)$/.exec(state.filters.source ?? '')?.[1] ?? '';
-  const source: 'PANCAKE' | 'ERP' | undefined =
-    state.filters.source === 'PANCAKE' || posShopId
-      ? 'PANCAKE'
-      : state.filters.source === 'ERP'
-        ? 'ERP'
-        : undefined;
+  // Ô POS (2026-11-04, thay ô Nguồn): chọn nhiều POS Pancake, mã shop nối dấu phẩy — đơn Pancake
+  // của POS đó + đơn ERP chọn POS đó khi tạo. Chỉ giữ mã dạng số (link cũ `POS:<mã>` bỏ qua).
+  const pos = (state.filters.pos ?? '')
+    .split(',')
+    .filter((s) => /^\d+$/.test(s))
+    .join(',');
   const pancakeShops = usePancakeShops();
   const from = state.filters.from ?? '';
   const to = state.filters.to ?? '';
@@ -903,9 +906,12 @@ export function PrintOrdersScreen() {
     [savedHidden],
   );
   // Lọc theo Ngày gán ĐVVC mà URL chưa chọn cột sắp → sắp theo giờ gửi hãng, mới nhất trước
-  // (2026-11-03) — thắng lần sắp đã lưu của người dùng.
+  // (2026-11-03) — thắng lần sắp đã lưu của người dùng. Đang tìm kiếm (ô tìm có chữ) mà chưa
+  // chọn cột sắp → ưu tiên đơn ít sản phẩm trước + abc tên sản phẩm (user 2026-11-04) để kho
+  // đóng theo lô; bấm cột khác thì theo cột đó.
   const sort: SortState | null =
     state.sort ??
+    (state.q !== '' ? { id: 'product', desc: false } : null) ??
     (dateField === 'sentToCarrierAt' ? { id: 'shipping', desc: true } : null) ??
     prefs.data?.sort ??
     null;
@@ -928,8 +934,7 @@ export function PrintOrdersScreen() {
       shortSkuId,
       skuId,
       skuOnly,
-      source,
-      pancakeShopId: posShopId || undefined,
+      pancakeShopId: pos || undefined,
       from,
       to,
       dateField,
@@ -943,8 +948,7 @@ export function PrintOrdersScreen() {
       shortSkuId,
       skuId,
       skuOnly,
-      source,
-      posShopId,
+      pos,
       from,
       to,
       dateField,
@@ -1076,7 +1080,7 @@ export function PrintOrdersScreen() {
     customerId !== '' ||
     shortSkuId !== '' ||
     skuId !== '' ||
-    source !== undefined ||
+    pos !== '' ||
     from !== '' ||
     to !== '' ||
     team !== '' ||
@@ -1116,7 +1120,8 @@ export function PrintOrdersScreen() {
           <>
             <OrderScanButton onScan={onScan} />
             <Can I="map" a="Sync">
-              <PancakeOrderResyncButton defaultShopId={posShopId} />
+              {/* Đang lọc đúng một POS → gợi ý POS đó khi đồng bộ lại đơn Pancake. */}
+              <PancakeOrderResyncButton defaultShopId={pos.includes(',') ? '' : pos} />
             </Can>
             <ExportExcelButton
               fileName="don-hang"
@@ -1210,21 +1215,18 @@ export function PrintOrdersScreen() {
                 />
               ),
             },
+            // POS, Page, Phòng ban ghim ngay trên thanh cạnh ô Sản phẩm (user 2026-11-04) — xem
+            // `pinned`; ô POS chọn nhiều thay ô Nguồn (ERP / Pancake).
             {
-              key: 'source',
-              label: 'Nguồn',
-              type: 'select',
+              key: 'pos',
+              label: 'POS',
+              type: 'multiSelect',
               group: 'Nguồn & người',
-              // Hàng chục POS Pancake — gõ tìm theo tên shop.
-              searchable: true,
-              options: [
-                { value: 'ERP', label: 'Tạo trong ERP' },
-                { value: 'PANCAKE', label: 'Pancake (mọi POS)' },
-                ...(pancakeShops.data ?? []).map((s) => ({
-                  value: `POS:${s.shopId}`,
-                  label: `Pancake · ${pancakeShopLabel(s)}`,
-                })),
-              ],
+              unit: 'POS',
+              options: (pancakeShops.data ?? []).map((s) => ({
+                value: s.shopId,
+                label: pancakeShopLabel(s),
+              })),
             },
             {
               key: 'fbPage',
@@ -1262,7 +1264,7 @@ export function PrintOrdersScreen() {
           values={{
             status: state.filters.status,
             customerId: state.filters.customerId,
-            source: state.filters.source,
+            pos,
             from: state.filters.from,
             to: state.filters.to,
             dateField: state.filters.dateField,
@@ -1271,7 +1273,7 @@ export function PrintOrdersScreen() {
             skuId: state.filters.skuId,
           }}
           onFilterChange={setFilter}
-          pinned={['skuId']}
+          pinned={['skuId', 'pos', 'fbPage', 'team']}
           searchPlaceholder="Mã đơn, SĐT, tên SP, mã vận đơn… nhiều giá trị cách dấu phẩy"
           right={
             <>
