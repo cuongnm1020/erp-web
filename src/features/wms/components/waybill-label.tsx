@@ -10,6 +10,7 @@ import { LABEL_SIZES, type PrintController } from '@/lib/print';
 import type { ShipmentLabelData } from '../api/use-pda';
 import { DEFAULT_PRINT_NOTE, hidePhone, parseGhtkTracking, routeLabel } from '../ghtk-label';
 import { f, labelInner, labelOuter, u, WAYBILL_EDGE } from '../label-scale';
+import { estimateLines, fitItems } from '../label-text';
 import { sortLabelsForPrint } from '../waybill-sort';
 import { LandscapeWaybillLabel } from './landscape-waybill-label';
 
@@ -48,25 +49,26 @@ const PORTRAIT_MM = {
   goodsHead: 9.5,
   /** Dòng "Mã đơn hàng" VNPost. */
   vnpost: 3.3,
-  /** Một dòng hàng: tên 1 dòng 7,5 pt × 1,3 + padding + viền. */
-  row: 4.5,
+  /** Một dòng chữ 7,5 pt × line-height 1,3 (tên sản phẩm, địa chỉ). */
+  line: 3.45,
+  /** Phần cố định mỗi hàng sản phẩm ngoài chữ: padding + viền (hàng 1 dòng = 4,5 mm). */
+  rowExtra: 1.05,
+  /** Bề ngang chữ cột tên sản phẩm (cột 55,3 mm trừ padding). */
+  nameWidth: 54,
+  /** Bề ngang chữ địa chỉ người nhận (ô 63,4 mm trừ padding + biểu tượng). */
+  addressWidth: 59,
   /** Dự phòng làm tròn để viền dòng cuối không bị xén. */
   slack: 0.5,
 } as const;
 
 /**
- * Số ký tự ước lượng vừa một dòng địa chỉ 7,5 pt đậm trên bề ngang ô người nhận (đo canvas:
- * ~10,3 px/ký tự trên 454 px dựng ×2 → ~44; lấy thấp hơn vì ngắt theo từ).
+ * Chỗ trống (mm) dành cho các dòng hàng trên tem dọc (2026-11-04). Trước đây khóa cứng 2 dòng →
+ * đơn 4–5 món bị gom "+N sản phẩm khác" dù nửa dưới tem trống (kho báo lỗi nghiêm trọng: không
+ * in hết danh sách). Ô Sản phẩm là phần co giãn (grid 1fr) nên chỗ trống = chiều cao trong
+ * viền đứt − các khối cố định. Số món in được: `fitItems` (tên in đủ, mỗi tên có thể nhiều
+ * dòng); vượt quá vẫn báo "+N sản phẩm khác" ở tiêu đề bảng.
  */
-const ADDRESS_CHARS_PER_LINE = 42;
-
-/**
- * Số dòng hàng in được trên tem dọc (2026-11-04). Trước đây khóa cứng 2 dòng → đơn 4–5 món bị
- * gom "+N sản phẩm khác" dù nửa dưới tem trống (kho báo lỗi nghiêm trọng: không in hết danh
- * sách). Ô Sản phẩm là phần co giãn (grid 1fr) nên số dòng = (chỗ còn lại sau các khối cố
- * định) / chiều cao một dòng; luôn ≥ 1. Vượt quá vẫn báo "+N sản phẩm khác" ở tiêu đề bảng.
- */
-export function portraitItemRows(opts: {
+export function portraitGoodsMm(opts: {
   longCode: boolean;
   seq: boolean;
   sender: boolean;
@@ -79,12 +81,24 @@ export function portraitItemRows(opts: {
   if (opts.sender) used += m.sender;
   if (opts.vnpost) used += m.vnpost;
   used += Math.max(0, Math.min(3, opts.addressLines) - 1) * m.addressLine;
-  return Math.max(1, Math.floor((m.content - used) / m.row));
+  return m.content - used;
+}
+
+/** Số món in được trên tem dọc với chỗ trống `availableMm` — tên in đủ, không cắt. */
+export function portraitItemCount(items: { name: string }[], availableMm: number): number {
+  const m = PORTRAIT_MM;
+  return fitItems(items, {
+    availableMm,
+    lineMm: m.line,
+    rowExtraMm: m.rowExtra,
+    pt: SENDER_PT,
+    widthMm: m.nameWidth,
+  });
 }
 
 /** Ước lượng số dòng địa chỉ người nhận (cắt 3 dòng ở JSX). */
 export function estimateAddressLines(address: string): number {
-  return Math.max(1, Math.ceil(address.length / ADDRESS_CHARS_PER_LINE));
+  return estimateLines(address, SENDER_PT, PORTRAIT_MM.addressWidth);
 }
 
 /**
@@ -162,14 +176,17 @@ export function WaybillLabel({
   const long = barValue.length > LONG_CODE;
   // Tuyến GHTK (NỘI TỈNH / NỘI MIỀN / LIÊN MIỀN) in cạnh COD — ERP tự suy từ tỉnh.
   const route = ghtk ? routeLabel(data.sender?.province, data.recipient?.province) : null;
-  // Số dòng hàng = chỗ còn trống của ô Sản phẩm (2026-11-04) — xem `portraitItemRows`.
-  const max = portraitItemRows({
-    longCode: long,
-    seq: seq != null,
-    sender: !!data.facebookPageName,
-    vnpost: data.carrierCode === 'VNPOST',
-    addressLines: data.recipient ? estimateAddressLines(fromDistrictAddress(data.recipient)) : 1,
-  });
+  // Số món = chỗ còn trống của ô Sản phẩm, tên in đủ không cắt (2026-11-04) — xem `portraitGoodsMm`.
+  const max = portraitItemCount(
+    data.items,
+    portraitGoodsMm({
+      longCode: long,
+      seq: seq != null,
+      sender: !!data.facebookPageName,
+      vnpost: data.carrierCode === 'VNPOST',
+      addressLines: data.recipient ? estimateAddressLines(fromDistrictAddress(data.recipient)) : 1,
+    }),
+  );
   const shown = data.items.slice(0, max);
   const more = data.items.length - shown.length;
   const carrier = data.carrierName ?? data.carrierCode ?? 'Vận đơn';
@@ -381,11 +398,12 @@ export function WaybillLabel({
         <tbody>
           {shown.map((it, i) => (
             <tr key={i}>
+              {/* Tên in đủ, xuống dòng (user chốt 2026-11-04) — số món đã tính theo số dòng */}
               <td
-                className="font-bold leading-tight"
-                style={{ border: BORDER, padding: `${u(0.4)} ${u(0.6)}` }}
+                className="font-bold"
+                style={{ border: BORDER, padding: `${u(0.4)} ${u(0.6)}`, lineHeight: 1.3 }}
               >
-                <span style={clamp(shown.length > 1 ? 1 : 2)}>{it.name}</span>
+                {it.name}
               </td>
               <td
                 className="text-center font-bold tabular-nums"

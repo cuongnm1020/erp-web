@@ -158,10 +158,13 @@ describe('Popup nhãn — tem ERP 100×75 mm (2026-10-13)', () => {
     const root = lastPrinted();
     expect(root.getAttribute('data-print-size')).toBe('WAYBILL_75x100');
     expect(root.querySelector('style')!.textContent).toContain('size: 75mm 100mm');
-    // Dọc: số dòng hàng theo chỗ trống (2026-11-04) — VTP có page, địa chỉ 1 dòng → 5 dòng,
-    // đủ 5 món, không còn "+N sản phẩm khác".
-    expect(within(root).getByText('Phân bón D')).toBeTruthy();
-    expect(within(root).queryByText(/sản phẩm khác/)).toBeNull();
+    // Dọc: số món theo chỗ trống, tên in đủ không cắt (2026-11-04) — VTP có page, địa chỉ 1
+    // dòng còn ~25 mm; tên toàn hoa 35 ký tự ước lượng 2 dòng (8 mm) + 3 tên ngắn (4,5 mm) →
+    // 4 món, món thứ 5 báo ở tiêu đề.
+    expect(within(root).getByText('COMBO 3 CHAI CANXI BO ORGANIC 500ML')).toBeTruthy();
+    expect(within(root).getByText('Phân bón C')).toBeTruthy();
+    expect(within(root).queryByText('Phân bón D')).toBeNull();
+    expect(within(root).getByText('+1 sản phẩm khác')).toBeTruthy();
   });
 
   it('tem chung dọc (VTP): hàng người gửi, SĐT người nhận 4 số cuối, ghi chú cuối tem / mặc định', async () => {

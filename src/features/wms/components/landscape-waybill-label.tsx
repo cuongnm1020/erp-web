@@ -16,6 +16,7 @@ import {
 } from '../ghtk-label';
 // Dựng ×2 rồi thu về — chống cài đặt "cỡ chữ tối thiểu" của Chrome (xem label-scale.ts).
 import { f, labelInner, labelOuter, u, WAYBILL_EDGE } from '../label-scale';
+import { fitItems } from '../label-text';
 
 /** Ô mã vạch: SVG của bwip-js giãn theo ô (giữ tỉ lệ), không theo kích thước gốc. */
 const FILL_SVG = '[&>svg]:!h-full [&>svg]:!w-full [&>svg]:!max-w-none';
@@ -23,12 +24,42 @@ const FILL_SVG = '[&>svg]:!h-full [&>svg]:!w-full [&>svg]:!max-w-none';
 const LINE = `${u(0.35)} solid currentColor`;
 
 /**
- * Số dòng hàng in ra; còn lại báo "+N sản phẩm khác không in" ở tiêu đề. Ô sản phẩm cao ~15 mm
- * (sau hàng Mã đơn KH và hàng ghi chú): 4 dòng tên 1 dòng vừa khít.
+ * Ô sản phẩm (sau hàng Mã đơn KH, trước hàng ghi chú) đo 16,5 mm trên Chrome 2026-11-04: trừ
+ * padding 1 mm + tiêu đề 3,2 mm còn ~12,3 mm cho các hàng; 4 hàng 7 pt (4 × 3,21 = 12,84 mm)
+ * đã in khít từ trước nên lấy 12,9. Tên in ĐỦ không cắt (user chốt 2026-11-04): số món in được
+ * tính theo số dòng mỗi tên (`fitItems`); còn lại báo "+N sản phẩm khác không in" ở tiêu đề.
  */
-const MAX_ITEMS = 4;
-/** Tới chừng này dòng hàng thì tên được in 2 dòng. */
-const FULL_NAME_ITEMS = 2;
+const GOODS_MM = { rows: 12.9, nameWidth: 55 } as const;
+/** Cả danh sách vừa ở 8 pt (tên 2 dòng được) thì in 8 pt, cách hàng 0,5 mm; không thì 7 pt sát. */
+const FONT = {
+  large: { pt: 8, lineMm: 3.67, gapMm: 0.5 },
+  small: { pt: 7, lineMm: 3.21, gapMm: 0 },
+} as const;
+
+/** Số món in được và cỡ chữ cho ô sản phẩm tem ngang. */
+export function landscapeGoodsFit(items: { name: string }[]): {
+  count: number;
+  pt: 7 | 8;
+} {
+  const large = fitItems(items, {
+    availableMm: GOODS_MM.rows + FONT.large.gapMm,
+    lineMm: FONT.large.lineMm,
+    rowExtraMm: FONT.large.gapMm,
+    pt: FONT.large.pt,
+    widthMm: GOODS_MM.nameWidth,
+  });
+  if (large >= items.length) return { count: items.length, pt: 8 };
+  return {
+    count: fitItems(items, {
+      availableMm: GOODS_MM.rows,
+      lineMm: FONT.small.lineMm,
+      rowExtraMm: FONT.small.gapMm,
+      pt: FONT.small.pt,
+      widthMm: GOODS_MM.nameWidth,
+    }),
+    pt: 7,
+  };
+}
 
 const clamp = (lines: number): CSSProperties => ({
   lineHeight: 1.3,
@@ -75,10 +106,11 @@ export function LandscapeWaybillLabel({
   const code = data.trackingNo ?? data.shipmentDocNumber;
   const barValue = ghtk?.shortCode ?? code;
   const note = (printNote(data) ?? DEFAULT_PRINT_NOTE).split('\n').join(' · ');
-  const shown = data.items.slice(0, MAX_ITEMS);
+  // Tên in đủ (xuống dòng); số món và cỡ chữ theo chỗ trống của ô — xem `landscapeGoodsFit`.
+  const goods = landscapeGoodsFit(data.items);
+  const shown = data.items.slice(0, goods.count);
   const more = data.items.length - shown.length;
-  // Nhiều hàng → mỗi tên 1 dòng, chữ nhỏ hơn một chút — đủ chỗ cho cả danh sách.
-  const many = data.items.length > FULL_NAME_ITEMS;
+  const many = goods.pt === 7;
   const route = ghtk ? routeLabel(data.sender?.province, data.recipient?.province) : null;
   const printed = `${formatDate(printedAt)} ${formatTime(printedAt).replace(':', 'h')}`;
   const carrier = ghtk ? 'GHTK' : (data.carrierName ?? data.carrierCode ?? 'Vận đơn');
@@ -290,7 +322,7 @@ export function LandscapeWaybillLabel({
               </div>
               {shown.map((it, i) => (
                 <div key={i} className="flex shrink-0 items-start" style={{ gap: u(2) }}>
-                  <span className="min-w-0 flex-1 font-semibold" style={clamp(many ? 1 : 2)}>
+                  <span className="min-w-0 flex-1 font-semibold" style={{ lineHeight: 1.3 }}>
                     {it.name}
                   </span>
                   <span className="shrink-0 font-bold tabular-nums" style={{ lineHeight: 1.3 }}>
