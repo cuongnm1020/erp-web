@@ -15212,7 +15212,7 @@ export interface components {
             previousFrom: string;
             previousTo: string;
             /** @enum {string} */
-            rankBy: "customers" | "orders" | "qty" | "revenue" | "grossProfit";
+            rankBy: "qty" | "customers" | "orders" | "revenue" | "grossProfit";
             /** @description Tối đa `limit` SKU, hạng 1..n. Bằng nhau thì doanh thu cao hơn đứng trước. */
             items: components["schemas"]["SalesTopProductItemDto"][];
             dataAsOf: string | null;
@@ -15267,7 +15267,7 @@ export interface components {
         SalesTopProductsMonthlyDto: {
             year: number;
             /** @enum {string} */
-            rankBy: "customers" | "orders" | "qty" | "revenue" | "grossProfit";
+            rankBy: "qty" | "customers" | "orders" | "revenue" | "grossProfit";
             /** @description Chỉ các tháng đã bắt đầu (năm hiện tại: tới tháng này). */
             months: components["schemas"]["SalesTopProductsMonthDto"][];
             /** @description Top `limit` SKU cả năm (01/01 → 31/12 hoặc hôm nay) — previous* so với năm trước cùng độ dài. */
