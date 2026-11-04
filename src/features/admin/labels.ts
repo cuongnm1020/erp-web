@@ -59,6 +59,7 @@ const PERMISSION_LABELS: Record<string, string> = {
   'sales_order.issues': 'Xử lý đơn lỗi (màn Quản trị)',
   'sales_order.filter_team': 'Lọc đơn theo NV lên đơn',
   'sales_order.filter_dept': 'Lọc đơn theo phòng ban',
+  'sales_order.set_order_date': 'Chọn ngày tạo đơn (vận đơn)',
   'task.read': 'Xem việc của mình',
   'task.read_all': 'Xem mọi việc (điều phối)',
   'stock.cost': 'Nhập giá vốn',
