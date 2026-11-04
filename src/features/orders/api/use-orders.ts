@@ -72,6 +72,8 @@ export interface OrderListParams {
   labelPrintedBy?: string;
   /** Đơn có sản phẩm (SKU) này — kể cả thành phần combo. */
   skuId?: string;
+  /** Với `skuId`: true = chỉ đơn mà mọi dòng đều là SKU đó (màn In đơn, 2026-11-04). */
+  skuOnly?: boolean;
   /** true = chỉ đơn có đơn trùng trong ngày (cùng SĐT, cùng ngày VN, chưa hủy — CSKH-5). */
   duplicate?: boolean;
   /** Khoảng orderDate — ngày `YYYY-MM-DD` (server lấy trọn ngày VN) hoặc ISO datetime. */
@@ -227,6 +229,7 @@ function listQuery(params: Omit<OrderListParams, 'take' | 'skip'>) {
     pickupStatus: params.pickupStatus,
     labelPrintedBy: params.labelPrintedBy || undefined,
     skuId: params.skuId || undefined,
+    skuOnly: params.skuId && params.skuOnly ? ('true' as const) : undefined,
     duplicate: params.duplicate ? ('true' as const) : undefined,
     from: params.from || undefined,
     to: params.to || undefined,

@@ -195,6 +195,8 @@ const ORDERS: SalesOrderList = {
       shipment: null,
       ownerName: null,
       creatorName: null,
+      packerName: null,
+      items: [],
       warehouseCode: null,
       warehouseName: null,
       facebookPageName: null,

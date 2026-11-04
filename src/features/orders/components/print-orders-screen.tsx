@@ -17,6 +17,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { BulkActionBar } from '@/components/data/bulk-action-bar';
+import { Checkbox } from '@/components/ui/checkbox';
 import { CopyButton } from '@/components/data/copy-button';
 import { CopyText } from '@/components/data/copy-text';
 import { ExportExcelButton, type ExportColumn } from '@/components/data/export-excel-button';
@@ -195,6 +196,8 @@ const DEFAULTS = {
     'printStatus',
     // Đơn có sản phẩm (SKU) này, kể cả thành phần combo (2026-11-02).
     'skuId',
+    // `true` = chỉ đơn mà mọi dòng đều là SKU đó — "lọc sản phẩm duy nhất" (2026-11-04).
+    'skuOnly',
   ] as const,
 };
 
@@ -500,17 +503,19 @@ const buildColumns = (
     header: 'Sản phẩm',
     // Không đặt width — xem cột Địa chỉ nhận.
     cell: ({ row }) => {
-      const p = row.original.product;
-      if (!p) return <span className="text-muted-foreground">—</span>;
-      const name = `${p.name} × ${formatQuantity(p.qty)}`;
+      // Màn In đơn hiện HẾT sản phẩm của đơn (2026-11-04) — mỗi dòng một hàng, không "+N khác".
+      const items = row.original.items;
+      if (items.length === 0) return <span className="text-muted-foreground">—</span>;
       return (
-        <div className="min-w-40 space-y-0.5">
-          <span className="line-clamp-2 break-words" title={name}>
-            {name}
-          </span>
-          {p.moreCount > 0 ? (
-            <span className="block text-xs text-primary">+{p.moreCount} sản phẩm khác</span>
-          ) : null}
+        <div className="min-w-40 space-y-0.5" data-testid="order-items">
+          {items.map((it, i) => {
+            const name = `${it.name} × ${formatQuantity(it.qty)}`;
+            return (
+              <span key={i} className="block break-words" title={name}>
+                {name}
+              </span>
+            );
+          })}
           {row.original.flow === 'NEEDS_FIX' && row.original.nonErpItems ? (
             // Cần sửa (2026-11-02): SP ngoài hệ thống — không Gửi sang ĐVVC được tới khi thay SP.
             <span
@@ -549,6 +554,16 @@ const buildColumns = (
           >
             {o.creatorName ?? '—'}
           </span>
+          {o.packerName ? (
+            // NV đóng hàng chọn lúc "Đóng gói + in vận đơn" (2026-11-04).
+            <span
+              className="block break-words text-xs text-muted-foreground"
+              title="NV đóng hàng"
+              data-testid="order-packer"
+            >
+              Đóng: {o.packerName}
+            </span>
+          ) : null}
           {o.facebookPageName ? (
             <span
               className="block break-words text-xs text-muted-foreground"
@@ -656,12 +671,11 @@ const buildExportColumns = (
   { header: 'Tỉnh/TP', value: (o) => o.province ?? null, width: 16 },
   {
     header: 'Sản phẩm',
-    value: (o) => {
-      const p = o.product;
-      if (!p) return null;
-      const more = p.moreCount > 0 ? ` (+${p.moreCount} sản phẩm khác)` : '';
-      return `${p.name} × ${formatQuantity(p.qty)}${more}`;
-    },
+    // Hết sản phẩm của đơn, cách nhau dấu "; " (2026-11-04).
+    value: (o) =>
+      o.items.length > 0
+        ? o.items.map((it) => `${it.name} × ${formatQuantity(it.qty)}`).join('; ')
+        : null,
     width: 40,
   },
   { header: 'NV lên đơn', value: (o) => o.creatorName ?? null, width: 20 },
@@ -812,20 +826,45 @@ function PrintStatusNote({ order }: { order: SalesOrderListItem }) {
   return null;
 }
 
-/** Ô lọc "Sản phẩm" (2026-11-02): chọn một SKU — đơn có dòng SKU đó, kể cả thành phần combo. */
-function ProductFilter({ skuId, onChange }: { skuId: string; onChange: (v: string) => void }) {
+/**
+ * Ô lọc "Sản phẩm" (2026-11-02): chọn một SKU — đơn có dòng SKU đó, kể cả thành phần combo.
+ * Màn In đơn (2026-11-04): tick "Chỉ sản phẩm này" = đơn không có sản phẩm nào khác (in theo lô
+ * cùng một mặt hàng).
+ */
+function ProductFilter({
+  skuId,
+  only,
+  onChange,
+  onOnlyChange,
+}: {
+  skuId: string;
+  only: boolean;
+  onChange: (v: string) => void;
+  onOnlyChange: (on: boolean) => void;
+}) {
   const detail = useSkuDetail(skuId);
   return (
-    <EntityPicker
-      className="h-9 w-64"
-      value={skuId}
-      onChange={(id) => onChange(id)}
-      useSearch={useSkuSearch}
-      selectedLabel={detail.data ? `${detail.data.code} · ${detail.data.name}` : undefined}
-      placeholder="Sản phẩm: tất cả"
-      searchPlaceholder="Gõ tên / mã sản phẩm…"
-      emptyText="Không tìm thấy sản phẩm"
-    />
+    <div className="flex items-center gap-3">
+      <EntityPicker
+        className="h-9 w-64"
+        value={skuId}
+        onChange={(id) => onChange(id)}
+        useSearch={useSkuSearch}
+        selectedLabel={detail.data ? `${detail.data.code} · ${detail.data.name}` : undefined}
+        placeholder="Sản phẩm: tất cả"
+        searchPlaceholder="Gõ tên / mã sản phẩm…"
+        emptyText="Không tìm thấy sản phẩm"
+      />
+      <label className="flex items-center gap-2 text-sm">
+        <Checkbox
+          checked={only}
+          disabled={!skuId}
+          onCheckedChange={(v) => onOnlyChange(v === true)}
+          data-testid="filter-sku-only"
+        />
+        Chỉ sản phẩm này
+      </label>
+    </div>
   );
 }
 
@@ -1159,6 +1198,7 @@ export function PrintOrdersScreen() {
   const shortSkuId = state.filters.shortSkuId ?? '';
   const printStatus = parsePrintStatus(state.filters.printStatus);
   const skuId = state.filters.skuId ?? '';
+  const skuOnly = skuId !== '' && state.filters.skuOnly === 'true';
   // Ô "Nguồn" gộp cả POS: `POS:<mã shop>` = đơn Pancake của đúng POS đó (URL giữ một khoá).
   const posShopId = /^POS:(\d+)$/.exec(state.filters.source ?? '')?.[1] ?? '';
   const source: 'PANCAKE' | 'ERP' | undefined =
@@ -1234,6 +1274,7 @@ export function PrintOrdersScreen() {
       shortSkuId,
       printStatus,
       skuId,
+      skuOnly,
       source,
       pancakeShopId: posShopId || undefined,
       from,
@@ -1261,6 +1302,7 @@ export function PrintOrdersScreen() {
       shortSkuId,
       printStatus,
       skuId,
+      skuOnly,
       source,
       posShopId,
       from,
@@ -1550,11 +1592,15 @@ export function PrintOrdersScreen() {
               key: 'skuId',
               label: 'Sản phẩm',
               type: 'custom',
-              chip: skuId ? (skuChip.data?.name ?? 'đã chọn') : null,
+              chip: skuId ? `${skuOnly ? 'Chỉ ' : ''}${skuChip.data?.name ?? 'đã chọn'}` : null,
               render: () => (
                 <ProductFilter
                   skuId={skuId}
-                  onChange={(v) => setFilter({ skuId: v || undefined })}
+                  only={skuOnly}
+                  onChange={(v) =>
+                    setFilter({ skuId: v || undefined, ...(v ? {} : { skuOnly: undefined }) })
+                  }
+                  onOnlyChange={(on) => setFilter({ skuOnly: on ? 'true' : undefined })}
                 />
               ),
             },
@@ -1888,11 +1934,13 @@ function OrderBulkBar({ rows, onClear }: { rows: SalesOrderListItem[]; onClear: 
       >
         <span className="ml-auto" />
         {canCancel ? <BulkCancelDialog rows={rows} onDone={onClear} /> : null}
-        <Can I="update" a="SalesOrder">
+        {/* Kho chuyển kho đơn bằng `send_carrier` (2026-11-04, user chốt) như sale có `update`. */}
+        {ability.can('update', 'SalesOrder') || canUpdate ? (
           <BulkMoveWarehouseDialog rows={rows} onDone={onClear} />
-        </Can>
+        ) : null}
         <Can I="fulfil_manual" a="SalesOrder">
-          <BulkFulfilPrintDialog rows={rows} onDone={onClear} />
+          {/* Màn In đơn: chọn NV đóng hàng trước khi in (2026-11-04). */}
+          <BulkFulfilPrintDialog rows={rows} onDone={onClear} askPacker />
         </Can>
         {canUpdate || canReprint || canCancelWaybill ? (
           <DropdownMenu modal={false}>

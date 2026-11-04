@@ -575,6 +575,12 @@ function orderListExtras(i: number, status: (typeof ORDER_STATUSES)[number]) {
       uomCode: 'cái',
       moreCount: (i % 9) + 1 - 1,
     },
+    items: Array.from({ length: (i % 9) + 1 }, (_, k) => ({
+      name: `Sản phẩm ${k + 1}`,
+      qty: '10',
+      uomCode: 'cái',
+    })),
+    packerName: null,
     shipment: shipped
       ? {
           status: flow === 'OUT_FOR_DELIVERY' ? ('OUT_FOR_DELIVERY' as const) : flow,
