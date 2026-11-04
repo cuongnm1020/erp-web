@@ -104,6 +104,18 @@ function Section({
   );
 }
 
+/**
+ * Ghi chú hãng tách dòng cho dễ đọc (2026-11-04): GHTK gộp nhiều lần hẹn vào một chuỗi
+ * ("NCC hẹn ngày lấy hàng — Lấy hàng lần 1: … Lấy hàng lần 2: …"). Xuống dòng ở dấu " — " đầu
+ * chuỗi, trước mỗi "Lấy / Giao / Trả hàng lần N:" và ở xuống dòng có sẵn.
+ */
+export function remarkLines(remark: string): string[] {
+  return remark
+    .split(/\r?\n|\s+—\s+|\s+(?=(?:Lấy|Giao|Trả) hàng lần \d+\s*:)/u)
+    .map((s) => s.trim())
+    .filter(Boolean);
+}
+
 function Row({ label, children }: { label: string; children: ReactNode }) {
   return (
     <div className="flex gap-2 text-sm">
@@ -298,7 +310,15 @@ export function CarrierStatusCard({ order }: { order: SalesOrderDetail }) {
               <Row label="Trạng thái VC:">{last.statusText ?? `Mã ${last.carrierStatusCode}`}</Row>
               {last.location ? <Row label="Tại:">{last.location}</Row> : null}
               <Row label="Thời gian:">{carrierTime(last.occurredAt ?? last.receivedAt)}</Row>
-              {last.remark ? <Row label="Với ghi chú:">{last.remark}</Row> : null}
+              {last.remark ? (
+                <Row label="Với ghi chú:">
+                  {remarkLines(last.remark).map((line, i) => (
+                    <span key={i} className="block">
+                      {line}
+                    </span>
+                  ))}
+                </Row>
+              ) : null}
             </dl>
           ) : (
             <p className="text-sm text-muted-foreground">
