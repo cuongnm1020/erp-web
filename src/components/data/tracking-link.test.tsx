@@ -11,13 +11,16 @@ describe('<TrackingLink>', () => {
       <div onClick={stop}>
         <TrackingLink
           trackingNo="S23013020.MN2-25-Y51.1197893935"
-          url="https://i.ghtk.vn/1197893935"
+          url="https://khachhang.giaohangtietkiem.vn/web/van-hanh/don-hang?module=detail&order=1197893935"
           prefilled
         />
       </div>,
     );
-    const a = screen.getByRole('link', { name: /Tra cứu vận đơn S23013020/ });
-    expect(a).toHaveAttribute('href', 'https://i.ghtk.vn/1197893935');
+    const a = screen.getByRole('link', { name: /Xem vận đơn S23013020/ });
+    expect(a).toHaveAttribute(
+      'href',
+      'https://khachhang.giaohangtietkiem.vn/web/van-hanh/don-hang?module=detail&order=1197893935',
+    );
     expect(a).toHaveAttribute('target', '_blank');
     expect(a).toHaveAttribute('rel', 'noopener noreferrer');
     fireEvent.click(a);
@@ -26,18 +29,14 @@ describe('<TrackingLink>', () => {
     expect(stop).not.toHaveBeenCalled();
   });
 
-  it('trang tra cứu không nhận mã → bấm là sao chép mã rồi mở trang', async () => {
+  it('trang hãng không nhận mã (VNPost) → bấm là sao chép mã rồi mở trang', async () => {
     const writeText = vi.fn().mockResolvedValue(undefined);
     Object.assign(navigator, { clipboard: { writeText } });
     render(
-      <TrackingLink
-        trackingNo="156308886583"
-        url="https://viettelpost.com.vn/tra-cuu-hanh-trinh-don/"
-        prefilled={false}
-      />,
+      <TrackingLink trackingNo="CF376440765VN" url="https://www.vnpost.vn/" prefilled={false} />,
     );
     fireEvent.click(screen.getByRole('link'));
-    await waitFor(() => expect(writeText).toHaveBeenCalledWith('156308886583'));
+    await waitFor(() => expect(writeText).toHaveBeenCalledWith('CF376440765VN'));
   });
 
   it('không có link → chữ bấm là sao chép (CopyText), không phải thẻ a', () => {

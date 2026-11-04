@@ -1,6 +1,6 @@
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { api, unwrap } from '@/lib/api/client';
-import type { components } from '@/lib/api/schema';
+import type { components, paths } from '@/lib/api/schema';
 
 /** Luật 2: shape response chỉ lấy từ schema.d.ts sinh bởi OpenAPI, không khai lại. */
 export type CarrierStatusLog = components['schemas']['CarrierStatusLogDto'];
@@ -16,14 +16,26 @@ export interface ShipmentMonitorFilter {
   carrierId?: string;
   /** Tài khoản hãng đã cấp vận đơn (ô chọn hãng dùng chung). */
   carrierAccountId?: string;
-  /** Phòng ban CSKH lên đơn (team `DEPT-<mã>`), 2026-10-29. */
-  careTeamId?: string;
+  /**
+   * Phòng ban lên đơn — id team `DEPT-<mã>` nối dấu phẩy, gồm cả phòng con (ô "Phòng ban" dùng
+   * chung với danh sách đơn, 2026-11-04; thay `careTeamId` một phòng).
+   */
+  teamIds?: string;
+  /** Trạng thái phiếu giao nối dấu phẩy (ô "Trạng thái", 2026-11-04). */
+  statuses?: string;
   holdDays: number;
 }
+
+export type ShipmentMonitorSort = NonNullable<
+  NonNullable<paths['/shipment-monitor']['get']['parameters']['query']>['sortBy']
+>;
 
 export interface ShipmentMonitorListParams extends ShipmentMonitorFilter {
   view: ShipmentMonitorView;
   q?: string;
+  /** Cột người dùng bấm sắp (2026-11-04); bỏ trống = thứ tự mặc định của góc nhìn. */
+  sortBy?: ShipmentMonitorSort;
+  sortDir?: 'asc' | 'desc';
   take: number;
   skip: number;
 }
@@ -35,7 +47,7 @@ export const shippingKeys = {
   all: ['wms', 'shipping'] as const,
   statusLog: (shipmentId: string) => [...shippingKeys.all, 'status-log', shipmentId] as const,
   carriers: () => [...shippingKeys.all, 'carriers'] as const,
-  careTeams: () => [...shippingKeys.all, 'care-teams'] as const,
+  teamOptions: () => [...shippingKeys.all, 'team-filter-options'] as const,
   monitorSummary: (p: ShipmentMonitorFilter) =>
     [...shippingKeys.all, 'monitor', 'summary', p] as const,
   monitorList: (p: ShipmentMonitorListParams) =>
@@ -166,7 +178,8 @@ export function useShipmentMonitorSummary(params: ShipmentMonitorFilter) {
               date: params.date,
               carrierId: params.carrierId,
               carrierAccountId: params.carrierAccountId,
-              careTeamId: params.careTeamId,
+              teamIds: params.teamIds,
+              statuses: params.statuses,
               holdDays: params.holdDays,
             },
           },
@@ -188,9 +201,12 @@ export function fetchShipmentMonitorList(params: ShipmentMonitorListParams) {
           date: params.date,
           carrierId: params.carrierId,
           carrierAccountId: params.carrierAccountId,
-          careTeamId: params.careTeamId,
+          teamIds: params.teamIds,
+          statuses: params.statuses,
           holdDays: params.holdDays,
           q: params.q || undefined,
+          sortBy: params.sortBy,
+          sortDir: params.sortBy ? params.sortDir : undefined,
           take: params.take,
           skip: params.skip,
         },
@@ -209,14 +225,15 @@ export function useShipmentMonitorList(params: ShipmentMonitorListParams) {
 }
 
 /**
- * GET /sales-orders/care-team-options — ô "Phòng ban CSKH" (2026-10-29). API trả theo người xem:
- * toàn quyền → mọi phòng CSKH, leader CSKH → phòng mình làm leader, người khác → rỗng (ẩn ô).
+ * GET /sales-orders/team-filter-options — ô "Phòng ban" dùng chung với danh sách đơn (2026-11-04):
+ * phòng CSKH + phòng Sale/MKT đã có đơn, chỉ Admin + kế toán (`report.sales_all`); người khác → rỗng
+ * (ẩn ô). Cùng endpoint với `useTeamFilterOptions` của orders — luật 12 không cho import chéo.
  */
-export function useShippingCareTeams(enabled: boolean) {
+export function useShippingTeamOptions(enabled: boolean) {
   return useQuery({
     enabled,
-    queryKey: shippingKeys.careTeams(),
-    queryFn: () => unwrap(api.GET('/sales-orders/care-team-options')),
+    queryKey: shippingKeys.teamOptions(),
+    queryFn: () => unwrap(api.GET('/sales-orders/team-filter-options')),
     staleTime: 300_000,
   });
 }

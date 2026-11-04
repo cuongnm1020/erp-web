@@ -9,9 +9,9 @@ import { CopyText } from './copy-text';
 export interface TrackingLinkProps {
   /** Mã vận đơn hiển thị / sao chép. */
   trackingNo: string;
-  /** Link tra cứu của hãng (API `shipment.trackingUrl`); null = không có → chỉ sao chép. */
+  /** Link xem chi tiết đơn trên app của hãng (API `shipment.trackingUrl`); null = không có → chỉ sao chép. */
   url: string | null;
-  /** false = trang tra cứu không nhận mã qua URL → sao chép mã trước rồi mới mở. */
+  /** false = trang hãng không nhận mã qua URL → sao chép mã trước rồi mới mở. */
   prefilled: boolean;
   children?: ReactNode;
   className?: string;
@@ -20,8 +20,9 @@ export interface TrackingLinkProps {
 }
 
 /**
- * Mã vận đơn bấm vào mở trang tra cứu của hãng ở tab mới (2026-11-03). Hãng không nhận mã qua URL
- * (Viettel Post, VNPost) thì sao chép mã vào clipboard trước, toast nhắc dán. Không có link → giống
+ * Mã vận đơn bấm vào mở chi tiết đơn trên app của hãng ở tab mới (2026-11-03; 2026-11-04 GHTK /
+ * Viettel Post trỏ vào trang quản trị của shop — chưa đăng nhập thì hãng đòi đăng nhập). Hãng không
+ * nhận mã qua URL (VNPost) thì sao chép mã vào clipboard trước, toast nhắc dán. Không có link → giống
  * `CopyText` (bấm là sao chép). Chặn click lan lên dòng bảng để không mở xem nhanh.
  */
 export function TrackingLink({
@@ -54,10 +55,10 @@ export function TrackingLink({
       rel="noopener noreferrer"
       title={
         prefilled
-          ? 'Mở đơn này trên trang tra cứu của hãng (tab mới)'
+          ? 'Mở chi tiết đơn này trên app của hãng (tab mới) — chưa đăng nhập thì hãng yêu cầu đăng nhập'
           : 'Mở trang tra cứu của hãng (tab mới) — mã được sao chép sẵn để dán'
       }
-      aria-label={`Tra cứu vận đơn ${trackingNo} trên trang hãng`}
+      aria-label={`Xem vận đơn ${trackingNo} trên app hãng`}
       onClick={onClick}
       onKeyDown={(e) => e.stopPropagation()}
       className={cn(

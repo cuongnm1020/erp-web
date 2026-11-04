@@ -11801,11 +11801,12 @@ export interface components {
             carrierName: string | null;
             trackingNo: string | null;
             /**
-             * @description Link tra cứu vận đơn công khai của hãng (2026-11-03): GHTK / GHN / J&T mang sẵn mã; Viettel
-             *     Post / VNPost chỉ là trang tra cứu (web sao chép mã để dán); null = hãng không có / chưa có mã.
+             * @description Link xem chi tiết vận đơn trên app của hãng (2026-11-04): GHTK (Vận hành › Đơn hàng, cần đăng
+             *     nhập shop) / Viettel Post (Thông tin đơn hàng, cần đăng nhập) / GHN / J&T mang sẵn mã; VNPost chỉ
+             *     là trang chủ (web sao chép mã để dán); null = hãng không có / chưa có mã.
              */
             trackingUrl: string | null;
-            /** @description true = `trackingUrl` mở ra đúng đơn; false = phải dán mã vào trang tra cứu. */
+            /** @description true = `trackingUrl` mở ra đúng đơn (chưa đăng nhập thì hãng đòi đăng nhập); false = phải dán mã vào trang tra cứu. */
             trackingUrlPrefilled: boolean;
             /** @description Phí VC = cước + phụ phí + phí COD hãng tính (chi phí của shop) — Decimal(18,4) chuỗi; null = hãng chưa báo cước. */
             shipFee: string | null;
@@ -12299,7 +12300,7 @@ export interface components {
             carrierAccountName: string | null;
             /** @description Mã vận đơn hãng cấp — null = chưa cấp (chưa đóng gói, hoặc hãng lỗi đang chờ). */
             trackingNo: string | null;
-            /** @description Link tra cứu vận đơn công khai của hãng — xem `SalesOrderListShipmentDto.trackingUrl`. */
+            /** @description Link xem chi tiết vận đơn trên app của hãng — xem `SalesOrderListShipmentDto.trackingUrl`. */
             trackingUrl: string | null;
             trackingUrlPrefilled: boolean;
             /** @description ISO — lần in nhãn gần nhất; null = chưa in. */
@@ -18727,16 +18728,20 @@ export interface operations {
     ShipmentMonitorController_summary: {
         parameters: {
             query: {
+                /** @description ShipmentStatus nối dấu phẩy */
+                statuses?: string;
                 /** @description Ngày theo giờ Việt Nam `YYYY-MM-DD` cho số đóng gói / bàn giao; bỏ trống = hôm nay. */
                 date?: string;
                 carrierId?: string;
                 /** @description Phiếu do MỘT tài khoản hãng cấp vận đơn (wms.CarrierAccount.id, 2026-10-25). */
                 carrierAccountId?: string;
                 /**
-                 * @description Phiếu giao của đơn do MỘT phòng ban CSKH lên (team `DEPT-<mã>`, `SalesOrder.teamId`) — ô lọc
-                 *     "Phòng ban CSKH" (2026-10-29). Giao với phạm vi người xem, không nới.
+                 * @description Phiếu giao của đơn do các phòng ban lên (`SalesOrder.teamId`, team `DEPT-<mã>` nối dấu phẩy,
+                 *     tối đa 100, mỗi phòng gồm cả phòng con) — ô "Phòng ban" dùng chung với danh sách đơn
+                 *     (2026-11-04, thay `careTeamId` một phòng). Danh sách: GET /sales-orders/team-filter-options.
+                 *     Giao với phạm vi người xem, không nới.
                  */
-                careTeamId?: string;
+                teamIds?: string;
                 /** @description Hãng giữ quá N ngày kể từ lúc rời kho → cảnh báo. */
                 holdDays: number;
             };
@@ -18759,16 +18764,20 @@ export interface operations {
     ShipmentMonitorController_list: {
         parameters: {
             query: {
+                /** @description ShipmentStatus nối dấu phẩy */
+                statuses?: string;
                 /** @description Ngày theo giờ Việt Nam `YYYY-MM-DD` cho số đóng gói / bàn giao; bỏ trống = hôm nay. */
                 date?: string;
                 carrierId?: string;
                 /** @description Phiếu do MỘT tài khoản hãng cấp vận đơn (wms.CarrierAccount.id, 2026-10-25). */
                 carrierAccountId?: string;
                 /**
-                 * @description Phiếu giao của đơn do MỘT phòng ban CSKH lên (team `DEPT-<mã>`, `SalesOrder.teamId`) — ô lọc
-                 *     "Phòng ban CSKH" (2026-10-29). Giao với phạm vi người xem, không nới.
+                 * @description Phiếu giao của đơn do các phòng ban lên (`SalesOrder.teamId`, team `DEPT-<mã>` nối dấu phẩy,
+                 *     tối đa 100, mỗi phòng gồm cả phòng con) — ô "Phòng ban" dùng chung với danh sách đơn
+                 *     (2026-11-04, thay `careTeamId` một phòng). Danh sách: GET /sales-orders/team-filter-options.
+                 *     Giao với phạm vi người xem, không nới.
                  */
-                careTeamId?: string;
+                teamIds?: string;
                 /** @description Hãng giữ quá N ngày kể từ lúc rời kho → cảnh báo. */
                 holdDays: number;
                 /**
@@ -18779,6 +18788,9 @@ export interface operations {
                 view: "PACKED" | "HANDED_OVER" | "HOLDING" | "OVERDUE";
                 /** @description Mã phiếu giao / mã vận đơn (chứa chuỗi) hoặc đúng số đơn bán. */
                 q?: string;
+                /** @description Sắp theo cột (2026-11-04): `shippedAt` = mốc bàn giao hãng. Bỏ trống = mặc định của góc nhìn. */
+                sortBy?: "shippedAt";
+                sortDir?: "asc" | "desc";
                 take: number;
                 skip: number;
             };
