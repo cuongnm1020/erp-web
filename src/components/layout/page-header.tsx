@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react';
+import { cn } from '@/lib/cn';
 import { Breadcrumb, type Crumb } from './breadcrumb';
 
 /**
@@ -8,6 +9,8 @@ import { Breadcrumb, type Crumb } from './breadcrumb';
  * Lớp dính 2 (token sticky-page-header = ngay dưới thanh trên) khi cuộn — tràn ra hết lề `p-5` của
  * <main> (-mx-5 px-5) để nội dung cuộn không lộ ở hai bên. z-40 để nằm trên ô dính của bảng (z-30).
  * Đầu bảng và BulkActionBar KHÔNG dính theo trang, chỉ dính trong khung cuộn riêng của bảng.
+ * `sticky={false}` (2026-11-04, màn In đơn): màn tự ghim khối khác ở lớp dính 2 (tab trạng thái +
+ * thanh thao tác) thì đầu trang cuộn theo nội dung, không chồng lên khối đó.
  */
 export function PageHeader({
   title,
@@ -15,6 +18,7 @@ export function PageHeader({
   status,
   actions,
   breadcrumb,
+  sticky = true,
 }: {
   title: string;
   description?: ReactNode;
@@ -22,9 +26,16 @@ export function PageHeader({
   status?: ReactNode;
   actions?: ReactNode;
   breadcrumb?: Crumb[];
+  /** Mặc định dính dưới thanh trên khi cuộn; `false` = cuộn theo trang. */
+  sticky?: boolean;
 }) {
   return (
-    <header className="sticky top-sticky-page-header z-40 -mx-5 -mt-2 mb-2 space-y-1 bg-background px-5 pb-2.5 pt-2">
+    <header
+      className={cn(
+        '-mx-5 -mt-2 mb-2 space-y-1 bg-background px-5 pb-2.5 pt-2',
+        sticky && 'sticky top-sticky-page-header z-40',
+      )}
+    >
       <Breadcrumb items={breadcrumb} />
       <div className="flex min-h-9 flex-wrap items-center justify-between gap-x-4 gap-y-2">
         <div className="min-w-0">

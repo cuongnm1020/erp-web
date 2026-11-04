@@ -71,6 +71,8 @@ type Counts = Partial<Record<OrderFlow, number>> | undefined;
  * tổng số; khối và chip tự xuống dòng nên màn hẹp không mất tab. Luôn chọn đúng một trạng thái.
  * `searching` = đang xem mọi trạng thái (ô tìm có chữ hoặc `?group=all`) — các khối mờ, không chip
  * nào chọn, dòng báo + "Quay lại <trạng thái>".
+ * `grouped={false}` (màn In đơn, user 2026-11-04): bỏ khối theo giai đoạn, mọi chip xếp sát nhau
+ * trên một dòng (vẫn tự xuống dòng khi hẹp); màu chip vẫn theo họ.
  */
 export function OrderFlowTabs({
   flow,
@@ -79,6 +81,7 @@ export function OrderFlowTabs({
   searchingLabel,
   onFlowChange,
   onExitSearch,
+  grouped = true,
 }: {
   flow: OrderFlow;
   counts: Counts;
@@ -87,40 +90,50 @@ export function OrderFlowTabs({
   searchingLabel: string;
   onFlowChange: (f: OrderFlow) => void;
   onExitSearch: () => void;
+  /** Mặc định chia 4 khối màu theo giai đoạn; `false` = một dãy chip liền. */
+  grouped?: boolean;
 }) {
+  const chipsOf = (g: (typeof ORDER_FLOW_GROUPS)[number]) =>
+    [...g.flows, ...g.done].map((f) => (
+      <FlowChip
+        key={f}
+        label={orderFlowLabel(f)}
+        n={counts?.[f]}
+        family={FLOW_FAMILY[f] ?? g.family}
+        active={!searching && flow === f}
+        onClick={() => onFlowChange(f)}
+      />
+    ));
   return (
     <div className="mb-3 grid gap-2">
       <div
         role="tablist"
         aria-label="Trạng thái đơn"
-        className={cn('flex flex-wrap items-stretch gap-2', searching && 'opacity-60')}
+        className={cn(
+          'flex flex-wrap items-stretch',
+          grouped ? 'gap-2' : 'gap-1.5',
+          searching && 'opacity-60',
+        )}
       >
-        {ORDER_FLOW_GROUPS.map((g) => {
-          const t = TONE[g.family];
-          return (
-            <div
-              key={g.group}
-              role="group"
-              aria-label={g.label}
-              className={cn(
-                'flex min-w-0 flex-auto basis-full flex-wrap items-center gap-1.5 rounded-lg border-l-4 px-2 py-1.5 md:basis-auto',
-                t.weak,
-                t.borderLeft,
-              )}
-            >
-              {[...g.flows, ...g.done].map((f) => (
-                <FlowChip
-                  key={f}
-                  label={orderFlowLabel(f)}
-                  n={counts?.[f]}
-                  family={FLOW_FAMILY[f] ?? g.family}
-                  active={!searching && flow === f}
-                  onClick={() => onFlowChange(f)}
-                />
-              ))}
-            </div>
-          );
-        })}
+        {!grouped
+          ? ORDER_FLOW_GROUPS.map(chipsOf)
+          : ORDER_FLOW_GROUPS.map((g) => {
+              const t = TONE[g.family];
+              return (
+                <div
+                  key={g.group}
+                  role="group"
+                  aria-label={g.label}
+                  className={cn(
+                    'flex min-w-0 flex-auto basis-full flex-wrap items-center gap-1.5 rounded-lg border-l-4 px-2 py-1.5 md:basis-auto',
+                    t.weak,
+                    t.borderLeft,
+                  )}
+                >
+                  {chipsOf(g)}
+                </div>
+              );
+            })}
       </div>
 
       {searching ? (
