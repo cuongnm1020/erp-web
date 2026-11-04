@@ -104,6 +104,28 @@ export function useSkuSearch(q: string): EntitySearchResult {
   return { options, isPending: query.isPending, error: query.error };
 }
 
+/**
+ * Ô lọc "Sản phẩm" màn In đơn (2026-11-04, user chốt): chỉ sản phẩm thường, BỎ combo
+ * (`isCombo=false`). Đơn có combo chứa sản phẩm đó vẫn lọc ra — dòng combo đã bung thành dòng
+ * thành phần mang SKU của sản phẩm.
+ */
+export function useNonComboSkuSearch(q: string): EntitySearchResult {
+  const query = useQuery({
+    queryKey: [...lineEntryKeys.skuSearch(q), 'non-combo'] as const,
+    queryFn: () =>
+      unwrap(
+        api.GET('/products', {
+          params: { query: { q: q || undefined, isCombo: false, take: 20, skip: 0 } },
+        }),
+      ),
+    staleTime: 30_000,
+  });
+  const options: EntityOption[] | undefined = query.data?.items.flatMap((p) =>
+    p.skus.map((s) => ({ id: s.id, label: s.name, hint: `${s.code} · ${p.name}` })),
+  );
+  return { options, isPending: query.isPending, error: query.error };
+}
+
 /** GET /skus/{id} — nguồn cho dropdown ĐVT: base UoM + các quy đổi (1 uom = factor × cơ sở). */
 export function useSkuDetail(id: string) {
   return useQuery({

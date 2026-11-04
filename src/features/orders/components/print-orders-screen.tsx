@@ -120,7 +120,7 @@ import { PancakeErpLockedBadge, PancakeMirrorBadge, PancakeOrderLink } from './p
 import { SameDayOrdersHover } from './same-day-orders-hover';
 import { MarketplaceBadge, MaskedPhoneBadge, waybillErrorText } from './waybill-error';
 import { EntityPicker } from '@/components/data/form';
-import { useSkuDetail, useSkuSearch } from '../api/use-line-entry';
+import { useNonComboSkuSearch, useSkuDetail } from '../api/use-line-entry';
 
 /**
  * In đơn (2026-11-04, user): màn Kho phục vụ in đơn, menu ngay dưới "Theo dõi đơn" — bản CLONE từ
@@ -849,7 +849,8 @@ function ProductFilter({
         className="h-9 w-64"
         value={skuId}
         onChange={(id) => onChange(id)}
-        useSearch={useSkuSearch}
+        // Chỉ sản phẩm thường, bỏ combo (2026-11-04) — đơn có combo chứa SP vẫn lọc ra.
+        useSearch={useNonComboSkuSearch}
         selectedLabel={detail.data ? `${detail.data.code} · ${detail.data.name}` : undefined}
         placeholder="Sản phẩm: tất cả"
         searchPlaceholder="Gõ tên / mã sản phẩm…"

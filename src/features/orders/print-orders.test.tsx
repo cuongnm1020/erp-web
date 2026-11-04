@@ -99,6 +99,21 @@ describe('PrintOrdersScreen — In đơn (clone màn Đơn hàng, 2026-11-04)', 
     expect(calls[0]!.body).toEqual({ orderIds: [rows[0]!.id, rows[1]!.id], packerId: 'u-pack' });
   });
 
+  it('ô tìm Sản phẩm chỉ liệt kê sản phẩm thường — GET /products?isCombo=false', async () => {
+    const seen: URLSearchParams[] = [];
+    server.use(
+      http.get('/api/products', ({ request }) => {
+        seen.push(new URL(request.url).searchParams);
+        return HttpResponse.json({ items: [], total: 0 });
+      }),
+    );
+    renderApp(<PrintOrdersScreen />);
+    await screen.findByText(FIRST.docNumber);
+    fireEvent.click(screen.getAllByText('Sản phẩm: tất cả')[0]!);
+    await waitFor(() => expect(seen.length).toBeGreaterThan(0));
+    expect(seen.every((p) => p.get('isCombo') === 'false')).toBe(true);
+  });
+
   it('lọc "Chỉ sản phẩm này": URL skuOnly=true + skuId → gửi skuOnly=true lên API', async () => {
     const sku = '00000000-0000-4000-8000-0000000000aa';
     search = `group=all&skuId=${sku}&skuOnly=true`;
