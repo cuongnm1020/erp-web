@@ -22,7 +22,7 @@ import { CopyButton } from '@/components/data/copy-button';
 import { CopyText } from '@/components/data/copy-text';
 import { ExportExcelButton, type ExportColumn } from '@/components/data/export-excel-button';
 import { pancakeShopLabel } from '@/components/data/pancake-shop-select';
-import { ColumnPicker, DataTable, FilterBar, type ColumnDef } from '@/components/data/data-table';
+import { DataTable, FilterBar, type ColumnDef } from '@/components/data/data-table';
 import { RowActions, type RowActionItem } from '@/components/data/row-actions';
 import { EmptyState, ListSkeleton, QueryState } from '@/components/data/states';
 import { StatusBadge } from '@/components/data/status-badge';
@@ -92,7 +92,6 @@ import { BulkShippingDialog } from './bulk-shipping-dialog';
 import { carrierTone } from './carrier-status-card';
 import { OrderFlowTabs } from './order-flow-tabs';
 import { FlowBadge, OrderQuickView, TelcoBadge } from './order-quick-view';
-import { OrderSavedViews } from './order-saved-views';
 import { OrderScanButton } from './order-scan-button';
 import { PancakeOrderResyncButton } from './pancake-order-resync-button';
 import { SendToCarrierMenu } from './send-to-carrier-menu';
@@ -107,6 +106,12 @@ import { useNonComboSkuSearch, useSkuDetail } from '../api/use-line-entry';
  * màn Đơn hàng (`order-list-screen.tsx`, /crm/orders) để tuỳ biến riêng; sửa màn này KHÔNG đụng
  * màn Đơn hàng và ngược lại. Cột ẩn + sắp xếp lưu riêng (`orders.print`), nhớ ngày riêng
  * (`date.print-orders`). Phần dưới là chú thích gốc của màn Đơn hàng.
+ *
+ * 2026-11-04 (tối, user): bỏ nút "Bộ lọc đã lưu" + "Cột" — luôn hiện hết cột (lựa chọn ẩn đã lưu bị
+ * bỏ qua, chỉ còn nhớ sắp xếp); bỏ panel "Bộ lọc khác" — mọi ô lọc bày trên thanh, "Xóa lọc (n)"
+ * đứng ngay cạnh; tab trạng thái một dãy chip liền (không khối giai đoạn); tab + thanh lọc / thanh
+ * chọn nhiều GHIM dưới thanh trên khi cuộn (đầu trang cuộn theo — khác luật chung của design system
+ * "BulkActionBar không dính theo trang", user chốt riêng cho màn này).
  *
  * D-03 Quản lý đơn hàng — GET /sales-orders + GET /sales-orders/flow-counts (thiết kế lại
  * 2026-10-12, canvas "Quản lý đơn hàng — thiết kế lại").
@@ -202,17 +207,10 @@ const SORT_FIELD: Record<string, OrderSortField> = {
 };
 
 /**
- * Cột ẩn khi người dùng chưa chọn lần nào. Hàng thiếu / Chờ từ / Thực thu ĐVVC đã bỏ khỏi bảng
- * (2026-11-02); Thực thu vẫn có trong file Excel xuất. Ngày đặt hiện mặc định từ 2026-11-03 (bỏ
- * dòng ngày dưới mã đơn).
+ * Luôn hiện hết cột (user chốt 2026-11-04 tối, bỏ nút "Cột"). Lựa chọn ẩn đã lưu từ trước trong
+ * `orders.print` bị bỏ qua; khi lưu sắp xếp ghi lại mảng rỗng.
  */
-const DEFAULT_HIDDEN: string[] = [];
-
-/**
- * Cột luôn hiện, không bỏ chọn được ở nút "Cột": Mã đơn, Ngày đặt (user chốt 2026-11-04). Lựa chọn
- * ẩn đã lưu từ trước bị bỏ qua.
- */
-const ALWAYS_SHOWN = new Set(['docNumber', 'orderDate']);
+const NO_HIDDEN: string[] = [];
 
 type OrderFilter = (typeof DEFAULTS.filterKeys)[number];
 
@@ -896,15 +894,11 @@ export function PrintOrdersScreen() {
   const fbPage = state.filters.fbPage ?? '';
   const teamOptions = useTeamFilterOptions(canFilterDept);
   const facebookPages = useFacebookPageOptions();
-  // Cột ẩn + sắp xếp lưu theo người dùng ở server (đăng xuất / đổi máy vẫn giữ). Sắp xếp trên URL
-  // (link dán cho đồng nghiệp) thắng; URL không có thì lấy lần sắp gần nhất của người dùng.
+  // Sắp xếp lưu theo người dùng ở server (đăng xuất / đổi máy vẫn giữ). Sắp xếp trên URL (link
+  // dán cho đồng nghiệp) thắng; URL không có thì lấy lần sắp gần nhất của người dùng. Cột ẩn không
+  // còn (luôn hiện hết cột).
   const prefs = useOrderListPrefs('orders.print');
   const savePrefs = useSaveOrderListPrefs('orders.print');
-  const savedHidden = prefs.data?.hidden;
-  const hidden = useMemo(
-    () => (savedHidden ?? DEFAULT_HIDDEN).filter((id) => !ALWAYS_SHOWN.has(id)),
-    [savedHidden],
-  );
   // Lọc theo Ngày gán ĐVVC mà URL chưa chọn cột sắp → sắp theo giờ gửi hãng, mới nhất trước
   // (2026-11-03) — thắng lần sắp đã lưu của người dùng. Đang tìm kiếm (ô tìm có chữ) mà chưa
   // chọn cột sắp → ưu tiên đơn ít sản phẩm trước + abc tên sản phẩm (user 2026-11-04) để kho
@@ -915,16 +909,10 @@ export function PrintOrdersScreen() {
     (dateField === 'sentToCarrierAt' ? { id: 'shipping', desc: true } : null) ??
     prefs.data?.sort ??
     null;
-  const sortBy = sort && !hidden.includes(sort.id) ? SORT_FIELD[sort.id] : undefined;
+  const sortBy = sort ? SORT_FIELD[sort.id] : undefined;
   const changeSort = (next: SortState | null) => {
     set({ sort: next });
-    savePrefs.mutate({ hidden, sort: next });
-  };
-  const changeHidden = (next: string[]) => {
-    // Ẩn cột đang sắp → bỏ sắp xếp theo cột đó (chỉ sắp theo cột đang hiện).
-    const dropSort = sort !== null && next.includes(sort.id);
-    if (dropSort) set({ sort: null });
-    savePrefs.mutate({ hidden: next, sort: dropSort ? null : sort });
+    savePrefs.mutate({ hidden: NO_HIDDEN, sort: next });
   };
   const filterParams = useMemo(
     () => ({
@@ -1020,17 +1008,6 @@ export function PrintOrdersScreen() {
     canCancelAfterCarrier,
     canEditAny,
   ]);
-  const pickerColumns = useMemo(
-    () =>
-      columns
-        .filter((c) => c.id !== 'actions')
-        .map((c) => ({
-          id: c.id!,
-          title: c.meta?.title ?? (typeof c.header === 'string' ? c.header : c.id!),
-          required: ALWAYS_SHOWN.has(c.id!),
-        })),
-    [columns],
-  );
   // Chờ sắp xếp đã lưu của người dùng (trừ khi URL có sẵn sort) rồi mới tải danh sách — trước đây
   // tải 2 lần (lần đầu chưa có sort, lần sau có), mỗi lần ~5 s trên prod (sự cố pool 2026-11-02).
   // Đọc prefs lỗi thì vẫn tải (isPending = false).
@@ -1093,6 +1070,7 @@ export function PrintOrdersScreen() {
     <>
       <PageHeader
         title="In đơn"
+        sticky={false}
         description={
           // "544 / 108.000" = đơn khớp bộ lọc / tổng mọi đơn, to, đậm (user 2026-11-03).
           <span className="block">
@@ -1141,158 +1119,162 @@ export function PrintOrdersScreen() {
         }
       />
 
-      <OrderFlowTabs
-        flow={currentFlow}
-        counts={counts.data}
-        searching={searching}
-        searchingLabel={state.q}
-        onFlowChange={(f) =>
-          set({
-            filters: {
-              ...state.filters,
-              group: undefined,
-              flow: f === DEFAULT_ORDER_FLOW && state.q === '' ? undefined : f,
-            },
-          })
-        }
-        onExitSearch={() => set({ q: '', filters: { ...state.filters, group: undefined } })}
-      />
-
-      {flow === 'WAITING_STOCK' || shortSkuId ? (
-        <WaitingStockNote
-          shortSkuName={
-            shortSkuId
-              ? (query.data?.items
-                  .flatMap((o) => o.shortage?.items ?? [])
-                  .find((i) => i.skuId === shortSkuId)?.skuName ?? 'sản phẩm đã chọn')
-              : null
+      {/*
+        Khối ghim (user 2026-11-04): tab trạng thái + ghi chú chờ hàng + thanh lọc / thanh chọn nhiều
+        dính dưới thanh trên khi cuộn bảng; đầu trang cuộn theo (PageHeader sticky={false}). flex-col
+        để lề dưới của FilterBar / OrderFlowTabs không tràn ra ngoài khối (nền che kín bảng bên dưới).
+        z-40 ngang PageHeader, trên ô dính của bảng.
+      */}
+      <div className="sticky top-sticky-page-header z-40 -mx-5 flex flex-col bg-background px-5">
+        <OrderFlowTabs
+          flow={currentFlow}
+          counts={counts.data}
+          searching={searching}
+          searchingLabel={state.q}
+          grouped={false}
+          onFlowChange={(f) =>
+            set({
+              filters: {
+                ...state.filters,
+                group: undefined,
+                flow: f === DEFAULT_ORDER_FLOW && state.q === '' ? undefined : f,
+              },
+            })
           }
-          onClearSku={() => setFilter({ shortSkuId: undefined })}
+          onExitSearch={() => set({ q: '', filters: { ...state.filters, group: undefined } })}
         />
-      ) : null}
 
-      {selectedRows.length > 0 ? (
-        <OrderBulkBar rows={selectedRows} onClear={clearSelection} />
-      ) : (
-        <FilterBar<OrderFilter>
-          q={state.q}
-          onQChange={(q) =>
-            // Bắt đầu tìm từ ô trống → mọi trạng thái (`group=all`, giữ `flow` cho nút "Quay lại");
-            // xóa hết chữ → về tab; sửa chữ đang tìm → giữ nguyên (tab đã chọn vẫn lọc).
-            set(
-              state.q === '' && q !== ''
-                ? { q, filters: { ...state.filters, group: 'all' } }
-                : q === ''
-                  ? { q, filters: { ...state.filters, group: undefined } }
-                  : { q },
-            )
-          }
-          filters={[
-            {
-              key: 'from',
-              toKey: 'to',
-              label: 'Ngày đặt',
-              type: 'dateRange',
-              rememberKey: 'date.print-orders',
-              // Mở màn lần đầu (chưa ghi nhớ, URL không có ngày) → 30 ngày qua (user 2026-11-03).
-              defaultPreset: 'last30',
-              fieldKey: 'dateField',
-              fields: DATE_FIELDS,
-            },
-            {
-              key: 'skuId',
-              label: 'Sản phẩm',
-              type: 'custom',
-              chip: skuId ? `${skuOnly ? 'Chỉ ' : ''}${skuChip.data?.name ?? 'đã chọn'}` : null,
-              render: () => (
-                <ProductFilter
-                  skuId={skuId}
-                  only={skuOnly}
-                  onChange={(v) =>
-                    setFilter({ skuId: v || undefined, ...(v ? {} : { skuOnly: undefined }) })
-                  }
-                  onOnlyChange={(on) => setFilter({ skuOnly: on ? 'true' : undefined })}
-                />
-              ),
-            },
-            // POS, Page, Phòng ban ghim ngay trên thanh cạnh ô Sản phẩm (user 2026-11-04) — xem
-            // `pinned`; ô POS chọn nhiều thay ô Nguồn (ERP / Pancake).
-            {
-              key: 'pos',
-              label: 'POS',
-              type: 'multiSelect',
-              group: 'Nguồn & người',
-              unit: 'POS',
-              options: (pancakeShops.data ?? []).map((s) => ({
-                value: s.shopId,
-                label: pancakeShopLabel(s),
-              })),
-            },
-            {
-              key: 'fbPage',
-              label: 'Page',
-              type: 'multiSelect',
-              group: 'Nguồn & người',
-              unit: 'page',
-              options: (facebookPages.data ?? []).map((p) => ({
-                value: p.id,
-                label: p.isActive ? p.name : `${p.name} (ngưng)`,
-                hint: p.shopIds.length ? `${p.shopIds.length} POS` : undefined,
-              })),
-            },
-            // Phòng ban: quyền `sales_order.filter_dept` (2026-11-04), chọn nhiều — phòng CSKH + phòng Sale/MKT
-            // đã có đơn; chưa chọn = tất cả.
-            ...(canFilterDept
-              ? [
-                  {
-                    key: 'team' as const,
-                    label: 'Phòng ban',
-                    type: 'multiSelect' as const,
-                    group: 'Nguồn & người',
-                    unit: 'phòng',
-                    options: (teamOptions.data ?? []).map((t) => ({
-                      value: t.teamId,
-                      label: t.isActive ? t.name : `${t.name} (ngừng hoạt động)`,
-                      hint: t.group === 'CSKH' ? 'CSKH' : 'Sale/MKT',
-                    })),
-                  },
-                ]
-              : []),
-            // Bỏ 2026-11-04 (user): Hãng VC, NV lên đơn, nhóm Vận chuyển (In tem, Gán hãng,
-            // Trạng thái hãng), nhóm Đơn (Trùng trong ngày, SP ngoài ERP, Giá trị đơn, Cân nặng).
-          ]}
-          values={{
-            status: state.filters.status,
-            customerId: state.filters.customerId,
-            pos,
-            from: state.filters.from,
-            to: state.filters.to,
-            dateField: state.filters.dateField,
-            team,
-            fbPage: state.filters.fbPage,
-            skuId: state.filters.skuId,
-          }}
-          onFilterChange={setFilter}
-          pinned={['skuId', 'pos', 'fbPage', 'team']}
-          searchPlaceholder="Mã đơn, SĐT, tên SP, mã vận đơn… nhiều giá trị cách dấu phẩy"
-          right={
-            <>
-              {customerId ? (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setFilter({ customerId: undefined })}
-                >
-                  <X aria-hidden />
-                  Đang lọc theo khách {customerName ? `“${customerName}”` : 'đã chọn'}
-                </Button>
-              ) : null}
-              <OrderSavedViews />
-              <ColumnPicker columns={pickerColumns} hidden={hidden} onChange={changeHidden} />
-            </>
-          }
-        />
-      )}
+        {flow === 'WAITING_STOCK' || shortSkuId ? (
+          <WaitingStockNote
+            shortSkuName={
+              shortSkuId
+                ? (query.data?.items
+                    .flatMap((o) => o.shortage?.items ?? [])
+                    .find((i) => i.skuId === shortSkuId)?.skuName ?? 'sản phẩm đã chọn')
+                : null
+            }
+            onClearSku={() => setFilter({ shortSkuId: undefined })}
+          />
+        ) : null}
+
+        {selectedRows.length > 0 ? (
+          <OrderBulkBar rows={selectedRows} onClear={clearSelection} />
+        ) : (
+          <FilterBar<OrderFilter>
+            q={state.q}
+            onQChange={(q) =>
+              // Bắt đầu tìm từ ô trống → mọi trạng thái (`group=all`, giữ `flow` cho nút "Quay lại");
+              // xóa hết chữ → về tab; sửa chữ đang tìm → giữ nguyên (tab đã chọn vẫn lọc).
+              set(
+                state.q === '' && q !== ''
+                  ? { q, filters: { ...state.filters, group: 'all' } }
+                  : q === ''
+                    ? { q, filters: { ...state.filters, group: undefined } }
+                    : { q },
+              )
+            }
+            filters={[
+              {
+                key: 'from',
+                toKey: 'to',
+                label: 'Ngày đặt',
+                type: 'dateRange',
+                rememberKey: 'date.print-orders',
+                // Mở màn lần đầu (chưa ghi nhớ, URL không có ngày) → 30 ngày qua (user 2026-11-03).
+                defaultPreset: 'last30',
+                fieldKey: 'dateField',
+                fields: DATE_FIELDS,
+              },
+              {
+                key: 'skuId',
+                label: 'Sản phẩm',
+                type: 'custom',
+                chip: skuId ? `${skuOnly ? 'Chỉ ' : ''}${skuChip.data?.name ?? 'đã chọn'}` : null,
+                render: () => (
+                  <ProductFilter
+                    skuId={skuId}
+                    only={skuOnly}
+                    onChange={(v) =>
+                      setFilter({ skuId: v || undefined, ...(v ? {} : { skuOnly: undefined }) })
+                    }
+                    onOnlyChange={(on) => setFilter({ skuOnly: on ? 'true' : undefined })}
+                  />
+                ),
+              },
+              // POS, Page, Phòng ban bày ngay trên thanh cạnh ô Sản phẩm (user 2026-11-04); không
+              // `pinned` → không có panel "Bộ lọc khác", "Xóa lọc (n)" đứng cạnh ô lọc cuối. Ô POS
+              // chọn nhiều thay ô Nguồn (ERP / Pancake).
+              {
+                key: 'pos',
+                label: 'POS',
+                type: 'multiSelect',
+                unit: 'POS',
+                options: (pancakeShops.data ?? []).map((s) => ({
+                  value: s.shopId,
+                  label: pancakeShopLabel(s),
+                })),
+              },
+              {
+                key: 'fbPage',
+                label: 'Page',
+                type: 'multiSelect',
+                unit: 'page',
+                options: (facebookPages.data ?? []).map((p) => ({
+                  value: p.id,
+                  label: p.isActive ? p.name : `${p.name} (ngưng)`,
+                  hint: p.shopIds.length ? `${p.shopIds.length} POS` : undefined,
+                })),
+              },
+              // Phòng ban: quyền `sales_order.filter_dept` (2026-11-04), chọn nhiều — phòng CSKH + phòng Sale/MKT
+              // đã có đơn; chưa chọn = tất cả.
+              ...(canFilterDept
+                ? [
+                    {
+                      key: 'team' as const,
+                      label: 'Phòng ban',
+                      type: 'multiSelect' as const,
+                      unit: 'phòng',
+                      options: (teamOptions.data ?? []).map((t) => ({
+                        value: t.teamId,
+                        label: t.isActive ? t.name : `${t.name} (ngừng hoạt động)`,
+                        hint: t.group === 'CSKH' ? 'CSKH' : 'Sale/MKT',
+                      })),
+                    },
+                  ]
+                : []),
+              // Bỏ 2026-11-04 (user): Hãng VC, NV lên đơn, nhóm Vận chuyển (In tem, Gán hãng,
+              // Trạng thái hãng), nhóm Đơn (Trùng trong ngày, SP ngoài ERP, Giá trị đơn, Cân nặng).
+            ]}
+            values={{
+              status: state.filters.status,
+              customerId: state.filters.customerId,
+              pos,
+              from: state.filters.from,
+              to: state.filters.to,
+              dateField: state.filters.dateField,
+              team,
+              fbPage: state.filters.fbPage,
+              skuId: state.filters.skuId,
+            }}
+            onFilterChange={setFilter}
+            searchPlaceholder="Mã đơn, SĐT, tên SP, mã vận đơn… nhiều giá trị cách dấu phẩy"
+            right={
+              <>
+                {customerId ? (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setFilter({ customerId: undefined })}
+                  >
+                    <X aria-hidden />
+                    Đang lọc theo khách {customerName ? `“${customerName}”` : 'đã chọn'}
+                  </Button>
+                ) : null}
+              </>
+            }
+          />
+        )}
+      </div>
 
       <QueryState
         query={query}
@@ -1334,7 +1316,6 @@ export function PrintOrdersScreen() {
             page={state.page}
             size={state.size}
             sort={sortBy ? sort : null}
-            hiddenColumns={hidden}
             onPageChange={(page) => set({ page })}
             onSizeChange={(size) => set({ size })}
             onSortChange={changeSort}

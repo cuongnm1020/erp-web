@@ -23,20 +23,24 @@ describe('PrintOrdersScreen — In đơn (clone màn Đơn hàng, 2026-11-04)', 
     expect(screen.getByTestId('order-count')).toHaveTextContent('60');
   });
 
-  it('ẩn cột lưu vào tuỳ chọn riêng orders.print, không đụng orders.list của màn Đơn hàng', async () => {
-    const keys: string[] = [];
+  it('không còn nút "Cột" / "Bộ lọc đã lưu" / "Bộ lọc khác"; luôn hiện hết cột dù đã lưu cột ẩn; tab một dãy chip liền (user 2026-11-04 tối)', async () => {
     server.use(
-      http.put('/api/me/preferences/:key', async ({ params, request }) => {
-        keys.push(String(params.key));
-        const body = (await request.json()) as { value: unknown };
-        return HttpResponse.json({ key: params.key, value: body.value });
-      }),
+      http.get('/api/me/preferences/:key', ({ params }) =>
+        HttpResponse.json({ key: params.key, value: { hidden: ['items'], sort: null } }),
+      ),
     );
     renderApp(<PrintOrdersScreen />);
     await screen.findByText(FIRST.docNumber);
-    fireEvent.click(screen.getByRole('button', { name: /^Cột/ }));
-    fireEvent.click(await screen.findByRole('checkbox', { name: 'Sản phẩm' }));
-    await waitFor(() => expect(keys).toEqual(['orders.print']));
+    expect(screen.queryByRole('button', { name: /^Cột/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Bộ lọc đã lưu/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Bộ lọc khác' })).not.toBeInTheDocument();
+    // Cột Sản phẩm đã lưu ẩn vẫn hiện.
+    expect(screen.getByRole('button', { name: /^Sắp xếp theo Sản phẩm/ })).toBeInTheDocument();
+    expect(screen.getAllByTestId('order-items').length).toBeGreaterThan(0);
+    // Không chia khối giai đoạn: tablist chứa thẳng 14 chip, không role=group.
+    const tablist = screen.getByRole('tablist', { name: 'Trạng thái đơn' });
+    expect(tablist.querySelectorAll('[role="group"]')).toHaveLength(0);
+    expect(tablist.querySelectorAll('[role="tab"]').length).toBeGreaterThanOrEqual(14);
   });
 
   it('cột Sản phẩm hiện HẾT sản phẩm của đơn, không "+N sản phẩm khác" (2026-11-04)', async () => {
@@ -167,10 +171,13 @@ describe('PrintOrdersScreen — In đơn (clone màn Đơn hàng, 2026-11-04)', 
         expect(seen.some((p) => p.get('pancakeShopId') === '715130909,715130910')).toBe(true),
       );
       for (const p of seen) expect(p.has('source')).toBe(false);
-      // Ghim trên thanh (không nằm trong "Bộ lọc khác"): nút combobox có sẵn mà chưa mở panel.
+      // Bày thẳng trên thanh (không có panel "Bộ lọc khác"): nút combobox có sẵn; "Xóa lọc (n)"
+      // đứng ngay trên thanh khi đang lọc (user 2026-11-04 tối).
       expect(screen.getByRole('combobox', { name: 'POS' })).toHaveTextContent('POS: 2 POS');
       expect(screen.getByRole('combobox', { name: 'Page' })).toBeInTheDocument();
       expect(screen.queryByText('Nguồn: tất cả')).not.toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: 'Bộ lọc khác' })).not.toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /Xóa lọc \(\d+\)/ })).toBeInTheDocument();
     } finally {
       search = 'group=all';
     }
