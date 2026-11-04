@@ -115,7 +115,11 @@ export function useNonComboSkuSearch(q: string): EntitySearchResult {
     queryFn: () =>
       unwrap(
         api.GET('/products', {
-          params: { query: { q: q || undefined, isCombo: false, take: 20, skip: 0 } },
+          // erpOnly (smoke 2026-11-04): bỏ cả SP Pancake tự sinh dạng gói ("02 chai rooting + 10
+          // gói …") — về bản chất cũng là combo, không phải sản phẩm thật.
+          params: {
+            query: { q: q || undefined, isCombo: false, erpOnly: true, take: 20, skip: 0 },
+          },
         }),
       ),
     staleTime: 30_000,

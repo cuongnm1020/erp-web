@@ -112,6 +112,8 @@ describe('PrintOrdersScreen — In đơn (clone màn Đơn hàng, 2026-11-04)', 
     fireEvent.click(screen.getAllByText('Sản phẩm: tất cả')[0]!);
     await waitFor(() => expect(seen.length).toBeGreaterThan(0));
     expect(seen.every((p) => p.get('isCombo') === 'false')).toBe(true);
+    // Bỏ cả SP Pancake tự sinh dạng gói (2026-11-04).
+    expect(seen.every((p) => p.get('erpOnly') === 'true')).toBe(true);
   });
 
   it('bỏ lọc Hãng VC / NV lên đơn / Vận chuyển / Đơn (2026-11-04): không hiện ô, link cũ không lọc ngầm', async () => {
