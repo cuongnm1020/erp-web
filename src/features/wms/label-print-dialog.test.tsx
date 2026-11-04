@@ -104,32 +104,41 @@ describe('Popup nhãn — tem ERP 100×75 mm (2026-10-13)', () => {
     expect(root.querySelector('style')!.textContent).toContain('size: 100mm 75mm');
     // Bản chụp đã tách khỏi document → getBy* (ném khi không thấy) thay cho toBeInTheDocument.
     const label = within(root);
+    // Tem ngang mọi hãng theo bố cục tem GHTK (2026-11-04): hãng | giờ in | số kiện; mã vạch +
+    // số; mã hãng nền đen; người gửi / người nhận | thu hộ | kho lấy / giao tới; Mã đơn KH;
+    // Sản phẩm / SL; ghi chú một hàng; QR.
     expect(label.getByText('Viettel Post')).toBeTruthy();
     expect(label.getByText('PKE1545655255')).toBeTruthy();
-    expect(label.getByText('Nguyễn Công Quân')).toBeTruthy();
-    // 2026-10-15: SĐT người nhận giữ 4 số cuối, thêm hàng người gửi
-    expect(label.getByText('******4567')).toBeTruthy();
+    expect(label.getByText('VTP')).toBeTruthy();
+    expect(label.getByText('1/1')).toBeTruthy();
+    // SĐT người nhận giữ 4 số cuối, địa chỉ che số nhà
+    expect(label.getByText(/Nguyễn Công Quân \/ \*{6}4567/)).toBeTruthy();
     expect(label.queryByText(/0901/)).toBeNull();
+    expect(label.getByText('Đ/c: ***, Xã Thiện Mỹ, Huyện Trà Ôn, Vĩnh Long')).toBeTruthy();
+    expect(label.queryByText(/Số nhà 137/)).toBeNull();
     // 2026-10-28: người gửi chỉ còn tên page Facebook
     expect(label.getByText('Thiên Nông Official')).toBeTruthy();
     expect(label.queryByText(/0339/)).toBeNull();
     expect(label.queryByText(/Mạnh/)).toBeNull();
-    expect(label.getByText(/Thiện Mỹ, Huyện Trà Ôn, Vĩnh Long/)).toBeTruthy();
-    // Bố cục theo nhãn Pancake (2026-10-14): mã hãng + số kiện, COD, bảng Sản phẩm / SL
-    expect(label.getByText('VTP')).toBeTruthy();
-    expect(label.getByText('1/1')).toBeTruthy();
-    // Số tiền thu hộ che trên tem (2026-11-03): chỉ "Thu *** đ", không lộ 215.000.
-    expect(label.getByText('Thu *** đ')).toBeTruthy();
+    // Kho lấy / Giao tới (huyện, tỉnh); không in khối lượng (user chốt 2026-11-04)
+    expect(label.getByText('Kho Thạch Thất')).toBeTruthy();
+    expect(label.getByText('Huyện Trà Ôn, Vĩnh Long')).toBeTruthy();
+    expect(label.queryByText(/Khối lượng/)).toBeNull();
+    // Số tiền thu hộ che trên tem (2026-11-03): chỉ "*** đ", không lộ 215.000.
+    expect(label.getByText('*** đ')).toBeTruthy();
     expect(label.queryByText(/215\.000/)).toBeNull();
-    // "+N sản phẩm khác" nằm ở tiêu đề cột để không bị cắt khi tên hàng dài (2026-10-14)
-    expect(
-      label.getByRole('columnheader', { name: /^Sản phẩm · \+3 sản phẩm khác$/ }),
-    ).toBeTruthy();
-    expect(label.getByRole('columnheader', { name: 'SL' })).toBeTruthy();
+    // Mã đơn KH = mã phiếu giao
+    expect(label.getByText('DN2610-00001')).toBeTruthy();
+    // Tối đa 4 dòng hàng; phần không in báo ở tiêu đề để luôn thấy
+    expect(label.getByText(/Sản phẩm \(5\)/)).toBeTruthy();
+    expect(label.getByText(/\+1 sản phẩm khác không in/)).toBeTruthy();
     expect(label.getByText('COMBO 3 CHAI CANXI BO ORGANIC 500ML')).toBeTruthy();
-    // Ngang in tối đa 2 dòng hàng, còn lại gom lại để chữ không bị thu nhỏ
-    expect(label.getByText('+3 sản phẩm khác')).toBeTruthy();
-    expect(label.getByText('Quý khách vui lòng quay video khi bóc hàng')).toBeTruthy();
+    expect(label.getByText('Phân bón C')).toBeTruthy();
+    expect(label.queryByText('Phân bón D')).toBeNull();
+    // Ghi chú một hàng: ghi chú đơn · tuỳ chọn gửi hãng
+    expect(
+      label.getByText(/Quý khách vui lòng quay video khi bóc hàng · Không cho xem hàng/),
+    ).toBeTruthy();
     expect(label.getByRole('img', { name: 'Mã vận đơn PKE1545655255' })).toBeTruthy();
     expect(label.getByRole('img', { name: 'QR PKE1545655255' })).toBeTruthy();
     // Không nhúng PDF của hãng
@@ -229,7 +238,7 @@ describe('Popup nhãn — tem ERP 100×75 mm (2026-10-13)', () => {
     ).toBeTruthy();
   });
 
-  it('đơn GHTK, tem ngang → bố cục tem GHTK: mã vạch đoạn số cuối, mã phân loại, tuyến, SĐT người gửi đầy đủ', async () => {
+  it('đơn GHTK, tem ngang → mã vạch đoạn số cuối, mã phân loại nền đen, tuyến, QR mã đầy đủ', async () => {
     const long = 'S23119447.BO.MN13-12-P52.1763110086';
     server.use(
       http.get('/api/shipments/:id/label-data', () =>
@@ -262,7 +271,14 @@ describe('Popup nhãn — tem ERP 100×75 mm (2026-10-13)', () => {
     expect(label.queryByText(/Khối lượng/)).toBeNull();
     expect(label.getByText('Đ/c: ***, Xã Thiện Mỹ, Huyện Trà Ôn, Vĩnh Long')).toBeTruthy();
     expect(label.getByText('DN2610-00001')).toBeTruthy();
-    expect(label.getByText(/Không cho xem hàng/)).toBeTruthy();
+    // Ghi chú một hàng dưới danh sách hàng (2026-11-04); kho lấy / giao tới
+    expect(
+      label.getByText(/Quý khách vui lòng quay video khi bóc hàng · Không cho xem hàng/),
+    ).toBeTruthy();
+    expect(label.getByText('Kho Thạch Thất')).toBeTruthy();
+    expect(label.getByText('Huyện Trà Ôn, Vĩnh Long')).toBeTruthy();
+    // Tem ngang không in số kiện "1/1" cho GHTK (chỗ đó là tuyến)
+    expect(label.queryByText('1/1')).toBeNull();
     // SĐT đầy đủ của người nhận không được in
     expect(label.queryByText(/0901/)).toBeNull();
     // Thu hộ che số tiền (2026-11-03)

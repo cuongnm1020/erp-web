@@ -11,23 +11,17 @@ import type { ShipmentLabelData } from '../api/use-pda';
 import { DEFAULT_PRINT_NOTE, hidePhone, parseGhtkTracking, routeLabel } from '../ghtk-label';
 import { f, labelInner, labelOuter, u, WAYBILL_EDGE } from '../label-scale';
 import { sortLabelsForPrint } from '../waybill-sort';
-import { GhtkWaybillLabel } from './ghtk-waybill-label';
+import { LandscapeWaybillLabel } from './landscape-waybill-label';
 
 export type WaybillOrientation = 'landscape' | 'portrait';
 
 /** Số dòng hàng in ra; còn lại gom thành "+N sản phẩm khác" để chữ không bị thu nhỏ. */
-const MAX_ITEMS = { landscape: 2, portrait: 2 } as const;
+const MAX_ITEMS = 2;
 
-/** Khổ tem (mm) theo hướng. */
+/** Khổ tem dọc (mm). */
 const SIZE = {
-  landscape: {
-    w: LABEL_SIZES.WAYBILL_100x75.labelWidthMm ?? 100,
-    h: LABEL_SIZES.WAYBILL_100x75.labelHeightMm ?? 75,
-  },
-  portrait: {
-    w: LABEL_SIZES.WAYBILL_75x100.labelWidthMm ?? 75,
-    h: LABEL_SIZES.WAYBILL_75x100.labelHeightMm ?? 100,
-  },
+  w: LABEL_SIZES.WAYBILL_75x100.labelWidthMm ?? 75,
+  h: LABEL_SIZES.WAYBILL_75x100.labelHeightMm ?? 100,
 } as const;
 
 /**
@@ -67,14 +61,16 @@ function fromDistrictAddress(r: { address: string; fromDistrict: string }): stri
 const SENDER_PT = 7.5;
 
 /**
- * Nhãn vận đơn ERP tự in, khổ 100×75 mm (máy in nhiệt 3 inch) — ngang hoặc dọc. Bố cục theo
+ * Nhãn vận đơn ERP tự in, khổ 100×75 mm (máy in nhiệt 3 inch). NGANG (mọi hãng) → bố cục tem
+ * GHTK ở `LandscapeWaybillLabel` (2026-11-04). Phần dưới đây là tem DỌC 75×100: bố cục theo
  * nhãn in từ Pancake (2026-10-14): viền đứt; trên = hãng + mã hãng + QR + giờ in | mã vạch + mã
  * vận đơn + số kiện; dưới = ô người nhận (tên, SĐT, địa chỉ chữ lớn, ghi chú in) | ô COD + bảng
  * Sản phẩm / SL. Hãng chưa cấp vận đơn → in mã phiếu giao thay thế để kho vẫn dán được kiện.
- * 2026-10-15 (ngang + dọc): thêm hàng người gửi trên ô người nhận, SĐT người nhận giữ 4 số cuối,
- * ghi chú xuống hàng cuối tem (đơn không ghi chú → câu mặc định).
- * 2026-10-16 (dọc): địa chỉ người nhận chỉ in từ xã/phường trở đi; địa chỉ + bảng sản phẩm cùng
- * cỡ chữ với hàng người gửi (`SENDER_PT`).
+ * 2026-10-15: thêm hàng người gửi trên ô người nhận, SĐT người nhận giữ 4 số cuối, ghi chú
+ * xuống hàng cuối tem (đơn không ghi chú → câu mặc định).
+ * 2026-10-16: địa chỉ người nhận chỉ in từ xã/phường trở đi; địa chỉ + bảng sản phẩm cùng cỡ
+ * chữ với hàng người gửi (`SENDER_PT`). GHTK dọc cùng khung này: mã vạch đoạn số cuối + mã phân
+ * loại + tuyến cạnh COD.
  * 2026-10-28: người gửi chỉ còn tên page Facebook; lề trên / phải bù `WAYBILL_EDGE`.
  * Kích thước thiết kế tính bằng mm/pt qua `u()` / `f()` (dựng ×2 — xem `label-scale.ts`).
  */
@@ -90,23 +86,21 @@ export function WaybillLabel({
   /** Số thứ tự tem trong lô in (2026-10-31) — "3/50" cạnh giờ in; in lẻ thì bỏ. */
   seq?: { index: number; total: number };
 }) {
-  const land = orientation === 'landscape';
-  // Đơn GHTK đã có mã đúng dạng GHTK: ngang → tem GHTK xếp gọn 100×75 (2026-10-14); dọc →
-  // cùng khung tem dọc chung (2026-10-16), mã vạch mang đoạn số cuối + in mã phân loại.
+  // Đơn GHTK đã có mã đúng dạng GHTK: mã vạch mang đoạn số cuối + in mã phân loại.
   const ghtk = data.carrierCode === 'GHTK' ? parseGhtkTracking(data.trackingNo) : null;
-  if (ghtk && land) {
-    return <GhtkWaybillLabel data={data} ghtk={ghtk} printedAt={printedAt} seq={seq} />;
+  if (orientation === 'landscape') {
+    return <LandscapeWaybillLabel data={data} ghtk={ghtk} printedAt={printedAt} seq={seq} />;
   }
   const seqText = seq ? `#${seq.index}/${seq.total}` : null;
-  const size = SIZE[orientation];
+  const size = SIZE;
   const code = data.trackingNo ?? data.shipmentDocNumber;
   /** Giá trị mã vạch: GHTK quét đoạn số cuối, hãng khác quét cả mã. */
   const barValue = ghtk?.shortCode ?? code;
   const long = barValue.length > LONG_CODE;
   // Tuyến GHTK (NỘI TỈNH / NỘI MIỀN / LIÊN MIỀN) in cạnh COD — ERP tự suy từ tỉnh.
   const route = ghtk ? routeLabel(data.sender?.province, data.recipient?.province) : null;
-  // Dọc + mã dài: khối mã chiếm thêm chỗ → bớt một dòng hàng.
-  const max = MAX_ITEMS[orientation] - (long && !land ? 1 : 0);
+  // Mã dài: khối mã chiếm thêm chỗ → bớt một dòng hàng.
+  const max = MAX_ITEMS - (long ? 1 : 0);
   const shown = data.items.slice(0, max);
   const more = data.items.length - shown.length;
   const carrier = data.carrierName ?? data.carrierCode ?? 'Vận đơn';
@@ -172,11 +166,11 @@ export function WaybillLabel({
           <span style={{ fontSize: f(11), marginLeft: u(2) }}>{seqText ?? '1/1'}</span>
         </span>
       </div>
-      {barcode(land ? 12 : 14, land ? 8.5 : 7.5)}
+      {barcode(14, 7.5)}
     </div>
   ) : (
     <div className="flex items-stretch" style={{ gap: u(3) }}>
-      <div className="flex shrink-0 flex-col" style={{ width: u(land ? 21 : 19), gap: u(0.4) }}>
+      <div className="flex shrink-0 flex-col" style={{ width: u(19), gap: u(0.4) }}>
         <div className="flex items-baseline" style={{ gap: u(1) }}>
           <span className="shrink-0 font-bold leading-none" style={{ fontSize: f(11) }}>
             {data.carrierCode ?? carrier}
@@ -187,7 +181,7 @@ export function WaybillLabel({
             </span>
           ) : null}
         </div>
-        <div style={{ width: u(land ? 12 : 15), height: u(land ? 12 : 15) }}>
+        <div style={{ width: u(15), height: u(15) }}>
           <Barcode
             value={code}
             symbology="qrcode"
@@ -208,7 +202,7 @@ export function WaybillLabel({
           </span>
         ) : null}
       </div>
-      {barcode(land ? 11 : 13, land ? 12 : 11)}
+      {barcode(13, 11)}
     </div>
   );
 
@@ -230,12 +224,9 @@ export function WaybillLabel({
             <Phone style={ICON} aria-hidden />
             <span>{hidePhone(data.recipient.phone, 4)}</span>
           </div>
-          <div
-            className="font-bold leading-tight"
-            style={{ fontSize: f(land ? 11 : SENDER_PT), ...clamp(3) }}
-          >
+          <div className="font-bold leading-tight" style={{ fontSize: f(SENDER_PT), ...clamp(3) }}>
             <MapPin style={{ ...ICON, display: 'inline', verticalAlign: '-0.1em' }} aria-hidden />{' '}
-            {land ? data.recipient.address : fromDistrictAddress(data.recipient)}
+            {fromDistrictAddress(data.recipient)}
           </div>
         </>
       ) : (
@@ -293,7 +284,7 @@ export function WaybillLabel({
       ) : null}
       <table
         className="w-full border-collapse"
-        style={{ fontSize: f(land ? 9.5 : SENDER_PT), tableLayout: 'fixed' }}
+        style={{ fontSize: f(SENDER_PT), tableLayout: 'fixed' }}
       >
         <colgroup>
           <col />
@@ -307,7 +298,7 @@ export function WaybillLabel({
               {more > 0 ? (
                 <>
                   {' · '}
-                  <span className="italic" style={{ fontSize: f(land ? 8 : SENDER_PT) }}>
+                  <span className="italic" style={{ fontSize: f(SENDER_PT) }}>
                     +{more} sản phẩm khác
                   </span>
                 </>
@@ -325,11 +316,11 @@ export function WaybillLabel({
                 className="font-bold leading-tight"
                 style={{ border: BORDER, padding: `${u(0.4)} ${u(0.6)}` }}
               >
-                <span style={clamp(shown.length > 1 ? 1 : land ? 3 : 2)}>{it.name}</span>
+                <span style={clamp(shown.length > 1 ? 1 : 2)}>{it.name}</span>
               </td>
               <td
                 className="text-center font-bold tabular-nums"
-                style={{ border: BORDER, padding: u(0.4), fontSize: f(land ? 11 : SENDER_PT) }}
+                style={{ border: BORDER, padding: u(0.4), fontSize: f(SENDER_PT) }}
               >
                 {formatQuantity(it.qty)}
               </td>
@@ -358,23 +349,13 @@ export function WaybillLabel({
         >
           {top}
           {sender}
-          {land ? (
-            <div
-              className="grid min-h-0 flex-1 grid-cols-2 overflow-hidden"
-              style={{ gap: u(1.5) }}
-            >
-              {recipient}
-              {goods}
-            </div>
-          ) : (
-            <div
-              className="grid min-h-0 flex-1 overflow-hidden"
-              style={{ gridTemplateRows: 'auto 1fr', gap: u(1.5) }}
-            >
-              {recipient}
-              {goods}
-            </div>
-          )}
+          <div
+            className="grid min-h-0 flex-1 overflow-hidden"
+            style={{ gridTemplateRows: 'auto 1fr', gap: u(1.5) }}
+          >
+            {recipient}
+            {goods}
+          </div>
           {bottomNote}
         </div>
       </div>
