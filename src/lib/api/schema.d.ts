@@ -13026,6 +13026,12 @@ export interface components {
             marketerId?: string | null;
             /** @description Ngày hẹn nhận hàng `YYYY-MM-DD`; `null` = bỏ hẹn. */
             expectedDeliveryDate?: string | null;
+            /**
+             * @description Ngày tạo đơn (ISO) — doanh số tính theo ngày này. Chỉ admin / người có
+             *     `sales_order.set_order_date` (2026-11-04, màn Sửa đơn); người khác 403. Không ở tương lai,
+             *     kỳ kế toán cũ và mới đều phải mở.
+             */
+            orderDate?: string;
             /** @description Lý do (khi hủy) — ghi vào event OrderCancelled. */
             reason?: string;
         };

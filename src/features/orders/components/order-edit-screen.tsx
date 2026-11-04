@@ -33,7 +33,16 @@ import { groupOrderLines } from '../combo-lines';
 import { isApiError } from '@/lib/api/errors';
 import { cn } from '@/lib/cn';
 import { messageFor, messageForCode } from '@/lib/error-messages';
-import { formatDate, formatDateTime, formatMoney, formatQuantity, toDecimal } from '@/lib/format';
+import { DatePicker } from '@/components/data/form/date-picker';
+import {
+  formatDate,
+  formatDateTime,
+  formatMoney,
+  formatQuantity,
+  formatTime,
+  toDecimal,
+  toLocalDateKey,
+} from '@/lib/format';
 import { Can, useAbility } from '@/lib/permission';
 import { useCarriers } from '@/features/wms/api/use-shipping';
 import { CarrierSelect } from '@/features/wms/components/carrier-select';
@@ -109,6 +118,19 @@ const DEFAULT_ACCOUNT = '__default__';
 /** `YYYY-MM-DD` → "01/11/2026". */
 const formatYmd = (ymd: string) => formatDate(`${ymd}T00:00:00Z`);
 
+/**
+ * Ngày tạo đơn mới (`YYYY-MM-DD`) → ISO: giữ nguyên GIỜ của đơn, chỉ dời ngày (2026-11-04). Dời
+ * về hôm nay mà giờ cũ chưa tới → lấy giờ hiện tại (server chặn giờ tương lai).
+ */
+export function movedOrderDateIso(orig: string, fromKey: string, toKey: string, now = new Date()) {
+  const day = (k: string) => {
+    const [y, m, d] = k.split('-').map(Number);
+    return Date.UTC(y!, m! - 1, d!);
+  };
+  const at = new Date(new Date(orig).getTime() + (day(toKey) - day(fromKey)));
+  return (at.getTime() > now.getTime() ? now : at).toISOString();
+}
+
 /** Tên trường trong `changed` của PATCH → chữ trên toast "Đã lưu thay đổi". */
 function changedLabel(c: string): string {
   switch (c) {
@@ -126,6 +148,8 @@ function changedLabel(c: string): string {
       return 'thẻ';
     case 'expectedDeliveryDate':
       return 'ngày hẹn nhận';
+    case 'orderDate':
+      return 'ngày tạo đơn';
     case 'warehouseId':
       return 'kho lấy hàng';
     case 'recipientPhone':
@@ -185,6 +209,10 @@ function Editor({ order }: { order: SalesOrderDetail }) {
   const [printNote, setPrintNote] = useState(order.printNote ?? '');
   const [tagIds, setTagIds] = useState<string[]>(() => order.tags.map((t) => t.id));
   const [expectedDate, setExpectedDate] = useState(order.expectedDeliveryDate ?? '');
+  // Ngày tạo đơn (2026-11-04): chỉ admin / `sales_order.set_order_date` đổi được, giữ nguyên giờ.
+  const canSetOrderDate = ability.can('set_order_date', 'SalesOrder');
+  const origOrderDay = toLocalDateKey(order.orderDate) ?? '';
+  const [orderDay, setOrderDay] = useState(origOrderDay);
   const [accountId, setAccountId] = useState<string>(order.carrierAccountId ?? DEFAULT_ACCOUNT);
   // SĐT người nhận riêng cho đơn (2026-10-28) — đơn sàn SĐT bị che: nhập số thật rồi xin lại vận đơn.
   const [recipientPhone, setRecipientPhone] = useState(order.recipientPhone ?? '');
@@ -261,6 +289,8 @@ function Editor({ order }: { order: SalesOrderDetail }) {
   const tagsChanged =
     tagIds.length !== originalTags.length || tagIds.some((t) => !originalTags.includes(t));
   const dateChanged = (expectedDate || null) !== (order.expectedDeliveryDate ?? null);
+  const orderDayEditable = canSetOrderDate && orderEditable(order.status);
+  const orderDayChanged = orderDayEditable && orderDay !== '' && orderDay !== origOrderDay;
   const nextAccount = accountId === DEFAULT_ACCOUNT ? null : accountId;
   // Đổi hãng → server tự về tài khoản mặc định; chỉ gửi tài khoản khi người dùng chọn khác đi.
   const accountChanged = carrierChanged
@@ -271,6 +301,7 @@ function Editor({ order }: { order: SalesOrderDetail }) {
     printChanged ||
     tagsChanged ||
     dateChanged ||
+    orderDayChanged ||
     accountChanged ||
     recipientPhoneChanged;
   const patchFieldsDirty =
@@ -437,6 +468,9 @@ function Editor({ order }: { order: SalesOrderDetail }) {
         ...(recipientPhoneChanged ? { recipientPhone: trimOrNull(recipientPhone) } : {}),
         ...(tagsChanged ? { tagIds } : {}),
         ...(dateChanged ? { expectedDeliveryDate: expectedDate || null } : {}),
+        ...(orderDayChanged
+          ? { orderDate: movedOrderDateIso(order.orderDate, origOrderDay, orderDay) }
+          : {}),
         ...(statusChanged && status === 'CANCELLED' && reason.trim()
           ? { reason: reason.trim() }
           : {}),
@@ -593,6 +627,9 @@ function Editor({ order }: { order: SalesOrderDetail }) {
             to: expectedDate ? formatYmd(expectedDate) : 'Bỏ hẹn',
           },
         ]
+      : []),
+    ...(orderDayChanged
+      ? [{ label: 'Ngày tạo đơn', from: formatYmd(origOrderDay), to: formatYmd(orderDay) }]
       : []),
     ...(internalChanged ? [{ label: 'Ghi chú nội bộ', from: 'cũ', to: 'mới' }] : []),
     ...(printChanged ? [{ label: 'Ghi chú in vận đơn', from: 'cũ', to: 'mới' }] : []),
@@ -1304,9 +1341,27 @@ function Editor({ order }: { order: SalesOrderDetail }) {
           </Card>
 
           <Card title="Giờ tạo đơn">
-            <Row label="Tạo lúc">
-              <ReadValue>{formatDateTime(order.orderDate)}</ReadValue>
-            </Row>
+            {orderDayEditable ? (
+              // Admin / nhân viên vận đơn đổi ngày (2026-11-04) — giữ giờ, chỉ chọn lùi.
+              <Row label="Ngày tạo đơn">
+                <div className="flex items-center gap-2">
+                  <DatePicker
+                    value={orderDay}
+                    onChange={(v) => setOrderDay(v || origOrderDay)}
+                    toDate={new Date()}
+                    aria-label="Ngày tạo đơn"
+                    className={cn('h-9 w-40', orderDayChanged && DIRTY)}
+                  />
+                  <span className="text-sm tabular-nums text-muted-foreground">
+                    {formatTime(order.orderDate)}
+                  </span>
+                </div>
+              </Row>
+            ) : (
+              <Row label="Tạo lúc">
+                <ReadValue>{formatDateTime(order.orderDate)}</ReadValue>
+              </Row>
+            )}
             {order.createdByName ? (
               <Row label="Người tạo">
                 <ReadValue>{order.createdByName}</ReadValue>
