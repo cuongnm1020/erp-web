@@ -158,8 +158,10 @@ describe('Popup nhãn — tem ERP 100×75 mm (2026-10-13)', () => {
     const root = lastPrinted();
     expect(root.getAttribute('data-print-size')).toBe('WAYBILL_75x100');
     expect(root.querySelector('style')!.textContent).toContain('size: 75mm 100mm');
-    // Dọc in tối đa 2 dòng hàng (thêm hàng người gửi + ghi chú cuối tem 2026-10-15)
-    expect(within(root).getByText('+3 sản phẩm khác')).toBeTruthy();
+    // Dọc: số dòng hàng theo chỗ trống (2026-11-04) — VTP có page, địa chỉ 1 dòng → 5 dòng,
+    // đủ 5 món, không còn "+N sản phẩm khác".
+    expect(within(root).getByText('Phân bón D')).toBeTruthy();
+    expect(within(root).queryByText(/sản phẩm khác/)).toBeNull();
   });
 
   it('tem chung dọc (VTP): hàng người gửi, SĐT người nhận 4 số cuối, ghi chú cuối tem / mặc định', async () => {

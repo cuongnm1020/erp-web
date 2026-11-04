@@ -15,14 +15,77 @@ import { LandscapeWaybillLabel } from './landscape-waybill-label';
 
 export type WaybillOrientation = 'landscape' | 'portrait';
 
-/** Số dòng hàng in ra; còn lại gom thành "+N sản phẩm khác" để chữ không bị thu nhỏ. */
-const MAX_ITEMS = 2;
-
 /** Khổ tem dọc (mm). */
 const SIZE = {
   w: LABEL_SIZES.WAYBILL_75x100.labelWidthMm ?? 75,
   h: LABEL_SIZES.WAYBILL_75x100.labelHeightMm ?? 100,
 } as const;
+
+/**
+ * Chiều cao (mm thiết kế) các khối cố định trên tem dọc — để tính số dòng hàng vừa ô Sản phẩm.
+ * Đo bằng getBoundingClientRect trên tem dựng ở Chrome 2026-11-04 (khớp kích thước khai trong
+ * JSX bên dưới); đổi padding / gap / cỡ chữ ở JSX thì đo và sửa lại số ở đây. Tem in ẩn
+ * (`display: none`) nên lúc in không đo DOM được — phải tính trước.
+ */
+const PORTRAIT_MM = {
+  /** Trong viền đứt: tem − lề ngoài (trên bù WAYBILL_EDGE) − viền + padding khung. */
+  content: SIZE.h - (1.5 + WAYBILL_EDGE.top) - 1.5 - 0.6 - 3,
+  /** 3 khoảng cách 1,5 mm: trên–lưới, lưới–ghi chú, người nhận–sản phẩm. */
+  gaps: 4.5,
+  /** Khối trên mã ngắn: hãng + QR 15 mm + giờ in; mã dài: dòng hãng + mã vạch 14 mm + mã 2 dòng. */
+  topShort: 22.2,
+  topLong: 27,
+  /** "#x/N" dưới giờ in (chỉ bố cục mã ngắn; mã dài in chung dòng hãng). */
+  seq: 3.95,
+  /** Hàng người gửi + khoảng cách. */
+  sender: 5.6 + 1.5,
+  /** Ô người nhận với địa chỉ 1 dòng; mỗi dòng địa chỉ thêm. */
+  recipient: 13.7,
+  addressLine: 3.45,
+  /** Ô ghi chú cuối tem (2 dòng). */
+  note: 9.05,
+  /** Ô sản phẩm trừ các dòng hàng: viền + padding + "Thu *** đ" + tiêu đề bảng. */
+  goodsHead: 9.5,
+  /** Dòng "Mã đơn hàng" VNPost. */
+  vnpost: 3.3,
+  /** Một dòng hàng: tên 1 dòng 7,5 pt × 1,3 + padding + viền. */
+  row: 4.5,
+  /** Dự phòng làm tròn để viền dòng cuối không bị xén. */
+  slack: 0.5,
+} as const;
+
+/**
+ * Số ký tự ước lượng vừa một dòng địa chỉ 7,5 pt đậm trên bề ngang ô người nhận (đo canvas:
+ * ~10,3 px/ký tự trên 454 px dựng ×2 → ~44; lấy thấp hơn vì ngắt theo từ).
+ */
+const ADDRESS_CHARS_PER_LINE = 42;
+
+/**
+ * Số dòng hàng in được trên tem dọc (2026-11-04). Trước đây khóa cứng 2 dòng → đơn 4–5 món bị
+ * gom "+N sản phẩm khác" dù nửa dưới tem trống (kho báo lỗi nghiêm trọng: không in hết danh
+ * sách). Ô Sản phẩm là phần co giãn (grid 1fr) nên số dòng = (chỗ còn lại sau các khối cố
+ * định) / chiều cao một dòng; luôn ≥ 1. Vượt quá vẫn báo "+N sản phẩm khác" ở tiêu đề bảng.
+ */
+export function portraitItemRows(opts: {
+  longCode: boolean;
+  seq: boolean;
+  sender: boolean;
+  vnpost: boolean;
+  addressLines: number;
+}): number {
+  const m = PORTRAIT_MM;
+  let used = m.gaps + m.note + m.goodsHead + m.recipient + m.slack;
+  used += opts.longCode ? m.topLong : m.topShort + (opts.seq ? m.seq : 0);
+  if (opts.sender) used += m.sender;
+  if (opts.vnpost) used += m.vnpost;
+  used += Math.max(0, Math.min(3, opts.addressLines) - 1) * m.addressLine;
+  return Math.max(1, Math.floor((m.content - used) / m.row));
+}
+
+/** Ước lượng số dòng địa chỉ người nhận (cắt 3 dòng ở JSX). */
+export function estimateAddressLines(address: string): number {
+  return Math.max(1, Math.ceil(address.length / ADDRESS_CHARS_PER_LINE));
+}
 
 /**
  * Mã dài hơn mức này (GHTK ~35 ký tự) cần CẢ chiều ngang tem để mỗi vạch còn ≥ ~2 chấm in
@@ -99,8 +162,14 @@ export function WaybillLabel({
   const long = barValue.length > LONG_CODE;
   // Tuyến GHTK (NỘI TỈNH / NỘI MIỀN / LIÊN MIỀN) in cạnh COD — ERP tự suy từ tỉnh.
   const route = ghtk ? routeLabel(data.sender?.province, data.recipient?.province) : null;
-  // Mã dài: khối mã chiếm thêm chỗ → bớt một dòng hàng.
-  const max = MAX_ITEMS - (long ? 1 : 0);
+  // Số dòng hàng = chỗ còn trống của ô Sản phẩm (2026-11-04) — xem `portraitItemRows`.
+  const max = portraitItemRows({
+    longCode: long,
+    seq: seq != null,
+    sender: !!data.facebookPageName,
+    vnpost: data.carrierCode === 'VNPOST',
+    addressLines: data.recipient ? estimateAddressLines(fromDistrictAddress(data.recipient)) : 1,
+  });
   const shown = data.items.slice(0, max);
   const more = data.items.length - shown.length;
   const carrier = data.carrierName ?? data.carrierCode ?? 'Vận đơn';
