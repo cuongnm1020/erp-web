@@ -975,17 +975,19 @@ export interface OrderListPrefs {
   sort?: { id: string; desc: boolean } | null;
 }
 
-const ORDER_LIST_PREFS_KEY = 'orders.list';
-const orderListPrefsKey = ['me', 'preferences', ORDER_LIST_PREFS_KEY] as const;
+/**
+ * Khoá tuỳ chọn bảng đơn: `orders.list` (Đơn hàng), `orders.print` (In đơn, 2026-11-04) — mỗi
+ * màn lưu cột ẩn + sắp xếp riêng.
+ */
+export type OrderListPrefsKey = 'orders.list' | 'orders.print';
+const orderListPrefsKey = (key: OrderListPrefsKey) => ['me', 'preferences', key] as const;
 
-/** GET /me/preferences/orders.list — null = chưa lưu lần nào (dùng mặc định). */
-export function useOrderListPrefs() {
+/** GET /me/preferences/:key — null = chưa lưu lần nào (dùng mặc định). */
+export function useOrderListPrefs(key: OrderListPrefsKey = 'orders.list') {
   return useQuery({
-    queryKey: orderListPrefsKey,
+    queryKey: orderListPrefsKey(key),
     queryFn: async () => {
-      const r = await unwrap(
-        api.GET('/me/preferences/{key}', { params: { path: { key: ORDER_LIST_PREFS_KEY } } }),
-      );
+      const r = await unwrap(api.GET('/me/preferences/{key}', { params: { path: { key } } }));
       return (r.value ?? null) as OrderListPrefs | null;
     },
     staleTime: Infinity,
@@ -996,17 +998,17 @@ export function useOrderListPrefs() {
  * PUT /me/preferences/orders.list — ghi trọn object. Tuỳ chọn cá nhân nên cập nhật cache ngay
  * (luật 5 cho phép optimistic với "sắp xếp cá nhân"); lỗi thì nạp lại bản server.
  */
-export function useSaveOrderListPrefs() {
+export function useSaveOrderListPrefs(key: OrderListPrefsKey = 'orders.list') {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (value: OrderListPrefs) =>
       unwrap(
         api.PUT('/me/preferences/{key}', {
-          params: { path: { key: ORDER_LIST_PREFS_KEY } },
+          params: { path: { key } },
           body: { value: value as Record<string, unknown> },
         }),
       ),
-    onMutate: (value) => qc.setQueryData(orderListPrefsKey, value),
-    onError: () => qc.invalidateQueries({ queryKey: orderListPrefsKey }),
+    onMutate: (value) => qc.setQueryData(orderListPrefsKey(key), value),
+    onError: () => qc.invalidateQueries({ queryKey: orderListPrefsKey(key) }),
   });
 }

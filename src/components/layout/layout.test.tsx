@@ -158,11 +158,12 @@ describe('visibleModules', () => {
     ]);
   });
 
-  it('chỉ có shipment.read → module Kho chỉ hiện Theo dõi giao hàng + Đơn đã gán vận chuyển', () => {
+  it('chỉ có shipment.read → module Kho chỉ hiện Theo dõi giao hàng + Theo dõi đơn + In đơn', () => {
     const mods = visibleModules((a, s) => a === 'read' && s === 'Shipment');
     expect(mods.find((m) => m.label === 'Kho')?.children?.map((c) => c.label)).toEqual([
       'Theo dõi giao hàng',
       'Theo dõi đơn',
+      'In đơn',
     ]);
   });
 
