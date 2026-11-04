@@ -168,7 +168,7 @@ describe('OrderListScreen — GET /sales-orders (P1-12)', () => {
 
       // Ô tìm có chữ → không gửi flow, không chip nào chọn, có "Quay lại <trạng thái>".
       cleanup();
-      search = 'q=0386&flow=IN_TRANSIT';
+      search = 'q=0386&flow=IN_TRANSIT&group=all';
       renderApp(<OrderListScreen />);
       await screen.findByText(/Đang tìm/);
       await waitFor(() => expect(lists.at(-1)!.get('q')).toBe('0386'));
@@ -180,6 +180,33 @@ describe('OrderListScreen — GET /sales-orders (P1-12)', () => {
       const url = String(replace.mock.calls.at(-1)![0]);
       expect(url).not.toContain('q=');
       expect(url).toContain('flow=IN_TRANSIT');
+
+      // 2026-11-04: bấm tab khi đang tìm GIỮ chữ — lọc chữ trong tab đó (kể cả Đơn mới).
+      cleanup();
+      renderApp(<OrderListScreen />);
+      await screen.findByText(/Đang tìm/);
+      replace.mockClear();
+      fireEvent.click(screen.getByRole('tab', { name: /^Đơn mới/ }));
+      await waitFor(() => expect(replace).toHaveBeenCalled());
+      // (lần ghi URL sau đó là ô ngày điền 30 ngày mặc định lúc mở màn — bỏ qua)
+      const tabCall = replace.mock.calls.map((c) => String(c[0])).find((u) => u.includes('flow='));
+      const kept = new URL(tabCall!, 'http://x').searchParams;
+      expect(kept.get('q')).toBe('0386');
+      expect(kept.get('flow')).toBe('NEW');
+      expect(kept.get('group')).toBeNull();
+
+      // URL có chữ + tab (không group=all) → gửi cả q lẫn flow, tab đó được chọn.
+      cleanup();
+      search = 'q=0386&flow=IN_TRANSIT';
+      lists.length = 0;
+      renderApp(<OrderListScreen />);
+      await waitFor(() => expect(lists.at(-1)?.get('flow')).toBe('IN_TRANSIT'));
+      expect(lists.at(-1)!.get('q')).toBe('0386');
+      expect(screen.getByRole('tab', { name: /^Đang vận chuyển/ })).toHaveAttribute(
+        'aria-selected',
+        'true',
+      );
+      expect(screen.queryByText(/Đang tìm/)).not.toBeInTheDocument();
     } finally {
       server.events.removeListener('request:start', onRequest);
     }
@@ -980,7 +1007,7 @@ describe('OrderListScreen — lọc theo hãng + thời gian (2026-09-19)', () =
         expect(url.searchParams.get('from')).toBe('2026-08-20');
       }
       expect(
-        screen.getByPlaceholderText('Mã đơn, mã Pancake, SĐT, tên khách, tên sản phẩm, mã vận đơn'),
+        screen.getByPlaceholderText('Mã đơn, SĐT, tên SP, mã vận đơn… nhiều giá trị cách dấu phẩy'),
       ).toBeInTheDocument();
     } finally {
       server.events.removeListener('request:start', onRequest);

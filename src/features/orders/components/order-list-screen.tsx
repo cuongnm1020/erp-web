@@ -1141,7 +1141,10 @@ export function OrderListScreen() {
   // Tab trạng thái v3 (2026-11-04): 14 trạng thái hiện cùng lúc, luôn chọn đúng một (mặc định Đơn
   // mới). Ô tìm có chữ / link `group=all` (từ màn khác) → xem mọi trạng thái (tìm đơn đã giao không
   // ra 0 vì đang ở tab khác). `?group=<nhóm>` cũ bỏ qua.
-  const searching = state.q !== '' || state.filters.group === 'all';
+  // 2026-11-04 (user): bấm tab khi ô tìm có chữ GIỮ chữ — lọc chữ trong đúng tab đó (URL ghi
+  // `flow` tường minh, kể cả NEW, bỏ `group`); gõ chữ từ ô trống → `group=all`, tìm mọi trạng thái.
+  // Link chỉ có `?q=` (quét mã, màn khác) cũng tìm mọi trạng thái.
+  const searching = state.filters.group === 'all' || (state.q !== '' && !urlFlow);
   const currentFlow: OrderFlow = urlFlow ?? DEFAULT_ORDER_FLOW;
   const flow = searching ? undefined : currentFlow;
   const status = parseOrderStatus(state.filters.status);
@@ -1486,11 +1489,10 @@ export function OrderListScreen() {
         searchingLabel={state.q}
         onFlowChange={(f) =>
           set({
-            q: '',
             filters: {
               ...state.filters,
               group: undefined,
-              flow: f === DEFAULT_ORDER_FLOW ? undefined : f,
+              flow: f === DEFAULT_ORDER_FLOW && state.q === '' ? undefined : f,
             },
           })
         }
@@ -1515,7 +1517,17 @@ export function OrderListScreen() {
       ) : (
         <FilterBar<OrderFilter>
           q={state.q}
-          onQChange={(q) => set({ q })}
+          onQChange={(q) =>
+            // Bắt đầu tìm từ ô trống → mọi trạng thái (`group=all`, giữ `flow` cho nút "Quay lại");
+            // xóa hết chữ → về tab; sửa chữ đang tìm → giữ nguyên (tab đã chọn vẫn lọc).
+            set(
+              state.q === '' && q !== ''
+                ? { q, filters: { ...state.filters, group: 'all' } }
+                : q === ''
+                  ? { q, filters: { ...state.filters, group: undefined } }
+                  : { q },
+            )
+          }
           filters={[
             {
               key: 'from',
@@ -1727,7 +1739,7 @@ export function OrderListScreen() {
           }
           pinned={['carrierId', 'creatorId', 'skuId']}
           secondRow={['totalMin', 'weightMin']}
-          searchPlaceholder="Mã đơn, mã Pancake, SĐT, tên khách, tên sản phẩm, mã vận đơn"
+          searchPlaceholder="Mã đơn, SĐT, tên SP, mã vận đơn… nhiều giá trị cách dấu phẩy"
           right={
             <>
               {customerId ? (

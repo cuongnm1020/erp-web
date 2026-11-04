@@ -24089,7 +24089,8 @@ export interface operations {
                 /**
                  * @description Tìm theo số chứng từ, mã hoặc tên khách (không phân biệt hoa thường), SĐT khách, mã vận đơn,
                  *     tên sản phẩm trong đơn (tên SKU / combo, có chữ cái, ≥ 2 ký tự) — hoặc id đơn Pancake (id theo shop hoặc id hệ thống trong link đơn, khớp tuyệt đối, cho phép
-                 *     tiền tố `#`).
+                 *     tiền tố `#`). Nhiều giá trị cách nhau dấu `,` (tối đa 50) → đơn khớp bất kỳ giá trị nào; dấu
+                 *     phẩy thập phân trong tên sản phẩm ("2,4d") không tách.
                  */
                 q?: string;
                 take: number;
@@ -24349,7 +24350,8 @@ export interface operations {
                 /**
                  * @description Tìm theo số chứng từ, mã hoặc tên khách (không phân biệt hoa thường), SĐT khách, mã vận đơn,
                  *     tên sản phẩm trong đơn (tên SKU / combo, có chữ cái, ≥ 2 ký tự) — hoặc id đơn Pancake (id theo shop hoặc id hệ thống trong link đơn, khớp tuyệt đối, cho phép
-                 *     tiền tố `#`).
+                 *     tiền tố `#`). Nhiều giá trị cách nhau dấu `,` (tối đa 50) → đơn khớp bất kỳ giá trị nào; dấu
+                 *     phẩy thập phân trong tên sản phẩm ("2,4d") không tách.
                  */
                 q?: string;
                 take: number;
@@ -24512,7 +24514,8 @@ export interface operations {
                 /**
                  * @description Tìm theo số chứng từ, mã hoặc tên khách (không phân biệt hoa thường), SĐT khách, mã vận đơn,
                  *     tên sản phẩm trong đơn (tên SKU / combo, có chữ cái, ≥ 2 ký tự) — hoặc id đơn Pancake (id theo shop hoặc id hệ thống trong link đơn, khớp tuyệt đối, cho phép
-                 *     tiền tố `#`).
+                 *     tiền tố `#`). Nhiều giá trị cách nhau dấu `,` (tối đa 50) → đơn khớp bất kỳ giá trị nào; dấu
+                 *     phẩy thập phân trong tên sản phẩm ("2,4d") không tách.
                  */
                 q?: string;
                 take: number;
