@@ -1526,6 +1526,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/sales-orders/{id}/pancake-history": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Lịch sử cập nhật đơn trên Pancake — ai sửa, lúc nào, đổi gì (mới nhất trước). Đơn ERP → []. */
+        get: operations["PancakeOrderHistoryController_pancakeHistory"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/tasks": {
         parameters: {
             query?: never;
@@ -9159,6 +9176,25 @@ export interface components {
         LinkPancakeWarehouseDto: {
             shopId: string;
             externalId: string;
+        };
+        PancakeOrderHistoryChangeDto: {
+            /** @description Trường Pancake (`status`, `items`, `shipping_address`, `cod`…). */
+            field: string;
+            /** @description Nhãn tiếng Việt ("Trạng thái", "SL Vua bật chồi 40gram", "Người nhận"…). */
+            label: string;
+            /** @description Giá trị trước; null = trống. */
+            from: string | null;
+            /** @description Giá trị sau; null = trống / đã bỏ. */
+            to: string | null;
+        };
+        PancakeOrderHistoryEntryDto: {
+            /** @description ISO datetime. */
+            at: string;
+            /** @description Tài khoản ERP đã liên kết với người sửa trên Pancake; null = chưa liên kết. */
+            userId: string | null;
+            /** @description Tên người sửa; null = nhân viên Pancake chưa liên kết tài khoản ERP. */
+            userName: string | null;
+            changes: components["schemas"]["PancakeOrderHistoryChangeDto"][];
         };
         TaskRowDto: {
             id: string;
@@ -19860,6 +19896,27 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["PancakePushReportDto"];
+                };
+            };
+        };
+    };
+    PancakeOrderHistoryController_pancakeHistory: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PancakeOrderHistoryEntryDto"][];
                 };
             };
         };

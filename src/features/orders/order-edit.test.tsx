@@ -750,6 +750,50 @@ describe('OrderEditScreen — sửa sản phẩm / người nhận, quyền sử
     expect(screen.getByText('295.000')).toBeInTheDocument();
   });
 
+  it('lịch sử sửa đơn trộn lần sửa trên Pancake (chip Pancake), xếp chung theo giờ mới nhất trước (2026-11-04)', async () => {
+    server.use(
+      http.get('/api/sales-orders/:id/edit-history', () =>
+        HttpResponse.json([
+          {
+            id: 'log-1',
+            at: '2026-11-04T03:25:00.000Z',
+            userId: 'u1',
+            userName: 'Kho Hạnh',
+            changes: [{ field: 'carrierId', label: 'Hãng vận chuyển', from: null, to: 'GHTK' }],
+          },
+        ]),
+      ),
+      http.get('/api/sales-orders/:id/pancake-history', () =>
+        HttpResponse.json([
+          {
+            at: '2026-11-04T03:28:43.000Z',
+            userId: 'u2',
+            userName: 'Nguyen Trinh',
+            changes: [
+              { field: 'items', label: 'SL Vua bật chồi 40gram', from: '× 20', to: '× 30' },
+            ],
+          },
+          {
+            at: '2026-11-04T03:20:29.000Z',
+            userId: null,
+            userName: null,
+            changes: [{ field: 'status', label: 'Trạng thái', from: 'Mới', to: 'Đã xác nhận' }],
+          },
+        ]),
+      ),
+    );
+    renderApp(<OrderEditScreen orderId={ORDER.id} />);
+    const newest = await screen.findByText('Nguyen Trinh');
+    const erp = screen.getByText('Kho Hạnh');
+    const oldest = screen.getByText('NV Pancake chưa liên kết');
+    const before = (a: Node, b: Node) =>
+      Boolean(a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING);
+    expect(before(newest, erp)).toBe(true);
+    expect(before(erp, oldest)).toBe(true);
+    expect(screen.getAllByText('Pancake')).toHaveLength(2);
+    expect(screen.getByText('× 30')).toBeInTheDocument();
+  });
+
   it('giỏ sửa được: tăng SL dòng đầu → PUT /lines (giữ đơn giá cũ) rồi về chi tiết', async () => {
     push.mockClear();
     withDetail({ linesLockedReason: null });

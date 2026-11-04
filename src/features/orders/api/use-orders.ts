@@ -891,6 +891,18 @@ export function useOrderEditHistory(id: string) {
 }
 
 /**
+ * GET /sales-orders/{id}/pancake-history — lịch sử sửa đơn trên Pancake (2026-11-04), mới nhất
+ * trước; đơn ERP trả [].
+ */
+export function usePancakeOrderHistory(id: string) {
+  return useQuery({
+    queryKey: [...orderKeys.detail(id), 'pancake-history'] as const,
+    queryFn: () =>
+      unwrap(api.GET('/sales-orders/{id}/pancake-history', { params: { path: { id } } })),
+  });
+}
+
+/**
  * GET /sales-orders/{id}/shipping-quote?carrierId= — cước hãng báo cho đơn này với hãng đang
  * chọn trên màn sửa (gọi hãng thật, chỉ đọc). `carrierId` null = chưa chọn → không gọi.
  * Không retry: hãng lỗi (502) hay đơn thiếu địa chỉ (422) thì hiện thông điệp, gọi lại vô ích.

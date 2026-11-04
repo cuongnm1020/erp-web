@@ -1915,6 +1915,7 @@ export const handlers = [
     );
   }),
   http.get('/api/sales-orders/:id/edit-history', () => HttpResponse.json([])),
+  http.get('/api/sales-orders/:id/pancake-history', () => HttpResponse.json([])),
   http.get('/api/sales-orders/:id', async ({ params }) => {
     await delay(50);
     const found = makeOrderDetail(String(params.id));
