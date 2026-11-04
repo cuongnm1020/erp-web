@@ -151,6 +151,58 @@ describe('PrintOrdersScreen — In đơn (clone màn Đơn hàng, 2026-11-04)', 
     }
   });
 
+  it('ô POS chọn nhiều thay ô Nguồn, ghim trên thanh cùng Page / Phòng ban; URL pos=a,b → pancakeShopId=a,b (2026-11-04)', async () => {
+    search = 'group=all&pos=715130909,715130910';
+    const seen: URLSearchParams[] = [];
+    server.use(
+      http.get('/api/sales-orders', ({ request }) => {
+        seen.push(new URL(request.url).searchParams);
+        return HttpResponse.json({ items: [FIRST], total: 1 });
+      }),
+    );
+    try {
+      renderApp(<PrintOrdersScreen />);
+      await screen.findByText(FIRST.docNumber);
+      await waitFor(() =>
+        expect(seen.some((p) => p.get('pancakeShopId') === '715130909,715130910')).toBe(true),
+      );
+      for (const p of seen) expect(p.has('source')).toBe(false);
+      // Ghim trên thanh (không nằm trong "Bộ lọc khác"): nút combobox có sẵn mà chưa mở panel.
+      expect(screen.getByRole('combobox', { name: 'POS' })).toHaveTextContent('POS: 2 POS');
+      expect(screen.getByRole('combobox', { name: 'Page' })).toBeInTheDocument();
+      expect(screen.queryByText('Nguồn: tất cả')).not.toBeInTheDocument();
+    } finally {
+      search = 'group=all';
+    }
+  });
+
+  it('cột Sản phẩm sắp được → sortBy=items; đang tìm kiếm chưa chọn cột → mặc định sortBy=items asc (2026-11-04)', async () => {
+    search = 'group=all&q=sherdoba';
+    const seen: URLSearchParams[] = [];
+    server.use(
+      http.get('/api/sales-orders', ({ request }) => {
+        seen.push(new URL(request.url).searchParams);
+        return HttpResponse.json({ items: [FIRST], total: 1 });
+      }),
+    );
+    try {
+      renderApp(<PrintOrdersScreen />);
+      await screen.findByText(FIRST.docNumber);
+      await waitFor(() => {
+        const last = seen.at(-1)!;
+        expect(last.get('sortBy')).toBe('items');
+        expect(last.get('sortDir')).toBe('asc');
+      });
+      // Cột Sản phẩm sắp được: tiêu đề là nút "Sắp xếp theo Sản phẩm", đang tăng dần (bấm đổi
+      // URL `sort=` — router mock nên không theo dõi tiếp ở đây).
+      expect(
+        screen.getByRole('button', { name: 'Sắp xếp theo Sản phẩm (đang tăng dần)' }),
+      ).toBeInTheDocument();
+    } finally {
+      search = 'group=all';
+    }
+  });
+
   it('lọc "Chỉ sản phẩm này": URL skuOnly=true + skuId → gửi skuOnly=true lên API', async () => {
     const sku = '00000000-0000-4000-8000-0000000000aa';
     search = `group=all&skuId=${sku}&skuOnly=true`;
