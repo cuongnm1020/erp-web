@@ -387,10 +387,11 @@ export function ShippingMonitorScreen() {
   const [selected, setSelected] = useState<ShipmentMonitorRow | null>(null);
 
   const carrierAccountId = state.filters.carrierAccountId;
-  // Phòng ban (dùng chung ô + danh sách với màn Đơn hàng, 2026-11-04): chỉ Admin + kế toán
-  // (`report.sales_all`, user 2026-11-03) — người khác ẩn ô và bỏ giá trị trên URL để không lọc ngầm.
+  // Phòng ban (dùng chung ô + danh sách với màn Đơn hàng, 2026-11-04): quyền `sales_order.filter_dept`
+  // (Admin, kế toán, kho) hoặc `report.sales_all` — người khác ẩn ô và bỏ giá trị trên URL.
   const ability = useAbility();
-  const canFilterDept = ability.can('sales_all', 'Report');
+  const canFilterDept =
+    ability.can('filter_dept', 'SalesOrder') || ability.can('sales_all', 'Report');
   const team = canFilterDept ? (state.filters.team ?? '') : '';
   const teamOptions = useShippingTeamOptions(canFilterDept && ability.can('read', 'SalesOrder'));
   const teamOptionList = teamOptions.data ?? [];

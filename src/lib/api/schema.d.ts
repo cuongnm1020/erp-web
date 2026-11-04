@@ -3672,8 +3672,8 @@ export interface paths {
         };
         /**
          * Ô lọc "Phòng ban" (danh sách đơn, Theo dõi đơn, báo cáo doanh thu): phòng CSKH + phòng Sale/MKT
-         *     đã có đơn (trừ Kho, Vận đơn, R&D). Chỉ Admin và kế toán (`report.sales_all`, 2026-11-03);
-         *     người khác rỗng → màn ẩn ô — khai TRƯỚC `:id`.
+         *     đã có đơn (trừ Kho, Vận đơn, R&D). Chỉ người có `sales_order.filter_dept` (Admin, kế toán, kho —
+         *     2026-11-04) hoặc `report.sales_all`; người khác rỗng → màn ẩn ô — khai TRƯỚC `:id`.
          */
         get: operations["SalesOrderController_teamFilterOptions"];
         put?: never;

@@ -1181,12 +1181,13 @@ export function OrderListScreen() {
     : undefined;
   const duplicate = state.filters.duplicate === 'true';
   const itemOrigin = parseItemOrigin(state.filters.itemOrigin);
-  // Ô NV lên đơn chỉ với người có `sales_order.filter_team` (2026-11-02); ô Phòng ban chỉ Admin + kế
-  // toán (`report.sales_all`, user 2026-11-03). Không có quyền thì bỏ luôn giá trị trên URL (link
-  // dán từ đồng nghiệp) để không lọc ngầm.
+  // Ô NV lên đơn chỉ với người có `sales_order.filter_team` (2026-11-02); ô Phòng ban với người có
+  // `sales_order.filter_dept` (Admin, kế toán, kho — user 2026-11-04) hoặc `report.sales_all`. Không
+  // có quyền thì bỏ luôn giá trị trên URL (link dán từ đồng nghiệp) để không lọc ngầm.
   const ability = useAbility();
   const canFilterTeam = ability.can('filter_team', 'SalesOrder');
-  const canFilterDept = ability.can('sales_all', 'Report');
+  const canFilterDept =
+    ability.can('filter_dept', 'SalesOrder') || ability.can('sales_all', 'Report');
   const team = canFilterDept ? (state.filters.team ?? '') : '';
   const creatorId = canFilterTeam ? (state.filters.creatorId ?? '') : '';
   const fbPage = state.filters.fbPage ?? '';
@@ -1614,7 +1615,7 @@ export function OrderListScreen() {
               unit: 'trạng thái',
               options: carrierStatusOptions(carrierStatuses.data ?? []),
             },
-            // Phòng ban: chỉ Admin + kế toán (2026-11-03), chọn nhiều — phòng CSKH + phòng Sale/MKT
+            // Phòng ban: quyền `sales_order.filter_dept` (2026-11-04), chọn nhiều — phòng CSKH + phòng Sale/MKT
             // đã có đơn; chưa chọn = tất cả.
             ...(canFilterDept
               ? [
