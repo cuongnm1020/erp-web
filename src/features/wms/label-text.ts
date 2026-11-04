@@ -50,3 +50,23 @@ export function fitItems(items: { name: string }[], opts: FitItemsOptions): numb
   }
   return count;
 }
+
+/**
+ * Chia danh sách thành các tờ (user chốt 2026-11-04): hết chỗ thì in tiếp sang tờ mới thay vì
+ * báo "+N sản phẩm khác". `fit(rest)` trả số món vừa một tờ (≥ 1 nên luôn kết thúc). Danh sách
+ * rỗng → một tờ rỗng (tem vẫn in mã vạch / người nhận).
+ */
+export function chunkItems<T extends { name: string }>(
+  items: T[],
+  fit: (rest: T[]) => number,
+): T[][] {
+  if (items.length === 0) return [[]];
+  const pages: T[][] = [];
+  let rest = items;
+  while (rest.length > 0) {
+    const n = Math.max(1, fit(rest));
+    pages.push(rest.slice(0, n));
+    rest = rest.slice(n);
+  }
+  return pages;
+}

@@ -319,7 +319,8 @@ function ErpLabel({
       {label.data ? (
         <>
           <div className="flex justify-center rounded-md border bg-muted p-4">
-            <div className="shadow-md">
+            {/* Đơn nhiều món in nhiều tờ (2026-11-04) → xem trước xếp dọc */}
+            <div className="flex flex-col gap-3 [&>*]:shadow-md">
               <WaybillLabel data={label.data} orientation={orientation} printedAt={printedAt} />
             </div>
           </div>
