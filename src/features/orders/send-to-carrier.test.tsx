@@ -9,6 +9,8 @@ import { toShippingOptions, DEFAULT_SHIPPING_OPTIONS_FORM } from './shipping-opt
 
 const replace = vi.fn();
 let search = '';
+/** Xem mọi trạng thái — màn mở mặc định chỉ tab Đơn mới (2026-11-04), dữ liệu mẫu trải mọi tab. */
+const ALL = 'group=all';
 const toastSuccess = vi.fn();
 const toastError = vi.fn();
 
@@ -99,7 +101,7 @@ const openFor = async (code: string) => {
 
 describe('Gửi sang ĐVVC — SendToCarrierMenu + SendToCarrierDialog', () => {
   it('menu dựng từ GET /carriers: chỉ hãng bật, có adapter và đủ cấu hình (GHN chưa cấu hình, MANUAL/OLD ẩn)', async () => {
-    search = '';
+    search = ALL;
     toastSuccess.mockClear();
     await selectTwoRows();
     openMenu();
@@ -113,7 +115,7 @@ describe('Gửi sang ĐVVC — SendToCarrierMenu + SendToCarrierDialog', () => {
   });
 
   it('GHTK: dialog hai cột — trái liệt kê đơn đã chọn (✕ bỏ đơn), phải có tuỳ chọn đường bay / ca lấy; Cập nhật → POST đúng orderIds + options, bỏ chọn sau khi xong', async () => {
-    search = '';
+    search = ALL;
     toastSuccess.mockClear();
     toastError.mockClear();
     const bodies: Record<string, unknown>[] = [];
@@ -209,7 +211,7 @@ describe('Gửi sang ĐVVC — SendToCarrierMenu + SendToCarrierDialog', () => {
   }, 15_000);
 
   it('VTP: không có ô đường bay / ca lấy; chọn dịch vụ VTK; gõ số đơn + Enter thêm đơn ngoài lựa chọn; kết quả gộp ISSUED/SAVED vào toast', async () => {
-    search = '';
+    search = ALL;
     toastSuccess.mockClear();
     const bodies: Record<string, unknown>[] = [];
     server.use(
@@ -278,7 +280,7 @@ describe('Gửi sang ĐVVC — SendToCarrierMenu + SendToCarrierDialog', () => {
   });
 
   it('lô có đơn hãng từ chối: đơn khác vẫn gửi, dialog giữ mở với danh sách đơn lỗi (số đơn, khách, lời hãng); Đóng → tắt', async () => {
-    search = '';
+    search = ALL;
     toastSuccess.mockClear();
     const rows = makeOrders(2);
     const said = 'Đơn hàng thiếu thông tin địa chỉ (Đường hoặc Phường).';
@@ -352,7 +354,7 @@ describe('Gửi sang ĐVVC — SendToCarrierMenu + SendToCarrierDialog', () => {
   });
 
   it('đơn đã có vận đơn ở tài khoản khác (ORDER_WAYBILL_ACCOUNT_LOCKED) → nút "Hủy vận đơn cũ" → xác nhận → POST /sales-orders/cancel-waybill đúng đơn, báo đã hủy', async () => {
-    search = '';
+    search = ALL;
     toastSuccess.mockClear();
     const rows = makeOrders(2);
     const cancelBodies: unknown[] = [];
@@ -425,7 +427,7 @@ describe('Gửi sang ĐVVC — SendToCarrierMenu + SendToCarrierDialog', () => {
   });
 
   it('lô nhiều đơn (2026-10-28): kết quả TỪNG đơn — có mã / chờ đóng gói / cần sửa; SĐT bị che (TikTok) → nhóm Cần sửa với việc phải làm', async () => {
-    search = '';
+    search = ALL;
     const rows = makeOrders(2);
     const base = { carrierId: 'c-ghtk', carrierCode: 'GHTK', carrierAccountId: null, reason: null };
     server.use(
@@ -483,7 +485,7 @@ describe('Gửi sang ĐVVC — SendToCarrierMenu + SendToCarrierDialog', () => {
   });
 
   it('xin mã sẵn (2026-10-31): gửi xong mọi đơn "Đang xin mã", hỏi lại POST /shipments/waybill-status → đơn có mã / đơn hãng từ chối cập nhật tại chỗ, thanh "Đã có mã x/N"', async () => {
-    search = '';
+    search = ALL;
     const rows = makeOrders(2);
     const base = { carrierId: 'c-ghtk', carrierCode: 'GHTK', carrierAccountId: null };
     let polls = 0;
@@ -550,7 +552,7 @@ describe('Gửi sang ĐVVC — SendToCarrierMenu + SendToCarrierDialog', () => {
   });
 
   it('"Đóng gói + in" sau khi gửi (2026-10-29): bulk-fulfil đơn gửi được (bỏ đơn cần sửa) → in tem → thả việc lấy hàng của cả lô → kết quả đóng gói', async () => {
-    search = '';
+    search = ALL;
     toastSuccess.mockClear();
     window.print = vi.fn();
     const rows = makeOrders(2);
@@ -627,7 +629,7 @@ describe('Gửi sang ĐVVC — SendToCarrierMenu + SendToCarrierDialog', () => {
   });
 
   it('đóng popup (Esc) khi đang hỏi = để kho lấy hàng', async () => {
-    search = '';
+    search = ALL;
     const released = captureRelease();
     await selectTwoRows();
     const dialog = await openFor('GHTK');
@@ -643,7 +645,7 @@ describe('Gửi sang ĐVVC — SendToCarrierMenu + SendToCarrierDialog', () => {
   });
 
   it('kho không có quyền đóng gói nhanh: không giữ việc lấy hàng, không hỏi', async () => {
-    search = '';
+    search = ALL;
     const released = captureRelease();
     const bodies: Record<string, unknown>[] = [];
     server.use(
@@ -686,7 +688,7 @@ describe('Gửi sang ĐVVC — SendToCarrierMenu + SendToCarrierDialog', () => {
   });
 
   it('kho xuất không có sản phẩm (ORDER_SKU_NOT_IN_WAREHOUSE) → cảnh báo nêu tên kho + từng sản phẩm, không gửi', async () => {
-    search = '';
+    search = ALL;
     const rows = makeOrders(2);
     server.use(
       http.post('/api/sales-orders/send-to-carrier', () =>
@@ -720,7 +722,7 @@ describe('Gửi sang ĐVVC — SendToCarrierMenu + SendToCarrierDialog', () => {
   });
 
   it('hãng nhiều tài khoản (FE-CARRIER-ACC-1): menu hiện từng tài khoản đủ cấu hình (chưa cấu hình ẩn); chọn tài khoản phụ → dialog chọn sẵn → POST kèm carrierAccountId; GHN mặc định thiếu cấu hình nhưng có tài khoản khác đủ → menu có GHN', async () => {
-    search = '';
+    search = ALL;
     toastSuccess.mockClear();
     const bodies: Record<string, unknown>[] = [];
     server.use(

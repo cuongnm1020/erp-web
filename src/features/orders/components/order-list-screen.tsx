@@ -87,6 +87,7 @@ import {
   type OrderCarrierSource,
   type OrderCarrierStatusOption,
   type OrderDateField,
+  type OrderFlow,
   type OrderItemOrigin,
   type OrderPrintStatus,
   type OrderSortField,
@@ -96,11 +97,7 @@ import {
   fulfilmentLabel,
   orderCancellable,
   orderFlowLabel,
-  DEFAULT_FLOW_GROUP,
-  flowGroupOf,
-  ORDER_FLOW_GROUPS,
-  type OrderFlowGroup,
-  parseFlowGroup,
+  DEFAULT_ORDER_FLOW,
   parseOrderFlow,
   parseOrderStatus,
 } from '../labels';
@@ -274,6 +271,12 @@ const SORT_FIELD: Record<string, OrderSortField> = {
  * dòng ngày dưới mã đơn).
  */
 const DEFAULT_HIDDEN: string[] = [];
+
+/**
+ * Cột luôn hiện, không bỏ chọn được ở nút "Cột": Mã đơn, Ngày đặt (user chốt 2026-11-04). Lựa chọn
+ * ẩn đã lưu từ trước bị bỏ qua.
+ */
+const ALWAYS_SHOWN = new Set(['docNumber', 'orderDate']);
 
 type OrderFilter = (typeof DEFAULTS.filterKeys)[number];
 
@@ -1135,23 +1138,12 @@ function rangeChip(min: string, max: string, fmt: (v: string) => string): string
 export function OrderListScreen() {
   const { state, set, skipTake } = useListState<OrderFilter>(DEFAULTS);
   const urlFlow = parseOrderFlow(state.filters.flow);
-  const groupParam = parseFlowGroup(state.filters.group);
-  // Ô tìm có chữ / link `group=all` → xem mọi trạng thái (tìm đơn đã giao không ra 0 vì đang ở
-  // tab khác). Ngoài ra luôn đứng trong một nhóm: theo flow, theo `group`, mặc định Chờ xử lý.
-  const searching = state.q !== '' || groupParam === 'all';
-  const group: OrderFlowGroup = urlFlow
-    ? flowGroupOf(urlFlow)
-    : groupParam && groupParam !== 'all'
-      ? groupParam
-      : DEFAULT_FLOW_GROUP;
-  const groupDef = ORDER_FLOW_GROUPS.find((g) => g.group === group)!;
-  const flow = searching ? undefined : urlFlow;
-  const flows = searching || urlFlow ? undefined : groupDef.flows;
-  // Đếm mọi tab còn mở (số 4 tab cha) + tab đã xong của nhóm đang mở.
-  const countFlows = useMemo(
-    () => [...ORDER_FLOW_GROUPS.flatMap((g) => g.flows), ...(searching ? [] : groupDef.done)],
-    [searching, groupDef],
-  );
+  // Tab trạng thái v3 (2026-11-04): 14 trạng thái hiện cùng lúc, luôn chọn đúng một (mặc định Đơn
+  // mới). Ô tìm có chữ / link `group=all` (từ màn khác) → xem mọi trạng thái (tìm đơn đã giao không
+  // ra 0 vì đang ở tab khác). `?group=<nhóm>` cũ bỏ qua.
+  const searching = state.q !== '' || state.filters.group === 'all';
+  const currentFlow: OrderFlow = urlFlow ?? DEFAULT_ORDER_FLOW;
+  const flow = searching ? undefined : currentFlow;
   const status = parseOrderStatus(state.filters.status);
   const customerId = state.filters.customerId ?? '';
   const weightMin = state.filters.weightMin ?? '';
@@ -1200,7 +1192,11 @@ export function OrderListScreen() {
   // (link dán cho đồng nghiệp) thắng; URL không có thì lấy lần sắp gần nhất của người dùng.
   const prefs = useOrderListPrefs();
   const savePrefs = useSaveOrderListPrefs();
-  const hidden = prefs.data?.hidden ?? DEFAULT_HIDDEN;
+  const savedHidden = prefs.data?.hidden;
+  const hidden = useMemo(
+    () => (savedHidden ?? DEFAULT_HIDDEN).filter((id) => !ALWAYS_SHOWN.has(id)),
+    [savedHidden],
+  );
   // Lọc theo Ngày gán ĐVVC mà URL chưa chọn cột sắp → sắp theo giờ gửi hãng, mới nhất trước
   // (2026-11-03) — thắng lần sắp đã lưu của người dùng.
   const sort: SortState | null =
@@ -1279,12 +1275,11 @@ export function OrderListScreen() {
     () => ({
       ...filterParams,
       flow,
-      flows,
       sortBy,
       sortDir: sortBy ? (sort?.desc ? ('desc' as const) : ('asc' as const)) : undefined,
       ...skipTake,
     }),
-    [filterParams, flow, flows, sortBy, sort?.desc, skipTake],
+    [filterParams, flow, sortBy, sort?.desc, skipTake],
   );
   const carriers = useCarriers();
   // Chữ chip "Đang lọc" của hai ô tự vẽ (sản phẩm, hãng) — cùng nguồn dữ liệu với ô chọn.
@@ -1359,7 +1354,7 @@ export function OrderListScreen() {
         .map((c) => ({
           id: c.id!,
           title: c.meta?.title ?? (typeof c.header === 'string' ? c.header : c.id!),
-          required: c.id === 'docNumber',
+          required: ALWAYS_SHOWN.has(c.id!),
         })),
     [columns],
   );
@@ -1367,18 +1362,18 @@ export function OrderListScreen() {
   // tải 2 lần (lần đầu chưa có sort, lần sau có), mỗi lần ~5 s trên prod (sự cố pool 2026-11-02).
   // Đọc prefs lỗi thì vẫn tải (isPending = false).
   const query = useOrders(params, { enabled: state.sort != null || !prefs.isPending });
-  const counts = useOrderFlowCounts(filterParams, countFlows);
+  // Đếm cả 14 trạng thái trong một lần (GROUP BY flow).
+  const counts = useOrderFlowCounts(filterParams);
   const grandTotal = useOrderGrandTotal();
   // Xuất Excel = mọi trang của đúng bộ lọc + tab + sắp xếp đang xem.
   const exportParams = useMemo(
     () => ({
       ...filterParams,
       flow,
-      flows,
       sortBy,
       sortDir: sortBy ? (sort?.desc ? ('desc' as const) : ('asc' as const)) : undefined,
     }),
-    [filterParams, flow, flows, sortBy, sort?.desc],
+    [filterParams, flow, sortBy, sort?.desc],
   );
   const exportColumns = useMemo(() => {
     const carrierById = new Map((carriers.data ?? []).map((c) => [c.id, c]));
@@ -1485,24 +1480,21 @@ export function OrderListScreen() {
       />
 
       <OrderFlowTabs
-        group={group}
-        flow={flow}
+        flow={currentFlow}
         counts={counts.data}
         searching={searching}
         searchingLabel={state.q}
-        onGroupChange={(g) =>
-          set({ q: '', filters: { ...state.filters, group: g, flow: undefined } })
-        }
-        onFlowChange={(f) => setFilter({ group, flow: f })}
-        onExitSearch={() =>
+        onFlowChange={(f) =>
           set({
             q: '',
             filters: {
               ...state.filters,
-              group: groupParam === 'all' ? DEFAULT_FLOW_GROUP : state.filters.group,
+              group: undefined,
+              flow: f === DEFAULT_ORDER_FLOW ? undefined : f,
             },
           })
         }
+        onExitSearch={() => set({ q: '', filters: { ...state.filters, group: undefined } })}
       />
 
       {flow === 'WAITING_STOCK' || shortSkuId ? (
