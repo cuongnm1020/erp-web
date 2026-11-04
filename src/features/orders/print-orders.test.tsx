@@ -114,6 +114,41 @@ describe('PrintOrdersScreen — In đơn (clone màn Đơn hàng, 2026-11-04)', 
     expect(seen.every((p) => p.get('isCombo') === 'false')).toBe(true);
   });
 
+  it('bỏ lọc Hãng VC / NV lên đơn / Vận chuyển / Đơn (2026-11-04): không hiện ô, link cũ không lọc ngầm', async () => {
+    search =
+      'group=all&carrierId=c-1&noCarrier=true&creatorId=u-1&printStatus=PRINTED&carrierSource=ERP&carrierStatus=x&duplicate=true&itemOrigin=CUSTOM&totalMin=100&weightMin=1';
+    const seen: URLSearchParams[] = [];
+    server.use(
+      http.get('/api/sales-orders', ({ request }) => {
+        seen.push(new URL(request.url).searchParams);
+        return HttpResponse.json({ items: [FIRST], total: 1 });
+      }),
+    );
+    try {
+      renderApp(<PrintOrdersScreen />);
+      await screen.findByText(FIRST.docNumber);
+      for (const label of ['Hãng VC: tất cả', 'Giá trị đơn', 'Cân nặng']) {
+        expect(screen.queryByText(label)).not.toBeInTheDocument();
+      }
+      const keys = [
+        'carrierId',
+        'noCarrier',
+        'creatorId',
+        'printStatus',
+        'carrierSource',
+        'carrierStatusText',
+        'duplicate',
+        'itemOrigin',
+        'totalMin',
+        'weightMin',
+      ];
+      expect(seen.length).toBeGreaterThan(0);
+      for (const p of seen) for (const k of keys) expect(p.has(k)).toBe(false);
+    } finally {
+      search = 'group=all';
+    }
+  });
+
   it('lọc "Chỉ sản phẩm này": URL skuOnly=true + skuId → gửi skuOnly=true lên API', async () => {
     const sku = '00000000-0000-4000-8000-0000000000aa';
     search = `group=all&skuId=${sku}&skuOnly=true`;

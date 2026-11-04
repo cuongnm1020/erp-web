@@ -15,7 +15,7 @@ import {
 } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { BulkActionBar } from '@/components/data/bulk-action-bar';
 import { Checkbox } from '@/components/ui/checkbox';
 import { CopyButton } from '@/components/data/copy-button';
@@ -35,14 +35,6 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { Input } from '@/components/ui/input';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
 import { toast } from '@/components/ui/toaster';
 import { cn } from '@/lib/cn';
 import { messageFor, messageForCode, messageForItemCode } from '@/lib/error-messages';
@@ -57,19 +49,13 @@ import {
   formatRelative,
   phoneCarrier,
   toDecimal,
-  toLocalDateKey,
 } from '@/lib/format';
 import { Can, useAbility } from '@/lib/permission';
 import { useInvalidateOn } from '@/lib/realtime';
 import { useHotkey } from '@/lib/use-hotkey';
 import { useListState, type SortState } from '@/lib/url-state';
 import { decimalCell } from '@/lib/xlsx-writer';
-import {
-  carrierAccountLabel,
-  useCarriers,
-  type CarrierAccountOption,
-} from '@/features/wms/api/use-shipping';
-import { CarrierSelect } from '@/features/wms/components/carrier-select';
+import { useCarriers } from '@/features/wms/api/use-shipping';
 import {
   fetchOrdersPage,
   orderKeys,
@@ -80,17 +66,11 @@ import {
   useRequestWaybill,
   useSetOrdersWaitingStock,
   useTeamFilterOptions,
-  useCarrierStatusOptions,
-  useOrderCreatorOptions,
   useFacebookPageOptions,
   usePancakeShops,
   useSaveOrderListPrefs,
-  type OrderCarrierSource,
-  type OrderCarrierStatusOption,
   type OrderDateField,
   type OrderFlow,
-  type OrderItemOrigin,
-  type OrderPrintStatus,
   type OrderSortField,
   type SalesOrderListItem,
 } from '../api/use-orders';
@@ -199,62 +179,6 @@ const DEFAULTS = {
     // `true` = chỉ đơn mà mọi dòng đều là SKU đó — "lọc sản phẩm duy nhất" (2026-11-04).
     'skuOnly',
   ] as const,
-};
-
-const ITEM_ORIGIN_OPTIONS: { value: OrderItemOrigin; label: string }[] = [
-  { value: 'NON_ERP', label: 'Có SP không phải hàng ERP' },
-  { value: 'CUSTOM', label: 'Có món gõ tay trên Pancake' },
-  { value: 'POS_SKU', label: 'Có SP Pancake tự tạo' },
-];
-const parseItemOrigin = (v: string | undefined): OrderItemOrigin | undefined =>
-  ITEM_ORIGIN_OPTIONS.find((o) => o.value === v)?.value;
-
-/** Ai gán hãng cho đơn (2026-10-25): chọn trong ERP hay Pancake gán + cấp vận đơn. */
-const CARRIER_SOURCE_OPTIONS: { value: OrderCarrierSource; label: string }[] = [
-  { value: 'ERP', label: 'Hệ thống ERP gán hãng' },
-  { value: 'PANCAKE', label: 'Pancake gán hãng' },
-];
-const parseCarrierSource = (v: string | undefined): OrderCarrierSource | undefined =>
-  CARRIER_SOURCE_OPTIONS.find((o) => o.value === v)?.value;
-
-/**
- * In tem của đơn ĐÃ gửi sang ĐVVC (2026-11-02): xem đơn đẩy sang hãng mà chưa in được tem + lý do.
- * "Lỗi" = "Đóng gói + in" không đóng gói được, hoặc hãng không cấp vận đơn.
- */
-const PRINT_STATUS_OPTIONS: { value: OrderPrintStatus; label: string }[] = [
-  { value: 'NOT_PRINTED', label: 'Đã gửi ĐVVC · chưa in tem' },
-  { value: 'ERROR', label: 'Đã gửi ĐVVC · lỗi, không in được' },
-  { value: 'PRINTED', label: 'Đã gửi ĐVVC · đã in tem' },
-];
-const parsePrintStatus = (v: string | undefined): OrderPrintStatus | undefined =>
-  PRINT_STATUS_OPTIONS.find((o) => o.value === v)?.value;
-
-/** Ô "Trạng thái hãng": giá trị URL = từng chữ encodeURIComponent nối dấu phẩy (chữ hãng có dấu phẩy). */
-const decodeList = (v: string): string[] =>
-  v
-    .split(',')
-    .filter(Boolean)
-    .flatMap((x) => {
-      try {
-        return [decodeURIComponent(x)];
-      } catch {
-        return [];
-      }
-    });
-
-/** Mỗi chữ một lựa chọn; cùng chữ ở nhiều hãng gộp một dòng, gợi ý ghi tên các hãng. */
-const carrierStatusOptions = (rows: OrderCarrierStatusOption[]) => {
-  const byText = new Map<string, Set<string>>();
-  for (const r of rows) {
-    const set = byText.get(r.statusText) ?? new Set<string>();
-    if (r.carrierCode) set.add(r.carrierCode);
-    byText.set(r.statusText, set);
-  }
-  return [...byText].map(([text, codes]) => ({
-    value: encodeURIComponent(text),
-    label: text,
-    hint: [...codes].join(', ') || undefined,
-  }));
 };
 
 /**
@@ -896,184 +820,6 @@ function WeightNote({ order }: { order: SalesOrderListItem }) {
 }
 
 /**
- * Khoảng cân nặng (kg): gõ xong rồi Enter / rời ô mới áp lên URL — không bắn request theo
- * từng phím. Cùng giá trị hai ô = lọc đúng một mức cân (vd tất cả đơn 1,2 kg).
- */
-function WeightRangeFilter({
-  min,
-  max,
-  onChange,
-}: {
-  min: string | undefined;
-  max: string | undefined;
-  onChange: (next: { weightMin: string | undefined; weightMax: string | undefined }) => void;
-}) {
-  const [draftMin, setDraftMin] = useState(min ?? '');
-  const [draftMax, setDraftMax] = useState(max ?? '');
-  useEffect(() => setDraftMin(min ?? ''), [min]);
-  useEffect(() => setDraftMax(max ?? ''), [max]);
-  const commit = () => {
-    const norm = (s: string) => {
-      const t = s.trim().replace(',', '.');
-      return t === '' || !/^\d{1,8}(\.\d{1,4})?$/.test(t) ? undefined : t;
-    };
-    const nextMin = norm(draftMin);
-    const nextMax = norm(draftMax);
-    if (nextMin === min && nextMax === max) return;
-    onChange({ weightMin: nextMin, weightMax: nextMax });
-  };
-  const onKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'Enter') commit();
-  };
-  return (
-    <div className="flex items-center gap-1 text-sm text-muted-foreground">
-      <span>Cân nặng</span>
-      <Input
-        value={draftMin}
-        onChange={(e) => setDraftMin(e.target.value)}
-        onBlur={commit}
-        onKeyDown={onKeyDown}
-        inputMode="decimal"
-        placeholder="từ"
-        aria-label="Cân nặng từ (kg)"
-        className="h-9 w-20 text-right tabular-nums"
-      />
-      <span>–</span>
-      <Input
-        value={draftMax}
-        onChange={(e) => setDraftMax(e.target.value)}
-        onBlur={commit}
-        onKeyDown={onKeyDown}
-        inputMode="decimal"
-        placeholder="đến"
-        aria-label="Cân nặng đến (kg)"
-        className="h-9 w-20 text-right tabular-nums"
-      />
-      <span>kg</span>
-    </div>
-  );
-}
-
-type TotalOp = 'gte' | 'lte' | 'eq' | 'between';
-const TOTAL_OPS: ReadonlyArray<{ value: TotalOp; label: string }> = [
-  { value: 'gte', label: '≥' },
-  { value: 'lte', label: '≤' },
-  { value: 'eq', label: '=' },
-  { value: 'between', label: 'Từ … đến' },
-];
-
-/** Toán tử đang áp, suy từ URL: chỉ min = ≥, chỉ max = ≤, hai cận bằng nhau = "=", khác = khoảng. */
-function totalOpOf(min: string | undefined, max: string | undefined): TotalOp {
-  if (min && max) return min === max ? 'eq' : 'between';
-  return max ? 'lte' : 'gte';
-}
-
-/** "1.500.000", "1 500 000 ₫" → "1500000"; không có chữ số → undefined. Tiền đồng, số nguyên. */
-function parseVnd(s: string): string | undefined {
-  const d = s.replace(/[^\d]/g, '').replace(/^0+(?=\d)/, '');
-  return d === '' || d.length > 15 ? undefined : d;
-}
-
-/** Chuỗi tiền đồng nguyên → "1.500.000" để hiện trong ô (không tính toán, chỉ chèn dấu chấm). */
-const groupVnd = (d: string) => d.replace(/\B(?=(\d{3})+(?!\d))/g, '.');
-
-/**
- * Lọc giá trị đơn (tổng tiền) — chọn toán tử rồi gõ số, Enter / rời ô mới áp lên URL
- * (totalMin / totalMax). "=" gửi hai cận bằng nhau.
- */
-function TotalValueFilter({
-  min,
-  max,
-  onChange,
-}: {
-  min: string | undefined;
-  max: string | undefined;
-  onChange: (next: { totalMin: string | undefined; totalMax: string | undefined }) => void;
-}) {
-  const [op, setOp] = useState<TotalOp>(totalOpOf(min, max));
-  const [a, setA] = useState(groupVnd((op === 'lte' ? max : min) ?? ''));
-  const [b, setB] = useState(groupVnd(max ?? ''));
-  // Toán tử người dùng đang chọn — đọc trong effect mà không đưa vào deps.
-  const opRef = useRef(op);
-  opRef.current = op;
-  useEffect(() => {
-    // Đang chọn "Từ … đến" thì GIỮ hai ô (user 2026-11-03): mới nhập một cận (URL chỉ có min hoặc
-    // max) hay hai cận bằng nhau không được tự nhảy sang "≥" / "≤" / "=". Toán tử khác suy từ URL.
-    const o = opRef.current === 'between' ? 'between' : totalOpOf(min, max);
-    setOp(o);
-    setA(groupVnd((o === 'lte' ? max : min) ?? ''));
-    setB(groupVnd(max ?? ''));
-  }, [min, max]);
-  const apply = (nextOp: TotalOp, rawA: string, rawB: string) => {
-    const va = parseVnd(rawA);
-    const vb = parseVnd(rawB);
-    const next =
-      nextOp === 'gte'
-        ? { totalMin: va, totalMax: undefined }
-        : nextOp === 'lte'
-          ? { totalMin: undefined, totalMax: va }
-          : nextOp === 'eq'
-            ? { totalMin: va, totalMax: va }
-            : { totalMin: va, totalMax: vb };
-    if (next.totalMin === min && next.totalMax === max) return;
-    onChange(next);
-  };
-  const onKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'Enter') apply(op, a, b);
-  };
-  return (
-    <div className="flex items-center gap-1 text-sm text-muted-foreground">
-      <span>Giá trị đơn</span>
-      <Select
-        value={op}
-        onValueChange={(v) => {
-          const o = v as TotalOp;
-          setOp(o);
-          if (a.trim() !== '') apply(o, a, b);
-        }}
-      >
-        <SelectTrigger className="h-9 w-24" aria-label="Toán tử giá trị đơn">
-          <SelectValue />
-        </SelectTrigger>
-        <SelectContent>
-          {TOTAL_OPS.map((o) => (
-            <SelectItem key={o.value} value={o.value}>
-              {o.label}
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
-      <Input
-        value={a}
-        onChange={(e) => setA(groupVnd(parseVnd(e.target.value) ?? ''))}
-        onBlur={() => apply(op, a, b)}
-        onKeyDown={onKeyDown}
-        inputMode="numeric"
-        placeholder={op === 'between' ? 'từ' : 'số tiền'}
-        aria-label={op === 'between' ? 'Giá trị đơn từ (₫)' : 'Giá trị đơn (₫)'}
-        className="h-9 w-28 text-right tabular-nums"
-      />
-      {op === 'between' ? (
-        <>
-          <span>–</span>
-          <Input
-            value={b}
-            onChange={(e) => setB(groupVnd(parseVnd(e.target.value) ?? ''))}
-            onBlur={() => apply(op, a, b)}
-            onKeyDown={onKeyDown}
-            inputMode="numeric"
-            placeholder="đến"
-            aria-label="Giá trị đơn đến (₫)"
-            className="h-9 w-28 text-right tabular-nums"
-          />
-        </>
-      ) : null}
-      <span>₫</span>
-    </div>
-  );
-}
-
-/**
  * Dải giải thích của tab Chờ hàng + chip "Đang lọc đơn thiếu <SP>" (từ màn Hàng chờ). Điều kiện
  * ghi đúng như API tính (apps/api docs/pick-pack-flow.md §3.6).
  */
@@ -1106,74 +852,6 @@ function WaitingStockNote({
   );
 }
 
-const NO_CARRIER = '__none__';
-const ANY = '__all__';
-
-/**
- * Ô "Hãng vận chuyển" của bộ lọc: Tất cả / Chưa gán hãng / từng tài khoản hãng (ô chọn dùng chung).
- * Ba key URL loại trừ nhau: `noCarrier`, `carrierAccountId` (hãng có tài khoản), `carrierId` (hãng
- * không tài khoản như giao thủ công — và link cũ lọc theo hãng).
- */
-function CarrierFilter({
-  noCarrier,
-  carrierId,
-  carrierAccountId,
-  onChange,
-  withNone = true,
-  filter,
-}: {
-  /** false = bỏ lựa chọn "Chưa gán hãng" (màn Đơn đã gán vận chuyển). */
-  withNone?: boolean;
-  /** Lọc bớt dòng hãng (vd màn Theo dõi đơn bỏ Giao thủ công, user 2026-11-03). */
-  filter?: (o: CarrierAccountOption) => boolean;
-  noCarrier: boolean;
-  carrierId: string;
-  carrierAccountId: string;
-  onChange: (
-    patch: Partial<Record<'noCarrier' | 'carrierId' | 'carrierAccountId', string | undefined>>,
-  ) => void;
-}) {
-  const carriers = useCarriers();
-  const ofAccount = carrierAccountId
-    ? (carriers.data ?? []).find((c) => c.accounts.some((a) => a.id === carrierAccountId))
-    : undefined;
-  const value = noCarrier
-    ? NO_CARRIER
-    : ofAccount
-      ? { carrierId: ofAccount.id, accountId: carrierAccountId }
-      : carrierId
-        ? { carrierId, accountId: null }
-        : ANY;
-  const clear = { noCarrier: undefined, carrierId: undefined, carrierAccountId: undefined };
-  return (
-    <CarrierSelect
-      className="h-9 w-64"
-      value={value}
-      filter={filter}
-      specials={[
-        { value: ANY, label: 'Hãng VC: tất cả' },
-        ...(withNone ? [{ value: NO_CARRIER, label: 'Chưa gán hãng' }] : []),
-      ]}
-      onChange={(v, option) => {
-        if (v === NO_CARRIER) onChange({ ...clear, noCarrier: 'true' });
-        else if (typeof v === 'string' || !option) onChange(clear);
-        // Lọc theo đúng tài khoản đã chọn (id thật — server tự gộp đơn chưa chọn tài khoản vào
-        // tài khoản mặc định).
-        else if (option.accountId) onChange({ ...clear, carrierAccountId: option.accountId });
-        else onChange({ ...clear, carrierId: option.carrier.id });
-      }}
-    />
-  );
-}
-
-/** Chip khoảng giá trị / cân nặng: "≥ a", "≤ b", "= a", "a – b"; không cận nào = không chip. */
-function rangeChip(min: string, max: string, fmt: (v: string) => string): string | null {
-  if (min && max) return min === max ? `= ${fmt(min)}` : `${fmt(min)} – ${fmt(max)}`;
-  if (min) return `≥ ${fmt(min)}`;
-  if (max) return `≤ ${fmt(max)}`;
-  return null;
-}
-
 export function PrintOrdersScreen() {
   const { state, set, skipTake } = useListState<OrderFilter>(DEFAULTS);
   const urlFlow = parseOrderFlow(state.filters.flow);
@@ -1188,16 +866,7 @@ export function PrintOrdersScreen() {
   const flow = searching ? undefined : currentFlow;
   const status = parseOrderStatus(state.filters.status);
   const customerId = state.filters.customerId ?? '';
-  const weightMin = state.filters.weightMin ?? '';
-  const weightMax = state.filters.weightMax ?? '';
-  const totalMin = state.filters.totalMin ?? '';
-  const totalMax = state.filters.totalMax ?? '';
-  const noCarrier = state.filters.noCarrier === 'true';
-  const carrierId = state.filters.carrierId ?? '';
-  const carrierAccountId = state.filters.carrierAccountId ?? '';
-  const carrierSource = parseCarrierSource(state.filters.carrierSource);
   const shortSkuId = state.filters.shortSkuId ?? '';
-  const printStatus = parsePrintStatus(state.filters.printStatus);
   const skuId = state.filters.skuId ?? '';
   const skuOnly = skuId !== '' && state.filters.skuOnly === 'true';
   // Ô "Nguồn" gộp cả POS: `POS:<mã shop>` = đơn Pancake của đúng POS đó (URL giữ một khoá).
@@ -1214,21 +883,14 @@ export function PrintOrdersScreen() {
   const dateField = DATE_FIELDS.some((f) => f.value === state.filters.dateField)
     ? (state.filters.dateField as OrderDateField)
     : undefined;
-  const duplicate = state.filters.duplicate === 'true';
-  const itemOrigin = parseItemOrigin(state.filters.itemOrigin);
-  // Ô NV lên đơn chỉ với người có `sales_order.filter_team` (2026-11-02); ô Phòng ban với người có
-  // `sales_order.filter_dept` (Admin, kế toán, kho — user 2026-11-04) hoặc `report.sales_all`. Không
-  // có quyền thì bỏ luôn giá trị trên URL (link dán từ đồng nghiệp) để không lọc ngầm.
+  // Ô Phòng ban với người có `sales_order.filter_dept` (Admin, kế toán, kho — user 2026-11-04) hoặc
+  // `report.sales_all`. Không có quyền thì bỏ luôn giá trị trên URL (link dán từ đồng nghiệp) để
+  // không lọc ngầm. Các ô đã bỏ khỏi màn này (2026-11-04) không đọc từ URL nữa.
   const ability = useAbility();
-  const canFilterTeam = ability.can('filter_team', 'SalesOrder');
   const canFilterDept =
     ability.can('filter_dept', 'SalesOrder') || ability.can('sales_all', 'Report');
   const team = canFilterDept ? (state.filters.team ?? '') : '';
-  const creatorId = canFilterTeam ? (state.filters.creatorId ?? '') : '';
   const fbPage = state.filters.fbPage ?? '';
-  const carrierStatus = state.filters.carrierStatus ?? '';
-  const carrierStatusText = useMemo(() => decodeList(carrierStatus), [carrierStatus]);
-  const carrierStatuses = useCarrierStatusOptions();
   const teamOptions = useTeamFilterOptions(canFilterDept);
   const facebookPages = useFacebookPageOptions();
   // Cột ẩn + sắp xếp lưu theo người dùng ở server (đăng xuất / đổi máy vẫn giữ). Sắp xếp trên URL
@@ -1261,19 +923,9 @@ export function PrintOrdersScreen() {
   const filterParams = useMemo(
     () => ({
       q: state.q,
-      duplicate,
       status,
       customerId,
-      weightMin,
-      weightMax,
-      totalMin,
-      totalMax,
-      noCarrier,
-      carrierId,
-      carrierAccountId,
-      carrierSource,
       shortSkuId,
-      printStatus,
       skuId,
       skuOnly,
       source,
@@ -1281,27 +933,14 @@ export function PrintOrdersScreen() {
       from,
       to,
       dateField,
-      itemOrigin,
       teamIds: team || undefined,
-      creatorId,
       facebookPageIds: fbPage || undefined,
-      carrierStatusText,
     }),
     [
       state.q,
-      duplicate,
       status,
       customerId,
-      weightMin,
-      weightMax,
-      totalMin,
-      totalMax,
-      noCarrier,
-      carrierId,
-      carrierAccountId,
-      carrierSource,
       shortSkuId,
-      printStatus,
       skuId,
       skuOnly,
       source,
@@ -1309,11 +948,8 @@ export function PrintOrdersScreen() {
       from,
       to,
       dateField,
-      itemOrigin,
       team,
-      creatorId,
       fbPage,
-      carrierStatusText,
     ],
   );
   const params = useMemo(
@@ -1327,19 +963,8 @@ export function PrintOrdersScreen() {
     [filterParams, flow, sortBy, sort?.desc, skipTake],
   );
   const carriers = useCarriers();
-  // Chữ chip "Đang lọc" của hai ô tự vẽ (sản phẩm, hãng) — cùng nguồn dữ liệu với ô chọn.
+  // Chữ chip "Đang lọc" của ô Sản phẩm — cùng nguồn dữ liệu với ô chọn.
   const skuChip = useSkuDetail(skuId);
-  const carrierChip = useMemo(() => {
-    if (noCarrier) return 'Chưa gán hãng';
-    const list = carriers.data ?? [];
-    if (carrierAccountId) {
-      const c = list.find((x) => x.accounts.some((a) => a.id === carrierAccountId));
-      const a = c?.accounts.find((x) => x.id === carrierAccountId);
-      return c && a ? `${c.code} ${carrierAccountLabel(c, a)}` : 'đã chọn';
-    }
-    if (carrierId) return list.find((x) => x.id === carrierId)?.name ?? 'đã chọn';
-    return null;
-  }, [noCarrier, carrierAccountId, carrierId, carriers.data]);
   const router = useRouter();
   const canUpdate = ability.can('update', 'SalesOrder');
   const canCreate = ability.can('create', 'SalesOrder');
@@ -1348,7 +973,6 @@ export function PrintOrdersScreen() {
   const canCancelAfterCarrier = ability.can('cancel_after_carrier', 'SalesOrder');
   const canEditAny = ability.can('edit_all', 'SalesOrder');
   const canCancel = canCancelAny || canCancelAfterCarrier || canCreate;
-  const creatorOptions = useOrderCreatorOptions(canFilterTeam);
   const [peek, setPeek] = useState<SalesOrderListItem | null>(null);
   // Nút Hủy trên dòng → hộp xác nhận dùng chung với hủy hàng loạt (một đơn).
   const [cancelling, setCancelling] = useState<SalesOrderListItem | null>(null);
@@ -1450,25 +1074,13 @@ export function PrintOrdersScreen() {
     flow !== undefined ||
     status !== undefined ||
     customerId !== '' ||
-    weightMin !== '' ||
-    weightMax !== '' ||
-    totalMin !== '' ||
-    totalMax !== '' ||
-    noCarrier ||
-    carrierId !== '' ||
-    carrierAccountId !== '' ||
-    carrierSource !== undefined ||
-    carrierStatus !== '' ||
     shortSkuId !== '' ||
-    printStatus !== undefined ||
     skuId !== '' ||
     source !== undefined ||
     from !== '' ||
     to !== '' ||
-    duplicate ||
-    itemOrigin !== undefined ||
     team !== '' ||
-    creatorId !== '';
+    fbPage !== '';
   const customerName = query.data?.items[0]?.customer.name;
   const selectedRows = (query.data?.items ?? []).filter((r) => selected[r.id]);
   const clearSelection = () => setSelected({});
@@ -1583,13 +1195,6 @@ export function PrintOrdersScreen() {
               fields: DATE_FIELDS,
             },
             {
-              key: 'printStatus',
-              label: 'In tem',
-              type: 'select',
-              group: 'Vận chuyển',
-              options: PRINT_STATUS_OPTIONS,
-            },
-            {
               key: 'skuId',
               label: 'Sản phẩm',
               type: 'custom',
@@ -1604,30 +1209,6 @@ export function PrintOrdersScreen() {
                   onOnlyChange={(on) => setFilter({ skuOnly: on ? 'true' : undefined })}
                 />
               ),
-            },
-            {
-              // Một ô cho cả "chưa gán hãng" lẫn "đã gán hãng X" — hai key URL (noCarrier / carrierId)
-              // loại trừ nhau.
-              key: 'carrierId',
-              label: 'Hãng VC',
-              type: 'custom',
-              chip: carrierChip,
-              clearKeys: ['noCarrier', 'carrierAccountId'],
-              render: () => (
-                <CarrierFilter
-                  noCarrier={noCarrier}
-                  carrierId={carrierId}
-                  carrierAccountId={carrierAccountId}
-                  onChange={setFilter}
-                />
-              ),
-            },
-            {
-              key: 'carrierSource',
-              label: 'Gán hãng',
-              type: 'select',
-              group: 'Vận chuyển',
-              options: CARRIER_SOURCE_OPTIONS,
             },
             {
               key: 'source',
@@ -1657,14 +1238,6 @@ export function PrintOrdersScreen() {
                 hint: p.shopIds.length ? `${p.shopIds.length} POS` : undefined,
               })),
             },
-            {
-              key: 'carrierStatus',
-              label: 'Trạng thái hãng',
-              type: 'multiSelect',
-              group: 'Vận chuyển',
-              unit: 'trạng thái',
-              options: carrierStatusOptions(carrierStatuses.data ?? []),
-            },
             // Phòng ban: quyền `sales_order.filter_dept` (2026-11-04), chọn nhiều — phòng CSKH + phòng Sale/MKT
             // đã có đơn; chưa chọn = tất cả.
             ...(canFilterDept
@@ -1683,108 +1256,22 @@ export function PrintOrdersScreen() {
                   },
                 ]
               : []),
-            // NV lên đơn: chỉ người có `sales_order.filter_team` (2026-11-02).
-            ...(canFilterTeam
-              ? [
-                  {
-                    // Danh sách theo người xem (2026-10-30): leader CSKH → nhân viên team, trưởng
-                    // nhóm → nhóm mình, nhân viên CSKH → mình; người khác mọi nhân viên.
-                    key: 'creatorId' as const,
-                    label: 'NV lên đơn',
-                    type: 'select' as const,
-                    searchable: true,
-                    options: (creatorOptions.data ?? []).map((s) => ({
-                      value: s.id,
-                      label: s.fullName,
-                    })),
-                  },
-                ]
-              : []),
-            {
-              key: 'duplicate',
-              label: 'Trùng trong ngày',
-              type: 'select',
-              group: 'Đơn',
-              options: [{ value: 'true', label: 'Chỉ đơn trùng trong ngày' }],
-            },
-            {
-              key: 'itemOrigin',
-              label: 'Sản phẩm ngoài ERP',
-              type: 'select',
-              group: 'Đơn',
-              options: ITEM_ORIGIN_OPTIONS,
-            },
-            {
-              key: 'totalMin',
-              label: 'Giá trị đơn',
-              type: 'custom',
-              group: 'Đơn',
-              chip: rangeChip(totalMin, totalMax, (v) => formatMoney(v)),
-              clearKeys: ['totalMax'],
-              render: () => (
-                <TotalValueFilter
-                  min={state.filters.totalMin}
-                  max={state.filters.totalMax}
-                  onChange={setFilter}
-                />
-              ),
-            },
-            {
-              key: 'weightMin',
-              label: 'Cân nặng',
-              type: 'custom',
-              group: 'Đơn',
-              chip: rangeChip(weightMin, weightMax, (v) => `${v} kg`),
-              clearKeys: ['weightMax'],
-              render: () => (
-                <WeightRangeFilter
-                  min={state.filters.weightMin}
-                  max={state.filters.weightMax}
-                  onChange={setFilter}
-                />
-              ),
-            },
+            // Bỏ 2026-11-04 (user): Hãng VC, NV lên đơn, nhóm Vận chuyển (In tem, Gán hãng,
+            // Trạng thái hãng), nhóm Đơn (Trùng trong ngày, SP ngoài ERP, Giá trị đơn, Cân nặng).
           ]}
           values={{
             status: state.filters.status,
             customerId: state.filters.customerId,
-            weightMin: state.filters.weightMin,
-            weightMax: state.filters.weightMax,
-            totalMin: state.filters.totalMin,
-            totalMax: state.filters.totalMax,
-            noCarrier: state.filters.noCarrier,
-            carrierId: state.filters.carrierId,
-            carrierAccountId: state.filters.carrierAccountId,
-            carrierSource: state.filters.carrierSource,
             source: state.filters.source,
             from: state.filters.from,
             to: state.filters.to,
             dateField: state.filters.dateField,
-            duplicate: state.filters.duplicate,
-            itemOrigin: state.filters.itemOrigin,
             team,
-            creatorId,
             fbPage: state.filters.fbPage,
-            carrierStatus: state.filters.carrierStatus,
-            printStatus: state.filters.printStatus,
             skuId: state.filters.skuId,
           }}
-          onFilterChange={(patch) =>
-            // Chọn "In tem" khi chưa lọc ngày → mặc định đơn gán ĐVVC HÔM NAY (2026-11-02); đổi
-            // khoảng ngày / trường ngày ở ô ngày như thường.
-            setFilter(
-              patch.printStatus && !from && !to
-                ? {
-                    ...patch,
-                    dateField: 'sentToCarrierAt',
-                    from: toLocalDateKey(new Date()) ?? undefined,
-                    to: toLocalDateKey(new Date()) ?? undefined,
-                  }
-                : patch,
-            )
-          }
-          pinned={['carrierId', 'creatorId', 'skuId']}
-          secondRow={['totalMin', 'weightMin']}
+          onFilterChange={setFilter}
+          pinned={['skuId']}
           searchPlaceholder="Mã đơn, SĐT, tên SP, mã vận đơn… nhiều giá trị cách dấu phẩy"
           right={
             <>
