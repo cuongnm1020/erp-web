@@ -556,6 +556,24 @@ describe('OrderCreateScreen — màn tạo đơn mới', () => {
     expect(screen.getAllByText('Đã chuyển khoản').length).toBeGreaterThan(0);
   });
 
+  it('Ngày tạo đơn (2026-11-04): sale / CSKH ô khóa "Hôm nay"; có sales_order.set_order_date → chọn được', async () => {
+    server.use(...skuHandlers());
+    const { unmount } = renderApp(<OrderCreateScreen />, {
+      me: { permissions: ['sales_order.read', 'sales_order.create'], hasGlobalAccess: false },
+    });
+    const locked = await screen.findByRole('button', { name: 'Ngày tạo đơn' });
+    expect(locked).toBeDisabled();
+    expect(locked).toHaveTextContent('Hôm nay');
+    unmount();
+    renderApp(<OrderCreateScreen />, {
+      me: {
+        permissions: ['sales_order.read', 'sales_order.create', 'sales_order.set_order_date'],
+        hasGlobalAccess: false,
+      },
+    });
+    expect(await screen.findByRole('button', { name: 'Ngày tạo đơn' })).toBeEnabled();
+  });
+
   it('ô SĐT đứng trước tên khách; khối Chốt đơn có phí ship + chuyển khoản, không Giảm giá / Phụ thu / Mã KM / Kích thước', async () => {
     server.use(...skuHandlers());
     renderApp(<OrderCreateScreen />);

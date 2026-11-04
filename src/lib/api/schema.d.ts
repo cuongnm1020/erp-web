@@ -12788,7 +12788,10 @@ export interface components {
             careStaffId?: string;
             /** Format: uuid */
             marketerId?: string;
-            /** @description Giờ tạo đơn (ISO) — mặc định bây giờ; không ở tương lai, kỳ kế toán phải đang mở. */
+            /**
+             * @description Giờ tạo đơn (ISO) — mặc định bây giờ; không ở tương lai, kỳ kế toán phải đang mở. Chỉ người có
+             *     `sales_order.set_order_date` (admin, nhân viên vận đơn) được gửi — người khác 403 (2026-11-04).
+             */
             orderDate?: string;
             /** @description Thẻ đơn (core.Tag.id). */
             tagIds?: string[];

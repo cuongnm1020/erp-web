@@ -42,6 +42,7 @@ import { isApiError, type ApiError } from '@/lib/api/errors';
 import { cn } from '@/lib/cn';
 import { messageFor } from '@/lib/error-messages';
 import { formatMoney } from '@/lib/format';
+import { useAbility } from '@/lib/permission';
 import { useWarehouse } from '@/lib/warehouse';
 import { useSameDayOrders, type SkuQuickRow } from '../../api/use-order-create';
 import {
@@ -283,13 +284,16 @@ export const OrderDraftForm = forwardRef<
   // sau (lỗi mạng, sửa giỏ) không hỏi lại.
   const customerPhone = useWatch({ control: form.control, name: 'customerPhone' });
   const sameDay = useSameDayOrders(customerPhone);
+  const canSetOrderDate = useAbility().can('set_order_date', 'SalesOrder');
   const [pendingDup, setPendingDup] = useState<CreateOrderValues | null>(null);
   const acceptedDupPhone = useRef<string | null>(null);
 
   const send = (values: CreateOrderValues) => {
     idemKey.current ??= newIdempotencyKey();
+    // Không có quyền chọn ngày (2026-11-04) → không gửi ngày (nháp cũ có thể còn giá trị).
+    const body = toCreateOrderBody(canSetOrderDate ? values : { ...values, orderDate: '' });
     create.mutate(
-      { body: toCreateOrderBody(values), key: idemKey.current },
+      { body, key: idemKey.current },
       {
         onSuccess: (r) => {
           setPendingDup(null);
@@ -634,6 +638,7 @@ function HeaderSelects({
   // (để trống) = phòng gốc. Một phòng / không phải CSKH → ẩn ô.
   const careTeams = useCareTeamOptions();
   const myCareTeams = (careTeams.data ?? []).filter((t) => t.mine);
+  const canSetOrderDate = useAbility().can('set_order_date', 'SalesOrder');
   return (
     <div className="grid grid-cols-2 gap-x-2.5 gap-y-2 sm:grid-cols-4 xl:grid-cols-8">
       <HeaderField label="Kênh">
@@ -805,7 +810,9 @@ function HeaderSelects({
           />
         </HeaderField>
       ) : null}
-      {/* Ngày tạo đơn (2026-11-03): doanh số tính theo ngày này. Trống = hôm nay; chỉ chọn lùi. */}
+      {/* Ngày tạo đơn (2026-11-03): doanh số tính theo ngày này. Trống = hôm nay; chỉ chọn lùi.
+          2026-11-04: chỉ admin / nhân viên vận đơn (`sales_order.set_order_date`) chọn được — sale /
+          CSKH luôn hôm nay (ô khóa). */}
       <HeaderField label="Ngày tạo đơn">
         <FormField
           control={form.control}
@@ -814,10 +821,11 @@ function HeaderSelects({
             <FormItem>
               <FormControl>
                 <DatePicker
-                  value={field.value}
+                  value={canSetOrderDate ? field.value : ''}
                   onChange={field.onChange}
                   placeholder="Hôm nay"
                   toDate={new Date()}
+                  disabled={!canSetOrderDate}
                   aria-label="Ngày tạo đơn"
                 />
               </FormControl>
