@@ -6,6 +6,7 @@ import { useSearchParams } from 'next/navigation';
 import { useRef, useState } from 'react';
 import { ConfirmDialog } from '@/components/data/confirm-dialog';
 import { ScanInput, type ScanInputHandle } from '@/components/data/scan-input';
+import { UomText } from '@/components/data/uom-text';
 import { ErrorState, ForbiddenState, ListSkeleton } from '@/components/data/states';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -435,7 +436,9 @@ function RelocateItems({
               </div>
               <div className="shrink-0 text-right">
                 <span className="text-xl font-bold tabular-nums">{formatQuantity(i.movable)}</span>{' '}
-                <span className="text-sm text-muted-foreground">{i.baseUomCode} chuyển được</span>
+                <span className="text-sm text-muted-foreground">
+                  <UomText code={i.baseUomCode} /> chuyển được
+                </span>
               </div>
             </div>
             {qtyGt(i.inHand, ZERO) ? (
@@ -481,7 +484,7 @@ function RelocateItems({
             {qtyGt(i.looseQty, ZERO) ? (
               <label className="mt-2 flex flex-wrap items-center gap-2 text-sm">
                 <span className="text-muted-foreground">
-                  Hàng rời chuyển ({i.baseUomCode}, tối đa {formatQuantity(max)})
+                  Hàng rời chuyển (<UomText code={i.baseUomCode} />, tối đa {formatQuantity(max)})
                 </span>
                 <input
                   type="text"

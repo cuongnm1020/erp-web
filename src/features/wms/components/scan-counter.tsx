@@ -3,6 +3,7 @@
 import { Check, CheckCircle2, CircleAlert, AlertTriangle } from 'lucide-react';
 import { cn } from '@/lib/cn';
 import { formatQuantity, toDecimal } from '@/lib/format';
+import { useUomName } from '@/lib/uom';
 import type { ScanFeedback } from '../scan-session';
 
 /** Quá số này thì thanh tiến độ chia 20 ô theo tỉ lệ thay vì mỗi đơn vị một ô. */
@@ -34,7 +35,9 @@ export function ScanCounter({
   const error = feedback?.kind === 'error';
   const count = p > 0 && p <= MAX_SEGMENTS && Number.isInteger(p) ? p : MAX_SEGMENTS;
   const filled = p > 0 ? Math.min(count, Math.floor((d / p) * count)) : 0;
-  const unitLabel = unit ? unit.toLowerCase() : '';
+  // Tên ĐVT ("Thùng" → "thùng") thay mã (2026-11-06).
+  const uomName = useUomName();
+  const unitLabel = unit ? uomName(unit).toLowerCase() : '';
 
   return (
     <div

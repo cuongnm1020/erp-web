@@ -268,6 +268,23 @@ describe('OrderDetailScreen — GET /sales-orders/{id} (P1-12)', () => {
   });
 });
 
+describe('OrderDetailScreen — tên ĐVT thay mã (2026-11-06)', () => {
+  it('dòng ĐVT mã BOX → hiện "Thùng" theo danh mục GET /uoms', async () => {
+    const d = makeOrderDetail(ORDER.id)!;
+    server.use(
+      http.get('/api/uoms', () =>
+        HttpResponse.json([{ id: 'u-box', code: 'BOX', name: 'Thùng', decimals: 0, version: 1 }]),
+      ),
+      http.get('/api/sales-orders/:id', () =>
+        HttpResponse.json({ ...d, lines: d.lines.map((l) => ({ ...l, uomCode: 'BOX' })) }),
+      ),
+    );
+    renderApp(<OrderDetailScreen orderId={ORDER.id} />);
+    expect((await screen.findAllByText('Thùng')).length).toBeGreaterThan(0);
+    expect(screen.queryByText('BOX')).not.toBeInTheDocument();
+  });
+});
+
 describe('OrderDetailScreen — làm tròn đơn Pancake lẻ (2026-10-26)', () => {
   it('roundingAmount > 0 → dòng "Làm tròn"; = 0 → không có dòng', async () => {
     server.use(

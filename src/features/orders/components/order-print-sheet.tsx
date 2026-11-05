@@ -3,6 +3,7 @@
 import type { CSSProperties } from 'react';
 import { Barcode } from '@/components/data/barcode';
 import { PrintSheet } from '@/components/data/print-sheet';
+import { UomText } from '@/components/data/uom-text';
 import { formatDate, formatQuantity } from '@/lib/format';
 import type { PrintController } from '@/lib/print';
 import type { SalesOrderDetail } from '../api/use-orders';
@@ -115,7 +116,9 @@ export function OrderPrintSheet({
                 <td className="py-1 text-right font-semibold tabular-nums">
                   {formatQuantity(qty)}
                 </td>
-                <td className="py-1 pl-2">{l.uomCode}</td>
+                <td className="py-1 pl-2">
+                  <UomText code={l.uomCode} />
+                </td>
                 <td className="py-1 pl-2">
                   <Barcode
                     value={l.skuCode}

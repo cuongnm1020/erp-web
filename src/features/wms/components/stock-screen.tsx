@@ -15,6 +15,7 @@ import {
 } from 'react';
 import { DataTable, FilterBar, type ColumnDef } from '@/components/data/data-table';
 import { MoneyInput } from '@/components/data/form';
+import { UomText } from '@/components/data/uom-text';
 import { EmptyState, ListSkeleton, QueryState } from '@/components/data/states';
 import { StatusBadge } from '@/components/data/status-badge';
 import { PageHeader } from '@/components/layout/page-header';
@@ -339,7 +340,13 @@ const skuColumns: ColumnDef<StockRow, unknown>[] = [
     cell: ({ getValue }) => <span className="font-mono text-xs">{getValue() as string}</span>,
   },
   { id: 'skuName', accessorKey: 'skuName', header: 'Tên sản phẩm', meta: { width: 300 } },
-  { id: 'baseUomCode', accessorKey: 'baseUomCode', header: 'ĐVT cơ sở', meta: { width: 110 } },
+  {
+    id: 'baseUomCode',
+    accessorKey: 'baseUomCode',
+    header: 'ĐVT cơ sở',
+    cell: ({ row }) => <UomText code={row.original.baseUomCode} />,
+    meta: { width: 110 },
+  },
   {
     id: 'weight',
     header: 'Cân nặng',

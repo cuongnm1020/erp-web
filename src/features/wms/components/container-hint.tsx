@@ -2,6 +2,7 @@
 
 import { Box } from 'lucide-react';
 import { Barcode } from '@/components/data/barcode';
+import { UomText } from '@/components/data/uom-text';
 import { formatQuantity } from '@/lib/format';
 import type { components } from '@/lib/api/schema';
 
@@ -40,7 +41,7 @@ export function ContainerHint({
               key={s.uomId}
               className="rounded border px-1.5 py-0.5 font-medium tabular-nums text-muted-foreground"
             >
-              {formatQuantity(s.count)} {s.uomCode}
+              {formatQuantity(s.count)} <UomText code={s.uomCode} />
               {s.containerTypeCode ? ` (${s.containerTypeCode.toLowerCase()})` : ''}
             </li>
           ))}

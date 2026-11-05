@@ -4,6 +4,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import Decimal from 'decimal.js';
 import { CopyPlus, Plus, X } from 'lucide-react';
 import Link from 'next/link';
+import { UomText } from '@/components/data/uom-text';
 import { useRouter } from 'next/navigation';
 import { useEffect, useRef } from 'react';
 import { useFieldArray, useForm, useWatch, type UseFormReturn } from 'react-hook-form';
@@ -638,7 +639,9 @@ function ComponentRow({
         )}
       />
       <div className="pt-2 font-mono text-xs text-muted-foreground">{row?.skuCode || '—'}</div>
-      <div className="pt-2 text-sm text-muted-foreground">{row?.baseUomCode || '—'}</div>
+      <div className="pt-2 text-sm text-muted-foreground">
+        {row?.baseUomCode ? <UomText code={row.baseUomCode} /> : '—'}
+      </div>
       <FormField
         control={form.control}
         name={`components.${index}.qty`}

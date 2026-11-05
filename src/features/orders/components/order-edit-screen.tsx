@@ -14,6 +14,7 @@ import Decimal from 'decimal.js';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { useWatch } from 'react-hook-form';
 import { CopyButton } from '@/components/data/copy-button';
+import { UomText } from '@/components/data/uom-text';
 import { DetailSkeleton, QueryState } from '@/components/data/states';
 import { StatusBadge } from '@/components/data/status-badge';
 import { NotFoundCard } from '@/components/layout/not-found-screen';
@@ -968,7 +969,7 @@ function Editor({ order }: { order: SalesOrderDetail }) {
                               </span>
                             </span>
                             <span className="text-center tabular-nums">
-                              {formatQuantity(g.line.qty)} {g.line.uomCode}
+                              {formatQuantity(g.line.qty)} <UomText code={g.line.uomCode} />
                             </span>
                             <span className="text-right tabular-nums">
                               {money(g.line.unitPrice)}
@@ -998,7 +999,7 @@ function Editor({ order }: { order: SalesOrderDetail }) {
                                   className="flex items-center gap-1 text-xs text-muted-foreground"
                                 >
                                   <CornerDownRight className="h-3 w-3" aria-hidden />
-                                  {l.skuName} × {formatQuantity(l.qty)} {l.uomCode}
+                                  {l.skuName} × {formatQuantity(l.qty)} <UomText code={l.uomCode} />
                                 </span>
                               ))}
                             </span>

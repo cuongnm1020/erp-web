@@ -3,6 +3,7 @@
 import { ListOrdered } from 'lucide-react';
 import { useRef, useState } from 'react';
 import { StatusBadge } from '@/components/data/status-badge';
+import { UomText } from '@/components/data/uom-text';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Skeleton } from '@/components/ui/skeleton';
 import { messageFor } from '@/lib/error-messages';
@@ -92,7 +93,12 @@ export function SameDayOrdersHover({ orderId, count }: { orderId: string; count:
                           <span className="min-w-0 break-words">{it.name}</span>
                           <span className="shrink-0 tabular-nums text-muted-foreground">
                             × {formatQuantity(it.qty)}
-                            {it.uomCode ? ` ${it.uomCode}` : ''}
+                            {it.uomCode ? (
+                              <>
+                                {' '}
+                                <UomText code={it.uomCode} />
+                              </>
+                            ) : null}
                           </span>
                         </li>
                       ))}

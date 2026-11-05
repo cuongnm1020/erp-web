@@ -1586,6 +1586,8 @@ export const FACEBOOK_PAGE_OPTIONS = [
 ];
 
 export const handlers = [
+  // Danh mục ĐVT cho tên ĐVT (2026-11-06) — rỗng mặc định = màn hiện mã như cũ; test tên tự override.
+  http.get('/api/uoms', () => HttpResponse.json([])),
   // Tag sản phẩm (2026-11-03) — danh mục rỗng mặc định; test cần tag thì tự override.
   http.get('/api/product-tags', () => HttpResponse.json([])),
   http.get('/api/goods-receipts/:id/containers', () => HttpResponse.json(RECEIPT_CONTAINERS_EMPTY)),

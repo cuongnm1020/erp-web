@@ -2,6 +2,7 @@
 
 import { Download, FileSpreadsheet, Plus, Trash2, Upload } from 'lucide-react';
 import Link from 'next/link';
+import { UomText } from '@/components/data/uom-text';
 import { useMemo, useState } from 'react';
 import {
   DataTable,
@@ -494,7 +495,7 @@ const skuColumns: ColumnDef<SkuListRow, unknown>[] = [
     id: 'uom',
     header: 'ĐVT',
     meta: { width: 70 },
-    cell: ({ row }) => row.original.baseUomCode,
+    cell: ({ row }) => <UomText code={row.original.baseUomCode} />,
   },
   {
     id: 'onHand',

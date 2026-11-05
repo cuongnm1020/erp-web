@@ -2,6 +2,7 @@
 
 import { Printer, Search, X } from 'lucide-react';
 import Link from 'next/link';
+import { UomText } from '@/components/data/uom-text';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useMemo, useState } from 'react';
 import { PrintSheet } from '@/components/data/print-sheet';
@@ -327,7 +328,7 @@ export function BarcodePrintScreen() {
                                   <SelectItem key={b.id} value={b.id}>
                                     <span className="font-mono">{b.code}</span>
                                     <span className="ml-1 text-muted-foreground">
-                                      · {b.uom.code}
+                                      · <UomText code={b.uom.code} />
                                     </span>
                                   </SelectItem>
                                 ))}

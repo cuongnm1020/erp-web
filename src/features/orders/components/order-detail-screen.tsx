@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Fragment, useEffect, useRef, useState, type ReactNode } from 'react';
 import { CopyButton } from '@/components/data/copy-button';
+import { UomText } from '@/components/data/uom-text';
 import { PdfPrintDialog } from '@/components/data/pdf-print-dialog';
 import { DetailSkeleton, QueryState } from '@/components/data/states';
 import { ConfirmDialog } from '@/components/data/confirm-dialog';
@@ -355,7 +356,9 @@ function LineRow({ l, component = false }: { l: SalesOrderLine; component?: bool
           </div>
         ) : null}
       </TableCell>
-      <TableCell className="px-2.5 py-1.5">{l.uomCode}</TableCell>
+      <TableCell className="px-2.5 py-1.5">
+        <UomText code={l.uomCode} />
+      </TableCell>
       <TableCell className="px-2.5 py-1.5 text-right tabular-nums">
         {qty(l.qty)}
         <div className="text-xs text-muted-foreground">{qty(l.qtyBase)} ĐVT cơ sở</div>

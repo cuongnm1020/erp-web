@@ -2141,6 +2141,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
+        /**
+         * Danh mục ĐVT — mọi người đăng nhập (2026-11-06): web hiện TÊN ĐVT ("Thùng") thay mã ("BOX") ở
+         *     mọi màn, kể cả kho / PDA không có product.read. Chỉ mã + tên, không nhạy cảm.
+         */
         get: operations["ProductController_listUoms"];
         put?: never;
         post: operations["ProductController_createUom"];

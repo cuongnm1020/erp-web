@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useRef, useState } from 'react';
 import { ScanInput, type ScanInputHandle } from '@/components/data/scan-input';
+import { UomText } from '@/components/data/uom-text';
 import { ErrorState, ForbiddenState, ListSkeleton } from '@/components/data/states';
 import { Button } from '@/components/ui/button';
 import { isApiError } from '@/lib/api/errors';
@@ -194,7 +195,9 @@ function LocationItemCard({ item }: { item: LocationItem }) {
         </div>
         <div className="shrink-0 text-right">
           <span className="text-2xl font-bold tabular-nums">{formatQuantity(item.onHand)}</span>{' '}
-          <span className="text-sm text-muted-foreground">{item.baseUomCode}</span>
+          <span className="text-sm text-muted-foreground">
+            <UomText code={item.baseUomCode} />
+          </span>
         </div>
       </div>
       {extra.length > 0 ? (
