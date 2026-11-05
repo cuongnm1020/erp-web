@@ -12713,16 +12713,23 @@ export interface components {
             outcome: "ISSUED" | "QUEUED" | "ALREADY_ISSUED";
             trackingNo: string | null;
         };
+        BulkFulfilShortageDto: {
+            skuCode: string;
+            /** @description Số lượng cơ sở còn thiếu, chuỗi decimal ("10"). */
+            qtyMissing: string;
+        };
         BulkFulfilFailedItemDto: {
             orderId: string;
             docNumber: string | null;
-            /** @description ORDER_CARRIER_REQUIRED, ORDER_IN_WAVE, ORDER_PICK_SHORTAGE, CARRIER_REJECTED… */
+            /** @description ORDER_CARRIER_REQUIRED, ORDER_IN_WAVE, ORDER_PICK_SHORTAGE, ORDER_PACK_SHORTAGE, CARRIER_REJECTED… */
             code: string;
             message: string;
             /** @description Nguyên văn lời hãng khi `code = CARRIER_REJECTED`; null nếu không phải. */
             carrierMessage: string | null;
             /** @description true = ĐÃ đóng gói (tồn đã trừ) nhưng xin vận đơn lỗi — cấp lại vận đơn, không đóng gói lại. */
             packed: boolean;
+            /** @description Dòng thiếu khi `code = ORDER_PACK_SHORTAGE`; còn lại []. */
+            shortages: components["schemas"]["BulkFulfilShortageDto"][];
         };
         BulkFulfilOrdersResultDto: {
             done: components["schemas"]["BulkFulfilDoneItemDto"][];
