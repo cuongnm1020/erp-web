@@ -762,7 +762,12 @@ function Detail({ order }: { order: SalesOrderDetail }) {
   const ability = useAbility();
   const autoPrint = useSearchParams().get('printLabel') === '1';
   const live = order.status !== 'CANCELLED';
-  const canEdit = live && ability.can('update', 'SalesOrder');
+  // Kho / admin chỉ có quyền trường (người nhận / ngày tạo đơn, 2026-11-05) cũng mở màn Sửa.
+  const canEdit =
+    live &&
+    (ability.can('update', 'SalesOrder') ||
+      ability.can('edit_receiver', 'SalesOrder') ||
+      ability.can('set_order_date', 'SalesOrder'));
   const canCreate = ability.can('create', 'SalesOrder');
   // Người lên đơn / trưởng phòng, trưởng nhóm CSKH hủy được không cần quyền hủy (2026-10-29) —
   // server kiểm từng đơn, không được thì báo lỗi.

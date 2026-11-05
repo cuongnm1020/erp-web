@@ -1298,12 +1298,15 @@ export function OrderListScreen() {
     return null;
   }, [noCarrier, carrierAccountId, carrierId, carriers.data]);
   const router = useRouter();
-  const canUpdate = ability.can('update', 'SalesOrder');
+  // Kho / admin sửa người nhận / ngày tạo đơn của mọi đơn kho mình, cả khi kho đã thao tác (2026-11-05).
+  const canEditFields =
+    ability.can('edit_receiver', 'SalesOrder') || ability.can('set_order_date', 'SalesOrder');
+  const canUpdate = ability.can('update', 'SalesOrder') || canEditFields;
   const canCreate = ability.can('create', 'SalesOrder');
   const canPack = ability.can('pack', 'Shipment');
   const canCancelAny = ability.can('cancel', 'SalesOrder');
   const canCancelAfterCarrier = ability.can('cancel_after_carrier', 'SalesOrder');
-  const canEditAny = ability.can('edit_all', 'SalesOrder');
+  const canEditAny = ability.can('edit_all', 'SalesOrder') || canEditFields;
   const canCancel = canCancelAny || canCancelAfterCarrier || canCreate;
   const creatorOptions = useOrderCreatorOptions(canFilterTeam);
   const [peek, setPeek] = useState<SalesOrderListItem | null>(null);

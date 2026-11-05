@@ -957,12 +957,15 @@ export function PrintOrdersScreen() {
   // Chữ chip "Đang lọc" của ô Sản phẩm — cùng nguồn dữ liệu với ô chọn.
   const skuChip = useSkuDetail(skuId);
   const router = useRouter();
-  const canUpdate = ability.can('update', 'SalesOrder');
+  // Kho / admin sửa người nhận / ngày tạo đơn của mọi đơn kho mình, cả khi kho đã thao tác (2026-11-05).
+  const canEditFields =
+    ability.can('edit_receiver', 'SalesOrder') || ability.can('set_order_date', 'SalesOrder');
+  const canUpdate = ability.can('update', 'SalesOrder') || canEditFields;
   const canCreate = ability.can('create', 'SalesOrder');
   const canPack = ability.can('pack', 'Shipment');
   const canCancelAny = ability.can('cancel', 'SalesOrder');
   const canCancelAfterCarrier = ability.can('cancel_after_carrier', 'SalesOrder');
-  const canEditAny = ability.can('edit_all', 'SalesOrder');
+  const canEditAny = ability.can('edit_all', 'SalesOrder') || canEditFields;
   const canCancel = canCancelAny || canCancelAfterCarrier || canCreate;
   const [peek, setPeek] = useState<SalesOrderListItem | null>(null);
   // Nút Hủy trên dòng → hộp xác nhận dùng chung với hủy hàng loạt (một đơn).

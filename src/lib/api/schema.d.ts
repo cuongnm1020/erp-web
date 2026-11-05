@@ -4103,6 +4103,9 @@ export interface paths {
          *     approve/post/cancel tương ứng — kiểm trong service vì tuỳ giá trị gửi lên. Đổi gì ngoài trạng
          *     thái (2026-10-29): chỉ người tạo đơn / NV xử lý / trưởng nhóm của họ / `sales_order.edit_all`
          *     → không thì 403 FORBIDDEN. Mỗi lần lưu có thay đổi ghi một dòng lịch sử sửa đơn.
+         *     2026-11-05: kho / admin (`sales_order.read_all` + `sales_order.set_order_date` /
+         *     `sales_order.edit_receiver`) đổi Ngày tạo đơn / thông tin nhận hàng của mọi đơn kho mình,
+         *     không cần `sales_order.update`; đổi ô khác thì vẫn cần.
          */
         patch: operations["SalesOrderController_update"];
         trace?: never;
@@ -12702,6 +12705,12 @@ export interface components {
              *     `sales_order.edit_all`, và đơn chưa kết thúc. false → màn Sửa đơn chỉ xem.
              */
             canEdit: boolean;
+            /**
+             * @description Sửa được thẻ Nhận hàng (người nhận, SĐT người nhận cho đơn, hẹn nhận hàng): như `canEdit`, hoặc
+             *     kho / admin có `sales_order.edit_receiver` (2026-11-05 — mọi đơn kho mình, kể cả khi kho đã
+             *     thao tác). Đơn đã kết thúc → false.
+             */
+            canEditReceiver: boolean;
             /**
              * @description Vì sao KHÔNG sửa được sản phẩm (thêm / bỏ / đổi số lượng); null = sửa được (PUT
              *     /sales-orders/:id/lines). Khóa khi: không có quyền sửa, đơn Pancake, đơn có khuyến mãi, kho đã

@@ -640,6 +640,7 @@ export function makeOrderDetail(id: string) {
     marketerName: null as string | null,
     createdByName: 'Quản trị hệ thống' as string | null,
     canEdit: header.status !== 'POSTED' && header.status !== 'CANCELLED',
+    canEditReceiver: header.status !== 'POSTED' && header.status !== 'CANCELLED',
     // Mặc định khóa sửa sản phẩm — test giỏ sửa được tự ghi đè (tránh tải chi tiết SKU ở mọi test).
     linesLockedReason: 'Kho đã bắt đầu lấy hàng' as string | null,
     // Luồng Đơn mới / Chờ hàng (2026-10-31).

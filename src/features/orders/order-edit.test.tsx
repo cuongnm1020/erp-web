@@ -701,11 +701,52 @@ describe('OrderEditScreen — sửa sản phẩm / người nhận, quyền sử
     );
 
   it('đơn người khác (canEdit=false) → banner, ô ghi chú khóa, nút Sửa người nhận ẩn', async () => {
-    withDetail({ canEdit: false, linesLockedReason: 'Chỉ người tạo đơn được sửa' });
+    withDetail({
+      canEdit: false,
+      canEditReceiver: false,
+      linesLockedReason: 'Chỉ người tạo đơn được sửa',
+    });
     renderApp(<OrderEditScreen orderId={ORDER.id} />);
     expect(await screen.findByText(/Đơn của người khác/)).toBeInTheDocument();
     expect(screen.getByLabelText('Ghi chú nội bộ')).toBeDisabled();
     expect(screen.queryByRole('button', { name: /Sửa người nhận/ })).not.toBeInTheDocument();
+  });
+
+  it('kho có edit_receiver, không sales_order.update (2026-11-05): sửa được thẻ Nhận hàng, ô khác khóa', async () => {
+    push.mockClear();
+    const calls: Array<Record<string, unknown>> = [];
+    server.use(
+      http.patch('/api/sales-orders/:id', async ({ params, request }) => {
+        const body = (await request.json()) as Record<string, unknown>;
+        calls.push(body);
+        return HttpResponse.json({
+          orderId: params.id,
+          docNumber: ORDER.docNumber,
+          status: ORDER.status,
+          carrierId: null,
+          changed: ['recipientPhone'],
+        });
+      }),
+    );
+    withDetail({
+      canEdit: false,
+      canEditReceiver: true,
+      linesLockedReason: 'Chỉ người tạo đơn được sửa',
+    });
+    renderApp(<OrderEditScreen orderId={ORDER.id} />, {
+      me: {
+        ...ME_SALE,
+        permissions: ['sales_order.read', 'sales_order.read_all', 'sales_order.edit_receiver'],
+      },
+    });
+    expect(await screen.findByText(/bạn sửa được thông tin nhận hàng/)).toBeInTheDocument();
+    expect(screen.getByLabelText('Ghi chú nội bộ')).toBeDisabled();
+    expect(screen.getByRole('button', { name: /Sửa người nhận/ })).toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText('SĐT người nhận cho đơn này'), {
+      target: { value: '0912345678' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: /Lưu thay đổi/ }));
+    await waitFor(() => expect(calls).toEqual([{ recipientPhone: '0912345678' }]));
   });
 
   it('Sửa người nhận → PATCH gửi address (tên, SĐT chuẩn hoá, địa chỉ), không gửi addressId', async () => {
