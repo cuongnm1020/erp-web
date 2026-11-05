@@ -1,6 +1,6 @@
 import { OrderIssuesScreen } from '@/features/orders/components/order-issues-screen';
 
-export const metadata = { title: 'Xử lý đơn lỗi — ERP' };
+export const metadata = { title: 'Đơn lỗi — ERP' };
 
 export default function Page() {
   return <OrderIssuesScreen />;

@@ -303,7 +303,8 @@ export const NAV_MODULES: NavModule[] = [
         ability: { action: 'execute', subject: 'Task' },
       },
       {
-        label: 'Theo dõi giao hàng',
+        // Đổi tên menu "Theo dõi giao hàng" → "Vận đơn" (user 2026-11-05).
+        label: 'Vận đơn',
         href: '/wms/shipping',
         icon: Truck,
         section: 'Vận hành',
@@ -311,8 +312,9 @@ export const NAV_MODULES: NavModule[] = [
       },
       {
         // Đơn đã gán vận chuyển (2026-11-03): đơn đã Gửi sang ĐVVC — lọc ngày gán / POS / phòng ban /
-        // sản phẩm / hãng, in lại tem hàng loạt. Đổi tên "Theo dõi đơn" (user 2026-11-03).
-        label: 'Theo dõi đơn',
+        // sản phẩm / hãng, in lại tem hàng loạt. Đổi tên "Theo dõi đơn" (user 2026-11-03),
+        // menu đổi tiếp thành "In đơn" (user 2026-11-05).
+        label: 'In đơn',
         href: '/wms/waybills',
         icon: Truck,
         section: 'Vận hành',
@@ -321,12 +323,23 @@ export const NAV_MODULES: NavModule[] = [
       {
         // In đơn (2026-11-04): clone màn Đơn hàng để tuỳ biến cho kho in đơn. Menu theo quyền kho
         // như "Theo dõi đơn" (shipment.read) — sale chỉ có sales_order.read không thấy module Kho.
-        // Dữ liệu vẫn GET /sales-orders, API scope theo người xem.
-        label: 'In đơn',
+        // Dữ liệu vẫn GET /sales-orders, API scope theo người xem. Menu đổi tên "Đẩy đơn" (user 2026-11-05).
+        label: 'Đẩy đơn',
         href: '/wms/print-orders',
         icon: Printer,
         section: 'Vận hành',
         ability: { action: 'read', subject: 'Shipment' },
+      },
+      {
+        // Đơn lỗi (trước "Xử lý đơn lỗi" ở Quản trị) — chuyển sang Kho › Vận hành + đổi tên
+        // (user 2026-11-05); URL giữ /admin/order-issues cho link cũ. Quyền sales_order.issues
+        // (2026-11-03, gán cho nhân viên kho ở màn Vai trò; superadmin luôn có). Tab "Bị Pancake
+        // ghi đè" bên trong vẫn chỉ superadmin (manage OrderIssue).
+        label: 'Đơn lỗi',
+        href: '/admin/order-issues',
+        icon: TriangleAlert,
+        section: 'Vận hành',
+        ability: { action: 'issues', subject: 'SalesOrder' },
       },
       {
         // Chờ hàng (2026-10-25): SKU thiếu cho đơn chờ hàng / tổng đơn chờ. API cần sales_order.read
@@ -612,14 +625,6 @@ export const NAV_MODULES: NavModule[] = [
         ability: { action: 'read', subject: 'Role' },
       },
       {
-        label: 'Xử lý đơn lỗi',
-        href: '/admin/order-issues',
-        icon: TriangleAlert,
-        // Quyền sales_order.issues (2026-11-03, gán cho nhân viên kho ở màn Vai trò; superadmin
-        // luôn có). Tab "Bị Pancake ghi đè" bên trong vẫn chỉ superadmin (manage OrderIssue).
-        ability: { action: 'issues', subject: 'SalesOrder' },
-      },
-      {
         label: 'Thiết bị PDA',
         href: '/admin/pda-devices',
         icon: Smartphone,
@@ -769,7 +774,7 @@ export const SEGMENT_LABELS: Record<string, string> = {
   dispatch: 'Điều phối task',
   pack: 'Trạm đóng gói',
   productivity: 'Năng suất kho',
-  shipping: 'Theo dõi giao hàng',
+  shipping: 'Vận đơn',
   transfers: 'Chuyển kho',
   po: 'Purchase order',
   receive: 'Nhận hàng',

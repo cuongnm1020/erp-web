@@ -241,8 +241,8 @@ export function OrderIssuesScreen() {
   return (
     <>
       <PageHeader
-        breadcrumb={[{ label: 'Quản trị' }, { label: 'Xử lý đơn lỗi' }]}
-        title="Xử lý đơn lỗi"
+        breadcrumb={[{ label: 'Kho' }, { label: 'Đơn lỗi' }]}
+        title="Đơn lỗi"
         description="Đơn kẹt ở bước gửi hãng, đóng gói, hãng lấy hàng — theo ngày đơn, kho đang chọn."
         status={<StatusBadge tone="neutral">Chỉ superadmin</StatusBadge>}
         actions={
