@@ -135,7 +135,7 @@ describe('OrderListScreen — GET /sales-orders (P1-12)', () => {
     await waitFor(() => expect(replace).toHaveBeenCalled());
     expect(String(replace.mock.calls.at(-1)![0])).toContain('group=all');
     expect(screen.queryByText('Đã xong')).not.toBeInTheDocument();
-    // Bấm chip → ?flow=; bấm Đơn mới (mặc định) → bỏ flow khỏi URL.
+    // Bấm chip → ?flow=; bấm Đơn mới cũng ghi flow tường minh (2026-11-06: URL trống = Tất cả).
     replace.mockClear();
     fireEvent.click(screen.getByRole('tab', { name: /^Đang vận chuyển/ }));
     await waitFor(() => expect(replace).toHaveBeenCalled());
@@ -143,10 +143,10 @@ describe('OrderListScreen — GET /sales-orders (P1-12)', () => {
     replace.mockClear();
     fireEvent.click(screen.getByRole('tab', { name: /^Đơn mới/ }));
     await waitFor(() => expect(replace).toHaveBeenCalled());
-    expect(String(replace.mock.calls.at(-1)![0])).not.toContain('flow=');
+    expect(String(replace.mock.calls.at(-1)![0])).toContain('flow=NEW');
   });
 
-  it('tab v3 (2026-11-04): mặc định Đơn mới gửi ?flow=NEW, đếm cả 14 trạng thái một lần; ô tìm → mọi trạng thái', async () => {
+  it('tab v3: mở màn (URL trống) → Tất cả, không gửi flow (2026-11-06); ?flow=NEW → Đơn mới; đếm cả 14 trạng thái một lần; ô tìm → mọi trạng thái', async () => {
     const lists: URLSearchParams[] = [];
     const counts: URLSearchParams[] = [];
     const onRequest = ({ request }: { request: Request }) => {
@@ -157,6 +157,12 @@ describe('OrderListScreen — GET /sales-orders (P1-12)', () => {
     server.events.on('request:start', onRequest);
     try {
       search = '';
+      renderApp(<OrderListScreen />);
+      await waitFor(() => expect(lists.length).toBeGreaterThan(0));
+      expect(lists.at(-1)!.get('flow')).toBeNull();
+      expect(screen.getAllByRole('tab', { selected: true })[0]).toHaveTextContent(/^Tất cả/);
+      cleanup();
+      search = 'flow=NEW';
       renderApp(<OrderListScreen />);
       await waitFor(() => expect(lists.at(-1)?.get('flow')).toBe('NEW'));
       expect(screen.getByRole('tab', { name: /^Đơn mới/ })).toHaveAttribute(
