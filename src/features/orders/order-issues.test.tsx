@@ -39,6 +39,33 @@ const COUNTS = {
   pancakeOverwrite: 34,
   pancakeOverwriteRestorable: 16,
   pancakeOverwriteCheckedAt: '2026-11-02T15:30:00.000Z',
+  warehouseSplit: 228,
+  warehouseSplitRepairable: 43,
+};
+
+const SPLIT_ORDER = {
+  orderId: '00000002-0000-4000-8000-000000000002',
+  docNumber: 'SOP2611-189319',
+  status: 'APPROVED',
+  customerName: 'Khách B',
+  warehouseId: null,
+  total: '150000',
+  fulfilmentStatus: 'NOT_STARTED',
+  carrierStatusText: null,
+  movedAt: '2026-11-05T01:42:00.000Z',
+  movedByName: 'Đặng Vinh Quang',
+  fromWarehouseId: null,
+  toWarehouseId: null,
+  fix: 'REPAIR',
+  reason: null,
+  extraLines: [{ skuCode: 'SP-0204', skuName: 'Rooting', qty: '2' }],
+};
+const SPLIT_PACKED = {
+  ...SPLIT_ORDER,
+  orderId: '00000003-0000-4000-8000-000000000003',
+  docNumber: 'SOP2611-189320',
+  fulfilmentStatus: 'PACKED',
+  fix: 'PACKED',
 };
 
 const OVERWRITE_ORDER = {
@@ -223,5 +250,62 @@ describe('OrderIssuesScreen', () => {
     fireEvent.click(within(dialog).getByRole('button', { name: /Khôi phục 1 đơn/ }));
     await waitFor(() => expect(restoreBodies).toEqual([{ orderIds: [OVERWRITE_ORDER.orderId] }]));
     expect((await within(dialog).findAllByText('Đã khôi phục')).length).toBeGreaterThan(0);
+  });
+
+  it('tab Đổi kho nhân đôi combo: quyền fix_warehouse_split; dọn chỉ gửi đơn dọn được', async () => {
+    expect(
+      buildAbility({
+        permissions: ['sales_order.issues', 'sales_order.fix_warehouse_split'],
+        hasGlobalAccess: false,
+      }).can('fix_warehouse_split', 'SalesOrder'),
+    ).toBe(true);
+    expect(
+      buildAbility({ permissions: ['sales_order.issues'], hasGlobalAccess: false }).can(
+        'fix_warehouse_split',
+        'SalesOrder',
+      ),
+    ).toBe(false);
+
+    search = 'issue=WAREHOUSE_SPLIT';
+    setup();
+    const repairBodies: unknown[] = [];
+    server.use(
+      http.get('/api/sales-orders/warehouse-splits', () =>
+        HttpResponse.json({
+          items: [SPLIT_ORDER, SPLIT_PACKED],
+          total: 2,
+          checkedAt: '2026-11-05T14:00:00.000Z',
+        }),
+      ),
+      http.get('/api/warehouses', () => HttpResponse.json([])),
+      http.post('/api/sales-orders/warehouse-splits/repair', async ({ request }) => {
+        repairBodies.push(await request.json());
+        return HttpResponse.json({
+          items: [
+            {
+              orderId: SPLIT_ORDER.orderId,
+              docNumber: SPLIT_ORDER.docNumber,
+              result: 'REPAIRED',
+              fix: null,
+            },
+          ],
+        });
+      }),
+    );
+    renderApp(<OrderIssuesScreen />);
+    const tile = await screen.findByTestId('issue-tile-WAREHOUSE_SPLIT');
+    await waitFor(() => expect(within(tile).getByText('228')).toBeInTheDocument());
+    expect(within(tile).getByText('43 đơn dọn được')).toBeInTheDocument();
+    expect(await screen.findByText('SOP2611-189319')).toBeInTheDocument();
+    expect(screen.getAllByText(/Rooting ×2/).length).toBe(2);
+    expect(screen.getByText(/Kho mở hộp lấy hàng thừa ra/)).toBeInTheDocument();
+    // Chọn cả hai: chỉ đơn dọn được vào hộp dọn.
+    fireEvent.click(screen.getAllByRole('checkbox')[1]!);
+    fireEvent.click(screen.getAllByRole('checkbox')[2]!);
+    fireEvent.click(await screen.findByRole('button', { name: /Dọn dòng thừa \(1\)/ }));
+    const dialog = await screen.findByRole('dialog');
+    fireEvent.click(within(dialog).getByRole('button', { name: /Dọn 1 đơn/ }));
+    await waitFor(() => expect(repairBodies).toEqual([{ orderIds: [SPLIT_ORDER.orderId] }]));
+    expect((await within(dialog).findAllByText('Đã dọn dòng thừa')).length).toBeGreaterThan(0);
   });
 });

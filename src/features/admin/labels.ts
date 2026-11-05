@@ -57,6 +57,7 @@ const PERMISSION_LABELS: Record<string, string> = {
   'sales_order.fulfil_manual': 'Đóng pick / gói tay',
   'sales_order.send_carrier': 'Gửi sang ĐVVC (kho)',
   'sales_order.issues': 'Xử lý đơn lỗi (màn Quản trị)',
+  'sales_order.fix_warehouse_split': 'Sửa đơn lỗi đổi kho nhân đôi combo',
   'sales_order.filter_team': 'Lọc đơn theo NV lên đơn',
   'sales_order.filter_dept': 'Lọc đơn theo phòng ban',
   'sales_order.set_order_date': 'Chọn ngày tạo đơn (vận đơn)',
