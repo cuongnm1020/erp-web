@@ -118,6 +118,15 @@ export type PancakeOverwriteChange = components['schemas']['PancakeOverwriteChan
 export type PancakeOverwriteFix = PancakeOverwriteOrder['fix'];
 export type PancakeOverwriteRestoreResult =
   components['schemas']['PancakeOverwriteRestoreResultDto'];
+export type WarehouseSplitOrder = components['schemas']['WarehouseSplitOrderDto'];
+export type WarehouseSplitFix = WarehouseSplitOrder['fix'];
+export type WarehouseSplitRepairItem = components['schemas']['WarehouseSplitRepairItemDto'];
+export interface WarehouseSplitParams {
+  fix?: WarehouseSplitFix;
+  q?: string;
+  take: number;
+  skip: number;
+}
 
 /** Query key theo phễu (luật 3): ['crm','orders','list', params] / ['crm','orders','detail', id]. */
 export const orderKeys = {
@@ -133,6 +142,8 @@ export const orderKeys = {
     [...orderKeys.lists(), 'issue-counts', p] as const,
   pancakeOverwrites: (p: { fix?: PancakeOverwriteFix; take: number; skip: number }) =>
     [...orderKeys.lists(), 'pancake-overwrites', p] as const,
+  warehouseSplits: (p: WarehouseSplitParams) =>
+    [...orderKeys.lists(), 'warehouse-splits', p] as const,
   details: () => [...orderKeys.all, 'detail'] as const,
   detail: (id: string) => [...orderKeys.details(), id] as const,
   shippingQuote: (
@@ -497,6 +508,53 @@ export function useRestorePancakeOverwrites() {
       void qc.invalidateQueries({ queryKey: orderKeys.lists() });
       void qc.invalidateQueries({ queryKey: orderKeys.details() });
     },
+  });
+}
+
+/**
+ * GET /sales-orders/warehouse-splits — đơn dính sự cố đổi kho nhân đôi combo (2026-11-05, quyền
+ * `sales_order.fix_warehouse_split`). Dưới prefix `lists` nên Sửa đơn / hủy đơn làm tươi luôn.
+ */
+export function useWarehouseSplits(p: WarehouseSplitParams) {
+  return useQuery({
+    queryKey: orderKeys.warehouseSplits(p),
+    queryFn: () => unwrap(api.GET('/sales-orders/warehouse-splits', { params: { query: p } })),
+    placeholderData: keepPreviousData,
+  });
+}
+
+/** POST …/warehouse-splits/scan — quét lại rồi làm tươi danh sách + đếm. */
+export function useScanWarehouseSplits() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () => unwrap(api.POST('/sales-orders/warehouse-splits/scan')),
+    onSuccess: () => void qc.invalidateQueries({ queryKey: orderKeys.lists() }),
+  });
+}
+
+/**
+ * POST …/warehouse-splits/repair — Dọn dòng thừa (≤ 50 đơn / lần; đẩy dòng gốc lên Pancake, chiếu
+ * về ERP, lập lại PICK). Không optimistic (luật 5): chờ kết quả từng đơn.
+ */
+export function useRepairWarehouseSplits() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (orderIds: string[]) =>
+      unwrap(api.POST('/sales-orders/warehouse-splits/repair', { body: { orderIds } })),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: orderKeys.lists() });
+      void qc.invalidateQueries({ queryKey: orderKeys.details() });
+    },
+  });
+}
+
+/** POST …/warehouse-splits/dismiss — Đánh dấu đã xử lý (ẩn khỏi danh sách). */
+export function useDismissWarehouseSplits() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (orderIds: string[]) =>
+      unwrap(api.POST('/sales-orders/warehouse-splits/dismiss', { body: { orderIds } })),
+    onSuccess: () => void qc.invalidateQueries({ queryKey: orderKeys.lists() }),
   });
 }
 

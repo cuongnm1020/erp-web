@@ -3933,6 +3933,81 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/sales-orders/warehouse-splits": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Đơn dính sự cố đổi kho nhân đôi combo (2026-11-05, tab của màn Xử lý đơn lỗi) — quyền
+         *     `sales_order.fix_warehouse_split` (mặc định ADMIN). Mỗi đơn kèm dòng giá 0 thừa hiện tại và
+         *     cách xử lý (`fix`). Khai TRƯỚC `:id`.
+         */
+        get: operations["SalesOrderController_warehouseSplits"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/sales-orders/warehouse-splits/scan": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Quét lại: lần ERP đổi kho từ 03/11 + lịch sử Pancake thêm dòng giá 0 → ghi đơn mới. */
+        post: operations["SalesOrderController_scanWarehouseSplits"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/sales-orders/warehouse-splits/repair": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Dọn dòng thừa (≤ 50 đơn / lần): đẩy lại dòng gốc lên Pancake, đọc lại xác nhận, chiếu về ERP,
+         *     lập lại PICK. Chỉ đơn kho chưa bắt đầu; đơn khác ra `skipped` kèm lý do.
+         */
+        post: operations["SalesOrderController_repairWarehouseSplits"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/sales-orders/warehouse-splits/dismiss": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Đánh dấu đã xử lý (sửa tay xong) — ẩn khỏi danh sách, ghi người + lúc. */
+        post: operations["SalesOrderController_dismissWarehouseSplits"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/sales-orders/pancake-overwrites": {
         parameters: {
             query?: never;
@@ -12267,6 +12342,78 @@ export interface components {
             pancakeOverwriteRestorable: number;
             /** @description Lần quét ghi đè gần nhất (ISO); null = chưa quét. */
             pancakeOverwriteCheckedAt: string | null;
+            /**
+             * @description Tab "Đổi kho nhân đôi combo" (2026-11-05): đơn còn dòng giá 0 thừa — chỉ người có
+             *     `sales_order.fix_warehouse_split` / superadmin, người khác 0.
+             */
+            warehouseSplit: number;
+            /** @description Trong `warehouseSplit`: dọn tự động được (kho chưa bắt đầu). */
+            warehouseSplitRepairable: number;
+        };
+        WarehouseSplitExtraLineDto: {
+            skuCode: string;
+            skuName: string;
+            /** @description Decimal chuỗi. */
+            qty: string;
+        };
+        WarehouseSplitOrderDto: {
+            /** @enum {string} */
+            fix: "REPAIR" | "PACKED" | "SHIPPED" | "MANUAL";
+            /**
+             * @description Lý do khi `fix` = MANUAL; null với các cách xử lý khác.
+             * @enum {string|null}
+             */
+            reason: "ZERO_BEFORE" | "ERP_LOCKED" | "NOT_APPROVED" | "WAREHOUSE_BUSY" | null;
+            orderId: string;
+            docNumber: string;
+            status: string;
+            customerName: string | null;
+            /** @description Kho hiện tại. */
+            warehouseId: string | null;
+            /** @description Tổng tiền hiện tại — Decimal chuỗi. */
+            total: string;
+            /** @description Trạng thái kho (snapshot); null = chưa tính. */
+            fulfilmentStatus: string | null;
+            carrierStatusText: string | null;
+            /** @description Lần ERP đổi kho làm tách dòng. */
+            movedAt: string;
+            movedByName: string | null;
+            fromWarehouseId: string | null;
+            toWarehouseId: string | null;
+            extraLines: components["schemas"]["WarehouseSplitExtraLineDto"][];
+        };
+        WarehouseSplitListDto: {
+            items: components["schemas"]["WarehouseSplitOrderDto"][];
+            total: number;
+            /** @description Lần quét gần nhất (ISO); null = chưa quét lần nào. */
+            checkedAt: string | null;
+        };
+        WarehouseSplitScanResultDto: {
+            /** @description Số đơn dính lỗi tìm thấy (kể cả đơn đã có / đã xử lý). */
+            found: number;
+            /** @description Số đơn mới ghi thêm. */
+            added: number;
+            ms: number;
+        };
+        WarehouseSplitRepairDto: {
+            orderIds: string[];
+        };
+        WarehouseSplitRepairItemDto: {
+            /** @enum {string} */
+            result: "REPAIRED" | "NOT_REPAIRABLE" | "PANCAKE_CHANGED" | "FAILED";
+            /**
+             * @description Khi NOT_REPAIRABLE: cách xử lý hiện tại của đơn.
+             * @enum {string|null}
+             */
+            fix: "REPAIR" | "PACKED" | "SHIPPED" | "MANUAL" | null;
+            orderId: string;
+            docNumber: string;
+        };
+        WarehouseSplitRepairResultDto: {
+            items: components["schemas"]["WarehouseSplitRepairItemDto"][];
+        };
+        WarehouseSplitOrderIdsDto: {
+            orderIds: string[];
         };
         PancakeOverwriteChangeDto: {
             /** @enum {string} */
@@ -24813,6 +24960,94 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["SalesOrderIssueCountsDto"];
                 };
+            };
+        };
+    };
+    SalesOrderController_warehouseSplits: {
+        parameters: {
+            query: {
+                fix?: "REPAIR" | "PACKED" | "SHIPPED" | "MANUAL";
+                /** @description Lọc theo mã đơn (chứa). */
+                q?: string;
+                take: number;
+                skip: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WarehouseSplitListDto"];
+                };
+            };
+        };
+    };
+    SalesOrderController_scanWarehouseSplits: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WarehouseSplitScanResultDto"];
+                };
+            };
+        };
+    };
+    SalesOrderController_repairWarehouseSplits: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WarehouseSplitRepairDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WarehouseSplitRepairResultDto"];
+                };
+            };
+        };
+    };
+    SalesOrderController_dismissWarehouseSplits: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WarehouseSplitOrderIdsDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };

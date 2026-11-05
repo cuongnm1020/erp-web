@@ -32,6 +32,7 @@ import {
   type OrderIssueCounts,
   type PancakeOverwriteFix,
   type SalesOrderListItem,
+  type WarehouseSplitFix,
 } from '../api/use-orders';
 import { fulfilmentLabel, orderFlowLabel } from '../labels';
 import { BulkFulfilPrintDialog } from './bulk-fulfil-print-dialog';
@@ -41,6 +42,7 @@ import { BulkShippingDialog } from './bulk-shipping-dialog';
 import { CancelWaybillDialog } from './cancel-waybill-dialog';
 import { SendToCarrierMenu } from './send-to-carrier-menu';
 import { PancakeOverwriteTab } from './pancake-overwrite-tab';
+import { WarehouseSplitTab } from './warehouse-split-tab';
 import { waybillErrorText } from './waybill-error';
 
 /**
@@ -54,7 +56,9 @@ type FilterKey = 'issue' | 'from' | 'to' | 'old' | 'ready' | 'fix';
 const FILTER_KEYS: readonly FilterKey[] = ['issue', 'from', 'to', 'old', 'ready', 'fix'];
 /** Tab thứ 6 (2026-11-02): đơn bị Pancake ghi đè — nguồn riêng, không phải bộ lọc `issue` của API. */
 const OVERWRITE = 'PANCAKE_OVERWRITE';
-type TabKey = OrderIssue | typeof OVERWRITE;
+/** Tab thứ 7 (2026-11-05): sự cố đổi kho nhân đôi combo — quyền `fix_warehouse_split SalesOrder`. */
+const SPLIT = 'WAREHOUSE_SPLIT';
+type TabKey = OrderIssue | typeof OVERWRITE | typeof SPLIT;
 const LIST_DEFAULTS = { filterKeys: FILTER_KEYS };
 const OLDER_DAYS = 2;
 
@@ -131,6 +135,14 @@ const ISSUE_TABS: IssueTab[] = [
     count: (c) => c.pancakeOverwrite,
     note: (c) => `${c.pancakeOverwriteRestorable} đơn khôi phục được`,
   },
+  {
+    issue: SPLIT,
+    label: 'Đổi kho nhân đôi combo',
+    level: 'block',
+    hint: 'Đổi kho đơn Pancake có combo làm Pancake tách thành phần combo thành dòng giá 0 — kho lấy gấp đôi. Đơn kho chưa làm: chọn rồi Dọn dòng thừa. Đơn đã đóng gói / đã giao: sửa tay theo cột Cách xử lý rồi Đánh dấu đã xử lý. Đơn hết dòng thừa tự rời danh sách.',
+    count: (c) => c.warehouseSplit,
+    note: (c) => `${c.warehouseSplitRepairable} đơn dọn được`,
+  },
 ];
 
 const LEVEL_TEXT: Record<Level, string> = {
@@ -165,13 +177,16 @@ export function OrderIssuesScreen() {
   // Màn mở cho quyền sales_order.issues (kho, 2026-11-03); tab "Bị Pancake ghi đè" chỉ superadmin.
   const ability = useAbility();
   const canOverwrite = ability.can('manage', 'OrderIssue');
-  const tabs = canOverwrite ? ISSUE_TABS : ISSUE_TABS.filter((t) => t.issue !== OVERWRITE);
+  const canSplit = ability.can('fix_warehouse_split', 'SalesOrder');
+  const hidden = (k: TabKey) => (k === OVERWRITE && !canOverwrite) || (k === SPLIT && !canSplit);
+  const tabs = ISSUE_TABS.filter((t) => !hidden(t.issue));
   const parsed = parseTab(state.filters.issue);
-  const tabKey: TabKey = parsed === OVERWRITE && !canOverwrite ? 'WAYBILL_ERROR' : parsed;
+  const tabKey: TabKey = hidden(parsed) ? 'WAYBILL_ERROR' : parsed;
   const tab = ISSUE_TABS.find((t) => t.issue === tabKey)!;
   const overwrite = tabKey === OVERWRITE;
-  // Tab ghi đè không gọi danh sách đơn — nhóm API mặc định để hook giữ thứ tự gọi.
-  const issue: OrderIssue = overwrite ? 'WAYBILL_ERROR' : (tabKey as OrderIssue);
+  const split = tabKey === SPLIT;
+  // Tab ghi đè / đổi kho không gọi danh sách đơn — nhóm API mặc định để hook giữ thứ tự gọi.
+  const issue: OrderIssue = overwrite || split ? 'WAYBILL_ERROR' : (tabKey as OrderIssue);
   const common = {
     q: state.q,
     from: state.filters.from,
@@ -190,7 +205,7 @@ export function OrderIssuesScreen() {
       take: state.size,
       skip: (state.page - 1) * state.size,
     },
-    { enabled: !overwrite },
+    { enabled: !overwrite && !split },
   );
   const carriers = useCarriers();
   const carrierCode = useMemo(() => {
@@ -262,10 +277,10 @@ export function OrderIssuesScreen() {
       <div
         role="tablist"
         aria-label="Cần xử lý"
-        className="mb-3 grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6"
+        className="mb-3 grid grid-cols-2 gap-3 md:grid-cols-4 xl:grid-cols-7"
       >
         {tabs.map((t) => {
-          const on = t.issue === issue;
+          const on = t.issue === tabKey;
           const c = counts.data;
           return (
             <button
@@ -300,7 +315,18 @@ export function OrderIssuesScreen() {
         {tab.hint}
       </p>
 
-      {overwrite ? (
+      {split ? (
+        <WarehouseSplitTab
+          fix={(state.filters.fix as WarehouseSplitFix | undefined) || undefined}
+          q={state.q}
+          page={state.page}
+          size={state.size}
+          onFixChange={(fix) => set({ filters: { ...state.filters, fix } })}
+          onQChange={(q) => set({ q })}
+          onPageChange={(page) => set({ page })}
+          onSizeChange={(size) => set({ size })}
+        />
+      ) : overwrite ? (
         <PancakeOverwriteTab
           fix={(state.filters.fix as PancakeOverwriteFix | undefined) || undefined}
           page={state.page}
