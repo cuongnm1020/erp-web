@@ -48,6 +48,8 @@ export interface SalesFilter {
   /** Nguồn đơn Pancake / hệ thống — chọn ở ô Kênh. */
   origin?: OrderOrigin;
   teamId?: string;
+  /** Nhóm CSKH — id trưởng nhóm (đơn trưởng nhóm + NV trong nhóm, 2026-11-05). */
+  groupLeadId?: string;
   ownerId?: string;
   /** POS Pancake của đơn (shop_id, chuỗi số). */
   pancakeShopId?: string;
@@ -112,6 +114,7 @@ const filterQuery = (f: SalesFilter) => ({
   channel: f.channel,
   origin: f.origin,
   teamId: f.teamId,
+  groupLeadId: f.groupLeadId,
   ownerId: f.ownerId,
   pancakeShopId: f.pancakeShopId,
   fulfilment: f.fulfilment,
@@ -349,6 +352,7 @@ export function useSalesTopProductsMonthly(
     channel: f.channel,
     origin: f.origin,
     teamId: f.teamId,
+    groupLeadId: f.groupLeadId,
     ownerId: f.ownerId,
     pancakeShopId: f.pancakeShopId,
     supplierId,
@@ -443,6 +447,20 @@ export function useReportDepartments(enabled: boolean) {
     enabled,
     queryKey: salesReportKeys.depts(),
     queryFn: () => unwrap(api.GET('/sales-orders/team-filter-options')),
+    staleTime: 300_000,
+  });
+}
+
+/**
+ * GET /reports/sales/filter-options — ô "Phòng" (phòng người xem làm leader) + "Nhóm" (nhóm CSKH
+ * trong các phòng đó) cho leader quản nhiều phòng / nhiều nhóm (2026-11-05). Màn chỉ hiện ô có
+ * từ 2 lựa chọn.
+ */
+export function useReportScopeOptions(enabled: boolean) {
+  return useQuery({
+    enabled,
+    queryKey: [...salesReportKeys.all, 'options', 'scope'] as const,
+    queryFn: () => unwrap(api.GET('/reports/sales/filter-options')),
     staleTime: 300_000,
   });
 }

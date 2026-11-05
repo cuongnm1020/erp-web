@@ -49,13 +49,19 @@ export function SearchableMultiSelect({
         : `${label}: ${values.length} ${unit ?? 'mục'}`;
   const toggle = (v: string) =>
     onChange(picked.has(v) ? values.filter((x) => x !== v) : [...values, v]);
-  // Mục đã chọn lên đầu (theo thứ tự danh sách gốc) — mở lại thấy ngay mình đang lọc gì.
+  // Mục đã chọn lên đầu (theo thứ tự danh sách gốc) — mở lại thấy ngay mình đang lọc gì. Thứ tự
+  // CHỐT lúc mở hộp (2026-11-05, user): tick / bỏ tick khi đang mở không làm dòng nhảy chỗ.
+  const [pinned, setPinned] = useState<ReadonlySet<string>>(() => new Set());
   const ordered = [
-    ...options.filter((o) => picked.has(o.value)),
-    ...options.filter((o) => !picked.has(o.value)),
+    ...options.filter((o) => pinned.has(o.value)),
+    ...options.filter((o) => !pinned.has(o.value)),
   ];
+  const onOpenChange = (next: boolean) => {
+    if (next) setPinned(new Set(values));
+    setOpen(next);
+  };
   return (
-    <Popover open={open} onOpenChange={setOpen}>
+    <Popover open={open} onOpenChange={onOpenChange}>
       <PopoverTrigger asChild>
         <button
           type="button"

@@ -208,6 +208,7 @@ const optionHandlers = [
       { id: 't-wh', code: 'WH', name: 'Kho', type: 'WAREHOUSE', parentId: null },
     ]),
   ),
+  http.get('/api/reports/sales/filter-options', () => HttpResponse.json({ teams: [], groups: [] })),
 ];
 
 /**
@@ -320,6 +321,70 @@ describe('SalesReportScreen — quyền + bộ lọc chung', () => {
     fireEvent.click(box);
     fireEvent.click(await screen.findByRole('option', { name: 'SPY · Sale FB' }));
     await waitFor(() => expect(lastUrl().get('teamId')).toBe('t-spy-sale'));
+  });
+
+  it('leader quản 2 phòng + nhiều nhóm: ô Phòng / Nhóm → teamId / groupLeadId vào query; chọn phòng lọc nhóm theo phòng (2026-11-05)', async () => {
+    search = `from=${RANGE.from}&to=${RANGE.to}`;
+    const calls: URLSearchParams[] = [];
+    server.use(
+      http.get('/api/reports/sales/filter-options', () =>
+        HttpResponse.json({
+          teams: [
+            { teamId: 't-la', name: 'CSKH LA' },
+            { teamId: 't-dn', name: 'CSKH DƯƠNG NỘI' },
+          ],
+          groups: [
+            { groupLeadId: 'g-ngoc', name: 'Bảo Ngọc', teamId: 't-la', memberCount: 3 },
+            { groupLeadId: 'g-van', name: 'Lê Thị Vân', teamId: 't-la', memberCount: 3 },
+            { groupLeadId: 'g-dn', name: 'Nhóm DN', teamId: 't-dn', memberCount: 2 },
+          ],
+        }),
+      ),
+      http.get('/api/reports/sales/summary', ({ request }) => {
+        calls.push(new URL(request.url).searchParams);
+        return HttpResponse.json(SUMMARY);
+      }),
+      http.get('/api/reports/sales/timeseries', () => HttpResponse.json(SERIES)),
+    );
+    renderApp(<SalesReportScreen />, { me: ME_LEADER });
+    fireEvent.click(await screen.findByRole('combobox', { name: 'Phòng' }));
+    fireEvent.click(await screen.findByRole('option', { name: 'CSKH LA' }));
+    await waitFor(() => expect(lastUrl().get('teamId')).toBe('t-la'));
+    expect(screen.queryByText(/^Team:/)).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('combobox', { name: 'Nhóm' }));
+    fireEvent.click(await screen.findByRole('option', { name: 'Lê Thị Vân · 3 NV' }));
+    await waitFor(() => expect(lastUrl().get('groupLeadId')).toBe('g-van'));
+  });
+
+  it('groupLeadId trên URL đi vào query; phòng chọn sẵn chỉ còn nhóm của phòng đó (2026-11-05)', async () => {
+    search = `from=${RANGE.from}&to=${RANGE.to}&teamId=t-la&groupLeadId=g-ngoc`;
+    const calls: URLSearchParams[] = [];
+    server.use(
+      http.get('/api/reports/sales/filter-options', () =>
+        HttpResponse.json({
+          teams: [
+            { teamId: 't-la', name: 'CSKH LA' },
+            { teamId: 't-dn', name: 'CSKH DƯƠNG NỘI' },
+          ],
+          groups: [
+            { groupLeadId: 'g-ngoc', name: 'Bảo Ngọc', teamId: 't-la', memberCount: 3 },
+            { groupLeadId: 'g-van', name: 'Lê Thị Vân', teamId: 't-la', memberCount: 3 },
+            { groupLeadId: 'g-dn', name: 'Nhóm DN', teamId: 't-dn', memberCount: 2 },
+          ],
+        }),
+      ),
+      http.get('/api/reports/sales/summary', ({ request }) => {
+        calls.push(new URL(request.url).searchParams);
+        return HttpResponse.json(SUMMARY);
+      }),
+      http.get('/api/reports/sales/timeseries', () => HttpResponse.json(SERIES)),
+    );
+    renderApp(<SalesReportScreen />, { me: ME_LEADER });
+    await waitFor(() => expect(calls.at(-1)?.get('groupLeadId')).toBe('g-ngoc'));
+    expect(calls.at(-1)?.get('teamId')).toBe('t-la');
+    fireEvent.click(await screen.findByRole('combobox', { name: 'Nhóm' }));
+    const names = (await screen.findAllByRole('option')).map((o) => o.textContent);
+    expect(names).not.toContain('Nhóm DN · 2 NV');
   });
 
   it('"Tính lại số liệu" chỉ cho report.sales_all: POST khoảng đang xem → toast', async () => {
@@ -1084,7 +1149,12 @@ describe('Tab Nhà cung cấp (RPT-05c)', () => {
       ),
     );
     renderApp(<SalesReportScreen />, { me: ME_LEADER });
-    fireEvent.click(await screen.findByRole('button', { name: 'Xem sản phẩm của Nhà cung cấp 1' }));
+    await screen.findByRole('button', { name: 'Xem sản phẩm của Nhà cung cấp 1' });
+    // Lựa chọn Phòng / Nhóm về sau có thể render lại bảng → bấm lại trên nút hiện tại tới khi ghi URL.
+    await waitFor(() => {
+      fireEvent.click(screen.getByRole('button', { name: 'Xem sản phẩm của Nhà cung cấp 1' }));
+      expect(replace).toHaveBeenCalled();
+    });
     const url = lastUrl();
     expect(url.get('tab')).toBe('product');
     expect(url.get('group')).toBe('product');

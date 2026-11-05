@@ -27,6 +27,8 @@ export const REPORT_FILTER_KEYS = [
   'channel',
   'teamId',
   'teamName',
+  // Nhóm CSKH (id trưởng nhóm) — ô "Nhóm" của leader (2026-11-05)
+  'groupLeadId',
   'ownerId',
   'ownerName',
   // POS Pancake của đơn
@@ -122,6 +124,7 @@ export function useSalesReportState() {
         channelRaw && CHANNEL_VALUES.has(channelRaw) ? (channelRaw as SalesChannel) : undefined,
       origin: channelRaw && ORIGIN_VALUES.has(channelRaw) ? (channelRaw as OrderOrigin) : undefined,
       teamId: state.filters.teamId,
+      groupLeadId: state.filters.groupLeadId,
       ownerId: state.filters.ownerId,
       pancakeShopId: /^[1-9]\d{0,17}$/.test(state.filters.pancakeShopId ?? '')
         ? state.filters.pancakeShopId
@@ -136,6 +139,7 @@ export function useSalesReportState() {
       channelRaw,
       fulfilmentRaw,
       state.filters.teamId,
+      state.filters.groupLeadId,
       state.filters.ownerId,
       state.filters.pancakeShopId,
     ],
