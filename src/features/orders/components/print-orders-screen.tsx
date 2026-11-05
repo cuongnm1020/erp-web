@@ -1141,6 +1141,7 @@ export function PrintOrdersScreen() {
             })
           }
           onExitSearch={() => set({ q: '', filters: { ...state.filters, group: undefined } })}
+          onShowAll={() => set({ filters: { ...state.filters, group: 'all' } })}
         />
 
         {flow === 'WAITING_STOCK' || shortSkuId ? (
