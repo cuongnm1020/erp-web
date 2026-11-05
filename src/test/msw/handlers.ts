@@ -1748,8 +1748,6 @@ export const handlers = [
     const all = makeCustomerOrders(25).filter((o) => !status || o.status === status);
     return HttpResponse.json({ items: all.slice(skip, skip + take), total: all.length });
   }),
-  // Tổng mọi đơn (mẫu số "khớp / tổng", 2026-11-03) — khai TRƯỚC /sales-orders/:id.
-  http.get('/api/sales-orders/count', () => HttpResponse.json({ total: 108_000 })),
   // Đếm tab (khai TRƯỚC /sales-orders/:id). Fixture không lọc thêm — đếm trên cả 60 đơn.
   http.get('/api/sales-orders/flow-counts', () => {
     const all = makeOrders(60);
