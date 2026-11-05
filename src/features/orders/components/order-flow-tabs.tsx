@@ -9,53 +9,45 @@ import type { OrderFlow } from '../api/use-orders';
 import { ORDER_FLOW_GROUPS, orderFlowLabel, type OrderFlowFamily } from '../labels';
 
 /** Lớp màu theo họ — viết đủ chuỗi để Tailwind sinh lớp. */
-const TONE: Record<
-  OrderFlowFamily,
-  { solid: string; weak: string; text: string; border: string; borderLeft: string }
-> = {
-  wait: {
-    solid: 'bg-flow-wait',
-    weak: 'bg-flow-wait-weak',
-    text: 'text-flow-wait',
-    border: 'border-flow-wait',
-    borderLeft: 'border-l-flow-wait',
-  },
-  fulfil: {
-    solid: 'bg-flow-fulfil',
-    weak: 'bg-flow-fulfil-weak',
-    text: 'text-flow-fulfil',
-    border: 'border-flow-fulfil',
-    borderLeft: 'border-l-flow-fulfil',
-  },
-  ship: {
-    solid: 'bg-flow-ship',
-    weak: 'bg-flow-ship-weak',
-    text: 'text-flow-ship',
-    border: 'border-flow-ship',
-    borderLeft: 'border-l-flow-ship',
-  },
-  done: {
-    solid: 'bg-flow-done',
-    weak: 'bg-flow-done-weak',
-    text: 'text-flow-done',
-    border: 'border-flow-done',
-    borderLeft: 'border-l-flow-done',
-  },
-  issue: {
-    solid: 'bg-flow-issue',
-    weak: 'bg-flow-issue-weak',
-    text: 'text-flow-issue',
-    border: 'border-flow-issue',
-    borderLeft: 'border-l-flow-issue',
-  },
-  off: {
-    solid: 'bg-flow-off',
-    weak: 'bg-flow-off-weak',
-    text: 'text-flow-off',
-    border: 'border-flow-off',
-    borderLeft: 'border-l-flow-off',
-  },
-};
+const TONE: Record<OrderFlowFamily, { solid: string; weak: string; text: string; border: string }> =
+  {
+    wait: {
+      solid: 'bg-flow-wait',
+      weak: 'bg-flow-wait-weak',
+      text: 'text-flow-wait',
+      border: 'border-flow-wait',
+    },
+    fulfil: {
+      solid: 'bg-flow-fulfil',
+      weak: 'bg-flow-fulfil-weak',
+      text: 'text-flow-fulfil',
+      border: 'border-flow-fulfil',
+    },
+    ship: {
+      solid: 'bg-flow-ship',
+      weak: 'bg-flow-ship-weak',
+      text: 'text-flow-ship',
+      border: 'border-flow-ship',
+    },
+    done: {
+      solid: 'bg-flow-done',
+      weak: 'bg-flow-done-weak',
+      text: 'text-flow-done',
+      border: 'border-flow-done',
+    },
+    issue: {
+      solid: 'bg-flow-issue',
+      weak: 'bg-flow-issue-weak',
+      text: 'text-flow-issue',
+      border: 'border-flow-issue',
+    },
+    off: {
+      solid: 'bg-flow-off',
+      weak: 'bg-flow-off-weak',
+      text: 'text-flow-off',
+      border: 'border-flow-off',
+    },
+  };
 
 /** Họ màu riêng của trạng thái kết thúc — Thành công / Đã hủy khác họ với khối chứa nó. */
 const FLOW_FAMILY: Partial<Record<OrderFlow, OrderFlowFamily>> = {
@@ -66,13 +58,12 @@ const FLOW_FAMILY: Partial<Record<OrderFlow, OrderFlowFamily>> = {
 type Counts = Partial<Record<OrderFlow, number>> | undefined;
 
 /**
- * Tab trạng thái đơn (design system FlowTabs v3, 2026-11-04): cả 14 trạng thái hiện cùng lúc,
- * chia 4 khối màu theo giai đoạn (Chờ xử lý · Kho · Cần xử lý · Vận chuyển), khối không có tên /
- * tổng số; khối và chip tự xuống dòng nên màn hẹp không mất tab. Luôn chọn đúng một trạng thái.
- * `searching` = đang xem mọi trạng thái (ô tìm có chữ hoặc `?group=all`) — các khối mờ, không chip
+ * Tab trạng thái đơn (design system FlowTabs v3, 2026-11-04): cả 14 trạng thái hiện cùng lúc
+ * thành một dãy chip liền, theo thứ tự giai đoạn (Chờ xử lý · Kho · Cần xử lý · Vận chuyển), tự
+ * xuống dòng khi hẹp; màu chip theo họ. Luôn chọn đúng một trạng thái. Trước đây chia 4 khối
+ * màu theo giai đoạn — bỏ ở màn In đơn (2026-11-04) rồi màn Đơn hàng (user 2026-11-05).
+ * `searching` = đang xem mọi trạng thái (ô tìm có chữ hoặc `?group=all`) — dãy chip mờ, không chip
  * nào chọn, dòng báo + "Quay lại <trạng thái>".
- * `grouped={false}` (màn In đơn, user 2026-11-04): bỏ khối theo giai đoạn, mọi chip xếp sát nhau
- * trên một dòng (vẫn tự xuống dòng khi hẹp); màu chip vẫn theo họ.
  */
 export function OrderFlowTabs({
   flow,
@@ -81,7 +72,6 @@ export function OrderFlowTabs({
   searchingLabel,
   onFlowChange,
   onExitSearch,
-  grouped = true,
 }: {
   flow: OrderFlow;
   counts: Counts;
@@ -90,8 +80,6 @@ export function OrderFlowTabs({
   searchingLabel: string;
   onFlowChange: (f: OrderFlow) => void;
   onExitSearch: () => void;
-  /** Mặc định chia 4 khối màu theo giai đoạn; `false` = một dãy chip liền. */
-  grouped?: boolean;
 }) {
   const chipsOf = (g: (typeof ORDER_FLOW_GROUPS)[number]) =>
     [...g.flows, ...g.done].map((f) => (
@@ -109,31 +97,9 @@ export function OrderFlowTabs({
       <div
         role="tablist"
         aria-label="Trạng thái đơn"
-        className={cn(
-          'flex flex-wrap items-stretch',
-          grouped ? 'gap-2' : 'gap-1.5',
-          searching && 'opacity-60',
-        )}
+        className={cn('flex flex-wrap items-stretch gap-1.5', searching && 'opacity-60')}
       >
-        {!grouped
-          ? ORDER_FLOW_GROUPS.map(chipsOf)
-          : ORDER_FLOW_GROUPS.map((g) => {
-              const t = TONE[g.family];
-              return (
-                <div
-                  key={g.group}
-                  role="group"
-                  aria-label={g.label}
-                  className={cn(
-                    'flex min-w-0 flex-auto basis-full flex-wrap items-center gap-1.5 rounded-lg border-l-4 px-2 py-1.5 md:basis-auto',
-                    t.weak,
-                    t.borderLeft,
-                  )}
-                >
-                  {chipsOf(g)}
-                </div>
-              );
-            })}
+        {ORDER_FLOW_GROUPS.map(chipsOf)}
       </div>
 
       {searching ? (

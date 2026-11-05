@@ -1131,7 +1131,6 @@ export function PrintOrdersScreen() {
           counts={counts.data}
           searching={searching}
           searchingLabel={state.q}
-          grouped={false}
           onFlowChange={(f) =>
             set({
               filters: {
