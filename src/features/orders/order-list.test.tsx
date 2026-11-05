@@ -121,16 +121,15 @@ describe('OrderListScreen — GET /sales-orders (P1-12)', () => {
     await waitFor(() =>
       expect(screen.getByTestId('order-count')).toHaveTextContent(String(n('DELIVERED'))),
     );
-    // v3 (2026-11-04): cả 14 trạng thái cùng lúc trong 4 khối, không tab cha / không tên khối.
+    // v3 (2026-11-04): cả 14 trạng thái cùng lúc, không tab cha. 2026-11-05: bỏ cả 4 khối giai
+    // đoạn — một dãy chip liền như màn In đơn.
     const chip = await screen.findByRole('tab', {
       name: new RegExp(`^Thành công\\s*${n('DELIVERED')}$`),
     });
     expect(chip).toHaveAttribute('aria-selected', 'true');
     expect(screen.getAllByRole('tab')).toHaveLength(14);
     expect(screen.getAllByRole('tab', { selected: true })).toHaveLength(1);
-    expect(
-      within(screen.getByRole('group', { name: 'Vận chuyển' })).getAllByRole('tab'),
-    ).toHaveLength(4);
+    expect(screen.queryByRole('group', { name: 'Vận chuyển' })).not.toBeInTheDocument();
     expect(screen.queryByRole('tab', { name: /^Tất cả/ })).not.toBeInTheDocument();
     expect(screen.queryByText('Đã xong')).not.toBeInTheDocument();
     // Bấm chip → ?flow=; bấm Đơn mới (mặc định) → bỏ flow khỏi URL.
