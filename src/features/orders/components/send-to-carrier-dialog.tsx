@@ -68,8 +68,11 @@ import {
   type ShippingOptionsFormValues,
 } from '../shipping-options';
 import { CarrierSelect } from '@/features/wms/components/carrier-select';
+import { usePdaPackers } from '@/features/wms/api/use-pda';
 
 const NO_SERVICE = '__default__';
+/** Ô NV đóng hàng để trống = không giao đích danh (kho giao trên PDA như cũ). */
+const NO_PACKER = '__none__';
 
 /**
  * "Gửi sang ĐVVC" — dialog hai cột như Pancake: trái là các đơn đã chọn (tìm / quét mã để thêm,
@@ -184,6 +187,28 @@ export function SendToCarrierDialog({
   const services = CARRIER_SERVICES[carrier.code] ?? [];
   const ghtk = hasPickupOptions(carrier.code);
   const customPickup = form.watch('customPickup');
+  const pickupWarehouseId = form.watch('warehouseId');
+
+  // NV đóng hàng (2026-11-06): người đóng gói của kho xuất — kho chọn ở "Tùy chọn địa chỉ lấy hàng",
+  // không thì kho chung của các đơn (lô nhiều kho → không chọn được). Lấy hàng xong PACK giao thẳng
+  // người này (server kiểm lại, sai kho → đơn vào danh sách lỗi).
+  const canPickPacker = useAbility().can('execute', 'Task');
+  const packWarehouseId = useMemo(() => {
+    if (customPickup && pickupWarehouseId) return pickupWarehouseId;
+    const whs = [...new Set(sendable.map((o) => o.warehouseId))];
+    return whs.length === 1 ? (whs[0] ?? null) : null;
+  }, [customPickup, pickupWarehouseId, sendable]);
+  const packers = usePdaPackers(canPickPacker ? packWarehouseId : null);
+  const [packerId, setPackerId] = useState<string>(NO_PACKER);
+  // Mở lại với lô khác → bỏ NV đã chọn của lô trước.
+  useEffect(() => {
+    if (open) setPackerId(NO_PACKER);
+  }, [open]);
+  useEffect(() => {
+    if (packerId !== NO_PACKER && !(packers.data ?? []).some((p) => p.id === packerId)) {
+      setPackerId(NO_PACKER);
+    }
+  }, [packers.data, packerId]);
 
   /** Enter trong ô tìm: khớp đơn đã có thì thôi; không thì tra API theo số đơn (quét mã). */
   const addByDocNumber = async () => {
@@ -221,6 +246,7 @@ export function SendToCarrierDialog({
         options: toShippingOptions(v),
         ...(v.customPickup && v.warehouseId ? { warehouseId: v.warehouseId } : {}),
         ...(canFulfil ? { holdPick: true } : {}),
+        ...(packerId !== NO_PACKER ? { packerId } : {}),
       });
       announce(carrier.code, r, orders.length - sendable.length);
       if (canFulfil && r.sent.length > 0) {
@@ -472,24 +498,66 @@ export function SendToCarrierDialog({
                   <div className="min-h-0 flex-1 space-y-5 overflow-y-auto bg-muted/20 px-5 py-4">
                     <h3 className="text-base font-semibold">Cấu hình</h3>
 
-                    <div className="space-y-1">
-                      <label
-                        htmlFor="send-carrier-account"
-                        className="text-sm text-muted-foreground"
-                      >
-                        Tài khoản {carrier.code}
-                      </label>
-                      {/* Ô chọn hãng dùng chung, chỉ tài khoản của hãng này (trường cấu hình bên dưới
-                        theo hãng). Một tài khoản thì chỉ hiện, không cần chọn. */}
-                      <CarrierSelect
-                        id="send-carrier-account"
-                        aria-label={`Tài khoản ${carrier.code}`}
-                        className="h-9 w-full sm:w-80"
-                        filter={(o) => o.carrier.id === carrier.id}
-                        value={{ carrierId: carrier.id, accountId }}
-                        disabled={accounts.length <= 1}
-                        onChange={(_, o) => setAccountId(o?.accountId ?? null)}
-                      />
+                    <div className="grid grid-cols-1 gap-x-6 gap-y-3 sm:grid-cols-2">
+                      <div className="space-y-1">
+                        <label
+                          htmlFor="send-carrier-account"
+                          className="text-sm text-muted-foreground"
+                        >
+                          Tài khoản {carrier.code}
+                        </label>
+                        {/* Ô chọn hãng dùng chung, chỉ tài khoản của hãng này (trường cấu hình bên
+                          dưới theo hãng). Một tài khoản thì chỉ hiện, không cần chọn. */}
+                        <CarrierSelect
+                          id="send-carrier-account"
+                          aria-label={`Tài khoản ${carrier.code}`}
+                          className="h-9 w-full"
+                          filter={(o) => o.carrier.id === carrier.id}
+                          value={{ carrierId: carrier.id, accountId }}
+                          disabled={accounts.length <= 1}
+                          onChange={(_, o) => setAccountId(o?.accountId ?? null)}
+                        />
+                      </div>
+                      {canPickPacker ? (
+                        <div className="space-y-1">
+                          <label
+                            htmlFor="send-carrier-packer"
+                            className="text-sm text-muted-foreground"
+                          >
+                            NV đóng hàng
+                          </label>
+                          <Select
+                            value={packerId}
+                            onValueChange={setPackerId}
+                            disabled={!packWarehouseId || packers.isPending}
+                          >
+                            <SelectTrigger
+                              id="send-carrier-packer"
+                              aria-label="NV đóng hàng"
+                              className="h-9 w-full"
+                            >
+                              <SelectValue placeholder="Không chọn" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value={NO_PACKER}>
+                                — Không chọn (giao trên PDA) —
+                              </SelectItem>
+                              {(packers.data ?? []).map((p) => (
+                                <SelectItem key={p.id} value={p.id}>
+                                  {p.fullName}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          <p className="text-xs text-muted-foreground">
+                            {!packWarehouseId
+                              ? 'Các đơn khác kho xuất — chọn "Tùy chọn địa chỉ lấy hàng" để chọn NV.'
+                              : packerId !== NO_PACKER
+                                ? 'Lấy hàng xong, việc đóng gói giao thẳng người này.'
+                                : 'Để trống: người lấy hàng giao người đóng gói trên PDA.'}
+                          </p>
+                        </div>
+                      ) : null}
                     </div>
 
                     <fieldset className="space-y-2">

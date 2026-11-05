@@ -13447,6 +13447,15 @@ export interface components {
              *     với người có quyền `sales_order.fulfil_manual`.
              */
             holdPick?: boolean;
+            /**
+             * Format: uuid
+             * @description NV đóng hàng cho cả lô (2026-11-06): người đóng gói đang hoạt động, có `shipment.pack`, kho làm
+             *     việc = kho xuất của đơn (GET /pda/packers?warehouseId=). Ghi `SalesOrder.packerId`; PACK sinh
+             *     sau khi lấy hàng xong giao thẳng người này (thắng lần giao trên PDA), PACK đang chờ chưa ai giữ
+             *     giao luôn. Sai kho / không hợp lệ → đơn đó vào `failed` (422 ORDER_PACKER_INVALID). Bỏ trống =
+             *     giữ nguyên.
+             */
+            packerId?: string;
         };
         SendOrderToCarrierItemDto: {
             orderId: string;
