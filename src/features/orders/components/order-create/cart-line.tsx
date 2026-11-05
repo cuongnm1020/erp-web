@@ -23,6 +23,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { formatMoney, formatQuantity } from '@/lib/format';
+import { useWarehouse } from '@/lib/warehouse';
 import {
   useComboAvailableIn,
   useLinePrice,
@@ -59,6 +60,11 @@ export interface LineMetrics {
   total: string | null;
   /** Cân nặng dòng (kg) = SL cơ sở × cân nặng SKU; null = SKU chưa khai cân nặng. */
   weightKg: string | null;
+  /**
+   * Sản phẩm "Chỉ bán từ kho" khác Kho xuất đang chọn (2026-11-05) → form chặn lưu / chốt. Server
+   * vẫn chặn (409 ORDER_SKU_SELL_WAREHOUSE) — đây chỉ báo sớm.
+   */
+  sellBlocked?: boolean;
 }
 
 /** Cột của giỏ hàng — header ở order-draft-form dùng chung để thẳng hàng. */
@@ -114,6 +120,13 @@ export function CartLine({
   const stock = useSkuAvailability(combo ? '' : (sku.data?.code ?? ''), warehouseId);
   const comboIn = useComboAvailableIn(combo ? (sku.data?.code ?? '') : '', warehouseId);
   const comboAvailable = warehouseId ? (comboIn.data ?? null) : (combo?.available ?? null);
+  // Chỉ bán từ kho (2026-11-05): Kho xuất chọn cụ thể mà sản phẩm khoá ở kho khác. "Kho mặc định
+  // của bạn" ('') do server quyết kho — server chặn nếu lệch.
+  const { options: warehouseOptions } = useWarehouse();
+  const sellWarehouseId = sku.data?.product?.sellWarehouseId ?? null;
+  const sellBlocked = !!sellWarehouseId && warehouseId !== '' && sellWarehouseId !== warehouseId;
+  const sellWarehouseName =
+    warehouseOptions.find((w) => w.id === sellWarehouseId)?.name ?? 'kho khác';
   /** Kho xuất không có dòng tồn nào của SKU — coi như 0. */
   const noStockHere = !combo && warehouseId !== '' && sku.data && stock.isSuccess && !stock.data;
   const qtyValid = QTY_RE.test(qty ?? '');
@@ -161,8 +174,8 @@ export function CartLine({
       ? pancakeAmountFix(lineTotal, qtyBase)
       : null;
   useEffect(() => {
-    onMetrics(fieldId, { total: lineTotal, weightKg });
-  }, [fieldId, lineTotal, weightKg, onMetrics]);
+    onMetrics(fieldId, { total: lineTotal, weightKg, sellBlocked });
+  }, [fieldId, lineTotal, weightKg, sellBlocked, onMetrics]);
 
   // Giá sửa tay thấp (kể cả 0, dưới trần CK) không còn vào duyệt — 2026-10-29 tắt quy tắc
   // "Đơn giá dưới trần chiết khấu" phía server.
@@ -271,6 +284,11 @@ export function CartLine({
         {combo ? (
           <p className="mt-0.5 text-xs text-muted-foreground">
             gồm {combo.components.map((c) => `${formatQuantity(c.qty)} × ${c.code}`).join(', ')}
+          </p>
+        ) : null}
+        {sellBlocked ? (
+          <p role="alert" className="mt-0.5 text-xs font-semibold text-destructive">
+            Chỉ bán từ {sellWarehouseName} — đổi Kho xuất hoặc bỏ dòng này
           </p>
         ) : null}
       </div>

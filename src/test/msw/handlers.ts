@@ -1018,6 +1018,8 @@ export function makeStockRows(n: number) {
       unitCost: i % 2 === 0 ? '12000' : null,
       // SKU lẻ chưa cân; SKU chẵn 250 g, 500 g… (kg Decimal chuỗi).
       weightKg: i % 2 === 0 ? String(0.25 * (i / 2 + 1)) : null,
+      // SKU-0002 chỉ bán ở kho HCM-2 (2026-11-05); còn lại bán mọi kho.
+      sellWarehouseId: i === 1 ? 'wh-2' : null,
     };
   });
 }
@@ -1925,6 +1927,14 @@ export const handlers = [
     const found = makeOrderDetail(String(params.id));
     return found ? HttpResponse.json(found) : errorEnvelope(404, 'NOT_FOUND');
   }),
+  // Danh mục kho (GET /warehouses) — màn Tồn kho dùng cho cột "Kho bán" (2026-11-05).
+  http.get('/api/warehouses', () =>
+    HttpResponse.json([
+      { id: 'wh-1', code: 'WH01', name: 'Kho HN-1', address: null, isActive: true },
+      { id: 'wh-2', code: 'WH02', name: 'Kho HCM-2', address: null, isActive: true },
+      { id: 'wh-t', code: 'TRANSIT', name: 'Kho trung chuyển', address: null, isActive: true },
+    ]),
+  ),
   http.get('/api/stock', async ({ request }) => {
     const url = new URL(request.url);
     const take = Number(url.searchParams.get('take') ?? 50);

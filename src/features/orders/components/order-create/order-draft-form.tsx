@@ -11,6 +11,7 @@ import {
   useMemo,
   useRef,
   useState,
+  type BaseSyntheticEvent,
   type ReactNode,
 } from 'react';
 import { useFieldArray, useForm, useWatch, type Path, type UseFormReturn } from 'react-hook-form';
@@ -180,7 +181,9 @@ export const OrderDraftForm = forwardRef<
   const [metrics, setMetrics] = useState<Record<string, LineMetrics>>({});
   const onMetrics = useCallback((fieldId: string, m: LineMetrics) => {
     setMetrics((prev) =>
-      prev[fieldId]?.total === m.total && prev[fieldId]?.weightKg === m.weightKg
+      prev[fieldId]?.total === m.total &&
+      prev[fieldId]?.weightKg === m.weightKg &&
+      prev[fieldId]?.sellBlocked === m.sellBlocked
         ? prev
         : { ...prev, [fieldId]: m },
     );
@@ -223,6 +226,8 @@ export const OrderDraftForm = forwardRef<
         ? null
         : priced.reduce((a, [, m]) => a.plus(m.total as string), new Decimal(0)).toFixed(4);
   const missingPrice = lines.fields.length - priced.length;
+  // Dòng có sản phẩm "Chỉ bán từ kho" khác Kho xuất (2026-11-05) — chặn lưu / chốt.
+  const sellBlockedCount = known.filter(([, m]) => m.sellBlocked).length;
   const weighed = known.filter(([, m]) => m.weightKg !== null);
   const estimatedWeightKg =
     weighed.length > 0
@@ -322,7 +327,7 @@ export const OrderDraftForm = forwardRef<
     );
   };
 
-  const onSubmit = form.handleSubmit(
+  const submitForm = form.handleSubmit(
     (values) => {
       const dup = sameDay.data;
       if (dup && dup.total > 0 && acceptedDupPhone.current !== values.customerPhone) {
@@ -342,6 +347,20 @@ export const OrderDraftForm = forwardRef<
       }
     },
   );
+  /**
+   * Chặn TRƯỚC kiểm tra form: dòng có sản phẩm "Chỉ bán từ kho" khác Kho xuất (2026-11-05) — lưu
+   * nháp cũng không cho, vì server từ chối mọi đơn lệch kho bán.
+   */
+  const onSubmit = (e?: BaseSyntheticEvent) => {
+    if (sellBlockedCount > 0) {
+      e?.preventDefault();
+      toast.error(
+        `${sellBlockedCount} sản phẩm không bán từ kho xuất đang chọn — đổi Kho xuất hoặc bỏ dòng báo đỏ`,
+      );
+      return Promise.resolve();
+    }
+    return submitForm(e);
+  };
 
   useImperativeHandle(ref, () => ({
     submit: (mode) => {

@@ -29,4 +29,21 @@ describe('ORDER_PACK_SHORTAGE (2026-11-05) — không đóng gói thiếu, nêu 
     expect(text).toContain('Thiếu: SP-0213 × 10.');
     expect(text).not.toContain('message thô');
   });
+
+  it('ORDER_SKU_SELL_WAREHOUSE: nêu sản phẩm + kho được bán từ details (2026-11-05)', () => {
+    const err = new ApiError(
+      409,
+      'ORDER_SKU_SELL_WAREHOUSE',
+      'message thô',
+      {
+        docNumber: null,
+        warehouseName: 'Kho Thạch Thất',
+        skus: [{ code: 'SP-0213', name: 'Siêu kali 25gr', sellWarehouseName: 'Kho Long An' }],
+      },
+      undefined,
+    );
+    expect(messageFor(err)).toBe(
+      'SP-0213 chỉ bán từ Kho Long An. Đổi Kho xuất sang đúng kho đó hoặc bỏ sản phẩm khỏi đơn.',
+    );
+  });
 });

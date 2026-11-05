@@ -10,6 +10,7 @@ export type LocationType = StockByLocationRow['locationType'];
 export type SetActualStockBody = components['schemas']['SetActualStockDto'];
 export type SetSkuCostsBody = components['schemas']['SetSkuCostsDto'];
 export type SetSkuWeightsBody = components['schemas']['SetSkuWeightsDto'];
+export type SetSkuSellWarehousesBody = components['schemas']['SetSkuSellWarehousesDto'];
 
 export interface StockListParams {
   q?: string;
@@ -185,6 +186,23 @@ export function useSetSkuWeights() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (body: SetSkuWeightsBody) => unwrap(api.POST('/stock/weights', { body })),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: stockKeys.all });
+      void qc.invalidateQueries({ queryKey: ['catalog'] });
+    },
+  });
+}
+
+/**
+ * POST /stock/sell-warehouses — "Chỉ bán từ kho" cho sản phẩm (quyền stock.adjust, 2026-11-05):
+ * `sellWarehouseId` null = bán ở mọi kho. Thao tác tuyệt đối, không cần Idempotency-Key. Làm mới
+ * tồn kho + danh mục (màn Lên đơn đọc `sku.product.sellWarehouseId`).
+ */
+export function useSetSellWarehouses() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (body: SetSkuSellWarehousesBody) =>
+      unwrap(api.POST('/stock/sell-warehouses', { body })),
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: stockKeys.all });
       void qc.invalidateQueries({ queryKey: ['catalog'] });

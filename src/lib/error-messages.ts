@@ -139,6 +139,8 @@ const MESSAGES: Record<string, string> = {
     'Facebook ID này đang gắn với tài khoản khác. Gỡ Facebook ID ở tài khoản đó trước nếu nhập đúng người.',
   ORDER_SKU_NOT_IN_WAREHOUSE:
     'Kho xuất của đơn không có sản phẩm cần giao. Đổi kho xuất hoặc chuyển hàng về kho rồi gửi lại.',
+  ORDER_SKU_SELL_WAREHOUSE:
+    'Đơn có sản phẩm chỉ bán từ kho khác. Đổi Kho xuất sang đúng kho đó hoặc bỏ sản phẩm khỏi đơn.',
   CARRIER_OPERATION_UNSUPPORTED:
     'Hãng này không hỗ trợ thao tác vừa gọi (tra cước / in nhãn). Chọn hãng khác hoặc làm tay.',
   CARRIER_NOT_FOUND: 'Hãng vận chuyển không tồn tại hoặc đã tắt. Tải lại danh sách hãng.',
@@ -436,6 +438,20 @@ export function messageFor(err: unknown): string {
           )
         : [];
       return `${MESSAGES.ORDER_PACK_SHORTAGE!} ${packShortageText(list)}`.trim();
+    }
+    if (err.code === 'ORDER_SKU_SELL_WAREHOUSE') {
+      // Sản phẩm + kho được bán là dữ liệu (details.skus), không phải message thô (luật 6).
+      const d = err.details as { skus?: unknown } | null;
+      const skus = Array.isArray(d?.skus)
+        ? (d.skus as Array<{ code?: unknown; sellWarehouseName?: unknown }>).flatMap((s) =>
+            typeof s.code === 'string' && typeof s.sellWarehouseName === 'string'
+              ? [`${s.code} chỉ bán từ ${s.sellWarehouseName}`]
+              : [],
+          )
+        : [];
+      if (skus.length) {
+        return `${skus.join(', ')}. Đổi Kho xuất sang đúng kho đó hoặc bỏ sản phẩm khỏi đơn.`;
+      }
     }
     if (err.code === 'BARCODE_TAKEN') {
       // Mã + SKU đang giữ mã là dữ liệu (details), không phải message thô của server.
