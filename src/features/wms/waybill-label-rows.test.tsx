@@ -6,6 +6,7 @@ import {
   estimateAddressLines,
   portraitGoodsMm,
   portraitItemCount,
+  portraitPages,
   WaybillLabel,
 } from './components/waybill-label';
 import { chunkItems, estimateLines, fitItems } from './label-text';
@@ -126,7 +127,7 @@ describe('tem dọc — chỗ trống ô Sản phẩm, số món mỗi tờ, in 
     expect(screen.getByText(LONG)).toBeInTheDocument();
   });
 
-  it('đơn 12 món không page: 2 tờ (7 + 5), mỗi tờ đủ mã vạch + người nhận, tiêu đề "Tờ x/2"', () => {
+  it('đơn 12 món không page: tờ 1 = tem đầy đủ không ghi chú (9 món), tờ 2 = tờ in tiếp + ghi chú (2026-11-05)', () => {
     const { container } = render(
       <WaybillLabel
         data={{ ...base, items: items(12) }}
@@ -136,19 +137,39 @@ describe('tem dọc — chỗ trống ô Sản phẩm, số món mỗi tờ, in 
     );
     const pages = pagesOf(container);
     expect(pages).toHaveLength(2);
-    expect(pages[0]!.textContent).toContain('Sản phẩm · Tờ 1/2');
-    expect(pages[0]!.textContent).toContain('Sản phẩm 7');
-    expect(pages[0]!.textContent).not.toContain('Sản phẩm 8');
-    expect(pages[1]!.textContent).toContain('Sản phẩm · Tờ 2/2');
-    expect(pages[1]!.textContent).toContain('Sản phẩm 8');
-    expect(pages[1]!.textContent).toContain('Sản phẩm 12');
-    expect(pages[1]!.textContent).not.toContain('Sản phẩm 7');
-    for (const p of pages) {
-      expect(p.getAttribute('data-waybill-label')).toBe('156309468422');
-      expect(p.textContent).toContain('Pham Duy');
-      expect(p.querySelector('[aria-label="Mã vận đơn 156309468422"]')).not.toBeNull();
-    }
+    const [p1, p2] = [pages[0]!, pages[1]!];
+    // Tờ 1: bỏ ô ghi chú → thêm 10,55 mm = 2 hàng (7 → 9 món)
+    expect(p1.textContent).toContain('Sản phẩm · Tờ 1/2');
+    expect(p1.textContent).toContain('Sản phẩm 9');
+    expect(p1.textContent).not.toContain('Sản phẩm 10');
+    expect(p1.textContent).toContain('Pham Duy');
+    expect(p1.querySelector('[aria-label="Mã vận đơn 156309468422"]')).not.toBeNull();
+    expect(p1.textContent).not.toContain('Quay video');
+    // Tờ 2: không phải phiếu thứ hai — chỉ mã + số tờ + món còn lại + ghi chú
+    expect(p2.getAttribute('data-waybill-label')).toBe('156309468422');
+    expect(p2.textContent).toContain('Tiếp theo · 156309468422');
+    expect(p2.textContent).toContain('Tờ 2/2');
+    expect(p2.textContent).toContain('Sản phẩm (tiếp)');
+    expect(p2.textContent).toContain('Sản phẩm 10');
+    expect(p2.textContent).toContain('Sản phẩm 12');
+    expect(p2.textContent).toContain('Quay video');
+    expect(p2.textContent).not.toContain('Pham Duy');
+    expect(p2.textContent).not.toContain('Thu *** đ');
+    expect(p2.querySelector('[aria-label="Mã vận đơn 156309468422"]')).toBeNull();
+    expect(p2.querySelector('[aria-label="QR 156309468422"]')).toBeNull();
     expect(screen.queryByText(/sản phẩm khác/)).not.toBeInTheDocument();
+  });
+
+  it('portraitPages: vừa một tờ → một tờ; không tờ nào chỉ có ghi chú; danh sách dài → nhiều tờ in tiếp', () => {
+    const goods = portraitGoodsMm(vtp);
+    expect(portraitPages(items(7), goods)).toEqual([items(7)]);
+    expect(portraitPages([], goods)).toEqual([[]]);
+    // 8 món: bỏ ghi chú thì tờ 1 vừa cả 8 → chừa món cuối sang tờ 2 (có hàng + ghi chú)
+    expect(portraitPages(items(8), goods).map((p) => p.length)).toEqual([7, 1]);
+    const long = portraitPages(items(40), goods);
+    expect(long.flat()).toEqual(items(40));
+    expect(long.length).toBeGreaterThanOrEqual(3);
+    expect(long.at(-1)!.length).toBeGreaterThan(0);
   });
 });
 
@@ -164,9 +185,10 @@ describe('tem ngang — ô Sản phẩm ~12,9 mm, tên in đủ, in nhiều tờ
       pages: [[{ name: SHORT }, { name: LONG }]],
       pt: 7,
     });
+    // Tờ in tiếp chỉ có danh sách (2026-11-05) chứa được nhiều hơn → 4 + 8
     const twelve = items(12, () => SHORT);
     expect(landscapePages(twelve)).toEqual({
-      pages: [twelve.slice(0, 4), twelve.slice(4, 8), twelve.slice(8)],
+      pages: [twelve.slice(0, 4), twelve.slice(4)],
       pt: 7,
     });
     // Món 3 tên 3 dòng không vừa phần còn lại → sang tờ 2 cùng món 4 (giữ thứ tự)
@@ -186,8 +208,15 @@ describe('tem ngang — ô Sản phẩm ~12,9 mm, tên in đủ, in nhiều tờ
     expect(pages).toHaveLength(2);
     expect(pages[0]!.textContent).toContain(LONG);
     expect(pages[0]!.textContent).toContain('Sản phẩm (6) · Tờ 1/2');
-    expect(pages[1]!.textContent).toContain('Sản phẩm (6) · Tờ 2/2');
+    expect(pages[0]!.textContent).not.toContain('Ghi chú:');
+    // Tờ 2 = tờ in tiếp (2026-11-05): danh sách còn lại + ghi chú, không mã vạch / người nhận
+    expect(pages[1]!.textContent).toContain('Tiếp theo · 156309468422');
+    expect(pages[1]!.textContent).toContain('Tờ 2/2');
+    expect(pages[1]!.textContent).toContain('Sản phẩm (tiếp)');
     expect(pages[1]!.textContent).toContain('Sản phẩm 5');
+    expect(pages[1]!.textContent).toContain('Ghi chú:');
+    expect(pages[1]!.textContent).not.toContain('Pham Duy');
+    expect(pages[1]!.querySelector('[aria-label="Mã vận đơn 156309468422"]')).toBeNull();
     expect(screen.queryByText(/không in/)).not.toBeInTheDocument();
   });
 });

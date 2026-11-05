@@ -1,6 +1,6 @@
 'use client';
 
-import type { CSSProperties } from 'react';
+import type { CSSProperties, ReactNode } from 'react';
 import { Barcode } from '@/components/data/barcode';
 import { PrintSheet } from '@/components/data/print-sheet';
 import { cn } from '@/lib/cn';
@@ -10,7 +10,7 @@ import { LABEL_SIZES, type PrintController } from '@/lib/print';
 import type { ShipmentLabelData } from '../api/use-pda';
 import { DEFAULT_PRINT_NOTE, hidePhone, parseGhtkTracking, routeLabel } from '../ghtk-label';
 import { f, labelInner, labelOuter, u, WAYBILL_EDGE } from '../label-scale';
-import { chunkItems, estimateLines, fitItems } from '../label-text';
+import { estimateLines, fitItems } from '../label-text';
 import { sortLabelsForPrint } from '../waybill-sort';
 import { LandscapeWaybillLabel } from './landscape-waybill-label';
 
@@ -96,6 +96,48 @@ export function portraitItemCount(items: { name: string }[], availableMm: number
   });
 }
 
+/**
+ * Tờ in tiếp (2026-11-05): dòng "Tiếp theo · mã · Tờ x/N" + ô bảng sản phẩm (viền + padding +
+ * tiêu đề bảng). Không mã vạch / người nhận / Thu — tờ tiếp không phải phiếu giao thứ hai.
+ */
+const CONT_MM = {
+  /** Dòng tiêu đề tờ tiếp (9 pt, leading-none) + khoảng cách 1,5 mm. */
+  head: 4.2 + 1.5,
+  /** Ô sản phẩm trừ các dòng hàng: viền + padding + tiêu đề bảng. */
+  goodsHead: 6.5,
+} as const;
+
+/**
+ * Chia tờ tem dọc (user chốt 2026-11-05): vừa một tờ (kể cả ghi chú) → một tờ như cũ. Không vừa →
+ * tờ 1 = phiếu đầy đủ KHÔNG ghi chú (thêm chỗ cho hàng), các tờ sau = tờ in tiếp chỉ có bảng sản
+ * phẩm; ghi chú in MỘT lần cuối tờ cuối. Hàng cuối vừa tờ tiếp nhưng không còn chỗ cho ghi chú
+ * → thêm một tờ chỉ có ghi chú.
+ */
+export function portraitPages<T extends { name: string }>(items: T[], goodsMm: number): T[][] {
+  if (items.length === 0 || portraitItemCount(items, goodsMm) >= items.length) return [items];
+  const m = PORTRAIT_MM;
+  const noteMm = m.note + 1.5;
+  const contMm = m.content - CONT_MM.head - CONT_MM.goodsHead - m.slack;
+  // Tờ không còn chỗ ghi chú mà lại vừa hết hàng → chừa món cuối sang tờ sau để tờ cuối có hàng
+  // + ghi chú (không in tờ chỉ có ghi chú). Chỉ còn 1 món mà không vừa cùng ghi chú → tờ ghi chú.
+  const take = (count: number, total: number) =>
+    Math.max(1, total > 1 ? Math.min(count, total - 1) : count);
+  const first = take(portraitItemCount(items, goodsMm + noteMm), items.length);
+  const pages: T[][] = [items.slice(0, first)];
+  let rest = items.slice(first);
+  while (rest.length > 0) {
+    if (portraitItemCount(rest, contMm - noteMm) >= rest.length) {
+      pages.push(rest);
+      return pages;
+    }
+    const n = rest.length > 1 ? take(portraitItemCount(rest, contMm), rest.length) : 1;
+    pages.push(rest.slice(0, n));
+    rest = rest.slice(n);
+  }
+  pages.push([]);
+  return pages;
+}
+
 /** Ước lượng số dòng địa chỉ người nhận (cắt 3 dòng ở JSX). */
 export function estimateAddressLines(address: string): number {
   return estimateLines(address, SENDER_PT, PORTRAIT_MM.addressWidth);
@@ -176,8 +218,8 @@ export function WaybillLabel({
   const long = barValue.length > LONG_CODE;
   // Tuyến GHTK (NỘI TỈNH / NỘI MIỀN / LIÊN MIỀN) in cạnh COD — ERP tự suy từ tỉnh.
   const route = ghtk ? routeLabel(data.sender?.province, data.recipient?.province) : null;
-  // Tên in đủ không cắt; hết chỗ ô Sản phẩm thì in tiếp sang tờ mới (user chốt 2026-11-04) —
-  // mỗi tờ vẫn đủ mã vạch / người nhận, tiêu đề bảng ghi "Tờ x/N". Xem `portraitGoodsMm`.
+  // Tên in đủ không cắt; hết chỗ ô Sản phẩm thì in tiếp sang tờ mới (user chốt 2026-11-04).
+  // 2026-11-05: tờ sau là TỜ IN TIẾP (chỉ bảng sản phẩm), ghi chú cuối tờ cuối — `portraitPages`.
   const goodsMm = portraitGoodsMm({
     longCode: long,
     seq: seq != null,
@@ -185,7 +227,7 @@ export function WaybillLabel({
     vnpost: data.carrierCode === 'VNPOST',
     addressLines: data.recipient ? estimateAddressLines(fromDistrictAddress(data.recipient)) : 1,
   });
-  const pages = chunkItems(data.items, (rest) => portraitItemCount(rest, goodsMm));
+  const pages = portraitPages(data.items, goodsMm);
   const carrier = data.carrierName ?? data.carrierCode ?? 'Vận đơn';
   const printed = `${formatTime(printedAt)} ${formatDate(printedAt)}`;
   const note = data.note?.trim() || null;
@@ -345,26 +387,8 @@ export function WaybillLabel({
     </div>
   );
 
-  const goods = (pageItems: ShipmentLabelData['items'], pageNo: number) => (
-    <div
-      className="flex min-h-0 min-w-0 flex-col overflow-hidden"
-      style={{ border: BORDER, padding: `${u(1)} ${u(1.2)}`, gap: u(0.6) }}
-    >
-      <div
-        className="flex items-baseline justify-between font-bold leading-none"
-        style={{ fontSize: f(11), gap: u(1) }}
-      >
-        {/* Che số tiền thu hộ trên tem (2026-11-03, user chốt) — shipper / hãng đã có COD trong
-            vận đơn; tem dán ngoài kiện không lộ giá trị hàng. */}
-        <span>Thu *** đ</span>
-        {route ? <span className="shrink-0 font-extrabold">{route}</span> : null}
-      </div>
-      {data.carrierCode === 'VNPOST' ? (
-        // Mã đơn hàng đã gửi VNPost (`saleOrderCode` = mã phiếu giao) — bưu cục tra theo mã này.
-        <div className="truncate font-bold leading-none" style={{ fontSize: f(SENDER_PT) }}>
-          Mã đơn hàng: {data.shipmentDocNumber}
-        </div>
-      ) : null}
+  const table = (pageItems: ShipmentLabelData['items'], pageNo: number) =>
+    pageItems.length === 0 ? null : (
       <table
         className="w-full border-collapse"
         style={{ fontSize: f(SENDER_PT), tableLayout: 'fixed' }}
@@ -376,8 +400,11 @@ export function WaybillLabel({
         <thead>
           <tr>
             <th className="text-center font-bold" style={{ border: BORDER, padding: u(0.4) }}>
-              Sản phẩm
-              {pages.length > 1 ? ` · Tờ ${pageNo}/${pages.length}` : null}
+              {pageNo > 1
+                ? 'Sản phẩm (tiếp)'
+                : pages.length > 1
+                  ? `Sản phẩm · Tờ 1/${pages.length}`
+                  : 'Sản phẩm'}
             </th>
             <th className="text-center font-bold" style={{ border: BORDER, padding: u(0.4) }}>
               SL
@@ -404,44 +431,99 @@ export function WaybillLabel({
           ))}
         </tbody>
       </table>
+    );
+
+  const goods = (pageItems: ShipmentLabelData['items']) => (
+    <div
+      className="flex min-h-0 min-w-0 flex-col overflow-hidden"
+      style={{ border: BORDER, padding: `${u(1)} ${u(1.2)}`, gap: u(0.6) }}
+    >
+      <div
+        className="flex items-baseline justify-between font-bold leading-none"
+        style={{ fontSize: f(11), gap: u(1) }}
+      >
+        {/* Che số tiền thu hộ trên tem (2026-11-03, user chốt) — shipper / hãng đã có COD trong
+            vận đơn; tem dán ngoài kiện không lộ giá trị hàng. */}
+        <span>Thu *** đ</span>
+        {route ? <span className="shrink-0 font-extrabold">{route}</span> : null}
+      </div>
+      {data.carrierCode === 'VNPOST' ? (
+        // Mã đơn hàng đã gửi VNPost (`saleOrderCode` = mã phiếu giao) — bưu cục tra theo mã này.
+        <div className="truncate font-bold leading-none" style={{ fontSize: f(SENDER_PT) }}>
+          Mã đơn hàng: {data.shipmentDocNumber}
+        </div>
+      ) : null}
+      {table(pageItems, 1)}
     </div>
   );
 
-  // Mỗi tờ một [data-print-page] (ngắt trang khi in) — tờ in không bọc thêm.
+  const last = pages.length;
+  const frame = (key: number, children: ReactNode) => (
+    <div
+      key={key}
+      data-print-page
+      data-waybill-label={code}
+      className="overflow-hidden bg-card text-foreground"
+      style={labelOuter(size.w, size.h)}
+    >
+      <div
+        style={{
+          ...labelInner(size.w, size.h),
+          padding: `${u(1.5 + WAYBILL_EDGE.top)} ${u(1.5 + WAYBILL_EDGE.right)} ${u(1.5)} ${u(1.5)}`,
+        }}
+      >
+        <div
+          className="flex h-full flex-col overflow-hidden"
+          style={{ border: `${u(0.3)} dashed currentColor`, padding: u(1.5), gap: u(1.5) }}
+        >
+          {children}
+        </div>
+      </div>
+    </div>
+  );
+
+  // Mỗi tờ một [data-print-page] (ngắt trang khi in) — tờ in không bọc thêm. Tờ 1 = phiếu giao;
+  // tờ sau = tờ in tiếp: chỉ mã vận đơn + "Tờ x/N" + bảng sản phẩm, ghi chú cuối tờ cuối.
   return (
     <>
-      {pages.map((pageItems, i) => (
-        <div
-          key={i}
-          data-print-page
-          data-waybill-label={code}
-          className="overflow-hidden bg-card text-foreground"
-          style={labelOuter(size.w, size.h)}
-        >
+      {frame(
+        0,
+        <>
+          {top}
+          {sender}
           <div
-            style={{
-              ...labelInner(size.w, size.h),
-              padding: `${u(1.5 + WAYBILL_EDGE.top)} ${u(1.5 + WAYBILL_EDGE.right)} ${u(1.5)} ${u(1.5)}`,
-            }}
+            className="grid min-h-0 flex-1 overflow-hidden"
+            style={{ gridTemplateRows: 'auto 1fr', gap: u(1.5) }}
           >
-            <div
-              className="flex h-full flex-col overflow-hidden"
-              style={{ border: `${u(0.3)} dashed currentColor`, padding: u(1.5), gap: u(1.5) }}
-            >
-              {top}
-              {sender}
-              <div
-                className="grid min-h-0 flex-1 overflow-hidden"
-                style={{ gridTemplateRows: 'auto 1fr', gap: u(1.5) }}
-              >
-                {recipient}
-                {goods(pageItems, i + 1)}
-              </div>
-              {bottomNote}
-            </div>
+            {recipient}
+            {goods(pages[0]!)}
           </div>
-        </div>
-      ))}
+          {last === 1 ? bottomNote : null}
+        </>,
+      )}
+      {pages.slice(1).map((pageItems, i) =>
+        frame(
+          i + 1,
+          <>
+            <div
+              className="flex shrink-0 items-baseline justify-between font-bold leading-none"
+              style={{ fontSize: f(9), gap: u(1) }}
+            >
+              <span className="min-w-0 truncate">Tiếp theo · {code}</span>
+              <span className="shrink-0">
+                Tờ {i + 2}/{last}
+              </span>
+            </div>
+            <div
+              className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden"
+              style={{ border: BORDER, padding: `${u(1)} ${u(1.2)}` }}
+            >
+              {table(pageItems, i + 2)}
+            </div>
+            {i + 2 === last ? bottomNote : null}
+          </>,
+        ),
+      )}
     </>
   );
 }

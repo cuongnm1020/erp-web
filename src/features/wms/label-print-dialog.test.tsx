@@ -77,12 +77,12 @@ const LABEL_DATA = {
 let printed: HTMLElement[] = [];
 const lastPrinted = () => printed[printed.length - 1]!;
 /**
- * Các tờ của tem vừa in — đơn 5 món mẫu in 2 tờ (4 + 1) ở cả ngang lẫn dọc (2026-11-04: hết
- * chỗ ô Sản phẩm thì sang tờ mới, mỗi tờ đủ mã vạch / người nhận) → soi từng tờ để getBy*
- * không gặp trùng.
+ * Các tờ của tem vừa in — đơn 5 món mẫu in 2 tờ (4 + 1) ở cả ngang lẫn dọc. 2026-11-05: tờ 1 =
+ * tem đầy đủ không ghi chú, tờ 2 = tờ in tiếp (chỉ danh sách sản phẩm) + ghi chú → soi từng tờ.
  */
 const pagesOf = (root: HTMLElement) => [...root.querySelectorAll<HTMLElement>('[data-print-page]')];
 const firstPage = () => pagesOf(lastPrinted())[0]!;
+const lastPage = () => pagesOf(lastPrinted()).at(-1)!;
 
 describe('Popup nhãn — tem ERP 100×75 mm (2026-10-13)', () => {
   const print = vi.fn(() => {
@@ -143,16 +143,22 @@ describe('Popup nhãn — tem ERP 100×75 mm (2026-10-13)', () => {
     expect(label.getByText('COMBO 3 CHAI CANXI BO ORGANIC 500ML')).toBeTruthy();
     expect(label.getByText('Phân bón C')).toBeTruthy();
     expect(label.queryByText('Phân bón D')).toBeNull();
+    // Tờ 2 = tờ in tiếp (2026-11-05): mã + "Tờ 2/2" + món còn lại + ghi chú; không mã vạch /
+    // người nhận / thu hộ (không phải tem thứ hai).
     const page2 = within(pages[1]!);
-    expect(page2.getByText('Sản phẩm (5) · Tờ 2/2')).toBeTruthy();
+    expect(page2.getByText('Tiếp theo · PKE1545655255')).toBeTruthy();
+    expect(page2.getByText('Tờ 2/2')).toBeTruthy();
+    expect(page2.getByText('Sản phẩm (tiếp)')).toBeTruthy();
     expect(page2.getByText('Phân bón D')).toBeTruthy();
-    expect(page2.getByText('PKE1545655255')).toBeTruthy();
-    expect(page2.getByRole('img', { name: 'Mã vận đơn PKE1545655255' })).toBeTruthy();
+    expect(page2.queryByRole('img', { name: 'Mã vận đơn PKE1545655255' })).toBeNull();
+    expect(page2.queryByText(/Nguyễn Công Quân/)).toBeNull();
+    expect(page2.queryByText('*** đ')).toBeNull();
     expect(screen.queryByText(/không in/)).toBeNull();
-    // Ghi chú một hàng: ghi chú đơn · tuỳ chọn gửi hãng
+    // Ghi chú một hàng (ghi chú đơn · tuỳ chọn gửi hãng) — chỉ ở tờ cuối
     expect(
-      label.getByText(/Quý khách vui lòng quay video khi bóc hàng · Không cho xem hàng/),
+      page2.getByText(/Quý khách vui lòng quay video khi bóc hàng · Không cho xem hàng/),
     ).toBeTruthy();
+    expect(label.queryByText(/Quý khách vui lòng quay video/)).toBeNull();
     expect(label.getByRole('img', { name: 'Mã vận đơn PKE1545655255' })).toBeTruthy();
     expect(label.getByRole('img', { name: 'QR PKE1545655255' })).toBeTruthy();
     // Không nhúng PDF của hãng
@@ -174,7 +180,8 @@ describe('Popup nhãn — tem ERP 100×75 mm (2026-10-13)', () => {
     expect(root.querySelector('style')!.textContent).toContain('size: 75mm 100mm');
     // Dọc: số món theo chỗ trống, tên in đủ không cắt (2026-11-04) — VTP có page, địa chỉ 1
     // dòng còn ~25 mm; tên toàn hoa 35 ký tự ước lượng 2 dòng (8 mm) + 3 tên ngắn (4,5 mm) →
-    // 4 món tờ 1, món thứ 5 sang tờ 2 (mỗi tờ đủ mã vạch + người nhận).
+    // 2026-11-05: không vừa cùng ghi chú → tờ 1 bỏ ghi chú (đủ chỗ 5 món) nhưng chừa món cuối
+    // sang tờ in tiếp để tờ cuối có hàng + ghi chú (không in tờ chỉ có ghi chú).
     const pages = pagesOf(root);
     expect(pages).toHaveLength(2);
     const page1 = within(pages[0]!);
@@ -182,11 +189,15 @@ describe('Popup nhãn — tem ERP 100×75 mm (2026-10-13)', () => {
     expect(page1.getByText('COMBO 3 CHAI CANXI BO ORGANIC 500ML')).toBeTruthy();
     expect(page1.getByText('Phân bón C')).toBeTruthy();
     expect(page1.queryByText('Phân bón D')).toBeNull();
+    expect(page1.queryByText('Quý khách vui lòng quay video khi bóc hàng')).toBeNull();
     const page2 = within(pages[1]!);
-    expect(page2.getByText('Sản phẩm · Tờ 2/2')).toBeTruthy();
+    expect(page2.getByText('Tiếp theo · PKE1545655255')).toBeTruthy();
+    expect(page2.getByText('Tờ 2/2')).toBeTruthy();
+    expect(page2.getByText('Sản phẩm (tiếp)')).toBeTruthy();
     expect(page2.getByText('Phân bón D')).toBeTruthy();
-    expect(page2.getByText('Nguyễn Công Quân')).toBeTruthy();
-    expect(page2.getByRole('img', { name: 'Mã vận đơn PKE1545655255' })).toBeTruthy();
+    expect(page2.getByText('Quý khách vui lòng quay video khi bóc hàng')).toBeTruthy();
+    expect(page2.queryByText('Nguyễn Công Quân')).toBeNull();
+    expect(page2.queryByRole('img', { name: 'Mã vận đơn PKE1545655255' })).toBeNull();
     expect(screen.queryByText(/sản phẩm khác/)).toBeNull();
   });
 
@@ -204,7 +215,8 @@ describe('Popup nhãn — tem ERP 100×75 mm (2026-10-13)', () => {
     expect(label.queryByText(/Số nhà 59/)).toBeNull();
     expect(label.getByText('******4567')).toBeTruthy();
     expect(label.queryByText(/0901/)).toBeNull();
-    expect(label.getByText('Quý khách vui lòng quay video khi bóc hàng')).toBeTruthy();
+    // Đơn 5 món in 2 tờ → ghi chú ở tờ cuối (2026-11-05)
+    expect(within(lastPage()).getByText('Quý khách vui lòng quay video khi bóc hàng')).toBeTruthy();
     // 2026-10-16: địa chỉ người nhận che số nhà → xã, in từ huyện trở đi
     expect(label.getByText('***, Huyện Trà Ôn, Vĩnh Long')).toBeTruthy();
     expect(label.queryByText(/Thiện Mỹ/)).toBeNull();
@@ -260,7 +272,7 @@ describe('Popup nhãn — tem ERP 100×75 mm (2026-10-13)', () => {
     );
     renderApp(<LabelPrintDialog open waybill={WAYBILL('VTP')} orderId={null} onClose={() => {}} />);
     await waitFor(() => expect(print).toHaveBeenCalledTimes(1));
-    const label = within(firstPage());
+    const label = within(lastPage());
     expect(
       label.getByText('Quý Khách Vui Lòng Quay video khi bóc hàng để được hỗ trợ đơn hàng'),
     ).toBeTruthy();
@@ -299,9 +311,11 @@ describe('Popup nhãn — tem ERP 100×75 mm (2026-10-13)', () => {
     expect(label.queryByText(/Khối lượng/)).toBeNull();
     expect(label.getByText('Đ/c: ***, Xã Thiện Mỹ, Huyện Trà Ôn, Vĩnh Long')).toBeTruthy();
     expect(label.getByText('DN2610-00001')).toBeTruthy();
-    // Ghi chú một hàng dưới danh sách hàng (2026-11-04); kho lấy / giao tới
+    // Ghi chú một hàng dưới danh sách hàng (2026-11-04) — 2 tờ thì ở tờ cuối; kho lấy / giao tới
     expect(
-      label.getByText(/Quý khách vui lòng quay video khi bóc hàng · Không cho xem hàng/),
+      within(lastPage()).getByText(
+        /Quý khách vui lòng quay video khi bóc hàng · Không cho xem hàng/,
+      ),
     ).toBeTruthy();
     expect(label.getByText('Kho Thạch Thất')).toBeTruthy();
     expect(label.getByText('Huyện Trà Ôn, Vĩnh Long')).toBeTruthy();
@@ -353,7 +367,7 @@ describe('Popup nhãn — tem ERP 100×75 mm (2026-10-13)', () => {
     expect(label.getByText('***, Huyện Trà Ôn, Vĩnh Long')).toBeTruthy();
     expect(label.queryByText(/Thiện Mỹ/)).toBeNull();
     expect(label.queryByText(/Số nhà/)).toBeNull();
-    expect(label.getByText('Quý khách vui lòng quay video khi bóc hàng')).toBeTruthy();
+    expect(within(lastPage()).getByText('Quý khách vui lòng quay video khi bóc hàng')).toBeTruthy();
     expect(label.queryByText(/0901/)).toBeNull();
   });
 
@@ -382,7 +396,7 @@ describe('Popup nhãn — tem ERP 100×75 mm (2026-10-13)', () => {
     );
     await waitFor(() => expect(print).toHaveBeenCalledTimes(1));
     expect(
-      within(firstPage()).getByText(
+      within(lastPage()).getByText(
         'Quý Khách Vui Lòng Quay video khi bóc hàng để được hỗ trợ đơn hàng',
       ),
     ).toBeTruthy();

@@ -16,7 +16,7 @@ import {
 } from '../ghtk-label';
 // Dựng ×2 rồi thu về — chống cài đặt "cỡ chữ tối thiểu" của Chrome (xem label-scale.ts).
 import { f, labelInner, labelOuter, u, WAYBILL_EDGE } from '../label-scale';
-import { chunkItems, fitItems } from '../label-text';
+import { fitItems } from '../label-text';
 
 /** Ô mã vạch: SVG của bwip-js giãn theo ô (giữ tỉ lệ), không theo kích thước gốc. */
 const FILL_SVG = '[&>svg]:!h-full [&>svg]:!w-full [&>svg]:!max-w-none';
@@ -37,7 +37,17 @@ const FONT = {
   small: { pt: 7, lineMm: 3.21, gapMm: 0 },
 } as const;
 
-/** Chia món ra các tờ và chọn cỡ chữ cho ô sản phẩm tem ngang. */
+/**
+ * Tờ in tiếp tem ngang (2026-11-05): trong viền (75 − lề trên 3,5 − lề dưới 1,5 − viền 0,7 =
+ * 69,3 mm) trừ dòng tiêu đề 6 mm, tiêu đề bảng 3,2 mm, dự phòng 1 mm; hàng ghi chú 4,6 mm.
+ */
+const CONT_MM = { rows: 59.1, note: 4.6 } as const;
+
+/**
+ * Chia món ra các tờ và chọn cỡ chữ cho ô sản phẩm tem ngang. Vừa một tờ → một tờ như cũ. Không
+ * vừa (user chốt 2026-11-05): tờ 1 = tem đầy đủ không ghi chú, tờ sau = tờ in tiếp chỉ có danh
+ * sách sản phẩm, ghi chú in một lần cuối tờ cuối (hết hàng ở tờ không còn chỗ → thêm tờ chỉ ghi chú).
+ */
 export function landscapePages<T extends { name: string }>(
   items: T[],
 ): { pages: T[][]; pt: 7 | 8 } {
@@ -49,18 +59,33 @@ export function landscapePages<T extends { name: string }>(
     widthMm: GOODS_MM.nameWidth,
   });
   if (large >= items.length) return { pages: [items], pt: 8 };
-  return {
-    pages: chunkItems(items, (rest) =>
+  const fit = (rest: T[], availableMm: number) =>
+    Math.max(
+      1,
       fitItems(rest, {
-        availableMm: GOODS_MM.rows,
+        availableMm,
         lineMm: FONT.small.lineMm,
         rowExtraMm: FONT.small.gapMm,
         pt: FONT.small.pt,
         widthMm: GOODS_MM.nameWidth,
       }),
-    ),
-    pt: 7,
-  };
+    );
+  const first = fit(items, GOODS_MM.rows);
+  if (first >= items.length) return { pages: [items], pt: 7 };
+  const pages: T[][] = [items.slice(0, first)];
+  let rest = items.slice(first);
+  while (rest.length > 0) {
+    if (fit(rest, CONT_MM.rows - CONT_MM.note) >= rest.length) {
+      pages.push(rest);
+      return { pages, pt: 7 };
+    }
+    // Vừa hết hàng mà không còn chỗ ghi chú → chừa món cuối sang tờ sau (tờ cuối có hàng + ghi chú).
+    const n = rest.length > 1 ? Math.min(fit(rest, CONT_MM.rows), rest.length - 1) : 1;
+    pages.push(rest.slice(0, n));
+    rest = rest.slice(n);
+  }
+  pages.push([]);
+  return { pages, pt: 7 };
 }
 
 const clamp = (lines: number): CSSProperties => ({
@@ -115,6 +140,78 @@ export function LandscapeWaybillLabel({
   const printed = `${formatDate(printedAt)} ${formatTime(printedAt).replace(':', 'h')}`;
   const carrier = ghtk ? 'GHTK' : (data.carrierName ?? data.carrierCode ?? 'Vận đơn');
   const destination = data.recipient?.fromDistrict || data.recipient?.province || null;
+
+  const noteRow = (
+    <div
+      className="truncate whitespace-nowrap"
+      style={{ borderTop: LINE, padding: `${u(0.6)} ${u(1.5)}`, fontSize: f(7) }}
+    >
+      <span className="font-bold">Ghi chú: </span>
+      {note}
+    </div>
+  );
+
+  const itemRows = (pageItems: ShipmentLabelData['items']) =>
+    pageItems.map((it, i) => (
+      <div key={i} className="flex shrink-0 items-start" style={{ gap: u(2) }}>
+        <span className="min-w-0 flex-1 font-semibold" style={{ lineHeight: 1.3 }}>
+          {it.name}
+        </span>
+        <span className="shrink-0 font-bold tabular-nums" style={{ lineHeight: 1.3 }}>
+          {formatQuantity(it.qty)}
+        </span>
+      </div>
+    ));
+
+  /**
+   * Tờ in tiếp (2026-11-05): KHÔNG phải tem thứ hai — chỉ "Tiếp theo · mã · Tờ x/N", danh sách
+   * sản phẩm còn lại, ghi chú ở tờ cuối.
+   */
+  const continuation = (pageItems: ShipmentLabelData['items'], pageNo: number) => (
+    <div
+      data-print-page
+      data-waybill-label={code}
+      className="overflow-hidden bg-card text-foreground"
+      style={labelOuter(W, H)}
+    >
+      <div
+        style={{
+          ...labelInner(W, H),
+          padding: `${u(1.5 + WAYBILL_EDGE.top)} ${u(2 + WAYBILL_EDGE.right)} ${u(1.5)} ${u(2)}`,
+        }}
+      >
+        <div
+          className="grid h-full overflow-hidden"
+          style={{
+            border: LINE,
+            gridTemplateRows: `${u(6)} minmax(0, 1fr) auto`,
+            fontSize: f(7),
+            lineHeight: 1.3,
+          }}
+        >
+          <div
+            className="flex items-center justify-between whitespace-nowrap font-bold"
+            style={{ borderBottom: LINE, padding: `0 ${u(1.5)}`, gap: u(2), fontSize: f(9) }}
+          >
+            <span className="min-w-0 truncate">Tiếp theo · {code}</span>
+            <span className="shrink-0">
+              Tờ {pageNo}/{pages.length}
+            </span>
+          </div>
+          <div className="flex min-h-0 flex-col overflow-hidden" style={{ padding: `0 ${u(1.5)}` }}>
+            {pageItems.length ? (
+              <div className="flex shrink-0 justify-between font-bold" style={{ lineHeight: 1.3 }}>
+                <span>Sản phẩm (tiếp)</span>
+                <span>SL</span>
+              </div>
+            ) : null}
+            {itemRows(pageItems)}
+          </div>
+          {pageNo === pages.length ? noteRow : <div />}
+        </div>
+      </div>
+    </div>
+  );
 
   // Mỗi tờ một [data-print-page] (ngắt trang khi in) — tờ in không bọc thêm.
   const page = (pageItems: ShipmentLabelData['items'], pageNo: number) => (
@@ -320,25 +417,11 @@ export function LandscapeWaybillLabel({
                 </span>
                 <span>SL</span>
               </div>
-              {pageItems.map((it, i) => (
-                <div key={i} className="flex shrink-0 items-start" style={{ gap: u(2) }}>
-                  <span className="min-w-0 flex-1 font-semibold" style={{ lineHeight: 1.3 }}>
-                    {it.name}
-                  </span>
-                  <span className="shrink-0 font-bold tabular-nums" style={{ lineHeight: 1.3 }}>
-                    {formatQuantity(it.qty)}
-                  </span>
-                </div>
-              ))}
+              {itemRows(pageItems)}
             </div>
-            {/* Ghi chú — một hàng dưới cùng, các ý nối " · ", quá dài thì cắt */}
-            <div
-              className="truncate whitespace-nowrap"
-              style={{ borderTop: LINE, padding: `${u(0.6)} ${u(1.5)}`, fontSize: f(7) }}
-            >
-              <span className="font-bold">Ghi chú: </span>
-              {note}
-            </div>
+            {/* Ghi chú — một hàng dưới cùng, các ý nối " · ", quá dài thì cắt. Có tờ in tiếp →
+                ghi chú xuống cuối tờ cuối (2026-11-05). */}
+            {pages.length === 1 ? noteRow : null}
           </div>
           <div
             className="flex items-center justify-center"
@@ -362,7 +445,7 @@ export function LandscapeWaybillLabel({
   return (
     <>
       {pages.map((pageItems, i) => (
-        <Fragment key={i}>{page(pageItems, i + 1)}</Fragment>
+        <Fragment key={i}>{i === 0 ? page(pageItems, 1) : continuation(pageItems, i + 1)}</Fragment>
       ))}
     </>
   );
