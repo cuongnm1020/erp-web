@@ -23,6 +23,7 @@ import {
   useReportOwners,
   useReportPancakeShops,
   useReportDepartments,
+  useReportScopeOptions,
   useReportTeams,
   useSalesRollupRebuild,
 } from '../api/use-sales-report';
@@ -86,6 +87,9 @@ export function SalesReportScreen() {
   // Ô Phòng ban: chỉ người xem toàn công ty (Admin + kế toán, user 2026-11-03) — mọi phòng ban đã
   // có đơn, CSKH + Sale/MKT. Leader CSKH không còn ô này (trước 2026-11-03 có danh sách phòng mình).
   const depts = useReportDepartments(canView && canAll && ability.can('read', 'SalesOrder'));
+  // Ô "Phòng" (phòng mình làm leader) + "Nhóm" (nhóm CSKH) cho leader quản nhiều phòng / nhóm
+  // (2026-11-05, user chốt) — mỗi ô chỉ hiện khi có từ 2 lựa chọn.
+  const scopeOpts = useReportScopeOptions(canView);
   const owners = useReportOwners(ownerPicker);
   // POS Pancake: ai xem được đơn là chọn được; lỗi (vd 403) thì ẩn bộ lọc.
   const shops = useReportPancakeShops(canView && ability.can('read', 'SalesOrder'));
@@ -101,14 +105,26 @@ export function SalesReportScreen() {
   const teamId = state.filters.teamId;
   const ownerId = state.filters.ownerId;
   const isCareTeam = !!teamId && careTeamOptions.some((t) => t.teamId === teamId);
-  const showTeamChip = !!teamId && !isCareTeam;
+  const leaderTeams = scopeOpts.data?.teams ?? [];
+  const isLeaderTeam = !!teamId && leaderTeams.some((t) => t.teamId === teamId);
+  const showTeamChip = !!teamId && !isCareTeam && !isLeaderTeam;
+  const groupLeadId = state.filters.groupLeadId;
+  // Đang chọn phòng → chỉ nhóm của phòng đó.
+  const groupOptions = (scopeOpts.data?.groups ?? []).filter((g) => !teamId || g.teamId === teamId);
   const teamChipName =
     state.filters.teamName ?? teamOptions.find((t) => t.id === teamId)?.name ?? 'đã chọn';
   const showOwnerChip = !!ownerId && !ownerOptions.some((u) => u.id === ownerId);
   const shopOptions = shops.data ?? [];
   const shopId = state.filters.pancakeShopId;
   const fulfilment = parseFulfilment(state.filters.fulfilment);
-  const hasFilter = !!(state.filters.channel || teamId || ownerId || shopId || fulfilment.length);
+  const hasFilter = !!(
+    state.filters.channel ||
+    teamId ||
+    groupLeadId ||
+    ownerId ||
+    shopId ||
+    fulfilment.length
+  );
 
   const clearKeys = (...keys: ReportFilterKey[]) =>
     setFilters(Object.fromEntries(keys.map((k) => [k, undefined])));
@@ -162,7 +178,28 @@ export function SalesReportScreen() {
               value: t.teamId,
               label: t.isActive ? t.name : `${t.name} (ngừng hoạt động)`,
             }))}
-            onChange={(v) => setFilters({ teamId: v, teamName: undefined })}
+            onChange={(v) => setFilters({ teamId: v, teamName: undefined, groupLeadId: undefined })}
+          />
+        ) : null}
+        {leaderTeams.length >= 2 ? (
+          <FilterSelect
+            label="Phòng"
+            value={isLeaderTeam ? teamId : undefined}
+            options={leaderTeams.map((t) => ({ value: t.teamId, label: t.name }))}
+            onChange={(v) => setFilters({ teamId: v, teamName: undefined, groupLeadId: undefined })}
+          />
+        ) : null}
+        {groupOptions.length >= 2 || (groupLeadId && groupOptions.length > 0) ? (
+          <FilterSelect
+            label="Nhóm"
+            value={
+              groupOptions.some((g) => g.groupLeadId === groupLeadId) ? groupLeadId : undefined
+            }
+            options={groupOptions.map((g) => ({
+              value: g.groupLeadId,
+              label: `${g.name} · ${g.memberCount} NV`,
+            }))}
+            onChange={(v) => setFilters({ groupLeadId: v })}
           />
         ) : null}
         {ownerPicker ? (
@@ -226,6 +263,7 @@ export function SalesReportScreen() {
                 'channel',
                 'teamId',
                 'teamName',
+                'groupLeadId',
                 'ownerId',
                 'ownerName',
                 'pancakeShopId',

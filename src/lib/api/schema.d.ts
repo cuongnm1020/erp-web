@@ -5464,6 +5464,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/reports/sales/filter-options": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Lựa chọn ô "Phòng" / "Nhóm" của báo cáo (2026-11-05): phòng người xem làm leader + nhóm CSKH
+         *     trong các phòng đó. Màn chỉ hiện ô khi có từ 2 lựa chọn.
+         */
+        get: operations["SalesReportController_filterOptions"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/reports/sales/summary": {
         parameters: {
             query?: never;
@@ -15044,6 +15064,25 @@ export interface components {
              *     `cogsBaseAmount`. Đơn chốt lại giá vốn trong lượt này (`costed`) đã kèm phần thuần, không đếm ở đây.
              */
             baseCostedLines: number;
+        };
+        SalesFilterTeamOptionDto: {
+            teamId: string;
+            /** @description Tên phòng (bỏ tiền tố "Phòng ban · "). */
+            name: string;
+        };
+        SalesFilterGroupOptionDto: {
+            /** @description Id trưởng nhóm — truyền vào `groupLeadId`. */
+            groupLeadId: string;
+            /** @description Tên trưởng nhóm. */
+            name: string;
+            /** @description Phòng của trưởng nhóm (null = không thuộc phòng nào trong danh sách). */
+            teamId: string | null;
+            /** @description Số nhân viên đang hoạt động trong nhóm (không kể trưởng nhóm). */
+            memberCount: number;
+        };
+        SalesFilterOptionsDto: {
+            teams: components["schemas"]["SalesFilterTeamOptionDto"][];
+            groups: components["schemas"]["SalesFilterGroupOptionDto"][];
         };
         SalesKpisDto: {
             revenue: string;
@@ -26712,6 +26751,25 @@ export interface operations {
             };
         };
     };
+    SalesReportController_filterOptions: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SalesFilterOptionsDto"];
+                };
+            };
+        };
+    };
     SalesReportController_summary: {
         parameters: {
             query: {
@@ -26736,6 +26794,11 @@ export interface operations {
                 teamId?: string;
                 /** @description Snapshot `SalesOrder.ownerId` lúc tạo đơn. */
                 ownerId?: string;
+                /**
+                 * @description Nhóm CSKH (2026-11-05): id trưởng nhóm — đơn do trưởng nhóm + nhân viên ĐANG trong nhóm lên.
+                 *     Giao với phạm vi xem của người gọi (chỉ thu hẹp). Lựa chọn: `GET /reports/sales/filter-options`.
+                 */
+                groupLeadId?: string;
                 /** @description Kho lấy hàng chọn trên đơn (`SalesOrder.warehouseId`). */
                 warehouseId?: string;
                 customerId?: string;
@@ -26782,6 +26845,11 @@ export interface operations {
                 teamId?: string;
                 /** @description Snapshot `SalesOrder.ownerId` lúc tạo đơn. */
                 ownerId?: string;
+                /**
+                 * @description Nhóm CSKH (2026-11-05): id trưởng nhóm — đơn do trưởng nhóm + nhân viên ĐANG trong nhóm lên.
+                 *     Giao với phạm vi xem của người gọi (chỉ thu hẹp). Lựa chọn: `GET /reports/sales/filter-options`.
+                 */
+                groupLeadId?: string;
                 /** @description Kho lấy hàng chọn trên đơn (`SalesOrder.warehouseId`). */
                 warehouseId?: string;
                 customerId?: string;
@@ -26830,6 +26898,11 @@ export interface operations {
                 teamId?: string;
                 /** @description Snapshot `SalesOrder.ownerId` lúc tạo đơn. */
                 ownerId?: string;
+                /**
+                 * @description Nhóm CSKH (2026-11-05): id trưởng nhóm — đơn do trưởng nhóm + nhân viên ĐANG trong nhóm lên.
+                 *     Giao với phạm vi xem của người gọi (chỉ thu hẹp). Lựa chọn: `GET /reports/sales/filter-options`.
+                 */
+                groupLeadId?: string;
                 /** @description Kho lấy hàng chọn trên đơn (`SalesOrder.warehouseId`). */
                 warehouseId?: string;
                 customerId?: string;
@@ -26891,6 +26964,11 @@ export interface operations {
                 teamId?: string;
                 /** @description Snapshot `SalesOrder.ownerId` lúc tạo đơn. */
                 ownerId?: string;
+                /**
+                 * @description Nhóm CSKH (2026-11-05): id trưởng nhóm — đơn do trưởng nhóm + nhân viên ĐANG trong nhóm lên.
+                 *     Giao với phạm vi xem của người gọi (chỉ thu hẹp). Lựa chọn: `GET /reports/sales/filter-options`.
+                 */
+                groupLeadId?: string;
                 /** @description Kho lấy hàng chọn trên đơn (`SalesOrder.warehouseId`). */
                 warehouseId?: string;
                 customerId?: string;
@@ -26938,6 +27016,11 @@ export interface operations {
                 teamId?: string;
                 /** @description Snapshot `SalesOrder.ownerId` lúc tạo đơn. */
                 ownerId?: string;
+                /**
+                 * @description Nhóm CSKH (2026-11-05): id trưởng nhóm — đơn do trưởng nhóm + nhân viên ĐANG trong nhóm lên.
+                 *     Giao với phạm vi xem của người gọi (chỉ thu hẹp). Lựa chọn: `GET /reports/sales/filter-options`.
+                 */
+                groupLeadId?: string;
                 /** @description Kho lấy hàng chọn trên đơn (`SalesOrder.warehouseId`). */
                 warehouseId?: string;
                 customerId?: string;
@@ -26991,6 +27074,11 @@ export interface operations {
                 teamId?: string;
                 /** @description Snapshot `SalesOrder.ownerId` lúc tạo đơn. */
                 ownerId?: string;
+                /**
+                 * @description Nhóm CSKH (2026-11-05): id trưởng nhóm — đơn do trưởng nhóm + nhân viên ĐANG trong nhóm lên.
+                 *     Giao với phạm vi xem của người gọi (chỉ thu hẹp). Lựa chọn: `GET /reports/sales/filter-options`.
+                 */
+                groupLeadId?: string;
                 /** @description Kho lấy hàng chọn trên đơn (`SalesOrder.warehouseId`). */
                 warehouseId?: string;
                 customerId?: string;
@@ -27032,6 +27120,8 @@ export interface operations {
                 channel?: "DIRECT" | "MARKETPLACE" | "WEBSITE" | "POS";
                 teamId?: string;
                 ownerId?: string;
+                /** @description Như {@link SalesReportFilterDto.groupLeadId}. */
+                groupLeadId?: string;
                 warehouseId?: string;
                 pancakeShopId?: string;
                 categoryId?: string;
@@ -27078,6 +27168,11 @@ export interface operations {
                 teamId?: string;
                 /** @description Snapshot `SalesOrder.ownerId` lúc tạo đơn. */
                 ownerId?: string;
+                /**
+                 * @description Nhóm CSKH (2026-11-05): id trưởng nhóm — đơn do trưởng nhóm + nhân viên ĐANG trong nhóm lên.
+                 *     Giao với phạm vi xem của người gọi (chỉ thu hẹp). Lựa chọn: `GET /reports/sales/filter-options`.
+                 */
+                groupLeadId?: string;
                 /** @description Kho lấy hàng chọn trên đơn (`SalesOrder.warehouseId`). */
                 warehouseId?: string;
                 customerId?: string;
@@ -27133,6 +27228,11 @@ export interface operations {
                 teamId?: string;
                 /** @description Snapshot `SalesOrder.ownerId` lúc tạo đơn. */
                 ownerId?: string;
+                /**
+                 * @description Nhóm CSKH (2026-11-05): id trưởng nhóm — đơn do trưởng nhóm + nhân viên ĐANG trong nhóm lên.
+                 *     Giao với phạm vi xem của người gọi (chỉ thu hẹp). Lựa chọn: `GET /reports/sales/filter-options`.
+                 */
+                groupLeadId?: string;
                 /** @description Kho lấy hàng chọn trên đơn (`SalesOrder.warehouseId`). */
                 warehouseId?: string;
                 customerId?: string;
