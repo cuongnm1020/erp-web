@@ -165,14 +165,19 @@ describe('OrderListScreen — GET /sales-orders (P1-12)', () => {
       expect(counts.at(-1)!.getAll('countFlows')).toEqual([]);
       expect(await screen.findByRole('tab', { name: /^Thành công\s*\d/ })).toBeInTheDocument();
 
-      // Ô tìm có chữ → không gửi flow, không chip nào chọn, có "Quay lại <trạng thái>".
+      // Ô tìm có chữ → không gửi flow; chip "Tất cả" (2026-11-05) đầu dãy là chip duy nhất đang
+      // chọn, số = tổng các trạng thái; có "Quay lại <trạng thái>".
       cleanup();
       search = 'q=0386&flow=IN_TRANSIT&group=all';
       renderApp(<OrderListScreen />);
       await screen.findByText(/Đang tìm/);
       await waitFor(() => expect(lists.at(-1)!.get('q')).toBe('0386'));
       expect(lists.at(-1)!.get('flow')).toBeNull();
-      expect(screen.queryAllByRole('tab', { selected: true })).toHaveLength(0);
+      const selected = screen.getAllByRole('tab', { selected: true });
+      expect(selected).toHaveLength(1);
+      expect(selected[0]).toHaveTextContent(/^Tất cả/);
+      expect(screen.getAllByRole('tab')[0]).toBe(selected[0]);
+      expect(screen.getAllByRole('tab')).toHaveLength(15);
       replace.mockClear();
       fireEvent.click(screen.getByRole('button', { name: 'Quay lại Đang vận chuyển' }));
       await waitFor(() => expect(replace).toHaveBeenCalled());
