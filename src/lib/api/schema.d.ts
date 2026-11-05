@@ -24489,6 +24489,13 @@ export interface operations {
                  */
                 from?: string;
                 to?: string;
+                /**
+                 * @description Khung giờ trong ngày (giờ VN, `HH:mm`) trên `dateField` (2026-11-06, màn In đơn: "gán từ 8h đến
+                 *     10h"): mỗi ngày trong from/to chỉ lấy đơn có giờ ≥ `timeFrom` và ≤ `timeTo` (trọn phút cuối).
+                 *     Bỏ trống một đầu = đầu / cuối ngày. Không có from/to = hôm nay. Khoảng ngày > 62 ngày → 422.
+                 */
+                timeFrom?: string;
+                timeTo?: string;
                 /** @description Kho lấy hàng chọn trên đơn (wms.Warehouse.id). */
                 warehouseId?: string;
                 /** @description Nguồn đơn: `PANCAKE` = đồng bộ từ Pancake, `ERP` = tạo trong ERP. */
@@ -24756,6 +24763,13 @@ export interface operations {
                  */
                 from?: string;
                 to?: string;
+                /**
+                 * @description Khung giờ trong ngày (giờ VN, `HH:mm`) trên `dateField` (2026-11-06, màn In đơn: "gán từ 8h đến
+                 *     10h"): mỗi ngày trong from/to chỉ lấy đơn có giờ ≥ `timeFrom` và ≤ `timeTo` (trọn phút cuối).
+                 *     Bỏ trống một đầu = đầu / cuối ngày. Không có from/to = hôm nay. Khoảng ngày > 62 ngày → 422.
+                 */
+                timeFrom?: string;
+                timeTo?: string;
                 /** @description Kho lấy hàng chọn trên đơn (wms.Warehouse.id). */
                 warehouseId?: string;
                 /** @description Nguồn đơn: `PANCAKE` = đồng bộ từ Pancake, `ERP` = tạo trong ERP. */
@@ -24926,6 +24940,13 @@ export interface operations {
                  */
                 from?: string;
                 to?: string;
+                /**
+                 * @description Khung giờ trong ngày (giờ VN, `HH:mm`) trên `dateField` (2026-11-06, màn In đơn: "gán từ 8h đến
+                 *     10h"): mỗi ngày trong from/to chỉ lấy đơn có giờ ≥ `timeFrom` và ≤ `timeTo` (trọn phút cuối).
+                 *     Bỏ trống một đầu = đầu / cuối ngày. Không có from/to = hôm nay. Khoảng ngày > 62 ngày → 422.
+                 */
+                timeFrom?: string;
+                timeTo?: string;
                 /** @description Kho lấy hàng chọn trên đơn (wms.Warehouse.id). */
                 warehouseId?: string;
                 /** @description Nguồn đơn: `PANCAKE` = đồng bộ từ Pancake, `ERP` = tạo trong ERP. */

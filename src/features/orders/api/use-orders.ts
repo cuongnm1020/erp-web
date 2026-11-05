@@ -47,6 +47,9 @@ export interface OrderListParams {
   totalMax?: string;
   /** Trường ngày của from/to — bỏ trống = ngày đặt (2026-10-28). */
   dateField?: OrderDateField;
+  /** Khung giờ trong ngày (giờ VN `HH:mm`) trên `dateField` — màn In đơn (2026-11-06). */
+  timeFrom?: string;
+  timeTo?: string;
   /** true = chỉ đơn chưa chọn hãng. */
   noCarrier?: boolean;
   /** true = chỉ đơn ĐÃ gán (gửi sang) ĐVVC — màn Đơn đã gán vận chuyển (2026-11-03). */
@@ -244,7 +247,10 @@ function listQuery(params: Omit<OrderListParams, 'take' | 'skip'>) {
     duplicate: params.duplicate ? ('true' as const) : undefined,
     from: params.from || undefined,
     to: params.to || undefined,
-    dateField: params.from || params.to ? params.dateField : undefined,
+    dateField:
+      params.from || params.to || params.timeFrom || params.timeTo ? params.dateField : undefined,
+    timeFrom: params.timeFrom || undefined,
+    timeTo: params.timeTo || undefined,
     itemOrigin: params.itemOrigin,
     careTeamId: params.careTeamId || undefined,
     teamIds: params.teamIds || undefined,

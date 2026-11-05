@@ -72,6 +72,21 @@ describe('WaybillOrdersScreen', () => {
     expect(screen.getByText('Đã lấy hàng/Đã nhập kho')).toBeInTheDocument();
   });
 
+  it('Giờ gán (2026-11-06): chọn 08:00 → URL timeFrom; URL timeFrom/timeTo → API kèm dateField=sentToCarrierAt', async () => {
+    search = 'timeFrom=08:00&timeTo=10:00';
+    const { listQueries } = setup();
+    renderApp(<WaybillOrdersScreen />);
+    await waitFor(() => expect(listQueries.length).toBeGreaterThan(0));
+    const q = listQueries.at(-1)!;
+    expect(q.get('timeFrom')).toBe('08:00');
+    expect(q.get('timeTo')).toBe('10:00');
+    expect(q.get('dateField')).toBe('sentToCarrierAt');
+    replace.mockClear();
+    fireEvent.change(screen.getByLabelText('Giờ gán từ'), { target: { value: '09:30' } });
+    await waitFor(() => expect(replace).toHaveBeenCalled());
+    expect(String(replace.mock.calls.at(-1)![0])).toContain('timeFrom=09%3A30');
+  });
+
   it('lọc hãng chưa lấy hàng + chưa in tem từ URL đi lên API', async () => {
     search = 'pickup=AWAITING&printStatus=NOT_PRINTED';
     const { listQueries } = setup();
