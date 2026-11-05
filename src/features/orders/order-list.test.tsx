@@ -127,10 +127,16 @@ describe('OrderListScreen — GET /sales-orders (P1-12)', () => {
       name: new RegExp(`^Thành công\\s*${n('DELIVERED')}$`),
     });
     expect(chip).toHaveAttribute('aria-selected', 'true');
-    expect(screen.getAllByRole('tab')).toHaveLength(14);
+    // 2026-11-05: chip "Tất cả" luôn đứng đầu (14 trạng thái + Tất cả), chưa chọn khi xem một trạng thái.
+    expect(screen.getAllByRole('tab')).toHaveLength(15);
+    expect(screen.getAllByRole('tab')[0]).toHaveTextContent(/^Tất cả/);
     expect(screen.getAllByRole('tab', { selected: true })).toHaveLength(1);
     expect(screen.queryByRole('group', { name: 'Vận chuyển' })).not.toBeInTheDocument();
-    expect(screen.queryByRole('tab', { name: /^Tất cả/ })).not.toBeInTheDocument();
+    // Bấm "Tất cả" → ?group=all (xem mọi trạng thái).
+    replace.mockClear();
+    fireEvent.click(screen.getAllByRole('tab')[0]!);
+    await waitFor(() => expect(replace).toHaveBeenCalled());
+    expect(String(replace.mock.calls.at(-1)![0])).toContain('group=all');
     expect(screen.queryByText('Đã xong')).not.toBeInTheDocument();
     // Bấm chip → ?flow=; bấm Đơn mới (mặc định) → bỏ flow khỏi URL.
     replace.mockClear();

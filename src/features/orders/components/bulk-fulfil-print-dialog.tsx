@@ -22,7 +22,12 @@ import {
 } from '@/components/ui/select';
 import { toast } from '@/components/ui/toaster';
 import { cn } from '@/lib/cn';
-import { carrierSaid, messageFor, messageForItemCode } from '@/lib/error-messages';
+import {
+  carrierSaid,
+  messageFor,
+  messageForItemCode,
+  packShortageText,
+} from '@/lib/error-messages';
 import { usePrint } from '@/lib/print';
 import { StaffSelect } from '@/components/data/form/staff-select';
 import {
@@ -58,7 +63,9 @@ export interface FulfilPrintOutcome {
 function failedReason(f: Failed): string {
   const base = f.carrierMessage
     ? `${messageForItemCode(f.code)} ${carrierSaid(f.carrierMessage)}`
-    : messageForItemCode(f.code);
+    : f.shortages?.length
+      ? `${messageForItemCode(f.code)} ${packShortageText(f.shortages)}`
+      : messageForItemCode(f.code);
   return f.packed
     ? `Đã đóng gói (đã trừ tồn) nhưng chưa có mã vận đơn — ${base} Sửa đơn rồi gửi lại hãng, không đóng gói lại.`
     : base;

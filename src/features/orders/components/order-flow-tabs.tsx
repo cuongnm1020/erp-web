@@ -62,9 +62,9 @@ type Counts = Partial<Record<OrderFlow, number>> | undefined;
  * thành một dãy chip liền, theo thứ tự giai đoạn (Chờ xử lý · Kho · Cần xử lý · Vận chuyển), tự
  * xuống dòng khi hẹp; màu chip theo họ. Luôn chọn đúng một trạng thái. Trước đây chia 4 khối
  * màu theo giai đoạn — bỏ ở màn In đơn (2026-11-04) rồi màn Đơn hàng (user 2026-11-05).
- * `searching` = đang xem mọi trạng thái (ô tìm có chữ hoặc `?group=all`) — thêm chip "Tất cả" đầu
- * dãy, đang chọn, số = tổng các trạng thái (user 2026-11-05); chip trạng thái mờ, dòng báo +
- * "Quay lại <trạng thái>".
+ * Chip "Tất cả" LUÔN đứng đầu dãy (user 2026-11-05), số = tổng các trạng thái; bấm → xem mọi
+ * trạng thái (`onShowAll`, `?group=all`). `searching` = đang xem mọi trạng thái (ô tìm có chữ hoặc
+ * `?group=all`) — "Tất cả" đang chọn, chip trạng thái mờ, dòng báo + "Quay lại <trạng thái>".
  */
 export function OrderFlowTabs({
   flow,
@@ -73,6 +73,7 @@ export function OrderFlowTabs({
   searchingLabel,
   onFlowChange,
   onExitSearch,
+  onShowAll,
 }: {
   flow: OrderFlow;
   counts: Counts;
@@ -81,6 +82,8 @@ export function OrderFlowTabs({
   searchingLabel: string;
   onFlowChange: (f: OrderFlow) => void;
   onExitSearch: () => void;
+  /** Bấm chip "Tất cả" → xem đơn ở mọi trạng thái (`?group=all`). */
+  onShowAll: () => void;
 }) {
   const chipsOf = (g: (typeof ORDER_FLOW_GROUPS)[number]) =>
     [...g.flows, ...g.done].map((f) => (
@@ -108,9 +111,15 @@ export function OrderFlowTabs({
         aria-label="Trạng thái đơn"
         className="flex flex-wrap items-stretch gap-1.5"
       >
-        {searching ? (
-          <FlowChip label="Tất cả" n={all} family="off" active onClick={() => {}} />
-        ) : null}
+        <FlowChip
+          label="Tất cả"
+          n={all}
+          family="off"
+          active={searching}
+          onClick={() => {
+            if (!searching) onShowAll();
+          }}
+        />
         {ORDER_FLOW_GROUPS.map(chipsOf)}
       </div>
 

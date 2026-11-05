@@ -231,6 +231,9 @@ const MESSAGES: Record<string, string> = {
   ORDER_NOT_DRAFT: 'Đơn không còn ở trạng thái Đơn mới — không cần xác nhận lại.',
   ORDER_WAITING_STOCK_INVALID:
     'Chỉ đơn Đã xác nhận (chưa gửi hãng, kho chưa lấy hàng) mới chuyển Chờ hàng; chỉ đơn đang Chờ hàng mới đưa lại được.',
+  // 2026-11-05 (user chốt): "Đóng gói + in vận đơn" không còn đóng gói thiếu.
+  ORDER_PACK_SHORTAGE:
+    'Đơn còn thiếu hàng — không đóng gói thiếu. Nhập đủ hàng vào kho rồi thử lại, hoặc sửa đơn bỏ dòng thiếu.',
   ORDER_PICK_SHORTAGE:
     'Không có dòng nào lấy được — thiếu tồn ở vị trí pick được. Nhập kho hoặc chuyển hàng vào vị trí pick rồi thử lại.',
   PDA_PICK_NEEDS_ASSIGNMENT:
@@ -409,9 +412,31 @@ export function messageForItemCode(code: string): string {
   return MESSAGES[code] ?? `Lỗi ${code} khi xử lý đơn này. Báo IT số đơn và mã lỗi.`;
 }
 
+/**
+ * "Thiếu: SP-0213 × 10, SP-0108 × 1." — dòng thiếu của ORDER_PACK_SHORTAGE (dữ liệu `shortages`,
+ * không phải message thô — luật 6). Rỗng → chuỗi rỗng.
+ */
+export function packShortageText(
+  shortages: ReadonlyArray<{ skuCode: string; qtyMissing: string }>,
+) {
+  if (shortages.length === 0) return '';
+  return `Thiếu: ${shortages.map((s) => `${s.skuCode} × ${s.qtyMissing}`).join(', ')}.`;
+}
+
 /** Câu hiển thị cho mọi lỗi — ApiError hoặc lỗi JS bất kỳ. Không bao giờ trả message thô. */
 export function messageFor(err: unknown): string {
   if (err instanceof ApiError) {
+    if (err.code === 'ORDER_PACK_SHORTAGE') {
+      const d = err.details as { shortages?: unknown } | null;
+      const list = Array.isArray(d?.shortages)
+        ? (d.shortages as Array<{ skuCode?: unknown; qtyMissing?: unknown }>).flatMap((s) =>
+            typeof s.skuCode === 'string' && typeof s.qtyMissing === 'string'
+              ? [{ skuCode: s.skuCode, qtyMissing: s.qtyMissing }]
+              : [],
+          )
+        : [];
+      return `${MESSAGES.ORDER_PACK_SHORTAGE!} ${packShortageText(list)}`.trim();
+    }
     if (err.code === 'BARCODE_TAKEN') {
       // Mã + SKU đang giữ mã là dữ liệu (details), không phải message thô của server.
       const d = err.details as { code?: unknown; skuCode?: unknown; skuName?: unknown } | null;
