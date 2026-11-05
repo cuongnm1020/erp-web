@@ -101,6 +101,9 @@ export const EntityPicker = React.forwardRef<HTMLButtonElement, EntityPickerProp
     const { options, isPending } = useSearch(open ? dq : '');
     const [picked, setPicked] = React.useState<EntityOption | undefined>();
     const label = picked?.id === value ? picked.label : (selectedLabel ?? (value ? value : ''));
+    // Có giá trị + bỏ chọn được → nút X đứng ĐÚNG chỗ icon mũi tên (thay nó). Trước đây X đặt
+    // right-8 còn `pr-8` đẩy mũi tên vào trong → hai icon chồng thành ký tự lạ (user 2026-11-05).
+    const showClear = clearable && !!value && !disabled;
 
     return (
       <Popover open={open} onOpenChange={setOpen}>
@@ -116,20 +119,24 @@ export const EntityPicker = React.forwardRef<HTMLButtonElement, EntityPickerProp
               className={cn(
                 'w-full justify-between font-normal',
                 !value && 'text-muted-foreground',
-                clearable && value && 'pr-8',
               )}
               {...aria}
             >
               <span className="truncate">{value ? label : placeholder}</span>
-              <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" aria-hidden />
+              {showClear ? (
+                // Giữ chỗ cho nút X nằm đè lên — chữ không chạy dưới nút.
+                <span className="ml-2 h-4 w-4 shrink-0" aria-hidden />
+              ) : (
+                <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" aria-hidden />
+              )}
             </Button>
           </PopoverTrigger>
-          {clearable && value && !disabled ? (
+          {showClear ? (
             <button
               type="button"
               aria-label="Bỏ chọn"
               onClick={() => onChange('')}
-              className="absolute right-8 top-1/2 -translate-y-1/2 rounded p-0.5 text-muted-foreground hover:bg-muted hover:text-foreground"
+              className="absolute right-2.5 top-1/2 -translate-y-1/2 rounded p-0.5 text-muted-foreground hover:bg-muted hover:text-foreground"
             >
               <X className="h-3.5 w-3.5" aria-hidden />
             </button>

@@ -1374,6 +1374,67 @@ describe('OrderCreateScreen — màn tạo đơn mới', () => {
     forgetWarehouseSelection();
   });
 
+  it('Chỉ bán từ kho (2026-11-05): sản phẩm khoá Kho Long An, chọn Kho Thạch Thất → dòng báo đỏ, Chốt đơn không gửi', async () => {
+    let posted = 0;
+    server.use(
+      http.get('/api/skus/:id', ({ params }) =>
+        params.id === SKU.id
+          ? HttpResponse.json({
+              ...skuDetail(SKU.id, SKU.code, SKU.name),
+              product: { id: 'p-1', code: 'P1', name: SKU.name, sellWarehouseId: 'wh-la' },
+            })
+          : new HttpResponse(null, { status: 404 }),
+      ),
+      http.post('/api/sales-orders', () => {
+        posted += 1;
+        return HttpResponse.json(CREATED, { status: 201 });
+      }),
+      ...skuHandlers(),
+    );
+    renderApp(
+      <WarehouseProvider
+        me={{
+          ...ME_ADMIN,
+          managesDepartments: false,
+          managesCareTeam: false,
+          warehouseIds: ['wh-tt', 'wh-la'],
+          warehouses: [
+            { id: 'wh-tt', code: 'KHO-TT-01', name: 'Kho Thạch Thất' },
+            { id: 'wh-la', code: 'KHO-LA-01', name: 'Kho Long An' },
+          ],
+          defaultWarehouseId: 'wh-la',
+          defaultPosShopId: null,
+          selectedWarehouseId: null,
+        }}
+      >
+        <OrderCreateScreen />
+      </WarehouseProvider>,
+    );
+    const box = await screen.findByRole('combobox', { name: 'Tìm sản phẩm' });
+    fireEvent.change(box, { target: { value: 'amino' } });
+    fireEvent.click(await screen.findByRole('option', { name: /Amino GA3 500ml/ }));
+    // Kho xuất đang là Kho Long An (kho mặc định) → không báo.
+    expect(await screen.findByText('AMINO-GA3')).toBeInTheDocument();
+    expect(screen.queryByText(/Chỉ bán từ/)).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('combobox', { name: 'Kho xuất' }));
+    fireEvent.click(await screen.findByRole('option', { name: /Kho Thạch Thất/ }));
+    expect(
+      await screen.findByText('Chỉ bán từ Kho Long An — đổi Kho xuất hoặc bỏ dòng này'),
+    ).toBeInTheDocument();
+    // Chặn TRƯỚC kiểm tra form: không gửi, cũng không chạy validate (ô tên khách chưa báo đỏ).
+    fireEvent.click(screen.getByRole('button', { name: /^Chốt đơn F10/ }));
+    await new Promise((r) => setTimeout(r, 50));
+    expect(screen.queryByText('Nhập tên khách hàng')).not.toBeInTheDocument();
+    expect(posted).toBe(0);
+
+    // Đổi lại đúng kho → hết báo.
+    fireEvent.click(screen.getByRole('combobox', { name: 'Kho xuất' }));
+    fireEvent.click(await screen.findByRole('option', { name: /Kho Long An/ }));
+    await waitFor(() => expect(screen.queryByText(/Chỉ bán từ/)).not.toBeInTheDocument());
+    forgetWarehouseSelection();
+  });
+
   it('ô NV xử lý chỉ liệt kê nhân viên cùng team (GET /sales-orders/owner-options), không lấy danh sách mọi nhân viên', async () => {
     renderApp(<OrderCreateScreen />);
     fireEvent.click(await screen.findByRole('combobox', { name: 'NV xử lý' }));

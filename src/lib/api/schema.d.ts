@@ -2653,6 +2653,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/stock/sell-warehouses": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["SkuSellWarehouseController_setSellWarehouses"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/attributes": {
         parameters: {
             query?: never;
@@ -8557,6 +8573,8 @@ export interface components {
             unitCost: string | null;
             /** @description Cân nặng một ĐVT cơ sở (kg, Decimal(12,4) chuỗi) — null = chưa cân; nhập ở màn Tồn kho (POST /stock/weights). */
             weightKg: string | null;
+            /** @description Chỉ bán từ kho (Product.sellWarehouseId, 2026-11-05) — null = bán ở mọi kho; đặt qua POST /stock/sell-warehouses. */
+            sellWarehouseId: string | null;
         };
         StockListResponseDto: {
             items: components["schemas"]["StockRowDto"][];
@@ -10476,6 +10494,8 @@ export interface components {
             isActive: boolean;
             /** @description Kho mặc định (wms.Warehouse.id) — tồn đầu kỳ SKU mới ghi vào đây. */
             defaultWarehouseId: string | null;
+            /** @description Chỉ bán từ kho (wms.Warehouse.id, 2026-11-05) — null = bán ở mọi kho; đặt ở màn Tồn kho (POST /stock/sell-warehouses). */
+            sellWarehouseId: string | null;
             /** @description Công dụng. */
             description: string | null;
             /** @description Thành phần (hoạt chất, hàm lượng). */
@@ -10958,6 +10978,27 @@ export interface components {
         SetSkuWeightsResultDto: {
             /** @description SKU đã đổi cân nặng. */
             updatedSkuCount: number;
+            /** @description SKU không tồn tại / đã xoá — không đổi gì. */
+            skippedSkuIds: string[];
+        };
+        SetSkuSellWarehouseLineDto: {
+            /**
+             * Format: uuid
+             * @description SKU trên màn Tồn kho — kho bán đặt cho SẢN PHẨM của SKU này (mọi biến thể dùng chung).
+             */
+            skuId: string;
+            /**
+             * Format: uuid
+             * @description Kho duy nhất được bán (wms.Warehouse.id); null = bán ở mọi kho.
+             */
+            sellWarehouseId: string | null;
+        };
+        SetSkuSellWarehousesDto: {
+            lines: components["schemas"]["SetSkuSellWarehouseLineDto"][];
+        };
+        SetSkuSellWarehousesResultDto: {
+            /** @description Số sản phẩm đã đổi kho bán (SKU cùng sản phẩm gộp làm một). */
+            updatedProductCount: number;
             /** @description SKU không tồn tại / đã xoá — không đổi gì. */
             skippedSkuIds: string[];
         };
@@ -22285,6 +22326,29 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["SetSkuWeightsResultDto"];
+                };
+            };
+        };
+    };
+    SkuSellWarehouseController_setSellWarehouses: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SetSkuSellWarehousesDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SetSkuSellWarehousesResultDto"];
                 };
             };
         };

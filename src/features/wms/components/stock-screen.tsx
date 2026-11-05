@@ -20,6 +20,13 @@ import { StatusBadge } from '@/components/data/status-badge';
 import { PageHeader } from '@/components/layout/page-header';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { toast } from '@/components/ui/toaster';
 import { cn } from '@/lib/cn';
 import { messageFor } from '@/lib/error-messages';
@@ -40,6 +47,7 @@ import {
   useActualCountSummary,
   useSetActualStock,
   useSetSkuCosts,
+  useSetSellWarehouses,
   useSetSkuWeights,
   useStockBySku,
   useStockByLocation,
@@ -49,6 +57,7 @@ import {
   type StockRow,
   type StockSortField,
 } from '../api/use-stock';
+import { isOperationalWarehouse, useWarehouses } from '../api/use-warehouses';
 import { StockExcelExportButton, StockExcelImportButton } from './stock-excel-dialogs';
 import { isNegativeQty, locationTypeLabel } from '../labels';
 
@@ -108,15 +117,23 @@ const COST_RE = /^\d+(\.\d{1,4})?$/;
 /** Gram, tối đa 1 chữ số lẻ (API giữ kg 4 chữ số lẻ). */
 const WEIGHT_RE = /^\d{1,9}(\.\d)?$/;
 
-/** Bản nháp một SKU: số đếm (kho), giá vốn (kế toán), cân nặng gram (kho) độc lập — '' = không đổi. */
+/** Ô "Kho bán" chọn "Mọi kho" (gửi null) — khác '' = không đổi. */
+const SELL_ANY = '__any__';
+
+/**
+ * Bản nháp một SKU: số đếm (kho), giá vốn (kế toán), cân nặng gram (kho), kho bán (kho) độc lập —
+ * '' = không đổi. `sellWh`: id kho, hoặc {@link SELL_ANY} = bán ở mọi kho.
+ */
 interface CountDraft {
   qty: string;
   unitCost: string;
   weightG: string;
+  sellWh: string;
 }
 
-const EMPTY_DRAFT: CountDraft = { qty: '', unitCost: '', weightG: '' };
-const draftEmpty = (d: CountDraft) => d.qty === '' && d.unitCost === '' && d.weightG === '';
+const EMPTY_DRAFT: CountDraft = { qty: '', unitCost: '', weightG: '', sellWh: '' };
+const draftEmpty = (d: CountDraft) =>
+  d.qty === '' && d.unitCost === '' && d.weightG === '' && d.sellWh === '';
 
 /** Dòng nháp sai định dạng (ô đã gõ mà không phải số hợp lệ). */
 function draftInvalid(d: CountDraft): boolean {
@@ -130,6 +147,8 @@ function draftInvalid(d: CountDraft): boolean {
 interface CountContextValue {
   drafts: Record<string, CountDraft>;
   setDraft: (row: StockRow, patch: Partial<CountDraft>) => void;
+  /** Mọi kho bán được (GET /warehouses, bỏ TRANSIT) — ô "Kho bán" + nhãn "Chỉ bán …". */
+  warehouses: { id: string; name: string }[];
 }
 
 /** Cân nặng kg (API) → "250 g" / "1.500 g"; null = chưa cân. */
@@ -223,6 +242,39 @@ function CountWeightCell({ row }: { row: StockRow }) {
   );
 }
 
+/** Nhãn "Chỉ bán <kho>" ở cột Ghi chú — không có kho bán thì không hiện gì (bán mọi kho). */
+function SellWarehouseBadge({ row }: { row: StockRow }) {
+  const ctx = useContext(CountContext);
+  if (!row.sellWarehouseId) return null;
+  const name = ctx?.warehouses.find((w) => w.id === row.sellWarehouseId)?.name ?? 'một kho';
+  return <StatusBadge tone="brand">Chỉ bán {name}</StatusBadge>;
+}
+
+/** Ô "Kho bán" (kho, stock.adjust): mặc định hiện giá trị hiện tại; chọn khác = đưa vào bản nháp. */
+function CountSellWarehouseCell({ row }: { row: StockRow }) {
+  const ctx = useContext(CountContext)!;
+  const current = row.sellWarehouseId ?? SELL_ANY;
+  const draft = ctx.drafts[row.skuId]?.sellWh ?? '';
+  return (
+    <Select
+      value={draft || current}
+      onValueChange={(v) => ctx.setDraft(row, { sellWh: v === current ? '' : v })}
+    >
+      <SelectTrigger aria-label={`Kho bán ${row.skuCode}`} className="h-8">
+        <SelectValue />
+      </SelectTrigger>
+      <SelectContent>
+        <SelectItem value={SELL_ANY}>Mọi kho</SelectItem>
+        {ctx.warehouses.map((w) => (
+          <SelectItem key={w.id} value={w.id}>
+            Chỉ {w.name}
+          </SelectItem>
+        ))}
+      </SelectContent>
+    </Select>
+  );
+}
+
 const STOCK_SORTABLE = new Set<string>([
   'weight',
   'onHand',
@@ -302,13 +354,14 @@ const skuColumns: ColumnDef<StockRow, unknown>[] = [
   {
     id: 'flags',
     header: 'Ghi chú',
-    meta: { width: 160 },
+    meta: { width: 220 },
     cell: ({ row }) => (
-      <span className="flex gap-1">
+      <span className="flex flex-wrap gap-1">
         {isNegativeQty(row.original.available) ? (
           <StatusBadge tone="err">Khả dụng âm</StatusBadge>
         ) : null}
         {row.original.isActive ? null : <StatusBadge tone="neutral">Ngừng bán</StatusBadge>}
+        <SellWarehouseBadge row={row.original} />
       </span>
     ),
   },
@@ -340,6 +393,13 @@ const weightEditColumn: ColumnDef<StockRow, unknown> = {
   meta: { align: 'right', width: 130 },
   cell: ({ row }) => <CountWeightCell row={row.original} />,
 };
+/** Kho bán (2026-11-05) — cùng quyền với cân nặng (stock.adjust), không theo kho đang chọn. */
+const sellEditColumn: ColumnDef<StockRow, unknown> = {
+  id: 'sellWarehouse',
+  header: 'Kho bán',
+  meta: { width: 170 },
+  cell: ({ row }) => <CountSellWarehouseCell row={row.original} />,
+};
 /** Chế độ nhập: bỏ cột Ghi chú và cột Cân nặng chỉ-đọc (thay bằng ô nhập khi có quyền). */
 const baseEditColumns = skuColumns.filter((c) => c.id !== 'flags' && c.id !== 'weight');
 /**
@@ -355,7 +415,7 @@ function buildEditColumns(opts: {
   return [
     ...baseEditColumns,
     ...(opts.qty ? qtyEditColumns : []),
-    ...(opts.weight ? [weightEditColumn] : []),
+    ...(opts.weight ? [weightEditColumn, sellEditColumn] : []),
     ...(opts.cost ? [costEditColumn] : []),
   ];
 }
@@ -585,7 +645,17 @@ export function StockScreen() {
   const setActual = useSetActualStock();
   const setCosts = useSetSkuCosts();
   const setWeights = useSetSkuWeights();
-  const saving = setActual.isPending || setCosts.isPending || setWeights.isPending;
+  const setSellWh = useSetSellWarehouses();
+  const warehouseList = useWarehouses();
+  const sellWarehouses = useMemo(
+    () =>
+      (warehouseList.data ?? [])
+        .filter(isOperationalWarehouse)
+        .map((w) => ({ id: w.id, name: w.name })),
+    [warehouseList.data],
+  );
+  const saving =
+    setActual.isPending || setCosts.isPending || setWeights.isPending || setSellWh.isPending;
   // Cột số lượng cần một kho cụ thể; cột cân nặng (stock.adjust) và giá vốn (stock.cost) không theo kho.
   const qtyEditable = canAdjust && countWarehouseId !== null;
   const editMode = canAdjust || canCost;
@@ -604,7 +674,10 @@ export function StockScreen() {
       return { ...prev, [row.skuId]: next };
     });
   }, []);
-  const countCtx = useMemo<CountContextValue>(() => ({ drafts, setDraft }), [drafts, setDraft]);
+  const countCtx = useMemo<CountContextValue>(
+    () => ({ drafts, setDraft, warehouses: sellWarehouses }),
+    [drafts, setDraft, sellWarehouses],
+  );
 
   const draftList = Object.entries(drafts);
   const invalidCount = draftList.filter(([, d]) => draftInvalid(d)).length;
@@ -645,6 +718,15 @@ export function StockScreen() {
       ? draftList
           .filter(([, d]) => d.weightG !== '')
           .map(([id, d]) => ({ skuId: id, weightKg: gramsToKg(d.weightG) }))
+      : [];
+    // Kho bán (2026-11-05): "Mọi kho" → null.
+    const sellLines = canAdjust
+      ? draftList
+          .filter(([, d]) => d.sellWh !== '')
+          .map(([id, d]) => ({
+            skuId: id,
+            sellWarehouseId: d.sellWh === SELL_ANY ? null : d.sellWh,
+          }))
       : [];
     const done: string[] = [];
     try {
@@ -695,6 +777,16 @@ export function StockScreen() {
           clearSaved(new Set(batch.map((l) => l.skuId)), 'weightG');
         }
         done.push(`cân nặng ${updated} SKU`);
+      }
+      if (sellLines.length) {
+        let updated = 0;
+        for (let i = 0; i < sellLines.length; i += ACTUAL_BATCH) {
+          const batch = sellLines.slice(i, i + ACTUAL_BATCH);
+          const r = await setSellWh.mutateAsync({ lines: batch });
+          updated += r.updatedProductCount;
+          clearSaved(new Set(batch.map((l) => l.skuId)), 'sellWh');
+        }
+        done.push(`kho bán ${updated} sản phẩm`);
       }
       if (done.length) toast.success(`Đã lưu ${done.join('; ')}`);
     } catch (err) {
@@ -824,6 +916,14 @@ export function StockScreen() {
               <b className="font-semibold">ĐVT cơ sở</b> theo gram (vd 250 = 250 g, 1500 = 1,5 kg),
               áp cho sản phẩm ở mọi kho; ô mờ là cân nặng hiện tại, để trống là không đổi. Dùng để
               tính khối lượng gửi hãng vận chuyển.
+            </span>
+          ) : null}
+          {canAdjust ? (
+            <span>
+              Cột <b className="font-semibold">Kho bán</b>: mặc định sản phẩm bán ở mọi kho. Chọn{' '}
+              <b className="font-semibold">Chỉ &lt;kho&gt;</b> thì đơn chỉ lên được ở kho đó — lên
+              đơn, sửa đơn hay chuyển sang kho khác đều bị chặn. Áp cho mọi biến thể của sản phẩm;
+              đơn đã lên giữ nguyên.
             </span>
           ) : null}
           {canCost ? (

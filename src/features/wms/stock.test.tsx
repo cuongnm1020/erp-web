@@ -271,6 +271,48 @@ describe('StockScreen — nhập tồn thực tế (POST /cycle-counts/actual-st
     await waitFor(() => expect(w1).toHaveValue(''));
   });
 
+  it('kho bán: nhãn "Chỉ bán …" khi xem; chế độ nhập chọn kho → POST /stock/sell-warehouses (Mọi kho = null)', async () => {
+    search = '';
+    forgetWarehouseSelection();
+    const sells: unknown[] = [];
+    server.use(
+      http.post('/api/stock/sell-warehouses', async ({ request }) => {
+        sells.push(await request.json());
+        return HttpResponse.json({ updatedProductCount: 2, skippedSkuIds: [] });
+      }),
+    );
+    renderApp(<StockScreen />, {
+      me: { permissions: ['stock.read', 'stock.adjust'], hasGlobalAccess: false },
+    });
+    // Xem: SKU-0002 khoá ở kho HCM-2.
+    expect(await screen.findByText('Chỉ bán Kho HCM-2')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Nhập tồn thực tế' }));
+    const sell1 = await screen.findByRole('combobox', { name: 'Kho bán SKU-0001' });
+    expect(sell1).toHaveTextContent('Mọi kho');
+    expect(screen.getByRole('combobox', { name: 'Kho bán SKU-0002' })).toHaveTextContent(
+      'Chỉ Kho HCM-2',
+    );
+    // SKU-0001 → chỉ HN-1 (kho TRANSIT không có trong danh sách).
+    fireEvent.click(sell1);
+    expect(screen.queryByRole('option', { name: 'Chỉ Kho trung chuyển' })).not.toBeInTheDocument();
+    fireEvent.click(await screen.findByRole('option', { name: 'Chỉ Kho HN-1' }));
+    // SKU-0002 → mọi kho.
+    fireEvent.click(screen.getByRole('combobox', { name: 'Kho bán SKU-0002' }));
+    fireEvent.click(await screen.findByRole('option', { name: 'Mọi kho' }));
+    expect(screen.getByText(/SKU đã nhập/)).toHaveTextContent('2 SKU đã nhập');
+    fireEvent.click(screen.getByRole('button', { name: 'Lưu thay đổi' }));
+    await waitFor(() =>
+      expect(sells).toEqual([
+        {
+          lines: [
+            { skuId: expect.any(String), sellWarehouseId: 'wh-1' },
+            { skuId: expect.any(String), sellWarehouseId: null },
+          ],
+        },
+      ]),
+    );
+  });
+
   it('kho (stock.adjust, không stock.cost): không có cột giá vốn', async () => {
     search = '';
     renderApp(<StockScreen />, {
