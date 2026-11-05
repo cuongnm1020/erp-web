@@ -27,7 +27,7 @@ const ADMIN = { permissions: [], hasGlobalAccess: true };
 describe('visibleModules', () => {
   it('sale không thấy Tài chính/Quản trị; con "Tạo đơn" bị ẩn vì thiếu create', () => {
     const mods = visibleModules((a, s) => {
-      const ab = new Set(['read:Customer', 'read:SalesOrder']);
+      const ab = new Set(['read:Customer', 'read:SalesOrder', 'view:SalesMenu']);
       return ab.has(`${a}:${s}`);
     });
     const labels = mods.map((m) => m.label);
@@ -158,21 +158,34 @@ describe('visibleModules', () => {
     ]);
   });
 
-  it('chỉ có shipment.read → module Kho chỉ hiện Vận đơn + In đơn + Đẩy đơn', () => {
+  it('chỉ có shipment.read → module Kho hiện Đơn hàng → Vận đơn → In đơn (2026-11-05)', () => {
     const mods = visibleModules((a, s) => a === 'read' && s === 'Shipment');
     expect(mods.find((m) => m.label === 'Kho')?.children?.map((c) => c.label)).toEqual([
+      'Đơn hàng',
       'Vận đơn',
       'In đơn',
-      'Đẩy đơn',
     ]);
+  });
+
+  it('nhân viên kho (không có view SalesMenu) → ẩn menu Bán hàng, URL /crm/orders vẫn theo sales_order.read', () => {
+    const kho = visibleModules((a, s) => (a === 'read' && s === 'SalesOrder') || s === 'Shipment');
+    expect(kho.map((m) => m.label)).not.toContain('Bán hàng');
+    const sale = visibleModules(
+      (a, s) => (a === 'read' && s === 'SalesOrder') || (a === 'view' && s === 'SalesMenu'),
+    );
+    expect(sale.map((m) => m.label)).toContain('Bán hàng');
+    expect(requiredAbilityFor('/crm/orders/x/edit')).toEqual({
+      action: 'read',
+      subject: 'SalesOrder',
+    });
   });
 
   it('task.read (PICKER) không mở Bảng điều phối — cần task.read_all (2026-09-15)', () => {
     const reader = visibleModules((a, s) => s === 'Task' && (a === 'read' || a === 'execute'));
     const wmsReader = reader.find((m) => m.label === 'Kho');
     expect(wmsReader?.children?.map((c) => c.label)).toEqual([
-      'Trạm đóng gói',
       'Lấy hàng (PDA)',
+      'Trạm đóng gói',
       'Cất hàng (PDA)',
       'Tra / chuyển vị trí (PDA)',
     ]);
@@ -186,14 +199,15 @@ describe('visibleModules', () => {
     const mods = visibleModules((a, s) => a === 'read' && s === 'Stock');
     const wms = mods.find((m) => m.label === 'Kho');
     // Thứ tự theo nhóm con (redesign 2026-10-17): Vận hành → Chứng từ → Danh mục kho.
+    // Tồn kho ở Danh mục kho (user 2026-11-05).
     expect(wms?.children?.map((c) => c.label)).toEqual([
-      'Tồn kho',
       'Hàng chờ',
       'Phiếu nhập kho',
       'Phiếu bán hàng',
       'Nhập hàng hoàn',
       'Chuyển kho',
       'Kiểm kê',
+      'Tồn kho',
       'Kho & vị trí',
       'Thùng / pallet',
       'Cảnh báo nhập hàng',

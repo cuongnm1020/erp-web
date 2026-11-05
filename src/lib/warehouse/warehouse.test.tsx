@@ -30,6 +30,7 @@ const me = (over: Partial<AuthMe> = {}): AuthMe => ({
   hasGlobalAccess: false,
   managesDepartments: false,
   managesCareTeam: false,
+  warehouseOnly: false,
   warehouseIds: ['wh-la', 'wh-tt'],
   warehouses: [
     { id: 'wh-tt', code: 'KHO-TT-01', name: 'Kho Thạch Thất' },

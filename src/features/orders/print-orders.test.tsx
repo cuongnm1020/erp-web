@@ -16,9 +16,9 @@ vi.mock('next/navigation', () => ({
 const FIRST = makeOrders(1)[0]!;
 
 describe('PrintOrdersScreen — In đơn (clone màn Đơn hàng, 2026-11-04)', () => {
-  it('tiêu đề + breadcrumb Kho › In đơn, bảng dữ liệu GET /sales-orders', async () => {
+  it('tiêu đề + breadcrumb Kho › Đơn hàng (menu đổi tên 2026-11-05), bảng dữ liệu GET /sales-orders', async () => {
     renderApp(<PrintOrdersScreen />);
-    expect(screen.getByRole('heading', { name: 'In đơn' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Đơn hàng' })).toBeInTheDocument();
     expect(await screen.findByText(FIRST.docNumber)).toBeInTheDocument();
     expect(screen.getByTestId('order-count')).toHaveTextContent('60');
   });

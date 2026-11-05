@@ -1273,6 +1273,7 @@ describe('OrderCreateScreen — màn tạo đơn mới', () => {
           ...ME_ADMIN,
           managesDepartments: false,
           managesCareTeam: false,
+          warehouseOnly: false,
           warehouseIds: ['wh-tt', 'wh-la'],
           warehouses: [
             { id: 'wh-tt', code: 'KHO-TT-01', name: 'Kho Thạch Thất' },
@@ -1348,6 +1349,7 @@ describe('OrderCreateScreen — màn tạo đơn mới', () => {
           ...ME_ADMIN,
           managesDepartments: false,
           managesCareTeam: false,
+          warehouseOnly: false,
           warehouseIds: ['wh-tt', 'wh-la'],
           warehouses: [
             { id: 'wh-tt', code: 'KHO-TT-01', name: 'Kho Thạch Thất' },
@@ -1397,6 +1399,7 @@ describe('OrderCreateScreen — màn tạo đơn mới', () => {
           ...ME_ADMIN,
           managesDepartments: false,
           managesCareTeam: false,
+          warehouseOnly: false,
           warehouseIds: ['wh-tt', 'wh-la'],
           warehouses: [
             { id: 'wh-tt', code: 'KHO-TT-01', name: 'Kho Thạch Thất' },

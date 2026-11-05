@@ -64,6 +64,22 @@ describe('buildAbility', () => {
     expect(sales.can('categories', 'Product')).toBe(true);
   });
 
+  it('menu Bán hàng (2026-11-05): warehouseOnly → không view SalesMenu, quyền đơn giữ nguyên', () => {
+    const kho = buildAbility({
+      permissions: ['sales_order.read', 'sales_order.create'],
+      hasGlobalAccess: false,
+      warehouseOnly: true,
+    });
+    expect(kho.can('view', 'SalesMenu')).toBe(false);
+    expect(kho.can('read', 'SalesOrder')).toBe(true);
+    const sale = buildAbility({
+      permissions: ['sales_order.read'],
+      hasGlobalAccess: false,
+      warehouseOnly: false,
+    });
+    expect(sale.can('view', 'SalesMenu')).toBe(true);
+  });
+
   it('hasGlobalAccess → manage all', () => {
     const a = buildAbility(ADMIN);
     expect(a.can('delete', 'Customer')).toBe(true);

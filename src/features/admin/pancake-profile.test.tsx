@@ -34,6 +34,7 @@ const ME_ADMIN = {
   hasGlobalAccess: true,
   managesDepartments: false,
   managesCareTeam: false,
+  warehouseOnly: false,
   warehouseIds: null,
   warehouses: [],
   defaultWarehouseId: null,

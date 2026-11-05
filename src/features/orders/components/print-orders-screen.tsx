@@ -1070,7 +1070,8 @@ export function PrintOrdersScreen() {
   return (
     <>
       <PageHeader
-        title="In đơn"
+        // Tên theo menu Kho › Đơn hàng (user 2026-11-05) — "In đơn" giờ là màn /wms/waybills.
+        title="Đơn hàng"
         sticky={false}
         description={
           // Số đơn khớp bộ lọc, to, đậm (user 2026-11-03); bỏ "/ tổng số đơn" (user 2026-11-05).
@@ -1086,7 +1087,7 @@ export function PrintOrdersScreen() {
             ) : null}
           </span>
         }
-        breadcrumb={[{ label: 'Kho' }, { label: 'In đơn' }]}
+        breadcrumb={[{ label: 'Kho' }, { label: 'Đơn hàng' }]}
         actions={
           <>
             <OrderScanButton onScan={onScan} />
