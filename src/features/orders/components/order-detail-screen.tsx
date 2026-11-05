@@ -542,11 +542,13 @@ function Lines({ order }: { order: SalesOrderDetail }) {
               g.kind === 'line' ? (
                 <LineRow key={g.line.id} l={g.line} />
               ) : (
-                /* Combo: một dòng tổng (giá combo × số combo) + các dòng thành phần thụt vào —
-                   kho giữ / pick trên thành phần nên hai cột cuối chỉ có ở dòng thành phần. */
+                /* Combo: MỘT dòng tổng (giá combo × số combo). Dòng thành phần không hiện ở chi tiết
+                   đơn (user 2026-11-06) — giữ / pick theo thành phần xem ở màn kho / PDA. */
                 <Fragment key={`combo-${g.groupNo}`}>
                   <TableRow className="bg-muted/40" data-testid="combo-row">
-                    <TableCell className="px-2.5 py-1.5 text-muted-foreground" />
+                    <TableCell className="px-2.5 py-1.5 text-muted-foreground">
+                      {g.lines[0]?.lineNo}
+                    </TableCell>
                     <TableCell className="px-2.5 py-1.5">
                       <div className="flex items-center gap-1.5 font-semibold">
                         {g.skuName}
@@ -576,9 +578,6 @@ function Lines({ order }: { order: SalesOrderDetail }) {
                     <TableCell className="px-2.5 py-1.5" />
                     <TableCell className="px-2.5 py-1.5" />
                   </TableRow>
-                  {g.lines.map((l) => (
-                    <LineRow key={l.id} l={l} component />
-                  ))}
                 </Fragment>
               ),
             )}
