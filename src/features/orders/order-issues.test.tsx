@@ -173,6 +173,24 @@ describe('OrderIssuesScreen', () => {
     expect(q.get('stockReady')).toBe('true');
   });
 
+  it('Không in được (2026-11-06): ô lọc "Hàng" Đủ / Thiếu hàng; đơn có mã → "In lại vận đơn" ở menu dòng + thanh chọn nhiều', async () => {
+    search = 'issue=PACK_ERROR&ready=false';
+    const { listQueries, rows } = setup();
+    Object.assign(rows[0]!.shipment, { trackingNo: 'S1.TRK' });
+    renderApp(<OrderIssuesScreen />);
+    await screen.findByText(rows[0]!.docNumber);
+    expect(listQueries.at(-1)!.get('stockReady')).toBe('false');
+    expect(screen.getByRole('combobox', { name: /Hàng/ })).toHaveTextContent('Thiếu hàng');
+    // Menu ⋯ dòng có mã → mục In lại vận đơn.
+    fireEvent.keyDown(screen.getAllByRole('button', { name: /Thao tác khác/ })[0]!, {
+      key: 'ArrowDown',
+    });
+    expect(await screen.findByRole('menuitem', { name: 'In lại vận đơn' })).toBeInTheDocument();
+    fireEvent.keyDown(document.activeElement ?? document.body, { key: 'Escape' });
+    fireEvent.click(screen.getAllByRole('checkbox')[1]!);
+    expect(await screen.findByRole('button', { name: 'In lại vận đơn (1)' })).toBeInTheDocument();
+  });
+
   it('bấm ô khác → đổi nhóm trên URL', async () => {
     search = '';
     setup();
