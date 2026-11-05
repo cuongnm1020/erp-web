@@ -18,6 +18,33 @@ export const stocktakeKeys = {
   detail: (id: string) => [...stocktakeKeys.all, 'detail', id] as const,
 };
 
+export type StockCountHistoryRow = components['schemas']['StockCountHistoryRowDto'];
+export type StockCountHistoryParams = NonNullable<
+  operations['StocktakeController_history']['parameters']['query']
+>;
+
+/**
+ * GET /cycle-counts/history — lịch sử nhập tồn từng dòng (2026-11-05): người nhập (admin đăng nhập
+ * thay → admin), lọc theo người / SKU, phân trang phía server.
+ */
+export function useStockCountHistory(params: StockCountHistoryParams) {
+  return useQuery({
+    queryKey: [...stocktakeKeys.all, 'history', params] as const,
+    queryFn: () => unwrap(api.GET('/cycle-counts/history', { params: { query: params } })),
+    placeholderData: (prev) => prev,
+  });
+}
+
+/** GET /cycle-counts/history/users — người đã nhập tồn (ô lọc "Nhân viên"). */
+export function useStockCountHistoryUsers(warehouseId: string | undefined) {
+  return useQuery({
+    queryKey: [...stocktakeKeys.all, 'history-users', warehouseId ?? null] as const,
+    queryFn: () =>
+      unwrap(api.GET('/cycle-counts/history/users', { params: { query: { warehouseId } } })),
+    staleTime: 60_000,
+  });
+}
+
 export function useCycleCounts(params: CycleCountListParams) {
   return useQuery({
     queryKey: stocktakeKeys.list(params),

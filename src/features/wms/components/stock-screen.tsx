@@ -1,7 +1,7 @@
 'use client';
 
 import Decimal from 'decimal.js';
-import { ClipboardCheck, Info } from 'lucide-react';
+import { ClipboardCheck, History, Info } from 'lucide-react';
 import Link from 'next/link';
 import {
   createContext,
@@ -771,6 +771,15 @@ export function StockScreen() {
         breadcrumb={[{ label: 'Kho' }, { label: 'Tồn kho' }]}
         actions={
           <>
+            {/* Lịch sử nhập tồn theo người nhập (2026-11-05) — trang riêng, lọc trên URL. */}
+            {!counting ? (
+              <Button variant="outline" asChild>
+                <Link href="/wms/stock/history">
+                  <History className="h-4 w-4" aria-hidden />
+                  Lịch sử nhập tồn
+                </Link>
+              </Button>
+            ) : null}
             {!counting ? <StockExcelExportButton /> : null}
             {canAdjust && !counting ? <StockExcelImportButton /> : null}
             {(canAdjust || canCost) && !counting ? (

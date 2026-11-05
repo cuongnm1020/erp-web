@@ -5804,6 +5804,43 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/cycle-counts/history": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Lịch sử nhập tồn từng dòng (2026-11-05) — dòng lệch của phiếu kiểm đã ghi sổ trong kho được
+         *     xem, lọc theo người nhập (admin đăng nhập thay → admin) / SKU. Khai TRƯỚC `:id`.
+         */
+        get: operations["StocktakeController_history"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/cycle-counts/history/users": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Người đã nhập tồn trong kho được xem — ô lọc "Nhân viên". Khai TRƯỚC `:id`. */
+        get: operations["StocktakeController_historyUsers"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/cycle-counts/{id}": {
         parameters: {
             query?: never;
@@ -15635,6 +15672,40 @@ export interface components {
             items: components["schemas"]["CycleCountListRowDto"][];
             total: number;
             statusCounts: components["schemas"]["CycleCountStatusCountsDto"];
+        };
+        StockCountHistoryRowDto: {
+            lineId: string;
+            countId: string;
+            docNumber: string;
+            /** @description Lúc ghi (ISO) — giờ đếm nếu có, không thì giờ lập phiếu. */
+            at: string;
+            warehouseName: string;
+            skuId: string;
+            skuCode: string;
+            skuName: string;
+            locationCode: string;
+            /** @description Decimal(18,6) dạng chuỗi — tồn sổ của vị trí lúc nhập. */
+            qtySystem: string;
+            qtyCounted: string | null;
+            variance: string | null;
+            note: string | null;
+            /** @description Người nhập: admin đăng nhập thay thì là admin; null = không rõ (dữ liệu cũ). */
+            userId: string | null;
+            userName: string | null;
+            /** @description Mã tài khoản người nhập (vd `admin`). */
+            userCode: string | null;
+            /** @description Admin đăng nhập thay → tên nhân viên bị đăng nhập thay; còn lại null. */
+            onBehalfOfName: string | null;
+        };
+        StockCountHistoryResponseDto: {
+            items: components["schemas"]["StockCountHistoryRowDto"][];
+            total: number;
+        };
+        StockCountHistoryUserDto: {
+            userId: string;
+            name: string;
+            code: string;
+            lineCount: number;
         };
         CycleCountLineDto: {
             id: string;
@@ -27521,6 +27592,54 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["CreateCycleCountResultDto"];
+                };
+            };
+        };
+    };
+    StocktakeController_history: {
+        parameters: {
+            query: {
+                warehouseId?: string;
+                /** @description Người nhập (admin đăng nhập thay → id admin). */
+                userId?: string;
+                /** @description Tìm theo mã / tên SKU. */
+                q?: string;
+                take: number;
+                skip: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StockCountHistoryResponseDto"];
+                };
+            };
+        };
+    };
+    StocktakeController_historyUsers: {
+        parameters: {
+            query?: {
+                warehouseId?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StockCountHistoryUserDto"][];
                 };
             };
         };
