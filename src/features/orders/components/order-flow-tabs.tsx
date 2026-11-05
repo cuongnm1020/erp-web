@@ -62,8 +62,9 @@ type Counts = Partial<Record<OrderFlow, number>> | undefined;
  * thành một dãy chip liền, theo thứ tự giai đoạn (Chờ xử lý · Kho · Cần xử lý · Vận chuyển), tự
  * xuống dòng khi hẹp; màu chip theo họ. Luôn chọn đúng một trạng thái. Trước đây chia 4 khối
  * màu theo giai đoạn — bỏ ở màn In đơn (2026-11-04) rồi màn Đơn hàng (user 2026-11-05).
- * `searching` = đang xem mọi trạng thái (ô tìm có chữ hoặc `?group=all`) — dãy chip mờ, không chip
- * nào chọn, dòng báo + "Quay lại <trạng thái>".
+ * `searching` = đang xem mọi trạng thái (ô tìm có chữ hoặc `?group=all`) — thêm chip "Tất cả" đầu
+ * dãy, đang chọn, số = tổng các trạng thái (user 2026-11-05); chip trạng thái mờ, dòng báo +
+ * "Quay lại <trạng thái>".
  */
 export function OrderFlowTabs({
   flow,
@@ -89,16 +90,27 @@ export function OrderFlowTabs({
         n={counts?.[f]}
         family={FLOW_FAMILY[f] ?? g.family}
         active={!searching && flow === f}
+        dim={searching}
         onClick={() => onFlowChange(f)}
       />
     ));
+  // Tổng mọi trạng thái — chưa đếm xong thì skeleton.
+  const all = counts
+    ? ORDER_FLOW_GROUPS.flatMap((g) => [...g.flows, ...g.done]).reduce(
+        (sum, f) => sum + (counts[f] ?? 0),
+        0,
+      )
+    : undefined;
   return (
     <div className="mb-3 grid gap-2">
       <div
         role="tablist"
         aria-label="Trạng thái đơn"
-        className={cn('flex flex-wrap items-stretch gap-1.5', searching && 'opacity-60')}
+        className="flex flex-wrap items-stretch gap-1.5"
       >
+        {searching ? (
+          <FlowChip label="Tất cả" n={all} family="off" active onClick={() => {}} />
+        ) : null}
         {ORDER_FLOW_GROUPS.map(chipsOf)}
       </div>
 
@@ -126,12 +138,15 @@ function FlowChip({
   n,
   family,
   active,
+  dim = false,
   onClick,
 }: {
   label: string;
   n: number | undefined;
   family: OrderFlowFamily;
   active: boolean;
+  /** Đang tìm trên mọi trạng thái — chip trạng thái mờ đi, chỉ "Tất cả" rõ. */
+  dim?: boolean;
   onClick: () => void;
 }) {
   const t = TONE[family];
@@ -144,6 +159,7 @@ function FlowChip({
       className={cn(
         'flex h-7 items-center gap-1.5 whitespace-nowrap rounded-full border pl-2.5 pr-1 text-sm',
         t.border,
+        dim && 'opacity-60',
         active ? cn(t.solid, 'font-semibold text-primary-foreground') : 'bg-card text-foreground',
       )}
     >
