@@ -24433,7 +24433,7 @@ export interface operations {
                  */
                 itemOrigin?: "CUSTOM" | "POS_SKU" | "NON_ERP";
                 /** @description Sắp xếp theo cột (2026-10-22); mặc định ngày đặt mới nhất trước. */
-                sortBy?: "orderDate" | "docNumber" | "customer" | "total" | "time" | "statusChangedAt" | "sentToCarrierAt" | "items";
+                sortBy?: "orderDate" | "docNumber" | "customer" | "total" | "time" | "statusChangedAt" | "sentToCarrierAt" | "items" | "weight";
                 customerId?: string;
                 status?: "DRAFT" | "PENDING_APPROVAL" | "APPROVED" | "POSTED" | "CANCELLED";
                 /** @description Lọc theo cân nặng gửi hãng HIỆU LỰC (đặt tay, không thì Σ dòng) — kg, chuỗi decimal, cận dưới (≥). */
@@ -24694,7 +24694,7 @@ export interface operations {
                  */
                 itemOrigin?: "CUSTOM" | "POS_SKU" | "NON_ERP";
                 /** @description Sắp xếp theo cột (2026-10-22); mặc định ngày đặt mới nhất trước. */
-                sortBy?: "orderDate" | "docNumber" | "customer" | "total" | "time" | "statusChangedAt" | "sentToCarrierAt" | "items";
+                sortBy?: "orderDate" | "docNumber" | "customer" | "total" | "time" | "statusChangedAt" | "sentToCarrierAt" | "items" | "weight";
                 /**
                  * @description Chỉ đếm các tab này (2026-11-03, tab cha + chip con màn Đơn hàng — bỏ các tab đã xong khi nhóm
                  *     của chúng đang đóng). Bỏ trống = mọi tab + `total`; có giá trị thì tab không đếm và `total`
@@ -24870,7 +24870,7 @@ export interface operations {
                  */
                 itemOrigin?: "CUSTOM" | "POS_SKU" | "NON_ERP";
                 /** @description Sắp xếp theo cột (2026-10-22); mặc định ngày đặt mới nhất trước. */
-                sortBy?: "orderDate" | "docNumber" | "customer" | "total" | "time" | "statusChangedAt" | "sentToCarrierAt" | "items";
+                sortBy?: "orderDate" | "docNumber" | "customer" | "total" | "time" | "statusChangedAt" | "sentToCarrierAt" | "items" | "weight";
                 customerId?: string;
                 status?: "DRAFT" | "PENDING_APPROVAL" | "APPROVED" | "POSTED" | "CANCELLED";
                 /** @description Lọc theo cân nặng gửi hãng HIỆU LỰC (đặt tay, không thì Σ dòng) — kg, chuỗi decimal, cận dưới (≥). */

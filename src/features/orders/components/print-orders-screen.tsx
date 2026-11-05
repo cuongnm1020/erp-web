@@ -203,6 +203,8 @@ const SORT_FIELD: Record<string, OrderSortField> = {
   // Cột Sản phẩm (2026-11-04): abc tên sản phẩm, cùng tên thì ít mặt hàng trước — cùng luật xếp
   // tem in hàng loạt; server sắp trong bộ nhớ (tối đa 20.000 đơn khớp).
   product: 'items',
+  // Cột Cân nặng (2026-11-06): cân hiệu lực đặt tay ?? Σ dòng, server sắp trong bộ nhớ.
+  weight: 'weight',
 };
 
 /**
@@ -509,6 +511,14 @@ const buildColumns = (
     cell: ({ row }) => <ShippingCell order={row.original} carrierOf={carrierOf} />,
   },
   {
+    // Cột riêng, sắp theo cân hiệu lực (2026-11-06, user: "sắp xếp theo cân nặng chưa đúng" — bấm
+    // cột Vận chuyển là sắp theo lúc gửi ĐVVC, không theo cân).
+    id: 'weight',
+    header: 'Cân nặng',
+    meta: { align: 'right', width: 84, sortable: true },
+    cell: ({ row }) => <WeightNote order={row.original} />,
+  },
+  {
     id: 'total',
     header: 'Tổng tiền',
     // Chỉ tổng tiền đơn, bỏ dòng COD (mockup 2026-10-29); cột hẹp để sát cột Vận chuyển.
@@ -690,9 +700,7 @@ function ShippingCell({
           prefilled={s.trackingUrlPrefilled}
           className="max-w-48 truncate font-mono text-muted-foreground"
         />
-      ) : (
-        <WeightNote order={order} />
-      )}
+      ) : null}
       {order.waybillErrorCode ? (
         // Lỗi vận đơn (2026-10-28): lý do hãng từ chối, đủ câu ở tooltip.
         <span
@@ -796,12 +804,15 @@ function ProductFilter({
 }
 
 /**
- * Cân nặng gửi hãng hiệu lực (`weightKg` = đặt tay ?? Σ dòng × cân nặng SKU) khi chưa có mã vận
- * đơn — gom đơn theo cân để gán hãng. Đặt tay có dấu ✎ + tooltip Σ dòng; 0 = SKU chưa khai.
+ * Cân nặng gửi hãng hiệu lực (`weightKg` = đặt tay ?? Σ dòng × cân nặng SKU) — cột Cân nặng
+ * (2026-11-06, trước nằm dưới cột Vận chuyển khi chưa có mã). Đặt tay có dấu ✎ + tooltip Σ dòng;
+ * 0 = SKU chưa khai → "—".
  */
 function WeightNote({ order }: { order: SalesOrderListItem }) {
   const manual = order.shippingWeightKg !== null;
-  if ((toDecimal(order.weightKg)?.isZero() ?? true) && !manual) return null;
+  if ((toDecimal(order.weightKg)?.isZero() ?? true) && !manual) {
+    return <span className="block text-muted-foreground">—</span>;
+  }
   return (
     <span
       className="block tabular-nums text-muted-foreground"
