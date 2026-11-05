@@ -9348,9 +9348,15 @@ export interface components {
         PancakeOrderHistoryEntryDto: {
             /** @description ISO datetime. */
             at: string;
-            /** @description Tài khoản ERP đã liên kết với người sửa trên Pancake; null = chưa liên kết. */
+            /**
+             * @description Tài khoản ERP của người sửa: liên kết với nhân viên Pancake, hoặc người lưu trên ERP cùng lúc
+             *     (ERP đẩy lên qua tài khoản admin); null = không rõ.
+             */
             userId: string | null;
-            /** @description Tên người sửa; null = nhân viên Pancake chưa liên kết tài khoản ERP. */
+            /**
+             * @description Tên người sửa: họ tên ERP (tài khoản thật đã liên kết / người lưu trên ERP cùng lúc), không thì
+             *     tên trên Pancake; null = không biết tên.
+             */
             userName: string | null;
             changes: components["schemas"]["PancakeOrderHistoryChangeDto"][];
         };

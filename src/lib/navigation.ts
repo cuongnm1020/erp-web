@@ -297,7 +297,7 @@ export const NAV_MODULES: NavModule[] = [
         // (user 2026-11-05), rồi "Đơn hàng" (user 2026-11-05 tối).
         label: 'Đơn hàng',
         href: '/wms/print-orders',
-        icon: Printer,
+        icon: ClipboardList, // máy in nhường cho "In đơn" (user 2026-11-06)
         section: 'Vận hành',
         ability: { action: 'read', subject: 'Shipment' },
       },
@@ -315,7 +315,7 @@ export const NAV_MODULES: NavModule[] = [
         // menu đổi tiếp thành "In đơn" (user 2026-11-05).
         label: 'In đơn',
         href: '/wms/waybills',
-        icon: Truck,
+        icon: Printer, // icon máy in (user 2026-11-06) — trước trùng icon xe tải với Vận đơn
         section: 'Vận hành',
         ability: { action: 'read', subject: 'Shipment' },
       },
@@ -331,7 +331,7 @@ export const NAV_MODULES: NavModule[] = [
         ability: { action: 'issues', subject: 'SalesOrder' },
       },
       {
-        label: 'Điều phối task',
+        label: 'Điều phối', // bỏ chữ "task" (user 2026-11-06)
         href: '/wms/dispatch',
         icon: Columns3,
         section: 'Vận hành',
@@ -783,7 +783,7 @@ export const SEGMENT_LABELS: Record<string, string> = {
   warehouses: 'Kho & vị trí',
   grn: 'Phiếu nhập kho',
   gdn: 'Phiếu xuất kho',
-  dispatch: 'Điều phối task',
+  dispatch: 'Điều phối',
   pack: 'Trạm đóng gói',
   productivity: 'Năng suất kho',
   shipping: 'Vận đơn',

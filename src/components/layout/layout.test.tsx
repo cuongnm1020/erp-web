@@ -191,7 +191,7 @@ describe('visibleModules', () => {
     ]);
     const all = visibleModules((a, s) => s === 'Task');
     expect(all.find((m) => m.label === 'Kho')?.children?.map((c) => c.label)).toContain(
-      'Điều phối task',
+      'Điều phối',
     );
   });
 
