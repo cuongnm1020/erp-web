@@ -26,6 +26,7 @@ const staff = (id: string, over: Record<string, unknown> = {}) => ({
   isActive: true,
   departmentId: DEPT.id,
   departmentName: DEPT.name,
+  departmentKind: 'CSKH',
   createdById: null,
   canManage: true,
   canEdit: true,
@@ -215,7 +216,52 @@ describe('CareStaffScreen — Nhân viên của team (trưởng nhóm CSKH, 2026
     );
   });
 
-  it('không phụ trách phòng CSKH nào → trạng thái trống, không có nút thêm', async () => {
+  it('trưởng phòng Sale (2026-11-06): nhân viên phòng Sale + doanh thu; không cột Nhóm, không "Chưa có nhóm"', async () => {
+    search = '';
+    const SALE = { id: 'd-sl1', code: 'SL1', name: 'Sale FB' };
+    const sale = (id: string, over: Record<string, unknown> = {}) =>
+      staff(id, {
+        code: `sl.${id}`,
+        departmentId: SALE.id,
+        departmentName: SALE.name,
+        departmentKind: 'SALES',
+        canLead: false,
+        roles: [{ code: 'SALES_MEMBER', name: 'Nhân viên Sale' }],
+        ...over,
+      });
+    server.use(
+      http.get('/api/org/care-staff', () =>
+        HttpResponse.json({
+          departments: [SALE],
+          staff: [
+            sale('lead', {
+              position: 'MANAGER',
+              canManage: false,
+              canEdit: false,
+              canLock: false,
+              roles: [{ code: 'SALES_LEADER', name: 'Trưởng phòng Sale' }],
+            }),
+            sale('b'),
+          ],
+          viewer: { position: 'MANAGER', canAdd: true, canSetManager: false },
+        }),
+      ),
+      http.get('/api/reports/sales/by-staff', () =>
+        HttpResponse.json({ items: [revenue('b', '3000000', 2)], groupBy: 'owner', totals: {} }),
+      ),
+    );
+    renderApp(<CareStaffScreen />, {
+      me: { ...ME_CSKH_LEAD, permissions: ['report.sales', 'user.manage_department'] },
+    });
+    const rowB = (await screen.findByText('Nhân viên b')).closest('tr')!;
+    await waitFor(() => expect(within(rowB).getByText('3.000.000')).toBeInTheDocument());
+    expect(within(rowB).getByText('Nhân viên')).toBeInTheDocument();
+    expect(screen.queryByRole('columnheader', { name: 'Nhóm' })).toBeNull();
+    expect(screen.queryByText('Chưa có nhóm')).toBeNull();
+    expect(screen.getByRole('button', { name: /Thêm nhân viên/ })).toBeInTheDocument();
+  });
+
+  it('không phụ trách phòng ban nào → trạng thái trống, không có nút thêm', async () => {
     search = '';
     server.use(
       http.get('/api/org/care-staff', () => HttpResponse.json({ departments: [], staff: [] })),
@@ -224,7 +270,7 @@ describe('CareStaffScreen — Nhân viên của team (trưởng nhóm CSKH, 2026
       ),
     );
     renderApp(<CareStaffScreen />, { me: ME_CSKH_LEAD });
-    expect(await screen.findByText('Bạn chưa phụ trách phòng CSKH nào')).toBeInTheDocument();
+    expect(await screen.findByText('Bạn chưa phụ trách phòng ban nào')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /Thêm nhân viên/ })).toBeNull();
   });
 

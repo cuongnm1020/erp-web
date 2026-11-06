@@ -7670,7 +7670,10 @@ export interface components {
              *     user.read. Trưởng nhóm CSKH đi màn "Nhân viên của team" (`managesCareTeam`), không thấy sơ đồ.
              */
             managesDepartments: boolean;
-            /** @description Phụ trách ít nhất một phòng ban CSKH (2026-10-22) — web hiện màn "Nhân viên của team". */
+            /**
+             * @description Phụ trách ít nhất một phòng ban CSKH (2026-10-22) hoặc Sale (2026-11-06), hoặc là trưởng nhóm
+             *     CSKH — web hiện màn "Nhân viên của team".
+             */
             managesCareTeam: boolean;
             /**
              * @description Nhân viên kho thuần (2026-11-05): chỉ mang vai trò kho (WAREHOUSE, WH_MANAGER, WH_SUPERVISOR,
@@ -11379,6 +11382,12 @@ export interface components {
             name: string;
         };
         CareStaffDto: {
+            /**
+             * @description Loại phòng ban (2026-11-06): `SALES` = phòng Sale — chỉ trưởng phòng / nhân viên, không có
+             *     trưởng nhóm / nhóm; `CSKH` như cũ.
+             * @enum {string}
+             */
+            departmentKind: "CSKH" | "SALES";
             /**
              * @description Trưởng phòng / trưởng nhóm / nhân viên.
              * @enum {string}
