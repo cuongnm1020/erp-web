@@ -661,6 +661,39 @@ describe('OrderListScreen — cân nặng gửi hãng + gán hãng hàng loạt'
     await waitFor(() => expect(screen.queryByRole('toolbar')).not.toBeInTheDocument());
   });
 
+  it('"Đóng gói + in vận đơn" (2026-11-06): đơn Pancake Chờ hàng (DRAFT) có hãng được tính; đơn ERP Đơn mới bị bỏ qua', async () => {
+    search = ALL;
+    const [a, b] = makeOrders(2);
+    const rows = [
+      {
+        ...a!,
+        status: 'DRAFT' as const,
+        flow: 'WAITING_STOCK' as const,
+        pancakeOrderId: '777',
+        carrierId: 'c-ghtk',
+      },
+      {
+        ...b!,
+        status: 'DRAFT' as const,
+        flow: 'NEW' as const,
+        pancakeOrderId: null,
+        carrierId: 'c-ghtk',
+      },
+    ];
+    server.use(
+      http.get('/api/sales-orders', () => HttpResponse.json({ items: rows, total: rows.length })),
+    );
+    renderApp(<OrderListScreen />);
+    await screen.findByText(a!.docNumber);
+    for (const i of [0, 1]) {
+      fireEvent.click(screen.getAllByRole('checkbox', { name: 'Chọn dòng' })[i]!);
+    }
+    fireEvent.click(await screen.findByRole('button', { name: /Đóng gói \+ in vận đơn/ }));
+    const dialog = await screen.findByRole('dialog');
+    expect(dialog).toHaveTextContent('Đóng gói và in vận đơn 1 đơn?');
+    expect(dialog).toHaveTextContent('1 đơn chưa xác nhận hoặc chưa gán hãng sẽ bị bỏ qua');
+  });
+
   it('"Đóng gói + in vận đơn": chỉ gửi đơn đã duyệt + có hãng → POST /sales-orders/bulk-fulfil, in tem đơn có mã, liệt kê đơn lỗi kèm lời hãng; bỏ chọn sau khi in + đóng hộp lỗi', async () => {
     search = ALL;
     toastSuccess.mockClear();
@@ -750,7 +783,7 @@ describe('OrderListScreen — cân nặng gửi hãng + gán hãng hàng loạt'
     fireEvent.click(await screen.findByRole('button', { name: /Đóng gói \+ in vận đơn/ }));
     const dialog = await screen.findByRole('dialog');
     expect(dialog).toHaveTextContent('Đóng gói và in vận đơn 2 đơn?');
-    expect(dialog).toHaveTextContent('1 đơn chưa duyệt hoặc chưa gán hãng sẽ bị bỏ qua');
+    expect(dialog).toHaveTextContent('1 đơn chưa xác nhận hoặc chưa gán hãng sẽ bị bỏ qua');
     fireEvent.click(screen.getByRole('button', { name: 'Đóng gói + in 2 đơn' }));
 
     await waitFor(() => expect(window.print).toHaveBeenCalledTimes(1));

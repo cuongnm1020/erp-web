@@ -355,7 +355,11 @@ export function FulfilResultsPanel({
 export type FulfilRow = Pick<
   SalesOrder,
   'id' | 'docNumber' | 'status' | 'carrierId' | 'marketplace' | 'customer'
->;
+> & {
+  /** Có ở dòng danh sách — đơn Pancake Chờ hàng (DRAFT) vẫn đóng gói được (2026-11-06). */
+  flow?: string;
+  pancakeOrderId?: string | null;
+};
 
 export function BulkFulfilPrintDialog({
   rows,
@@ -380,7 +384,14 @@ export function BulkFulfilPrintDialog({
   const [packerId, setPackerId] = useState('');
   const assignPacker = useBulkUpdateOrders();
 
-  const ready = rows.filter((r) => r.status === 'APPROVED' && r.carrierId);
+  // Đơn Pancake sale để Chờ hàng trên POS (DRAFT, tab Chờ hàng) cũng đóng gói được — server tự xác
+  // nhận (Pancake 11 → 1) trước khi đóng gói (2026-11-06, user chốt).
+  const ready = rows.filter(
+    (r) =>
+      (r.status === 'APPROVED' ||
+        (r.status === 'DRAFT' && r.flow === 'WAITING_STOCK' && !!r.pancakeOrderId)) &&
+      r.carrierId,
+  );
   const skipped = rows.length - ready.length;
   // NV đóng hàng chọn theo kho của các đơn — đơn nhiều kho thì phải chọn lại theo từng kho.
   const readyWarehouses = [...new Set(ready.map((r) => r.warehouseId ?? ''))];
@@ -465,7 +476,9 @@ export function BulkFulfilPrintDialog({
                 <DialogDescription>
                   Không cần pick / đóng gói trên ERP: hệ thống đánh dấu đã đóng gói (trừ tồn kho),
                   xin mã vận đơn của hãng đã gán trên đơn rồi in tem ERP 100×75 mm, mỗi đơn một tem.
-                  {skipped > 0 ? ` ${skipped} đơn chưa duyệt hoặc chưa gán hãng sẽ bị bỏ qua.` : ''}
+                  {skipped > 0
+                    ? ` ${skipped} đơn chưa xác nhận hoặc chưa gán hãng sẽ bị bỏ qua.`
+                    : ''}
                 </DialogDescription>
               </DialogHeader>
               {askPacker ? (
