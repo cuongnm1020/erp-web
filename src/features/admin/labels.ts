@@ -60,7 +60,7 @@ const PERMISSION_LABELS: Record<string, string> = {
   'sales_order.fix_warehouse_split': 'Sửa đơn lỗi đổi kho nhân đôi combo',
   'sales_order.filter_team': 'Lọc đơn theo NV lên đơn',
   'sales_order.filter_dept': 'Lọc đơn theo phòng ban',
-  'sales_order.set_order_date': 'Chọn ngày tạo đơn (vận đơn)',
+  'sales_order.set_order_date': 'Sửa ngày tạo đơn (tính doanh số)',
   'sales_order.edit_receiver': 'Sửa thông tin nhận hàng (kho)',
   'task.read': 'Xem việc của mình',
   'task.read_all': 'Xem mọi việc (điều phối)',

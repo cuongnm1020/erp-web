@@ -168,6 +168,45 @@ describe('OrderEditScreen — trang sửa đơn (D-05, PATCH /sales-orders/{id})
     await waitFor(() => expect(push).toHaveBeenCalledWith(`/crm/orders/${ORDER.id}`));
   });
 
+  it('đổi NV xử lý (2026-11-07) → PATCH ownerId, doanh số chuyển theo người mới', async () => {
+    push.mockClear();
+    const calls: Array<Record<string, unknown>> = [];
+    server.use(
+      http.patch('/api/sales-orders/:id', async ({ params, request }) => {
+        const body = (await request.json()) as Record<string, unknown>;
+        calls.push(body);
+        return HttpResponse.json({
+          orderId: params.id,
+          docNumber: ORDER.docNumber,
+          status: ORDER.status,
+          carrierId: null,
+          changed: Object.keys(body),
+        });
+      }),
+      // Trước handler :id — cùng một server.use, handler đứng trước thắng.
+      http.get('/api/sales-orders/owner-options', () =>
+        HttpResponse.json([
+          {
+            id: '00000000-0000-4000-8000-0000000000a2',
+            code: 'sale.hn.2',
+            fullName: 'Trần Thị Hai',
+          },
+        ]),
+      ),
+      http.get('/api/sales-orders/:id', () =>
+        HttpResponse.json({ ...DETAIL, ownerId: null, ownerName: null }),
+      ),
+    );
+    renderApp(<OrderEditScreen orderId={ORDER.id} />);
+    await screen.findByRole('heading', { level: 1 });
+    fireEvent.click(screen.getByRole('combobox', { name: 'NV xử lý' }));
+    fireEvent.click(await screen.findByRole('option', { name: /Trần Thị Hai/ }));
+    fireEvent.click(screen.getByRole('button', { name: /Lưu thay đổi/ }));
+    await waitFor(() =>
+      expect(calls).toEqual([{ ownerId: '00000000-0000-4000-8000-0000000000a2' }]),
+    );
+  });
+
   it('chọn hãng có bảng cước (GHTK) → hỏi GET shipping-quote?carrierId và hiện cước; hãng không có quote → không hỏi', async () => {
     const asked: string[] = [];
     server.use(

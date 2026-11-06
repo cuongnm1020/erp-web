@@ -12778,9 +12778,10 @@ export interface components {
              */
             linesLockedReason: string | null;
             /**
-             * @description Kho đã thao tác trên đơn (2026-10-31): đã Gửi ĐVVC / kho chuyển Chờ hàng / kho đã nhận việc lấy
-             *     hàng / có phiếu giao / đơn đã kết thúc. Khác null → người lên đơn KHÔNG sửa / hủy được nữa
-             *     (người có `sales_order.edit_all` / `sales_order.cancel` vẫn được). null = còn Đơn mới / Đã xác nhận.
+             * @description Kho đã thao tác trên đơn (2026-10-31): đã Gửi ĐVVC / kho đã nhận việc lấy hàng / có phiếu giao /
+             *     đơn đã kết thúc. Khác null → người lên đơn KHÔNG sửa / hủy được nữa (người có
+             *     `sales_order.edit_all` / `sales_order.cancel` vẫn được). null = còn Đơn mới / Chờ hàng / Đã xác
+             *     nhận (Chờ hàng sửa + hủy được từ 2026-11-07).
              */
             stageLockedReason: string | null;
             /**
@@ -13345,6 +13346,12 @@ export interface components {
             packerId?: string | null;
             /** Format: uuid */
             marketerId?: string | null;
+            /**
+             * Format: uuid
+             * @description NV xử lý (2026-11-07) — người cùng team với người sửa (như lúc tạo đơn); doanh số nhân viên +
+             *     team chuyển theo người này. Không bỏ trống được.
+             */
+            ownerId?: string;
             /** @description Ngày hẹn nhận hàng `YYYY-MM-DD`; `null` = bỏ hẹn. */
             expectedDeliveryDate?: string | null;
             /**

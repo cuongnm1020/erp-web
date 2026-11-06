@@ -315,10 +315,12 @@ interface RowActionContext {
  * Nhân bản (+ Xin lại vận đơn ở tab Cần sửa khi lỗi vận đơn) · Hủy đơn (chữ đỏ, cuối cụm, qua hộp xác nhận —
  * mockup TmGafrdk3wiAxJu4cFY937). Mở chi tiết = bấm mã đơn.
  */
-/** Tab còn trước khi kho thao tác — người lên đơn còn sửa / hủy được (2026-10-31). */
-const OPEN_FLOWS: readonly string[] = ['NEW', 'PENDING_APPROVAL', 'WAREHOUSE'];
-/** Sửa đơn còn được thêm ở Chờ hàng — kho chưa lấy hàng thật (2026-11-03; hủy vẫn khóa). */
-const EDIT_OPEN_FLOWS: readonly string[] = [...OPEN_FLOWS, 'WAITING_STOCK'];
+/**
+ * Tab còn trước khi kho thao tác — người lên đơn / NV xử lý / leader còn sửa + hủy được
+ * (2026-10-31). Chờ hàng: sửa từ 2026-11-03, hủy từ 2026-11-07 (user chốt).
+ */
+const OPEN_FLOWS: readonly string[] = ['NEW', 'PENDING_APPROVAL', 'WAREHOUSE', 'WAITING_STOCK'];
+const EDIT_OPEN_FLOWS = OPEN_FLOWS;
 const STAGE_LOCKED = 'Kho đã xử lý đơn — không sửa / hủy được nữa';
 
 function orderRowItems(o: SalesOrderListItem, ctx: RowActionContext): RowActionItem[] {

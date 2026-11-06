@@ -130,7 +130,7 @@ const staffSearch =
   (q: string): EntitySearchResult => {
     const staff = useList();
     const needle = q.trim().toLowerCase();
-    const options = staff.data
+    const options = (Array.isArray(staff.data) ? staff.data : undefined)
       ?.filter(
         (u) =>
           needle === '' ||
@@ -144,6 +144,41 @@ const staffSearch =
 const useStaffSearch = staffSearch(useOrderStaffOptions);
 /** NV xử lý chỉ chọn trong team người tạo (GET /sales-orders/owner-options). */
 const useOwnerSearch = staffSearch(useOrderOwnerOptions);
+
+/**
+ * Ô NV xử lý không gắn form (màn Sửa đơn, 2026-11-07): cùng danh sách người cùng team như lúc tạo
+ * đơn. Doanh số nhân viên + team đi theo người chọn ở đây (server tính lại team).
+ */
+export function OwnerPicker({
+  value,
+  onChange,
+  currentName,
+  disabled,
+}: {
+  value: string;
+  onChange: (id: string, name: string | null) => void;
+  /** Tên NV xử lý hiện tại của đơn — người đó có thể không nằm trong danh sách chọn của mình. */
+  currentName?: string | null;
+  disabled?: boolean;
+}) {
+  const owners = useOrderOwnerOptions();
+  const list = Array.isArray(owners.data) ? owners.data : [];
+  return (
+    <EntityPicker
+      value={value}
+      onChange={(id, option) => {
+        if (id) onChange(id, option?.label ?? null);
+      }}
+      useSearch={useOwnerSearch}
+      selectedLabel={list.find((u) => u.id === value)?.fullName ?? currentName ?? undefined}
+      placeholder="Chọn NV xử lý"
+      searchPlaceholder="Tìm tên, mã nhân viên…"
+      emptyText="Không có nhân viên khớp"
+      disabled={disabled}
+      aria-label="NV xử lý"
+    />
+  );
+}
 
 /**
  * Ô chọn nhân viên trên đơn. `bare` = chỉ ô chọn (nhãn do nơi gọi vẽ — dải "Thông tin đơn" đầu

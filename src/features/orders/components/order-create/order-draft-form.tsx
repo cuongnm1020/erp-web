@@ -55,11 +55,8 @@ import {
   usePancakeShops,
   usePosShopSearch,
 } from '../../api/use-orders';
-import { orderChannelLabel, orderSourceLabel } from '../../labels';
 import {
   createOrderSchema,
-  ORDER_CHANNELS,
-  ORDER_SOURCES,
   previewManualDiscount,
   toCreateOrderBody,
   type CreateOrderValues,
@@ -80,7 +77,6 @@ import { ProductSearch } from './product-search';
 import { COD_LOW_RATIO, formatRatioPct, lowCodRatio } from './cod-check';
 import { SameDayDialog } from './same-day-dialog';
 
-const NONE = '__none__';
 const DEFAULT_WAREHOUSE = '__default__';
 /**
  * Mật độ riêng màn tạo đơn: cả form nằm gọn một màn hình không phải cuộn. Ô nhập / ô chọn / nút mở
@@ -711,59 +707,9 @@ function HeaderSelects({
   const myCareTeams = (careTeams.data ?? []).filter((t) => t.mine);
   const canSetOrderDate = useAbility().can('set_order_date', 'SalesOrder');
   return (
-    <div className="grid grid-cols-2 gap-x-2.5 gap-y-2 sm:grid-cols-4 xl:grid-cols-8">
-      <HeaderField label="Kênh">
-        <FormField
-          control={form.control}
-          name="channel"
-          render={({ field }) => (
-            <FormItem>
-              <Select value={field.value} onValueChange={field.onChange}>
-                <FormControl>
-                  <SelectTrigger aria-label="Kênh bán">
-                    <SelectValue />
-                  </SelectTrigger>
-                </FormControl>
-                <SelectContent>
-                  {ORDER_CHANNELS.map((c) => (
-                    <SelectItem key={c} value={c}>
-                      {orderChannelLabel(c)}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </FormItem>
-          )}
-        />
-      </HeaderField>
-      <HeaderField label="Nguồn đơn">
-        <FormField
-          control={form.control}
-          name="source"
-          render={({ field }) => (
-            <FormItem>
-              <Select
-                value={field.value || NONE}
-                onValueChange={(v) => field.onChange(v === NONE ? '' : v)}
-              >
-                <FormControl>
-                  <SelectTrigger aria-label="Nguồn đơn">
-                    <SelectValue placeholder="Chọn nguồn đơn" />
-                  </SelectTrigger>
-                </FormControl>
-                <SelectContent>
-                  <SelectItem value={NONE}>Chọn nguồn đơn</SelectItem>
-                  {ORDER_SOURCES.map((s) => (
-                    <SelectItem key={s} value={s}>
-                      {orderSourceLabel(s)}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </FormItem>
-          )}
-        />
-      </HeaderField>
+    // Kênh + Nguồn đơn ẩn khỏi màn tạo đơn (2026-11-07, user chốt) — gửi mặc định (Trực tiếp /
+    // trống) theo giá trị sẵn của form; màn chi tiết / sửa đơn vẫn hiện để xem.
+    <div className="grid grid-cols-2 gap-x-2.5 gap-y-2 sm:grid-cols-3 xl:grid-cols-6">
       <HeaderField label="POS">
         <FormField
           control={form.control}
@@ -882,8 +828,8 @@ function HeaderSelects({
         </HeaderField>
       ) : null}
       {/* Ngày tạo đơn (2026-11-03): doanh số tính theo ngày này. Trống = hôm nay; chỉ chọn lùi.
-          2026-11-04: chỉ admin / nhân viên vận đơn (`sales_order.set_order_date`) chọn được — sale /
-          CSKH luôn hôm nay (ô khóa). */}
+          Chỉ người có quyền "Sửa ngày tạo đơn" (`sales_order.set_order_date`, mặc định Admin từ
+          2026-11-07) chọn được — người khác luôn hôm nay (ô khóa). */}
       <HeaderField label="Ngày tạo đơn">
         <FormField
           control={form.control}
