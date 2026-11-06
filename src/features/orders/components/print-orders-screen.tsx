@@ -91,6 +91,7 @@ import { BulkShippingDialog } from './bulk-shipping-dialog';
 import { carrierTone } from './carrier-status-card';
 import { OrderFlowTabs } from './order-flow-tabs';
 import { FlowBadge, OrderQuickView, TelcoBadge } from './order-quick-view';
+import { rangeChip, WeightRangeFilter } from './weight-range-filter';
 import { OrderScanButton } from './order-scan-button';
 import { PancakeOrderResyncButton } from './pancake-order-resync-button';
 import { SendToCarrierMenu } from './send-to-carrier-menu';
@@ -882,6 +883,10 @@ export function PrintOrdersScreen() {
   const shortSkuId = state.filters.shortSkuId ?? '';
   const skuId = state.filters.skuId ?? '';
   const skuOnly = skuId !== '' && state.filters.skuOnly === 'true';
+  // Cân nặng (2026-11-06, user "clone phần lọc cân nặng từ Bán hàng › Đơn hàng"): cân gửi hãng
+  // hiệu lực (đặt tay ?? Σ dòng × cân SKU), API lọc như màn Đơn hàng.
+  const weightMin = state.filters.weightMin ?? '';
+  const weightMax = state.filters.weightMax ?? '';
   // Ô POS (2026-11-04, thay ô Nguồn): chọn nhiều POS Pancake, mã shop nối dấu phẩy — đơn Pancake
   // của POS đó + đơn ERP chọn POS đó khi tạo. Chỉ giữ mã dạng số (link cũ `POS:<mã>` bỏ qua).
   const pos = (state.filters.pos ?? '')
@@ -932,6 +937,8 @@ export function PrintOrdersScreen() {
       shortSkuId,
       skuId,
       skuOnly,
+      weightMin,
+      weightMax,
       pancakeShopId: pos || undefined,
       from,
       to,
@@ -946,6 +953,8 @@ export function PrintOrdersScreen() {
       shortSkuId,
       skuId,
       skuOnly,
+      weightMin,
+      weightMax,
       pos,
       from,
       to,
@@ -1069,6 +1078,8 @@ export function PrintOrdersScreen() {
     customerId !== '' ||
     shortSkuId !== '' ||
     skuId !== '' ||
+    weightMin !== '' ||
+    weightMax !== '' ||
     pos !== '' ||
     from !== '' ||
     to !== '' ||
@@ -1247,8 +1258,23 @@ export function PrintOrdersScreen() {
                     },
                   ]
                 : []),
+              // Cân nặng (đưa lại 2026-11-06, user) — cùng ô với Bán hàng › Đơn hàng.
+              {
+                key: 'weightMin',
+                label: 'Cân nặng',
+                type: 'custom',
+                chip: rangeChip(weightMin, weightMax, (v) => `${v} kg`),
+                clearKeys: ['weightMax'],
+                render: () => (
+                  <WeightRangeFilter
+                    min={state.filters.weightMin}
+                    max={state.filters.weightMax}
+                    onChange={setFilter}
+                  />
+                ),
+              },
               // Bỏ 2026-11-04 (user): Hãng VC, NV lên đơn, nhóm Vận chuyển (In tem, Gán hãng,
-              // Trạng thái hãng), nhóm Đơn (Trùng trong ngày, SP ngoài ERP, Giá trị đơn, Cân nặng).
+              // Trạng thái hãng), nhóm Đơn (Trùng trong ngày, SP ngoài ERP, Giá trị đơn).
             ]}
             values={{
               status: state.filters.status,
@@ -1260,6 +1286,8 @@ export function PrintOrdersScreen() {
               team,
               fbPage: state.filters.fbPage,
               skuId: state.filters.skuId,
+              weightMin: state.filters.weightMin,
+              weightMax: state.filters.weightMax,
             }}
             onFilterChange={setFilter}
             searchPlaceholder="Mã đơn, SĐT, tên SP, mã vận đơn… nhiều giá trị cách dấu phẩy"

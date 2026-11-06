@@ -136,7 +136,7 @@ describe('PrintOrdersScreen — In đơn (clone màn Đơn hàng, 2026-11-04)', 
 
   it('bỏ lọc Hãng VC / NV lên đơn / Vận chuyển / Đơn (2026-11-04): không hiện ô, link cũ không lọc ngầm', async () => {
     search =
-      'group=all&carrierId=c-1&noCarrier=true&creatorId=u-1&printStatus=PRINTED&carrierSource=ERP&carrierStatus=x&duplicate=true&itemOrigin=CUSTOM&totalMin=100&weightMin=1';
+      'group=all&carrierId=c-1&noCarrier=true&creatorId=u-1&printStatus=PRINTED&carrierSource=ERP&carrierStatus=x&duplicate=true&itemOrigin=CUSTOM&totalMin=100';
     const seen: URLSearchParams[] = [];
     server.use(
       http.get('/api/sales-orders', ({ request }) => {
@@ -150,8 +150,6 @@ describe('PrintOrdersScreen — In đơn (clone màn Đơn hàng, 2026-11-04)', 
       for (const label of ['Hãng VC: tất cả', 'Giá trị đơn']) {
         expect(screen.queryByText(label)).not.toBeInTheDocument();
       }
-      // Ô lọc Cân nặng không có — cột Cân nặng (sắp được, 2026-11-06) thì có.
-      expect(screen.queryByRole('button', { name: 'Cân nặng' })).not.toBeInTheDocument();
       expect(screen.getByRole('button', { name: 'Sắp xếp theo Cân nặng' })).toBeInTheDocument();
       const keys = [
         'carrierId',
@@ -163,10 +161,31 @@ describe('PrintOrdersScreen — In đơn (clone màn Đơn hàng, 2026-11-04)', 
         'duplicate',
         'itemOrigin',
         'totalMin',
-        'weightMin',
       ];
       expect(seen.length).toBeGreaterThan(0);
       for (const p of seen) for (const k of keys) expect(p.has(k)).toBe(false);
+    } finally {
+      search = 'group=all';
+    }
+  });
+
+  it('lọc Cân nặng (đưa lại 2026-11-06, như Bán hàng › Đơn hàng): URL weightMin/weightMax → gửi API, ô nhập phản ánh URL', async () => {
+    search = 'group=all&weightMin=1&weightMax=1.5';
+    const seen: URLSearchParams[] = [];
+    server.use(
+      http.get('/api/sales-orders', ({ request }) => {
+        seen.push(new URL(request.url).searchParams);
+        return HttpResponse.json({ items: [FIRST], total: 1 });
+      }),
+    );
+    try {
+      renderApp(<PrintOrdersScreen />);
+      await screen.findByText(FIRST.docNumber);
+      expect(screen.getByLabelText('Cân nặng từ (kg)')).toHaveValue('1');
+      expect(screen.getByLabelText('Cân nặng đến (kg)')).toHaveValue('1.5');
+      expect(seen.some((p) => p.get('weightMin') === '1' && p.get('weightMax') === '1.5')).toBe(
+        true,
+      );
     } finally {
       search = 'group=all';
     }
