@@ -618,10 +618,16 @@ function CancelOrderDialog({
       {
         onSuccess: (r) => {
           const notes = cancelOutcomeNotes([r]);
-          toast.success(`Đã hủy đơn ${order.docNumber}`, {
-            description: notes.join(' ') || 'Hàng đang giữ cho đơn này đã được nhả về khả dụng.',
-            duration: notes.length > 0 ? 10_000 : undefined,
-          });
+          // Hãng đã lấy hàng (2026-11-07): đơn chưa hủy — Sự cố hoàn tới khi nhập hàng hoàn.
+          toast.success(
+            r.awaitingReturn
+              ? `Đơn ${order.docNumber} chờ hàng hoàn`
+              : `Đã hủy đơn ${order.docNumber}`,
+            {
+              description: notes.join(' ') || 'Hàng đang giữ cho đơn này đã được nhả về khả dụng.',
+              duration: notes.length > 0 ? 10_000 : undefined,
+            },
+          );
           onOpenChange(false);
           if (recreate) router.push(`/crm/orders/new?from=${order.id}`);
         },

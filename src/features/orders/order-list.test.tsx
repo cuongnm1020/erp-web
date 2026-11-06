@@ -635,8 +635,9 @@ describe('OrderListScreen — cân nặng gửi hãng + gán hãng hàng loạt'
     fireEvent.click(await within(toolbar).findByRole('button', { name: /Hủy đơn/ }));
     const dialog = await screen.findByRole('dialog');
     expect(dialog).toHaveTextContent('Hủy 2 đơn đã chọn?');
-    // Người test có quyền hủy sau khi gán ĐVVC → chỉ bỏ đơn đã hủy / hãng đã lấy hàng.
-    expect(dialog).toHaveTextContent('1 đơn đã hủy hoặc hãng đã lấy hàng sẽ bị bỏ qua');
+    // Người test có quyền Hủy đơn (2026-11-07) → chỉ bỏ đơn đã hủy / đã giao thành công; hãng đã
+    // lấy hàng thì chuyển Sự cố hoàn.
+    expect(dialog).toHaveTextContent('1 đơn đã hủy hoặc đã giao thành công sẽ bị bỏ qua');
     fireEvent.change(screen.getByLabelText('Lý do hủy (tùy chọn)'), {
       target: { value: ' Khách đổi ý ' },
     });
