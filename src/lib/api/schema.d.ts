@@ -7670,7 +7670,10 @@ export interface components {
              *     user.read. Trưởng nhóm CSKH đi màn "Nhân viên của team" (`managesCareTeam`), không thấy sơ đồ.
              */
             managesDepartments: boolean;
-            /** @description Phụ trách ít nhất một phòng ban CSKH (2026-10-22) — web hiện màn "Nhân viên của team". */
+            /**
+             * @description Phụ trách ít nhất một phòng ban CSKH (2026-10-22) hoặc Sale (2026-11-06), hoặc là trưởng nhóm
+             *     CSKH — web hiện màn "Nhân viên của team".
+             */
             managesCareTeam: boolean;
             /**
              * @description Nhân viên kho thuần (2026-11-05): chỉ mang vai trò kho (WAREHOUSE, WH_MANAGER, WH_SUPERVISOR,
@@ -9824,6 +9827,13 @@ export interface components {
             freeShipping: boolean;
             componentCount: number;
             /**
+             * @description Định mức (2026-11-06): Σ số lượng thành phần cho MỘT combo (`ComboComponent.qty`, theo ĐVT cơ
+             *     sở của thành phần) — Decimal(18,6) chuỗi; "Combo 5 hũ …" = 5. Sắp được (`sortBy=quantity`).
+             */
+            quantity: string;
+            /** @description ĐVT của định mức khi mọi thành phần cùng một ĐVT cơ sở; khác nhau → null. */
+            quantityUomCode: string | null;
+            /**
              * @description Số combo còn bán được = min theo thành phần của floor(available / qty) — chuỗi số nguyên,
              *     `0` khi có thành phần âm/hết. Tính từ tồn mọi kho (bất biến 2: combo không có tồn riêng).
              */
@@ -9874,6 +9884,13 @@ export interface components {
             /** @description Combo miễn ship — gợi ý cho sale khi lên đơn. */
             freeShipping: boolean;
             componentCount: number;
+            /**
+             * @description Định mức (2026-11-06): Σ số lượng thành phần cho MỘT combo (`ComboComponent.qty`, theo ĐVT cơ
+             *     sở của thành phần) — Decimal(18,6) chuỗi; "Combo 5 hũ …" = 5. Sắp được (`sortBy=quantity`).
+             */
+            quantity: string;
+            /** @description ĐVT của định mức khi mọi thành phần cùng một ĐVT cơ sở; khác nhau → null. */
+            quantityUomCode: string | null;
             /**
              * @description Số combo còn bán được = min theo thành phần của floor(available / qty) — chuỗi số nguyên,
              *     `0` khi có thành phần âm/hết. Tính từ tồn mọi kho (bất biến 2: combo không có tồn riêng).
@@ -11379,6 +11396,12 @@ export interface components {
             name: string;
         };
         CareStaffDto: {
+            /**
+             * @description Loại phòng ban (2026-11-06): `SALES` = phòng Sale — chỉ trưởng phòng / nhân viên, không có
+             *     trưởng nhóm / nhóm; `CSKH` như cũ.
+             * @enum {string}
+             */
+            departmentKind: "CSKH" | "SALES";
             /**
              * @description Trưởng phòng / trưởng nhóm / nhân viên.
              * @enum {string}
@@ -20678,7 +20701,7 @@ export interface operations {
                 /** @description Tìm theo mã / tên combo, mã / tên SKU thành phần. */
                 q?: string;
                 isActive?: boolean;
-                sortBy?: "code" | "name" | "createdAt";
+                sortBy?: "code" | "name" | "createdAt" | "quantity";
                 sortDir?: "asc" | "desc";
                 take: number;
                 skip: number;

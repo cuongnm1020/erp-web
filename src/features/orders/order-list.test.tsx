@@ -873,8 +873,10 @@ describe('OrderListScreen — cân nặng gửi hãng + gán hãng hàng loạt'
     });
     await screen.findByText(FIRST.docNumber);
     fireEvent.click(screen.getAllByRole('checkbox', { name: 'Chọn dòng' })[0]!);
+    // "In lại vận đơn" ra ngoài menu Khác (2026-11-06) — nút riêng trên thanh chọn nhiều.
+    expect(await screen.findByRole('button', { name: /In lại vận đơn/ })).toBeInTheDocument();
     openMoreMenu();
-    expect(await screen.findByRole('menuitem', { name: /In lại vận đơn/ })).toBeInTheDocument();
+    expect(screen.queryByRole('menuitem', { name: /In lại vận đơn/ })).not.toBeInTheDocument();
     expect(
       screen.queryByRole('button', { name: /Đóng gói \+ in vận đơn/ }),
     ).not.toBeInTheDocument();

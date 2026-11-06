@@ -32,7 +32,7 @@ import { fetchCombos, useCombos, useDeleteCombo, type ComboListItem } from '../a
  */
 const DEFAULTS = { size: 50, filterKeys: ['status'] as const };
 type ComboFilter = (typeof DEFAULTS.filterKeys)[number];
-const SORTABLE = new Set(['code', 'name', 'createdAt']);
+const SORTABLE = new Set(['code', 'name', 'createdAt', 'quantity']);
 
 const columns: ColumnDef<ComboListItem, unknown>[] = [
   {
@@ -61,6 +61,19 @@ const columns: ColumnDef<ComboListItem, unknown>[] = [
     header: 'Thành phần',
     meta: { width: 110, align: 'right' },
     cell: ({ row }) => <span className="tabular-nums">{row.original.componentCount} SKU</span>,
+  },
+  {
+    // Định mức (user 2026-11-06): Σ SL thành phần cho MỘT combo — "Combo 5 hũ …" = 5 Hũ. Sắp được
+    // (API sortBy=quantity). ĐVT chỉ hiện khi mọi thành phần cùng ĐVT cơ sở.
+    id: 'quantity',
+    header: 'Định mức',
+    meta: { width: 110, align: 'right', sortable: true },
+    cell: ({ row }) => (
+      <span className="tabular-nums">
+        {formatQuantity(row.original.quantity)}{' '}
+        {row.original.quantityUomCode ? <UomText code={row.original.quantityUomCode} /> : null}
+      </span>
+    ),
   },
   {
     id: 'salePrice',
@@ -122,6 +135,7 @@ const EXPORT_COLUMNS: ExportColumn<ComboListItem>[] = [
   { header: 'Mã combo', value: (r) => r.code, width: 16 },
   { header: 'Tên combo', value: (r) => r.name, width: 36 },
   { header: 'Số SKU thành phần', value: (r) => r.componentCount },
+  { header: 'Định mức', value: (r) => decimalCell(r.quantity) },
   { header: 'Giá bán', value: (r) => decimalCell(r.salePrice) },
   { header: 'Còn bán được', value: (r) => decimalCell(r.available) },
   { header: 'ĐVT', value: (r) => r.baseUomCode },
@@ -177,7 +191,7 @@ export function ComboListScreen() {
     () => ({
       q: state.q,
       isActive: status === 'active' ? true : status === 'inactive' ? false : undefined,
-      sortBy: sort ? (sort.id as 'code' | 'name' | 'createdAt') : undefined,
+      sortBy: sort ? (sort.id as 'code' | 'name' | 'createdAt' | 'quantity') : undefined,
       sortDir: sort ? (sort.desc ? ('desc' as const) : ('asc' as const)) : undefined,
       ...skipTake,
     }),

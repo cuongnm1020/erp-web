@@ -1446,6 +1446,17 @@ function OrderBulkBar({ rows, onClear }: { rows: SalesOrderListItem[]; onClear: 
           {/* Màn In đơn: chọn NV đóng hàng trước khi in (2026-11-04). */}
           <BulkFulfilPrintDialog rows={rows} onDone={onClear} askPacker />
         </Can>
+        {canReprint ? (
+          // Ra ngoài menu "Khác" (user 2026-11-06) — như màn Đơn lỗi; đếm đơn đã có mã vận đơn.
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={withWaybill.length === 0}
+            onClick={() => setDialog('reprint')}
+          >
+            In lại vận đơn{withWaybill.length > 0 ? ` (${withWaybill.length})` : ''}
+          </Button>
+        ) : null}
         {canUpdate || canReprint || canCancelWaybill ? (
           <DropdownMenu modal={false}>
             <DropdownMenuTrigger asChild>
@@ -1468,11 +1479,6 @@ function OrderBulkBar({ rows, onClear }: { rows: SalesOrderListItem[]; onClear: 
               {canUpdate ? (
                 <DropdownMenuItem onSelect={() => setWaiting(false)}>
                   Đưa lại Đã xác nhận
-                </DropdownMenuItem>
-              ) : null}
-              {canReprint ? (
-                <DropdownMenuItem onSelect={() => setDialog('reprint')}>
-                  In lại vận đơn
                 </DropdownMenuItem>
               ) : null}
               {canReprint ? (

@@ -56,7 +56,8 @@ const POSITION: Record<CarePosition, { label: string; tone: 'brand' | 'draft' | 
 type Filter = 'from' | 'to' | 'inactive' | 'dept' | 'pos' | 'group';
 
 /**
- * Nhân viên của team — trưởng nhóm CSKH (2026-10-22, thay Sơ đồ nhân sự với CSKH). Danh sách
+ * Nhân viên của team — trưởng nhóm CSKH (2026-10-22, thay Sơ đồ nhân sự với CSKH); từ 2026-11-06
+ * cả trưởng phòng Sale (nhân sự Sale `departmentKind = SALES`: không trưởng nhóm / nhóm). Danh sách
  * GET /org/care-staff (phòng CSKH mình phụ trách, API lọc phạm vi) + doanh thu kỳ chọn theo người
  * phụ trách đơn (GET /reports/sales/by-staff, đã lọc theo team). Thêm = POST /users vào phòng CSKH;
  * Sửa / Khóa / Mở khóa = PATCH /users/{id} — server kiểm lại quyền (StaffAccessService).
@@ -105,6 +106,8 @@ export function CareStaffScreen() {
   const nameById = new Map(all.map((s) => [s.id, s.fullName]));
   // Cột "Quyền thêm" chỉ cho người cấp được (trưởng phòng / quản trị).
   const showGrants = all.some((s) => s.position === 'GROUP_LEAD' && s.canLead);
+  // Cột "Nhóm" chỉ khi có nhân sự CSKH — phòng Sale không có nhóm (2026-11-06).
+  const hasCare = all.some((s) => s.departmentKind === 'CSKH');
 
   const columns = useMemo<ColumnDef<Row, unknown>[]>(
     () => [
@@ -152,6 +155,7 @@ export function CareStaffScreen() {
         meta: { width: 170 },
         cell: ({ row }) => {
           const r = row.original;
+          if (r.departmentKind === 'SALES') return <span className="text-muted-foreground">—</span>;
           if (r.position === 'GROUP_LEAD')
             return (
               <span className="text-xs">
@@ -278,6 +282,7 @@ export function CareStaffScreen() {
     ],
     [revenue.isPending, showGrants],
   );
+  const visibleColumns = hasCare ? columns : columns.filter((c) => c.id !== 'group');
 
   const rows: Row[] = all
     .filter((s) => dept === ALL_DEPTS || s.departmentId === dept)
@@ -286,7 +291,7 @@ export function CareStaffScreen() {
       !group
         ? true
         : group === NO_GROUP
-          ? s.position === 'MEMBER' && !s.groupLeaderId
+          ? s.departmentKind === 'CSKH' && s.position === 'MEMBER' && !s.groupLeaderId
           : s.groupLeaderId === group || s.id === group,
     )
     .map((s) => ({
@@ -378,7 +383,7 @@ export function CareStaffScreen() {
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value={ALL_DEPTS}>Mọi phòng CSKH</SelectItem>
+              <SelectItem value={ALL_DEPTS}>Mọi phòng ban</SelectItem>
               {departments.map((d) => (
                 <SelectItem key={d.id} value={d.id}>
                   {d.name}
@@ -440,13 +445,13 @@ export function CareStaffScreen() {
           <EmptyState
             title={
               staff.data?.departments.length === 0
-                ? 'Bạn chưa phụ trách phòng CSKH nào'
+                ? 'Bạn chưa phụ trách phòng ban nào'
                 : 'Team chưa có nhân viên'
             }
             description={
               staff.data?.departments.length === 0
-                ? 'Màn này dành cho trưởng nhóm CSKH — nhờ quản trị gán bạn làm leader CSKH.'
-                : 'Thêm nhân viên đầu tiên để chia khách chăm sóc.'
+                ? 'Màn này dành cho trưởng phòng CSKH / Sale — nhờ quản trị gán bạn làm trưởng phòng.'
+                : 'Thêm nhân viên đầu tiên của team.'
             }
             action={
               createDept ? (
@@ -461,7 +466,7 @@ export function CareStaffScreen() {
       >
         {() => (
           <DataTable
-            columns={columns}
+            columns={visibleColumns}
             rows={rows}
             getRowId={(r) => r.id}
             total={rows.length}
