@@ -17,7 +17,8 @@ const STATUS_LABEL: Record<SalesOrderStatus, string> = {
   // Đơn tạo trên ERP chờ người tạo "Xác nhận" (2026-10-31).
   DRAFT: 'Đơn mới',
   PENDING_APPROVAL: 'Chờ duyệt',
-  APPROVED: 'Đã duyệt',
+  // Khớp Pancake 1 "Đã xác nhận" và tab Đã xác nhận (2026-11-07, bỏ nhãn "Đã duyệt").
+  APPROVED: 'Đã xác nhận',
   POSTED: 'Đã chốt',
   CANCELLED: 'Đã hủy',
 };

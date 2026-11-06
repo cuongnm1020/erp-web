@@ -89,7 +89,7 @@ describe('OrderEditScreen — trang sửa đơn (D-05, PATCH /sales-orders/{id})
     );
   });
 
-  it('DRAFT + admin: chỉ đích Đã duyệt / Đã hủy; chọn Đã duyệt + giao thủ công → PATCH 2 trường → về chi tiết', async () => {
+  it('DRAFT + admin: chỉ đích Đã xác nhận / Đã hủy; chọn Đã xác nhận + giao thủ công → PATCH 2 trường → về chi tiết', async () => {
     push.mockClear();
     const calls: Array<{ id: string; body: Record<string, unknown> }> = [];
     server.use(
@@ -111,10 +111,10 @@ describe('OrderEditScreen — trang sửa đơn (D-05, PATCH /sales-orders/{id})
     fireEvent.click(screen.getByRole('combobox', { name: 'Trạng thái' }));
     expect((await screen.findAllByRole('option')).map((o) => o.textContent)).toEqual([
       'Đơn mới (hiện tại)',
-      'Đã duyệt',
+      'Đã xác nhận',
       'Đã hủy',
     ]);
-    fireEvent.click(screen.getByRole('option', { name: 'Đã duyệt' }));
+    fireEvent.click(screen.getByRole('option', { name: 'Đã xác nhận' }));
 
     fireEvent.click(screen.getByRole('combobox', { name: 'Hãng vận chuyển' }));
     expect((await screen.findAllByRole('option')).map((o) => o.textContent)).toEqual([
