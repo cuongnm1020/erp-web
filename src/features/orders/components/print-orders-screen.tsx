@@ -64,6 +64,8 @@ import {
   useOrders,
   useRequestWaybill,
   useSetOrdersWaitingStock,
+  useBulkConfirmOrders,
+  isUnconfirmedErp,
   useTeamFilterOptions,
   useFacebookPageOptions,
   usePancakeShops,
@@ -1420,6 +1422,25 @@ function OrderBulkBar({ rows, onClear }: { rows: SalesOrderListItem[]; onClear: 
     ability.can('cancel', 'SalesOrder') ||
     ability.can('cancel_after_carrier', 'SalesOrder') ||
     ability.can('create', 'SalesOrder');
+  // Xác nhận hàng loạt (2026-11-06): đơn ERP Đơn mới / Chờ duyệt (đơn Pancake xác nhận trên POS).
+  const confirm = useBulkConfirmOrders();
+  const unconfirmed = rows.filter(isUnconfirmedErp);
+  const confirmAll = () =>
+    confirm.mutate(
+      unconfirmed.map((r) => r.id),
+      {
+        onSuccess: (r) => {
+          if (r.confirmed.length > 0) toast.success(`Đã xác nhận ${r.confirmed.length} đơn`);
+          if (r.failed.length > 0) {
+            toast.error(
+              `${r.failed.length} đơn không xác nhận được: ${messageForCode(r.failed[0]!.code, 409)}`,
+            );
+          }
+          if (r.failed.length === 0) onClear();
+        },
+        onError: (err) => toast.error(messageFor(err)),
+      },
+    );
 
   return (
     <div className="mb-3">
@@ -1438,6 +1459,11 @@ function OrderBulkBar({ rows, onClear }: { rows: SalesOrderListItem[]; onClear: 
       >
         <span className="ml-auto" />
         {canCancel ? <BulkCancelDialog rows={rows} onDone={onClear} /> : null}
+        {ability.can('create', 'SalesOrder') && unconfirmed.length > 0 ? (
+          <Button variant="outline" size="sm" loading={confirm.isPending} onClick={confirmAll}>
+            Xác nhận đơn ({unconfirmed.length})
+          </Button>
+        ) : null}
         {/* Kho chuyển kho đơn bằng `send_carrier` (2026-11-04, user chốt) như sale có `update`. */}
         {ability.can('update', 'SalesOrder') || canUpdate ? (
           <BulkMoveWarehouseDialog rows={rows} onDone={onClear} />

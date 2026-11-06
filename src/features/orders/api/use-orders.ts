@@ -696,6 +696,27 @@ export function useSetOrdersWaitingStock() {
   });
 }
 
+/**
+ * POST /sales-orders/bulk-confirm (2026-11-06) — "Xác nhận" nhiều Đơn mới / Chờ duyệt. Server xác
+ * nhận từng đơn (cùng luật nút Xác nhận ở chi tiết); đơn không được vào `failed`. Không optimistic.
+ */
+/** Đơn ERP chưa xác nhận (Đơn mới / Chờ duyệt) — đơn Pancake xác nhận trên POS, không ở đây. */
+export function isUnconfirmedErp(o: { status: string; pancakeOrderId: string | null }): boolean {
+  return (o.status === 'DRAFT' || o.status === 'PENDING_APPROVAL') && !o.pancakeOrderId;
+}
+
+export function useBulkConfirmOrders() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (orderIds: string[]) =>
+      unwrap(api.POST('/sales-orders/bulk-confirm', { body: { orderIds } })),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: orderKeys.lists() });
+      void qc.invalidateQueries({ queryKey: orderKeys.details() });
+    },
+  });
+}
+
 export type BulkUpdateOrdersBody = components['schemas']['BulkUpdateOrdersDto'];
 export type BulkUpdateOrdersResult = components['schemas']['BulkUpdateOrdersResultDto'];
 

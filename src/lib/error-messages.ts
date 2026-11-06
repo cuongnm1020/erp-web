@@ -234,6 +234,9 @@ const MESSAGES: Record<string, string> = {
   ORDER_STAGE_LOCKED:
     'Kho đã xử lý đơn này (gửi hãng / chờ hàng / đang lấy hàng) — không sửa hay hủy được nữa. Liên hệ kho hoặc quản lý.',
   ORDER_NOT_DRAFT: 'Đơn không còn ở trạng thái Đơn mới — không cần xác nhận lại.',
+  // Gửi sang ĐVVC (2026-11-06): đơn Đơn mới / Chờ duyệt không gửi hãng.
+  ORDER_NOT_CONFIRMED:
+    'Đơn chưa xác nhận (Đơn mới / Chờ duyệt) — bấm "Xác nhận đơn" trước rồi gửi sang ĐVVC.',
   ORDER_WAITING_STOCK_INVALID:
     'Chỉ đơn Đã xác nhận (chưa gửi hãng, kho chưa lấy hàng) mới chuyển Chờ hàng; chỉ đơn đang Chờ hàng mới đưa lại được.',
   // 2026-11-05 (user chốt): "Đóng gói + in vận đơn" không còn đóng gói thiếu.
