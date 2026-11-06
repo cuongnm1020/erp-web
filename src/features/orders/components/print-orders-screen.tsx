@@ -947,6 +947,8 @@ export function PrintOrdersScreen() {
       dateField,
       teamIds: team || undefined,
       facebookPageIds: fbPage || undefined,
+      // Tab Đã xác nhận màn In đơn chỉ đơn chưa có mã vận đơn (2026-11-06) — cả danh sách lẫn số đếm.
+      warehouseNoWaybill: true,
     }),
     [
       state.q,

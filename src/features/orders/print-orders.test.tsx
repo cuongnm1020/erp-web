@@ -290,4 +290,33 @@ describe('PrintOrdersScreen — In đơn (clone màn Đơn hàng, 2026-11-04)', 
       search = 'group=all';
     }
   });
+
+  it('tab Đã xác nhận bỏ đơn đã có mã vận đơn (2026-11-06): danh sách + số đếm tab gửi warehouseNoWaybill=true', async () => {
+    search = 'flow=WAREHOUSE';
+    const list: URLSearchParams[] = [];
+    const counts: URLSearchParams[] = [];
+    server.use(
+      http.get('/api/sales-orders', ({ request }) => {
+        list.push(new URL(request.url).searchParams);
+        return HttpResponse.json({ items: [], total: 0 });
+      }),
+      http.get('/api/sales-orders/flow-counts', ({ request }) => {
+        counts.push(new URL(request.url).searchParams);
+        return HttpResponse.json({ total: 0 });
+      }),
+    );
+    try {
+      renderApp(<PrintOrdersScreen />);
+      await waitFor(() =>
+        expect(
+          list.some((p) => p.get('flow') === 'WAREHOUSE' && p.get('warehouseNoWaybill') === 'true'),
+        ).toBe(true),
+      );
+      await waitFor(() =>
+        expect(counts.some((p) => p.get('warehouseNoWaybill') === 'true')).toBe(true),
+      );
+    } finally {
+      search = 'group=all';
+    }
+  });
 });

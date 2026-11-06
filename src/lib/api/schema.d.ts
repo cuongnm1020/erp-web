@@ -24538,6 +24538,11 @@ export interface operations {
                  *     "lọc sản phẩm duy nhất" màn In đơn (2026-11-04). Không có `skuId` thì bỏ qua.
                  */
                 skuOnly?: "true" | "false";
+                /**
+                 * @description `true` = tab Đã xác nhận (`WAREHOUSE`) chỉ gồm đơn CHƯA có mã vận đơn — màn In đơn (2026-11-06).
+                 *     Áp cho danh sách khi lọc tab đó và cho số đếm tab đó; tab khác không đổi.
+                 */
+                warehouseNoWaybill?: "true" | "false";
                 /** @description Đơn đang thiếu tồn SKU này (core.Sku.id) — "Xem đơn" từ màn Hàng chờ (2026-10-25). */
                 shortSkuId?: string;
                 /**
@@ -24812,6 +24817,11 @@ export interface operations {
                  *     "lọc sản phẩm duy nhất" màn In đơn (2026-11-04). Không có `skuId` thì bỏ qua.
                  */
                 skuOnly?: "true" | "false";
+                /**
+                 * @description `true` = tab Đã xác nhận (`WAREHOUSE`) chỉ gồm đơn CHƯA có mã vận đơn — màn In đơn (2026-11-06).
+                 *     Áp cho danh sách khi lọc tab đó và cho số đếm tab đó; tab khác không đổi.
+                 */
+                warehouseNoWaybill?: "true" | "false";
                 /** @description Đơn đang thiếu tồn SKU này (core.Sku.id) — "Xem đơn" từ màn Hàng chờ (2026-10-25). */
                 shortSkuId?: string;
                 /**
@@ -24989,6 +24999,11 @@ export interface operations {
                  *     "lọc sản phẩm duy nhất" màn In đơn (2026-11-04). Không có `skuId` thì bỏ qua.
                  */
                 skuOnly?: "true" | "false";
+                /**
+                 * @description `true` = tab Đã xác nhận (`WAREHOUSE`) chỉ gồm đơn CHƯA có mã vận đơn — màn In đơn (2026-11-06).
+                 *     Áp cho danh sách khi lọc tab đó và cho số đếm tab đó; tab khác không đổi.
+                 */
+                warehouseNoWaybill?: "true" | "false";
                 /** @description Đơn đang thiếu tồn SKU này (core.Sku.id) — "Xem đơn" từ màn Hàng chờ (2026-10-25). */
                 shortSkuId?: string;
                 /**
