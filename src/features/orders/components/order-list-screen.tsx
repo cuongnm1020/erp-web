@@ -1449,6 +1449,7 @@ export function OrderListScreen() {
         <OrderBulkBar rows={selectedRows} onClear={clearSelection} />
       ) : (
         <FilterBar<OrderFilter>
+          busy={query.isPlaceholderData}
           q={state.q}
           onQChange={(q) =>
             // Bắt đầu tìm từ ô trống → mọi trạng thái (`group=all`, giữ `flow` cho nút "Quay lại");

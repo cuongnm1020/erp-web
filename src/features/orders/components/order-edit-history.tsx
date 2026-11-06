@@ -17,14 +17,18 @@ interface Entry {
   key: string;
   at: string;
   who: string;
+  /** Admin "đăng nhập với tư cách" `who` lúc thao tác (2026-11-06) — hiện "(thay <who>)". */
+  onBehalfOf: string | null;
   pancake: boolean;
   changes: Change[];
 }
 
 /**
- * Lịch sử sửa đơn (2026-10-29): mỗi lần lưu ở màn Sửa đơn — giờ, người sửa, từng thay đổi cũ → mới.
+ * Lịch sử đơn (2026-10-29): mỗi lần lưu ở màn Sửa đơn — giờ, người sửa, từng thay đổi cũ → mới.
  * Server ghi sẵn chuỗi hiển thị (tên người, hãng, địa chỉ một dòng, "OE-X ×2").
  * 2026-11-04: trộn cả lịch sử cập nhật trên Pancake (chip "Pancake"), xếp chung theo giờ.
+ * 2026-11-06: server ghi cả tạo đơn (người tạo + SP/SL), xác nhận, gửi ĐVVC, chuyển kho, hủy đơn,
+ * hủy vận đơn; admin đăng nhập thay nhân viên → hiện tên admin, kèm "(thay <nhân viên>)".
  */
 export function OrderEditHistory({ orderId }: { orderId: string }) {
   const erp = useOrderEditHistory(orderId);
@@ -32,17 +36,22 @@ export function OrderEditHistory({ orderId }: { orderId: string }) {
   const pending = erp.isPending || pancake.isPending;
   const failed = erp.isError || pancake.isError;
   const entries: Entry[] = [
-    ...(erp.data ?? []).map((l) => ({
-      key: `erp-${l.id}`,
-      at: l.at,
-      who: l.userName ?? 'Tài khoản đã xóa',
-      pancake: false,
-      changes: l.changes,
-    })),
+    ...(erp.data ?? []).map((l) => {
+      const user = l.userName ?? 'Tài khoản đã xóa';
+      return {
+        key: `erp-${l.id}`,
+        at: l.at,
+        who: l.impersonatorId ? (l.impersonatorName ?? 'Tài khoản đã xóa') : user,
+        onBehalfOf: l.impersonatorId ? user : null,
+        pancake: false,
+        changes: l.changes,
+      };
+    }),
     ...(pancake.data ?? []).map((l, i) => ({
       key: `pancake-${l.at}-${i}`,
       at: l.at,
       who: l.userName ?? 'NV Pancake chưa liên kết',
+      onBehalfOf: null,
       pancake: true,
       changes: l.changes,
     })),
@@ -72,7 +81,7 @@ export function OrderEditHistory({ orderId }: { orderId: string }) {
       ) : entries.length === 0 ? (
         <p className="flex items-center gap-1.5 text-sm text-muted-foreground">
           <History className="h-3.5 w-3.5" aria-hidden />
-          Đơn chưa được sửa lần nào.
+          Chưa có lịch sử.
         </p>
       ) : (
         <ol className="max-h-96 space-y-3 overflow-y-auto">
@@ -81,6 +90,11 @@ export function OrderEditHistory({ orderId }: { orderId: string }) {
               <p className="flex flex-wrap items-baseline justify-between gap-x-2">
                 <span className="flex items-center gap-1.5 font-semibold">
                   {log.who}
+                  {log.onBehalfOf ? (
+                    <span className="font-normal text-muted-foreground">
+                      (thay {log.onBehalfOf})
+                    </span>
+                  ) : null}
                   {log.pancake ? (
                     <StatusBadge tone="neutral" dot={false}>
                       Pancake

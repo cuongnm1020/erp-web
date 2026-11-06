@@ -13424,12 +13424,17 @@ export interface components {
             to: string | null;
         };
         OrderEditLogDto: {
+            /** @description Id dòng log; `created-<orderId>` = dòng "Tạo đơn" server tự dựng cho đơn cũ chưa ghi lúc tạo. */
             id: string;
             /** @description ISO datetime. */
             at: string;
             userId: string;
-            /** @description Tên người sửa; null = tài khoản đã xóa. */
+            /** @description Tên người thao tác; null = tài khoản đã xóa. */
             userName: string | null;
+            /** @description Admin "đăng nhập với tư cách" userId lúc thao tác; null = chính chủ. */
+            impersonatorId: string | null;
+            /** @description Tên admin đó — web hiện "<admin> (thay <userName>)". */
+            impersonatorName: string | null;
             changes: components["schemas"]["OrderEditChangeDto"][];
         };
         BulkUpdateOrdersDto: {

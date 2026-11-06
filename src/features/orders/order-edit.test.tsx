@@ -816,6 +816,48 @@ describe('OrderEditScreen — sửa sản phẩm / người nhận, quyền sử
     expect(screen.getByText('295.000')).toBeInTheDocument();
   });
 
+  it('lịch sử: dòng "Tạo đơn" (người tạo, SP ×SL); admin đăng nhập thay → tên admin "(thay NV)" (2026-11-06)', async () => {
+    server.use(
+      http.get('/api/sales-orders/:id/edit-history', () =>
+        HttpResponse.json([
+          {
+            id: 'log-2',
+            at: '2026-11-06T04:00:00.000Z',
+            userId: 'u1',
+            userName: 'Nguyễn Thị Hồng',
+            impersonatorId: 'u-admin',
+            impersonatorName: 'Cấn Xuân Mạnh',
+            changes: [
+              { field: 'status', label: 'Trạng thái', from: 'Đã xác nhận', to: 'Đã hủy' },
+              { field: 'cancelReason', label: 'Lý do hủy', from: null, to: 'hết hàng' },
+            ],
+          },
+          {
+            id: 'created-o1',
+            at: '2026-11-02T08:44:18.000Z',
+            userId: 'u1',
+            userName: 'Nguyễn Thị Hồng',
+            impersonatorId: null,
+            impersonatorName: null,
+            changes: [
+              { field: 'created', label: 'Tạo đơn', from: null, to: 'Đã xác nhận' },
+              { field: 'lines', label: 'Sản phẩm', from: null, to: 'SP-0147 ×5 · 735.000 ₫' },
+              { field: 'total', label: 'Tổng tiền', from: null, to: '735.000' },
+            ],
+          },
+        ]),
+      ),
+    );
+    renderApp(<OrderEditScreen orderId={ORDER.id} />);
+    expect(await screen.findByText('Cấn Xuân Mạnh')).toBeInTheDocument();
+    expect(screen.getByText('(thay Nguyễn Thị Hồng)')).toBeInTheDocument();
+    expect(screen.getByText('hết hàng')).toBeInTheDocument();
+    expect(screen.getByText('Tạo đơn')).toBeInTheDocument();
+    expect(screen.getByText('SP-0147 ×5 · 735.000 ₫')).toBeInTheDocument();
+    // Dòng tạo đơn: người tạo hiện tên thường (không có "(thay …)").
+    expect(screen.getByText('Nguyễn Thị Hồng')).toBeInTheDocument();
+  });
+
   it('lịch sử sửa đơn trộn lần sửa trên Pancake (chip Pancake), xếp chung theo giờ mới nhất trước (2026-11-04)', async () => {
     server.use(
       http.get('/api/sales-orders/:id/edit-history', () =>

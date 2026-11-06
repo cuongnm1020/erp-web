@@ -16,6 +16,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { Spinner } from '@/components/ui/spinner';
+import { useDelayedFlag } from '@/lib/use-delayed-flag';
 
 export type FilterDef<F extends string = string> = FilterDefCommon<F> &
   (
@@ -101,7 +103,13 @@ export function FilterBar<F extends string = string>({
   right,
   pinned,
   secondRow,
+  busy = false,
 }: {
+  /**
+   * Danh sách đang tải lại theo tìm / lọc (`query.isPlaceholderData`) — kính lúp đổi thành vòng
+   * xoay (hiện sau 150ms, giữ ≥300ms). Bảng mờ + thanh chạy do `QueryState` lo.
+   */
+  busy?: boolean;
   q: string;
   onQChange: (q: string) => void;
   filters?: FilterDef<F>[];
@@ -123,6 +131,7 @@ export function FilterBar<F extends string = string>({
    */
   secondRow?: F[];
 }) {
+  const busyShown = useDelayedFlag(busy);
   const active =
     Object.entries(values).filter(
       // Ngày cuối của khoảng ngày đi cùng ngày đầu — một bộ lọc, đếm một lần.
@@ -250,10 +259,14 @@ export function FilterBar<F extends string = string>({
   return (
     <div className="mb-3 flex flex-wrap items-center gap-2">
       <div className="relative">
-        <Search
-          className="pointer-events-none absolute left-2 top-2.5 h-4 w-4 text-muted-foreground"
-          aria-hidden
-        />
+        {busyShown ? (
+          <Spinner className="pointer-events-none absolute left-2.5 top-2.5 size-3.5 text-primary" />
+        ) : (
+          <Search
+            className="pointer-events-none absolute left-2 top-2.5 h-4 w-4 text-muted-foreground"
+            aria-hidden
+          />
+        )}
         <DraftInput
           value={q}
           onCommit={onQChange}

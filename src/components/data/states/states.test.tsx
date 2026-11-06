@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { ApiError } from '@/lib/api/errors';
 import { EmptyState } from './empty-state';
@@ -67,5 +67,50 @@ describe('states', () => {
     expect(screen.getByText('empty')).toBeInTheDocument();
     rerender(ui({ data: ['a', 'b'], error: null, isPending: false }));
     expect(screen.getByText('a,b')).toBeInTheDocument();
+  });
+
+  describe('QueryState tải lại (placeholderData)', () => {
+    const ui = (q: { isPlaceholderData: boolean; error?: unknown }) => (
+      <QueryState
+        query={{ data: ['cũ'], error: q.error ?? null, isPending: false, refetch: vi.fn(), ...q }}
+        skeleton={<span>skeleton</span>}
+      >
+        {(d) => <span>{d.join(',')}</span>}
+      </QueryState>
+    );
+
+    it('dưới 150ms không hiện gì; sau đó giữ dữ liệu cũ + aria-busy; quá 3s báo chậm', () => {
+      vi.useFakeTimers();
+      try {
+        const { container, rerender } = render(ui({ isPlaceholderData: true }));
+        expect(screen.getByText('cũ')).toBeInTheDocument();
+        expect(container.querySelector('[aria-busy]')).toBeNull();
+        act(() => vi.advanceTimersByTime(160));
+        expect(container.querySelector('[aria-busy="true"]')).not.toBeNull();
+        expect(screen.getByText('cũ')).toBeInTheDocument();
+        expect(screen.queryByText(/phản hồi chậm/)).not.toBeInTheDocument();
+        act(() => vi.advanceTimersByTime(3000));
+        expect(screen.getByText(/phản hồi chậm/)).toBeInTheDocument();
+        rerender(ui({ isPlaceholderData: false }));
+        act(() => vi.advanceTimersByTime(400));
+        expect(container.querySelector('[aria-busy]')).toBeNull();
+        expect(screen.queryByText(/phản hồi chậm/)).not.toBeInTheDocument();
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it('lỗi khi còn dữ liệu → giữ dữ liệu, dải lỗi + Thử lại (không thay cả khối)', () => {
+      render(
+        ui({
+          isPlaceholderData: false,
+          error: new ApiError(500, 'SERVER_ERROR', 'raw', undefined, 'tr-1'),
+        }),
+      );
+      expect(screen.getByText('cũ')).toBeInTheDocument();
+      expect(screen.getByRole('alert')).toHaveTextContent('Không tải lại được dữ liệu');
+      expect(screen.queryByText('raw')).not.toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Thử lại' })).toBeInTheDocument();
+    });
   });
 });

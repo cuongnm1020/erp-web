@@ -119,10 +119,22 @@ const config: Config = {
           from: { height: 'var(--radix-accordion-content-height)' },
           to: { height: '0' },
         },
+        // Thanh tải 2px không xác định (2026-11-06): khối 1/3 bề rộng chạy trái → phải.
+        indeterminate: {
+          from: { transform: 'translateX(-100%)' },
+          to: { transform: 'translateX(300%)' },
+        },
+        // Thanh chuyển trang: đầy dần tới 88% rồi đứng chờ trang mới.
+        'route-progress': {
+          from: { transform: 'scaleX(0)' },
+          to: { transform: 'scaleX(0.88)' },
+        },
       },
       animation: {
         'accordion-down': 'accordion-down 0.2s ease-out',
         'accordion-up': 'accordion-up 0.2s ease-out',
+        indeterminate: 'indeterminate 1.1s cubic-bezier(0.4, 0, 0.2, 1) infinite',
+        'route-progress': 'route-progress 2.4s cubic-bezier(0.1, 0.6, 0.2, 1) forwards',
       },
     },
   },
