@@ -288,7 +288,9 @@ export const ORDER_FLOW_TABS: ReadonlyArray<{
   { flow: 'WAREHOUSE', label: 'Đã xác nhận', family: 'fulfil' },
   // Chờ hàng (2026-10-25; luật ≥ 24h bỏ 2026-11-03): kho chuyển tay / Pancake 11 — cần người xử lý → họ "chờ".
   { flow: 'WAITING_STOCK', label: 'Chờ hàng', family: 'wait' },
-  { flow: 'PICKING', label: 'Đang lấy hàng', family: 'fulfil' },
+  // "Đang đóng hàng" (2026-11-07, user chốt; trước "Đang lấy hàng"): đã Gửi sang ĐVVC tới khi PDA
+  // đóng gói xong — gồm cả đơn đóng gói TAY (chưa sang Chờ chuyển hàng tới khi hãng lấy).
+  { flow: 'PICKING', label: 'Đang đóng hàng', family: 'fulfil' },
   { flow: 'PACKED', label: 'Chờ chuyển hàng', family: 'fulfil' },
   // Cần sửa (2026-11-02, thay tab Lỗi vận đơn): hãng không cấp được mã + đơn chưa đóng gói có SP
   // ngoài hệ thống (món gõ tay / SP Pancake tự tạo) — không được Gửi sang ĐVVC tới khi sửa xong.
