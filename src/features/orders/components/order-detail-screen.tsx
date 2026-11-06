@@ -938,6 +938,25 @@ function Detail({ order }: { order: SalesOrderDetail }) {
                 <Link href={`/crm/orders/${order.id}/edit`}>Sửa đơn</Link>
               </Button>
             ) : null}
+            {order.canConfirmWaiting ? (
+              // Đơn mới → thẳng Chờ hàng (2026-11-07) — chỉ người tạo đơn / NV xử lý.
+              <Button
+                variant="outline"
+                disabled={confirm.isPending}
+                onClick={() =>
+                  confirm.mutate(
+                    { orderId: order.id, waitingStock: true },
+                    {
+                      onSuccess: () =>
+                        toast.success(`Đã xác nhận đơn ${order.docNumber} vào Chờ hàng`),
+                      onError: (err) => toast.error(messageFor(err)),
+                    },
+                  )
+                }
+              >
+                Xác nhận vào Chờ hàng
+              </Button>
+            ) : null}
             {order.canConfirm ? (
               // Đơn mới → Đã xác nhận (2026-10-31) — nút chính khi đơn còn ở Đơn mới.
               <Button

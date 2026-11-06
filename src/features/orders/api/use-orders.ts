@@ -653,8 +653,19 @@ export function usePancakeUnlock() {
 export function useConfirmOrder() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (orderId: string) =>
-      unwrap(api.POST('/sales-orders/{id}/confirm', { params: { path: { id: orderId } } })),
+    /** `waitingStock` (2026-11-07): Đơn mới → thẳng Chờ hàng — người tạo / NV xử lý. */
+    mutationFn: (orderId: string | { orderId: string; waitingStock: boolean }) => {
+      const { id, waitingStock } =
+        typeof orderId === 'string'
+          ? { id: orderId, waitingStock: false }
+          : { id: orderId.orderId, waitingStock: orderId.waitingStock };
+      return unwrap(
+        api.POST('/sales-orders/{id}/confirm', {
+          params: { path: { id } },
+          body: waitingStock ? { waitingStock: true } : {},
+        }),
+      );
+    },
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: orderKeys.lists() });
       void qc.invalidateQueries({ queryKey: orderKeys.details() });

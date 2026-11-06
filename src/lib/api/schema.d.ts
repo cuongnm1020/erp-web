@@ -4384,7 +4384,8 @@ export interface paths {
         /**
          * Người lên đơn "Xác nhận" đơn (2026-10-31): Đơn mới / Chờ duyệt → Đã xác nhận (OrderConfirmed),
          *     KHÔNG qua duyệt kể cả bán dưới trần. Người được sửa đơn (người tạo / NV xử lý / trưởng nhóm /
-         *     `sales_order.edit_all`); đơn Pancake không xác nhận ở đây.
+         *     `sales_order.edit_all`); đơn Pancake không xác nhận ở đây. `waitingStock: true` (2026-11-07):
+         *     vào thẳng Chờ hàng — chỉ người tạo đơn hoặc NV xử lý (403 người khác).
          */
         post: operations["SalesOrderController_confirm"];
         delete?: never;
@@ -12795,6 +12796,11 @@ export interface components {
              *     — không qua duyệt, kể cả bán dưới trần (2026-10-31).
              */
             canConfirm: boolean;
+            /**
+             * @description Bấm được "Xác nhận vào Chờ hàng" (2026-11-07): như `canConfirm` nhưng chỉ người tạo đơn hoặc
+             *     NV xử lý — POST /sales-orders/:id/confirm `{ waitingStock: true }`.
+             */
+            canConfirmWaiting: boolean;
             /** @description Kho chuyển đơn sang Chờ hàng bằng tay lúc này (ISO); null = không. */
             waitingStockAt: string | null;
             timeline: components["schemas"]["OrderTimelineDto"];
@@ -13651,6 +13657,10 @@ export interface components {
         CancelOrderDto: {
             reason?: string;
         };
+        ConfirmOrderDto: {
+            /** @description true = Đơn mới → thẳng Chờ hàng — chỉ người tạo đơn hoặc NV xử lý. */
+            waitingStock?: boolean;
+        };
         ApproveOrderResultDto: {
             orderId: string;
             docNumber: string;
@@ -13661,6 +13671,11 @@ export interface components {
         };
         BulkConfirmOrdersDto: {
             orderIds: string[];
+            /**
+             * @description true = Đơn mới → thẳng Chờ hàng (xác nhận + giữ chỗ, nằm tab Chờ hàng) — chỉ người tạo đơn
+             *     hoặc NV xử lý (2026-11-07). Bỏ trống = Đã xác nhận.
+             */
+            waitingStock?: boolean;
         };
         OrderWaitingStockItemDto: {
             orderId: string;
@@ -25650,7 +25665,11 @@ export interface operations {
             };
             cookie?: never;
         };
-        requestBody?: never;
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ConfirmOrderDto"];
+            };
+        };
         responses: {
             201: {
                 headers: {

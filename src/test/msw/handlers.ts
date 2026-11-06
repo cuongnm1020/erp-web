@@ -646,6 +646,7 @@ export function makeOrderDetail(id: string) {
     // Luồng Đơn mới / Chờ hàng (2026-10-31).
     stageLockedReason: null as string | null,
     canConfirm: header.status === 'DRAFT',
+    canConfirmWaiting: header.status === 'DRAFT',
     waitingStockAt: null as string | null,
     timeline: {
       approvedAt:
