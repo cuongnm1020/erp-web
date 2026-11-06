@@ -32,6 +32,9 @@ const MESSAGES: Record<string, string> = {
   // Danh sách đơn (GET /sales-orders?weightMin/weightMax)
   ORDER_WEIGHT_FILTER_TOO_BROAD:
     'Lọc cân nặng trên quá nhiều đơn. Chọn thêm Ngày đặt hoặc tab trạng thái để thu hẹp rồi lọc lại.',
+  // Sắp theo Sản phẩm / Cân nặng (sortBy=items|weight) — sắp trong bộ nhớ, tối đa 200.000 đơn khớp lọc.
+  ORDER_SORT_TOO_BROAD:
+    'Quá nhiều đơn để sắp theo cột này (tối đa 200.000 đơn). Thu hẹp Ngày đặt, chọn tab trạng thái hoặc tìm cụ thể hơn, hay bỏ sắp theo cột này.',
   PRICE_NOT_FOUND:
     'Chưa có giá cho sản phẩm này với khách đang chọn. Báo quản lý cập nhật bảng giá.',
   INVALID_STATUS_TRANSITION:

@@ -47,3 +47,19 @@ describe('ORDER_PACK_SHORTAGE (2026-11-05) — không đóng gói thiếu, nêu 
     );
   });
 });
+
+describe('ORDER_SORT_TOO_BROAD (2026-11-06) — sắp Sản phẩm / Cân nặng quá 200.000 đơn', () => {
+  it('nói rõ quá nhiều đơn + cách thu hẹp, không rơi về câu chung 422', () => {
+    const err = new ApiError(
+      422,
+      'ORDER_SORT_TOO_BROAD',
+      'message thô',
+      { max: 200000 },
+      undefined,
+    );
+    const text = messageFor(err);
+    expect(text).toContain('Quá nhiều đơn để sắp theo cột này');
+    expect(text).not.toContain('Một số trường chưa hợp lệ');
+    expect(text).not.toContain('message thô');
+  });
+});
