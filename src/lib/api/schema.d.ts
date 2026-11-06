@@ -4323,10 +4323,11 @@ export interface paths {
         get?: never;
         put?: never;
         /**
-         * "Hủy vận đơn" (2026-11-02) — một hay nhiều đơn: hãng hủy vận đơn (đúng tài khoản đã cấp), phiếu
-         *     giao chưa rời kho về Hãng hủy ngay → "Gửi sang ĐVVC" lại được bằng tài khoản / hãng khác. Đơn
-         *     giữ nguyên. Chỉ người chọn hãng (`sales_order.send_carrier` — kho / admin; sale không chọn hãng
-         *     từ 2026-10-31). Đơn không hủy được nằm ở `failed`.
+         * "Hủy vận đơn" (2026-11-02) — một hay nhiều đơn: hãng hủy vận đơn (đúng tài khoản đã cấp).
+         *     Từ 2026-11-07 (user chốt): kho chưa lấy xong hàng → đơn về Đã xác nhận (xóa mốc Gửi sang ĐVVC,
+         *     hủy PICK / PACK mở) để sửa lại và gửi hãng khác; đã lấy / đóng gói → phiếu giao Hãng hủy, gửi
+         *     lại được. Quyền `sales_order.cancel_after_carrier` hoặc `sales_order.cancel`. Đơn không hủy
+         *     được nằm ở `failed`.
          */
         post: operations["SalesOrderController_cancelWaybill"];
         delete?: never;
@@ -12785,6 +12786,11 @@ export interface components {
              */
             stageLockedReason: string | null;
             /**
+             * @description ISO — lúc kho "Gửi sang ĐVVC" (2026-11-07); null = chưa gửi / đã hủy vận đơn về Đã xác nhận.
+             *     Đã gửi: không ai sửa đơn, chỉ người có `sales_order.cancel` hủy đơn.
+             */
+            sentToCarrierAt: string | null;
+            /**
              * @description Người đang xem bấm được "Xác nhận" (đơn tạo trên ERP ở Đơn mới / Chờ duyệt, người được sửa đơn)
              *     — không qua duyệt, kể cả bán dưới trần (2026-10-31).
              */
@@ -13615,9 +13621,15 @@ export interface components {
             /** @description Mã vận đơn vừa hủy bên hãng. */
             trackingNo: string;
             carrierCode: string;
+            /**
+             * @description Đơn đã về Đã xác nhận (2026-11-07): kho chưa lấy xong hàng → xóa mốc Gửi sang ĐVVC + việc
+             *     PICK / PACK mở, sale sửa lại được. false = kho đã lấy / đóng gói → giữ ở Đang đóng hàng, phiếu
+             *     giao Hãng hủy, gửi lại hãng khác.
+             */
+            revertedToConfirmed: boolean;
         };
         CancelOrderWaybillsResultDto: {
-            /** @description Đơn đã hủy vận đơn — phiếu giao về Hãng hủy, gửi sang ĐVVC lại được ngay. */
+            /** @description Đơn đã hủy vận đơn — về Đã xác nhận (hoặc Hãng hủy nếu kho đã lấy hàng), gửi lại được. */
             cancelled: components["schemas"]["CancelledOrderWaybillDto"][];
             /**
              * @description Đơn không hủy được (ORDER_NO_ACTIVE_WAYBILL, ORDER_CARRIER_PICKED_UP,

@@ -322,6 +322,7 @@ interface RowActionContext {
 const OPEN_FLOWS: readonly string[] = ['NEW', 'PENDING_APPROVAL', 'WAREHOUSE', 'WAITING_STOCK'];
 const EDIT_OPEN_FLOWS = OPEN_FLOWS;
 const STAGE_LOCKED = 'Kho đã xử lý đơn — không sửa / hủy được nữa';
+const SENT_LOCKED = 'Đã gửi ĐVVC — hủy vận đơn để sửa đơn';
 
 function orderRowItems(o: SalesOrderListItem, ctx: RowActionContext): RowActionItem[] {
   const stageOpen = OPEN_FLOWS.includes(o.flow);
@@ -347,9 +348,12 @@ function orderRowItems(o: SalesOrderListItem, ctx: RowActionContext): RowActionI
             disabledReason:
               o.status === 'CANCELLED'
                 ? 'Đơn đã hủy'
-                : !editOpen && !o.editPastStage && !ctx.canEditAny
-                  ? STAGE_LOCKED
-                  : undefined,
+                : // 2026-11-07: đã gửi hãng thì không ai sửa — trừ tab Cần sửa (hãng từ chối cấp mã).
+                  o.sentToCarrierAt && o.flow !== 'NEEDS_FIX'
+                  ? SENT_LOCKED
+                  : !editOpen && !o.editPastStage && !ctx.canEditAny
+                    ? STAGE_LOCKED
+                    : undefined,
           },
         ]
       : []),
@@ -373,13 +377,16 @@ function orderRowItems(o: SalesOrderListItem, ctx: RowActionContext): RowActionI
             disabledReason:
               o.status === 'CANCELLED'
                 ? 'Đơn đã hủy'
-                : !orderCancellable(o.status, o.fulfilmentStatus, ctx.canCancelAfterCarrier)
-                  ? ctx.canCancelAfterCarrier
-                    ? 'Hãng đã lấy hàng — xử lý bằng hoàn hàng'
-                    : 'Kho đã đóng gói — nhờ trưởng phòng / quản trị hủy'
-                  : !stageOpen && !ctx.canCancelAny && !ctx.canCancelAfterCarrier
-                    ? STAGE_LOCKED
-                    : undefined,
+                : // 2026-11-07: đã gửi hãng → chỉ quyền Hủy đơn (`cancel`); cancel_after_carrier chỉ hủy vận đơn.
+                  o.sentToCarrierAt && !ctx.canCancelAny
+                  ? 'Đã gửi ĐVVC — chỉ người có quyền Hủy đơn hủy được (hoặc hủy vận đơn)'
+                  : !orderCancellable(o.status, o.fulfilmentStatus, ctx.canCancelAny)
+                    ? ctx.canCancelAny
+                      ? 'Hãng đã lấy hàng — xử lý bằng hoàn hàng'
+                      : 'Kho đã đóng gói — nhờ người có quyền Hủy đơn'
+                    : !stageOpen && !ctx.canCancelAny
+                      ? STAGE_LOCKED
+                      : undefined,
           },
         ]
       : []),
@@ -1818,8 +1825,9 @@ function OrderBulkBar({ rows, onClear }: { rows: SalesOrderListItem[]; onClear: 
       },
     );
   const canReprint = ability.can('pack', 'Shipment');
-  // Hủy vận đơn (2026-11-02) — đi cùng Gửi sang ĐVVC: chỉ người chọn hãng (kho / admin).
-  const canCancelWaybill = canUpdate;
+  // Hủy vận đơn → đơn về Đã xác nhận (2026-11-07): quyền `cancel_after_carrier` hoặc `cancel`.
+  const canCancelWaybill =
+    ability.can('cancel_after_carrier', 'SalesOrder') || ability.can('cancel', 'SalesOrder');
   const withWaybill = rows.filter((r) => r.shipment?.trackingNo);
   // Xin lại vận đơn hàng loạt (2026-11-02) — cùng quyền với nút trên dòng (`pack` Shipment).
   const retryable = rows.filter(retryableWaybill);

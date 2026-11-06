@@ -69,10 +69,23 @@ export function CancelWaybillDialog({
         ...(reason.trim() ? { reason: reason.trim() } : {}),
       });
       if (r.cancelled.length > 0) {
+        // 2026-11-07: kho chưa lấy xong hàng → đơn về Đã xác nhận (sửa lại được); đã lấy / đóng gói
+        // → giữ ở Đang đóng hàng, gửi lại hãng khác.
+        const back = r.cancelled.filter((c) => c.revertedToConfirmed);
+        const kept = r.cancelled.filter((c) => !c.revertedToConfirmed);
+        const label = (c: (typeof r.cancelled)[number]) =>
+          c.trackingNo ? `${c.docNumber} (${c.trackingNo})` : c.docNumber;
         toast.success(`Đã hủy ${r.cancelled.length} vận đơn`, {
-          description: `${r.cancelled
-            .map((c) => `${c.docNumber} (${c.trackingNo})`)
-            .join(', ')} — gửi sang ĐVVC lại để lấy vận đơn mới.`,
+          description: [
+            back.length > 0
+              ? `${back.map(label).join(', ')} — về Đã xác nhận, sửa đơn / gửi hãng khác được.`
+              : null,
+            kept.length > 0
+              ? `${kept.map(label).join(', ')} — kho đã lấy hàng, gửi sang ĐVVC lại để lấy vận đơn mới.`
+              : null,
+          ]
+            .filter(Boolean)
+            .join('\n'),
           duration: 10_000,
         });
       }
@@ -102,9 +115,9 @@ export function CancelWaybillDialog({
               : `Hủy vận đơn của ${rows.length} đơn đã chọn?`}
           </DialogTitle>
           <DialogDescription>
-            Hãng sẽ hủy mã vận đơn — không đến lấy hàng theo mã này nữa. Đơn và hàng giữ nguyên; sau
-            đó gửi sang ĐVVC lại (đổi tài khoản / hãng được) để lấy vận đơn mới. Đơn hãng đã lấy
-            hàng hoặc chưa có mã sẽ báo lỗi riêng.
+            Hãng sẽ hủy mã vận đơn — không đến lấy hàng theo mã này nữa. Kho chưa lấy hàng thì đơn
+            về <strong>Đã xác nhận</strong>: sửa lại đơn, rồi gửi sang ĐVVC (đổi hãng được). Đơn
+            hãng đã lấy hàng sẽ báo lỗi riêng.
           </DialogDescription>
         </DialogHeader>
         <div className="space-y-1.5">
