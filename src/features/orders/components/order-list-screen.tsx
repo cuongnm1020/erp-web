@@ -532,6 +532,19 @@ const buildColumns = (
               Có SP ngoài hệ thống
             </span>
           ) : null}
+          {row.original.shortage?.items.length ? (
+            // Đơn Chờ hàng / thiếu hàng (2026-11-07, user chốt): SP thiếu bao nhiêu theo khả dụng kho.
+            <span
+              className="block text-xs font-semibold text-warning"
+              data-testid="order-shortage"
+              title="Khả dụng của kho không đủ cho đơn — bỏ bớt SP hoặc chờ hàng về rồi gán hãng"
+            >
+              Thiếu:{' '}
+              {row.original.shortage.items
+                .map((i) => `${i.skuCode} ${i.skuName} × ${formatQuantity(i.qty)}`)
+                .join(' · ')}
+            </span>
+          ) : null}
         </div>
       );
     },

@@ -1789,6 +1789,11 @@ describe('OrderListScreen — tab Chờ hàng (2026-10-25)', () => {
       'kho chọn đơn rồi bấm Chuyển Chờ hàng',
     );
     await screen.findByText(waiting.docNumber);
+    // Dòng đơn hiện SP thiếu ngay dưới sản phẩm (2026-11-07).
+    const short = screen.getByTestId('order-shortage');
+    for (const i of waiting.shortage!.items) {
+      expect(short).toHaveTextContent(i.skuCode);
+    }
     expect(screen.queryByRole('columnheader', { name: /Hàng thiếu/ })).not.toBeInTheDocument();
     expect(screen.queryByRole('columnheader', { name: /Chờ từ/ })).not.toBeInTheDocument();
     expect(screen.queryByRole('columnheader', { name: /Thực thu/ })).not.toBeInTheDocument();
