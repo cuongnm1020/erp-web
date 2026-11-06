@@ -853,8 +853,8 @@ function WaitingStockNote({
       <p role="note" className="flex-1 rounded-lg bg-info-weak px-3 py-2 text-sm text-info">
         Đơn vào tab này khi kho chọn đơn rồi bấm <strong>Chuyển Chờ hàng</strong>, hoặc sale để{' '}
         <strong>Chờ hàng</strong> trên Pancake. Đơn rời tab khi <strong>Gửi sang ĐVVC</strong>, kho
-        bấm <strong>Đưa lại Đã xác nhận</strong>, hoặc sale xác nhận lại trên Pancake. Hàng về đủ
-        không tự chuyển — kho tự quyết.{' '}
+        bấm <strong>Chuyển sang Đã xác nhận</strong>, hoặc sale xác nhận lại trên Pancake. Hàng về
+        đủ không tự chuyển — kho tự quyết.{' '}
         <Link href="/wms/waiting-stock" className="font-semibold text-primary hover:underline">
           Xem tổng hàng thiếu
         </Link>
@@ -1405,7 +1405,7 @@ function OrderBulkBar({ rows, onClear }: { rows: SalesOrderListItem[]; onClear: 
       { orderIds: rows.map((r) => r.id), waiting: on },
       {
         onSuccess: (r) => {
-          const verb = on ? 'chuyển Chờ hàng' : 'đưa lại Đã xác nhận';
+          const verb = on ? 'chuyển Chờ hàng' : 'chuyển sang Đã xác nhận';
           if (r.updated.length > 0) toast.success(`Đã ${verb} ${r.updated.length} đơn`);
           if (r.failed.length > 0) {
             toast.error(
@@ -1509,7 +1509,7 @@ function OrderBulkBar({ rows, onClear }: { rows: SalesOrderListItem[]; onClear: 
               ) : null}
               {canUpdate ? (
                 <DropdownMenuItem onSelect={() => setWaiting(false)}>
-                  Đưa lại Đã xác nhận
+                  Chuyển sang Đã xác nhận
                 </DropdownMenuItem>
               ) : null}
               {canReprint ? (

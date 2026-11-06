@@ -685,7 +685,7 @@ export type SetOrdersWaitingStockResult = components['schemas']['SetOrdersWaitin
 
 /**
  * POST /sales-orders/waiting-stock (2026-10-31) — kho chuyển đơn Đã xác nhận sang Chờ hàng
- * (`waiting: true`) hoặc đưa lại Đã xác nhận. Đơn không chuyển được về trong `failed`.
+ * (`waiting: true`) hoặc chuyển sang Đã xác nhận. Đơn không chuyển được về trong `failed`.
  */
 export function useSetOrdersWaitingStock() {
   const qc = useQueryClient();

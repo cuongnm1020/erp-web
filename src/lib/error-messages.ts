@@ -238,7 +238,7 @@ const MESSAGES: Record<string, string> = {
   ORDER_NOT_CONFIRMED:
     'Đơn chưa xác nhận (Đơn mới / Chờ duyệt) — bấm "Xác nhận đơn" trước rồi gửi sang ĐVVC.',
   ORDER_WAITING_STOCK_INVALID:
-    'Chỉ đơn Đã xác nhận (chưa gửi hãng, kho chưa lấy hàng) mới chuyển Chờ hàng; chỉ đơn đang Chờ hàng mới đưa lại được.',
+    'Chỉ đơn Đã xác nhận (chưa gửi hãng, kho chưa lấy hàng) mới chuyển Chờ hàng; chỉ đơn đang Chờ hàng mới chuyển sang Đã xác nhận được.',
   // 2026-11-05 (user chốt): "Đóng gói + in vận đơn" không còn đóng gói thiếu.
   ORDER_PACK_SHORTAGE:
     'Đơn còn thiếu hàng — không đóng gói thiếu. Nhập đủ hàng vào kho rồi thử lại, hoặc sửa đơn bỏ dòng thiếu.',
