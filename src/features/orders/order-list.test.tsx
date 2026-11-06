@@ -124,8 +124,10 @@ describe('OrderListScreen — GET /sales-orders (P1-12)', () => {
       name: new RegExp(`^Thành công\\s*${n('DELIVERED')}$`),
     });
     expect(chip).toHaveAttribute('aria-selected', 'true');
-    // 2026-11-05: chip "Tất cả" luôn đứng đầu (14 trạng thái + Tất cả), chưa chọn khi xem một trạng thái.
-    expect(screen.getAllByRole('tab')).toHaveLength(15);
+    // 2026-11-05: chip "Tất cả" luôn đứng đầu, chưa chọn khi xem một trạng thái. 2026-11-07: bỏ
+    // chip Chờ duyệt → 13 trạng thái + Tất cả.
+    expect(screen.getAllByRole('tab')).toHaveLength(14);
+    expect(screen.queryByRole('tab', { name: /^Chờ duyệt/ })).not.toBeInTheDocument();
     expect(screen.getAllByRole('tab')[0]).toHaveTextContent(/^Tất cả/);
     expect(screen.getAllByRole('tab', { selected: true })).toHaveLength(1);
     expect(screen.queryByRole('group', { name: 'Vận chuyển' })).not.toBeInTheDocument();
@@ -186,7 +188,7 @@ describe('OrderListScreen — GET /sales-orders (P1-12)', () => {
       expect(selected).toHaveLength(1);
       expect(selected[0]).toHaveTextContent(/^Tất cả/);
       expect(screen.getAllByRole('tab')[0]).toBe(selected[0]);
-      expect(screen.getAllByRole('tab')).toHaveLength(15);
+      expect(screen.getAllByRole('tab')).toHaveLength(14);
       replace.mockClear();
       fireEvent.click(screen.getByRole('button', { name: 'Quay lại Đang vận chuyển' }));
       await waitFor(() => expect(replace).toHaveBeenCalled());

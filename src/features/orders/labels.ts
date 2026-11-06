@@ -321,7 +321,9 @@ export const ORDER_FLOW_GROUPS: ReadonlyArray<{
     group: 'wait',
     label: 'Chờ xử lý',
     family: 'wait',
-    flows: ['NEW', 'PENDING_APPROVAL', 'WAITING_STOCK'],
+    // Bỏ tab Chờ duyệt (2026-11-07, user chốt) trên Đơn hàng + In đơn — đơn Chờ duyệt vẫn xem được
+    // qua "Tất cả" / tìm kiếm và ô lọc trạng thái.
+    flows: ['NEW', 'WAITING_STOCK'],
     done: [],
   },
   {
