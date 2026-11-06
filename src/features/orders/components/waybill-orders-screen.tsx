@@ -237,6 +237,7 @@ export function WaybillOrdersScreen() {
         <FilterBar<FilterKey>
           q={state.q}
           onQChange={(q) => set({ q })}
+          busy={query.isPlaceholderData}
           searchPlaceholder="Mã đơn, SĐT, tên khách, mã vận đơn"
           filters={[
             {

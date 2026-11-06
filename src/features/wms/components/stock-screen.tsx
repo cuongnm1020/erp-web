@@ -538,6 +538,7 @@ interface ListQuery<T> {
   data: { items: T[]; total: number } | undefined;
   error: unknown;
   isPending: boolean;
+  isPlaceholderData?: boolean;
   refetch: () => unknown;
 }
 
@@ -984,6 +985,7 @@ export function StockScreen() {
       <FilterBar<StockFilter>
         q={state.q}
         onQChange={(q) => set({ q })}
+        busy={(tab === 'sku' ? bySku : tab === 'location' ? byLocation : byLot).isPlaceholderData}
         // KHÔNG đưa `tab` vào values: tab là chế độ xem, "Xóa lọc" không được reset nó
         values={{
           skuId: state.filters.skuId,

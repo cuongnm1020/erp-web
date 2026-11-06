@@ -328,6 +328,7 @@ export function CustomerListScreen() {
       <FilterBar<CustomerFilter>
         q={state.q}
         onQChange={(q) => set({ q })}
+        busy={query.isPlaceholderData}
         values={state.filters}
         onFilterChange={setFilters}
         searchPlaceholder="Tìm theo tên, mã KH, SĐT…"

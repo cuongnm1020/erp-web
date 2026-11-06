@@ -22,6 +22,7 @@ import {
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { UserAvatar } from '@/components/data/user-avatar';
 import { CommandPalette } from './command-palette';
+import { RouteProgress } from './route-progress';
 import { Sidebar } from './sidebar';
 import { WarehouseSwitcher } from './warehouse-switcher';
 
@@ -98,6 +99,7 @@ export function AppShell({
             </div>
           ) : null}
           <header className="sticky top-0 z-40 flex h-12 shrink-0 items-center gap-2.5 border-b bg-card px-4">
+            <RouteProgress />
             <Button
               variant="ghost"
               size="icon"

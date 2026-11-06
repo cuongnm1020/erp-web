@@ -2,6 +2,7 @@ import { Slot, Slottable } from '@radix-ui/react-slot';
 import { cva, type VariantProps } from 'class-variance-authority';
 import * as React from 'react';
 import { cn } from '@/lib/cn';
+import { Spinner } from './spinner';
 
 /**
  * Nút theo design system "Thiên Nông ERP" (2026-10-20): md 32px (mặc định) / sm 28px, bo 4px,
@@ -18,7 +19,7 @@ import { cn } from '@/lib/cn';
  */
 const buttonVariants = cva(
   // Đổi màu hover / nhấn tức thì (duration-color 0ms) — không transition-colors.
-  'inline-flex items-center justify-center gap-1.5 whitespace-nowrap rounded-md text-sm font-semibold disabled:pointer-events-none disabled:opacity-45 aria-busy:pointer-events-none aria-busy:opacity-75 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0',
+  'inline-flex items-center justify-center gap-1.5 whitespace-nowrap rounded-md text-sm font-semibold disabled:pointer-events-none disabled:opacity-45 aria-busy:pointer-events-none aria-busy:opacity-75 aria-busy:[&>svg]:hidden [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0',
   {
     variants: {
       variant: {
@@ -51,8 +52,8 @@ export interface ButtonProps
   extends React.ButtonHTMLAttributes<HTMLButtonElement>, VariantProps<typeof buttonVariants> {
   asChild?: boolean;
   /**
-   * Đang gửi: nhãn đổi sang `loadingText` ("Đang lưu…"), mờ 75%, khóa bấm — không spinner.
-   * Thiếu `loadingText` thì giữ nhãn cũ.
+   * Đang gửi: vòng xoay thay icon bên trái (mockup trạng thái tải 2026-11-06), nhãn đổi sang
+   * `loadingText` ("Đang lưu…"), mờ 75%, khóa bấm. Thiếu `loadingText` thì giữ nhãn cũ.
    */
   loading?: boolean;
   loadingText?: React.ReactNode;
@@ -131,6 +132,7 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
         aria-busy={loading || undefined}
         {...props}
       >
+        {loading ? <Spinner className="size-3.5" /> : null}
         {loading && loadingText ? loadingText : children}
         {extras}
       </button>
