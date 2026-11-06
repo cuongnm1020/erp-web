@@ -139,6 +139,16 @@ export function SendToCarrierDialog({
   const [packWhenReady, setPackWhenReady] = useState(false);
   const [waitTimedOut, setWaitTimedOut] = useState(false);
   /**
+   * Đang xin mã vận đơn (2026-11-07, user chốt): khóa "Để kho lấy hàng" + "Đóng gói + in" tới khi
+   * mọi đơn có mã / bị hãng từ chối, hoặc quá {@link WAIT_WAYBILL_MS} (hãng chậm — mở lại nút).
+   */
+  const waitingCodes = !allResolved && !waitTimedOut;
+  useEffect(() => {
+    if (allResolved || waitTimedOut) return;
+    const timer = setTimeout(() => setWaitTimedOut(true), WAIT_WAYBILL_MS);
+    return () => clearTimeout(timer);
+  }, [allResolved, waitTimedOut]);
+  /**
    * Tài khoản của hãng (FE-CARRIER-ACC-1): chỉ hỏi khi hãng có từ 2 tài khoản đủ cấu hình (tài
    * khoản chưa cấu hình ẩn, 2026-10-22); chọn sẵn tài khoản chọn từ menu, không có thì mặc định
    * (chưa đủ cấu hình thì tài khoản đủ cấu hình đầu tiên).
@@ -380,7 +390,9 @@ export function SendToCarrierDialog({
                       ),
                       busyLabel:
                         fp.busyLabel ??
-                        (packWhenReady ? `Chờ mã vận đơn ${issuing.done}/${issuing.total}…` : null),
+                        (packWhenReady || waitingCodes
+                          ? `Đang xin mã vận đơn ${issuing.done}/${issuing.total}…`
+                          : null),
                       progress: fp.progressBar,
                       onPack: () => void packAndPrint(),
                     }

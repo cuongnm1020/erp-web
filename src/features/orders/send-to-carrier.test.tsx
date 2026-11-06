@@ -568,10 +568,16 @@ describe('Gửi sang ĐVVC — SendToCarrierMenu + SendToCarrierDialog', () => {
       name: 'Tiến độ xin mã vận đơn',
     });
     expect(bar).toHaveAttribute('aria-valuenow', '0');
+    // Mã chưa về (2026-11-07): khóa cả "Để kho lấy hàng" lẫn "Đóng gói + in".
+    expect(within(dialog).getByRole('button', { name: 'Để kho lấy hàng' })).toBeDisabled();
+    expect(within(dialog).getByRole('button', { name: /Đang xin mã vận đơn 0\/2/ })).toBeDisabled();
     // Hỏi lại sau 2 s → một đơn có mã, một đơn hãng từ chối.
     await waitFor(() => expect(within(panel).getByText('Có mã S9.A1.777')).toBeInTheDocument(), {
       timeout: 5000,
     });
+    // Mọi đơn đã có mã / bị từ chối → mở lại hai nút.
+    expect(within(dialog).getByRole('button', { name: 'Để kho lấy hàng' })).toBeEnabled();
+    expect(within(dialog).getByRole('button', { name: /Đóng gói \+ in/ })).toBeEnabled();
     fireEvent.click(within(panel).getByRole('button', { name: 'Cần sửa 1' }));
     const fix = within(panel).getByRole('list', { name: 'Danh sách đơn lỗi' });
     expect(fix).toHaveTextContent(rows[1]!.docNumber);
