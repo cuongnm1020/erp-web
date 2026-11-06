@@ -16,6 +16,7 @@ import {
 import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { ConfirmDialog } from '@/components/data/confirm-dialog';
+import { UomText } from '@/components/data/uom-text';
 import { MoneyInput, QuantityInput } from '@/components/data/form';
 import { DetailSkeleton, QueryState } from '@/components/data/states';
 import { StatusBadge } from '@/components/data/status-badge';
@@ -464,7 +465,7 @@ function DetailBody({
                       <div className="font-mono text-xs text-muted-foreground">{l.skuCode}</div>
                     </TableCell>
                     <TableCell className="px-2.5 py-1.5 text-muted-foreground">
-                      {l.baseUomCode}
+                      <UomText code={l.baseUomCode} />
                     </TableCell>
                     <TableCell className="px-2.5 py-1.5 text-right tabular-nums">
                       {qty.editing && !l.packaging ? (
@@ -515,7 +516,7 @@ function DetailBody({
                                   onChange={(v) => cost.setDraft(l.id, v)}
                                 />
                                 <span className="text-xs text-muted-foreground">
-                                  / {l.uomCode ?? l.baseUomCode}
+                                  / <UomText code={l.uomCode ?? l.baseUomCode} />
                                 </span>
                               </div>
                               {err ? <span className="text-xs text-destructive">{err}</span> : null}
@@ -525,7 +526,7 @@ function DetailBody({
                               {formatMoney(l.unitCost)}
                               {l.uomCode ? (
                                 <div className="text-xs text-muted-foreground">
-                                  {formatMoney(enteredCostOf(l))} / {l.uomCode}
+                                  {formatMoney(enteredCostOf(l))} / <UomText code={l.uomCode} />
                                 </div>
                               ) : null}
                             </>

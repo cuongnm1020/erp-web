@@ -3,6 +3,7 @@
 import Decimal from 'decimal.js';
 import { Loader2, Search } from 'lucide-react';
 import { forwardRef, useEffect, useId, useMemo, useState } from 'react';
+import { UomText } from '@/components/data/uom-text';
 import { Checkbox } from '@/components/ui/checkbox';
 import { cn } from '@/lib/cn';
 import { formatQuantity } from '@/lib/format';
@@ -203,7 +204,7 @@ export const ProductSearch = forwardRef<
                     <span className="min-w-0 flex-1">
                       <span className="block truncate font-medium">{r.name}</span>
                       <span className="block truncate text-xs text-muted-foreground">
-                        {r.code} · {r.baseUomCode}
+                        {r.code} · <UomText code={r.baseUomCode} />
                         {r.isCombo ? ' · Combo' : ''}
                       </span>
                     </span>

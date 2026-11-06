@@ -3,6 +3,7 @@
 import Decimal from 'decimal.js';
 import { ChevronDown, Printer, QrCode, ScanBarcode } from 'lucide-react';
 import Link from 'next/link';
+import { UomText } from '@/components/data/uom-text';
 import { Fragment, useState } from 'react';
 import { Barcode } from '@/components/data/barcode';
 import { PrintSheet } from '@/components/data/print-sheet';
@@ -659,7 +660,7 @@ function LevelLabel({ level }: { level: BarcodeLevel }) {
     <div className="flex flex-col text-sm">
       <span className="font-semibold">{level.label}</span>
       <span className="text-xs text-muted-foreground">
-        {level.uomCode ?? 'ĐVT cơ sở'} {level.hint}
+        {level.uomCode ? <UomText code={level.uomCode} /> : 'ĐVT cơ sở'} {level.hint}
       </span>
     </div>
   );
@@ -799,10 +800,13 @@ function UnitRows({
       </TableRow>
       {sku.uomConversions.map((c) => (
         <TableRow key={c.id}>
-          <TableCell className="px-2.5 py-1.5 font-semibold">{c.uom.code}</TableCell>
+          <TableCell className="px-2.5 py-1.5 font-semibold">
+            <UomText code={c.uom.code} />
+          </TableCell>
           <TableCell className={NUM_CELL}>{formatQuantity(c.factor)}</TableCell>
           <TableCell className="px-2.5 py-1.5">
-            1 {c.uom.code} = {formatQuantity(c.factor)} {sku.baseUom.code}
+            1 <UomText code={c.uom.code} /> = {formatQuantity(c.factor)}{' '}
+            <UomText code={sku.baseUom.code} />
           </TableCell>
           <TableCell className="px-2.5 py-1.5 font-mono text-xs">
             {barcodeFor(sku, c.uomId) ?? noBarcode}

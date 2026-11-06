@@ -2,6 +2,7 @@
 
 import { CopyPlus, Plus } from 'lucide-react';
 import Link from 'next/link';
+import { UomText } from '@/components/data/uom-text';
 import { useMemo } from 'react';
 import { DataTable, FilterBar, type ColumnDef, type FilterDef } from '@/components/data/data-table';
 import {
@@ -85,7 +86,7 @@ const columns: ColumnDef<ComboListItem, unknown>[] = [
         )}
         title="min(khả dụng thành phần ÷ định mức) — tồn nằm ở thành phần"
       >
-        {formatQuantity(row.original.available)} {row.original.baseUomCode}
+        {formatQuantity(row.original.available)} <UomText code={row.original.baseUomCode} />
       </span>
     ),
   },

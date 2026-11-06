@@ -19,6 +19,8 @@ const ME = {
   ...ME_ADMIN,
   managesDepartments: false,
   managesCareTeam: false,
+  warehouseOnly: false,
+  salesOnly: false,
   warehouseIds: null,
   warehouses: [
     { id: 'wh-tt', code: 'KHO-TT-01', name: 'Kho Thạch Thất' },

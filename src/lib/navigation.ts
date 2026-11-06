@@ -82,6 +82,11 @@ export interface NavItem {
   hidden?: boolean;
   /** Nhãn nhóm con trong module (Kho: Vận hành / Chứng từ / Danh mục kho / Màn PDA). */
   section?: string;
+  /**
+   * Điều kiện THÊM chỉ để hiện trên menu (sidebar + command palette) — KHÔNG gate URL. Dùng khi
+   * người có quyền mở trang vẫn không nên thấy mục trên menu (Bán hàng với nhân viên kho).
+   */
+  menuAbility?: NavAbility;
 }
 
 /** Màu module ở menu trái (token --mod-*) — chỉ cho điều hướng, không mang nghĩa trạng thái. */
@@ -115,6 +120,8 @@ export const NAV_MODULES: NavModule[] = [
     icon: ShoppingCart,
     tone: 'sales',
     ability: { action: 'read', subject: 'SalesOrder' },
+    // Ẩn với nhân viên kho (user 2026-11-05) — kho làm đơn ở Kho › Vận hành › Đơn hàng.
+    menuAbility: { action: 'view', subject: 'SalesMenu' },
     shortcut: 'g d',
     children: [
       {
@@ -281,26 +288,20 @@ export const NAV_MODULES: NavModule[] = [
     shortcut: 'g w',
     // Chia 4 nhóm con theo `section` (redesign 2026-10-17) — thứ tự mảng = thứ tự hiển thị.
     children: [
+      // Vận hành theo thứ tự Đơn hàng → Vận đơn → In đơn → Đơn lỗi (user 2026-11-05), sau đó các
+      // màn điều phối. Tồn kho xuống Danh mục kho, Trạm đóng gói xuống Màn PDA (user 2026-11-05).
       {
-        label: 'Tồn kho',
-        href: '/wms/stock',
-        icon: Boxes,
+        // In đơn (2026-11-04): clone màn Đơn hàng để tuỳ biến cho kho in đơn. Menu theo quyền kho
+        // như "Theo dõi đơn" (shipment.read) — sale chỉ có sales_order.read không thấy module Kho.
+        // Dữ liệu vẫn GET /sales-orders, API scope theo người xem. Menu đổi tên "Đẩy đơn"
+        // (user 2026-11-05), rồi "Đơn hàng" (user 2026-11-05 tối).
+        label: 'Đơn hàng',
+        href: '/wms/print-orders',
+        icon: ClipboardList, // máy in nhường cho "In đơn" (user 2026-11-06)
         section: 'Vận hành',
-        ability: { action: 'read', subject: 'Stock' },
-      },
-      {
-        label: 'Điều phối task',
-        href: '/wms/dispatch',
-        icon: Columns3,
-        section: 'Vận hành',
-        ability: { action: 'read_all', subject: 'Task' },
-      },
-      {
-        label: 'Trạm đóng gói',
-        href: '/wms/pack',
-        icon: PackageCheck,
-        section: 'Vận hành',
-        ability: { action: 'execute', subject: 'Task' },
+        ability: { action: 'read', subject: 'Shipment' },
+        // Ẩn với sale + CSKH (user 2026-11-06) — họ dùng Bán hàng › Đơn hàng.
+        menuAbility: { action: 'view', subject: 'WarehouseOpsMenu' },
       },
       {
         // Đổi tên menu "Theo dõi giao hàng" → "Vận đơn" (user 2026-11-05).
@@ -309,6 +310,7 @@ export const NAV_MODULES: NavModule[] = [
         icon: Truck,
         section: 'Vận hành',
         ability: { action: 'read', subject: 'Shipment' },
+        menuAbility: { action: 'view', subject: 'WarehouseOpsMenu' },
       },
       {
         // Đơn đã gán vận chuyển (2026-11-03): đơn đã Gửi sang ĐVVC — lọc ngày gán / POS / phòng ban /
@@ -316,19 +318,10 @@ export const NAV_MODULES: NavModule[] = [
         // menu đổi tiếp thành "In đơn" (user 2026-11-05).
         label: 'In đơn',
         href: '/wms/waybills',
-        icon: Truck,
+        icon: Printer, // icon máy in (user 2026-11-06) — trước trùng icon xe tải với Vận đơn
         section: 'Vận hành',
         ability: { action: 'read', subject: 'Shipment' },
-      },
-      {
-        // In đơn (2026-11-04): clone màn Đơn hàng để tuỳ biến cho kho in đơn. Menu theo quyền kho
-        // như "Theo dõi đơn" (shipment.read) — sale chỉ có sales_order.read không thấy module Kho.
-        // Dữ liệu vẫn GET /sales-orders, API scope theo người xem. Menu đổi tên "Đẩy đơn" (user 2026-11-05).
-        label: 'Đẩy đơn',
-        href: '/wms/print-orders',
-        icon: Printer,
-        section: 'Vận hành',
-        ability: { action: 'read', subject: 'Shipment' },
+        menuAbility: { action: 'view', subject: 'WarehouseOpsMenu' },
       },
       {
         // Đơn lỗi (trước "Xử lý đơn lỗi" ở Quản trị) — chuyển sang Kho › Vận hành + đổi tên
@@ -340,6 +333,13 @@ export const NAV_MODULES: NavModule[] = [
         icon: TriangleAlert,
         section: 'Vận hành',
         ability: { action: 'issues', subject: 'SalesOrder' },
+      },
+      {
+        label: 'Điều phối', // bỏ chữ "task" (user 2026-11-06)
+        href: '/wms/dispatch',
+        icon: Columns3,
+        section: 'Vận hành',
+        ability: { action: 'read_all', subject: 'Task' },
       },
       {
         // Chờ hàng (2026-10-25): SKU thiếu cho đơn chờ hàng / tổng đơn chờ. API cần sales_order.read
@@ -411,6 +411,13 @@ export const NAV_MODULES: NavModule[] = [
       //   ability: { action: 'read', subject: 'Stock' },
       // },
       {
+        label: 'Tồn kho',
+        href: '/wms/stock',
+        icon: Boxes,
+        section: 'Danh mục kho',
+        ability: { action: 'read', subject: 'Stock' },
+      },
+      {
         label: 'Kho & vị trí',
         href: '/wms/warehouses',
         icon: MapPin,
@@ -435,6 +442,13 @@ export const NAV_MODULES: NavModule[] = [
         label: 'Lấy hàng (PDA)',
         href: '/pda/pick',
         icon: ScanBarcode,
+        section: 'Màn PDA',
+        ability: { action: 'execute', subject: 'Task' },
+      },
+      {
+        label: 'Trạm đóng gói',
+        href: '/wms/pack',
+        icon: PackageCheck,
         section: 'Màn PDA',
         ability: { action: 'execute', subject: 'Task' },
       },
@@ -696,16 +710,18 @@ export interface CanFn {
 }
 
 export function visibleModules(can: CanFn): NavModule[] {
+  const allowed = (a?: NavAbility) => !a || can(a.action, a.subject);
   return NAV_MODULES.filter((m) => !m.hidden)
     .map((m) => ({
       ...m,
       children: m.children?.filter(
-        (c) => !c.hidden && (!c.ability || can(c.ability.action, c.ability.subject)),
+        (c) => !c.hidden && allowed(c.ability) && allowed(c.menuAbility),
       ),
     }))
     .filter(
       (m) =>
-        (!m.ability || can(m.ability.action, m.ability.subject)) &&
+        allowed(m.ability) &&
+        allowed(m.menuAbility) &&
         // Module có children mà bị ẩn hết → ẩn luôn module (href của nó cũng cần quyền)
         (!m.children || m.children.length > 0),
     );
@@ -771,7 +787,7 @@ export const SEGMENT_LABELS: Record<string, string> = {
   warehouses: 'Kho & vị trí',
   grn: 'Phiếu nhập kho',
   gdn: 'Phiếu xuất kho',
-  dispatch: 'Điều phối task',
+  dispatch: 'Điều phối',
   pack: 'Trạm đóng gói',
   productivity: 'Năng suất kho',
   shipping: 'Vận đơn',

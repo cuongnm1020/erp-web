@@ -210,6 +210,35 @@ describe('Gửi sang ĐVVC — SendToCarrierMenu + SendToCarrierDialog', () => {
     // Dựng cả màn danh sách đơn + nhiều thao tác: local ~1,3 s, runner CI chậm ~6× vượt 5 s mặc định.
   }, 15_000);
 
+  it('NV đóng hàng (2026-11-06): đơn cùng kho → chọn người đóng gói của kho, POST kèm packerId', async () => {
+    search = ALL;
+    const bodies: Record<string, unknown>[] = [];
+    const rows = makeOrders(2).map((o) => ({ ...o, warehouseId: 'wh-1' }));
+    server.use(
+      http.get('/api/sales-orders', () => HttpResponse.json({ items: rows, total: rows.length })),
+      http.get('/api/pda/packers', ({ request }) => {
+        expect(new URL(request.url).searchParams.get('warehouseId')).toBe('wh-1');
+        return HttpResponse.json([{ id: 'u-pk1', code: 'pk1', fullName: 'Lê Đóng Gói' }]);
+      }),
+      http.post('/api/sales-orders/send-to-carrier', async ({ request }) => {
+        const body = (await request.json()) as Record<string, unknown>;
+        bodies.push(body);
+        return HttpResponse.json({ sent: [], failed: [] }, { status: 201 });
+      }),
+    );
+    renderApp(<OrderListScreen />);
+    await screen.findByText(rows[0]!.docNumber);
+    fireEvent.click(screen.getAllByRole('checkbox', { name: 'Chọn dòng' })[0]!);
+    const dialog = await openFor('GHTK');
+    const packer = within(dialog).getByRole('combobox', { name: 'NV đóng hàng' });
+    await waitFor(() => expect(packer).toBeEnabled());
+    fireEvent.click(packer);
+    fireEvent.click(await screen.findByRole('option', { name: 'Lê Đóng Gói' }));
+    fireEvent.click(within(dialog).getByRole('button', { name: /^Cập nhật/ }));
+    await waitFor(() => expect(bodies).toHaveLength(1));
+    expect(bodies[0]).toMatchObject({ orderIds: [rows[0]!.id], packerId: 'u-pk1' });
+  }, 15_000);
+
   it('VTP: không có ô đường bay / ca lấy; chọn dịch vụ VTK; gõ số đơn + Enter thêm đơn ngoài lựa chọn; kết quả gộp ISSUED/SAVED vào toast', async () => {
     search = ALL;
     toastSuccess.mockClear();

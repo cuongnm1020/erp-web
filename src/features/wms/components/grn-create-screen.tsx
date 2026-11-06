@@ -19,6 +19,7 @@ import {
   MoneyInput,
 } from '@/components/data/form';
 import { ScanInput } from '@/components/data/scan-input';
+import { useUomName } from '@/lib/uom';
 import { EmptyState, FormSkeleton, QueryState } from '@/components/data/states';
 import { PageHeader } from '@/components/layout/page-header';
 import { Button } from '@/components/ui/button';
@@ -289,6 +290,7 @@ function GrnCreateForm({ copyOf }: { copyOf?: ReceiptDetail }) {
   // Mã quét chưa gán cho SKU nào → hộp thoại gán ngay (2026-10-13).
   const [unknownCode, setUnknownCode] = useState<string | null>(null);
   const typeCodeById = new Map((containerTypes.data ?? []).map((t) => [t.id, t.code]));
+  const uomName = useUomName();
 
   /**
    * Quét mã dán sẵn trên sản phẩm / thùng / pallet: cùng SKU + ĐVT đã có dòng → +1; dòng cuối
@@ -319,7 +321,7 @@ function GrnCreateForm({ copyOf }: { copyOf?: ReceiptDetail }) {
       const next = (QTY_RE.test(cur) ? new Decimal(cur) : new Decimal(0)).plus(step);
       form.setValue(`lines.${same}.qty`, next.toString(), { shouldValidate: true });
       toast.success(
-        `${lookup.sku.name}: ${formatQuantity(next.toString())} ${uom || lookup.baseUom.code}`,
+        `${lookup.sku.name}: ${formatQuantity(next.toString())} ${uomName(uom || lookup.baseUom.code)}`,
       );
       return;
     }
@@ -338,7 +340,7 @@ function GrnCreateForm({ copyOf }: { copyOf?: ReceiptDetail }) {
     if (last >= 0 && lines[last]!.skuId === '') form.setValue(`lines.${last}`, line);
     else append(line);
     idemKey.current = null;
-    toast.success(`Đã thêm ${lookup.sku.name} (${uom || lookup.baseUom.code})`);
+    toast.success(`Đã thêm ${lookup.sku.name} (${uomName(uom || lookup.baseUom.code)})`);
   };
 
   const submit = (thenPost: boolean) =>
@@ -734,7 +736,9 @@ function QtyUnitCell({
   const uom = useWatch({ control: form.control, name: `lines.${i}.uom` });
   const qty = useWatch({ control: form.control, name: `lines.${i}.qty` });
   const factor = useWatch({ control: form.control, name: `lines.${i}.factor` });
-  const baseUom = useWatch({ control: form.control, name: `lines.${i}.baseUomCode` });
+  const baseUomCode = useWatch({ control: form.control, name: `lines.${i}.baseUomCode` });
+  const uomName = useUomName();
+  const baseUom = uomName(baseUomCode);
   const conversions = useSkuConversions(skuId);
   const typeById = new Map(containerTypes.map((t) => [t.id, t]));
   // Chỉ thùng / pallet đã khai quy cách ở sản phẩm (quy đổi là cấp đóng gói) — ĐVT phụ khác bỏ.
@@ -794,7 +798,7 @@ function QtyUnitCell({
             <SelectItem value={BASE}>{baseUom || 'Đơn vị bán chính'}</SelectItem>
             {options.map((c) => (
               <SelectItem key={c.id} value={c.uom.code}>
-                {`${(c.containerTypeId && typeById.get(c.containerTypeId)?.name) || c.uom.code} (${formatQuantity(c.factor)} ${baseUom})`}
+                {`${(c.containerTypeId && typeById.get(c.containerTypeId)?.name) || uomName(c.uom.code)} (${formatQuantity(c.factor)} ${baseUom})`}
               </SelectItem>
             ))}
           </SelectContent>

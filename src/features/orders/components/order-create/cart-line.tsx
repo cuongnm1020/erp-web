@@ -13,6 +13,7 @@ import {
   MoneyInput,
 } from '@/components/data/form';
 import { StatusBadge } from '@/components/data/status-badge';
+import { useUomName } from '@/lib/uom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
@@ -168,6 +169,8 @@ export function CartLine({
       ? sku.data.baseUom.code
       : (sku.data.uomConversions.find((c) => c.uomId === uomId)?.uom.code ?? null)
     : null;
+  // Tên ĐVT ("Thùng") thay mã ("BOX") khi hiển thị (2026-11-06).
+  const uomName = useUomName();
   const priceRatio = isGift ? null : suspiciousPriceRatio(unitPrice, listPrice);
   const amountFix =
     wholeUnitPrice && !isGift && !combo && lineTotal !== null && qtyBase
@@ -244,10 +247,13 @@ export function CartLine({
                   <SelectContent>
                     {sku.data ? (
                       <>
-                        <SelectItem value={sku.data.baseUomId}>{sku.data.baseUom.code}</SelectItem>
+                        <SelectItem value={sku.data.baseUomId}>
+                          {uomName(sku.data.baseUom.code)}
+                        </SelectItem>
                         {sku.data.uomConversions.map((c) => (
                           <SelectItem key={c.uomId} value={c.uomId}>
-                            {c.uom.code} (= {formatQuantity(c.factor)} {sku.data!.baseUom.code})
+                            {uomName(c.uom.code)} (= {formatQuantity(c.factor)}{' '}
+                            {uomName(sku.data!.baseUom.code)})
                           </SelectItem>
                         ))}
                       </>
@@ -269,7 +275,7 @@ export function CartLine({
             <span className="font-semibold text-destructive">Kho xuất chưa có hàng</span>
           ) : stock.data ? (
             <span className={low ? 'font-semibold text-destructive' : undefined}>
-              Khả dụng {formatQuantity(stock.data.available)} {stock.data.baseUomCode}
+              Khả dụng {formatQuantity(stock.data.available)} {uomName(stock.data.baseUomCode)}
               {low ? ' — thiếu hàng' : ''}
             </span>
           ) : sku.data && !stock.isPending ? (
@@ -352,7 +358,7 @@ export function CartLine({
               <p role="alert" className="text-right text-xs font-semibold text-warning">
                 Chỉ bằng {priceRatio.mul(100).toDecimalPlaces(1).toString()}% giá niêm yết{' '}
                 {formatMoney(listPrice, { unit: '' })}
-                {uomCode ? `/${uomCode}` : ''} — kiểm tra lại đơn vị tính
+                {uomCode ? `/${uomName(uomCode)}` : ''} — kiểm tra lại đơn vị tính
               </p>
             ) : !isGift && manualPrice !== '' && listPrice !== null ? (
               <p className="text-right text-xs text-muted-foreground">

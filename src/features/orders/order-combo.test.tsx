@@ -66,7 +66,7 @@ describe('groupOrderLines / collapseComboLines', () => {
 });
 
 describe('OrderDetailScreen — đơn có combo', () => {
-  it('hiện một dòng tổng combo (giá combo × số combo) + dòng thành phần thụt vào', async () => {
+  it('hiện một dòng tổng combo (giá combo × số combo), KHÔNG hiện dòng thành phần (2026-11-06)', async () => {
     search = '';
     server.use(
       http.get('/api/sales-orders/:id', ({ params }) =>
@@ -79,9 +79,8 @@ describe('OrderDetailScreen — đơn có combo', () => {
     expect(within(comboRow).getByText('Combo A + B')).toBeInTheDocument();
     expect(within(comboRow).getByText('Combo')).toBeInTheDocument();
     expect(within(comboRow).getByText('450.000')).toBeInTheDocument();
-    const components = screen.getAllByTestId('combo-component-row');
-    expect(components).toHaveLength(2);
-    expect(within(components[0]!).getByText(/2 \/ combo/)).toBeInTheDocument();
+    expect(screen.queryAllByTestId('combo-component-row')).toHaveLength(0);
+    expect(screen.queryByText(/\/ combo/)).not.toBeInTheDocument();
     // Dòng thường không có nhãn combo
     expect(screen.getByText('Sản phẩm C')).toBeInTheDocument();
   });

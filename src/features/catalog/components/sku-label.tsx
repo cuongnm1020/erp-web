@@ -2,6 +2,7 @@
 
 import type { CSSProperties } from 'react';
 import { Barcode } from '@/components/data/barcode';
+import { UomText } from '@/components/data/uom-text';
 import { cn } from '@/lib/cn';
 import { formatMoney } from '@/lib/format';
 import { LABEL_SIZES, type ApiBarcodeType } from '@/lib/print';
@@ -71,10 +72,12 @@ export function SkuLabel({
         {options.showSku ? <span className="font-mono">{data.skuCode}</span> : <span />}
         {options.showPrice && data.price ? (
           <span className="font-semibold">
-            {formatMoney(data.price, { unit: '' })} / {data.uomCode}
+            {formatMoney(data.price, { unit: '' })} / <UomText code={data.uomCode} />
           </span>
         ) : (
-          <span>{data.uomCode}</span>
+          <span>
+            <UomText code={data.uomCode} />
+          </span>
         )}
       </div>
       <div className="flex justify-center">

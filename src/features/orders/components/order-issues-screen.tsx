@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { Eye, Pencil, RefreshCw } from 'lucide-react';
+import { Eye, Pencil, Printer, RefreshCw } from 'lucide-react';
 import { useCallback, useMemo, useState } from 'react';
 import { BulkActionBar } from '@/components/data/bulk-action-bar';
 import { CopyText } from '@/components/data/copy-text';
@@ -106,7 +106,7 @@ const ISSUE_TABS: IssueTab[] = [
     issue: 'PACK_ERROR',
     label: 'Không in được',
     level: 'warn',
-    hint: 'Lỗi "Đóng gói + in" lần trước. Lọc "Hiện tại: Đã đủ hàng" rồi Đóng gói + in lại; đơn vẫn thiếu thì Chuyển Chờ hàng.',
+    hint: 'Lỗi "Đóng gói + in" lần trước. Lọc "Hàng: Đủ hàng" rồi Đóng gói + in lại; lọc "Thiếu hàng" để Chuyển Chờ hàng.',
     count: (c) => c.packError,
     note: (c) => `${c.packErrorStockReady} đơn nay đã đủ hàng — đóng gói lại được`,
   },
@@ -122,7 +122,7 @@ const ISSUE_TABS: IssueTab[] = [
     issue: 'UNSENT',
     label: 'Chưa gửi ĐVVC',
     level: 'info',
-    hint: 'Đơn đã xác nhận nhưng chưa Gửi sang ĐVVC. Lọc "Hiện tại: Đã đủ hàng" để gửi; đơn đang thiếu hàng thì Chuyển Chờ hàng thay vì gửi.',
+    hint: 'Đơn đã xác nhận nhưng chưa Gửi sang ĐVVC. Lọc "Hàng: Đủ hàng" để gửi; lọc "Thiếu hàng" để Chuyển Chờ hàng thay vì gửi.',
     count: (c) => c.unsent,
     note: (c) =>
       `${c.unsentOld} đơn quá ${c.olderThanDays} ngày · ${c.unsentShort} đang thiếu hàng`,
@@ -157,7 +157,7 @@ const LEVEL_DOT: Record<Level, string> = {
 };
 
 /**
- * Nhóm có lọc "Hiện tại: Đã đủ hàng / Vẫn thiếu" (`stockReady`). Chưa gửi ĐVVC thêm 2026-11-03:
+ * Nhóm có lọc "Hàng: Đủ hàng / Thiếu hàng" (`stockReady`). Chưa gửi ĐVVC thêm 2026-11-03:
  * lọc đơn đủ hàng để Gửi sang ĐVVC hàng loạt, đơn thiếu để Chuyển Chờ hàng.
  */
 const STOCK_FILTER_ISSUES: ReadonlySet<OrderIssue> = new Set(['PACK_ERROR', 'UNSENT']);
@@ -224,8 +224,16 @@ export function OrderIssuesScreen() {
     set({ filters: { ...state.filters, issue: next, ready: undefined, fix: undefined } });
   };
 
+  // In lại vận đơn từ menu ⋯ của dòng (2026-11-06) — đơn đã có mã vận đơn.
+  const [reprintRows, setReprintRows] = useState<SalesOrderListItem[] | null>(null);
   const columns = useMemo(
-    () => buildColumns(issue, carrierCode, (o) => setRetryRows([o])),
+    () =>
+      buildColumns(
+        issue,
+        carrierCode,
+        (o) => setRetryRows([o]),
+        (o) => setReprintRows([o]),
+      ),
     [issue, carrierCode],
   );
 
@@ -240,12 +248,13 @@ export function OrderIssuesScreen() {
     ...(STOCK_FILTER_ISSUES.has(issue)
       ? [
           {
+            // Tồn hiện tại của kho (2026-11-06: đổi chữ cho dễ thấy — "Hàng: Đủ hàng / Thiếu hàng").
             key: 'ready' as const,
-            label: 'Hiện tại',
+            label: 'Hàng',
             type: 'select' as const,
             options: [
-              { value: 'true', label: 'Đã đủ hàng' },
-              { value: 'false', label: 'Vẫn thiếu' },
+              { value: 'true', label: 'Đủ hàng' },
+              { value: 'false', label: 'Thiếu hàng' },
             ],
           },
         ]
@@ -402,6 +411,13 @@ export function OrderIssuesScreen() {
         }}
         onDone={() => setRetryRows(null)}
       />
+      <BulkReprintWaybillDialog
+        rows={reprintRows ?? []}
+        open={reprintRows !== null}
+        onOpenChange={(o) => {
+          if (!o) setReprintRows(null);
+        }}
+      />
     </>
   );
 }
@@ -410,6 +426,7 @@ function buildColumns(
   issue: OrderIssue,
   carrierCode: (o: SalesOrderListItem) => string | null,
   onRetry: (o: SalesOrderListItem) => void,
+  onReprint: (o: SalesOrderListItem) => void,
 ): ColumnDef<SalesOrderListItem, unknown>[] {
   const doc: ColumnDef<SalesOrderListItem, unknown> = {
     id: 'doc',
@@ -488,6 +505,16 @@ function buildColumns(
                 label: 'Xin lại vận đơn',
                 icon: <RefreshCw aria-hidden />,
                 onSelect: () => onRetry(o),
+              },
+            ]
+          : []),
+        // In lại tem vận đơn (2026-11-06) — chỉ đơn đã có mã.
+        ...(o.shipment?.trackingNo
+          ? [
+              {
+                label: 'In lại vận đơn',
+                icon: <Printer aria-hidden />,
+                onSelect: () => onReprint(o),
               },
             ]
           : []),
@@ -689,6 +716,11 @@ function IssueBulkBar({
               In lại vận đơn ({rows.length})
             </Button>
           </>
+        ) : withWaybill.length > 0 ? (
+          // Tab khác (2026-11-06): đơn chọn đã có mã → in lại tem được.
+          <Button variant="outline" size="sm" onClick={() => setDialog('reprint')}>
+            In lại vận đơn ({withWaybill.length})
+          </Button>
         ) : null}
         {issue === 'WAYBILL_ERROR' ? (
           <Button size="sm" onClick={() => setDialog('retry')}>

@@ -1,5 +1,6 @@
-import { render, screen } from '@testing-library/react';
+import { screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
+import { renderApp as render } from '@/test/render';
 import { ScanCounter } from './components/scan-counter';
 
 describe('ScanCounter — khung đếm dòng đang lấy', () => {

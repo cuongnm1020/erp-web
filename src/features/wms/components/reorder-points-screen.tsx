@@ -10,6 +10,7 @@ import {
   type ExportColumn,
 } from '@/components/data/export-excel-button';
 import { EmptyState, ListSkeleton, QueryState } from '@/components/data/states';
+import { UomText } from '@/components/data/uom-text';
 import { StatusBadge, type StatusTone } from '@/components/data/status-badge';
 import { PageHeader } from '@/components/layout/page-header';
 import { Button } from '@/components/ui/button';
@@ -78,7 +79,13 @@ const columns: ColumnDef<ReplenishmentRow, unknown>[] = [
       </span>
     ),
   },
-  { id: 'baseUomCode', accessorKey: 'baseUomCode', header: 'ĐVT', meta: { width: 80 } },
+  {
+    id: 'baseUomCode',
+    accessorKey: 'baseUomCode',
+    header: 'ĐVT',
+    cell: ({ row }) => <UomText code={row.original.baseUomCode} />,
+    meta: { width: 80 },
+  },
   {
     id: 'reorderLevel',
     header: 'Mức tồn kho',

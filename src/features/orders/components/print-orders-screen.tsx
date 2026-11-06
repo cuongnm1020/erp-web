@@ -203,6 +203,8 @@ const SORT_FIELD: Record<string, OrderSortField> = {
   // Cột Sản phẩm (2026-11-04): abc tên sản phẩm, cùng tên thì ít mặt hàng trước — cùng luật xếp
   // tem in hàng loạt; server sắp trong bộ nhớ (tối đa 20.000 đơn khớp).
   product: 'items',
+  // Cột Cân nặng (2026-11-06): cân hiệu lực đặt tay ?? Σ dòng, server sắp trong bộ nhớ.
+  weight: 'weight',
 };
 
 /**
@@ -509,6 +511,14 @@ const buildColumns = (
     cell: ({ row }) => <ShippingCell order={row.original} carrierOf={carrierOf} />,
   },
   {
+    // Cột riêng, sắp theo cân hiệu lực (2026-11-06, user: "sắp xếp theo cân nặng chưa đúng" — bấm
+    // cột Vận chuyển là sắp theo lúc gửi ĐVVC, không theo cân).
+    id: 'weight',
+    header: 'Cân nặng',
+    meta: { align: 'right', width: 84, sortable: true },
+    cell: ({ row }) => <WeightNote order={row.original} />,
+  },
+  {
     id: 'total',
     header: 'Tổng tiền',
     // Chỉ tổng tiền đơn, bỏ dòng COD (mockup 2026-10-29); cột hẹp để sát cột Vận chuyển.
@@ -690,9 +700,7 @@ function ShippingCell({
           prefilled={s.trackingUrlPrefilled}
           className="max-w-48 truncate font-mono text-muted-foreground"
         />
-      ) : (
-        <WeightNote order={order} />
-      )}
+      ) : null}
       {order.waybillErrorCode ? (
         // Lỗi vận đơn (2026-10-28): lý do hãng từ chối, đủ câu ở tooltip.
         <span
@@ -796,12 +804,15 @@ function ProductFilter({
 }
 
 /**
- * Cân nặng gửi hãng hiệu lực (`weightKg` = đặt tay ?? Σ dòng × cân nặng SKU) khi chưa có mã vận
- * đơn — gom đơn theo cân để gán hãng. Đặt tay có dấu ✎ + tooltip Σ dòng; 0 = SKU chưa khai.
+ * Cân nặng gửi hãng hiệu lực (`weightKg` = đặt tay ?? Σ dòng × cân nặng SKU) — cột Cân nặng
+ * (2026-11-06, trước nằm dưới cột Vận chuyển khi chưa có mã). Đặt tay có dấu ✎ + tooltip Σ dòng;
+ * 0 = SKU chưa khai → "—".
  */
 function WeightNote({ order }: { order: SalesOrderListItem }) {
   const manual = order.shippingWeightKg !== null;
-  if ((toDecimal(order.weightKg)?.isZero() ?? true) && !manual) return null;
+  if ((toDecimal(order.weightKg)?.isZero() ?? true) && !manual) {
+    return <span className="block text-muted-foreground">—</span>;
+  }
   return (
     <span
       className="block tabular-nums text-muted-foreground"
@@ -957,12 +968,15 @@ export function PrintOrdersScreen() {
   // Chữ chip "Đang lọc" của ô Sản phẩm — cùng nguồn dữ liệu với ô chọn.
   const skuChip = useSkuDetail(skuId);
   const router = useRouter();
-  const canUpdate = ability.can('update', 'SalesOrder');
+  // Kho / admin sửa người nhận / ngày tạo đơn của mọi đơn kho mình, cả khi kho đã thao tác (2026-11-05).
+  const canEditFields =
+    ability.can('edit_receiver', 'SalesOrder') || ability.can('set_order_date', 'SalesOrder');
+  const canUpdate = ability.can('update', 'SalesOrder') || canEditFields;
   const canCreate = ability.can('create', 'SalesOrder');
   const canPack = ability.can('pack', 'Shipment');
   const canCancelAny = ability.can('cancel', 'SalesOrder');
   const canCancelAfterCarrier = ability.can('cancel_after_carrier', 'SalesOrder');
-  const canEditAny = ability.can('edit_all', 'SalesOrder');
+  const canEditAny = ability.can('edit_all', 'SalesOrder') || canEditFields;
   const canCancel = canCancelAny || canCancelAfterCarrier || canCreate;
   const [peek, setPeek] = useState<SalesOrderListItem | null>(null);
   // Nút Hủy trên dòng → hộp xác nhận dùng chung với hủy hàng loạt (một đơn).
@@ -1067,7 +1081,8 @@ export function PrintOrdersScreen() {
   return (
     <>
       <PageHeader
-        title="In đơn"
+        // Tên theo menu Kho › Đơn hàng (user 2026-11-05) — "In đơn" giờ là màn /wms/waybills.
+        title="Đơn hàng"
         sticky={false}
         description={
           // Số đơn khớp bộ lọc, to, đậm (user 2026-11-03); bỏ "/ tổng số đơn" (user 2026-11-05).
@@ -1083,7 +1098,7 @@ export function PrintOrdersScreen() {
             ) : null}
           </span>
         }
-        breadcrumb={[{ label: 'Kho' }, { label: 'In đơn' }]}
+        breadcrumb={[{ label: 'Kho' }, { label: 'Đơn hàng' }]}
         actions={
           <>
             <OrderScanButton onScan={onScan} />

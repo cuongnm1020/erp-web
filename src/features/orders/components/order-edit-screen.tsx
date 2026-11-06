@@ -14,6 +14,7 @@ import Decimal from 'decimal.js';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { useWatch } from 'react-hook-form';
 import { CopyButton } from '@/components/data/copy-button';
+import { UomText } from '@/components/data/uom-text';
 import { DetailSkeleton, QueryState } from '@/components/data/states';
 import { StatusBadge } from '@/components/data/status-badge';
 import { NotFoundCard } from '@/components/layout/not-found-screen';
@@ -233,6 +234,12 @@ function Editor({ order }: { order: SalesOrderDetail }) {
   const targets = manualStatusTargets(order.status, (a) => ability.can(a, 'SalesOrder'));
   // Chỉ người tạo đơn / NV xử lý / trưởng nhóm của họ sửa được các ô (server: order.canEdit).
   const carrierEditable = canUpdate && orderEditable(order.status) && order.canEdit;
+  // Kho / admin sửa thẻ Nhận hàng của mọi đơn kho mình (2026-11-05, `sales_order.edit_receiver`) —
+  // server tính `canEditReceiver` (gồm cả người được sửa đơn).
+  const canEditReceiverPerm = ability.can('edit_receiver', 'SalesOrder');
+  const receiverEditable =
+    carrierEditable ||
+    ((canUpdate || canEditReceiverPerm) && orderEditable(order.status) && order.canEditReceiver);
   // Hãng vận chuyển chỉ kho / admin chọn (2026-10-31) — sale / CSKH chỉ xem hãng đã gán.
   const canChooseCarrier = ability.can('send_carrier', 'SalesOrder');
   const statusEditable = canUpdate && targets.length > 0;
@@ -291,6 +298,8 @@ function Editor({ order }: { order: SalesOrderDetail }) {
   const dateChanged = (expectedDate || null) !== (order.expectedDeliveryDate ?? null);
   const orderDayEditable = canSetOrderDate && orderEditable(order.status);
   const orderDayChanged = orderDayEditable && orderDay !== '' && orderDay !== origOrderDay;
+  // Lưu được: quyền sửa đơn, hoặc chỉ quyền trường (kho không có sales_order.update, 2026-11-05).
+  const canSave = canUpdate || receiverEditable || orderDayEditable;
   const nextAccount = accountId === DEFAULT_ACCOUNT ? null : accountId;
   // Đổi hãng → server tự về tài khoản mặc định; chỉ gửi tài khoản khi người dùng chọn khác đi.
   const accountChanged = carrierChanged
@@ -404,7 +413,7 @@ function Editor({ order }: { order: SalesOrderDetail }) {
       router.push(detailHref);
       return;
     }
-    if (!canUpdate) return;
+    if (!canSave) return;
     // Sản phẩm lưu TRƯỚC (giữ chỗ + PICK lại), rồi mới chuyển kho / PATCH các ô còn lại.
     if (lineEdit.body) {
       replaceLines.mutate(lineEdit.body, {
@@ -527,9 +536,13 @@ function Editor({ order }: { order: SalesOrderDetail }) {
   }, [router, detailHref]);
 
   const readOnlyReason =
-    !canUpdate && !(canFulfil && fulfilTargets.length > 0)
+    !canSave && !(canFulfil && fulfilTargets.length > 0)
       ? 'Bạn chỉ có quyền xem đơn này — cần quyền sửa đơn (sales_order.update) để lưu thay đổi.'
-      : !order.canEdit && orderEditable(order.status) && !statusEditable
+      : !order.canEdit &&
+          orderEditable(order.status) &&
+          !statusEditable &&
+          !receiverEditable &&
+          !orderDayEditable
         ? 'Đơn của người khác — chỉ người tạo đơn, NV xử lý hoặc trưởng nhóm / leader của họ được sửa.'
         : order.status === 'CANCELLED'
           ? 'Đơn đã hủy — trạng thái cuối, không sửa được gì nữa.'
@@ -698,6 +711,22 @@ function Editor({ order }: { order: SalesOrderDetail }) {
         >
           <Lock className="h-3.5 w-3.5 text-warning" aria-hidden />
           {readOnlyReason}
+        </div>
+      ) : !order.canEdit &&
+        orderEditable(order.status) &&
+        (receiverEditable || orderDayEditable) ? (
+        <div
+          role="status"
+          className="flex items-center gap-2 rounded-md border border-warning-line bg-warning-weak px-3 py-2 text-sm"
+        >
+          <Lock className="h-3.5 w-3.5 text-warning" aria-hidden />
+          Đơn của người khác — bạn sửa được{' '}
+          {receiverEditable && orderDayEditable
+            ? 'thông tin nhận hàng và ngày tạo đơn'
+            : receiverEditable
+              ? 'thông tin nhận hàng'
+              : 'ngày tạo đơn'}
+          . Ô khác do người tạo đơn, NV xử lý hoặc trưởng nhóm / leader của họ sửa.
         </div>
       ) : canUpdate && !order.canEdit && orderEditable(order.status) ? (
         <div
@@ -940,7 +969,7 @@ function Editor({ order }: { order: SalesOrderDetail }) {
                               </span>
                             </span>
                             <span className="text-center tabular-nums">
-                              {formatQuantity(g.line.qty)} {g.line.uomCode}
+                              {formatQuantity(g.line.qty)} <UomText code={g.line.uomCode} />
                             </span>
                             <span className="text-right tabular-nums">
                               {money(g.line.unitPrice)}
@@ -970,7 +999,7 @@ function Editor({ order }: { order: SalesOrderDetail }) {
                                   className="flex items-center gap-1 text-xs text-muted-foreground"
                                 >
                                   <CornerDownRight className="h-3 w-3" aria-hidden />
-                                  {l.skuName} × {formatQuantity(l.qty)} {l.uomCode}
+                                  {l.skuName} × {formatQuantity(l.qty)} <UomText code={l.uomCode} />
                                 </span>
                               ))}
                             </span>
@@ -1092,7 +1121,7 @@ function Editor({ order }: { order: SalesOrderDetail }) {
           <Card
             title="Nhận hàng"
             actions={
-              carrierEditable ? (
+              receiverEditable ? (
                 receiver ? (
                   <Button type="button" variant="ghost" size="sm" onClick={() => setReceiver(null)}>
                     Bỏ sửa
@@ -1118,7 +1147,7 @@ function Editor({ order }: { order: SalesOrderDetail }) {
               <Select
                 value={addressId}
                 onValueChange={setAddressId}
-                disabled={!carrierEditable || customer.isPending}
+                disabled={!receiverEditable || customer.isPending}
               >
                 <SelectTrigger aria-label="Địa chỉ giao" className={cn(addressChanged && DIRTY)}>
                   <SelectValue placeholder="Mặc định của khách" />
@@ -1173,7 +1202,7 @@ function Editor({ order }: { order: SalesOrderDetail }) {
                 placeholder="Trống = SĐT của địa chỉ"
                 value={recipientPhone}
                 onChange={(e) => setRecipientPhone(e.target.value)}
-                disabled={!carrierEditable}
+                disabled={!receiverEditable}
                 aria-invalid={phoneStillMasked || undefined}
                 aria-describedby={phoneStillMasked ? 'order-recipient-phone-hint' : undefined}
                 className={cn(
@@ -1195,7 +1224,7 @@ function Editor({ order }: { order: SalesOrderDetail }) {
                 aria-label="Hẹn nhận hàng"
                 value={expectedDate}
                 onChange={(e) => setExpectedDate(e.target.value)}
-                disabled={!carrierEditable}
+                disabled={!receiverEditable}
                 className={cn('tabular-nums', dateChanged && DIRTY)}
               />
             </Row>
@@ -1414,7 +1443,7 @@ function Editor({ order }: { order: SalesOrderDetail }) {
               <Button variant="outline" className="flex-1" asChild shortcut="Esc">
                 <Link href={detailHref}>Hủy bỏ</Link>
               </Button>
-              {canUpdate || canFulfil ? (
+              {canSave || canFulfil ? (
                 <Button
                   className="flex-1"
                   onClick={save}

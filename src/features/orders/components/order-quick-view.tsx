@@ -5,6 +5,7 @@ import Decimal from 'decimal.js';
 import { Copy, X } from 'lucide-react';
 import Link from 'next/link';
 import { CopyButton } from '@/components/data/copy-button';
+import { UomText } from '@/components/data/uom-text';
 import { TrackingLink } from '@/components/data/tracking-link';
 import { Button } from '@/components/ui/button';
 import { DialogOverlay, DialogPortal } from '@/components/ui/dialog';
@@ -136,7 +137,7 @@ function Body({ row }: { row: SalesOrderListItem }) {
                   <span className="min-w-0">
                     {l.skuName}{' '}
                     <span className="text-muted-foreground">
-                      × {formatQuantity(l.qty)} {l.uomCode}
+                      × {formatQuantity(l.qty)} <UomText code={l.uomCode} />
                     </span>
                   </span>
                   <span className="tabular-nums">{formatMoney(l.lineTotal, { unit: '' })}</span>

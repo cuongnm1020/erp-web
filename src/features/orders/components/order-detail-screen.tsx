@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Fragment, useEffect, useRef, useState, type ReactNode } from 'react';
 import { CopyButton } from '@/components/data/copy-button';
+import { UomText } from '@/components/data/uom-text';
 import { PdfPrintDialog } from '@/components/data/pdf-print-dialog';
 import { DetailSkeleton, QueryState } from '@/components/data/states';
 import { ConfirmDialog } from '@/components/data/confirm-dialog';
@@ -355,7 +356,9 @@ function LineRow({ l, component = false }: { l: SalesOrderLine; component?: bool
           </div>
         ) : null}
       </TableCell>
-      <TableCell className="px-2.5 py-1.5">{l.uomCode}</TableCell>
+      <TableCell className="px-2.5 py-1.5">
+        <UomText code={l.uomCode} />
+      </TableCell>
       <TableCell className="px-2.5 py-1.5 text-right tabular-nums">
         {qty(l.qty)}
         <div className="text-xs text-muted-foreground">{qty(l.qtyBase)} ĐVT cơ sở</div>
@@ -539,11 +542,13 @@ function Lines({ order }: { order: SalesOrderDetail }) {
               g.kind === 'line' ? (
                 <LineRow key={g.line.id} l={g.line} />
               ) : (
-                /* Combo: một dòng tổng (giá combo × số combo) + các dòng thành phần thụt vào —
-                   kho giữ / pick trên thành phần nên hai cột cuối chỉ có ở dòng thành phần. */
+                /* Combo: MỘT dòng tổng (giá combo × số combo). Dòng thành phần không hiện ở chi tiết
+                   đơn (user 2026-11-06) — giữ / pick theo thành phần xem ở màn kho / PDA. */
                 <Fragment key={`combo-${g.groupNo}`}>
                   <TableRow className="bg-muted/40" data-testid="combo-row">
-                    <TableCell className="px-2.5 py-1.5 text-muted-foreground" />
+                    <TableCell className="px-2.5 py-1.5 text-muted-foreground">
+                      {g.lines[0]?.lineNo}
+                    </TableCell>
                     <TableCell className="px-2.5 py-1.5">
                       <div className="flex items-center gap-1.5 font-semibold">
                         {g.skuName}
@@ -573,9 +578,6 @@ function Lines({ order }: { order: SalesOrderDetail }) {
                     <TableCell className="px-2.5 py-1.5" />
                     <TableCell className="px-2.5 py-1.5" />
                   </TableRow>
-                  {g.lines.map((l) => (
-                    <LineRow key={l.id} l={l} component />
-                  ))}
                 </Fragment>
               ),
             )}
@@ -762,7 +764,12 @@ function Detail({ order }: { order: SalesOrderDetail }) {
   const ability = useAbility();
   const autoPrint = useSearchParams().get('printLabel') === '1';
   const live = order.status !== 'CANCELLED';
-  const canEdit = live && ability.can('update', 'SalesOrder');
+  // Kho / admin chỉ có quyền trường (người nhận / ngày tạo đơn, 2026-11-05) cũng mở màn Sửa.
+  const canEdit =
+    live &&
+    (ability.can('update', 'SalesOrder') ||
+      ability.can('edit_receiver', 'SalesOrder') ||
+      ability.can('set_order_date', 'SalesOrder'));
   const canCreate = ability.can('create', 'SalesOrder');
   // Người lên đơn / trưởng phòng, trưởng nhóm CSKH hủy được không cần quyền hủy (2026-10-29) —
   // server kiểm từng đơn, không được thì báo lỗi.

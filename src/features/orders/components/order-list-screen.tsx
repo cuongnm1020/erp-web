@@ -46,7 +46,6 @@ import { toast } from '@/components/ui/toaster';
 import { cn } from '@/lib/cn';
 import { messageFor, messageForCode, messageForItemCode } from '@/lib/error-messages';
 import {
-  formatDate,
   formatDateTime,
   formatMoney,
   formatPhone,
@@ -436,10 +435,9 @@ const buildColumns = (
     id: 'orderDate',
     header: 'Ngày đặt',
     meta: { width: 116, sortable: true },
+    // Ngày + giờ đặt (user 2026-11-06).
     cell: ({ row }) => (
-      <span className="whitespace-nowrap text-xs" title={formatDateTime(row.original.orderDate)}>
-        {formatDate(row.original.orderDate)}
-      </span>
+      <span className="whitespace-nowrap text-xs">{formatDateTime(row.original.orderDate)}</span>
     ),
   },
   {
@@ -1143,7 +1141,10 @@ export function OrderListScreen() {
   // 2026-11-04 (user): bấm tab khi ô tìm có chữ GIỮ chữ — lọc chữ trong đúng tab đó (URL ghi
   // `flow` tường minh, kể cả NEW, bỏ `group`); gõ chữ từ ô trống → `group=all`, tìm mọi trạng thái.
   // Link chỉ có `?q=` (quét mã, màn khác) cũng tìm mọi trạng thái.
-  const searching = state.filters.group === 'all' || (state.q !== '' && !urlFlow);
+  // 2026-11-06 (user): mở màn (URL không có tab / nhóm / chữ) → tab Tất cả; bấm tab nào cũng ghi
+  // `flow` tường minh trên URL.
+  const openedPlain = !urlFlow && state.filters.group === undefined && state.q === '';
+  const searching = openedPlain || state.filters.group === 'all' || (state.q !== '' && !urlFlow);
   const currentFlow: OrderFlow = urlFlow ?? DEFAULT_ORDER_FLOW;
   const flow = searching ? undefined : currentFlow;
   const status = parseOrderStatus(state.filters.status);
@@ -1298,12 +1299,15 @@ export function OrderListScreen() {
     return null;
   }, [noCarrier, carrierAccountId, carrierId, carriers.data]);
   const router = useRouter();
-  const canUpdate = ability.can('update', 'SalesOrder');
+  // Kho / admin sửa người nhận / ngày tạo đơn của mọi đơn kho mình, cả khi kho đã thao tác (2026-11-05).
+  const canEditFields =
+    ability.can('edit_receiver', 'SalesOrder') || ability.can('set_order_date', 'SalesOrder');
+  const canUpdate = ability.can('update', 'SalesOrder') || canEditFields;
   const canCreate = ability.can('create', 'SalesOrder');
   const canPack = ability.can('pack', 'Shipment');
   const canCancelAny = ability.can('cancel', 'SalesOrder');
   const canCancelAfterCarrier = ability.can('cancel_after_carrier', 'SalesOrder');
-  const canEditAny = ability.can('edit_all', 'SalesOrder');
+  const canEditAny = ability.can('edit_all', 'SalesOrder') || canEditFields;
   const canCancel = canCancelAny || canCancelAfterCarrier || canCreate;
   const creatorOptions = useOrderCreatorOptions(canFilterTeam);
   const [peek, setPeek] = useState<SalesOrderListItem | null>(null);
@@ -1482,11 +1486,13 @@ export function OrderListScreen() {
             filters: {
               ...state.filters,
               group: undefined,
-              flow: f === DEFAULT_ORDER_FLOW && state.q === '' ? undefined : f,
+              flow: f,
             },
           })
         }
-        onExitSearch={() => set({ q: '', filters: { ...state.filters, group: undefined } })}
+        onExitSearch={() =>
+          set({ q: '', filters: { ...state.filters, group: undefined, flow: currentFlow } })
+        }
         onShowAll={() => set({ filters: { ...state.filters, group: 'all' } })}
       />
 
@@ -1526,8 +1532,9 @@ export function OrderListScreen() {
               label: 'Ngày đặt',
               type: 'dateRange',
               rememberKey: 'date.orders',
-              // Mở màn lần đầu (chưa ghi nhớ, URL không có ngày) → 30 ngày qua (user 2026-11-03).
-              defaultPreset: 'last30',
+              // Mở màn lần đầu (chưa ghi nhớ, URL không có ngày) → 7 ngày qua (user 2026-11-06;
+              // trước 30 ngày qua, 2026-11-03).
+              defaultPreset: 'last7',
               fieldKey: 'dateField',
               fields: DATE_FIELDS,
             },

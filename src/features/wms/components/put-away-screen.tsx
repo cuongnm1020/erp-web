@@ -6,6 +6,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
 import { ConfirmDialog } from '@/components/data/confirm-dialog';
 import { ScanInput, type ScanInputHandle } from '@/components/data/scan-input';
+import { useUomName } from '@/lib/uom';
 import { ErrorState, ForbiddenState } from '@/components/data/states';
 import { Button } from '@/components/ui/button';
 import { newIdempotencyKey } from '@/lib/api/client';
@@ -74,6 +75,7 @@ const unitCount = (v: string): number => (/^\d+$/.test(v) ? Number.parseInt(v, 1
  * Màn chờ: hàng đợi cất hàng + đã cất hôm nay. `?task=<id>` (từ màn lấy hàng) → tự nhận việc.
  */
 export function PutAwayScreen() {
+  const uomName = useUomName();
   const ability = useAbility();
   const canExecute = ability.can('execute', 'Task');
   const queue = usePdaQueue('PUT_AWAY', canExecute);
@@ -342,7 +344,7 @@ export function PutAwayScreen() {
       setBasket((b) => addLoose(b, pad.group, padBase));
       flash(
         'ok',
-        `${formatQuantity(padBase)} ${pad.group.baseUomCode} ${pad.group.skuCode} vào giỏ`,
+        `${formatQuantity(padBase)} ${uomName(pad.group.baseUomCode)} ${pad.group.skuCode} vào giỏ`,
         'Quét mã vị trí để cất.',
       );
     }
@@ -535,7 +537,7 @@ export function PutAwayScreen() {
                   <span className="text-sm text-muted-foreground">
                     {pad.mode === 'units'
                       ? `Số thùng (còn ${pad.max}, thùng ${pad.scanned.barcode} trước)`
-                      : `Số lượng (${pad.uomCode}) · còn ${formatQuantity(looseFree(pad.group, basket))} ${pad.group.baseUomCode} chưa cất`}
+                      : `Số lượng (${uomName(pad.uomCode)}) · còn ${formatQuantity(looseFree(pad.group, basket))} ${uomName(pad.group.baseUomCode)} chưa cất`}
                   </span>
                   <input
                     ref={padRef}
@@ -570,7 +572,7 @@ export function PutAwayScreen() {
                 </label>
                 {pad.mode === 'loose' && pad.factor !== '1' && padBase ? (
                   <p className="mt-1 text-sm text-muted-foreground">
-                    = {formatQuantity(padBase)} {pad.group.baseUomCode}
+                    = {formatQuantity(padBase)} {uomName(pad.group.baseUomCode)}
                   </p>
                 ) : null}
               </section>
@@ -631,7 +633,7 @@ export function PutAwayScreen() {
                         </span>
                         <span className="shrink-0 tabular-nums">
                           {e.units.length > 0 ? `${e.units.length} thùng · ` : ''}
-                          {formatQuantity(entryQty(e))} {e.uomCode}
+                          {formatQuantity(entryQty(e))} {uomName(e.uomCode)}
                         </span>
                       </li>
                     ))}
@@ -666,7 +668,7 @@ export function PutAwayScreen() {
                           {g.containerTypeCode ? (
                             <span className="block font-semibold">{g.remainingCount} thùng</span>
                           ) : null}
-                          {formatQuantity(g.remainingQty)} {g.baseUomCode}
+                          {formatQuantity(g.remainingQty)} {uomName(g.baseUomCode)}
                         </span>
                       </button>
                     </li>
@@ -755,7 +757,7 @@ export function PutAwayScreen() {
                   ? 'Số lượng không hợp lệ'
                   : pad.mode === 'units'
                     ? `Cho ${pad.value} thùng vào giỏ`
-                    : `Cho ${pad.value} ${pad.uomCode} vào giỏ`}
+                    : `Cho ${pad.value} ${uomName(pad.uomCode)} vào giỏ`}
               </Button>
               <Button
                 variant="outline"

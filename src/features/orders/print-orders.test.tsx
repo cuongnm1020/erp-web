@@ -16,9 +16,9 @@ vi.mock('next/navigation', () => ({
 const FIRST = makeOrders(1)[0]!;
 
 describe('PrintOrdersScreen — In đơn (clone màn Đơn hàng, 2026-11-04)', () => {
-  it('tiêu đề + breadcrumb Kho › In đơn, bảng dữ liệu GET /sales-orders', async () => {
+  it('tiêu đề + breadcrumb Kho › Đơn hàng (menu đổi tên 2026-11-05), bảng dữ liệu GET /sales-orders', async () => {
     renderApp(<PrintOrdersScreen />);
-    expect(screen.getByRole('heading', { name: 'In đơn' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Đơn hàng' })).toBeInTheDocument();
     expect(await screen.findByText(FIRST.docNumber)).toBeInTheDocument();
     expect(screen.getByTestId('order-count')).toHaveTextContent('60');
   });
@@ -120,6 +120,20 @@ describe('PrintOrdersScreen — In đơn (clone màn Đơn hàng, 2026-11-04)', 
     expect(seen.every((p) => p.get('erpOnly') === 'true')).toBe(true);
   });
 
+  it('cột Cân nặng (2026-11-06): bấm tiêu đề → GET /sales-orders?sortBy=weight', async () => {
+    const seen: URLSearchParams[] = [];
+    server.use(
+      http.get('/api/sales-orders', ({ request }) => {
+        seen.push(new URL(request.url).searchParams);
+        return HttpResponse.json({ items: [FIRST], total: 1 });
+      }),
+    );
+    renderApp(<PrintOrdersScreen />);
+    await screen.findByText(FIRST.docNumber);
+    fireEvent.click(screen.getByRole('button', { name: 'Sắp xếp theo Cân nặng' }));
+    await waitFor(() => expect(seen.some((p) => p.get('sortBy') === 'weight')).toBe(true));
+  });
+
   it('bỏ lọc Hãng VC / NV lên đơn / Vận chuyển / Đơn (2026-11-04): không hiện ô, link cũ không lọc ngầm', async () => {
     search =
       'group=all&carrierId=c-1&noCarrier=true&creatorId=u-1&printStatus=PRINTED&carrierSource=ERP&carrierStatus=x&duplicate=true&itemOrigin=CUSTOM&totalMin=100&weightMin=1';
@@ -133,9 +147,12 @@ describe('PrintOrdersScreen — In đơn (clone màn Đơn hàng, 2026-11-04)', 
     try {
       renderApp(<PrintOrdersScreen />);
       await screen.findByText(FIRST.docNumber);
-      for (const label of ['Hãng VC: tất cả', 'Giá trị đơn', 'Cân nặng']) {
+      for (const label of ['Hãng VC: tất cả', 'Giá trị đơn']) {
         expect(screen.queryByText(label)).not.toBeInTheDocument();
       }
+      // Ô lọc Cân nặng không có — cột Cân nặng (sắp được, 2026-11-06) thì có.
+      expect(screen.queryByRole('button', { name: 'Cân nặng' })).not.toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Sắp xếp theo Cân nặng' })).toBeInTheDocument();
       const keys = [
         'carrierId',
         'noCarrier',

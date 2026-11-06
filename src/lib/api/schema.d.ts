@@ -2141,6 +2141,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
+        /**
+         * Danh mục ĐVT — mọi người đăng nhập (2026-11-06): web hiện TÊN ĐVT ("Thùng") thay mã ("BOX") ở
+         *     mọi màn, kể cả kho / PDA không có product.read. Chỉ mã + tên, không nhạy cảm.
+         */
         get: operations["ProductController_listUoms"];
         put?: never;
         post: operations["ProductController_createUom"];
@@ -4103,6 +4107,9 @@ export interface paths {
          *     approve/post/cancel tương ứng — kiểm trong service vì tuỳ giá trị gửi lên. Đổi gì ngoài trạng
          *     thái (2026-10-29): chỉ người tạo đơn / NV xử lý / trưởng nhóm của họ / `sales_order.edit_all`
          *     → không thì 403 FORBIDDEN. Mỗi lần lưu có thay đổi ghi một dòng lịch sử sửa đơn.
+         *     2026-11-05: kho / admin (`sales_order.read_all` + `sales_order.set_order_date` /
+         *     `sales_order.edit_receiver`) đổi Ngày tạo đơn / thông tin nhận hàng của mọi đơn kho mình,
+         *     không cần `sales_order.update`; đổi ô khác thì vẫn cần.
          */
         patch: operations["SalesOrderController_update"];
         trace?: never;
@@ -7665,6 +7672,17 @@ export interface components {
             managesDepartments: boolean;
             /** @description Phụ trách ít nhất một phòng ban CSKH (2026-10-22) — web hiện màn "Nhân viên của team". */
             managesCareTeam: boolean;
+            /**
+             * @description Nhân viên kho thuần (2026-11-05): chỉ mang vai trò kho (WAREHOUSE, WH_MANAGER, WH_SUPERVISOR,
+             *     PICKER, PACKER; IMPERSONATOR không tính). Web ẩn menu Bán hàng — quyền API không đổi.
+             */
+            warehouseOnly: boolean;
+            /**
+             * @description Nhân viên sale / CSKH thuần (2026-11-06): chỉ mang vai trò SALES_LEADER, SALES_MEMBER,
+             *     CSKH_LEADER, CSKH_MEMBER, CSKH_GROUP_LEAD (IMPERSONATOR không tính). Web ẩn Kho › Đơn hàng,
+             *     Vận đơn, In đơn — quyền API không đổi.
+             */
+            salesOnly: boolean;
             /** @description Kho được phép (id) — null = mọi kho (superadmin / quyền `warehouse.all`). */
             warehouseIds: string[] | null;
             /** @description Kho được phép kèm mã + tên, kho mặc định hệ thống trước rồi theo mã — cho ô chọn kho. */
@@ -9340,9 +9358,15 @@ export interface components {
         PancakeOrderHistoryEntryDto: {
             /** @description ISO datetime. */
             at: string;
-            /** @description Tài khoản ERP đã liên kết với người sửa trên Pancake; null = chưa liên kết. */
+            /**
+             * @description Tài khoản ERP của người sửa: liên kết với nhân viên Pancake, hoặc người lưu trên ERP cùng lúc
+             *     (ERP đẩy lên qua tài khoản admin); null = không rõ.
+             */
             userId: string | null;
-            /** @description Tên người sửa; null = nhân viên Pancake chưa liên kết tài khoản ERP. */
+            /**
+             * @description Tên người sửa: họ tên ERP (tài khoản thật đã liên kết / người lưu trên ERP cùng lúc), không thì
+             *     tên trên Pancake; null = không biết tên.
+             */
             userName: string | null;
             changes: components["schemas"]["PancakeOrderHistoryChangeDto"][];
         };
@@ -12703,6 +12727,12 @@ export interface components {
              */
             canEdit: boolean;
             /**
+             * @description Sửa được thẻ Nhận hàng (người nhận, SĐT người nhận cho đơn, hẹn nhận hàng): như `canEdit`, hoặc
+             *     kho / admin có `sales_order.edit_receiver` (2026-11-05 — mọi đơn kho mình, kể cả khi kho đã
+             *     thao tác). Đơn đã kết thúc → false.
+             */
+            canEditReceiver: boolean;
+            /**
              * @description Vì sao KHÔNG sửa được sản phẩm (thêm / bỏ / đổi số lượng); null = sửa được (PUT
              *     /sales-orders/:id/lines). Khóa khi: không có quyền sửa, đơn Pancake, đơn có khuyến mãi, kho đã
              *     bắt đầu lấy hàng / đã có phiếu giao.
@@ -13423,6 +13453,15 @@ export interface components {
              *     với người có quyền `sales_order.fulfil_manual`.
              */
             holdPick?: boolean;
+            /**
+             * Format: uuid
+             * @description NV đóng hàng cho cả lô (2026-11-06): người đóng gói đang hoạt động, có `shipment.pack`, kho làm
+             *     việc = kho xuất của đơn (GET /pda/packers?warehouseId=). Ghi `SalesOrder.packerId`; PACK sinh
+             *     sau khi lấy hàng xong giao thẳng người này (thắng lần giao trên PDA), PACK đang chờ chưa ai giữ
+             *     giao luôn. Sai kho / không hợp lệ → đơn đó vào `failed` (422 ORDER_PACKER_INVALID). Bỏ trống =
+             *     giữ nguyên.
+             */
+            packerId?: string;
         };
         SendOrderToCarrierItemDto: {
             orderId: string;
@@ -24409,7 +24448,7 @@ export interface operations {
                  */
                 itemOrigin?: "CUSTOM" | "POS_SKU" | "NON_ERP";
                 /** @description Sắp xếp theo cột (2026-10-22); mặc định ngày đặt mới nhất trước. */
-                sortBy?: "orderDate" | "docNumber" | "customer" | "total" | "time" | "statusChangedAt" | "sentToCarrierAt" | "items";
+                sortBy?: "orderDate" | "docNumber" | "customer" | "total" | "time" | "statusChangedAt" | "sentToCarrierAt" | "items" | "weight";
                 customerId?: string;
                 status?: "DRAFT" | "PENDING_APPROVAL" | "APPROVED" | "POSTED" | "CANCELLED";
                 /** @description Lọc theo cân nặng gửi hãng HIỆU LỰC (đặt tay, không thì Σ dòng) — kg, chuỗi decimal, cận dưới (≥). */
@@ -24456,6 +24495,13 @@ export interface operations {
                  */
                 from?: string;
                 to?: string;
+                /**
+                 * @description Khung giờ trong ngày (giờ VN, `HH:mm`) trên `dateField` (2026-11-06, màn In đơn: "gán từ 8h đến
+                 *     10h"): mỗi ngày trong from/to chỉ lấy đơn có giờ ≥ `timeFrom` và ≤ `timeTo` (trọn phút cuối).
+                 *     Bỏ trống một đầu = đầu / cuối ngày. Không có from/to = hôm nay. Khoảng ngày > 62 ngày → 422.
+                 */
+                timeFrom?: string;
+                timeTo?: string;
                 /** @description Kho lấy hàng chọn trên đơn (wms.Warehouse.id). */
                 warehouseId?: string;
                 /** @description Nguồn đơn: `PANCAKE` = đồng bộ từ Pancake, `ERP` = tạo trong ERP. */
@@ -24670,7 +24716,7 @@ export interface operations {
                  */
                 itemOrigin?: "CUSTOM" | "POS_SKU" | "NON_ERP";
                 /** @description Sắp xếp theo cột (2026-10-22); mặc định ngày đặt mới nhất trước. */
-                sortBy?: "orderDate" | "docNumber" | "customer" | "total" | "time" | "statusChangedAt" | "sentToCarrierAt" | "items";
+                sortBy?: "orderDate" | "docNumber" | "customer" | "total" | "time" | "statusChangedAt" | "sentToCarrierAt" | "items" | "weight";
                 /**
                  * @description Chỉ đếm các tab này (2026-11-03, tab cha + chip con màn Đơn hàng — bỏ các tab đã xong khi nhóm
                  *     của chúng đang đóng). Bỏ trống = mọi tab + `total`; có giá trị thì tab không đếm và `total`
@@ -24723,6 +24769,13 @@ export interface operations {
                  */
                 from?: string;
                 to?: string;
+                /**
+                 * @description Khung giờ trong ngày (giờ VN, `HH:mm`) trên `dateField` (2026-11-06, màn In đơn: "gán từ 8h đến
+                 *     10h"): mỗi ngày trong from/to chỉ lấy đơn có giờ ≥ `timeFrom` và ≤ `timeTo` (trọn phút cuối).
+                 *     Bỏ trống một đầu = đầu / cuối ngày. Không có from/to = hôm nay. Khoảng ngày > 62 ngày → 422.
+                 */
+                timeFrom?: string;
+                timeTo?: string;
                 /** @description Kho lấy hàng chọn trên đơn (wms.Warehouse.id). */
                 warehouseId?: string;
                 /** @description Nguồn đơn: `PANCAKE` = đồng bộ từ Pancake, `ERP` = tạo trong ERP. */
@@ -24846,7 +24899,7 @@ export interface operations {
                  */
                 itemOrigin?: "CUSTOM" | "POS_SKU" | "NON_ERP";
                 /** @description Sắp xếp theo cột (2026-10-22); mặc định ngày đặt mới nhất trước. */
-                sortBy?: "orderDate" | "docNumber" | "customer" | "total" | "time" | "statusChangedAt" | "sentToCarrierAt" | "items";
+                sortBy?: "orderDate" | "docNumber" | "customer" | "total" | "time" | "statusChangedAt" | "sentToCarrierAt" | "items" | "weight";
                 customerId?: string;
                 status?: "DRAFT" | "PENDING_APPROVAL" | "APPROVED" | "POSTED" | "CANCELLED";
                 /** @description Lọc theo cân nặng gửi hãng HIỆU LỰC (đặt tay, không thì Σ dòng) — kg, chuỗi decimal, cận dưới (≥). */
@@ -24893,6 +24946,13 @@ export interface operations {
                  */
                 from?: string;
                 to?: string;
+                /**
+                 * @description Khung giờ trong ngày (giờ VN, `HH:mm`) trên `dateField` (2026-11-06, màn In đơn: "gán từ 8h đến
+                 *     10h"): mỗi ngày trong from/to chỉ lấy đơn có giờ ≥ `timeFrom` và ≤ `timeTo` (trọn phút cuối).
+                 *     Bỏ trống một đầu = đầu / cuối ngày. Không có from/to = hôm nay. Khoảng ngày > 62 ngày → 422.
+                 */
+                timeFrom?: string;
+                timeTo?: string;
                 /** @description Kho lấy hàng chọn trên đơn (wms.Warehouse.id). */
                 warehouseId?: string;
                 /** @description Nguồn đơn: `PANCAKE` = đồng bộ từ Pancake, `ERP` = tạo trong ERP. */

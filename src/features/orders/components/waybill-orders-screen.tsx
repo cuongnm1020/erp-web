@@ -16,6 +16,7 @@ import { EmptyState, ListSkeleton, QueryState } from '@/components/data/states';
 import { StatusBadge } from '@/components/data/status-badge';
 import { PageHeader } from '@/components/layout/page-header';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { formatDateTime, formatQuantity, groupVi } from '@/lib/format';
 import { useAbility } from '@/lib/permission';
 import { useListState, type SortState } from '@/lib/url-state';
@@ -40,6 +41,9 @@ import {
 const FILTER_KEYS = [
   'from',
   'to',
+  // Khung giờ gán trong ngày (giờ VN `HH:mm`, user 2026-11-06 "từ 8h đến 10h").
+  'timeFrom',
+  'timeTo',
   'pos',
   'team',
   'skuId',
@@ -65,6 +69,54 @@ const PRINT_OPTIONS: { value: OrderPrintStatus; label: string }[] = [
 ];
 const pick = <T extends string>(opts: { value: T }[], v: string | undefined): T | undefined =>
   opts.find((o) => o.value === v)?.value;
+
+const HHMM = /^([01]\d|2[0-3]):[0-5]\d$/;
+
+/** Chip "Giờ gán": "08:00 – 10:00", "từ 08:00", "đến 10:00"; không cận nào = không chip. */
+function timeChip(from: string | undefined, to: string | undefined): string | null {
+  if (from && to) return `${from} – ${to}`;
+  if (from) return `từ ${from}`;
+  if (to) return `đến ${to}`;
+  return null;
+}
+
+/**
+ * Ô "Giờ gán" (2026-11-06, user: "lọc theo thời gian gán đơn, ví dụ từ 8h đến 10h"): khung giờ VN
+ * trong MỖI ngày của ô Ngày gán (không chọn ngày = hôm nay) — API `timeFrom` / `timeTo`.
+ */
+function TimeRangeFilter({
+  from,
+  to,
+  onChange,
+}: {
+  from: string | undefined;
+  to: string | undefined;
+  onChange: (next: { timeFrom: string | undefined; timeTo: string | undefined }) => void;
+}) {
+  const norm = (v: string) => (HHMM.test(v) ? v : undefined);
+  return (
+    <div className="flex items-center gap-1 text-sm text-muted-foreground">
+      <span>Giờ gán</span>
+      <Input
+        type="time"
+        step={60}
+        value={from ?? ''}
+        onChange={(e) => onChange({ timeFrom: norm(e.target.value), timeTo: to })}
+        aria-label="Giờ gán từ"
+        className="h-9 w-28 tabular-nums"
+      />
+      <span>–</span>
+      <Input
+        type="time"
+        step={60}
+        value={to ?? ''}
+        onChange={(e) => onChange({ timeFrom: from, timeTo: norm(e.target.value) })}
+        aria-label="Giờ gán đến"
+        className="h-9 w-28 tabular-nums"
+      />
+    </div>
+  );
+}
 
 /** Trạng thái kho sau khi hãng đã lấy hàng (báo lấy → giao / hoàn). */
 const PICKED_UP_STATUSES: ReadonlySet<string> = new Set([
@@ -108,6 +160,8 @@ export function WaybillOrdersScreen() {
     from: f.from,
     to: f.to,
     dateField: 'sentToCarrierAt',
+    timeFrom: f.timeFrom,
+    timeTo: f.timeTo,
     pancakeShopId: f.pos || undefined,
     teamIds: team || undefined,
     skuId: f.skuId,
@@ -136,6 +190,8 @@ export function WaybillOrdersScreen() {
     state.q ||
     f.from ||
     f.to ||
+    f.timeFrom ||
+    f.timeTo ||
     f.pos ||
     team ||
     f.skuId ||
@@ -189,6 +245,20 @@ export function WaybillOrdersScreen() {
               label: 'Ngày gán',
               type: 'dateRange',
               rememberKey: 'date.waybills',
+            },
+            {
+              key: 'timeFrom',
+              label: 'Giờ gán',
+              type: 'custom',
+              chip: timeChip(f.timeFrom, f.timeTo),
+              clearKeys: ['timeTo'],
+              render: () => (
+                <TimeRangeFilter
+                  from={f.timeFrom}
+                  to={f.timeTo}
+                  onChange={(next) => setFilter(next)}
+                />
+              ),
             },
             { key: 'pickup', label: 'Hãng lấy hàng', type: 'select', options: PICKUP_OPTIONS },
             {
