@@ -59,6 +59,11 @@ export function suspiciousPriceRatio(
 export interface LineMetrics {
   /** Thành tiền xem trước, Decimal(18,4) chuỗi; null = chưa có giá. */
   total: string | null;
+  /**
+   * Giá niêm yết × SL, Decimal(18,4) chuỗi — mẫu số của kiểm tra COD thấp (2026-11-06). Dòng quà
+   * = 0 như server (quà snapshot listPrice 0). null = chưa có giá.
+   */
+  listTotal?: string | null;
   /** Cân nặng dòng (kg) = SL cơ sở × cân nặng SKU; null = SKU chưa khai cân nặng. */
   weightKg: string | null;
   /**
@@ -163,6 +168,11 @@ export function CartLine({
     unitPrice !== null && qtyValid
       ? new Decimal(unitPrice).mul(qty).toDecimalPlaces(4).toFixed(4)
       : null;
+  const listTotal = isGift
+    ? '0.0000'
+    : listPrice !== null && qtyValid
+      ? new Decimal(listPrice).mul(qty).toDecimalPlaces(4).toFixed(4)
+      : null;
   const weightKg = qtyBase && sku.data?.weightKg ? qtyBase.mul(sku.data.weightKg).toFixed(4) : null;
   const uomCode = sku.data
     ? uomId === sku.data.baseUomId
@@ -177,8 +187,8 @@ export function CartLine({
       ? pancakeAmountFix(lineTotal, qtyBase)
       : null;
   useEffect(() => {
-    onMetrics(fieldId, { total: lineTotal, weightKg, sellBlocked });
-  }, [fieldId, lineTotal, weightKg, sellBlocked, onMetrics]);
+    onMetrics(fieldId, { total: lineTotal, listTotal, weightKg, sellBlocked });
+  }, [fieldId, lineTotal, listTotal, weightKg, sellBlocked, onMetrics]);
 
   // Giá sửa tay thấp (kể cả 0, dưới trần CK) không còn vào duyệt — 2026-10-29 tắt quy tắc
   // "Đơn giá dưới trần chiết khấu" phía server.

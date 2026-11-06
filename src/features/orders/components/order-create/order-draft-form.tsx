@@ -42,6 +42,7 @@ import { newIdempotencyKey } from '@/lib/api/client';
 import { isApiError, type ApiError } from '@/lib/api/errors';
 import { cn } from '@/lib/cn';
 import { messageFor } from '@/lib/error-messages';
+import { ConfirmDialog } from '@/components/data/confirm-dialog';
 import { formatMoney } from '@/lib/format';
 import { useAbility } from '@/lib/permission';
 import { useWarehouse } from '@/lib/warehouse';
@@ -76,6 +77,7 @@ import {
 } from './order-side-cards';
 import { addCartSku, GiftLines } from './gift-lines';
 import { ProductSearch } from './product-search';
+import { COD_LOW_RATIO, formatRatioPct, lowCodRatio } from './cod-check';
 import { SameDayDialog } from './same-day-dialog';
 
 const NONE = '__none__';
@@ -182,6 +184,7 @@ export const OrderDraftForm = forwardRef<
   const onMetrics = useCallback((fieldId: string, m: LineMetrics) => {
     setMetrics((prev) =>
       prev[fieldId]?.total === m.total &&
+      prev[fieldId]?.listTotal === m.listTotal &&
       prev[fieldId]?.weightKg === m.weightKg &&
       prev[fieldId]?.sellBlocked === m.sellBlocked
         ? prev
@@ -242,6 +245,13 @@ export const OrderDraftForm = forwardRef<
   const prepaid = new Decimal(money(prepaidAmount));
   const cod = total !== null ? Decimal.max(total.minus(prepaid), 0).toFixed(4) : null;
   const prepaidTooBig = total !== null && prepaid.greaterThan(total);
+  // Σ(giá niêm yết × SL) — chỉ tính khi MỌI dòng đã có giá, thiếu một dòng thì chưa kiểm COD.
+  const listed = known.filter(([, m]) => m.listTotal != null);
+  const goods =
+    lines.fields.length > 0 && listed.length === lines.fields.length
+      ? listed.reduce((a, [, m]) => a.plus(m.listTotal as string), new Decimal(0)).toFixed(4)
+      : null;
+  const codRatio = lowCodRatio(cod, goods);
 
   /**
    * Chọn sản phẩm từ ô tìm / máy quét: đã có trong giỏ (cùng loại bán / khuyến mãi) thì +1, chưa có
@@ -327,14 +337,28 @@ export const OrderDraftForm = forwardRef<
     );
   };
 
+  // COD thấp (2026-11-06, thay job cron cod-alert): COD < 30% tổng giá niêm yết → hỏi lại trước
+  // khi lưu. Cảnh báo, không chặn. Đã đồng ý cho cặp (COD, tổng niêm yết) nào thì không hỏi lại.
+  const [pendingCod, setPendingCod] = useState<CreateOrderValues | null>(null);
+  const acceptedCod = useRef<string | null>(null);
+  const codSig = codRatio && cod !== null && goods !== null ? `${cod}|${goods}` : null;
+
+  const afterCodCheck = (values: CreateOrderValues) => {
+    const dup = sameDay.data;
+    if (dup && dup.total > 0 && acceptedDupPhone.current !== values.customerPhone) {
+      setPendingDup(values);
+      return;
+    }
+    send(values);
+  };
+
   const submitForm = form.handleSubmit(
     (values) => {
-      const dup = sameDay.data;
-      if (dup && dup.total > 0 && acceptedDupPhone.current !== values.customerPhone) {
-        setPendingDup(values);
+      if (codSig && acceptedCod.current !== codSig) {
+        setPendingCod(values);
         return;
       }
-      send(values);
+      afterCodCheck(values);
     },
     (errors) => {
       if (form.getValues('lines').length === 0) {
@@ -372,6 +396,28 @@ export const OrderDraftForm = forwardRef<
 
   return (
     <Form {...form}>
+      {pendingCod && codRatio && cod !== null && goods !== null ? (
+        <ConfirmDialog
+          open
+          onOpenChange={(open) => (open ? undefined : setPendingCod(null))}
+          title={`COD chỉ bằng ${formatRatioPct(codRatio)} tổng giá niêm yết`}
+          description={
+            `Thu hộ ${formatMoney(cod)} / hàng theo giá niêm yết ${formatMoney(goods)}` +
+            (prepaid.greaterThan(0)
+              ? ` (đã chuyển khoản ${formatMoney(prepaid.toFixed(4))})`
+              : '') +
+            `. Dưới ${formatRatioPct(COD_LOW_RATIO)} là chiết khấu bất thường — kiểm tra lại đơn giá, chiết khấu, đơn vị tính trước khi lưu.`
+          }
+          confirmLabel="Vẫn lưu đơn"
+          destructive={false}
+          onConfirm={() => {
+            const values = pendingCod;
+            acceptedCod.current = codSig;
+            setPendingCod(null);
+            afterCodCheck(values);
+          }}
+        />
+      ) : null}
       {pendingDup && sameDay.data ? (
         <SameDayDialog
           data={sameDay.data}
@@ -563,6 +609,12 @@ export const OrderDraftForm = forwardRef<
                   {cod !== null ? formatMoney(cod) : '—'}
                 </span>
               </div>
+              {codRatio ? (
+                <p className="text-right text-xs text-warning">
+                  COD chỉ bằng {formatRatioPct(codRatio)} tổng giá niêm yết
+                  {goods !== null ? ` (${formatMoney(goods)})` : ''} — kiểm tra chiết khấu.
+                </p>
+              ) : null}
               <div className="mt-1.5 flex gap-2">
                 {/* Lưu nháp → Đơn mới (chưa giữ hàng); Chốt đơn → Đã xác nhận (2026-11-02). */}
                 <Button
