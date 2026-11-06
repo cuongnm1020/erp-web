@@ -557,6 +557,7 @@ function orderListExtras(i: number, status: (typeof ORDER_STATUSES)[number]) {
     labelPrintedById: null,
     labelPrintedByName: null,
     carrierStatusText: null,
+    carrierStage: null,
     packError: null,
     packErrorCode: null,
     packErrorAt: null,
@@ -1776,6 +1777,46 @@ export const handlers = [
       CANCELLED: count('CANCELLED'),
     });
   }),
+  // Đếm chip tab cha (2026-11-07). "Đơn hàng": tab ERP theo `flow`; phần đã gửi hãng gộp như API.
+  http.get('/api/sales-orders/tab-counts', ({ request }) => {
+    const group = new URL(request.url).searchParams.get('group');
+    const all = makeOrders(60);
+    const count = (...f: string[]) => all.filter((o) => f.includes(o.flow)).length;
+    if (group === 'issues') {
+      const counts = {
+        NEEDS_FIX: count('NEEDS_FIX'),
+        CARRIER_CANCELLED: count('CARRIER_CANCELLED'),
+        PICKUP_DELAYED: 0,
+        PICKUP_FAILED: 0,
+        DELIVERY_DELAYED: 0,
+        DELIVERY_FAILED: 0,
+        UNRECONCILED: 0,
+        RECON_MISMATCH: 0,
+        RETURNED_TO_SENDER: 0,
+        INCIDENT: 0,
+      };
+      const total = counts.NEEDS_FIX + counts.CARRIER_CANCELLED;
+      return HttpResponse.json({ total, attention: total, counts });
+    }
+    return HttpResponse.json({
+      total: all.length,
+      counts: {
+        NEW: count('NEW'),
+        WAITING_STOCK: count('WAITING_STOCK'),
+        WAREHOUSE: count('WAREHOUSE'),
+        PICKING: count('PICKING'),
+        PACKED: count('PACKED'),
+        SHIPPED: count('PICKED_UP', 'IN_TRANSIT'),
+        OUT_FOR_DELIVERY: count('OUT_FOR_DELIVERY'),
+        DELIVERED: count('DELIVERED'),
+        PAID: 0,
+        RETURNING: count('RETURNED'),
+        PARTIAL: 0,
+        RETURNED: 0,
+        CANCELLED: count('CANCELLED'),
+      },
+    });
+  }),
   // POS Pancake cho bộ lọc đơn — đúng shape PancakeShopOptionDto.
   http.get('/api/pancake-sync/shops', () =>
     HttpResponse.json([
@@ -1840,6 +1881,18 @@ export const handlers = [
     if (status) all = all.filter((o) => o.status === status);
     const flow = url.searchParams.get('flow');
     if (flow) all = all.filter((o) => o.flow === flow);
+    // Tab cha (2026-11-07): chip "Đơn hàng" / "Cần xử lý" → các `flow` fixture tương ứng.
+    const TAB_FLOWS: Record<string, string[]> = {
+      SHIPPED: ['PICKED_UP', 'IN_TRANSIT'],
+      RETURNING: ['RETURNED'],
+      PAID: [],
+      PARTIAL: [],
+      RETURNED: [],
+    };
+    const tab = url.searchParams.get('tab');
+    if (tab) all = all.filter((o) => (TAB_FLOWS[tab] ?? [tab]).includes(o.flow));
+    const issues = url.searchParams.getAll('carrierIssue');
+    if (issues.length) all = all.filter((o) => issues.includes(o.flow));
     if (customerId) all = all.filter((o) => o.customer.id === customerId);
     // Fixture thôi — so sánh bằng Number là đủ, không phải tiền.
     if (weightMin) all = all.filter((o) => Number(o.weightKg) >= Number(weightMin));

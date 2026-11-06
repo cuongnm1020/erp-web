@@ -179,6 +179,7 @@ const ORDERS: SalesOrderList = {
       labelPrintedById: null,
       labelPrintedByName: null,
       carrierStatusText: null,
+      carrierStage: null,
       packError: null,
       packErrorCode: null,
       packErrorAt: null,

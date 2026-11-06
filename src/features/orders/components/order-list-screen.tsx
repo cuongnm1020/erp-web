@@ -72,7 +72,7 @@ import { rangeChip, WeightRangeFilter } from './weight-range-filter';
 import {
   fetchOrdersPage,
   orderKeys,
-  useOrderFlowCounts,
+  useOrderTabCounts,
   useOrderListPrefs,
   useOrders,
   useRequestWaybill,
@@ -87,9 +87,10 @@ import {
   useSaveOrderListPrefs,
   type OrderCarrierSource,
   type OrderCarrierStatusOption,
+  type CarrierIssue,
   type OrderDateField,
-  type OrderFlow,
   type OrderItemOrigin,
+  type OrderTab,
   type OrderPrintStatus,
   type OrderSortField,
   type SalesOrderListItem,
@@ -98,9 +99,12 @@ import {
   fulfilmentLabel,
   orderCancellable,
   orderFlowLabel,
-  DEFAULT_ORDER_FLOW,
-  parseOrderFlow,
+  CARRIER_ISSUE_DEFS,
+  DEFAULT_ORDER_TAB,
+  parseCarrierIssue,
+  parseLegacyIssue,
   parseOrderStatus,
+  parseOrderTab,
 } from '../labels';
 import { BulkCancelDialog } from './bulk-cancel-dialog';
 import { CancelWaybillDialog } from './cancel-waybill-dialog';
@@ -110,7 +114,7 @@ import { BulkReprintWaybillDialog } from './bulk-reprint-waybill-dialog';
 import { BulkRetryWaybillDialog, retryableWaybill } from './bulk-retry-waybill-dialog';
 import { BulkShippingDialog } from './bulk-shipping-dialog';
 import { carrierTone } from './carrier-status-card';
-import { OrderFlowTabs } from './order-flow-tabs';
+import { CarrierStageTag, OrderTabs, type OrderTabView } from './order-tabs';
 import { FlowBadge, OrderQuickView, TelcoBadge } from './order-quick-view';
 import { OrderSavedViews } from './order-saved-views';
 import { OrderScanButton } from './order-scan-button';
@@ -150,6 +154,9 @@ const DEFAULTS = {
   size: 50,
   filterKeys: [
     'flow',
+    // Tab cha "Cần xử lý" (`view=issues`) + chip của nó (`ci`), 2026-11-07.
+    'view',
+    'ci',
     // Tab cha (2026-11-03): wait / fulfil / issue / ship, `all` = mọi trạng thái (link từ màn khác).
     // Có `flow` thì nhóm suy từ flow.
     'group',
@@ -594,6 +601,12 @@ const buildColumns = (
             <span title={o.fulfilmentStatus ? fulfilmentLabel(o.fulfilmentStatus) : undefined}>
               <FlowBadge flow={o.flow} />
             </span>
+            {/* Trạng thái hãng (2026-11-07) — chữ hãng gần nhất khi rê chuột. */}
+            {o.carrierStage ? (
+              <span title={o.carrierStatusText ?? undefined}>
+                <CarrierStageTag stage={o.carrierStage} />
+              </span>
+            ) : null}
             {o.sameDayCount > 0 ? (
               <span className="inline-flex items-center gap-0.5">
                 <span title={`Cùng SĐT khách còn ${o.sameDayCount} đơn khác hôm đặt đơn này`}>
@@ -1079,7 +1092,13 @@ export function CarrierFilter({
 
 export function OrderListScreen() {
   const { state, set, skipTake } = useListState<OrderFilter>(DEFAULTS);
-  const urlFlow = parseOrderFlow(state.filters.flow);
+  // Tab cha (2026-11-07): `?view=issues` = "Cần xử lý" (chip `?ci=`), còn lại = "Đơn hàng" (chip
+  // `?flow=` — giữ tên tham số cũ, link cũ đổi sang chip mới qua parseOrderTab). Link cũ
+  // `?flow=NEEDS_FIX` / `CARRIER_CANCELLED` mở thẳng chip Cần xử lý tương ứng.
+  const legacyIssue = parseLegacyIssue(state.filters.flow);
+  const view: OrderTabView = state.filters.view === 'issues' || legacyIssue ? 'issues' : 'orders';
+  const issue: CarrierIssue | null = parseCarrierIssue(state.filters.ci) ?? legacyIssue ?? null;
+  const urlFlow = parseOrderTab(state.filters.flow);
   // Tab trạng thái v3 (2026-11-04): 14 trạng thái hiện cùng lúc, luôn chọn đúng một (mặc định Đơn
   // mới). Ô tìm có chữ / link `group=all` (từ màn khác) → xem mọi trạng thái (tìm đơn đã giao không
   // ra 0 vì đang ở tab khác). `?group=<nhóm>` cũ bỏ qua.
@@ -1089,9 +1108,21 @@ export function OrderListScreen() {
   // 2026-11-06 (user): mở màn (URL không có tab / nhóm / chữ) → tab Tất cả; bấm tab nào cũng ghi
   // `flow` tường minh trên URL.
   const openedPlain = !urlFlow && state.filters.group === undefined && state.q === '';
-  const searching = openedPlain || state.filters.group === 'all' || (state.q !== '' && !urlFlow);
-  const currentFlow: OrderFlow = urlFlow ?? DEFAULT_ORDER_FLOW;
-  const flow = searching ? undefined : currentFlow;
+  const searching =
+    view === 'orders' &&
+    (openedPlain || state.filters.group === 'all' || (state.q !== '' && !urlFlow));
+  const currentFlow: OrderTab = urlFlow ?? DEFAULT_ORDER_TAB;
+  const flow = view === 'orders' && !searching ? currentFlow : undefined;
+  // Điều kiện tab gửi API: chip "Đơn hàng" (`tab`) hoặc chip "Cần xử lý" (Tất cả = mọi chip).
+  const tabParams = useMemo(
+    () =>
+      view === 'issues'
+        ? { carrierIssue: issue ? [issue] : CARRIER_ISSUE_DEFS.map((d) => d.issue) }
+        : flow
+          ? { tab: flow }
+          : {},
+    [view, issue, flow],
+  );
   const status = parseOrderStatus(state.filters.status);
   const customerId = state.filters.customerId ?? '';
   const weightMin = state.filters.weightMin ?? '';
@@ -1222,12 +1253,12 @@ export function OrderListScreen() {
   const params = useMemo(
     () => ({
       ...filterParams,
-      flow,
+      ...tabParams,
       sortBy,
       sortDir: sortBy ? (sort?.desc ? ('desc' as const) : ('asc' as const)) : undefined,
       ...skipTake,
     }),
-    [filterParams, flow, sortBy, sort?.desc, skipTake],
+    [filterParams, tabParams, sortBy, sort?.desc, skipTake],
   );
   const carriers = useCarriers();
   // Chữ chip "Đang lọc" của hai ô tự vẽ (sản phẩm, hãng) — cùng nguồn dữ liệu với ô chọn.
@@ -1313,17 +1344,18 @@ export function OrderListScreen() {
   // tải 2 lần (lần đầu chưa có sort, lần sau có), mỗi lần ~5 s trên prod (sự cố pool 2026-11-02).
   // Đọc prefs lỗi thì vẫn tải (isPending = false).
   const query = useOrders(params, { enabled: state.sort != null || !prefs.isPending });
-  // Đếm cả 14 trạng thái trong một lần (GROUP BY flow).
-  const counts = useOrderFlowCounts(filterParams);
+  // Số chip của cả hai tab cha — số "Cần xử lý" hiện trên tab cha cả khi đang ở "Đơn hàng".
+  const orderCounts = useOrderTabCounts(filterParams, 'orders');
+  const issueCounts = useOrderTabCounts(filterParams, 'issues');
   // Xuất Excel = mọi trang của đúng bộ lọc + tab + sắp xếp đang xem.
   const exportParams = useMemo(
     () => ({
       ...filterParams,
-      flow,
+      ...tabParams,
       sortBy,
       sortDir: sortBy ? (sort?.desc ? ('desc' as const) : ('asc' as const)) : undefined,
     }),
-    [filterParams, flow, sortBy, sort?.desc],
+    [filterParams, tabParams, sortBy, sort?.desc],
   );
   const exportColumns = useMemo(() => {
     const carrierById = new Map((carriers.data ?? []).map((c) => [c.id, c]));
@@ -1421,17 +1453,43 @@ export function OrderListScreen() {
         }
       />
 
-      <OrderFlowTabs
-        flow={currentFlow}
-        counts={counts.data}
+      <OrderTabs
+        view={view}
+        tab={currentFlow}
+        issue={issue}
+        orderCounts={orderCounts.data}
+        issueCounts={issueCounts.data}
         searching={searching}
         searchingLabel={state.q}
-        onFlowChange={(f) =>
+        onViewChange={(v) =>
           set({
             filters: {
               ...state.filters,
+              view: v === 'issues' ? 'issues' : undefined,
+              // Link cũ ?flow=NEEDS_FIX: về "Đơn hàng" thì bỏ, không còn là chip.
+              flow: legacyIssue ? undefined : state.filters.flow,
+              ci: v === 'issues' ? (issue ?? undefined) : undefined,
+            },
+          })
+        }
+        onTabChange={(f) =>
+          set({
+            filters: {
+              ...state.filters,
+              view: undefined,
+              ci: undefined,
               group: undefined,
               flow: f,
+            },
+          })
+        }
+        onIssueChange={(i) =>
+          set({
+            filters: {
+              ...state.filters,
+              view: 'issues',
+              ci: i ?? undefined,
+              flow: legacyIssue ? undefined : state.filters.flow,
             },
           })
         }

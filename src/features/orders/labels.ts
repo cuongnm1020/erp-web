@@ -2,7 +2,10 @@ import Decimal from 'decimal.js';
 import type { StatusTone } from '@/components/data/status-badge';
 import { formatMoney } from '@/lib/format';
 import type {
+  CarrierIssue,
+  CarrierStage,
   OrderFlow,
+  OrderTab,
   SalesOrderChannel,
   SalesOrderDetail,
   SalesOrderStatus,
@@ -439,6 +442,106 @@ export function parseOrderFlow(v: string | undefined): OrderFlow | undefined {
   // Link cũ ?flow=WAYBILL_ERROR (tab Lỗi vận đơn, nay gộp vào Cần sửa 2026-11-02).
   if (v === 'WAYBILL_ERROR') return 'NEEDS_FIX';
   return ORDER_FLOW_TABS.find((t) => t.flow === v)?.flow;
+}
+
+// ── Tab cha "Đơn hàng" / "Cần xử lý" (2026-11-07, mockup SbgUqZzjfFrgyto7HKPeVC đã duyệt) ──
+
+/** Chip tab cha "Đơn hàng" — mỗi đơn đúng một chip (API `?tab=`). */
+export const ORDER_TAB_DEFS: ReadonlyArray<{
+  tab: OrderTab;
+  label: string;
+  family: OrderFlowFamily;
+}> = [
+  { tab: 'NEW', label: 'Đơn mới', family: 'wait' },
+  { tab: 'WAITING_STOCK', label: 'Chờ hàng', family: 'wait' },
+  { tab: 'WAREHOUSE', label: 'Đã xác nhận', family: 'fulfil' },
+  { tab: 'PICKING', label: 'Đang đóng hàng', family: 'fulfil' },
+  { tab: 'PACKED', label: 'Chờ chuyển hàng', family: 'fulfil' },
+  { tab: 'SHIPPED', label: 'Đã gửi hàng', family: 'ship' },
+  { tab: 'OUT_FOR_DELIVERY', label: 'Đang giao', family: 'ship' },
+  { tab: 'DELIVERED', label: 'Đã nhận', family: 'done' },
+  { tab: 'PAID', label: 'Đã thu tiền', family: 'done' },
+  { tab: 'RETURNING', label: 'Đang hoàn', family: 'issue' },
+  { tab: 'PARTIAL', label: 'Hoàn 1 phần', family: 'issue' },
+  { tab: 'RETURNED', label: 'Đã hoàn', family: 'off' },
+  { tab: 'CANCELLED', label: 'Đã hủy', family: 'off' },
+];
+
+/** Chip tab cha "Cần xử lý" (API `?carrierIssue=`). Chưa đối soát không cộng vào số tab cha. */
+export const CARRIER_ISSUE_DEFS: ReadonlyArray<{
+  issue: CarrierIssue;
+  label: string;
+  family: OrderFlowFamily;
+}> = [
+  { issue: 'NEEDS_FIX', label: 'Cần sửa', family: 'issue' },
+  { issue: 'PICKUP_DELAYED', label: 'Trễ lấy hàng', family: 'issue' },
+  { issue: 'PICKUP_FAILED', label: 'Không lấy được hàng', family: 'issue' },
+  { issue: 'CARRIER_CANCELLED', label: 'Hãng hủy', family: 'issue' },
+  { issue: 'DELIVERY_DELAYED', label: 'Trễ giao hàng', family: 'issue' },
+  { issue: 'DELIVERY_FAILED', label: 'Giao không thành công', family: 'issue' },
+  { issue: 'UNRECONCILED', label: 'Chưa đối soát', family: 'done' },
+  { issue: 'RECON_MISMATCH', label: 'Đối soát lệch', family: 'issue' },
+  { issue: 'RETURNED_TO_SENDER', label: 'Hãng đã trả hàng', family: 'issue' },
+  { issue: 'INCIDENT', label: 'Sự cố', family: 'issue' },
+];
+
+export const DEFAULT_ORDER_TAB: OrderTab = 'NEW';
+
+/**
+ * `?flow=` trên URL giữ chip "Đơn hàng" (link cũ / màn khác dùng tên tab cũ vẫn mở đúng chip).
+ * Tên cũ không còn chip: Đã lấy hàng / Đang vận chuyển → Đã gửi hàng, Thành công → Đã nhận, Sự cố
+ * hoàn → Đang hoàn. Cần sửa / Hãng hủy → {@link parseLegacyIssue}.
+ */
+export function parseOrderTab(v: string | undefined): OrderTab | undefined {
+  if (v === 'PICKED_UP' || v === 'IN_TRANSIT') return 'SHIPPED';
+  return ORDER_TAB_DEFS.find((t) => t.tab === v)?.tab;
+}
+
+export function parseCarrierIssue(v: string | undefined): CarrierIssue | undefined {
+  return CARRIER_ISSUE_DEFS.find((t) => t.issue === v)?.issue;
+}
+
+/** Link cũ `?flow=NEEDS_FIX` / `WAYBILL_ERROR` / `CARRIER_CANCELLED` → chip "Cần xử lý". */
+export function parseLegacyIssue(v: string | undefined): CarrierIssue | undefined {
+  if (v === 'NEEDS_FIX' || v === 'WAYBILL_ERROR') return 'NEEDS_FIX';
+  if (v === 'CARRIER_CANCELLED') return 'CARRIER_CANCELLED';
+  return undefined;
+}
+
+export function orderTabLabel(t: OrderTab): string {
+  return ORDER_TAB_DEFS.find((d) => d.tab === t)?.label ?? t;
+}
+
+export function carrierIssueLabel(i: CarrierIssue): string {
+  return CARRIER_ISSUE_DEFS.find((d) => d.issue === i)?.label ?? i;
+}
+
+/** Cột "Thẻ" tab Cần xử lý — chữ + họ màu của trạng thái hãng. */
+const CARRIER_STAGE_DEFS: Record<CarrierStage, { label: string; family: OrderFlowFamily }> = {
+  WAITING_PICKUP: { label: 'Chờ lấy hàng', family: 'fulfil' },
+  PICKUP_DELAYED: { label: 'Trễ lấy hàng', family: 'issue' },
+  PICKUP_FAILED: { label: 'Không lấy được hàng', family: 'issue' },
+  CARRIER_CANCELLED: { label: 'Hãng hủy', family: 'issue' },
+  IN_TRANSIT: { label: 'Đang vận chuyển', family: 'ship' },
+  OUT_FOR_DELIVERY: { label: 'Đang giao', family: 'ship' },
+  DELIVERY_DELAYED: { label: 'Trễ giao hàng', family: 'issue' },
+  DELIVERY_FAILED: { label: 'Giao không thành công', family: 'issue' },
+  DELIVERED: { label: 'Chưa đối soát', family: 'done' },
+  PAID: { label: 'Đã thu tiền', family: 'done' },
+  RECON_MISMATCH: { label: 'Đối soát lệch', family: 'issue' },
+  PARTIAL: { label: 'Hoàn 1 phần', family: 'issue' },
+  RETURNING: { label: 'Đang hoàn', family: 'issue' },
+  RETURNED_TO_SENDER: { label: 'Hãng đã trả hàng', family: 'issue' },
+  RETURN_RECEIVED: { label: 'Đã nhập hàng hoàn', family: 'off' },
+  INCIDENT: { label: 'Sự cố', family: 'issue' },
+};
+
+export function carrierStageLabel(s: CarrierStage): string {
+  return CARRIER_STAGE_DEFS[s].label;
+}
+
+export function carrierStageFamily(s: CarrierStage): OrderFlowFamily {
+  return CARRIER_STAGE_DEFS[s].family;
 }
 
 export function orderFlowLabel(f: OrderFlow): string {

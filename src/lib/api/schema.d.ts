@@ -3916,6 +3916,27 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/sales-orders/tab-counts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Số đơn từng chip của tab cha "Đơn hàng" (`group=orders`) / "Cần xử lý" (`group=issues`)
+         *     (2026-11-07) — cùng bộ lọc với GET /sales-orders, bỏ qua `flow`, `flows`, `tab`,
+         *     `carrierIssue`. Khai TRƯỚC `:id`.
+         */
+        get: operations["SalesOrderController_tabCounts"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/sales-orders/issue-counts": {
         parameters: {
             query?: never;
@@ -12193,6 +12214,12 @@ export interface components {
             /** @description Chữ trạng thái hãng gửi gần nhất (nguyên văn, 2026-11-03); null = hãng chưa báo gì. */
             carrierStatusText: string | null;
             /**
+             * @description Trạng thái hãng (2026-11-07) — cột "Thẻ" tab Cần xử lý. Chờ lấy hàng quá 24 giờ kể từ Gửi ĐVVC
+             *     trả `PICKUP_DELAYED`. Null = chưa gửi hãng.
+             * @enum {string|null}
+             */
+            carrierStage: "IN_TRANSIT" | "OUT_FOR_DELIVERY" | "DELIVERED" | "CARRIER_CANCELLED" | "WAITING_PICKUP" | "PICKUP_DELAYED" | "PICKUP_FAILED" | "DELIVERY_DELAYED" | "DELIVERY_FAILED" | "PAID" | "RECON_MISMATCH" | "PARTIAL" | "RETURNING" | "RETURNED_TO_SENDER" | "RETURN_RECEIVED" | "INCIDENT" | null;
+            /**
              * @description Lý do "Đóng gói + in vận đơn" lần gần nhất KHÔNG đóng gói được (lời lỗi nghiệp vụ của API,
              *     2026-11-02); null = không lỗi / đã đóng gói. Lỗi sau khi đóng gói là `waybillError`.
              */
@@ -12372,6 +12399,44 @@ export interface components {
             RETURNED?: number;
             CARRIER_CANCELLED?: number;
             CANCELLED?: number;
+        };
+        SalesOrderTabChipCountsDto: {
+            NEW?: number;
+            WAITING_STOCK?: number;
+            WAREHOUSE?: number;
+            PICKING?: number;
+            PACKED?: number;
+            /** @description Đã gửi hàng — hãng đã lấy, đang trung chuyển. */
+            SHIPPED?: number;
+            OUT_FOR_DELIVERY?: number;
+            /** @description Đã nhận — giao thành công, chưa thu tiền COD. */
+            DELIVERED?: number;
+            /** @description Đã thu tiền — hãng đối soát / file đối soát khớp tiền. */
+            PAID?: number;
+            /** @description Đang hoàn — gồm cả hãng đã trả mà kho chưa nhập. */
+            RETURNING?: number;
+            /** @description Hoàn 1 phần. */
+            PARTIAL?: number;
+            /** @description Đã hoàn — kho đã nhập hàng hoàn. */
+            RETURNED?: number;
+            CANCELLED?: number;
+            NEEDS_FIX?: number;
+            PICKUP_DELAYED?: number;
+            PICKUP_FAILED?: number;
+            CARRIER_CANCELLED?: number;
+            DELIVERY_DELAYED?: number;
+            DELIVERY_FAILED?: number;
+            UNRECONCILED?: number;
+            RECON_MISMATCH?: number;
+            RETURNED_TO_SENDER?: number;
+            INCIDENT?: number;
+        };
+        SalesOrderTabCountsDto: {
+            /** @description Chip "Tất cả" của tab cha: `orders` = mọi đơn khớp bộ lọc; `issues` = đơn thuộc ít nhất một chip. */
+            total: number;
+            /** @description Chỉ `issues`: số trên tab cha "Cần xử lý" — bỏ Chưa đối soát. */
+            attention?: number;
+            counts: components["schemas"]["SalesOrderTabChipCountsDto"];
         };
         OrderIssueCodeCountDto: {
             /** @description PICKUP_WAREHOUSE_NOT_READY, CARRIER_REJECTED, CARRIER_WAYBILL_DATA… */
@@ -24537,6 +24602,18 @@ export interface operations {
                  */
                 flows?: ("NEW" | "PENDING_APPROVAL" | "WAREHOUSE" | "WAITING_STOCK" | "PICKING" | "PACKED" | "NEEDS_FIX" | "PICKED_UP" | "IN_TRANSIT" | "OUT_FOR_DELIVERY" | "DELIVERED" | "RETURNED" | "CARRIER_CANCELLED" | "CANCELLED")[];
                 /**
+                 * @description Chip của tab cha "Đơn hàng" (2026-11-07) — mỗi đơn đúng một chip: tab ERP tới Chờ chuyển hàng
+                 *     (cột `flow`) + Đã gửi hàng · Đang giao · Đã nhận · Đã thu tiền · Đang hoàn · Hoàn 1 phần · Đã
+                 *     hoàn (trạng thái hãng) · Đã hủy. Đếm: GET /sales-orders/tab-counts. Bỏ qua `flow` / `flows`.
+                 */
+                tab?: "NEW" | "WAITING_STOCK" | "WAREHOUSE" | "PICKING" | "PACKED" | "SHIPPED" | "OUT_FOR_DELIVERY" | "DELIVERED" | "PAID" | "RETURNING" | "PARTIAL" | "RETURNED" | "CANCELLED";
+                /**
+                 * @description Chip của tab cha "Cần xử lý" (2026-11-07): Cần sửa · Trễ lấy hàng (mã hãng hoặc chờ lấy quá 24
+                 *     giờ) · Không lấy được · Hãng hủy · Trễ giao · Giao không thành công · Chưa đối soát · Đối soát
+                 *     lệch · Hãng đã trả hàng · Sự cố. Lặp tham số = đơn thuộc MỘT trong các chip (chip "Tất cả").
+                 */
+                carrierIssue?: ("NEEDS_FIX" | "PICKUP_DELAYED" | "PICKUP_FAILED" | "CARRIER_CANCELLED" | "DELIVERY_DELAYED" | "DELIVERY_FAILED" | "UNRECONCILED" | "RECON_MISMATCH" | "RETURNED_TO_SENDER" | "INCIDENT")[];
+                /**
                  * @description Đơn có sản phẩm KHÔNG phải hàng ERP (2026-10-22): `CUSTOM` = có món gõ tay trên Pancake
                  *     (`sales_order_external.custom_items`), `POS_SKU` = có dòng là SKU do đồng bộ Pancake tự tạo
                  *     (liên kết sản phẩm `auto`), `NON_ERP` = một trong hai.
@@ -24810,6 +24887,18 @@ export interface operations {
                  */
                 flows?: ("NEW" | "PENDING_APPROVAL" | "WAREHOUSE" | "WAITING_STOCK" | "PICKING" | "PACKED" | "NEEDS_FIX" | "PICKED_UP" | "IN_TRANSIT" | "OUT_FOR_DELIVERY" | "DELIVERED" | "RETURNED" | "CARRIER_CANCELLED" | "CANCELLED")[];
                 /**
+                 * @description Chip của tab cha "Đơn hàng" (2026-11-07) — mỗi đơn đúng một chip: tab ERP tới Chờ chuyển hàng
+                 *     (cột `flow`) + Đã gửi hàng · Đang giao · Đã nhận · Đã thu tiền · Đang hoàn · Hoàn 1 phần · Đã
+                 *     hoàn (trạng thái hãng) · Đã hủy. Đếm: GET /sales-orders/tab-counts. Bỏ qua `flow` / `flows`.
+                 */
+                tab?: "NEW" | "WAITING_STOCK" | "WAREHOUSE" | "PICKING" | "PACKED" | "SHIPPED" | "OUT_FOR_DELIVERY" | "DELIVERED" | "PAID" | "RETURNING" | "PARTIAL" | "RETURNED" | "CANCELLED";
+                /**
+                 * @description Chip của tab cha "Cần xử lý" (2026-11-07): Cần sửa · Trễ lấy hàng (mã hãng hoặc chờ lấy quá 24
+                 *     giờ) · Không lấy được · Hãng hủy · Trễ giao · Giao không thành công · Chưa đối soát · Đối soát
+                 *     lệch · Hãng đã trả hàng · Sự cố. Lặp tham số = đơn thuộc MỘT trong các chip (chip "Tất cả").
+                 */
+                carrierIssue?: ("NEEDS_FIX" | "PICKUP_DELAYED" | "PICKUP_FAILED" | "CARRIER_CANCELLED" | "DELIVERY_DELAYED" | "DELIVERY_FAILED" | "UNRECONCILED" | "RECON_MISMATCH" | "RETURNED_TO_SENDER" | "INCIDENT")[];
+                /**
                  * @description Đơn có sản phẩm KHÔNG phải hàng ERP (2026-10-22): `CUSTOM` = có món gõ tay trên Pancake
                  *     (`sales_order_external.custom_items`), `POS_SKU` = có dòng là SKU do đồng bộ Pancake tự tạo
                  *     (liên kết sản phẩm `auto`), `NON_ERP` = một trong hai.
@@ -24951,6 +25040,202 @@ export interface operations {
             };
         };
     };
+    SalesOrderController_tabCounts: {
+        parameters: {
+            query: {
+                /**
+                 * @description Ai gán hãng (2026-10-25): `ERP` = chọn trong ERP (sửa đơn / Gửi sang ĐVVC / tạo đơn) — đã có
+                 *     hãng, phiếu giao mới nhất không gửi ngoài ERP; `PANCAKE` = Pancake gán hãng + cấp vận đơn
+                 *     (phiếu gửi ngoài ERP).
+                 */
+                carrierSource?: "ERP" | "PANCAKE";
+                /**
+                 * @description Chữ "Trạng thái VC" gần nhất hãng gửi (2026-10-28) — khớp ĐÚNG một trong các giá trị (lặp
+                 *     tham số cho nhiều giá trị: `?carrierStatusText=a&carrierStatusText=b`). Giá trị chọn được:
+                 *     GET /sales-orders/carrier-status-options.
+                 */
+                carrierStatusText?: string[];
+                /**
+                 * @description Bộ lọc "Đã gửi ĐVVC — in tem" (2026-11-02), chỉ đơn ĐÃ gửi sang ĐVVC (`sentToCarrierAt`):
+                 *     `PRINTED` đã in tem (phiếu giao mới nhất có `labelPrintedAt`); `NOT_PRINTED` chưa in, không lỗi;
+                 *     `ERROR` có lỗi — "Đóng gói + in" không đóng gói được (`packError`) hoặc lỗi vận đơn.
+                 */
+                printStatus?: "PRINTED" | "NOT_PRINTED" | "ERROR";
+                /**
+                 * @description Hãng đã lấy hàng chưa (2026-11-03, màn Theo dõi đơn), chỉ đơn ĐÃ gửi sang ĐVVC chưa hủy:
+                 *     `AWAITING` hãng chưa tới bắn mã lấy hàng (trạng thái kho tới Đã đóng gói); `PICKED_UP` hãng đã
+                 *     lấy (Đã lấy hàng → Thành công / Hoàn). Hãng hủy mã không thuộc nhóm nào.
+                 */
+                pickupStatus?: "AWAITING" | "PICKED_UP";
+                /**
+                 * @description Nhóm đơn lỗi (2026-11-02; quyền `sales_order.issues` từ 2026-11-03 — thiếu thì 403 ORDER_ISSUES_FORBIDDEN), đơn
+                 *     chưa hủy: `WAYBILL_ERROR` phiếu giao mới nhất lỗi vận đơn · `CARRIER_CANCELLED` hãng hủy mã,
+                 *     chưa xin lại · `PACK_ERROR` "Đóng gói + in" lần trước không đóng gói được · `AWAITING_PICKUP`
+                 *     có mã vận đơn, hãng chưa lấy hàng · `UNSENT` đã xác nhận, chưa Gửi sang ĐVVC.
+                 */
+                issue?: "WAYBILL_ERROR" | "CARRIER_CANCELLED" | "PACK_ERROR" | "AWAITING_PICKUP" | "UNSENT";
+                /** @description Trường ngày mà from/to lọc — xem ORDER_DATE_FIELDS. Bỏ trống = `orderDate`. */
+                dateField?: "orderDate" | "createdAt" | "updatedAt" | "sentToCarrierAt";
+                /**
+                 * @description Tab của danh sách đơn (2026-10-12) — gộp trạng thái chứng từ + kho / giao hàng
+                 *     (`flowOf` trong sales-order-flow.ts). Đếm từng tab: GET /sales-orders/flow-counts.
+                 */
+                flow?: "NEW" | "PENDING_APPROVAL" | "WAREHOUSE" | "WAITING_STOCK" | "PICKING" | "PACKED" | "NEEDS_FIX" | "PICKED_UP" | "IN_TRANSIT" | "OUT_FOR_DELIVERY" | "DELIVERED" | "RETURNED" | "CARRIER_CANCELLED" | "CANCELLED";
+                /**
+                 * @description Nhiều tab cùng lúc (2026-11-03, tab cha "Tất cả kho"…): đơn thuộc MỘT trong các tab (lặp tham
+                 *     số: `?flows=WAREHOUSE&flows=PICKING`). Bỏ qua khi có `flow`.
+                 */
+                flows?: ("NEW" | "PENDING_APPROVAL" | "WAREHOUSE" | "WAITING_STOCK" | "PICKING" | "PACKED" | "NEEDS_FIX" | "PICKED_UP" | "IN_TRANSIT" | "OUT_FOR_DELIVERY" | "DELIVERED" | "RETURNED" | "CARRIER_CANCELLED" | "CANCELLED")[];
+                /**
+                 * @description Chip của tab cha "Đơn hàng" (2026-11-07) — mỗi đơn đúng một chip: tab ERP tới Chờ chuyển hàng
+                 *     (cột `flow`) + Đã gửi hàng · Đang giao · Đã nhận · Đã thu tiền · Đang hoàn · Hoàn 1 phần · Đã
+                 *     hoàn (trạng thái hãng) · Đã hủy. Đếm: GET /sales-orders/tab-counts. Bỏ qua `flow` / `flows`.
+                 */
+                tab?: "NEW" | "WAITING_STOCK" | "WAREHOUSE" | "PICKING" | "PACKED" | "SHIPPED" | "OUT_FOR_DELIVERY" | "DELIVERED" | "PAID" | "RETURNING" | "PARTIAL" | "RETURNED" | "CANCELLED";
+                /**
+                 * @description Chip của tab cha "Cần xử lý" (2026-11-07): Cần sửa · Trễ lấy hàng (mã hãng hoặc chờ lấy quá 24
+                 *     giờ) · Không lấy được · Hãng hủy · Trễ giao · Giao không thành công · Chưa đối soát · Đối soát
+                 *     lệch · Hãng đã trả hàng · Sự cố. Lặp tham số = đơn thuộc MỘT trong các chip (chip "Tất cả").
+                 */
+                carrierIssue?: ("NEEDS_FIX" | "PICKUP_DELAYED" | "PICKUP_FAILED" | "CARRIER_CANCELLED" | "DELIVERY_DELAYED" | "DELIVERY_FAILED" | "UNRECONCILED" | "RECON_MISMATCH" | "RETURNED_TO_SENDER" | "INCIDENT")[];
+                /**
+                 * @description Đơn có sản phẩm KHÔNG phải hàng ERP (2026-10-22): `CUSTOM` = có món gõ tay trên Pancake
+                 *     (`sales_order_external.custom_items`), `POS_SKU` = có dòng là SKU do đồng bộ Pancake tự tạo
+                 *     (liên kết sản phẩm `auto`), `NON_ERP` = một trong hai.
+                 */
+                itemOrigin?: "CUSTOM" | "POS_SKU" | "NON_ERP";
+                /** @description Sắp xếp theo cột (2026-10-22); mặc định ngày đặt mới nhất trước. */
+                sortBy?: "orderDate" | "docNumber" | "customer" | "total" | "time" | "statusChangedAt" | "sentToCarrierAt" | "items" | "weight";
+                customerId?: string;
+                status?: "DRAFT" | "PENDING_APPROVAL" | "APPROVED" | "POSTED" | "CANCELLED";
+                /** @description Lọc theo cân nặng gửi hãng HIỆU LỰC (đặt tay, không thì Σ dòng) — kg, chuỗi decimal, cận dưới (≥). */
+                weightMin?: string;
+                /** @description Cận trên (≤), kg. Cùng giá trị với weightMin = lọc đúng một mức cân. */
+                weightMax?: string;
+                /**
+                 * @description Giá trị đơn (`total`, gồm phí ship / phụ thu / làm tròn) ≥ giá trị này — chuỗi decimal ≥ 0
+                 *     (2026-11-02). Lọc "= X" gửi totalMin = totalMax = X; "≤ X" chỉ gửi totalMax.
+                 */
+                totalMin?: string;
+                /** @description Giá trị đơn ≤ giá trị này — chuỗi decimal ≥ 0. Phải ≥ totalMin. */
+                totalMax?: string;
+                /** @description Chỉ đơn CHƯA chọn hãng (`true`) — gom đơn cần gán hãng. */
+                noCarrier?: string;
+                /** @description Chỉ đơn ĐÃ gán (gửi sang) ĐVVC — `sentToCarrierAt` có giá trị (`true`, 2026-11-03). */
+                sentToCarrier?: string;
+                /** @description Đơn ĐÃ gán hãng này (wms.Carrier.id). Kết hợp được với from/to. */
+                carrierId?: string;
+                /**
+                 * @description Đơn gán MỘT tài khoản hãng (wms.CarrierAccount.id, 2026-10-25) — đơn chưa chọn tài khoản
+                 *     (`carrierAccountId` null) tính là tài khoản mặc định của hãng. Thay được cho `carrierId`.
+                 */
+                carrierAccountId?: string;
+                /** @description Chỉ đơn có ngày đơn cũ hơn N ngày (so với bây giờ) — dùng với `issue`. */
+                olderThanDays?: number;
+                /**
+                 * @description Với `issue=PACK_ERROR`: `true` = việc lấy hàng nay không còn dòng thiếu tồn (đóng gói lại
+                 *     được), `false` = vẫn thiếu. Theo snapshot `SalesOrderFulfilment.waitingStockSince`.
+                 */
+                stockReady?: "true" | "false";
+                /** @description Đơn có dòng SKU này (core.Sku.id) — kể cả dòng thành phần của combo SKU này (2026-11-02). */
+                skuId?: string;
+                /**
+                 * @description Với `skuId`: `true` = chỉ đơn mà MỌI dòng đều là SKU đó (hoặc thành phần của combo SKU đó) —
+                 *     "lọc sản phẩm duy nhất" màn In đơn (2026-11-04). Không có `skuId` thì bỏ qua.
+                 */
+                skuOnly?: "true" | "false";
+                /**
+                 * @description `true` = tab Đã xác nhận (`WAREHOUSE`) chỉ gồm đơn CHƯA có mã vận đơn — màn In đơn (2026-11-06).
+                 *     Áp cho danh sách khi lọc tab đó và cho số đếm tab đó; tab khác không đổi.
+                 */
+                warehouseNoWaybill?: "true" | "false";
+                /** @description Đơn đang thiếu tồn SKU này (core.Sku.id) — "Xem đơn" từ màn Hàng chờ (2026-10-25). */
+                shortSkuId?: string;
+                /**
+                 * @description Khoảng ngày (ISO) trên trường `dateField` (mặc định `orderDate`): `from` ≤ ngày. `to` là NGÀY
+                 *     (`YYYY-MM-DD`) thì lấy hết ngày đó (< to + 1 ngày, giờ Việt Nam); là datetime thì ≤ to.
+                 */
+                from?: string;
+                to?: string;
+                /**
+                 * @description Khung giờ trong ngày (giờ VN, `HH:mm`) trên `dateField` (2026-11-06, màn In đơn: "gán từ 8h đến
+                 *     10h"): mỗi ngày trong from/to chỉ lấy đơn có giờ ≥ `timeFrom` và ≤ `timeTo` (trọn phút cuối).
+                 *     Bỏ trống một đầu = đầu / cuối ngày. Không có from/to = hôm nay. Khoảng ngày > 62 ngày → 422.
+                 */
+                timeFrom?: string;
+                timeTo?: string;
+                /** @description Kho lấy hàng chọn trên đơn (wms.Warehouse.id). */
+                warehouseId?: string;
+                /** @description Nguồn đơn: `PANCAKE` = đồng bộ từ Pancake, `ERP` = tạo trong ERP. */
+                source?: "PANCAKE" | "ERP";
+                /**
+                 * @description Chỉ đơn của các shop (POS) Pancake này — mã shop Pancake (số nguyên dương, chuỗi), nhiều mã
+                 *     cách nhau dấu phẩy (tối đa 100, 2026-11-04). Danh sách POS: GET /pancake-sync/shops. Đơn ERP
+                 *     chọn POS khi tạo cũng thuộc POS đó. Kèm `source=ERP` thì không đơn nào khớp.
+                 */
+                pancakeShopId?: string;
+                /**
+                 * @description Chỉ đơn của các page Facebook này (id core.FacebookPage, cách nhau dấu phẩy, tối đa 100) — đơn
+                 *     Pancake theo Page ID + đơn ERP chọn page (2026-10-26). Danh sách: GET /facebook-pages/options.
+                 */
+                facebookPageIds?: string;
+                /** @description Người phụ trách (SalesOrder.ownerId). */
+                ownerId?: string;
+                /**
+                 * @description Người bấm tạo đơn (2026-10-29): đơn ERP theo `createdBy`, đơn Pancake theo người tạo trên
+                 *     Pancake (`external.creatorUserId`) — cùng nguồn với cột `creatorName`.
+                 */
+                creatorId?: string;
+                /**
+                 * @description NV in đơn (2026-11-03, màn Theo dõi đơn): người in tem vận đơn lần gần nhất của phiếu giao mới
+                 *     nhất. Lần in trước 2026-11-03 không ghi người in nên không khớp bộ lọc này.
+                 */
+                labelPrintedBy?: string;
+                /**
+                 * @description Team CSKH lên đơn (SalesOrder.teamId) — team phòng ban CSKH, gồm cả phòng ban con. Danh sách:
+                 *     GET /sales-orders/care-team-options.
+                 */
+                careTeamId?: string;
+                /**
+                 * @description Phòng ban lên đơn — nhiều phòng (team `DEPT-<mã>`, cách nhau dấu phẩy, tối đa 100), mỗi phòng
+                 *     gồm cả phòng con; bỏ trống = mọi phòng (2026-11-02). Danh sách: GET
+                 *     /sales-orders/team-filter-options (phòng CSKH + phòng Sale/MKT đã có đơn).
+                 */
+                teamIds?: string;
+                /**
+                 * @description `true` = chỉ đơn có đơn trùng trong ngày (cùng SĐT khách, cùng ngày VN, chưa hủy, mọi nguồn —
+                 *     CSKH-5). Theo from/to nếu có, không thì 7 ngày VN gần nhất.
+                 */
+                duplicate?: string;
+                sortDir?: "asc" | "desc";
+                /**
+                 * @description Tìm theo số chứng từ, mã hoặc tên khách (không phân biệt hoa thường), SĐT khách, mã vận đơn,
+                 *     tên sản phẩm trong đơn (tên SKU / combo, có chữ cái, ≥ 2 ký tự) — hoặc id đơn Pancake (id theo shop hoặc id hệ thống trong link đơn, khớp tuyệt đối, cho phép
+                 *     tiền tố `#`). Nhiều giá trị cách nhau dấu `,` (tối đa 50) → đơn khớp bất kỳ giá trị nào; dấu
+                 *     phẩy thập phân trong tên sản phẩm ("2,4d") không tách.
+                 */
+                q?: string;
+                take: number;
+                skip: number;
+                /** @description `orders` = chip tab "Đơn hàng"; `issues` = chip tab "Cần xử lý". */
+                group: "orders" | "issues";
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SalesOrderTabCountsDto"];
+                };
+            };
+        };
+    };
     SalesOrderController_issueCounts: {
         parameters: {
             query: {
@@ -24997,6 +25282,18 @@ export interface operations {
                  *     số: `?flows=WAREHOUSE&flows=PICKING`). Bỏ qua khi có `flow`.
                  */
                 flows?: ("NEW" | "PENDING_APPROVAL" | "WAREHOUSE" | "WAITING_STOCK" | "PICKING" | "PACKED" | "NEEDS_FIX" | "PICKED_UP" | "IN_TRANSIT" | "OUT_FOR_DELIVERY" | "DELIVERED" | "RETURNED" | "CARRIER_CANCELLED" | "CANCELLED")[];
+                /**
+                 * @description Chip của tab cha "Đơn hàng" (2026-11-07) — mỗi đơn đúng một chip: tab ERP tới Chờ chuyển hàng
+                 *     (cột `flow`) + Đã gửi hàng · Đang giao · Đã nhận · Đã thu tiền · Đang hoàn · Hoàn 1 phần · Đã
+                 *     hoàn (trạng thái hãng) · Đã hủy. Đếm: GET /sales-orders/tab-counts. Bỏ qua `flow` / `flows`.
+                 */
+                tab?: "NEW" | "WAITING_STOCK" | "WAREHOUSE" | "PICKING" | "PACKED" | "SHIPPED" | "OUT_FOR_DELIVERY" | "DELIVERED" | "PAID" | "RETURNING" | "PARTIAL" | "RETURNED" | "CANCELLED";
+                /**
+                 * @description Chip của tab cha "Cần xử lý" (2026-11-07): Cần sửa · Trễ lấy hàng (mã hãng hoặc chờ lấy quá 24
+                 *     giờ) · Không lấy được · Hãng hủy · Trễ giao · Giao không thành công · Chưa đối soát · Đối soát
+                 *     lệch · Hãng đã trả hàng · Sự cố. Lặp tham số = đơn thuộc MỘT trong các chip (chip "Tất cả").
+                 */
+                carrierIssue?: ("NEEDS_FIX" | "PICKUP_DELAYED" | "PICKUP_FAILED" | "CARRIER_CANCELLED" | "DELIVERY_DELAYED" | "DELIVERY_FAILED" | "UNRECONCILED" | "RECON_MISMATCH" | "RETURNED_TO_SENDER" | "INCIDENT")[];
                 /**
                  * @description Đơn có sản phẩm KHÔNG phải hàng ERP (2026-10-22): `CUSTOM` = có món gõ tay trên Pancake
                  *     (`sales_order_external.custom_items`), `POS_SKU` = có dòng là SKU do đồng bộ Pancake tự tạo

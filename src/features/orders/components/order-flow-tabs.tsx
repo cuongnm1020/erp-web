@@ -142,7 +142,8 @@ export function OrderFlowTabs({
   );
 }
 
-function FlowChip({
+/** Chip tab trạng thái — dùng chung với tab cha màn Đơn hàng (`order-tabs.tsx`, 2026-11-07). */
+export function FlowChip({
   label,
   n,
   family,
