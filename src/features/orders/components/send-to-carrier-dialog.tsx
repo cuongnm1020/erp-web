@@ -32,7 +32,9 @@ import { Textarea } from '@/components/ui/textarea';
 import { toast } from '@/components/ui/toaster';
 import { cn } from '@/lib/cn';
 import { carrierSaid, messageFor, messageForCode } from '@/lib/error-messages';
-import { formatDate, formatTime, toLocalDateKey } from '@/lib/format';
+import { formatDate, formatQuantity, formatTime, toLocalDateKey } from '@/lib/format';
+import { isApiError } from '@/lib/api/errors';
+import Decimal from 'decimal.js';
 import { useAbility } from '@/lib/permission';
 import type { Carrier } from '@/features/wms/api/use-shipping';
 import {
@@ -102,6 +104,7 @@ export function SendToCarrierDialog({
   const [lookupState, setLookupState] = useState<'idle' | 'busy' | 'missing'>('idle');
   /** Kết quả lô vừa gửi có đơn lỗi → dialog chuyển sang danh sách đơn lỗi thay vì đóng. */
   const [failedResult, setFailedResult] = useState<SendOrdersToCarrierResult | null>(null);
+  const [stockShort, setStockShort] = useState<CarrierStockShortItem[] | null>(null);
   const lookup = useOrderLookup();
   const warehouses = usePickupWarehouses();
   const send = useSendOrdersToCarrier();
@@ -244,7 +247,11 @@ export function SendToCarrierDialog({
     }
   };
 
-  const remove = (id: string) => setOrders((cur) => cur.filter((o) => o.id !== id));
+  const remove = (id: string) => {
+    setOrders((cur) => cur.filter((o) => o.id !== id));
+    // Bỏ bớt đơn → danh sách thiếu cũ không còn đúng; bấm Gửi lại để kiểm.
+    setStockShort(null);
+  };
 
   const submit = form.handleSubmit(async (v) => {
     if (sendable.length === 0 || send.isPending) return;
@@ -280,6 +287,12 @@ export function SendToCarrierDialog({
       onOpenChange(false);
       onDone();
     } catch (err) {
+      // Không đủ tồn cho cả lô (2026-11-07): hiện danh sách SP thiếu ngay trong hộp để bỏ bớt đơn.
+      const short = carrierStockShortOf(err);
+      if (short) {
+        setStockShort(short);
+        return;
+      }
       toast.error(messageFor(err));
     }
   });
@@ -838,6 +851,8 @@ export function SendToCarrierDialog({
                     </div>
                   </div>
 
+                  {stockShort ? <CarrierStockShortNote items={stockShort} /> : null}
+
                   <DialogFooter className="border-t px-5 py-3">
                     <Button
                       type="button"
@@ -1145,6 +1160,57 @@ const OUTCOME_LABEL: Record<SendOrderToCarrierItem['outcome'], string> = {
   QUEUED: 'hãng chưa phản hồi, sẽ thử lại',
   SAVED: 'đã gán hãng, cấp vận đơn khi đóng gói',
 };
+
+/** Một SKU thiếu trong `details.items` của 409 ORDER_CARRIER_STOCK_SHORT (2026-11-07). */
+export interface CarrierStockShortItem {
+  skuCode: string;
+  skuName: string;
+  required: string;
+  available: string;
+  docNumbers: string[];
+}
+
+/** Lỗi "không đủ tồn cho cả lô" → danh sách SKU thiếu; lỗi khác → null. */
+function carrierStockShortOf(err: unknown): CarrierStockShortItem[] | null {
+  if (!isApiError(err) || err.code !== 'ORDER_CARRIER_STOCK_SHORT') return null;
+  const items = (err.details as { items?: unknown } | null)?.items;
+  if (!Array.isArray(items)) return null;
+  return items.filter(
+    (i): i is CarrierStockShortItem =>
+      typeof i === 'object' &&
+      i !== null &&
+      typeof (i as CarrierStockShortItem).skuCode === 'string',
+  );
+}
+
+/**
+ * Gửi ĐVVC bị dừng vì tồn thực không đủ cho cả lô (2026-11-07): từng SP cần bao nhiêu, kho còn bao
+ * nhiêu (đã trừ hàng gán hãng cho đơn khác chưa rời kho), đơn nào cần — để nhân viên bỏ bớt đơn.
+ */
+function CarrierStockShortNote({ items }: { items: CarrierStockShortItem[] }) {
+  return (
+    <div
+      role="alert"
+      className="mx-5 mb-3 space-y-2 rounded-md border border-destructive-line bg-destructive-weak p-3 text-sm"
+    >
+      <p className="font-semibold text-destructive">
+        Không đủ tồn cho {items.length} sản phẩm — chưa gửi đơn nào. Bỏ bớt đơn rồi bấm gửi lại.
+      </p>
+      <ul className="space-y-1">
+        {items.map((i) => (
+          <li key={i.skuCode}>
+            <span className="font-medium">{i.skuCode}</span> {i.skuName}: cần{' '}
+            {formatQuantity(i.required)}, còn {formatQuantity(i.available)}, thiếu{' '}
+            {formatQuantity(new Decimal(i.required).minus(i.available).toString())}
+            <span className="block text-xs text-muted-foreground">
+              Đơn: {i.docNumbers.join(', ')}
+            </span>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
 
 /** Toast kết quả: một câu tổng + từng nhóm kết cục, đơn hỏng kèm số đơn để tìm lại. */
 function announce(carrierCode: string, r: SendOrdersToCarrierResult, skipped: number) {

@@ -210,6 +210,46 @@ describe('Gửi sang ĐVVC — SendToCarrierMenu + SendToCarrierDialog', () => {
     // Dựng cả màn danh sách đơn + nhiều thao tác: local ~1,3 s, runner CI chậm ~6× vượt 5 s mặc định.
   }, 15_000);
 
+  it('không đủ tồn cho cả lô (409 ORDER_CARRIER_STOCK_SHORT, 2026-11-07): hộp giữ mở, liệt kê SP cần / còn / thiếu + đơn; bỏ đơn thì danh sách ẩn', async () => {
+    search = ALL;
+    toastError.mockClear();
+    server.use(
+      http.post('/api/sales-orders/send-to-carrier', () =>
+        HttpResponse.json(
+          {
+            code: 'ORDER_CARRIER_STOCK_SHORT',
+            message: 'x',
+            details: {
+              items: [
+                {
+                  warehouseId: 'w1',
+                  skuId: 's1',
+                  skuCode: 'SP-0147',
+                  skuName: 'Combi chelate 25g',
+                  required: '5',
+                  available: '3',
+                  docNumbers: ['SO-1', 'SO-2'],
+                },
+              ],
+            },
+          },
+          { status: 409 },
+        ),
+      ),
+    );
+    await selectTwoRows();
+    const dialog = await openFor('GHTK');
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Cập nhật 2 đơn' }));
+    const note = await within(dialog).findByRole('alert');
+    expect(note).toHaveTextContent('Không đủ tồn cho 1 sản phẩm — chưa gửi đơn nào');
+    expect(note).toHaveTextContent('SP-0147 Combi chelate 25g: cần 5, còn 3, thiếu 2');
+    expect(note).toHaveTextContent('Đơn: SO-1, SO-2');
+    expect(toastError).not.toHaveBeenCalled();
+    const rows = makeOrders(3);
+    fireEvent.click(within(dialog).getByRole('button', { name: `Bỏ đơn ${rows[1]!.docNumber}` }));
+    expect(within(dialog).queryByRole('alert')).not.toBeInTheDocument();
+  }, 15_000);
+
   it('NV đóng hàng (2026-11-06): đơn cùng kho → chọn người đóng gói của kho, POST kèm packerId', async () => {
     search = ALL;
     const bodies: Record<string, unknown>[] = [];

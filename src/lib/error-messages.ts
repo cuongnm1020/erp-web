@@ -241,6 +241,9 @@ const MESSAGES: Record<string, string> = {
   ORDER_SENT_TO_CARRIER:
     'Đơn đã gửi sang đơn vị vận chuyển — không sửa được. Hủy vận đơn để đơn về Đã xác nhận rồi sửa / gửi hãng khác.',
   ORDER_PACK_IN_PROGRESS: 'Kho đang đóng gói đơn này — chờ đóng gói xong rồi hủy.',
+  // 2026-11-07 (user chốt): gán hãng kiểm tồn thực cả lô; hộp Gửi ĐVVC hiện danh sách SP thiếu.
+  ORDER_CARRIER_STOCK_SHORT:
+    'Không đủ tồn cho các đơn đang gán hãng — chưa gửi đơn nào. Bỏ bớt đơn thiếu hàng rồi gửi lại.',
   ORDER_WAITING_STOCK_INVALID:
     'Chỉ đơn Đã xác nhận (chưa gửi hãng, kho chưa lấy hàng) mới chuyển Chờ hàng; chỉ đơn đang Chờ hàng mới chuyển sang Đã xác nhận được.',
   // 2026-11-05 (user chốt): "Đóng gói + in vận đơn" không còn đóng gói thiếu.
