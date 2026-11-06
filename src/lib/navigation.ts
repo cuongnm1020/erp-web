@@ -300,6 +300,8 @@ export const NAV_MODULES: NavModule[] = [
         icon: ClipboardList, // máy in nhường cho "In đơn" (user 2026-11-06)
         section: 'Vận hành',
         ability: { action: 'read', subject: 'Shipment' },
+        // Ẩn với sale + CSKH (user 2026-11-06) — họ dùng Bán hàng › Đơn hàng.
+        menuAbility: { action: 'view', subject: 'WarehouseOpsMenu' },
       },
       {
         // Đổi tên menu "Theo dõi giao hàng" → "Vận đơn" (user 2026-11-05).
@@ -308,6 +310,7 @@ export const NAV_MODULES: NavModule[] = [
         icon: Truck,
         section: 'Vận hành',
         ability: { action: 'read', subject: 'Shipment' },
+        menuAbility: { action: 'view', subject: 'WarehouseOpsMenu' },
       },
       {
         // Đơn đã gán vận chuyển (2026-11-03): đơn đã Gửi sang ĐVVC — lọc ngày gán / POS / phòng ban /
@@ -318,6 +321,7 @@ export const NAV_MODULES: NavModule[] = [
         icon: Printer, // icon máy in (user 2026-11-06) — trước trùng icon xe tải với Vận đơn
         section: 'Vận hành',
         ability: { action: 'read', subject: 'Shipment' },
+        menuAbility: { action: 'view', subject: 'WarehouseOpsMenu' },
       },
       {
         // Đơn lỗi (trước "Xử lý đơn lỗi" ở Quản trị) — chuyển sang Kho › Vận hành + đổi tên

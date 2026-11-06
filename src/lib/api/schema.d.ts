@@ -7677,6 +7677,12 @@ export interface components {
              *     PICKER, PACKER; IMPERSONATOR không tính). Web ẩn menu Bán hàng — quyền API không đổi.
              */
             warehouseOnly: boolean;
+            /**
+             * @description Nhân viên sale / CSKH thuần (2026-11-06): chỉ mang vai trò SALES_LEADER, SALES_MEMBER,
+             *     CSKH_LEADER, CSKH_MEMBER, CSKH_GROUP_LEAD (IMPERSONATOR không tính). Web ẩn Kho › Đơn hàng,
+             *     Vận đơn, In đơn — quyền API không đổi.
+             */
+            salesOnly: boolean;
             /** @description Kho được phép (id) — null = mọi kho (superadmin / quyền `warehouse.all`). */
             warehouseIds: string[] | null;
             /** @description Kho được phép kèm mã + tên, kho mặc định hệ thống trước rồi theo mã — cho ô chọn kho. */

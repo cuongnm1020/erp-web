@@ -159,12 +159,25 @@ describe('visibleModules', () => {
   });
 
   it('chỉ có shipment.read → module Kho hiện Đơn hàng → Vận đơn → In đơn (2026-11-05)', () => {
-    const mods = visibleModules((a, s) => a === 'read' && s === 'Shipment');
+    const mods = visibleModules(
+      (a, s) => (a === 'read' && s === 'Shipment') || (a === 'view' && s === 'WarehouseOpsMenu'),
+    );
     expect(mods.find((m) => m.label === 'Kho')?.children?.map((c) => c.label)).toEqual([
       'Đơn hàng',
       'Vận đơn',
       'In đơn',
     ]);
+  });
+
+  it('sale / CSKH (không có view WarehouseOpsMenu) → ẩn Kho › Đơn hàng / Vận đơn / In đơn, URL vẫn theo shipment.read (2026-11-06)', () => {
+    const sale = visibleModules((a, s) => a === 'read' && (s === 'Shipment' || s === 'SalesOrder'));
+    expect(sale.map((m) => m.label)).not.toContain('Kho');
+    expect(requiredAbilityFor('/wms/shipping')).toEqual({ action: 'read', subject: 'Shipment' });
+    expect(requiredAbilityFor('/wms/waybills')).toEqual({ action: 'read', subject: 'Shipment' });
+    expect(requiredAbilityFor('/wms/print-orders')).toEqual({
+      action: 'read',
+      subject: 'Shipment',
+    });
   });
 
   it('nhân viên kho (không có view SalesMenu) → ẩn menu Bán hàng, URL /crm/orders vẫn theo sales_order.read', () => {

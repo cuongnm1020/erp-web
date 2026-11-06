@@ -35,6 +35,7 @@ const ME_ADMIN = {
   managesDepartments: false,
   managesCareTeam: false,
   warehouseOnly: false,
+  salesOnly: false,
   warehouseIds: null,
   warehouses: [],
   defaultWarehouseId: null,

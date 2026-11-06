@@ -38,6 +38,7 @@ export function renderApp(ui: ReactElement, opts: AppRenderOptions = {}) {
         managesDepartments: false,
         managesCareTeam: false,
         warehouseOnly: false,
+        salesOnly: false,
         warehouseIds: opts.warehouses.map((w) => w.id),
         warehouses: opts.warehouses,
         defaultWarehouseId: opts.warehouses[0]?.id ?? null,

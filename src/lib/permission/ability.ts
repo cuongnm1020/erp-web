@@ -29,7 +29,9 @@ export function parsePermission(code: string): { action: AppAction; subject: App
 export function buildAbility(
   me:
     | (Pick<AuthMe, 'permissions' | 'hasGlobalAccess'> &
-        Partial<Pick<AuthMe, 'managesDepartments' | 'managesCareTeam' | 'warehouseOnly'>>)
+        Partial<
+          Pick<AuthMe, 'managesDepartments' | 'managesCareTeam' | 'warehouseOnly' | 'salesOnly'>
+        >)
     | null,
 ): AppAbility {
   const rules: Array<{ action: AppAction; subject: AppSubject }> = [];
@@ -48,6 +50,9 @@ export function buildAbility(
   // Menu Bán hàng (2026-11-05): ẩn với nhân viên kho thuần (server tính `warehouseOnly` theo vai
   // trò) — chỉ menu; URL /crm/orders/* vẫn gate theo sales_order.read (kho mở Sửa đơn từ menu Kho).
   if (me && !me.warehouseOnly) rules.push({ action: 'view', subject: 'SalesMenu' });
+  // Kho › Đơn hàng / Vận đơn / In đơn (2026-11-06): ẩn với sale + CSKH thuần (server tính
+  // `salesOnly` theo vai trò) — chỉ menu; shipment.read giữ nguyên (thẻ Giao hàng, chi tiết đơn).
+  if (me && !me.salesOnly) rules.push({ action: 'view', subject: 'WarehouseOpsMenu' });
   return createMongoAbility<[AppAction, AppSubject]>(rules);
 }
 

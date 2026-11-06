@@ -80,6 +80,22 @@ describe('buildAbility', () => {
     expect(sale.can('view', 'SalesMenu')).toBe(true);
   });
 
+  it('menu Kho › Vận hành (2026-11-06): salesOnly → không view WarehouseOpsMenu, shipment.read giữ nguyên', () => {
+    const sale = buildAbility({
+      permissions: ['shipment.read'],
+      hasGlobalAccess: false,
+      salesOnly: true,
+    });
+    expect(sale.can('view', 'WarehouseOpsMenu')).toBe(false);
+    expect(sale.can('read', 'Shipment')).toBe(true);
+    const kho = buildAbility({
+      permissions: ['shipment.read'],
+      hasGlobalAccess: false,
+      salesOnly: false,
+    });
+    expect(kho.can('view', 'WarehouseOpsMenu')).toBe(true);
+  });
+
   it('hasGlobalAccess → manage all', () => {
     const a = buildAbility(ADMIN);
     expect(a.can('delete', 'Customer')).toBe(true);
