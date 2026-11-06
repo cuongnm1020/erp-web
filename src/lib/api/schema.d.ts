@@ -4392,7 +4392,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/sales-orders/waiting-stock": {
+    "/sales-orders/bulk-confirm": {
         parameters: {
             query?: never;
             header?: never;
@@ -4405,6 +4405,22 @@ export interface paths {
          * Kho chuyển Đã xác nhận ↔ Chờ hàng (2026-10-31): `sales_order.send_carrier`, đơn của kho mình
          *     bất kể khách (ngoại lệ có tên của bất biến 8). Đơn Pancake đẩy 11 / 1 lên POS.
          */
+        post: operations["SalesOrderController_bulkConfirm"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/sales-orders/waiting-stock": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
         post: operations["SalesOrderController_setWaitingStock"];
         delete?: never;
         options?: never;
@@ -13619,13 +13635,25 @@ export interface components {
             /** @description true = đã qua bước duyệt cuối → đơn sang APPROVED và event đã emit. */
             completed: boolean;
         };
-        SetOrdersWaitingStockDto: {
+        BulkConfirmOrdersDto: {
             orderIds: string[];
-            waiting: boolean;
         };
         OrderWaitingStockItemDto: {
             orderId: string;
             docNumber: string;
+        };
+        BulkConfirmOrdersResultDto: {
+            /** @description Đơn đã chuyển Đã xác nhận. */
+            confirmed: components["schemas"]["OrderWaitingStockItemDto"][];
+            /**
+             * @description Đơn không xác nhận được (ORDER_NOT_DRAFT — đã xác nhận / đơn Pancake, ORDER_NOT_EDITABLE —
+             *     không phải người được sửa đơn, NOT_FOUND…).
+             */
+            failed: components["schemas"]["BulkUpdateFailedItemDto"][];
+        };
+        SetOrdersWaitingStockDto: {
+            orderIds: string[];
+            waiting: boolean;
         };
         SetOrdersWaitingStockResultDto: {
             updated: components["schemas"]["OrderWaitingStockItemDto"][];
@@ -25591,6 +25619,29 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ApproveOrderResultDto"];
+                };
+            };
+        };
+    };
+    SalesOrderController_bulkConfirm: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BulkConfirmOrdersDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BulkConfirmOrdersResultDto"];
                 };
             };
         };

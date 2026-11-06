@@ -54,6 +54,31 @@ describe('PrintOrdersScreen — In đơn (clone màn Đơn hàng, 2026-11-04)', 
     expect(screen.queryByText(/sản phẩm khác/)).not.toBeInTheDocument();
   });
 
+  it('Xác nhận hàng loạt (2026-11-06): chọn Đơn mới ERP + đơn Pancake + đơn đã xác nhận → "Xác nhận đơn (1)" → POST bulk-confirm chỉ đơn ERP chưa xác nhận', async () => {
+    const [a, b, c] = makeOrders(3);
+    const rows = [
+      { ...a!, status: 'DRAFT' as const, pancakeOrderId: null },
+      { ...b!, status: 'DRAFT' as const, pancakeOrderId: '555' },
+      { ...c!, status: 'APPROVED' as const, pancakeOrderId: null },
+    ];
+    const bodies: unknown[] = [];
+    server.use(
+      http.get('/api/sales-orders', () => HttpResponse.json({ items: rows, total: rows.length })),
+      http.post('/api/sales-orders/bulk-confirm', async ({ request }) => {
+        bodies.push(await request.json());
+        return HttpResponse.json({
+          confirmed: [{ orderId: a!.id, docNumber: a!.docNumber }],
+          failed: [],
+        });
+      }),
+    );
+    renderApp(<PrintOrdersScreen />);
+    await screen.findByText(a!.docNumber);
+    fireEvent.click(screen.getByRole('checkbox', { name: /Chọn tất cả/ }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Xác nhận đơn (1)' }));
+    await waitFor(() => expect(bodies).toEqual([{ orderIds: [a!.id] }]));
+  });
+
   it('"Đóng gói + in vận đơn" bắt chọn NV đóng hàng cùng kho → bulk-update packerId TRƯỚC bulk-fulfil', async () => {
     const rows = makeOrders(2).map((o) => ({
       ...o,
