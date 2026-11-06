@@ -1,7 +1,7 @@
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { EntityOption, EntitySearchResult } from '@/components/data/form';
 import { api, unwrap } from '@/lib/api/client';
-import type { components } from '@/lib/api/schema';
+import type { components, operations } from '@/lib/api/schema';
 import { productKeys } from './use-products';
 
 export type ComboListItem = components['schemas']['ComboListItemDto'];
@@ -14,7 +14,8 @@ export type UpdateComboInput = components['schemas']['UpdateComboDto'];
 export interface ComboListParams {
   q?: string;
   isActive?: boolean;
-  sortBy?: 'code' | 'name' | 'createdAt';
+  /** Lấy từ schema sinh (luật 2) — gồm `quantity` = định mức (2026-11-06). */
+  sortBy?: operations['ComboController_list']['parameters']['query']['sortBy'];
   sortDir?: 'asc' | 'desc';
   take: number;
   skip: number;

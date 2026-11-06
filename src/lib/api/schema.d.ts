@@ -9827,6 +9827,13 @@ export interface components {
             freeShipping: boolean;
             componentCount: number;
             /**
+             * @description Định mức (2026-11-06): Σ số lượng thành phần cho MỘT combo (`ComboComponent.qty`, theo ĐVT cơ
+             *     sở của thành phần) — Decimal(18,6) chuỗi; "Combo 5 hũ …" = 5. Sắp được (`sortBy=quantity`).
+             */
+            quantity: string;
+            /** @description ĐVT của định mức khi mọi thành phần cùng một ĐVT cơ sở; khác nhau → null. */
+            quantityUomCode: string | null;
+            /**
              * @description Số combo còn bán được = min theo thành phần của floor(available / qty) — chuỗi số nguyên,
              *     `0` khi có thành phần âm/hết. Tính từ tồn mọi kho (bất biến 2: combo không có tồn riêng).
              */
@@ -9877,6 +9884,13 @@ export interface components {
             /** @description Combo miễn ship — gợi ý cho sale khi lên đơn. */
             freeShipping: boolean;
             componentCount: number;
+            /**
+             * @description Định mức (2026-11-06): Σ số lượng thành phần cho MỘT combo (`ComboComponent.qty`, theo ĐVT cơ
+             *     sở của thành phần) — Decimal(18,6) chuỗi; "Combo 5 hũ …" = 5. Sắp được (`sortBy=quantity`).
+             */
+            quantity: string;
+            /** @description ĐVT của định mức khi mọi thành phần cùng một ĐVT cơ sở; khác nhau → null. */
+            quantityUomCode: string | null;
             /**
              * @description Số combo còn bán được = min theo thành phần của floor(available / qty) — chuỗi số nguyên,
              *     `0` khi có thành phần âm/hết. Tính từ tồn mọi kho (bất biến 2: combo không có tồn riêng).
@@ -20687,7 +20701,7 @@ export interface operations {
                 /** @description Tìm theo mã / tên combo, mã / tên SKU thành phần. */
                 q?: string;
                 isActive?: boolean;
-                sortBy?: "code" | "name" | "createdAt";
+                sortBy?: "code" | "name" | "createdAt" | "quantity";
                 sortDir?: "asc" | "desc";
                 take: number;
                 skip: number;
