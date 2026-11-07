@@ -1754,7 +1754,7 @@ export function OrderListScreen() {
           }
           pinned={['carrierId', 'creatorId', 'skuId']}
           secondRow={['totalMin', 'weightMin']}
-          searchPlaceholder="Mã đơn, SĐT, tên SP, mã vận đơn… nhiều giá trị cách dấu phẩy"
+          searchPlaceholder="Mã đơn, SĐT, tên SP, mã vận đơn… nhiều giá trị cách dấu phẩy hoặc dấu cách"
           right={
             <>
               {customerId ? (
