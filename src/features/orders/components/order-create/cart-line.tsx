@@ -152,6 +152,11 @@ export function CartLine({
       ? sku.data.uomConversions.find((c) => c.uomId === uomId)?.factor
       : null;
   const qtyBase = qtyValid ? (factor ? new Decimal(qty).mul(factor) : new Decimal(qty)) : null;
+  /** ĐVT lớn dòng đang mang sẵn (Thùng / Pallet từ đơn cũ); null = đang ở ĐVT cơ sở. */
+  const legacyUom =
+    sku.data && uomId && uomId !== sku.data.baseUomId
+      ? (sku.data.uomConversions.find((c) => c.uomId === uomId) ?? null)
+      : null;
   const low = combo
     ? qtyValid && comboAvailable !== null && new Decimal(comboAvailable).lessThan(qty)
     : noStockHere
@@ -239,41 +244,42 @@ export function CartLine({
         </div>
         <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
           <span className="tabular-nums">{sku.data?.code}</span>
-          <FormField
-            control={form.control}
-            name={`lines.${index}.uomId`}
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel className="sr-only">Đơn vị tính</FormLabel>
-                <Select value={field.value} onValueChange={field.onChange} disabled={!sku.data}>
-                  <FormControl>
-                    <SelectTrigger
-                      aria-label="Đơn vị tính"
-                      className="h-7 w-auto gap-1 px-2 text-xs"
-                    >
-                      <SelectValue placeholder="ĐVT" />
-                    </SelectTrigger>
-                  </FormControl>
-                  <SelectContent>
-                    {sku.data ? (
-                      <>
-                        <SelectItem value={sku.data.baseUomId}>
-                          {uomName(sku.data.baseUom.code)}
-                        </SelectItem>
-                        {sku.data.uomConversions.map((c) => (
-                          <SelectItem key={c.uomId} value={c.uomId}>
-                            {uomName(c.uom.code)} (= {formatQuantity(c.factor)}{' '}
-                            {uomName(sku.data!.baseUom.code)})
-                          </SelectItem>
-                        ))}
-                      </>
-                    ) : null}
-                  </SelectContent>
-                </Select>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
+          {/* Chỉ bán theo ĐVT cơ sở (nhỏ nhất) — bỏ Thùng / Pallet khỏi lựa chọn (2026-11-07).
+              Dòng đang mang sẵn ĐVT lớn (nhân bản / sửa đơn cũ) vẫn giữ ĐVT đó để SL không đổi
+              ngầm, chỉ đổi được về ĐVT cơ sở. */}
+          {sku.data && legacyUom ? (
+            <FormField
+              control={form.control}
+              name={`lines.${index}.uomId`}
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel className="sr-only">Đơn vị tính</FormLabel>
+                  <Select value={field.value} onValueChange={field.onChange}>
+                    <FormControl>
+                      <SelectTrigger
+                        aria-label="Đơn vị tính"
+                        className="h-7 w-auto gap-1 px-2 text-xs"
+                      >
+                        <SelectValue placeholder="ĐVT" />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      <SelectItem value={sku.data!.baseUomId}>
+                        {uomName(sku.data!.baseUom.code)}
+                      </SelectItem>
+                      <SelectItem value={legacyUom.uomId}>
+                        {uomName(legacyUom.uom.code)} (= {formatQuantity(legacyUom.factor)}{' '}
+                        {uomName(sku.data!.baseUom.code)})
+                      </SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+          ) : sku.data ? (
+            <span aria-label="Đơn vị tính">{uomName(sku.data.baseUom.code)}</span>
+          ) : null}
           {combo ? (
             comboAvailable !== null ? (
               <span className={low ? 'font-semibold text-destructive' : undefined}>
