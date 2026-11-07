@@ -408,6 +408,28 @@ describe('OrderCreateScreen — màn tạo đơn mới', () => {
     expect(screen.getAllByLabelText('Số lượng')).toHaveLength(1);
   });
 
+  it('chỉ bán theo ĐVT cơ sở: SKU có Thùng / Pallet → dòng mới hiện "Cái", không có ô chọn ĐVT (2026-11-07)', async () => {
+    server.use(
+      ...skuHandlers(),
+      http.get('/api/skus/:id', () =>
+        HttpResponse.json({
+          ...skuDetail(SKU.id, SKU.code, SKU.name),
+          uomConversions: [
+            { uomId: 'u-box', factor: '12', uom: { id: 'u-box', code: 'BOX', name: 'Thùng' } },
+            { uomId: 'u-plt', factor: '240', uom: { id: 'u-plt', code: 'PLT', name: 'Pallet' } },
+          ],
+        }),
+      ),
+    );
+    renderApp(<OrderCreateScreen />);
+    const box = await screen.findByRole('combobox', { name: 'Tìm sản phẩm' });
+    fireEvent.change(box, { target: { value: 'amino' } });
+    fireEvent.click(await screen.findByRole('option', { name: /Amino GA3 500ml/ }));
+    await waitFor(() => expect(screen.getByLabelText('Đơn vị tính')).toBeInTheDocument());
+    expect(screen.getByLabelText('Đơn vị tính').tagName).toBe('SPAN');
+    expect(screen.queryByRole('combobox', { name: 'Đơn vị tính' })).not.toBeInTheDocument();
+  });
+
   it('?from= (nhân bản): banner "Nhân bản từ <mã đơn>" + tab đánh dấu bản sao; khối chốt ở cột phải', async () => {
     search = `from=${ORDER.id}`;
     server.use(...skuHandlers());
