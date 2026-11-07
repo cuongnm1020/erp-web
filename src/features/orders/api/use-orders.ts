@@ -495,8 +495,14 @@ export function useOrderFlowCounts(
         }),
       ),
     placeholderData: keepPreviousData,
+    // Số tab: 15–30 câu COUNT trên 200k đơn mỗi lần hỏi (đo 2026-11-07) — không hỏi lại khi quay lại
+    // màn trong 15 s; thao tác trên đơn vẫn làm tươi qua invalidate prefix `lists`.
+    staleTime: COUNTS_STALE_MS,
   });
 }
+
+/** Số tab / chip coi là còn mới trong bao lâu (API cũng nhớ 5 s phía server). */
+const COUNTS_STALE_MS = 15_000;
 
 /**
  * GET /sales-orders/tab-counts (2026-11-07) — số đơn từng chip của tab cha "Đơn hàng" (`orders`) /
@@ -515,6 +521,7 @@ export function useOrderTabCounts(
         }),
       ),
     placeholderData: keepPreviousData,
+    staleTime: COUNTS_STALE_MS,
   });
 }
 
@@ -534,6 +541,7 @@ export function useOrderIssueCounts(
         }),
       ),
     placeholderData: keepPreviousData,
+    staleTime: COUNTS_STALE_MS,
   });
 }
 
@@ -855,8 +863,10 @@ export function useBulkFulfilOrders() {
   return useMutation({
     mutationFn: (orderIds: string[]) =>
       unwrap(api.POST('/sales-orders/bulk-fulfil', { body: { orderIds } })),
+    // Không nạp lại danh sách sau MỖI nhóm 8 đơn (đo pg_stat_statements 2026-11-07: mỗi lần nạp lại
+    // là danh sách + 15–30 câu đếm tab trên 200k đơn; lô 50 đơn = 7 lần). Hộp "Đóng gói + in" gọi
+    // `invalidateQueries(orderKeys.lists())` MỘT lần khi cả lô xong; chi tiết đơn nạp lại ngay.
     onSuccess: () => {
-      void qc.invalidateQueries({ queryKey: orderKeys.lists() });
       void qc.invalidateQueries({ queryKey: orderKeys.details() });
     },
   });
