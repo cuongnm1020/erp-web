@@ -1123,7 +1123,9 @@ describe('OrderListScreen — lọc theo hãng + thời gian (2026-09-19)', () =
         expect(url.searchParams.get('from')).toBe('2026-08-20');
       }
       expect(
-        screen.getByPlaceholderText('Mã đơn, SĐT, tên SP, mã vận đơn… nhiều giá trị cách dấu phẩy'),
+        screen.getByPlaceholderText(
+          'Mã đơn, SĐT, tên SP, mã vận đơn… nhiều giá trị cách dấu phẩy hoặc dấu cách',
+        ),
       ).toBeInTheDocument();
     } finally {
       server.events.removeListener('request:start', onRequest);
