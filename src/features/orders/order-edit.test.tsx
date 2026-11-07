@@ -803,6 +803,16 @@ describe('OrderEditScreen — sửa sản phẩm / người nhận, quyền sử
           changed: ['addressId'],
         });
       }),
+      // Bộ chọn địa chỉ kiểu Pancake (2026-11-07): Hà Nội › Phường Hoàn Kiếm.
+      http.get('/api/geo/units', ({ request }) => {
+        const parent = new URL(request.url).searchParams.get('parentId');
+        return HttpResponse.json({
+          ready: true,
+          items: parent
+            ? [{ id: '84_VN10101', name: 'Phường Hoàn Kiếm', level: 'WARD', converted: null }]
+            : [{ id: '84_VN101', name: 'Hà Nội', level: 'PROVINCE', converted: null }],
+        });
+      }),
     );
     renderApp(<OrderEditScreen orderId={ORDER.id} />);
     fireEvent.click(await screen.findByRole('button', { name: /Sửa người nhận/ }));
@@ -811,9 +821,13 @@ describe('OrderEditScreen — sửa sản phẩm / người nhận, quyền sử
     set('Tên người nhận', 'Chị Mai');
     set('SĐT', '0912 345 678');
     set('Địa chỉ (số nhà, đường, thôn)', '12 Lê Lợi');
-    set('Phường / xã', '');
-    set('Quận / huyện', '');
-    set('Tỉnh / thành', 'Hà Nội');
+    const box = screen.getByRole('combobox', { name: 'Tỉnh / Phường xã' });
+    if (screen.queryByRole('button', { name: 'Xóa địa chỉ đã chọn' })) {
+      fireEvent.click(screen.getByRole('button', { name: 'Xóa địa chỉ đã chọn' }));
+    }
+    fireEvent.click(box);
+    fireEvent.click(await screen.findByRole('option', { name: 'Hà Nội' }));
+    fireEvent.click(await screen.findByRole('option', { name: 'Phường Hoàn Kiếm' }));
     fireEvent.click(screen.getByRole('button', { name: /Lưu thay đổi/ }));
     await waitFor(() =>
       expect(calls).toEqual([
@@ -822,6 +836,7 @@ describe('OrderEditScreen — sửa sản phẩm / người nhận, quyền sử
             recipient: 'Chị Mai',
             phone: '0912345678',
             line1: '12 Lê Lợi',
+            ward: 'Phường Hoàn Kiếm',
             province: 'Hà Nội',
           },
         },

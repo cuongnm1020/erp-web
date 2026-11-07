@@ -122,6 +122,7 @@ describe('OrderDetailScreen — GET /sales-orders/{id} (P1-12)', () => {
           ...DETAIL,
           status: 'APPROVED',
           ownerName: 'Mai Hương',
+          teamName: 'Phòng Kinh doanh 2',
           careStaffName: 'Nguyễn Thu Trang',
           createdByName: 'Quản trị',
           fulfilment: { ...DETAIL.fulfilment, status: 'PACKED' },
@@ -138,6 +139,9 @@ describe('OrderDetailScreen — GET /sales-orders/{id} (P1-12)', () => {
     await screen.findByRole('heading', { level: 1 });
     expect(screen.getAllByText('Mai Hương').length).toBeGreaterThan(0);
     expect(screen.getByText('Nguyễn Thu Trang')).toBeInTheDocument();
+    // Phòng ban của NV phụ trách (2026-11-07).
+    expect(screen.getByText('Phòng ban')).toBeInTheDocument();
+    expect(screen.getByText('Phòng Kinh doanh 2')).toBeInTheDocument();
     const progress = screen.getByRole('list', { name: 'Tiến độ đơn hàng' });
     expect(progress).toHaveTextContent('22/10 09:39');
     expect(progress).toHaveTextContent('22/10 09:50 · packer.01');

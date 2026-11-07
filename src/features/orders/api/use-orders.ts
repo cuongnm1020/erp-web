@@ -372,6 +372,26 @@ export function useGeoSuggest(
   });
 }
 
+export type GeoUnit = components['schemas']['GeoUnitDto'];
+export type GeoGeneration = 'OLD' | 'NEW';
+
+/**
+ * GET /geo/units — bộ chọn địa chỉ kiểu Pancake (2026-11-07): không `parentId` → tỉnh; có → xã của
+ * tỉnh (mới) / huyện của tỉnh, xã của huyện (cũ). Danh mục gần như không đổi → giữ lâu.
+ */
+export function useGeoUnits(
+  generation: GeoGeneration,
+  parentId: string | undefined,
+  enabled = true,
+) {
+  return useQuery({
+    queryKey: ['geo', 'units', generation, parentId ?? ''] as const,
+    queryFn: () => unwrap(api.GET('/geo/units', { params: { query: { generation, parentId } } })),
+    enabled,
+    staleTime: 60 * 60_000,
+  });
+}
+
 export type OrderCarrierStatusOption = components['schemas']['OrderCarrierStatusOptionDto'];
 
 /** GET /sales-orders/carrier-status-options — chữ "Trạng thái VC" các hãng đã gửi, cho ô lọc. */

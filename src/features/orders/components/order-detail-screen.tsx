@@ -1152,6 +1152,9 @@ function Detail({ order }: { order: SalesOrderDetail }) {
                     <span className="text-muted-foreground">Đơn của team, chưa chia</span>
                   ))}
               </ProfileItem>
+              {order.teamName ? (
+                <ProfileItem label="Phòng ban">{order.teamName}</ProfileItem>
+              ) : null}
               {order.careStaffName ? (
                 <ProfileItem label="NV chăm sóc">{order.careStaffName}</ProfileItem>
               ) : null}

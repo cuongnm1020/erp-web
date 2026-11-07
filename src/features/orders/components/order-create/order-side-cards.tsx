@@ -61,6 +61,7 @@ import {
 import { useGeoSuggest, type GeoSuggestion } from '../../api/use-orders';
 import { GENDER_LABEL } from '../../labels';
 import { GENDERS, normalizePhoneInput, type CreateOrderValues } from '../../schema';
+import { AddressPicker, addressLabel, type AddressValue } from '../address-picker';
 import { NewCustomerFarm } from './new-customer-farm';
 import { useDebounced } from './use-debounced';
 
@@ -891,11 +892,7 @@ export function ReceiverCard({ form }: { form: Form }) {
         })}
       </div>
       <AddressSuggestions form={form} onApply={onTyped} />
-      <div className="grid gap-2.5 sm:grid-cols-3">
-        {textField('ward', 'Xã / Phường', 'Phường / Xã')}
-        {textField('district', 'Quận / Huyện', 'Quận / Huyện (cũ)')}
-        {textField('province', 'Tỉnh / TP', 'Tỉnh / Thành phố')}
-      </div>
+      <AddressPickerField form={form} onApply={onTyped} />
       <FormField
         control={form.control}
         name="expectedDeliveryDate"
@@ -921,10 +918,47 @@ export function ReceiverCard({ form }: { form: Form }) {
 }
 
 /**
- * Gợi ý Xã / Huyện / Tỉnh từ dòng Địa chỉ (2026-10-26, kiểu Pancake): gõ "0332119579, Xã Quảng Tân,
- * Huyện Tuy Đức, Đắk Nông" → hiện "Đắk Nông, Huyện Tuy Đức, Xã Quảng Tân"; bấm thì điền ba ô (tên
- * đúng danh mục, địa giới cũ giữ tên cũ) và dòng Địa chỉ chỉ còn phần không phải địa giới. Gợi ý
- * trùng với ba ô đang có thì ẩn.
+ * Ô "Tỉnh / Phường xã" (bộ chọn kiểu Pancake, 2026-11-07) thay ba ô Xã / Huyện / Tỉnh gõ tay.
+ * Lỗi bắt buộc của Tỉnh hiện dưới ô.
+ */
+function AddressPickerField({
+  form,
+  onApply,
+}: {
+  form: Form;
+  onApply: (name: (typeof ADDRESS_FIELDS)[number], value: string) => void;
+}) {
+  const [ward, district, province] = useWatch({
+    control: form.control,
+    name: ['ward', 'district', 'province'],
+  });
+  const error = form.formState.errors.province?.message;
+  return (
+    <div className="flex flex-col gap-1">
+      <span className={FIELD_LABEL}>Tỉnh / Phường xã</span>
+      <AddressPicker
+        value={{ ward: ward ?? '', district: district ?? '', province: province ?? '' }}
+        invalid={!!error}
+        onChange={(v) => {
+          onApply('ward', v.ward);
+          onApply('district', v.district);
+          onApply('province', v.province);
+        }}
+      />
+      {district ? (
+        <span className="text-xs text-muted-foreground">Huyện cũ (gợi ý cho hãng): {district}</span>
+      ) : null}
+      {error ? <p className="text-xs font-medium text-destructive">{error}</p> : null}
+    </div>
+  );
+}
+
+/**
+ * Gợi ý địa chỉ từ dòng Địa chỉ (2026-10-26, kiểu Pancake; 2026-11-07 hiện theo địa chỉ mới): gõ
+ * "0332119579, Xã Quảng Tân, Huyện Tuy Đức, Đắk Nông" → "Xã Quảng Tân, Lâm Đồng · Đổi từ địa chỉ
+ * cũ: …"; bấm thì điền ô "Tỉnh / Phường xã" theo địa chỉ mới (huyện cũ giữ làm gợi ý cho hãng) và
+ * dòng Địa chỉ chỉ còn phần không phải địa giới. Xã cũ chưa có trong bảng đổi → điền nguyên tên cũ.
+ * Gợi ý trùng với ô đang có thì ẩn.
  */
 function AddressSuggestions({
   form,
@@ -941,41 +975,55 @@ function AddressSuggestions({
   const ctxProvince = useDebounced(province ?? '', 300);
   const ctxDistrict = useDebounced(district ?? '', 300);
   const suggest = useGeoSuggest(q, { province: ctxProvince, district: ctxDistrict });
-  const items = (suggest.data?.items ?? []).filter(
-    (s) =>
-      !(
-        s.province === province &&
-        (s.district ?? '') === (district ?? '') &&
-        (s.ward ?? '') === (ward ?? '')
-      ),
-  );
+  const items = (suggest.data?.items ?? [])
+    .map((s) => ({ s, v: suggestionValue(s) }))
+    .filter(({ v }) => !(v.province === province && v.ward === (ward ?? '')));
   if (!items.length) return null;
-  const apply = (s: GeoSuggestion) => {
-    onApply('ward', s.ward ?? '');
-    onApply('district', s.district ?? '');
-    onApply('province', s.province);
+  const apply = ({ s, v }: (typeof items)[number]) => {
+    onApply('ward', v.ward);
+    onApply('district', v.district);
+    onApply('province', v.province);
     if (s.line1 && s.line1 !== line1) onApply('line1', s.line1);
   };
   return (
-    <div className="flex flex-col gap-1" role="group" aria-label="Gợi ý xã, huyện, tỉnh">
-      {items.map((s) => (
+    <div
+      className="flex flex-col gap-0.5 rounded-md border bg-card p-1"
+      role="group"
+      aria-label="Gợi ý địa chỉ"
+    >
+      <span className="px-2 py-0.5 text-xs font-semibold text-muted-foreground">
+        Gợi ý theo địa chỉ mới
+      </span>
+      {items.map((it) => (
         <button
-          key={`${s.generation}|${s.label}`}
+          key={`${it.s.generation}|${it.s.label}`}
           type="button"
-          onClick={() => apply(s)}
-          className="flex items-center gap-2 rounded-md border border-dashed border-input bg-card px-2.5 py-1.5 text-left text-sm hover:bg-muted"
+          onClick={() => apply(it)}
+          className="flex flex-col gap-0.5 rounded-sm px-2 py-1.5 text-left text-sm hover:bg-muted"
         >
-          <MapPin className="h-4 w-4 shrink-0 text-primary" aria-hidden />
-          <span className="min-w-0 flex-1 truncate" title={s.label}>
-            {s.label}
+          <span className="flex min-w-0 items-center gap-1.5">
+            <MapPin className="h-4 w-4 shrink-0 text-primary" aria-hidden />
+            <span className="truncate font-medium">{addressLabel(it.v)}</span>
           </span>
-          <span className="shrink-0 text-xs text-muted-foreground">
-            {s.generation === 'OLD' ? 'Địa giới cũ' : 'Địa giới mới'}
-          </span>
+          {it.s.generation === 'OLD' ? (
+            <span className="pl-5 text-xs text-muted-foreground">
+              {it.s.converted?.ward
+                ? `Đổi từ địa chỉ cũ: ${[it.s.ward, it.s.district, it.s.province].filter(Boolean).join(', ')}`
+                : 'Địa chỉ cũ — chưa đổi được sang địa chỉ mới'}
+            </span>
+          ) : null}
         </button>
       ))}
     </div>
   );
+}
+
+/** Giá trị điền vào ô địa chỉ từ một gợi ý: địa giới cũ đổi được → theo địa chỉ mới + huyện cũ. */
+function suggestionValue(s: GeoSuggestion): AddressValue {
+  if (s.generation === 'OLD' && s.converted?.ward) {
+    return { province: s.converted.province, ward: s.converted.ward, district: s.district ?? '' };
+  }
+  return { province: s.province, ward: s.ward ?? '', district: s.district ?? '' };
 }
 
 // ── Vận chuyển ─────────────────────────────────────────────
