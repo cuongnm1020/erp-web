@@ -769,9 +769,12 @@ describe('OrderCreateScreen — màn tạo đơn mới', () => {
     fireEvent.change(line1, {
       target: { value: '0332119579, Xã Quảng Tân, Huyện Tuy Đức, Đắk Nông' },
     });
-    const pick = await screen.findByRole('button', {
-      name: /^Xã Quảng Tân, Huyện Tuy Đức, Đắk Nông/,
-    });
+    // Gợi ý chờ debounce 300 ms + câu hỏi API → nới thời gian chờ (CI chậm từng trượt mốc 1 s).
+    const pick = await screen.findByRole(
+      'button',
+      { name: /^Xã Quảng Tân, Huyện Tuy Đức, Đắk Nông/ },
+      { timeout: 4000 },
+    );
     expect(pick).toHaveTextContent('Địa chỉ cũ');
     expect(pick).not.toHaveTextContent('Lâm Đồng');
     fireEvent.click(pick);
