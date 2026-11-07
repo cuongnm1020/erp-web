@@ -876,6 +876,19 @@ describe('OrderCreateScreen — màn tạo đơn mới', () => {
       'true',
     );
     expect(await screen.findByRole('option', { name: 'Huyện Cai Lậy' })).toBeInTheDocument();
+
+    // Bấm tab tỉnh → về danh sách tỉnh, chọn lại được (lỗi 2026-11-07: tự nhảy lại bước huyện).
+    fireEvent.click(screen.getByRole('tab', { name: 'Tiền Giang' }));
+    expect(await screen.findByRole('option', { name: 'Tiền Giang' })).toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: 'Tỉnh / Thành phố' })).toHaveAttribute(
+      'aria-selected',
+      'true',
+    );
+    // Đổi sang Địa chỉ mới cũng ở bước tỉnh.
+    fireEvent.click(screen.getByRole('tab', { name: 'Địa chỉ mới' }));
+    fireEvent.click(await screen.findByRole('option', { name: 'Đồng Tháp' }));
+    fireEvent.click(await screen.findByRole('option', { name: 'Xã Ngũ Hiệp' }));
+    expect(box()).toHaveTextContent('Xã Ngũ Hiệp, Đồng Tháp');
   });
 
   it('ô Page: page ngưng ẩn; chọn page một POS khi ô POS trống → tự điền POS; có POS thì "Page của POS này" lên trước', async () => {

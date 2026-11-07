@@ -71,16 +71,23 @@ export function AddressPicker({
 
   // Mở lại khi đã có tỉnh mới → vào thẳng bước Phường xã của tỉnh đó.
   // Mở lại khi đã có tỉnh → vào thẳng bước kế của tỉnh đó, đúng bộ địa chỉ đang có (có huyện = cũ).
+  // Chỉ MỘT lần mỗi lần mở — bấm lại tab tỉnh / đổi bộ thì không tự nhảy lại (lỗi 2026-11-07:
+  // không chọn lại được tỉnh).
+  const jumped = useRef(false);
   useEffect(() => {
-    if (!open || province || !value.province.trim()) return;
-    const p = provinces.data?.items.find((x) => x.name === value.province);
+    if (!open || jumped.current || !provinces.data) return;
+    jumped.current = true;
+    const p = value.province.trim()
+      ? provinces.data.items.find((x) => x.name === value.province)
+      : undefined;
     if (p) {
       setProvince(p);
       setStep(gen === 'OLD' ? 'district' : 'ward');
     }
-  }, [open, gen, province, value.province, provinces.data]);
+  }, [open, gen, value.province, provinces.data]);
 
   const openPicker = () => {
+    jumped.current = false;
     setGen(value.district.trim() ? 'OLD' : 'NEW');
     setOpen(true);
   };
