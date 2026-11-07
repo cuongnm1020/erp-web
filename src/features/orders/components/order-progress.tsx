@@ -4,7 +4,7 @@ import { cn } from '@/lib/cn';
 import { formatDateTime } from '@/lib/format';
 import type { OrderFlow } from '../api/use-orders';
 
-const STEPS = ['Đã duyệt', 'Đóng gói', 'Hãng lấy hàng', 'Đang giao', 'Thành công'] as const;
+const STEPS = ['Đã xác nhận', 'Đóng gói', 'Hãng lấy hàng', 'Đang giao', 'Thành công'] as const;
 
 /**
  * Luồng chung của đơn → số bước đã xong + bước đang ở (chỉ số trong STEPS). Đơn kết thúc lệch

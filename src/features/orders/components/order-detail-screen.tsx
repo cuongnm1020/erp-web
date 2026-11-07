@@ -618,10 +618,16 @@ function CancelOrderDialog({
       {
         onSuccess: (r) => {
           const notes = cancelOutcomeNotes([r]);
-          toast.success(`Đã hủy đơn ${order.docNumber}`, {
-            description: notes.join(' ') || 'Hàng đang giữ cho đơn này đã được nhả về khả dụng.',
-            duration: notes.length > 0 ? 10_000 : undefined,
-          });
+          // Hãng đã lấy hàng (2026-11-07): đơn chưa hủy — Sự cố hoàn tới khi nhập hàng hoàn.
+          toast.success(
+            r.awaitingReturn
+              ? `Đơn ${order.docNumber} chờ hàng hoàn`
+              : `Đã hủy đơn ${order.docNumber}`,
+            {
+              description: notes.join(' ') || 'Hàng đang giữ cho đơn này đã được nhả về khả dụng.',
+              duration: notes.length > 0 ? 10_000 : undefined,
+            },
+          );
           onOpenChange(false);
           if (recreate) router.push(`/crm/orders/new?from=${order.id}`);
         },
@@ -774,20 +780,24 @@ function Detail({ order }: { order: SalesOrderDetail }) {
   // Người lên đơn / trưởng phòng, trưởng nhóm CSKH hủy được không cần quyền hủy (2026-10-29) —
   // server kiểm từng đơn, không được thì báo lỗi.
   // Từ 2026-10-31: kho đã xử lý đơn (`stageLockedReason`) thì người lên đơn thôi hủy.
+  // Từ 2026-11-07: đã Gửi sang ĐVVC thì chỉ người có quyền Hủy đơn (`cancel`) hủy đơn.
   const canCancel =
     live &&
-    (ability.can('cancel', 'SalesOrder') ||
-      ability.can('cancel_after_carrier', 'SalesOrder') ||
-      (ability.can('create', 'SalesOrder') && !order.stageLockedReason));
+    (order.sentToCarrierAt
+      ? ability.can('cancel', 'SalesOrder')
+      : ability.can('cancel', 'SalesOrder') ||
+        ability.can('cancel_after_carrier', 'SalesOrder') ||
+        (ability.can('create', 'SalesOrder') && !order.stageLockedReason));
   const confirm = useConfirmOrder();
   const canRecreate = canCancel && canCreate;
-  // Hủy vận đơn (2026-11-02): còn mã vận đơn, hãng chưa lấy hàng — để gửi lại bằng tài khoản /
-  // hãng khác. Đi cùng Gửi sang ĐVVC: chỉ người chọn hãng (kho / admin, `send_carrier`).
+  // Hủy vận đơn (2026-11-02): hãng chưa lấy hàng — đơn về Đã xác nhận để sửa / gửi hãng khác
+  // (2026-11-07). Quyền `cancel_after_carrier` hoặc `cancel` (user chốt 2026-11-07). Đã gửi mà hãng
+  // chưa cấp mã cũng hủy được (chỉ đưa đơn về).
   const canCancelWaybill =
     live &&
-    order.shipment?.status === 'PENDING' &&
-    !!order.shipment.trackingNo &&
-    ability.can('send_carrier', 'SalesOrder');
+    !!order.sentToCarrierAt &&
+    (!order.shipment || order.shipment.status === 'PENDING') &&
+    (ability.can('cancel_after_carrier', 'SalesOrder') || ability.can('cancel', 'SalesOrder'));
   const canReturn =
     RETURNABLE_FULFILMENT.has(order.fulfilment.status) && ability.can('receive', 'Stock');
   // Module Công việc (2026-10-22): CSKH tạo yêu cầu hỗ trợ từ đơn; ai đọc được việc thấy dải nhắc.
@@ -932,6 +942,25 @@ function Detail({ order }: { order: SalesOrderDetail }) {
             {canEdit ? (
               <Button asChild shortcut="E" variant={order.canConfirm ? 'outline' : 'default'}>
                 <Link href={`/crm/orders/${order.id}/edit`}>Sửa đơn</Link>
+              </Button>
+            ) : null}
+            {order.canConfirmWaiting ? (
+              // Đơn mới → thẳng Chờ hàng (2026-11-07) — chỉ người tạo đơn / NV xử lý.
+              <Button
+                variant="outline"
+                disabled={confirm.isPending}
+                onClick={() =>
+                  confirm.mutate(
+                    { orderId: order.id, waitingStock: true },
+                    {
+                      onSuccess: () =>
+                        toast.success(`Đã xác nhận đơn ${order.docNumber} vào Chờ hàng`),
+                      onError: (err) => toast.error(messageFor(err)),
+                    },
+                  )
+                }
+              >
+                Xác nhận vào Chờ hàng
               </Button>
             ) : null}
             {order.canConfirm ? (

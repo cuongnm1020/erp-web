@@ -72,7 +72,7 @@ import { rangeChip, WeightRangeFilter } from './weight-range-filter';
 import {
   fetchOrdersPage,
   orderKeys,
-  useOrderFlowCounts,
+  useOrderTabCounts,
   useOrderListPrefs,
   useOrders,
   useRequestWaybill,
@@ -87,9 +87,10 @@ import {
   useSaveOrderListPrefs,
   type OrderCarrierSource,
   type OrderCarrierStatusOption,
+  type CarrierIssue,
   type OrderDateField,
-  type OrderFlow,
   type OrderItemOrigin,
+  type OrderTab,
   type OrderPrintStatus,
   type OrderSortField,
   type SalesOrderListItem,
@@ -98,9 +99,12 @@ import {
   fulfilmentLabel,
   orderCancellable,
   orderFlowLabel,
-  DEFAULT_ORDER_FLOW,
-  parseOrderFlow,
+  CARRIER_ISSUE_DEFS,
+  DEFAULT_ORDER_TAB,
+  parseCarrierIssue,
+  parseLegacyIssue,
   parseOrderStatus,
+  parseOrderTab,
 } from '../labels';
 import { BulkCancelDialog } from './bulk-cancel-dialog';
 import { CancelWaybillDialog } from './cancel-waybill-dialog';
@@ -110,7 +114,7 @@ import { BulkReprintWaybillDialog } from './bulk-reprint-waybill-dialog';
 import { BulkRetryWaybillDialog, retryableWaybill } from './bulk-retry-waybill-dialog';
 import { BulkShippingDialog } from './bulk-shipping-dialog';
 import { carrierTone } from './carrier-status-card';
-import { OrderFlowTabs } from './order-flow-tabs';
+import { CarrierStageTag, OrderTabs, type OrderTabView } from './order-tabs';
 import { FlowBadge, OrderQuickView, TelcoBadge } from './order-quick-view';
 import { OrderSavedViews } from './order-saved-views';
 import { OrderScanButton } from './order-scan-button';
@@ -150,6 +154,9 @@ const DEFAULTS = {
   size: 50,
   filterKeys: [
     'flow',
+    // Tab cha "Cần xử lý" (`view=issues`) + chip của nó (`ci`), 2026-11-07.
+    'view',
+    'ci',
     // Tab cha (2026-11-03): wait / fulfil / issue / ship, `all` = mọi trạng thái (link từ màn khác).
     // Có `flow` thì nhóm suy từ flow.
     'group',
@@ -315,11 +322,14 @@ interface RowActionContext {
  * Nhân bản (+ Xin lại vận đơn ở tab Cần sửa khi lỗi vận đơn) · Hủy đơn (chữ đỏ, cuối cụm, qua hộp xác nhận —
  * mockup TmGafrdk3wiAxJu4cFY937). Mở chi tiết = bấm mã đơn.
  */
-/** Tab còn trước khi kho thao tác — người lên đơn còn sửa / hủy được (2026-10-31). */
-const OPEN_FLOWS: readonly string[] = ['NEW', 'PENDING_APPROVAL', 'WAREHOUSE'];
-/** Sửa đơn còn được thêm ở Chờ hàng — kho chưa lấy hàng thật (2026-11-03; hủy vẫn khóa). */
-const EDIT_OPEN_FLOWS: readonly string[] = [...OPEN_FLOWS, 'WAITING_STOCK'];
+/**
+ * Tab còn trước khi kho thao tác — người lên đơn / NV xử lý / leader còn sửa + hủy được
+ * (2026-10-31). Chờ hàng: sửa từ 2026-11-03, hủy từ 2026-11-07 (user chốt).
+ */
+const OPEN_FLOWS: readonly string[] = ['NEW', 'PENDING_APPROVAL', 'WAREHOUSE', 'WAITING_STOCK'];
+const EDIT_OPEN_FLOWS = OPEN_FLOWS;
 const STAGE_LOCKED = 'Kho đã xử lý đơn — không sửa / hủy được nữa';
+const SENT_LOCKED = 'Đã gửi ĐVVC — hủy vận đơn để sửa đơn';
 
 function orderRowItems(o: SalesOrderListItem, ctx: RowActionContext): RowActionItem[] {
   const stageOpen = OPEN_FLOWS.includes(o.flow);
@@ -345,9 +355,12 @@ function orderRowItems(o: SalesOrderListItem, ctx: RowActionContext): RowActionI
             disabledReason:
               o.status === 'CANCELLED'
                 ? 'Đơn đã hủy'
-                : !editOpen && !o.editPastStage && !ctx.canEditAny
-                  ? STAGE_LOCKED
-                  : undefined,
+                : // 2026-11-07: đã gửi hãng thì không ai sửa — trừ tab Cần sửa (hãng từ chối cấp mã).
+                  o.sentToCarrierAt && o.flow !== 'NEEDS_FIX'
+                  ? SENT_LOCKED
+                  : !editOpen && !o.editPastStage && !ctx.canEditAny
+                    ? STAGE_LOCKED
+                    : undefined,
           },
         ]
       : []),
@@ -371,13 +384,16 @@ function orderRowItems(o: SalesOrderListItem, ctx: RowActionContext): RowActionI
             disabledReason:
               o.status === 'CANCELLED'
                 ? 'Đơn đã hủy'
-                : !orderCancellable(o.status, o.fulfilmentStatus, ctx.canCancelAfterCarrier)
-                  ? ctx.canCancelAfterCarrier
-                    ? 'Hãng đã lấy hàng — xử lý bằng hoàn hàng'
-                    : 'Kho đã đóng gói — nhờ trưởng phòng / quản trị hủy'
-                  : !stageOpen && !ctx.canCancelAny && !ctx.canCancelAfterCarrier
-                    ? STAGE_LOCKED
-                    : undefined,
+                : // 2026-11-07: đã gửi hãng → chỉ quyền Hủy đơn (`cancel`); cancel_after_carrier chỉ hủy vận đơn.
+                  o.sentToCarrierAt && !ctx.canCancelAny
+                  ? 'Đã gửi ĐVVC — chỉ người có quyền Hủy đơn hủy được (hoặc hủy vận đơn)'
+                  : !orderCancellable(o.status, o.fulfilmentStatus, ctx.canCancelAny)
+                    ? ctx.canCancelAny
+                      ? 'Hãng đã lấy hàng — xử lý bằng hoàn hàng'
+                      : 'Kho đã đóng gói — nhờ người có quyền Hủy đơn'
+                    : !stageOpen && !ctx.canCancelAny
+                      ? STAGE_LOCKED
+                      : undefined,
           },
         ]
       : []),
@@ -516,6 +532,19 @@ const buildColumns = (
               Có SP ngoài hệ thống
             </span>
           ) : null}
+          {row.original.shortage?.items.length ? (
+            // Đơn Chờ hàng / thiếu hàng (2026-11-07, user chốt): SP thiếu bao nhiêu theo khả dụng kho.
+            <span
+              className="block text-xs font-semibold text-warning"
+              data-testid="order-shortage"
+              title="Khả dụng của kho không đủ cho đơn — bỏ bớt SP hoặc chờ hàng về rồi gán hãng"
+            >
+              Thiếu:{' '}
+              {row.original.shortage.items
+                .map((i) => `${i.skuCode} ${i.skuName} × ${formatQuantity(i.qty)}`)
+                .join(' · ')}
+            </span>
+          ) : null}
         </div>
       );
     },
@@ -585,6 +614,12 @@ const buildColumns = (
             <span title={o.fulfilmentStatus ? fulfilmentLabel(o.fulfilmentStatus) : undefined}>
               <FlowBadge flow={o.flow} />
             </span>
+            {/* Trạng thái hãng (2026-11-07) — chữ hãng gần nhất khi rê chuột. */}
+            {o.carrierStage ? (
+              <span title={o.carrierStatusText ?? undefined}>
+                <CarrierStageTag stage={o.carrierStage} />
+              </span>
+            ) : null}
             {o.sameDayCount > 0 ? (
               <span className="inline-flex items-center gap-0.5">
                 <span title={`Cùng SĐT khách còn ${o.sameDayCount} đơn khác hôm đặt đơn này`}>
@@ -991,8 +1026,8 @@ function WaitingStockNote({
       <p role="note" className="flex-1 rounded-lg bg-info-weak px-3 py-2 text-sm text-info">
         Đơn vào tab này khi kho chọn đơn rồi bấm <strong>Chuyển Chờ hàng</strong>, hoặc sale để{' '}
         <strong>Chờ hàng</strong> trên Pancake. Đơn rời tab khi <strong>Gửi sang ĐVVC</strong>, kho
-        bấm <strong>Đưa lại Đã xác nhận</strong>, hoặc sale xác nhận lại trên Pancake. Hàng về đủ
-        không tự chuyển — kho tự quyết.{' '}
+        bấm <strong>Chuyển sang Đã xác nhận</strong>, hoặc sale xác nhận lại trên Pancake. Hàng về
+        đủ không tự chuyển — kho tự quyết.{' '}
         <Link href="/wms/waiting-stock" className="font-semibold text-primary hover:underline">
           Xem tổng hàng thiếu
         </Link>
@@ -1070,7 +1105,13 @@ export function CarrierFilter({
 
 export function OrderListScreen() {
   const { state, set, skipTake } = useListState<OrderFilter>(DEFAULTS);
-  const urlFlow = parseOrderFlow(state.filters.flow);
+  // Tab cha (2026-11-07): `?view=issues` = "Cần xử lý" (chip `?ci=`), còn lại = "Đơn hàng" (chip
+  // `?flow=` — giữ tên tham số cũ, link cũ đổi sang chip mới qua parseOrderTab). Link cũ
+  // `?flow=NEEDS_FIX` / `CARRIER_CANCELLED` mở thẳng chip Cần xử lý tương ứng.
+  const legacyIssue = parseLegacyIssue(state.filters.flow);
+  const view: OrderTabView = state.filters.view === 'issues' || legacyIssue ? 'issues' : 'orders';
+  const issue: CarrierIssue | null = parseCarrierIssue(state.filters.ci) ?? legacyIssue ?? null;
+  const urlFlow = parseOrderTab(state.filters.flow);
   // Tab trạng thái v3 (2026-11-04): 14 trạng thái hiện cùng lúc, luôn chọn đúng một (mặc định Đơn
   // mới). Ô tìm có chữ / link `group=all` (từ màn khác) → xem mọi trạng thái (tìm đơn đã giao không
   // ra 0 vì đang ở tab khác). `?group=<nhóm>` cũ bỏ qua.
@@ -1080,9 +1121,21 @@ export function OrderListScreen() {
   // 2026-11-06 (user): mở màn (URL không có tab / nhóm / chữ) → tab Tất cả; bấm tab nào cũng ghi
   // `flow` tường minh trên URL.
   const openedPlain = !urlFlow && state.filters.group === undefined && state.q === '';
-  const searching = openedPlain || state.filters.group === 'all' || (state.q !== '' && !urlFlow);
-  const currentFlow: OrderFlow = urlFlow ?? DEFAULT_ORDER_FLOW;
-  const flow = searching ? undefined : currentFlow;
+  const searching =
+    view === 'orders' &&
+    (openedPlain || state.filters.group === 'all' || (state.q !== '' && !urlFlow));
+  const currentFlow: OrderTab = urlFlow ?? DEFAULT_ORDER_TAB;
+  const flow = view === 'orders' && !searching ? currentFlow : undefined;
+  // Điều kiện tab gửi API: chip "Đơn hàng" (`tab`) hoặc chip "Cần xử lý" (Tất cả = mọi chip).
+  const tabParams = useMemo(
+    () =>
+      view === 'issues'
+        ? { carrierIssue: issue ? [issue] : CARRIER_ISSUE_DEFS.map((d) => d.issue) }
+        : flow
+          ? { tab: flow }
+          : {},
+    [view, issue, flow],
+  );
   const status = parseOrderStatus(state.filters.status);
   const customerId = state.filters.customerId ?? '';
   const weightMin = state.filters.weightMin ?? '';
@@ -1213,12 +1266,12 @@ export function OrderListScreen() {
   const params = useMemo(
     () => ({
       ...filterParams,
-      flow,
+      ...tabParams,
       sortBy,
       sortDir: sortBy ? (sort?.desc ? ('desc' as const) : ('asc' as const)) : undefined,
       ...skipTake,
     }),
-    [filterParams, flow, sortBy, sort?.desc, skipTake],
+    [filterParams, tabParams, sortBy, sort?.desc, skipTake],
   );
   const carriers = useCarriers();
   // Chữ chip "Đang lọc" của hai ô tự vẽ (sản phẩm, hãng) — cùng nguồn dữ liệu với ô chọn.
@@ -1304,17 +1357,18 @@ export function OrderListScreen() {
   // tải 2 lần (lần đầu chưa có sort, lần sau có), mỗi lần ~5 s trên prod (sự cố pool 2026-11-02).
   // Đọc prefs lỗi thì vẫn tải (isPending = false).
   const query = useOrders(params, { enabled: state.sort != null || !prefs.isPending });
-  // Đếm cả 14 trạng thái trong một lần (GROUP BY flow).
-  const counts = useOrderFlowCounts(filterParams);
+  // Số chip của cả hai tab cha — số "Cần xử lý" hiện trên tab cha cả khi đang ở "Đơn hàng".
+  const orderCounts = useOrderTabCounts(filterParams, 'orders');
+  const issueCounts = useOrderTabCounts(filterParams, 'issues');
   // Xuất Excel = mọi trang của đúng bộ lọc + tab + sắp xếp đang xem.
   const exportParams = useMemo(
     () => ({
       ...filterParams,
-      flow,
+      ...tabParams,
       sortBy,
       sortDir: sortBy ? (sort?.desc ? ('desc' as const) : ('asc' as const)) : undefined,
     }),
-    [filterParams, flow, sortBy, sort?.desc],
+    [filterParams, tabParams, sortBy, sort?.desc],
   );
   const exportColumns = useMemo(() => {
     const carrierById = new Map((carriers.data ?? []).map((c) => [c.id, c]));
@@ -1412,17 +1466,43 @@ export function OrderListScreen() {
         }
       />
 
-      <OrderFlowTabs
-        flow={currentFlow}
-        counts={counts.data}
+      <OrderTabs
+        view={view}
+        tab={currentFlow}
+        issue={issue}
+        orderCounts={orderCounts.data}
+        issueCounts={issueCounts.data}
         searching={searching}
         searchingLabel={state.q}
-        onFlowChange={(f) =>
+        onViewChange={(v) =>
           set({
             filters: {
               ...state.filters,
+              view: v === 'issues' ? 'issues' : undefined,
+              // Link cũ ?flow=NEEDS_FIX: về "Đơn hàng" thì bỏ, không còn là chip.
+              flow: legacyIssue ? undefined : state.filters.flow,
+              ci: v === 'issues' ? (issue ?? undefined) : undefined,
+            },
+          })
+        }
+        onTabChange={(f) =>
+          set({
+            filters: {
+              ...state.filters,
+              view: undefined,
+              ci: undefined,
               group: undefined,
               flow: f,
+            },
+          })
+        }
+        onIssueChange={(i) =>
+          set({
+            filters: {
+              ...state.filters,
+              view: 'issues',
+              ci: i ?? undefined,
+              flow: legacyIssue ? undefined : state.filters.flow,
             },
           })
         }
@@ -1784,7 +1864,7 @@ function OrderBulkBar({ rows, onClear }: { rows: SalesOrderListItem[]; onClear: 
       { orderIds: rows.map((r) => r.id), waiting: on },
       {
         onSuccess: (r) => {
-          const verb = on ? 'chuyển Chờ hàng' : 'đưa lại Đã xác nhận';
+          const verb = on ? 'chuyển Chờ hàng' : 'chuyển sang Đã xác nhận';
           if (r.updated.length > 0) toast.success(`Đã ${verb} ${r.updated.length} đơn`);
           if (r.failed.length > 0) {
             toast.error(
@@ -1816,8 +1896,9 @@ function OrderBulkBar({ rows, onClear }: { rows: SalesOrderListItem[]; onClear: 
       },
     );
   const canReprint = ability.can('pack', 'Shipment');
-  // Hủy vận đơn (2026-11-02) — đi cùng Gửi sang ĐVVC: chỉ người chọn hãng (kho / admin).
-  const canCancelWaybill = canUpdate;
+  // Hủy vận đơn → đơn về Đã xác nhận (2026-11-07): quyền `cancel_after_carrier` hoặc `cancel`.
+  const canCancelWaybill =
+    ability.can('cancel_after_carrier', 'SalesOrder') || ability.can('cancel', 'SalesOrder');
   const withWaybill = rows.filter((r) => r.shipment?.trackingNo);
   // Xin lại vận đơn hàng loạt (2026-11-02) — cùng quyền với nút trên dòng (`pack` Shipment).
   const retryable = rows.filter(retryableWaybill);
@@ -1848,9 +1929,10 @@ function OrderBulkBar({ rows, onClear }: { rows: SalesOrderListItem[]; onClear: 
             Xác nhận đơn ({unconfirmed.length})
           </Button>
         ) : null}
-        <Can I="update" a="SalesOrder">
+        {/* Chuyển kho (2026-11-07): người lên đơn / NV xử lý / trưởng nhóm (update) và kho (send_carrier). */}
+        {ability.can('update', 'SalesOrder') || canUpdate ? (
           <BulkMoveWarehouseDialog rows={rows} onDone={onClear} />
-        </Can>
+        ) : null}
         <Can I="fulfil_manual" a="SalesOrder">
           <BulkFulfilPrintDialog rows={rows} onDone={onClear} />
         </Can>
@@ -1886,7 +1968,7 @@ function OrderBulkBar({ rows, onClear }: { rows: SalesOrderListItem[]; onClear: 
               ) : null}
               {canUpdate ? (
                 <DropdownMenuItem onSelect={() => setWaiting(false)}>
-                  Đưa lại Đã xác nhận
+                  Chuyển sang Đã xác nhận
                 </DropdownMenuItem>
               ) : null}
               {canReprint ? (

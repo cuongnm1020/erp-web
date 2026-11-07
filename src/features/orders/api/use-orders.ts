@@ -20,6 +20,8 @@ export type SalesOrderChannel = SalesOrder['channel'];
 export type SalesOrderListItem = SalesOrder;
 export type OrderFlow = SalesOrderListItem['flow'];
 export type OrderFlowCounts = components['schemas']['SalesOrderFlowCountsDto'];
+export type OrderTabCounts = components['schemas']['SalesOrderTabCountsDto'];
+export type CarrierStage = NonNullable<SalesOrderListItem['carrierStage']>;
 /** Trường ngày của bộ lọc from/to trên danh sách đơn. */
 export type OrderDateField = NonNullable<
   NonNullable<paths['/sales-orders']['get']['parameters']['query']>['dateField']
@@ -31,6 +33,10 @@ export interface OrderListParams {
   flow?: OrderFlow;
   /** Nhiều tab — đơn thuộc một trong các tab (tab cha "Tất cả kho"…, 2026-11-03). `flow` thắng. */
   flows?: readonly OrderFlow[];
+  /** Chip tab cha "Đơn hàng" (2026-11-07) — thắng `flow` / `flows`. */
+  tab?: OrderTab;
+  /** Chip tab cha "Cần xử lý" (2026-11-07) — nhiều = đơn thuộc một trong các chip. */
+  carrierIssue?: readonly CarrierIssue[];
   /** Kho lấy hàng chọn trên đơn. */
   warehouseId?: string;
   /** Nguồn: PANCAKE = đồng bộ từ Pancake, ERP = tạo trong ERP. */
@@ -117,6 +123,8 @@ export type OrderPrintStatus = NonNullable<OrderListQuery['printStatus']>;
 export type OrderPickupStatus = NonNullable<OrderListQuery['pickupStatus']>;
 export type OrderSortField = NonNullable<OrderListQuery['sortBy']>;
 export type OrderIssue = NonNullable<OrderListQuery['issue']>;
+export type OrderTab = NonNullable<OrderListQuery['tab']>;
+export type CarrierIssue = NonNullable<OrderListQuery['carrierIssue']>[number];
 export type OrderIssueCounts = components['schemas']['SalesOrderIssueCountsDto'];
 export type PancakeOverwriteOrder = components['schemas']['PancakeOverwriteOrderDto'];
 export type PancakeOverwriteChange = components['schemas']['PancakeOverwriteChangeDto'];
@@ -143,6 +151,10 @@ export const orderKeys = {
     p: Omit<OrderListParams, 'flow' | 'flows' | 'take' | 'skip'>,
     countFlows?: readonly OrderFlow[],
   ) => [...orderKeys.lists(), 'flow-counts', p, countFlows ?? 'all'] as const,
+  tabCounts: (
+    p: Omit<OrderListParams, 'flow' | 'flows' | 'tab' | 'carrierIssue' | 'take' | 'skip'>,
+    group: 'orders' | 'issues',
+  ) => [...orderKeys.lists(), 'tab-counts', group, p] as const,
   issueCounts: (p: Omit<OrderListParams, 'issue' | 'stockReady' | 'take' | 'skip'>) =>
     [...orderKeys.lists(), 'issue-counts', p] as const,
   pancakeOverwrites: (p: { fix?: PancakeOverwriteFix; take: number; skip: number }) =>
@@ -225,6 +237,8 @@ function listQuery(params: Omit<OrderListParams, 'take' | 'skip'>) {
     q: params.q || undefined,
     flow: params.flow,
     flows: params.flows?.length ? [...params.flows] : undefined,
+    tab: params.tab,
+    carrierIssue: params.carrierIssue?.length ? [...params.carrierIssue] : undefined,
     warehouseId: params.warehouseId || undefined,
     source: params.source,
     pancakeShopId: params.pancakeShopId || undefined,
@@ -465,6 +479,26 @@ export function useOrderFlowCounts(
 }
 
 /**
+ * GET /sales-orders/tab-counts (2026-11-07) — số đơn từng chip của tab cha "Đơn hàng" (`orders`) /
+ * "Cần xử lý" (`issues`, kèm `attention` = số trên tab cha) với cùng bộ lọc danh sách.
+ */
+export function useOrderTabCounts(
+  params: Omit<OrderListParams, 'flow' | 'flows' | 'tab' | 'carrierIssue' | 'take' | 'skip'>,
+  group: 'orders' | 'issues',
+) {
+  return useQuery({
+    queryKey: orderKeys.tabCounts(params, group),
+    queryFn: () =>
+      unwrap(
+        api.GET('/sales-orders/tab-counts', {
+          params: { query: { ...listQuery(params), group, take: 1, skip: 0 } },
+        }),
+      ),
+    placeholderData: keepPreviousData,
+  });
+}
+
+/**
  * GET /sales-orders/issue-counts — số đơn từng nhóm của màn Xử lý đơn lỗi (CHỈ superadmin, API 403
  * với người khác). Nằm dưới prefix `lists` — thao tác trên đơn làm tươi luôn.
  */
@@ -653,8 +687,19 @@ export function usePancakeUnlock() {
 export function useConfirmOrder() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (orderId: string) =>
-      unwrap(api.POST('/sales-orders/{id}/confirm', { params: { path: { id: orderId } } })),
+    /** `waitingStock` (2026-11-07): Đơn mới → thẳng Chờ hàng — người tạo / NV xử lý. */
+    mutationFn: (orderId: string | { orderId: string; waitingStock: boolean }) => {
+      const { id, waitingStock } =
+        typeof orderId === 'string'
+          ? { id: orderId, waitingStock: false }
+          : { id: orderId.orderId, waitingStock: orderId.waitingStock };
+      return unwrap(
+        api.POST('/sales-orders/{id}/confirm', {
+          params: { path: { id } },
+          body: waitingStock ? { waitingStock: true } : {},
+        }),
+      );
+    },
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: orderKeys.lists() });
       void qc.invalidateQueries({ queryKey: orderKeys.details() });
@@ -685,7 +730,7 @@ export type SetOrdersWaitingStockResult = components['schemas']['SetOrdersWaitin
 
 /**
  * POST /sales-orders/waiting-stock (2026-10-31) — kho chuyển đơn Đã xác nhận sang Chờ hàng
- * (`waiting: true`) hoặc đưa lại Đã xác nhận. Đơn không chuyển được về trong `failed`.
+ * (`waiting: true`) hoặc chuyển sang Đã xác nhận. Đơn không chuyển được về trong `failed`.
  */
 export function useSetOrdersWaitingStock() {
   const qc = useQueryClient();

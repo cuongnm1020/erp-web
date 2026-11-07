@@ -80,7 +80,7 @@ import { CarrierStatusCard } from './carrier-status-card';
 import { MarketplaceBadge, waybillErrorText } from './waybill-error';
 import { CART_GRID } from './order-create/cart-line';
 import { DENSE } from './order-create/order-draft-form';
-import { Card } from './order-create/order-side-cards';
+import { Card, OwnerPicker } from './order-create/order-side-cards';
 import { OrderTagsField } from './order-tags-field';
 import { OrderEditHistory } from './order-edit-history';
 import { customRows, linesChange, OrderEditLines, useOrderLinesForm } from './order-edit-lines';
@@ -209,6 +209,9 @@ function Editor({ order }: { order: SalesOrderDetail }) {
   const [internalNote, setInternalNote] = useState(order.internalNote ?? '');
   const [printNote, setPrintNote] = useState(order.printNote ?? '');
   const [tagIds, setTagIds] = useState<string[]>(() => order.tags.map((t) => t.id));
+  // NV xử lý (2026-11-07): đổi được, doanh số nhân viên + team chuyển theo người mới.
+  const [ownerId, setOwnerId] = useState(order.ownerId ?? '');
+  const [ownerName, setOwnerName] = useState<string | null>(order.ownerName ?? null);
   const [expectedDate, setExpectedDate] = useState(order.expectedDeliveryDate ?? '');
   // Ngày tạo đơn (2026-11-04): chỉ admin / `sales_order.set_order_date` đổi được, giữ nguyên giờ.
   const canSetOrderDate = ability.can('set_order_date', 'SalesOrder');
@@ -295,6 +298,7 @@ function Editor({ order }: { order: SalesOrderDetail }) {
   const originalTags = order.tags.map((t) => t.id);
   const tagsChanged =
     tagIds.length !== originalTags.length || tagIds.some((t) => !originalTags.includes(t));
+  const ownerChanged = ownerId !== '' && ownerId !== (order.ownerId ?? '');
   const dateChanged = (expectedDate || null) !== (order.expectedDeliveryDate ?? null);
   const orderDayEditable = canSetOrderDate && orderEditable(order.status);
   const orderDayChanged = orderDayEditable && orderDay !== '' && orderDay !== origOrderDay;
@@ -309,6 +313,7 @@ function Editor({ order }: { order: SalesOrderDetail }) {
     internalChanged ||
     printChanged ||
     tagsChanged ||
+    ownerChanged ||
     dateChanged ||
     orderDayChanged ||
     accountChanged ||
@@ -476,6 +481,7 @@ function Editor({ order }: { order: SalesOrderDetail }) {
         ...(printChanged ? { printNote: trimOrNull(printNote) } : {}),
         ...(recipientPhoneChanged ? { recipientPhone: trimOrNull(recipientPhone) } : {}),
         ...(tagsChanged ? { tagIds } : {}),
+        ...(ownerChanged ? { ownerId } : {}),
         ...(dateChanged ? { expectedDeliveryDate: expectedDate || null } : {}),
         ...(orderDayChanged
           ? { orderDate: movedOrderDateIso(order.orderDate, origOrderDay, orderDay) }
@@ -611,6 +617,15 @@ function Editor({ order }: { order: SalesOrderDetail }) {
             label: 'ĐVVC',
             from: carrierLabel(order.carrierId ?? null),
             to: carrierLabel(nextCarrier),
+          },
+        ]
+      : []),
+    ...(ownerChanged
+      ? [
+          {
+            label: 'NV xử lý (doanh số chuyển theo)',
+            from: order.ownerName ?? '—',
+            to: ownerName ?? '—',
           },
         ]
       : []),
@@ -855,6 +870,17 @@ function Editor({ order }: { order: SalesOrderDetail }) {
                 dirty={tagsChanged}
               />
             </HeaderField>
+            <HeaderField label="NV xử lý (tính doanh số)">
+              <OwnerPicker
+                value={ownerId}
+                onChange={(id, name) => {
+                  setOwnerId(id);
+                  setOwnerName(name);
+                }}
+                currentName={order.ownerName}
+                disabled={!carrierEditable}
+              />
+            </HeaderField>
             <div className="flex flex-col gap-0.5 text-xs text-muted-foreground">
               {fulfilTarget ? (
                 <p className="text-warning">
@@ -900,10 +926,6 @@ function Editor({ order }: { order: SalesOrderDetail }) {
                 <ReadOnlyItem label="Kênh">{orderChannelLabel(order.channel)}</ReadOnlyItem>
                 <ReadOnlyItem label="Nguồn đơn">
                   {order.source ? orderSourceLabel(order.source) : '—'}
-                </ReadOnlyItem>
-                <ReadOnlyItem label="NV xử lý">
-                  {order.ownerName ??
-                    (order.ownerId ? 'Đã có người phụ trách' : 'Đơn của team, chưa chia')}
                 </ReadOnlyItem>
               </dl>
             </section>

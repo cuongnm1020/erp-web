@@ -52,6 +52,7 @@ const SPLIT_ORDER = {
   total: '150000',
   fulfilmentStatus: 'NOT_STARTED',
   carrierStatusText: null,
+  carrierStage: null,
   movedAt: '2026-11-05T01:42:00.000Z',
   movedByName: 'Đặng Vinh Quang',
   fromWarehouseId: null,

@@ -77,6 +77,30 @@ describe('OrderDetailScreen — GET /sales-orders/{id} (P1-12)', () => {
     expect(screen.queryByRole('button', { name: 'Hủy đơn' })).not.toBeInTheDocument();
   });
 
+  it('Đơn mới, người tạo (2026-11-07): "Xác nhận vào Chờ hàng" → POST confirm { waitingStock: true }', async () => {
+    const bodies: unknown[] = [];
+    server.use(
+      http.get('/api/sales-orders/:id', () =>
+        HttpResponse.json({
+          ...DETAIL,
+          status: 'DRAFT',
+          canConfirm: true,
+          canConfirmWaiting: true,
+        }),
+      ),
+      http.post('/api/sales-orders/:id/confirm', async ({ params, request }) => {
+        bodies.push(await request.json());
+        return HttpResponse.json(
+          { orderId: params.id, docNumber: DETAIL.docNumber, status: 'APPROVED', completed: true },
+          { status: 201 },
+        );
+      }),
+    );
+    renderApp(<OrderDetailScreen orderId={ORDER.id} />);
+    fireEvent.click(await screen.findByRole('button', { name: 'Xác nhận vào Chờ hàng' }));
+    await waitFor(() => expect(bodies).toEqual([{ waitingStock: true }]));
+  });
+
   it('Nhân bản đơn: link sang /crm/orders/new?from=<id>; phím D / E mở nhân bản / sửa', async () => {
     push.mockClear();
     renderApp(<OrderDetailScreen orderId={ORDER.id} />);

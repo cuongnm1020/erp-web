@@ -110,7 +110,7 @@ describe('OrderListScreen — GET /sales-orders (P1-12)', () => {
     expect(screen.queryByTestId('order-owner')).not.toBeInTheDocument();
   });
 
-  it('tab theo luồng đơn đọc ?flow= từ URL, lọc phía server; mỗi tab có số đếm từ API (luật 8)', async () => {
+  it('tab cha Đơn hàng: ?flow= chọn chip, gửi `tab` lên server; mỗi chip có số đếm từ API (luật 8)', async () => {
     const all = makeOrders(60);
     const n = (f: string) => all.filter((o) => o.flow === f).length;
     search = 'flow=DELIVERED';
@@ -118,88 +118,155 @@ describe('OrderListScreen — GET /sales-orders (P1-12)', () => {
     await waitFor(() =>
       expect(screen.getByTestId('order-count')).toHaveTextContent(String(n('DELIVERED'))),
     );
-    // v3 (2026-11-04): cả 14 trạng thái cùng lúc, không tab cha. 2026-11-05: bỏ cả 4 khối giai
-    // đoạn — một dãy chip liền như màn In đơn.
-    const chip = await screen.findByRole('tab', {
-      name: new RegExp(`^Thành công\\s*${n('DELIVERED')}$`),
+    // Tab cha 2026-11-07 (mockup SbgUqZzjfFrgyto7HKPeVC): "Đơn hàng" | "Cần xử lý"; chip con giữ
+    // FlowChip. Thành công → "Đã nhận".
+    const parents = screen.getByRole('tablist', { name: 'Nhóm tab' });
+    expect(within(parents).getByRole('tab', { name: /^Đơn hàng/ })).toHaveAttribute(
+      'aria-selected',
+      'true',
+    );
+    const chips = screen.getByRole('tablist', { name: 'Trạng thái đơn' });
+    const chip = await within(chips).findByRole('tab', {
+      name: new RegExp(`^Đã nhận\\s*${n('DELIVERED')}$`),
     });
     expect(chip).toHaveAttribute('aria-selected', 'true');
-    // 2026-11-05: chip "Tất cả" luôn đứng đầu (14 trạng thái + Tất cả), chưa chọn khi xem một trạng thái.
-    expect(screen.getAllByRole('tab')).toHaveLength(15);
-    expect(screen.getAllByRole('tab')[0]).toHaveTextContent(/^Tất cả/);
-    expect(screen.getAllByRole('tab', { selected: true })).toHaveLength(1);
-    expect(screen.queryByRole('group', { name: 'Vận chuyển' })).not.toBeInTheDocument();
+    // Tất cả + 13 chip; không còn Chờ duyệt / Cần sửa / Thành công ở "Đơn hàng".
+    expect(within(chips).getAllByRole('tab')).toHaveLength(14);
+    expect(within(chips).queryByRole('tab', { name: /^Chờ duyệt/ })).not.toBeInTheDocument();
+    expect(within(chips).queryByRole('tab', { name: /^Cần sửa/ })).not.toBeInTheDocument();
+    expect(within(chips).getAllByRole('tab')[0]).toHaveTextContent(/^Tất cả/);
+    expect(within(chips).getAllByRole('tab', { selected: true })).toHaveLength(1);
     // Bấm "Tất cả" → ?group=all (xem mọi trạng thái).
     replace.mockClear();
-    fireEvent.click(screen.getAllByRole('tab')[0]!);
+    fireEvent.click(within(chips).getAllByRole('tab')[0]!);
     await waitFor(() => expect(replace).toHaveBeenCalled());
     expect(String(replace.mock.calls.at(-1)![0])).toContain('group=all');
-    expect(screen.queryByText('Đã xong')).not.toBeInTheDocument();
-    // Bấm chip → ?flow=; bấm Đơn mới cũng ghi flow tường minh (2026-11-06: URL trống = Tất cả).
+    // Bấm chip → ?flow=<chip>.
     replace.mockClear();
-    fireEvent.click(screen.getByRole('tab', { name: /^Đang vận chuyển/ }));
+    fireEvent.click(within(chips).getByRole('tab', { name: /^Đã gửi hàng/ }));
     await waitFor(() => expect(replace).toHaveBeenCalled());
-    expect(String(replace.mock.calls.at(-1)![0])).toContain('flow=IN_TRANSIT');
+    expect(String(replace.mock.calls.at(-1)![0])).toContain('flow=SHIPPED');
     replace.mockClear();
-    fireEvent.click(screen.getByRole('tab', { name: /^Đơn mới/ }));
+    fireEvent.click(within(chips).getByRole('tab', { name: /^Đơn mới/ }));
     await waitFor(() => expect(replace).toHaveBeenCalled());
     expect(String(replace.mock.calls.at(-1)![0])).toContain('flow=NEW');
   });
 
-  it('tab v3: mở màn (URL trống) → Tất cả, không gửi flow (2026-11-06); ?flow=NEW → Đơn mới; đếm cả 14 trạng thái một lần; ô tìm → mọi trạng thái', async () => {
+  it('tab cha Cần xử lý: ?view=issues gửi mọi carrierIssue (Tất cả); chip → ?ci=; số tab cha = attention; link cũ ?flow=NEEDS_FIX mở chip Cần sửa', async () => {
+    const lists: URLSearchParams[] = [];
+    const onRequest = ({ request }: { request: Request }) => {
+      const u = new URL(request.url);
+      if (u.pathname === '/api/sales-orders') lists.push(u.searchParams);
+    };
+    server.events.on('request:start', onRequest);
+    server.use(
+      http.get('/api/sales-orders/tab-counts', ({ request }) =>
+        HttpResponse.json(
+          new URL(request.url).searchParams.get('group') === 'issues'
+            ? {
+                total: 7,
+                attention: 5,
+                counts: { PICKUP_DELAYED: 3, UNRECONCILED: 2, NEEDS_FIX: 2 },
+              }
+            : { total: 60, counts: {} },
+        ),
+      ),
+    );
+    try {
+      search = 'view=issues';
+      renderApp(<OrderListScreen />);
+      await waitFor(() => expect(lists.at(-1)?.getAll('carrierIssue').length).toBe(10));
+      expect(lists.at(-1)!.get('tab')).toBeNull();
+      const parents = screen.getByRole('tablist', { name: 'Nhóm tab' });
+      const issueTab = within(parents).getByRole('tab', { name: /^Cần xử lý/ });
+      expect(issueTab).toHaveAttribute('aria-selected', 'true');
+      // Số trên tab cha = attention (không tính Chưa đối soát), không phải total.
+      await waitFor(() => expect(issueTab).toHaveTextContent(/^Cần xử lý\s*5$/));
+      const chips = screen.getByRole('tablist', { name: 'Đơn cần xử lý' });
+      expect(within(chips).getAllByRole('tab')).toHaveLength(11);
+      expect(within(chips).getByRole('tab', { name: /^Trễ lấy hàng\s*3$/ })).toBeInTheDocument();
+      replace.mockClear();
+      fireEvent.click(within(chips).getByRole('tab', { name: /^Trễ lấy hàng/ }));
+      await waitFor(() => expect(replace).toHaveBeenCalled());
+      expect(String(replace.mock.calls.at(-1)![0])).toContain('ci=PICKUP_DELAYED');
+
+      cleanup();
+      search = 'flow=NEEDS_FIX';
+      renderApp(<OrderListScreen />);
+      await waitFor(() => expect(lists.at(-1)?.getAll('carrierIssue')).toEqual(['NEEDS_FIX']));
+      expect(
+        within(screen.getByRole('tablist', { name: 'Đơn cần xử lý' })).getByRole('tab', {
+          name: /^Cần sửa/,
+        }),
+      ).toHaveAttribute('aria-selected', 'true');
+    } finally {
+      server.events.removeListener('request:start', onRequest);
+    }
+  });
+
+  it('tab v3: mở màn (URL trống) → Tất cả, không gửi tab (2026-11-06); ?flow=NEW → Đơn mới; đếm chip qua tab-counts; ô tìm → mọi trạng thái', async () => {
     const lists: URLSearchParams[] = [];
     const counts: URLSearchParams[] = [];
     const onRequest = ({ request }: { request: Request }) => {
       const u = new URL(request.url);
       if (u.pathname === '/api/sales-orders') lists.push(u.searchParams);
-      if (u.pathname === '/api/sales-orders/flow-counts') counts.push(u.searchParams);
+      if (u.pathname === '/api/sales-orders/tab-counts') counts.push(u.searchParams);
     };
     server.events.on('request:start', onRequest);
+    const chipsTab = () => screen.getByRole('tablist', { name: 'Trạng thái đơn' });
     try {
       search = '';
       renderApp(<OrderListScreen />);
       await waitFor(() => expect(lists.length).toBeGreaterThan(0));
-      expect(lists.at(-1)!.get('flow')).toBeNull();
-      expect(screen.getAllByRole('tab', { selected: true })[0]).toHaveTextContent(/^Tất cả/);
+      expect(lists.at(-1)!.get('tab')).toBeNull();
+      expect(within(chipsTab()).getAllByRole('tab', { selected: true })[0]).toHaveTextContent(
+        /^Tất cả/,
+      );
       cleanup();
       search = 'flow=NEW';
       renderApp(<OrderListScreen />);
-      await waitFor(() => expect(lists.at(-1)?.get('flow')).toBe('NEW'));
-      expect(screen.getByRole('tab', { name: /^Đơn mới/ })).toHaveAttribute(
+      await waitFor(() => expect(lists.at(-1)?.get('tab')).toBe('NEW'));
+      expect(within(chipsTab()).getByRole('tab', { name: /^Đơn mới/ })).toHaveAttribute(
         'aria-selected',
         'true',
       );
-      expect(lists.at(-1)!.getAll('flows')).toEqual([]);
-      // Đếm một lần, không gửi countFlows (= đếm hết, kể cả Thành công / Đã hủy).
-      expect(counts.at(-1)!.getAll('countFlows')).toEqual([]);
-      expect(await screen.findByRole('tab', { name: /^Thành công\s*\d/ })).toBeInTheDocument();
+      expect(lists.at(-1)!.get('flow')).toBeNull();
+      // Đếm hai tab cha (số "Cần xử lý" hiện cả khi đang ở "Đơn hàng").
+      await waitFor(() =>
+        expect(counts.map((c) => c.get('group')).sort()).toEqual(
+          expect.arrayContaining(['issues', 'orders']),
+        ),
+      );
+      expect(
+        await within(chipsTab()).findByRole('tab', { name: /^Đã nhận\s*\d/ }),
+      ).toBeInTheDocument();
 
-      // Ô tìm có chữ → không gửi flow; chip "Tất cả" (2026-11-05) đầu dãy là chip duy nhất đang
-      // chọn, số = tổng các trạng thái; có "Quay lại <trạng thái>".
+      // Ô tìm có chữ → không gửi tab; chip "Tất cả" đầu dãy là chip duy nhất đang chọn; có
+      // "Quay lại <trạng thái>". Link cũ flow=IN_TRANSIT → chip Đã gửi hàng.
       cleanup();
       search = 'q=0386&flow=IN_TRANSIT&group=all';
       renderApp(<OrderListScreen />);
       await screen.findByText(/Đang tìm/);
       await waitFor(() => expect(lists.at(-1)!.get('q')).toBe('0386'));
-      expect(lists.at(-1)!.get('flow')).toBeNull();
-      const selected = screen.getAllByRole('tab', { selected: true });
+      expect(lists.at(-1)!.get('tab')).toBeNull();
+      const selected = within(chipsTab()).getAllByRole('tab', { selected: true });
       expect(selected).toHaveLength(1);
       expect(selected[0]).toHaveTextContent(/^Tất cả/);
-      expect(screen.getAllByRole('tab')[0]).toBe(selected[0]);
-      expect(screen.getAllByRole('tab')).toHaveLength(15);
+      expect(within(chipsTab()).getAllByRole('tab')[0]).toBe(selected[0]);
+      expect(within(chipsTab()).getAllByRole('tab')).toHaveLength(14);
       replace.mockClear();
-      fireEvent.click(screen.getByRole('button', { name: 'Quay lại Đang vận chuyển' }));
+      fireEvent.click(screen.getByRole('button', { name: 'Quay lại Đã gửi hàng' }));
       await waitFor(() => expect(replace).toHaveBeenCalled());
       const url = String(replace.mock.calls.at(-1)![0]);
       expect(url).not.toContain('q=');
-      expect(url).toContain('flow=IN_TRANSIT');
+      expect(url).toContain('flow=SHIPPED');
 
       // 2026-11-04: bấm tab khi đang tìm GIỮ chữ — lọc chữ trong tab đó (kể cả Đơn mới).
       cleanup();
       renderApp(<OrderListScreen />);
       await screen.findByText(/Đang tìm/);
       replace.mockClear();
-      fireEvent.click(screen.getByRole('tab', { name: /^Đơn mới/ }));
+      fireEvent.click(within(chipsTab()).getByRole('tab', { name: /^Đơn mới/ }));
       await waitFor(() => expect(replace).toHaveBeenCalled());
       // (lần ghi URL sau đó là ô ngày điền 30 ngày mặc định lúc mở màn — bỏ qua)
       const tabCall = replace.mock.calls.map((c) => String(c[0])).find((u) => u.includes('flow='));
@@ -210,12 +277,12 @@ describe('OrderListScreen — GET /sales-orders (P1-12)', () => {
 
       // URL có chữ + tab (không group=all) → gửi cả q lẫn flow, tab đó được chọn.
       cleanup();
-      search = 'q=0386&flow=IN_TRANSIT';
+      search = 'q=0386&flow=SHIPPED';
       lists.length = 0;
       renderApp(<OrderListScreen />);
-      await waitFor(() => expect(lists.at(-1)?.get('flow')).toBe('IN_TRANSIT'));
+      await waitFor(() => expect(lists.at(-1)?.get('tab')).toBe('SHIPPED'));
       expect(lists.at(-1)!.get('q')).toBe('0386');
-      expect(screen.getByRole('tab', { name: /^Đang vận chuyển/ })).toHaveAttribute(
+      expect(within(chipsTab()).getByRole('tab', { name: /^Đã gửi hàng/ })).toHaveAttribute(
         'aria-selected',
         'true',
       );
@@ -633,8 +700,9 @@ describe('OrderListScreen — cân nặng gửi hãng + gán hãng hàng loạt'
     fireEvent.click(await within(toolbar).findByRole('button', { name: /Hủy đơn/ }));
     const dialog = await screen.findByRole('dialog');
     expect(dialog).toHaveTextContent('Hủy 2 đơn đã chọn?');
-    // Người test có quyền hủy sau khi gán ĐVVC → chỉ bỏ đơn đã hủy / hãng đã lấy hàng.
-    expect(dialog).toHaveTextContent('1 đơn đã hủy hoặc hãng đã lấy hàng sẽ bị bỏ qua');
+    // Người test có quyền Hủy đơn (2026-11-07) → chỉ bỏ đơn đã hủy / đã giao thành công; hãng đã
+    // lấy hàng thì chuyển Sự cố hoàn.
+    expect(dialog).toHaveTextContent('1 đơn đã hủy hoặc đã giao thành công sẽ bị bỏ qua');
     fireEvent.change(screen.getByLabelText('Lý do hủy (tùy chọn)'), {
       target: { value: ' Khách đổi ý ' },
     });
@@ -1049,7 +1117,7 @@ describe('OrderListScreen — lọc theo hãng + thời gian (2026-09-19)', () =
         await screen.findByRole('button', { name: 'Ngày gán ĐVVC: 20/08 – 22/08/2026' }),
       ).toBeInTheDocument();
       await waitFor(() => expect(seen.length).toBeGreaterThanOrEqual(2));
-      for (const path of ['/api/sales-orders', '/api/sales-orders/flow-counts']) {
+      for (const path of ['/api/sales-orders', '/api/sales-orders/tab-counts']) {
         const url = new URL(seen.find((u) => new URL(u).pathname === path)!);
         expect(url.searchParams.get('dateField')).toBe('sentToCarrierAt');
         expect(url.searchParams.get('from')).toBe('2026-08-20');
@@ -1075,7 +1143,7 @@ describe('OrderListScreen — lọc theo hãng + thời gian (2026-09-19)', () =
       await waitFor(() => expect(box).toHaveTextContent('Pancake · Thiên Nông chính'));
       await waitFor(() => expect(seen.length).toBeGreaterThanOrEqual(2));
       const list = seen.find((u) => new URL(u).pathname === '/api/sales-orders')!;
-      const counts = seen.find((u) => new URL(u).pathname === '/api/sales-orders/flow-counts')!;
+      const counts = seen.find((u) => new URL(u).pathname === '/api/sales-orders/tab-counts')!;
       for (const u of [list, counts]) {
         const p = new URL(u).searchParams;
         expect(p.get('source')).toBe('PANCAKE');
@@ -1349,7 +1417,7 @@ describe('OrderListScreen — lọc theo hãng + thời gian (2026-09-19)', () =
       );
       await waitFor(() => {
         const list = seen.find((u) => new URL(u).pathname === '/api/sales-orders');
-        const counts = seen.find((u) => new URL(u).pathname === '/api/sales-orders/flow-counts');
+        const counts = seen.find((u) => new URL(u).pathname === '/api/sales-orders/tab-counts');
         expect(list).toContain('carrierSource=PANCAKE');
         expect(list).toContain('carrierAccountId=acc-vtp-default');
         expect(counts).toContain('carrierSource=PANCAKE');
@@ -1565,9 +1633,9 @@ describe('OrderListScreen — chọn cột, sắp xếp theo cột, lọc SP ngo
         seen.push(`list:${new URL(request.url).searchParams.get('itemOrigin')}`);
         return HttpResponse.json({ items: makeOrders(1), total: 1 });
       }),
-      http.get('/api/sales-orders/flow-counts', ({ request }) => {
+      http.get('/api/sales-orders/tab-counts', ({ request }) => {
         seen.push(`count:${new URL(request.url).searchParams.get('itemOrigin')}`);
-        return HttpResponse.json({ total: 1 });
+        return HttpResponse.json({ total: 1, counts: {} });
       }),
     );
     renderApp(<OrderListScreen />);
@@ -1721,11 +1789,16 @@ describe('OrderListScreen — tab Chờ hàng (2026-10-25)', () => {
       'kho chọn đơn rồi bấm Chuyển Chờ hàng',
     );
     await screen.findByText(waiting.docNumber);
+    // Dòng đơn hiện SP thiếu ngay dưới sản phẩm (2026-11-07).
+    const short = screen.getByTestId('order-shortage');
+    for (const i of waiting.shortage!.items) {
+      expect(short).toHaveTextContent(i.skuCode);
+    }
     expect(screen.queryByRole('columnheader', { name: /Hàng thiếu/ })).not.toBeInTheDocument();
     expect(screen.queryByRole('columnheader', { name: /Chờ từ/ })).not.toBeInTheDocument();
     expect(screen.queryByRole('columnheader', { name: /Thực thu/ })).not.toBeInTheDocument();
     const url = new URL(asked.at(-1)!);
-    expect(url.searchParams.get('flow')).toBe('WAITING_STOCK');
+    expect(url.searchParams.get('tab')).toBe('WAITING_STOCK');
     expect(url.searchParams.get('shortSkuId')).toBe('sku-a');
 
     replace.mockClear();
@@ -1771,7 +1844,8 @@ describe('OrderListScreen — Lỗi vận đơn + đơn TikTok (2026-10-28, tab 
     const waybillBodies: unknown[] = [];
     server.use(
       http.get('/api/sales-orders', ({ request }) => {
-        seenFlow.push(new URL(request.url).searchParams.get('flow'));
+        // Link cũ → tab cha Cần xử lý, chip Cần sửa (2026-11-07).
+        seenFlow.push(new URL(request.url).searchParams.getAll('carrierIssue').join(',') || null);
         return HttpResponse.json({ items: [errorRow()], total: 1 });
       }),
       http.post('/api/shipments/:id/waybill', async ({ request, params }) => {

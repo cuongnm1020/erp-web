@@ -28,7 +28,11 @@ export function cancelOutcomeNotes(done: CancelOrderResult[]): string[] {
   const carrier = done.filter((d) => d.carrierCancel === 'CANCELLED').length;
   const manual = done.filter((d) => d.carrierCancel === 'MANUAL_REQUIRED').map((d) => d.docNumber);
   const restocked = done.filter((d) => d.returnReceiptDocNumber);
+  const awaiting = done.filter((d) => d.awaitingReturn).map((d) => d.docNumber);
   return [
+    awaiting.length > 0
+      ? `Hãng đã lấy hàng — ${awaiting.join(', ')} chuyển Sự cố hoàn, nhập hàng hoàn xong đơn tự hủy.`
+      : '',
     carrier > 0 ? `Đã hủy ${carrier} vận đơn bên hãng.` : '',
     manual.length > 0
       ? `Hãng không hủy qua hệ thống được — hủy tay vận đơn trên portal hãng: ${manual.join(', ')}.`
@@ -61,11 +65,11 @@ export function BulkCancelDialog({
   const { controlled, open, setOpen } = useControlledOpen(openProp, onOpenChange);
   const [reason, setReason] = useState('');
   const bulk = useBulkCancelOrders();
-  // Hủy đơn đã đóng gói mà hãng chưa lấy hàng (2026-11-02) — server hủy vận đơn + nhập lại kho.
-  const afterCarrier = useAbility().can('cancel_after_carrier', 'SalesOrder');
+  // Quyền Hủy đơn (2026-11-07): hủy được tới trước Thành công — hãng đã lấy thì Sự cố hoàn.
+  const canCancelAny = useAbility().can('cancel', 'SalesOrder');
 
   const cancellable = rows.filter((r) =>
-    orderCancellable(r.status, r.fulfilmentStatus, afterCarrier),
+    orderCancellable(r.status, r.fulfilmentStatus, canCancelAny),
   );
   const skipped = rows.length - cancellable.length;
   const withCarrier = cancellable.some((r) => r.shipment?.trackingNo);
@@ -138,13 +142,13 @@ export function BulkCancelDialog({
               {withCarrier
                 ? ' Đơn đã có mã vận đơn: hệ thống hủy vận đơn bên hãng trước — hãng không đồng ý thì đơn đó giữ nguyên.'
                 : ''}
-              {afterCarrier
-                ? ' Đơn kho đã đóng gói: hàng tự nhập lại kho (phiếu nhập hàng hoàn).'
+              {canCancelAny
+                ? ' Đơn hãng đã lấy hàng: chuyển Sự cố hoàn, nhập hàng hoàn xong đơn mới hủy.'
                 : ''}
               {skipped > 0
-                ? afterCarrier
-                  ? ` ${skipped} đơn đã hủy hoặc hãng đã lấy hàng sẽ bị bỏ qua (xử lý bằng hoàn hàng).`
-                  : ` ${skipped} đơn đã hủy hoặc kho đã đóng gói sẽ bị bỏ qua (đã đóng gói thì nhờ trưởng phòng / quản trị hủy).`
+                ? canCancelAny
+                  ? ` ${skipped} đơn đã hủy hoặc đã giao thành công sẽ bị bỏ qua.`
+                  : ` ${skipped} đơn đã hủy hoặc kho đã đóng gói sẽ bị bỏ qua (nhờ người có quyền Hủy đơn).`
                 : ''}
             </DialogDescription>
           </DialogHeader>

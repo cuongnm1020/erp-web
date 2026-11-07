@@ -37,9 +37,9 @@ export const CUSTOMER_TYPE_OPTIONS: Array<{ value: CustomerType; label: string }
  * CustomerOrderItemDto nên backend thêm giá trị thì TypeScript bắt lỗi ở đây.
  */
 const ORDER_STATUS_LABEL: Record<CustomerOrderStatus, string> = {
-  DRAFT: 'Nháp',
+  DRAFT: 'Đơn mới',
   PENDING_APPROVAL: 'Chờ duyệt',
-  APPROVED: 'Đã duyệt',
+  APPROVED: 'Đã xác nhận',
   POSTED: 'Đã chốt',
   CANCELLED: 'Đã hủy',
 };
