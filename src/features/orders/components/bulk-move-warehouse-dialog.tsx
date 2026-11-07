@@ -46,6 +46,8 @@ export function BulkMoveWarehouseDialog({
     (r) =>
       r.status !== 'CANCELLED' &&
       r.status !== 'POSTED' &&
+      // Đã Gửi ĐVVC (Đang đóng hàng / Chờ chuyển hàng) phải hủy vận đơn trước (2026-11-07).
+      !r.sentToCarrierAt &&
       (r.fulfilmentStatus === null || r.fulfilmentStatus === 'NOT_STARTED'),
   );
   const skipped = rows.length - movable.length;
@@ -105,9 +107,11 @@ export function BulkMoveWarehouseDialog({
           <DialogHeader>
             <DialogTitle>Chuyển {movable.length} đơn sang kho khác</DialogTitle>
             <DialogDescription>
-              Hàng đang giữ ở kho cũ được nhả và giữ lại ở kho mới; việc lấy hàng lập lại theo kho
-              mới. Chỉ chuyển được đơn kho chưa bắt đầu lấy hàng.
-              {skipped > 0 ? ` ${skipped} đơn đã bắt đầu lấy hàng / đã kết thúc sẽ bị bỏ qua.` : ''}
+              Giữ chỗ của đơn chuyển sang kho mới. Chỉ chuyển được đơn Đơn mới / Chờ hàng / Đã xác
+              nhận — đơn đã gửi ĐVVC phải hủy vận đơn trước.
+              {skipped > 0
+                ? ` ${skipped} đơn đã gửi ĐVVC / kho đã làm / đã kết thúc sẽ bị bỏ qua.`
+                : ''}
             </DialogDescription>
           </DialogHeader>
           {failures.length > 0 ? (

@@ -1929,9 +1929,10 @@ function OrderBulkBar({ rows, onClear }: { rows: SalesOrderListItem[]; onClear: 
             Xác nhận đơn ({unconfirmed.length})
           </Button>
         ) : null}
-        <Can I="update" a="SalesOrder">
+        {/* Chuyển kho (2026-11-07): người lên đơn / NV xử lý / trưởng nhóm (update) và kho (send_carrier). */}
+        {ability.can('update', 'SalesOrder') || canUpdate ? (
           <BulkMoveWarehouseDialog rows={rows} onDone={onClear} />
-        </Can>
+        ) : null}
         <Can I="fulfil_manual" a="SalesOrder">
           <BulkFulfilPrintDialog rows={rows} onDone={onClear} />
         </Can>
