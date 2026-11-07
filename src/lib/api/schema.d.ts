@@ -12477,9 +12477,12 @@ export interface components {
             INCIDENT?: number;
         };
         SalesOrderTabCountsDto: {
-            /** @description Chip "Tất cả" của tab cha: `orders` = mọi đơn khớp bộ lọc; `issues` = đơn thuộc ít nhất một chip. */
+            /**
+             * @description Chip "Tất cả" của tab cha: `orders` = mọi đơn khớp bộ lọc; `issues` = đơn thuộc ít nhất một chip
+             *     đỏ (bỏ Chưa đối soát — user chốt 2026-11-07).
+             */
             total: number;
-            /** @description Chỉ `issues`: số trên tab cha "Cần xử lý" — bỏ Chưa đối soát. */
+            /** @description Chỉ `issues`: số trên tab cha "Cần xử lý" — bằng `total`. */
             attention?: number;
             counts: components["schemas"]["SalesOrderTabChipCountsDto"];
         };
@@ -24684,7 +24687,8 @@ export interface operations {
                 /**
                  * @description Chip của tab cha "Cần xử lý" (2026-11-07): Cần sửa · Trễ lấy hàng (mã hãng hoặc chờ lấy quá 24
                  *     giờ) · Không lấy được · Hãng hủy · Trễ giao · Giao không thành công · Chưa đối soát · Đối soát
-                 *     lệch · Hãng đã trả hàng · Sự cố. Lặp tham số = đơn thuộc MỘT trong các chip (chip "Tất cả").
+                 *     lệch · Hãng đã trả hàng · Sự cố. Lặp tham số = đơn thuộc MỘT trong các chip (chip "Tất cả" =
+                 *     mọi chip trừ Chưa đối soát, user chốt 2026-11-07).
                  */
                 carrierIssue?: ("NEEDS_FIX" | "PICKUP_DELAYED" | "PICKUP_FAILED" | "CARRIER_CANCELLED" | "DELIVERY_DELAYED" | "DELIVERY_FAILED" | "UNRECONCILED" | "RECON_MISMATCH" | "RETURNED_TO_SENDER" | "INCIDENT")[];
                 /**
@@ -24971,7 +24975,8 @@ export interface operations {
                 /**
                  * @description Chip của tab cha "Cần xử lý" (2026-11-07): Cần sửa · Trễ lấy hàng (mã hãng hoặc chờ lấy quá 24
                  *     giờ) · Không lấy được · Hãng hủy · Trễ giao · Giao không thành công · Chưa đối soát · Đối soát
-                 *     lệch · Hãng đã trả hàng · Sự cố. Lặp tham số = đơn thuộc MỘT trong các chip (chip "Tất cả").
+                 *     lệch · Hãng đã trả hàng · Sự cố. Lặp tham số = đơn thuộc MỘT trong các chip (chip "Tất cả" =
+                 *     mọi chip trừ Chưa đối soát, user chốt 2026-11-07).
                  */
                 carrierIssue?: ("NEEDS_FIX" | "PICKUP_DELAYED" | "PICKUP_FAILED" | "CARRIER_CANCELLED" | "DELIVERY_DELAYED" | "DELIVERY_FAILED" | "UNRECONCILED" | "RECON_MISMATCH" | "RETURNED_TO_SENDER" | "INCIDENT")[];
                 /**
@@ -25173,7 +25178,8 @@ export interface operations {
                 /**
                  * @description Chip của tab cha "Cần xử lý" (2026-11-07): Cần sửa · Trễ lấy hàng (mã hãng hoặc chờ lấy quá 24
                  *     giờ) · Không lấy được · Hãng hủy · Trễ giao · Giao không thành công · Chưa đối soát · Đối soát
-                 *     lệch · Hãng đã trả hàng · Sự cố. Lặp tham số = đơn thuộc MỘT trong các chip (chip "Tất cả").
+                 *     lệch · Hãng đã trả hàng · Sự cố. Lặp tham số = đơn thuộc MỘT trong các chip (chip "Tất cả" =
+                 *     mọi chip trừ Chưa đối soát, user chốt 2026-11-07).
                  */
                 carrierIssue?: ("NEEDS_FIX" | "PICKUP_DELAYED" | "PICKUP_FAILED" | "CARRIER_CANCELLED" | "DELIVERY_DELAYED" | "DELIVERY_FAILED" | "UNRECONCILED" | "RECON_MISMATCH" | "RETURNED_TO_SENDER" | "INCIDENT")[];
                 /**
@@ -25371,7 +25377,8 @@ export interface operations {
                 /**
                  * @description Chip của tab cha "Cần xử lý" (2026-11-07): Cần sửa · Trễ lấy hàng (mã hãng hoặc chờ lấy quá 24
                  *     giờ) · Không lấy được · Hãng hủy · Trễ giao · Giao không thành công · Chưa đối soát · Đối soát
-                 *     lệch · Hãng đã trả hàng · Sự cố. Lặp tham số = đơn thuộc MỘT trong các chip (chip "Tất cả").
+                 *     lệch · Hãng đã trả hàng · Sự cố. Lặp tham số = đơn thuộc MỘT trong các chip (chip "Tất cả" =
+                 *     mọi chip trừ Chưa đối soát, user chốt 2026-11-07).
                  */
                 carrierIssue?: ("NEEDS_FIX" | "PICKUP_DELAYED" | "PICKUP_FAILED" | "CARRIER_CANCELLED" | "DELIVERY_DELAYED" | "DELIVERY_FAILED" | "UNRECONCILED" | "RECON_MISMATCH" | "RETURNED_TO_SENDER" | "INCIDENT")[];
                 /**

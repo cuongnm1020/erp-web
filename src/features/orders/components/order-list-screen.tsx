@@ -99,7 +99,7 @@ import {
   fulfilmentLabel,
   orderCancellable,
   orderFlowLabel,
-  CARRIER_ISSUE_DEFS,
+  CARRIER_ISSUES_ALL,
   DEFAULT_ORDER_TAB,
   parseCarrierIssue,
   parseLegacyIssue,
@@ -1126,11 +1126,12 @@ export function OrderListScreen() {
     (openedPlain || state.filters.group === 'all' || (state.q !== '' && !urlFlow));
   const currentFlow: OrderTab = urlFlow ?? DEFAULT_ORDER_TAB;
   const flow = view === 'orders' && !searching ? currentFlow : undefined;
-  // Điều kiện tab gửi API: chip "Đơn hàng" (`tab`) hoặc chip "Cần xử lý" (Tất cả = mọi chip).
+  // Điều kiện tab gửi API: chip "Đơn hàng" (`tab`) hoặc chip "Cần xử lý" (Tất cả = mọi chip đỏ,
+  // bỏ Chưa đối soát — user chốt 2026-11-07, khớp số trên tab cha).
   const tabParams = useMemo(
     () =>
       view === 'issues'
-        ? { carrierIssue: issue ? [issue] : CARRIER_ISSUE_DEFS.map((d) => d.issue) }
+        ? { carrierIssue: issue ? [issue] : CARRIER_ISSUES_ALL }
         : flow
           ? { tab: flow }
           : {},

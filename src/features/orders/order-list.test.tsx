@@ -152,7 +152,7 @@ describe('OrderListScreen — GET /sales-orders (P1-12)', () => {
     expect(String(replace.mock.calls.at(-1)![0])).toContain('flow=NEW');
   });
 
-  it('tab cha Cần xử lý: ?view=issues gửi mọi carrierIssue (Tất cả); chip → ?ci=; số tab cha = attention; link cũ ?flow=NEEDS_FIX mở chip Cần sửa', async () => {
+  it('tab cha Cần xử lý: ?view=issues gửi mọi carrierIssue trừ Chưa đối soát (Tất cả); chip → ?ci=; số tab cha = attention; link cũ ?flow=NEEDS_FIX mở chip Cần sửa', async () => {
     const lists: URLSearchParams[] = [];
     const onRequest = ({ request }: { request: Request }) => {
       const u = new URL(request.url);
@@ -164,7 +164,7 @@ describe('OrderListScreen — GET /sales-orders (P1-12)', () => {
         HttpResponse.json(
           new URL(request.url).searchParams.get('group') === 'issues'
             ? {
-                total: 7,
+                total: 5,
                 attention: 5,
                 counts: { PICKUP_DELAYED: 3, UNRECONCILED: 2, NEEDS_FIX: 2 },
               }
@@ -175,12 +175,15 @@ describe('OrderListScreen — GET /sales-orders (P1-12)', () => {
     try {
       search = 'view=issues';
       renderApp(<OrderListScreen />);
-      await waitFor(() => expect(lists.at(-1)?.getAll('carrierIssue').length).toBe(10));
+      // Chip "Tất cả" không gửi UNRECONCILED (user chốt 2026-11-07): đơn Thành công chờ tiền về
+      // không lẫn vào danh sách Cần xử lý.
+      await waitFor(() => expect(lists.at(-1)?.getAll('carrierIssue').length).toBe(9));
+      expect(lists.at(-1)!.getAll('carrierIssue')).not.toContain('UNRECONCILED');
       expect(lists.at(-1)!.get('tab')).toBeNull();
       const parents = screen.getByRole('tablist', { name: 'Nhóm tab' });
       const issueTab = within(parents).getByRole('tab', { name: /^Cần xử lý/ });
       expect(issueTab).toHaveAttribute('aria-selected', 'true');
-      // Số trên tab cha = attention (không tính Chưa đối soát), không phải total.
+      // Số trên tab cha = attention (không tính Chưa đối soát).
       await waitFor(() => expect(issueTab).toHaveTextContent(/^Cần xử lý\s*5$/));
       const chips = screen.getByRole('tablist', { name: 'Đơn cần xử lý' });
       expect(within(chips).getAllByRole('tab')).toHaveLength(11);
