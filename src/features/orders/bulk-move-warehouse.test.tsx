@@ -82,7 +82,9 @@ describe('BulkMoveWarehouseDialog', () => {
     );
     fireEvent.click(screen.getByRole('button', { name: 'Chuyển kho' }));
     const dialog = await screen.findByRole('dialog');
-    expect(within(dialog).getByText(/1 đơn đã gửi ĐVVC \/ kho đã làm \/ đã kết thúc sẽ bị bỏ qua/)).toBeInTheDocument();
+    expect(
+      within(dialog).getByText(/1 đơn đã gửi ĐVVC \/ kho đã làm \/ đã kết thúc sẽ bị bỏ qua/),
+    ).toBeInTheDocument();
     fireEvent.click(within(dialog).getByRole('combobox', { name: 'Chuyển tới kho' }));
     fireEvent.click(await screen.findByRole('option', { name: 'Kho Long An' }));
     fireEvent.click(within(dialog).getByRole('button', { name: 'Chuyển 2 đơn' }));
