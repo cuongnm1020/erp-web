@@ -739,7 +739,7 @@ describe('OrderCreateScreen — màn tạo đơn mới', () => {
     expect(bare).not.toHaveProperty('facebookPageId');
   });
 
-  it('gõ địa chỉ cũ → gợi ý theo địa chỉ mới "Xã Quảng Tân, Lâm Đồng"; bấm điền ô Tỉnh / Phường xã, huyện cũ giữ làm gợi ý, dòng địa chỉ còn phần còn lại (2026-11-07)', async () => {
+  it('gõ địa chỉ cũ → gợi ý giữ địa chỉ cũ "Xã Quảng Tân, Huyện Tuy Đức, Đắk Nông" (không tự đổi sang mới); bấm điền ô Tỉnh / Phường xã, dòng địa chỉ còn phần còn lại (2026-11-07)', async () => {
     const asked: string[] = [];
     server.use(
       ...skuHandlers(),
@@ -769,18 +769,20 @@ describe('OrderCreateScreen — màn tạo đơn mới', () => {
     fireEvent.change(line1, {
       target: { value: '0332119579, Xã Quảng Tân, Huyện Tuy Đức, Đắk Nông' },
     });
-    const pick = await screen.findByRole('button', { name: /^Xã Quảng Tân, Lâm Đồng/ });
-    expect(pick).toHaveTextContent('Đổi từ địa chỉ cũ: Xã Quảng Tân, Huyện Tuy Đức, Đắk Nông');
+    const pick = await screen.findByRole('button', {
+      name: /^Xã Quảng Tân, Huyện Tuy Đức, Đắk Nông/,
+    });
+    expect(pick).toHaveTextContent('Địa chỉ cũ');
+    expect(pick).not.toHaveTextContent('Lâm Đồng');
     fireEvent.click(pick);
     expect(screen.getByRole('combobox', { name: 'Tỉnh / Phường xã' })).toHaveTextContent(
-      'Xã Quảng Tân, Lâm Đồng',
+      'Xã Quảng Tân, Huyện Tuy Đức, Đắk Nông',
     );
-    expect(screen.getByText('Huyện cũ (gợi ý cho hãng): Huyện Tuy Đức')).toBeInTheDocument();
     expect(line1).toHaveValue('0332119579');
     // Đã điền khớp → gợi ý ẩn.
     await waitFor(() =>
       expect(
-        screen.queryByRole('button', { name: /^Xã Quảng Tân, Lâm Đồng/ }),
+        screen.queryByRole('button', { name: /^Xã Quảng Tân, Huyện Tuy Đức/ }),
       ).not.toBeInTheDocument(),
     );
     expect(asked.every((q) => q.length >= 6)).toBe(true);
@@ -855,7 +857,7 @@ describe('OrderCreateScreen — màn tạo đơn mới', () => {
     );
   });
 
-  it('ô Tỉnh / Phường xã: Địa chỉ cũ Tỉnh → Huyện → Xã lưu theo địa chỉ mới + huyện cũ; xã chưa có bảng đổi giữ tên cũ (2026-11-07)', async () => {
+  it('ô Tỉnh / Phường xã: Địa chỉ cũ Tỉnh → Huyện → Xã lưu đúng địa chỉ cũ, không đổi sang mới; mở lại vào thẳng bộ cũ (2026-11-07)', async () => {
     server.use(...skuHandlers(), geoUnitHandler());
     renderApp(<OrderCreateScreen />);
     const box = () => screen.getByRole('combobox', { name: 'Tỉnh / Phường xã' });
@@ -864,16 +866,16 @@ describe('OrderCreateScreen — màn tạo đơn mới', () => {
     fireEvent.click(await screen.findByRole('option', { name: 'Tiền Giang' }));
     fireEvent.click(await screen.findByRole('option', { name: 'Huyện Cai Lậy' }));
     fireEvent.click(await screen.findByRole('option', { name: 'Xã Ngũ Hiệp' }));
-    expect(box()).toHaveTextContent('Xã Ngũ Hiệp, Đồng Tháp');
-    expect(screen.getByText('Huyện cũ (gợi ý cho hãng): Huyện Cai Lậy')).toBeInTheDocument();
+    expect(box()).toHaveTextContent('Xã Ngũ Hiệp, Huyện Cai Lậy, Tiền Giang');
+    expect(box()).not.toHaveTextContent('Đồng Tháp');
 
-    fireEvent.click(screen.getByRole('button', { name: 'Xóa địa chỉ đã chọn' }));
+    // Mở lại: đang là địa chỉ cũ → tab Địa chỉ cũ, vào bước Quận / Huyện của Tiền Giang.
     fireEvent.click(box());
-    fireEvent.click(await screen.findByRole('tab', { name: 'Địa chỉ cũ' }));
-    fireEvent.click(await screen.findByRole('option', { name: 'Tiền Giang' }));
-    fireEvent.click(await screen.findByRole('option', { name: 'Huyện Cai Lậy' }));
-    fireEvent.click(await screen.findByRole('option', { name: 'Xã Cũ Lạ' }));
-    expect(box()).toHaveTextContent('Xã Cũ Lạ, Tiền Giang');
+    expect(await screen.findByRole('tab', { name: 'Địa chỉ cũ' })).toHaveAttribute(
+      'aria-selected',
+      'true',
+    );
+    expect(await screen.findByRole('option', { name: 'Huyện Cai Lậy' })).toBeInTheDocument();
   });
 
   it('ô Page: page ngưng ẩn; chọn page một POS khi ô POS trống → tự điền POS; có POS thì "Page của POS này" lên trước', async () => {

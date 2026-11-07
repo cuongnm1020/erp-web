@@ -1609,9 +1609,6 @@ function ReceiverFields({
           value={{ ward: value.ward, district: value.district, province: value.province }}
           onChange={(v) => onChange({ ...value, ...v })}
         />
-        {value.district ? (
-          <span className="font-normal">Huyện cũ (gợi ý cho hãng): {value.district}</span>
-        ) : null}
       </div>
     </div>
   );

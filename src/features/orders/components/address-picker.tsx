@@ -1,7 +1,7 @@
 'use client';
 
 import { Command as CommandPrimitive } from 'cmdk';
-import { AlertTriangle, Check, Info, Search, X } from 'lucide-react';
+import { Check, Search, X } from 'lucide-react';
 import { useEffect, useId, useMemo, useRef, useState } from 'react';
 import { matchesVi } from '@/components/data/form/search-select';
 import { Button } from '@/components/ui/button';
@@ -11,7 +11,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/cn';
 import { useGeoUnits, type GeoGeneration, type GeoUnit } from '../api/use-orders';
 
-/** Ba ô địa giới của đơn — tên đúng danh mục (bộ mới: `district` trống hoặc là huyện cũ làm gợi ý). */
+/** Ba ô địa giới của đơn — tên đúng danh mục (địa chỉ mới: `district` trống). */
 export interface AddressValue {
   province: string;
   district: string;
@@ -20,17 +20,17 @@ export interface AddressValue {
 
 type Step = 'province' | 'district' | 'ward';
 
-/** "Phường Buôn Ma Thuột, Đắk Lắk" — thứ tự như ô "Tỉnh / Phường xã". */
+/** "Phường Buôn Ma Thuột, Đắk Lắk" / "Xã Quảng Tân, Huyện Tuy Đức, Đắk Nông" (địa chỉ cũ). */
 export function addressLabel(v: AddressValue): string {
-  return [v.ward, v.province].filter((x) => x.trim()).join(', ');
+  return [v.ward, v.district, v.province].filter((x) => x.trim()).join(', ');
 }
 
 /**
  * Ô "Tỉnh / Phường xã" kiểu Pancake (mockup K8qEG4ssEjZTB6GKoLhXVB, duyệt 2026-11-07). Bấm mở bảng
  * chọn: công tắc **Địa chỉ mới** (Tỉnh → Phường xã) / **Địa chỉ cũ** (Tỉnh → Quận huyện → Phường
- * xã). Chọn xã cũ → lưu theo địa chỉ mới tương ứng, huyện cũ giữ ở `district` làm gợi ý cho hãng;
- * xã cũ chưa có trong bảng đổi → lưu nguyên tên cũ. Gõ để lọc (không dấu cũng được), ↑ ↓ Enter,
- * Backspace khi ô trống → về bước trước, Esc đóng.
+ * xã). Chọn bộ nào lưu đúng bộ đó — KHÔNG tự đổi địa chỉ cũ sang mới (user 2026-11-07: nhiều hãng
+ * vận chuyển chưa dùng địa chỉ mới). Gõ để lọc (không dấu cũng được), ↑ ↓ Enter, Backspace khi ô
+ * trống → về bước trước, Esc đóng.
  */
 export function AddressPicker({
   value,
@@ -66,18 +66,24 @@ export function AddressPicker({
         ? province?.id
         : (district ?? province)?.id;
   const units = useGeoUnits(gen, parentId, open);
-  const provinces = useGeoUnits('NEW', undefined, open);
+  const provinces = useGeoUnits(gen, undefined, open);
   const items = useMemo(() => units.data?.items ?? [], [units.data]);
 
   // Mở lại khi đã có tỉnh mới → vào thẳng bước Phường xã của tỉnh đó.
+  // Mở lại khi đã có tỉnh → vào thẳng bước kế của tỉnh đó, đúng bộ địa chỉ đang có (có huyện = cũ).
   useEffect(() => {
-    if (!open || gen !== 'NEW' || province || !value.province.trim()) return;
+    if (!open || province || !value.province.trim()) return;
     const p = provinces.data?.items.find((x) => x.name === value.province);
     if (p) {
       setProvince(p);
-      setStep('ward');
+      setStep(gen === 'OLD' ? 'district' : 'ward');
     }
   }, [open, gen, province, value.province, provinces.data]);
+
+  const openPicker = () => {
+    setGen(value.district.trim() ? 'OLD' : 'NEW');
+    setOpen(true);
+  };
 
   const reset = (g: GeoGeneration) => {
     setGen(g);
@@ -120,17 +126,11 @@ export function AddressPicker({
       setStep('ward');
       return;
     }
-    if (gen === 'NEW') {
-      onChange({ province: province?.name ?? '', district: '', ward: u.name });
-    } else if (u.converted?.ward) {
-      onChange({
-        province: u.converted.province,
-        district: district?.name ?? '',
-        ward: u.converted.ward,
-      });
-    } else {
-      onChange({ province: province?.name ?? '', district: district?.name ?? '', ward: u.name });
-    }
+    onChange({
+      province: province?.name ?? '',
+      district: gen === 'OLD' ? (district?.name ?? '') : '',
+      ward: u.name,
+    });
     close();
   };
 
@@ -176,7 +176,7 @@ export function AddressPicker({
       className={cn('overflow-visible bg-transparent', className)}
       label={label}
     >
-      <Popover open={open} onOpenChange={(o) => (o ? setOpen(true) : close())}>
+      <Popover open={open} onOpenChange={(o) => (o ? openPicker() : close())}>
         <PopoverAnchor asChild>
           <div ref={anchorRef} className="relative">
             {open ? (
@@ -209,7 +209,7 @@ export function AddressPicker({
                   aria-controls={listId}
                   aria-label={label}
                   aria-invalid={invalid || undefined}
-                  onClick={() => setOpen(true)}
+                  onClick={openPicker}
                   className={cn(
                     'flex h-control w-full items-center justify-between gap-2 rounded-md border border-control-border bg-card px-2.5 text-left text-sm focus-visible:border-control-border-focus aria-[invalid=true]:border-destructive',
                     shown && 'pr-8',
@@ -330,7 +330,7 @@ export function AddressPicker({
               <>
                 <CommandEmpty>Không có mục nào khớp</CommandEmpty>
                 {items.map((u) => {
-                  const chosen = u.level === 'WARD' && (u.converted?.ward ?? u.name) === value.ward;
+                  const chosen = u.level === 'WARD' && u.name === value.ward;
                   return (
                     <CommandItem
                       key={u.id}
@@ -386,37 +386,14 @@ function PickerFooter({
       </div>
     );
   }
-  if (gen === 'NEW') {
-    return (
-      <div className="border-t px-3 py-1.5 text-xs text-muted-foreground">
-        Sẽ điền:{' '}
-        <b className="font-semibold text-foreground">
-          {active.name}, {province?.name}
-        </b>
-      </div>
-    );
-  }
-  if (active.converted?.ward) {
-    return (
-      <div className="flex items-start gap-2 border-t bg-info-weak px-3 py-2 text-xs text-foreground">
-        <Info className="mt-px h-4 w-4 shrink-0 text-info" aria-hidden />
-        <span>
-          Sẽ lưu theo địa chỉ mới:{' '}
-          <b className="font-semibold">
-            {active.converted.ward}, {active.converted.province}
-          </b>
-          . {district?.name} (cũ) giữ lại làm gợi ý cho hãng vận chuyển.
-        </span>
-      </div>
-    );
-  }
   return (
-    <div className="flex items-start gap-2 border-t bg-warning-weak px-3 py-2 text-xs text-foreground">
-      <AlertTriangle className="mt-px h-4 w-4 shrink-0 text-warning" aria-hidden />
-      <span>
-        Chưa đổi được sang địa chỉ mới — mở tab <b className="font-semibold">Địa chỉ mới</b> để chọn
-        Phường / Xã. Đơn vẫn lưu được.
-      </span>
+    <div className="border-t px-3 py-1.5 text-xs text-muted-foreground">
+      Sẽ điền {gen === 'OLD' ? 'địa chỉ cũ' : 'địa chỉ mới'}:{' '}
+      <b className="font-semibold text-foreground">
+        {[active.name, gen === 'OLD' ? district?.name : null, province?.name]
+          .filter(Boolean)
+          .join(', ')}
+      </b>
     </div>
   );
 }
