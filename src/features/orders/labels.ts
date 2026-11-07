@@ -467,7 +467,10 @@ export const ORDER_TAB_DEFS: ReadonlyArray<{
   { tab: 'CANCELLED', label: 'Đã hủy', family: 'off' },
 ];
 
-/** Chip tab cha "Cần xử lý" (API `?carrierIssue=`). Chưa đối soát không cộng vào số tab cha. */
+/**
+ * Chip tab cha "Cần xử lý" (API `?carrierIssue=`). Chưa đối soát không cộng vào số tab cha và
+ * không vào chip "Tất cả" ({@link CARRIER_ISSUES_QUIET}).
+ */
 export const CARRIER_ISSUE_DEFS: ReadonlyArray<{
   issue: CarrierIssue;
   label: string;
@@ -484,6 +487,17 @@ export const CARRIER_ISSUE_DEFS: ReadonlyArray<{
   { issue: 'RETURNED_TO_SENDER', label: 'Hãng đã trả hàng', family: 'issue' },
   { issue: 'INCIDENT', label: 'Sự cố', family: 'issue' },
 ];
+
+/**
+ * Chip Cần xử lý chỉ xem khi bấm đúng chip (user chốt 2026-11-07): đơn hãng đã giao Thành công
+ * chờ tiền về không lẫn vào chip "Tất cả" của Cần xử lý. Cùng luật `CARRIER_ISSUES_QUIET` bên api.
+ */
+export const CARRIER_ISSUES_QUIET: readonly CarrierIssue[] = ['UNRECONCILED'];
+
+/** Chip "Tất cả" của Cần xử lý gửi API = mọi chip trừ {@link CARRIER_ISSUES_QUIET}. */
+export const CARRIER_ISSUES_ALL: readonly CarrierIssue[] = CARRIER_ISSUE_DEFS.map(
+  (d) => d.issue,
+).filter((i) => !CARRIER_ISSUES_QUIET.includes(i));
 
 export const DEFAULT_ORDER_TAB: OrderTab = 'NEW';
 

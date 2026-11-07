@@ -21,7 +21,8 @@ export type OrderTabView = 'orders' | 'issues';
  * duyệt): "Đơn hàng" (mỗi đơn đúng một chip theo vòng đời) | "Cần xử lý" (đơn cần người thao tác —
  * số cạnh tên = các chip đỏ, không tính Chưa đối soát). Tab cha gạch chân như các màn danh sách
  * khác; chip con giữ nguyên FlowChip (màu theo họ, số đếm). Chip "Tất cả" luôn đứng đầu:
- * "Đơn hàng" › Tất cả = mọi đơn (`searching`, như trước); "Cần xử lý" › Tất cả = đơn ở mọi chip.
+ * "Đơn hàng" › Tất cả = mọi đơn (`searching`, như trước); "Cần xử lý" › Tất cả = đơn ở mọi chip đỏ
+ * (bỏ Chưa đối soát — user chốt 2026-11-07, số chip = số trên tab cha).
  */
 export function OrderTabs({
   view,
