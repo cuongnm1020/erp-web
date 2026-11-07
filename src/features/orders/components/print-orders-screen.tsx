@@ -15,7 +15,7 @@ import {
 } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { BulkActionBar } from '@/components/data/bulk-action-bar';
 import { Checkbox } from '@/components/ui/checkbox';
 import { CopyButton } from '@/components/data/copy-button';
@@ -1099,7 +1099,19 @@ export function PrintOrdersScreen() {
     team !== '' ||
     fbPage !== '';
   const customerName = query.data?.items[0]?.customer.name;
-  const selectedRows = (query.data?.items ?? []).filter((r) => selected[r.id]);
+  // Dòng đã chọn: nhớ cả dòng vừa RỜI bộ lọc (sự cố 2026-11-07, màn In đơn: Gửi ĐVVC xong đơn sang
+  // tab Đang đóng hàng → tab Đã xác nhận không còn dòng chọn → thanh chọn nhiều bị gỡ kéo theo hộp
+  // Sang ĐVVC đang hỏi "Đóng gói + in vận đơn luôn?"). Chỉ bỏ nhớ khi bỏ chọn.
+  const selectedRowCache = useRef(new Map<string, SalesOrderListItem>());
+  const items = query.data?.items ?? [];
+  for (const r of items) if (selected[r.id]) selectedRowCache.current.set(r.id, r);
+  for (const id of [...selectedRowCache.current.keys()]) {
+    if (!selected[id]) selectedRowCache.current.delete(id);
+  }
+  const selectedRows = [
+    ...items.filter((r) => selected[r.id]),
+    ...[...selectedRowCache.current.values()].filter((r) => !items.some((i) => i.id === r.id)),
+  ];
   const clearSelection = () => setSelected({});
 
   return (

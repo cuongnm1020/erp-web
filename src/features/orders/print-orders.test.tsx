@@ -3,7 +3,7 @@ import { http, HttpResponse } from 'msw';
 import { describe, expect, it, vi } from 'vitest';
 import { makeOrders } from '@/test/msw/handlers';
 import { server } from '@/test/msw/server';
-import { renderApp } from '@/test/render';
+import { makeTestQueryClient, renderApp } from '@/test/render';
 import { PrintOrdersScreen } from './components/print-orders-screen';
 
 let search = 'group=all';
@@ -126,6 +126,32 @@ describe('PrintOrdersScreen — In đơn (clone màn Đơn hàng, 2026-11-04)', 
     fireEvent.click(go);
     await waitFor(() => expect(calls.map((c) => c.url)).toEqual(['bulk-update', 'bulk-fulfil']));
     expect(calls[0]!.body).toEqual({ orderIds: [rows[0]!.id, rows[1]!.id], packerId: 'u-pack' });
+  });
+
+  it('dòng đã chọn rời bộ lọc khi nạp lại (Gửi ĐVVC xong đơn sang tab khác) → thanh chọn nhiều vẫn còn, không gỡ hộp thoại đang mở (2026-11-07)', async () => {
+    const two = makeOrders(2);
+    let calls = 0;
+    server.use(
+      http.get('/api/sales-orders', () => {
+        calls += 1;
+        return HttpResponse.json(
+          calls === 1 ? { items: two, total: 2 } : { items: [two[1]], total: 1 },
+        );
+      }),
+    );
+    const queryClient = makeTestQueryClient();
+    renderApp(<PrintOrdersScreen />, { queryClient });
+    await screen.findByText(two[0]!.docNumber);
+    fireEvent.click(screen.getAllByRole('checkbox', { name: 'Chọn dòng' })[0]!);
+    expect(await screen.findByRole('toolbar')).toHaveTextContent('1 đơn đã chọn');
+
+    await queryClient.invalidateQueries();
+    await waitFor(() => expect(screen.queryByText(two[0]!.docNumber)).not.toBeInTheDocument());
+    expect(calls).toBeGreaterThan(1);
+    expect(screen.getByRole('toolbar')).toHaveTextContent('1 đơn đã chọn');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Bỏ chọn' }));
+    await waitFor(() => expect(screen.queryByRole('toolbar')).not.toBeInTheDocument());
   });
 
   it('ô tìm Sản phẩm chỉ liệt kê sản phẩm thường — GET /products?isCombo=false', async () => {
