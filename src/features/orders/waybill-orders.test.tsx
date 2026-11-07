@@ -138,6 +138,22 @@ describe('WaybillOrdersScreen', () => {
     expect(q.get('carrierId')).toBe('00000000-0000-4000-8000-0000000000bb');
   });
 
+  it('ô POS chọn nhiều như màn In đơn: URL pos=a,b → pancakeShopId=a,b (2026-11-07)', async () => {
+    search = 'pos=715130909,715130910';
+    const { listQueries } = setup();
+    try {
+      renderApp(<WaybillOrdersScreen />);
+      await waitFor(() =>
+        expect(listQueries.some((q) => q.get('pancakeShopId') === '715130909,715130910')).toBe(
+          true,
+        ),
+      );
+      expect(await screen.findByRole('combobox', { name: 'POS' })).toHaveTextContent('2 POS');
+    } finally {
+      search = '';
+    }
+  });
+
   it('chọn nhiều đơn → thanh hàng loạt có "In lại vận đơn"', async () => {
     search = '';
     const { rows } = setup();

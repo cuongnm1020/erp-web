@@ -162,7 +162,12 @@ export function WaybillOrdersScreen() {
     dateField: 'sentToCarrierAt',
     timeFrom: f.timeFrom,
     timeTo: f.timeTo,
-    pancakeShopId: f.pos || undefined,
+    // Nhiều POS nối dấu phẩy; chỉ giữ mã dạng số (link cũ lạ bỏ qua) — như màn In đơn.
+    pancakeShopId:
+      (f.pos ?? '')
+        .split(',')
+        .filter((s) => /^\d+$/.test(s))
+        .join(',') || undefined,
     teamIds: team || undefined,
     skuId: f.skuId,
     carrierId: f.carrierId,
@@ -283,10 +288,11 @@ export function WaybillOrdersScreen() {
               })),
             },
             {
+              // Chọn nhiều POS (2026-11-07, như màn In đơn) — mã shop nối dấu phẩy.
               key: 'pos',
               label: 'POS',
-              type: 'select',
-              searchable: true,
+              type: 'multiSelect',
+              unit: 'POS',
               options: (shops.data ?? []).map((s) => ({
                 value: s.shopId,
                 label: pancakeShopLabel(s),
