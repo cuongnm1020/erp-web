@@ -3009,6 +3009,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/geo/units": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Bộ chọn địa chỉ kiểu Pancake (2026-11-07): không `parentId` → danh sách tỉnh; có → xã của tỉnh
+         *     (bộ mới) / huyện của tỉnh, xã của huyện (bộ cũ). Đơn vị bộ cũ kèm đơn vị bộ mới tương ứng.
+         */
+        get: operations["GeoController_units"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/teams": {
         parameters: {
             query?: never;
@@ -11515,6 +11535,11 @@ export interface components {
             note?: string | null;
             isActive?: boolean;
         };
+        GeoConvertedDto: {
+            province: string;
+            /** @description null khi chỉ đổi được tỉnh. */
+            ward: string | null;
+        };
         GeoSuggestionDto: {
             /**
              * @description OLD = địa giới cũ 3 cấp (trước 7/2025), NEW = địa giới mới 2 cấp.
@@ -11529,10 +11554,30 @@ export interface components {
             label: string;
             /** @description Dòng địa chỉ sau khi bỏ các đoạn trùng tên đơn vị đã khớp ("0332119579"). */
             line1: string;
+            /**
+             * @description Gợi ý địa giới cũ: đơn vị địa giới mới tương ứng (theo bảng đổi của Pancake) — null với địa giới
+             *     mới, hoặc xã cũ chưa có trong bảng đổi.
+             */
+            converted: components["schemas"]["GeoConvertedDto"] | null;
         };
         GeoSuggestResponseDto: {
             items: components["schemas"]["GeoSuggestionDto"][];
             /** @description false = danh mục địa giới chưa nạp (worker đang nạp lần đầu). */
+            ready: boolean;
+        };
+        GeoUnitDto: {
+            /** @description Mã Pancake: "606" / "60634" / "84_VN126". */
+            id: string;
+            name: string;
+            /** @enum {string} */
+            level: "PROVINCE" | "DISTRICT" | "WARD";
+            /** @description Địa giới cũ: đơn vị địa giới mới tương ứng (huyện: null); địa giới mới: null. */
+            converted: components["schemas"]["GeoConvertedDto"] | null;
+        };
+        GeoUnitsResponseDto: {
+            /** @description Sắp theo tên tiếng Việt. */
+            items: components["schemas"]["GeoUnitDto"][];
+            /** @description false = danh mục địa giới chưa nạp. */
             ready: boolean;
         };
         TeamDto: {
@@ -12822,6 +12867,11 @@ export interface components {
         SalesOrderDetailDto: {
             /** @description NV phụ trách (ownerId) — tên hiển thị; null = đơn của team chưa chia / người dùng đã xoá. */
             ownerName: string | null;
+            /**
+             * @description Phòng ban / team tính doanh số của đơn (SalesOrder.teamId, theo NV xử lý), bỏ tiền tố
+             *     "Phòng ban · "; null = không gắn team.
+             */
+            teamName: string | null;
             careStaffName: string | null;
             packerName: string | null;
             marketerName: string | null;
@@ -23341,6 +23391,30 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["GeoSuggestResponseDto"];
+                };
+            };
+        };
+    };
+    GeoController_units: {
+        parameters: {
+            query: {
+                /** @description OLD = địa giới cũ 3 cấp, NEW = địa giới mới 2 cấp. */
+                generation: "OLD" | "NEW";
+                /** @description Mã đơn vị cha (tỉnh, hoặc huyện của bộ cũ). Bỏ trống → danh sách tỉnh. */
+                parentId?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GeoUnitsResponseDto"];
                 };
             };
         };

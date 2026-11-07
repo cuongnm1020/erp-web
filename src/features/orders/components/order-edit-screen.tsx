@@ -81,6 +81,7 @@ import { MarketplaceBadge, waybillErrorText } from './waybill-error';
 import { CART_GRID } from './order-create/cart-line';
 import { DENSE } from './order-create/order-draft-form';
 import { Card, OwnerPicker } from './order-create/order-side-cards';
+import { AddressPicker } from './address-picker';
 import { OrderTagsField } from './order-tags-field';
 import { OrderEditHistory } from './order-edit-history';
 import { customRows, linesChange, OrderEditLines, useOrderLinesForm } from './order-edit-lines';
@@ -1599,9 +1600,19 @@ function ReceiverFields({
       <div className="sm:col-span-2">
         {field('line1', 'Địa chỉ (số nhà, đường, thôn)', { required: true })}
       </div>
-      {field('ward', 'Phường / xã')}
-      {field('district', 'Quận / huyện')}
-      <div className="sm:col-span-2">{field('province', 'Tỉnh / thành', { required: true })}</div>
+      <div className="flex min-w-0 flex-col gap-1 text-xs font-semibold text-muted-foreground sm:col-span-2">
+        <span>
+          Tỉnh / Phường xã<span className="text-destructive"> *</span>
+        </span>
+        <AddressPicker
+          triggerClassName={cn(dirty && DIRTY)}
+          value={{ ward: value.ward, district: value.district, province: value.province }}
+          onChange={(v) => onChange({ ...value, ...v })}
+        />
+        {value.district ? (
+          <span className="font-normal">Huyện cũ (gợi ý cho hãng): {value.district}</span>
+        ) : null}
+      </div>
     </div>
   );
 }
