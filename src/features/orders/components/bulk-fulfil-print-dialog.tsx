@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { PackageCheck } from 'lucide-react';
 import { useEffect, useState, type ReactNode } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -42,6 +43,7 @@ import {
   type WaybillOrientation,
 } from '@/features/wms/components/waybill-label';
 import {
+  orderKeys,
   useBulkFulfilOrders,
   useBulkUpdateOrders,
   type BulkFulfilOrdersResult,
@@ -84,6 +86,7 @@ export function useFulfilPrint() {
   const [printedAt, setPrintedAt] = useState(() => new Date());
   const printer = usePrint();
   const bulk = useBulkFulfilOrders();
+  const queryClient = useQueryClient();
   const fetchLabels = useShipmentLabelDataMany();
   const markPrinted = useMarkLabelsPrinted();
 
@@ -120,6 +123,8 @@ export function useFulfilPrint() {
         }
         setProgress({ stage: 'pack', done: Math.min(i + FULFIL_CHUNK, total), total });
       }
+      // Nạp lại danh sách + số tab MỘT lần cho cả lô (không sau mỗi nhóm 8 đơn — đo 2026-11-07).
+      void queryClient.invalidateQueries({ queryKey: orderKeys.lists() });
       const printable = r.done.filter((d) => d.trackingNo).map((d) => d.shipmentId);
       const queued = r.done.length - printable.length;
       if (printable.length > 0) {
