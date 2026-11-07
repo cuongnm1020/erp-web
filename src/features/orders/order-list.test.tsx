@@ -10,7 +10,7 @@ import {
   scenario,
 } from '@/test/msw/handlers';
 import { server } from '@/test/msw/server';
-import { renderApp } from '@/test/render';
+import { makeTestQueryClient, renderApp } from '@/test/render';
 import { OrderListScreen, TotalValueFilter } from './components/order-list-screen';
 
 const replace = vi.fn();
@@ -1733,6 +1733,34 @@ describe('OrderListScreen — redesign Bán hàng (2026-10-22)', () => {
     expect(bar).toHaveTextContent('1 đơn đã chọn');
     expect(bar).toHaveTextContent('tổng');
     expect(screen.queryByRole('textbox', { name: 'Tìm nhanh' })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Bỏ chọn' }));
+    expect(await screen.findByRole('textbox', { name: 'Tìm nhanh' })).toBeInTheDocument();
+  });
+
+  it('dòng đã chọn rời bộ lọc khi nạp lại (Gửi ĐVVC xong đơn sang tab khác) → thanh chọn nhiều vẫn còn, không gỡ hộp thoại đang mở (2026-11-07)', async () => {
+    search = ALL;
+    const two = makeOrders(2);
+    let calls = 0;
+    server.use(
+      http.get('/api/sales-orders', () => {
+        calls += 1;
+        return HttpResponse.json(
+          calls === 1 ? { items: two, total: 2 } : { items: [two[1]], total: 1 },
+        );
+      }),
+    );
+    const queryClient = makeTestQueryClient();
+    renderApp(<OrderListScreen />, { queryClient });
+    await screen.findByText(two[0]!.docNumber);
+    fireEvent.click(screen.getAllByRole('checkbox', { name: 'Chọn dòng' })[0]!);
+    expect(await screen.findByRole('toolbar')).toHaveTextContent('1 đơn đã chọn');
+
+    // Nạp lại danh sách (như sau khi Gửi ĐVVC xong): đơn đã chọn không còn trong bộ lọc.
+    await queryClient.invalidateQueries();
+    await waitFor(() => expect(screen.queryByText(two[0]!.docNumber)).not.toBeInTheDocument());
+    expect(calls).toBeGreaterThan(1);
+    expect(screen.getByRole('toolbar')).toHaveTextContent('1 đơn đã chọn');
+
     fireEvent.click(screen.getByRole('button', { name: 'Bỏ chọn' }));
     expect(await screen.findByRole('textbox', { name: 'Tìm nhanh' })).toBeInTheDocument();
   });
