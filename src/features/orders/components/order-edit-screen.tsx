@@ -11,7 +11,7 @@ import {
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import Decimal from 'decimal.js';
-import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { Fragment, useEffect, useRef, useState, type ReactNode } from 'react';
 import { useWatch } from 'react-hook-form';
 import { CopyButton } from '@/components/data/copy-button';
 import { UomText } from '@/components/data/uom-text';
@@ -59,6 +59,7 @@ import {
   useUpdateOrder,
   type SalesOrderDetail,
   type SalesOrderStatus,
+  type ShippingOptions,
 } from '../api/use-orders';
 import {
   fulfilTargetLabel,
@@ -133,6 +134,51 @@ export function movedOrderDateIso(orig: string, fromKey: string, toKey: string, 
   return (at.getTime() > now.getTime() ? now : at).toISOString();
 }
 
+const SIZE_KEYS = ['lengthCm', 'widthCm', 'heightCm'] as const;
+type PackageSize = Record<(typeof SIZE_KEYS)[number], string>;
+const SIZE_LABELS: Record<(typeof SIZE_KEYS)[number], string> = {
+  lengthCm: 'Dài (cm)',
+  widthCm: 'Rộng (cm)',
+  heightCm: 'Cao (cm)',
+};
+
+/** Kích thước đã lưu trên đơn → chuỗi cho ô nhập ('' = chưa khai). */
+export function packageSizeOf(opts: SalesOrderDetail['shippingOptions']): PackageSize {
+  const text = (n: number | null | undefined) => (n ? String(n) : '');
+  return {
+    lengthCm: text(opts?.lengthCm),
+    widthCm: text(opts?.widthCm),
+    heightCm: text(opts?.heightCm),
+  };
+}
+
+/**
+ * Body `shippingOptions` của PATCH: PATCH thay CẢ bộ tuỳ chọn → giữ nguyên các tuỳ chọn gửi hãng
+ * đã lưu, chỉ thay 3 chiều kích thước; trống cả 3 → bỏ kích thước (bộ rỗng → null).
+ */
+export function withPackageSize(
+  opts: SalesOrderDetail['shippingOptions'],
+  size: PackageSize,
+): ShippingOptions | null {
+  const rest: ShippingOptions = { ...(opts ?? {}) };
+  for (const k of SIZE_KEYS) delete rest[k];
+  const filled = SIZE_KEYS.every((k) => size[k].trim() !== '');
+  const next: ShippingOptions = filled
+    ? {
+        ...rest,
+        lengthCm: Number.parseInt(size.lengthCm, 10),
+        widthCm: Number.parseInt(size.widthCm, 10),
+        heightCm: Number.parseInt(size.heightCm, 10),
+      }
+    : rest;
+  return Object.keys(next).length === 0 ? null : next;
+}
+
+const sizeLabel = (s: PackageSize) =>
+  SIZE_KEYS.every((k) => s[k].trim() !== '')
+    ? `${s.lengthCm} × ${s.widthCm} × ${s.heightCm} cm`
+    : 'Chưa khai';
+
 /** Tên trường trong `changed` của PATCH → chữ trên toast "Đã lưu thay đổi". */
 function changedLabel(c: string): string {
   switch (c) {
@@ -140,6 +186,8 @@ function changedLabel(c: string): string {
       return 'địa chỉ giao';
     case 'shippingWeightKg':
       return 'cân nặng gửi hãng';
+    case 'shippingOptions':
+      return 'kích thước gói hàng';
     case 'carrierAccountId':
       return 'tài khoản hãng';
     case 'internalNote':
@@ -206,6 +254,9 @@ function Editor({ order }: { order: SalesOrderDetail }) {
   const addresses = customer.data?.addresses ?? [];
   // Cân nặng gửi hãng: ô trống = dùng cân nặng tính từ dòng (server: shippingWeightKg null).
   const [weightKg, setWeightKg] = useState<string>(order.shippingWeightKg ?? '');
+  // Kích thước gói hàng (2026-11-09): lưu vào shippingOptions, hãng nhận khi xin (lại) vận đơn.
+  const origSize = packageSizeOf(order.shippingOptions);
+  const [size, setSize] = useState<PackageSize>(origSize);
   // Ghi chú / thẻ / hẹn nhận / tài khoản hãng — PATCH nhận từ 2026-10-22 (đơn chưa kết thúc).
   const [internalNote, setInternalNote] = useState(order.internalNote ?? '');
   const [printNote, setPrintNote] = useState(order.printNote ?? '');
@@ -289,6 +340,14 @@ function Editor({ order }: { order: SalesOrderDetail }) {
     (nextWeight === null
       ? order.shippingWeightKg !== null
       : order.shippingWeightKg === null || !toDecimal(order.shippingWeightKg)?.eq(nextWeight));
+  const sizeFilled = SIZE_KEYS.filter((k) => size[k].trim() !== '').length;
+  // Hãng chỉ nhận đủ 3 chiều (adapter GHTK bỏ qua nếu thiếu) → nhập đủ 3 hoặc để trống cả 3.
+  const sizeInvalid =
+    SIZE_KEYS.some((k) => !/^\d{0,5}$/.test(size[k].trim()) || Number(size[k]) > 10_000) ||
+    (sizeFilled > 0 && sizeFilled < 3) ||
+    (sizeFilled === 3 && SIZE_KEYS.some((k) => Number(size[k]) === 0));
+  const sizeChanged =
+    !sizeInvalid && SIZE_KEYS.some((k) => Number(size[k] || 0) !== Number(origSize[k] || 0));
   // Đổi kho đi đường chuyển đơn (PLAN-warehouse-context K3: dời giữ chỗ + lập lại PICK) — không
   // qua PATCH (PATCH chặn ORDER_WAREHOUSE_LOCKED khi hàng đã giữ ở kho cũ).
   const moveTo = warehouseChanged && nextWarehouse ? nextWarehouse : null;
@@ -320,7 +379,12 @@ function Editor({ order }: { order: SalesOrderDetail }) {
     accountChanged ||
     recipientPhoneChanged;
   const patchFieldsDirty =
-    statusChanged || carrierChanged || addressChanged || weightChanged || extrasChanged;
+    statusChanged ||
+    carrierChanged ||
+    addressChanged ||
+    weightChanged ||
+    sizeChanged ||
+    extrasChanged;
   const patchFieldsDirtyAll = patchFieldsDirty || receiverChanged;
   const patchDirty = patchFieldsDirtyAll || moveTo !== null || linesChanged;
   const carrierAccounts = selectedCarrier?.accounts ?? [];
@@ -400,6 +464,12 @@ function Editor({ order }: { order: SalesOrderDetail }) {
       toast.error('Cân nặng gửi hãng phải là số kg lớn hơn 0, tối đa 4 số lẻ');
       return;
     }
+    if (sizeInvalid) {
+      toast.error(
+        'Kích thước gói hàng: nhập đủ dài × rộng × cao (cm, số nguyên > 0) hoặc để trống',
+      );
+      return;
+    }
     if (fulfilTarget === 'PACKED' && nextCarrier === null) {
       toast.error(
         'Chọn hãng vận chuyển (ĐVVC) trước khi đóng gói — vận đơn được xin ngay trong cùng thao tác',
@@ -477,6 +547,7 @@ function Editor({ order }: { order: SalesOrderDetail }) {
         ...(addressChanged ? { addressId: nextAddress } : {}),
         ...(receiverChanged && receiverBody ? { address: receiverBody } : {}),
         ...(weightChanged ? { shippingWeightKg: nextWeight } : {}),
+        ...(sizeChanged ? { shippingOptions: withPackageSize(order.shippingOptions, size) } : {}),
         ...(accountChanged ? { carrierAccountId: nextAccount } : {}),
         ...(internalChanged ? { internalNote: trimOrNull(internalNote) } : {}),
         ...(printChanged ? { printNote: trimOrNull(printNote) } : {}),
@@ -638,6 +709,9 @@ function Editor({ order }: { order: SalesOrderDetail }) {
             to: weightLabel(nextWeight),
           },
         ]
+      : []),
+    ...(sizeChanged
+      ? [{ label: 'Kích thước gói hàng', from: sizeLabel(origSize), to: sizeLabel(size) }]
       : []),
     ...(accountChanged
       ? [
@@ -1355,6 +1429,34 @@ function Editor({ order }: { order: SalesOrderDetail }) {
             {weightInvalid ? (
               <p className="text-right text-xs text-destructive">
                 Nhập số kg lớn hơn 0, tối đa 4 số lẻ (vd 0,5 hay 1.25)
+              </p>
+            ) : null}
+            <Row label="Kích thước (cm)" htmlFor="order-size-lengthCm">
+              <div className="flex items-center gap-1.5">
+                {SIZE_KEYS.map((k, i) => (
+                  <Fragment key={k}>
+                    {i > 0 ? <span className="text-muted-foreground">×</span> : null}
+                    <Input
+                      id={`order-size-${k}`}
+                      value={size[k]}
+                      onChange={(e) => setSize((s) => ({ ...s, [k]: e.target.value }))}
+                      inputMode="numeric"
+                      placeholder={i === 0 ? 'D' : i === 1 ? 'R' : 'C'}
+                      aria-label={SIZE_LABELS[k]}
+                      aria-invalid={sizeInvalid || undefined}
+                      disabled={!carrierEditable}
+                      className={cn(
+                        'min-w-0 flex-1 text-right tabular-nums',
+                        sizeChanged && size[k] !== origSize[k] && DIRTY,
+                      )}
+                    />
+                  </Fragment>
+                ))}
+              </div>
+            </Row>
+            {sizeInvalid ? (
+              <p className="text-right text-xs text-destructive">
+                Nhập đủ dài × rộng × cao (số nguyên cm, lớn hơn 0) hoặc để trống cả ba
               </p>
             ) : null}
             <div className="grid gap-2.5 sm:grid-cols-2">
