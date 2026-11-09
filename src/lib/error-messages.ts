@@ -208,6 +208,9 @@ const MESSAGES: Record<string, string> = {
   ORDER_NOT_EDITABLE: 'Đơn đã kết thúc (đã chốt hoặc đã hủy) — không đóng gói được nữa.',
   SHIPMENT_ALREADY_DISPATCHED:
     'Hãng đã lấy hàng / phiếu giao đã rời kho — không đóng gói lại được. Kiểm tra tồn với quản lý kho.',
+  // Phiếu theo vận đơn Pancake còn hiệu lực (2026-11-10) — không xin thêm vận đơn hãng khác từ ERP.
+  SHIPMENT_PANCAKE_WAYBILL_ACTIVE:
+    'Đơn đang có vận đơn gửi từ Pancake. Hủy vận đơn đó trên Pancake rồi bấm Gửi sang ĐVVC lại để ERP tạo vận đơn mới.',
   SHIPMENT_INVALID_TRANSITION:
     'Phiếu giao không ở trạng thái đóng gói được (đã hủy / hãng đã xử lý). Mở đơn xem trạng thái phiếu giao.',
   SHIPMENT_NOT_FOUND: 'Không tìm thấy phiếu giao của đơn. Tải lại danh sách rồi thử lại.',
