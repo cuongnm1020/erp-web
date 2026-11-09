@@ -22,7 +22,13 @@ import { formatDate, formatMoney, formatQuantity } from '@/lib/format';
 import { Can, useAbility } from '@/lib/permission';
 import { useListState } from '@/lib/url-state';
 import { decimalCell } from '@/lib/xlsx-writer';
-import { fetchCombos, useCombos, useDeleteCombo, type ComboListItem } from '../api/use-combos';
+import {
+  fetchCombos,
+  useComboCreators,
+  useCombos,
+  useDeleteCombo,
+  type ComboListItem,
+} from '../api/use-combos';
 
 /**
  * Combo sản phẩm — GET /combos. Combo = một mã bán gộp nhiều SKU thành phần: KHÔNG có tồn
@@ -30,7 +36,12 @@ import { fetchCombos, useCombos, useDeleteCombo, type ComboListItem } from '../a
  * mức)). Khi lên đơn chọn combo như SKU thường — server bung thành dòng thành phần và giữ
  * tồn trên từng thành phần.
  */
-const DEFAULTS = { size: 50, filterKeys: ['status'] as const };
+// Mặc định mới tạo trước (2026-11-09); lọc người tạo + khoảng ngày tạo.
+const DEFAULTS = {
+  size: 50,
+  sort: { id: 'createdAt', desc: true },
+  filterKeys: ['status', 'createdBy', 'createdFrom', 'createdTo'] as const,
+};
 type ComboFilter = (typeof DEFAULTS.filterKeys)[number];
 const SORTABLE = new Set(['code', 'name', 'createdAt', 'quantity']);
 
@@ -199,7 +210,7 @@ function ComboRowActions({ combo }: { combo: ComboListItem }) {
 
 export function ComboListScreen() {
   const { state, set, skipTake } = useListState<ComboFilter>(DEFAULTS);
-  const status = state.filters.status;
+  const { status, createdBy, createdFrom, createdTo } = state.filters;
   const sort = state.sort && SORTABLE.has(state.sort.id) ? state.sort : null;
   const params = useMemo(
     () => ({
@@ -207,14 +218,31 @@ export function ComboListScreen() {
       isActive: status === 'active' ? true : status === 'inactive' ? false : undefined,
       sortBy: sort ? (sort.id as 'code' | 'name' | 'createdAt' | 'quantity') : undefined,
       sortDir: sort ? (sort.desc ? ('desc' as const) : ('asc' as const)) : undefined,
+      createdBy,
+      createdFrom,
+      createdTo,
       ...skipTake,
     }),
-    [state.q, status, sort, skipTake],
+    [state.q, status, sort, createdBy, createdFrom, createdTo, skipTake],
   );
   const query = useCombos(params);
-  const hasFilter = state.q !== '' || (status !== undefined && status !== '');
+  const creators = useComboCreators();
+  const hasFilter = state.q !== '' || Object.values(state.filters).some((v) => !!v);
 
   const filterDefs: FilterDef<ComboFilter>[] = [
+    {
+      key: 'createdBy',
+      label: 'Người tạo',
+      type: 'select',
+      searchable: true,
+      options: (creators.data ?? []).map((c) => ({ value: c.id, label: c.name ?? '—' })),
+    },
+    {
+      key: 'createdFrom',
+      toKey: 'createdTo',
+      label: 'Ngày tạo',
+      type: 'dateRange',
+    },
     {
       key: 'status',
       label: 'Trạng thái',
@@ -257,7 +285,7 @@ export function ComboListScreen() {
         q={state.q}
         onQChange={(q) => set({ q })}
         filters={filterDefs}
-        values={{ status: state.filters.status }}
+        values={state.filters}
         onFilterChange={(patch) => set({ filters: { ...state.filters, ...patch } })}
         searchPlaceholder="Tìm theo mã, tên combo hoặc mã / tên SKU thành phần…"
       />

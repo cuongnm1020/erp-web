@@ -18,6 +18,11 @@ export interface ComboListParams {
   /** Lấy từ schema sinh (luật 2) — gồm `quantity` = định mức (2026-11-06). */
   sortBy?: operations['ComboController_list']['parameters']['query']['sortBy'];
   sortDir?: 'asc' | 'desc';
+  /** Người tạo (userId) — 2026-11-09. */
+  createdBy?: string;
+  /** Ngày tạo từ / đến, YYYY-MM-DD giờ VN, gồm cả hai đầu. */
+  createdFrom?: string;
+  createdTo?: string;
   take: number;
   skip: number;
 }
@@ -43,6 +48,9 @@ export function fetchCombos(params: ComboListParams) {
           isActive: params.isActive,
           sortBy: params.sortBy,
           sortDir: params.sortDir,
+          createdBy: params.createdBy || undefined,
+          createdFrom: params.createdFrom || undefined,
+          createdTo: params.createdTo || undefined,
           take: params.take,
           skip: params.skip,
         },
@@ -56,6 +64,15 @@ export function useCombos(params: ComboListParams) {
     queryKey: comboKeys.list(params),
     queryFn: () => fetchCombos(params),
     placeholderData: keepPreviousData,
+  });
+}
+
+/** GET /combos/creators — người đã tạo combo, cho ô lọc "Người tạo" (2026-11-09). */
+export function useComboCreators() {
+  return useQuery({
+    queryKey: [...comboKeys.all, 'creators'] as const,
+    queryFn: () => unwrap(api.GET('/combos/creators')),
+    staleTime: 5 * 60_000,
   });
 }
 

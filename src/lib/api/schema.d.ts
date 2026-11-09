@@ -2046,6 +2046,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/combos/creators": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Người đã tạo combo — ô lọc "Người tạo" của danh sách (2026-11-09). Khai trước `:id`. */
+        get: operations["ComboController_creators"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/combos/{id}": {
         parameters: {
             query?: never;
@@ -10216,6 +10233,10 @@ export interface components {
         ComboListResponseDto: {
             items: components["schemas"]["ComboListItemDto"][];
             total: number;
+        };
+        ComboCreatorDto: {
+            id: string;
+            name: string | null;
         };
         ComboComponentDto: {
             skuId: string;
@@ -21727,8 +21748,15 @@ export interface operations {
                 /** @description Tìm theo mã / tên combo, mã / tên SKU thành phần. */
                 q?: string;
                 isActive?: boolean;
+                /** @description Bỏ trống = mới tạo trước (createdAt desc, 2026-11-09). */
                 sortBy?: "code" | "name" | "createdAt" | "quantity";
                 sortDir?: "asc" | "desc";
+                /** @description Người tạo combo (2026-11-09) — cùng luật cột `createdById` (combo cũ: người ghi audit CREATE). */
+                createdBy?: string;
+                /** @description Ngày tạo từ (YYYY-MM-DD, giờ VN, gồm cả ngày này). */
+                createdFrom?: string;
+                /** @description Ngày tạo đến (YYYY-MM-DD, giờ VN, gồm cả ngày này). */
+                createdTo?: string;
                 take: number;
                 skip: number;
             };
@@ -21767,6 +21795,25 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ComboDetailDto"];
+                };
+            };
+        };
+    };
+    ComboController_creators: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ComboCreatorDto"][];
                 };
             };
         };

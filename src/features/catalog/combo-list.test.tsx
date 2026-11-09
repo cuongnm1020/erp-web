@@ -134,4 +134,35 @@ describe('ComboListScreen — GET /combos', () => {
     await waitFor(() => expect(replace).toHaveBeenCalled());
     expect(search).toContain('status=inactive');
   });
+
+  it('mặc định sắp Ngày tạo mới trước; lọc Người tạo (danh sách từ /combos/creators) + Ngày tạo gửi lên API (2026-11-09)', async () => {
+    search = '';
+    const seen: URLSearchParams[] = [];
+    server.use(
+      http.get('/api/combos/creators', () =>
+        HttpResponse.json([{ id: uuid(901), name: 'Trần Anh Tuấn' }]),
+      ),
+      http.get('/api/combos', ({ request }) => {
+        seen.push(new URL(request.url).searchParams);
+        return HttpResponse.json({ items: ROWS, total: 2 });
+      }),
+    );
+    const { unmount } = renderApp(<ComboListScreen />);
+    await screen.findByText('Combo trừ sâu 2+1');
+    expect(seen[0]!.get('sortBy')).toBe('createdAt');
+    expect(seen[0]!.get('sortDir')).toBe('desc');
+    fireEvent.click(screen.getByRole('combobox', { name: 'Người tạo' }));
+    fireEvent.click(await screen.findByRole('option', { name: 'Trần Anh Tuấn' }));
+    await waitFor(() => expect(search).toContain(`createdBy=${uuid(901)}`));
+    unmount();
+
+    search = `createdBy=${uuid(901)}&createdFrom=2026-11-01&createdTo=2026-11-09`;
+    seen.length = 0;
+    renderApp(<ComboListScreen />);
+    await screen.findByText('Combo trừ sâu 2+1');
+    expect(seen[0]!.get('createdBy')).toBe(uuid(901));
+    expect(seen[0]!.get('createdFrom')).toBe('2026-11-01');
+    expect(seen[0]!.get('createdTo')).toBe('2026-11-09');
+    search = '';
+  });
 });
