@@ -12862,6 +12862,11 @@ export interface components {
             declaredValue: string | null;
             /** @description Tiền thu hộ trên phiếu, Decimal(18,4) chuỗi. */
             codAmount: string | null;
+            /**
+             * @description Tiền thu hộ HÃNG đang thu theo tín hiệu mới nhất (webhook / tra đơn, 2026-11-10), Decimal(18,4)
+             *     chuỗi; null = hãng chưa báo. Khác COD đơn = shop sửa trên app hãng → chip Lệch COD.
+             */
+            carrierCodAmount: string | null;
             /** @description Tổng phí hãng (cước + phụ phí + phí COD), Decimal(18,4) chuỗi; null = chưa có cước. */
             carrierFeeTotal: string | null;
             /** @description ISO — đối soát phí với hãng; null = chưa đối soát. */

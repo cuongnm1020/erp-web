@@ -1,5 +1,6 @@
 'use client';
 
+import Decimal from 'decimal.js';
 import { AlertTriangle, ArrowLeftRight, Clock, ShoppingCart } from 'lucide-react';
 import { useState, type ReactNode } from 'react';
 import { CopyButton } from '@/components/data/copy-button';
@@ -125,6 +126,16 @@ function Row({ label, children }: { label: string; children: ReactNode }) {
   );
 }
 
+/**
+ * Hãng báo đang thu số KHÁC COD ERP đã gửi (2026-11-10) — shop sửa tiền thu hộ ngay trên app hãng.
+ * So theo đồng chẵn (COD đơn có thể lẻ phần nghìn). Hãng chưa báo → không so.
+ */
+export function carrierCodDiffers(s: Pick<Shipment, 'codAmount' | 'carrierCodAmount'>): boolean {
+  if (s.carrierCodAmount == null) return false;
+  const sent = new Decimal(s.codAmount ?? '0').toDecimalPlaces(0, Decimal.ROUND_HALF_UP);
+  return !new Decimal(s.carrierCodAmount).toDecimalPlaces(0, Decimal.ROUND_HALF_UP).eq(sent);
+}
+
 /** Hộp "Đối soát" — phí hãng đã đối soát chưa, ngày, COD, tổng phí. Chỉ xem. */
 function ReconcileBox({ s, tone }: { s: Shipment; tone: typeof OTHER_TONE }) {
   return (
@@ -221,7 +232,9 @@ export function CarrierStatusCard({ order }: { order: SalesOrderDetail }) {
         : [`Dịch vụ: ${[s.serviceCode, s.serviceName].filter(Boolean).join(' - ')}`]
       : []),
     ...(s.declaredValue ? [`Khai giá: ${formatMoney(s.declaredValue)}`] : []),
+    ...(s.carrierCodAmount != null ? [`Hãng đang thu: ${formatMoney(s.carrierCodAmount)}`] : []),
   ];
+  const codDiffers = carrierCodDiffers(s);
   const alert =
     s.status === 'RETURNED'
       ? { tone: 'err' as const, text: 'Đơn đang hoàn về shop. Theo dõi hàng hoàn để nhập lại kho.' }
@@ -284,6 +297,17 @@ export function CarrierStatusCard({ order }: { order: SalesOrderDetail }) {
               {l}
             </p>
           ))}
+          {codDiffers ? (
+            <p
+              role="status"
+              className="flex items-start gap-1.5 rounded-control bg-warning-weak px-2 py-1.5 text-xs text-warning"
+            >
+              <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden />
+              {`${tone.label} đang thu ${formatMoney(s.carrierCodAmount)}, khác COD ERP đã gửi ${formatMoney(
+                s.codAmount ?? '0',
+              )}. Hỏi người đã sửa trên app hãng rồi sửa đơn cho khớp.`}
+            </p>
+          ) : null}
         </Section>
 
         <Section
