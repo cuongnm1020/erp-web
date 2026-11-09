@@ -5,11 +5,35 @@ import type {
   CarrierIssue,
   CarrierStage,
   OrderFlow,
+  OrderPickupStatus,
+  OrderPrintStatus,
   OrderTab,
   SalesOrderChannel,
   SalesOrderDetail,
   SalesOrderStatus,
 } from './api/use-orders';
+
+/**
+ * Ô lọc "Hãng lấy hàng" (2026-11-03) — "Chưa lấy" = đã gán ĐVVC nhưng hãng chưa tới bắn mã. Dùng
+ * chung màn Theo dõi đơn + Kho › Đơn hàng (2026-11-10).
+ */
+export const PICKUP_OPTIONS: { value: OrderPickupStatus; label: string }[] = [
+  { value: 'AWAITING', label: 'Hãng chưa lấy hàng' },
+  { value: 'PICKED_UP', label: 'Hãng đã lấy hàng' },
+];
+
+/** Ô lọc "In tem" (2026-11-02) — dùng chung màn Theo dõi đơn + Kho › Đơn hàng. */
+export const PRINT_OPTIONS: { value: OrderPrintStatus; label: string }[] = [
+  { value: 'NOT_PRINTED', label: 'Chưa in tem' },
+  { value: 'PRINTED', label: 'Đã in tem' },
+  { value: 'ERROR', label: 'Lỗi, không in được' },
+];
+
+/** Giá trị URL → giá trị hợp lệ của một ô chọn; lạ / trống → undefined. */
+export const pickOption = <T extends string>(
+  opts: { value: T }[],
+  v: string | undefined,
+): T | undefined => opts.find((o) => o.value === v)?.value;
 
 /**
  * Nhãn tiếng Việt theo cái người dùng điều khiển, không theo enum của DB.

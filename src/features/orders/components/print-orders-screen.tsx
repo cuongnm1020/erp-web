@@ -86,6 +86,9 @@ import {
   DEFAULT_ORDER_FLOW,
   parseOrderFlow,
   parseOrderStatus,
+  PICKUP_OPTIONS,
+  PRINT_OPTIONS,
+  pickOption,
 } from '../labels';
 import { BulkCancelDialog } from './bulk-cancel-dialog';
 import { CancelWaybillDialog } from './cancel-waybill-dialog';
@@ -190,6 +193,8 @@ const DEFAULTS = {
     'shortSkuId',
     // Đơn đã gửi ĐVVC: đã in / chưa in / lỗi in tem (2026-11-02).
     'printStatus',
+    // Hãng đã / chưa lấy hàng (2026-11-10, như màn Theo dõi đơn) — lọc kèm các tab.
+    'pickup',
     // Đơn có sản phẩm (SKU) này, kể cả thành phần combo (2026-11-02).
     'skuId',
     // `true` = chỉ đơn mà mọi dòng đều là SKU đó — "lọc sản phẩm duy nhất" (2026-11-04).
@@ -942,6 +947,9 @@ export function PrintOrdersScreen() {
     ability.can('filter_dept', 'SalesOrder') || ability.can('sales_all', 'Report');
   const team = canFilterDept ? (state.filters.team ?? '') : '';
   const fbPage = state.filters.fbPage ?? '';
+  // Hãng lấy hàng / In tem (2026-11-10, user) — cùng ô với màn Theo dõi đơn, lọc kèm mọi tab.
+  const pickupStatus = pickOption(PICKUP_OPTIONS, state.filters.pickup);
+  const printStatus = pickOption(PRINT_OPTIONS, state.filters.printStatus);
   const teamOptions = useTeamFilterOptions(canFilterDept);
   const facebookPages = useFacebookPageOptions();
   // Sắp xếp lưu theo người dùng ở server (đăng xuất / đổi máy vẫn giữ). Sắp xếp trên URL (link
@@ -980,6 +988,8 @@ export function PrintOrdersScreen() {
       dateField,
       teamIds: team || undefined,
       facebookPageIds: fbPage || undefined,
+      pickupStatus,
+      printStatus,
       // Tab Đã xác nhận màn In đơn chỉ đơn chưa có mã vận đơn (2026-11-06) — cả danh sách lẫn số đếm.
       warehouseNoWaybill: true,
     }),
@@ -998,6 +1008,8 @@ export function PrintOrdersScreen() {
       dateField,
       team,
       fbPage,
+      pickupStatus,
+      printStatus,
     ],
   );
   const params = useMemo(
@@ -1125,7 +1137,9 @@ export function PrintOrdersScreen() {
     from !== '' ||
     to !== '' ||
     team !== '' ||
-    fbPage !== '';
+    fbPage !== '' ||
+    pickupStatus !== undefined ||
+    printStatus !== undefined;
   const customerName = query.data?.items[0]?.customer.name;
   // Dòng đã chọn: nhớ cả dòng vừa RỜI bộ lọc (sự cố 2026-11-07, màn In đơn: Gửi ĐVVC xong đơn sang
   // tab Đang đóng hàng → tab Đã xác nhận không còn dòng chọn → thanh chọn nhiều bị gỡ kéo theo hộp
@@ -1357,8 +1371,12 @@ export function PrintOrdersScreen() {
                   />
                 ),
               },
-              // Bỏ 2026-11-04 (user): Hãng VC, NV lên đơn, nhóm Vận chuyển (In tem, Gán hãng,
-              // Trạng thái hãng), nhóm Đơn (Trùng trong ngày, SP ngoài ERP, Giá trị đơn).
+              // Hãng lấy hàng + In tem (2026-11-10, user: "thêm 2 filter này … lọc kèm các tab") —
+              // cùng ô với màn Theo dõi đơn.
+              { key: 'pickup', label: 'Hãng lấy hàng', type: 'select', options: PICKUP_OPTIONS },
+              { key: 'printStatus', label: 'In tem', type: 'select', options: PRINT_OPTIONS },
+              // Bỏ 2026-11-04 (user): Hãng VC, NV lên đơn, nhóm Vận chuyển (Gán hãng, Trạng thái
+              // hãng), nhóm Đơn (Trùng trong ngày, SP ngoài ERP, Giá trị đơn).
             ]}
             values={{
               status: state.filters.status,
@@ -1372,6 +1390,8 @@ export function PrintOrdersScreen() {
               skuId: state.filters.skuId,
               weightMin: state.filters.weightMin,
               weightMax: state.filters.weightMax,
+              pickup: pickupStatus,
+              printStatus,
             }}
             onFilterChange={setFilter}
             searchPlaceholder="Mã đơn, SĐT, tên SP, mã vận đơn… nhiều giá trị cách dấu phẩy hoặc dấu cách"

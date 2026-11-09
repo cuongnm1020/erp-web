@@ -170,6 +170,9 @@ const MESSAGES: Record<string, string> = {
     'Đơn đang lỗi vận đơn. Sửa đơn rồi bấm "Xin lại vận đơn" (tab Cần sửa) thay vì gửi lại.',
   ORDER_WAYBILL_ACCOUNT_LOCKED:
     'Đơn đã có vận đơn ở tài khoản khác của hãng này. Bấm "Hủy vận đơn cũ" rồi gửi lại.',
+  // 2026-11-10: đổi hãng / tài khoản qua Gửi sang ĐVVC tự hủy mã cũ; cấp thẳng trên phiếu thì không.
+  SHIPMENT_WAYBILL_LIVE:
+    'Phiếu đang có vận đơn còn hiệu lực. Bấm "Gửi sang ĐVVC" chọn hãng / tài khoản mới — ERP tự hủy vận đơn cũ rồi cấp vận đơn mới.',
   ORDER_NO_ACTIVE_WAYBILL:
     'Đơn không có vận đơn còn hiệu lực để hủy (chưa cấp mã, đã hủy, hoặc gửi ngoài ERP qua Pancake).',
   PICKUP_WAREHOUSE_NOT_READY:

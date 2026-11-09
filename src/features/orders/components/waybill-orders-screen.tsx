@@ -26,10 +26,9 @@ import {
   usePancakeShops,
   useOrders,
   useTeamFilterOptions,
-  type OrderPickupStatus,
-  type OrderPrintStatus,
   type SalesOrderListItem,
 } from '../api/use-orders';
+import { PICKUP_OPTIONS, PRINT_OPTIONS, pickOption } from '../labels';
 import { BulkReprintWaybillDialog } from './bulk-reprint-waybill-dialog';
 import {
   CarrierFilter,
@@ -56,19 +55,6 @@ const FILTER_KEYS = [
   'carrierStatus',
 ] as const;
 type FilterKey = (typeof FILTER_KEYS)[number];
-
-/** Hãng đã lấy hàng chưa (2026-11-03) — "Chưa lấy" = đã gán ĐVVC nhưng hãng chưa tới bắn mã. */
-const PICKUP_OPTIONS: { value: OrderPickupStatus; label: string }[] = [
-  { value: 'AWAITING', label: 'Hãng chưa lấy hàng' },
-  { value: 'PICKED_UP', label: 'Hãng đã lấy hàng' },
-];
-const PRINT_OPTIONS: { value: OrderPrintStatus; label: string }[] = [
-  { value: 'NOT_PRINTED', label: 'Chưa in tem' },
-  { value: 'PRINTED', label: 'Đã in tem' },
-  { value: 'ERROR', label: 'Lỗi, không in được' },
-];
-const pick = <T extends string>(opts: { value: T }[], v: string | undefined): T | undefined =>
-  opts.find((o) => o.value === v)?.value;
 
 const HHMM = /^([01]\d|2[0-3]):[0-5]\d$/;
 
@@ -172,8 +158,8 @@ export function WaybillOrdersScreen() {
     skuId: f.skuId,
     carrierId: f.carrierId,
     carrierAccountId: f.carrierAccountId,
-    pickupStatus: pick(PICKUP_OPTIONS, f.pickup),
-    printStatus: pick(PRINT_OPTIONS, f.printStatus),
+    pickupStatus: pickOption(PICKUP_OPTIONS, f.pickup),
+    printStatus: pickOption(PRINT_OPTIONS, f.printStatus),
     labelPrintedBy: f.printedBy,
     carrierStatusText,
     sortBy: 'sentToCarrierAt',
