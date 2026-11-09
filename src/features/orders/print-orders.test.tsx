@@ -186,8 +186,9 @@ describe('PrintOrdersScreen — In đơn (clone màn Đơn hàng, 2026-11-04)', 
   });
 
   it('bỏ lọc Hãng VC / NV lên đơn / Vận chuyển / Đơn (2026-11-04): không hiện ô, link cũ không lọc ngầm', async () => {
+    // In tem đưa lại 2026-11-10 (test riêng bên dưới).
     search =
-      'group=all&carrierId=c-1&noCarrier=true&creatorId=u-1&printStatus=PRINTED&carrierSource=ERP&carrierStatus=x&duplicate=true&itemOrigin=CUSTOM&totalMin=100';
+      'group=all&carrierId=c-1&noCarrier=true&creatorId=u-1&carrierSource=ERP&carrierStatus=x&duplicate=true&itemOrigin=CUSTOM&totalMin=100';
     const seen: URLSearchParams[] = [];
     server.use(
       http.get('/api/sales-orders', ({ request }) => {
@@ -206,7 +207,6 @@ describe('PrintOrdersScreen — In đơn (clone màn Đơn hàng, 2026-11-04)', 
         'carrierId',
         'noCarrier',
         'creatorId',
-        'printStatus',
         'carrierSource',
         'carrierStatusText',
         'duplicate',
@@ -312,6 +312,64 @@ describe('PrintOrdersScreen — In đơn (clone màn Đơn hàng, 2026-11-04)', 
       await waitFor(() =>
         expect(seen.some((p) => p.get('skuId') === sku && p.get('skuOnly') === 'true')).toBe(true),
       );
+    } finally {
+      search = 'group=all';
+    }
+  });
+
+  it('lọc Hãng lấy hàng + In tem (2026-11-10): hiện hai ô; URL pickup / printStatus → danh sách + số đếm tab cùng gửi, giá trị lạ bỏ qua', async () => {
+    search = 'flow=PACKED&pickup=AWAITING&printStatus=NOT_PRINTED';
+    const list: URLSearchParams[] = [];
+    const counts: URLSearchParams[] = [];
+    server.use(
+      http.get('/api/sales-orders', ({ request }) => {
+        list.push(new URL(request.url).searchParams);
+        return HttpResponse.json({ items: [], total: 0 });
+      }),
+      http.get('/api/sales-orders/flow-counts', ({ request }) => {
+        counts.push(new URL(request.url).searchParams);
+        return HttpResponse.json({ total: 0 });
+      }),
+    );
+    try {
+      renderApp(<PrintOrdersScreen />);
+      expect(await screen.findByRole('combobox', { name: 'Hãng lấy hàng' })).toBeInTheDocument();
+      expect(screen.getByRole('combobox', { name: 'In tem' })).toBeInTheDocument();
+      await waitFor(() =>
+        expect(
+          list.some(
+            (p) =>
+              p.get('flow') === 'PACKED' &&
+              p.get('pickupStatus') === 'AWAITING' &&
+              p.get('printStatus') === 'NOT_PRINTED',
+          ),
+        ).toBe(true),
+      );
+      await waitFor(() =>
+        expect(
+          counts.some(
+            (p) => p.get('pickupStatus') === 'AWAITING' && p.get('printStatus') === 'NOT_PRINTED',
+          ),
+        ).toBe(true),
+      );
+    } finally {
+      search = 'group=all';
+    }
+    search = 'group=all&pickup=XYZ&printStatus=ABC';
+    const odd: URLSearchParams[] = [];
+    server.use(
+      http.get('/api/sales-orders', ({ request }) => {
+        odd.push(new URL(request.url).searchParams);
+        return HttpResponse.json({ items: [], total: 0 });
+      }),
+    );
+    try {
+      renderApp(<PrintOrdersScreen />);
+      await waitFor(() => expect(odd.length).toBeGreaterThan(0));
+      for (const p of odd) {
+        expect(p.has('pickupStatus')).toBe(false);
+        expect(p.has('printStatus')).toBe(false);
+      }
     } finally {
       search = 'group=all';
     }
