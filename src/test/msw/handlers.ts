@@ -1794,6 +1794,7 @@ export const handlers = [
         RECON_MISMATCH: 0,
         RETURNED_TO_SENDER: 0,
         INCIDENT: 0,
+        COD_MISMATCH: 0,
       };
       const total = counts.NEEDS_FIX + counts.CARRIER_CANCELLED;
       return HttpResponse.json({ total, attention: total, counts });

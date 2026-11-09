@@ -177,8 +177,10 @@ describe('OrderListScreen — GET /sales-orders (P1-12)', () => {
       renderApp(<OrderListScreen />);
       // Chip "Tất cả" không gửi UNRECONCILED (user chốt 2026-11-07): đơn Thành công chờ tiền về
       // không lẫn vào danh sách Cần xử lý.
-      await waitFor(() => expect(lists.at(-1)?.getAll('carrierIssue').length).toBe(9));
+      // 10 chip đỏ (Lệch COD 2026-11-09 vào "Tất cả").
+      await waitFor(() => expect(lists.at(-1)?.getAll('carrierIssue').length).toBe(10));
       expect(lists.at(-1)!.getAll('carrierIssue')).not.toContain('UNRECONCILED');
+      expect(lists.at(-1)!.getAll('carrierIssue')).toContain('COD_MISMATCH');
       expect(lists.at(-1)!.get('tab')).toBeNull();
       const parents = screen.getByRole('tablist', { name: 'Nhóm tab' });
       const issueTab = within(parents).getByRole('tab', { name: /^Cần xử lý/ });
@@ -186,7 +188,8 @@ describe('OrderListScreen — GET /sales-orders (P1-12)', () => {
       // Số trên tab cha = attention (không tính Chưa đối soát).
       await waitFor(() => expect(issueTab).toHaveTextContent(/^Cần xử lý\s*5$/));
       const chips = screen.getByRole('tablist', { name: 'Đơn cần xử lý' });
-      expect(within(chips).getAllByRole('tab')).toHaveLength(11);
+      // Tất cả + 11 chip (gồm Chưa đối soát, Lệch COD).
+      expect(within(chips).getAllByRole('tab')).toHaveLength(12);
       expect(within(chips).getByRole('tab', { name: /^Trễ lấy hàng\s*3$/ })).toBeInTheDocument();
       replace.mockClear();
       fireEvent.click(within(chips).getByRole('tab', { name: /^Trễ lấy hàng/ }));

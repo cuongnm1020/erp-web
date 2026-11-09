@@ -486,6 +486,8 @@ export const CARRIER_ISSUE_DEFS: ReadonlyArray<{
   { issue: 'RECON_MISMATCH', label: 'Đối soát lệch', family: 'issue' },
   { issue: 'RETURNED_TO_SENDER', label: 'Hãng đã trả hàng', family: 'issue' },
   { issue: 'INCIDENT', label: 'Sự cố', family: 'issue' },
+  // Vận đơn đã gửi hãng COD khác COD hiện tại của đơn (2026-11-09) — sửa COD với hãng hoặc sửa đơn.
+  { issue: 'COD_MISMATCH', label: 'Lệch COD', family: 'issue' },
 ];
 
 /**

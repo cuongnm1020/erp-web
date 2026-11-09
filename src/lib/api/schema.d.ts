@@ -12551,6 +12551,8 @@ export interface components {
             RECON_MISMATCH?: number;
             RETURNED_TO_SENDER?: number;
             INCIDENT?: number;
+            /** @description Lệch COD — vận đơn đã gửi hãng COD khác COD hiện tại của đơn (2026-11-09). */
+            COD_MISMATCH?: number;
         };
         SalesOrderTabCountsDto: {
             /**
@@ -24823,7 +24825,7 @@ export interface operations {
                  *     lệch · Hãng đã trả hàng · Sự cố. Lặp tham số = đơn thuộc MỘT trong các chip (chip "Tất cả" =
                  *     mọi chip trừ Chưa đối soát, user chốt 2026-11-07).
                  */
-                carrierIssue?: ("NEEDS_FIX" | "PICKUP_DELAYED" | "PICKUP_FAILED" | "CARRIER_CANCELLED" | "DELIVERY_DELAYED" | "DELIVERY_FAILED" | "UNRECONCILED" | "RECON_MISMATCH" | "RETURNED_TO_SENDER" | "INCIDENT")[];
+                carrierIssue?: ("NEEDS_FIX" | "PICKUP_DELAYED" | "PICKUP_FAILED" | "CARRIER_CANCELLED" | "DELIVERY_DELAYED" | "DELIVERY_FAILED" | "UNRECONCILED" | "RECON_MISMATCH" | "RETURNED_TO_SENDER" | "INCIDENT" | "COD_MISMATCH")[];
                 /**
                  * @description Đơn có sản phẩm KHÔNG phải hàng ERP (2026-10-22): `CUSTOM` = có món gõ tay trên Pancake
                  *     (`sales_order_external.custom_items`), `POS_SKU` = có dòng là SKU do đồng bộ Pancake tự tạo
@@ -25111,7 +25113,7 @@ export interface operations {
                  *     lệch · Hãng đã trả hàng · Sự cố. Lặp tham số = đơn thuộc MỘT trong các chip (chip "Tất cả" =
                  *     mọi chip trừ Chưa đối soát, user chốt 2026-11-07).
                  */
-                carrierIssue?: ("NEEDS_FIX" | "PICKUP_DELAYED" | "PICKUP_FAILED" | "CARRIER_CANCELLED" | "DELIVERY_DELAYED" | "DELIVERY_FAILED" | "UNRECONCILED" | "RECON_MISMATCH" | "RETURNED_TO_SENDER" | "INCIDENT")[];
+                carrierIssue?: ("NEEDS_FIX" | "PICKUP_DELAYED" | "PICKUP_FAILED" | "CARRIER_CANCELLED" | "DELIVERY_DELAYED" | "DELIVERY_FAILED" | "UNRECONCILED" | "RECON_MISMATCH" | "RETURNED_TO_SENDER" | "INCIDENT" | "COD_MISMATCH")[];
                 /**
                  * @description Đơn có sản phẩm KHÔNG phải hàng ERP (2026-10-22): `CUSTOM` = có món gõ tay trên Pancake
                  *     (`sales_order_external.custom_items`), `POS_SKU` = có dòng là SKU do đồng bộ Pancake tự tạo
@@ -25314,7 +25316,7 @@ export interface operations {
                  *     lệch · Hãng đã trả hàng · Sự cố. Lặp tham số = đơn thuộc MỘT trong các chip (chip "Tất cả" =
                  *     mọi chip trừ Chưa đối soát, user chốt 2026-11-07).
                  */
-                carrierIssue?: ("NEEDS_FIX" | "PICKUP_DELAYED" | "PICKUP_FAILED" | "CARRIER_CANCELLED" | "DELIVERY_DELAYED" | "DELIVERY_FAILED" | "UNRECONCILED" | "RECON_MISMATCH" | "RETURNED_TO_SENDER" | "INCIDENT")[];
+                carrierIssue?: ("NEEDS_FIX" | "PICKUP_DELAYED" | "PICKUP_FAILED" | "CARRIER_CANCELLED" | "DELIVERY_DELAYED" | "DELIVERY_FAILED" | "UNRECONCILED" | "RECON_MISMATCH" | "RETURNED_TO_SENDER" | "INCIDENT" | "COD_MISMATCH")[];
                 /**
                  * @description Đơn có sản phẩm KHÔNG phải hàng ERP (2026-10-22): `CUSTOM` = có món gõ tay trên Pancake
                  *     (`sales_order_external.custom_items`), `POS_SKU` = có dòng là SKU do đồng bộ Pancake tự tạo
@@ -25513,7 +25515,7 @@ export interface operations {
                  *     lệch · Hãng đã trả hàng · Sự cố. Lặp tham số = đơn thuộc MỘT trong các chip (chip "Tất cả" =
                  *     mọi chip trừ Chưa đối soát, user chốt 2026-11-07).
                  */
-                carrierIssue?: ("NEEDS_FIX" | "PICKUP_DELAYED" | "PICKUP_FAILED" | "CARRIER_CANCELLED" | "DELIVERY_DELAYED" | "DELIVERY_FAILED" | "UNRECONCILED" | "RECON_MISMATCH" | "RETURNED_TO_SENDER" | "INCIDENT")[];
+                carrierIssue?: ("NEEDS_FIX" | "PICKUP_DELAYED" | "PICKUP_FAILED" | "CARRIER_CANCELLED" | "DELIVERY_DELAYED" | "DELIVERY_FAILED" | "UNRECONCILED" | "RECON_MISMATCH" | "RETURNED_TO_SENDER" | "INCIDENT" | "COD_MISMATCH")[];
                 /**
                  * @description Đơn có sản phẩm KHÔNG phải hàng ERP (2026-10-22): `CUSTOM` = có món gõ tay trên Pancake
                  *     (`sales_order_external.custom_items`), `POS_SKU` = có dòng là SKU do đồng bộ Pancake tự tạo
