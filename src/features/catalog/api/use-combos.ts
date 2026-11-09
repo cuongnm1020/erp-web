@@ -8,6 +8,7 @@ export type ComboListItem = components['schemas']['ComboListItemDto'];
 export type ComboListResponse = components['schemas']['ComboListResponseDto'];
 export type ComboDetail = components['schemas']['ComboDetailDto'];
 export type ComboComponent = components['schemas']['ComboComponentDto'];
+export type ComboHistoryEntry = components['schemas']['ComboHistoryEntryDto'];
 export type CreateComboInput = components['schemas']['CreateComboDto'];
 export type UpdateComboInput = components['schemas']['UpdateComboDto'];
 
@@ -63,6 +64,18 @@ export function useCombo(id: string) {
   return useQuery({
     queryKey: comboKeys.detail(id),
     queryFn: () => unwrap(api.GET('/combos/{id}', { params: { path: { id } } })),
+    enabled: id !== '',
+  });
+}
+
+/**
+ * GET /combos/{id}/history — lịch sử sửa combo (2026-11-09): ai, lúc nào, đổi gì (tên, định mức,
+ * giá bán…), mới nhất trước. Key nằm dưới `detail(id)` nên lưu combo xong tự tải lại.
+ */
+export function useComboHistory(id: string) {
+  return useQuery({
+    queryKey: [...comboKeys.detail(id), 'history'] as const,
+    queryFn: () => unwrap(api.GET('/combos/{id}/history', { params: { path: { id } } })),
     enabled: id !== '',
   });
 }

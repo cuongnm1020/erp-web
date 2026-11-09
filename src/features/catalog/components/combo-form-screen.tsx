@@ -45,6 +45,7 @@ import {
   type ComboDetail,
 } from '../api/use-combos';
 import { useBrands, useCategories } from '../api/use-products';
+import { ComboHistory } from './combo-history';
 import {
   comboAvailableFromRows,
   comboFormSchema,
@@ -579,6 +580,8 @@ function ComboFormBody({ combo, copyOf }: { combo?: ComboDetail; copyOf?: ComboD
             combo mà vào từng thành phần
           </p>
         </section>
+
+        {combo ? <ComboHistory comboId={combo.id} /> : null}
       </form>
     </Form>
   );

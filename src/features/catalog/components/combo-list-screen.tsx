@@ -113,6 +113,19 @@ const columns: ColumnDef<ComboListItem, unknown>[] = [
     ),
   },
   {
+    id: 'createdBy',
+    header: 'Người tạo',
+    meta: { width: 160 },
+    cell: ({ row }) =>
+      row.original.createdByName ? (
+        <span className="truncate" title={row.original.createdByName}>
+          {row.original.createdByName}
+        </span>
+      ) : (
+        <span className="text-muted-foreground">—</span>
+      ),
+  },
+  {
     id: 'status',
     header: 'Trạng thái',
     meta: { width: 110 },
@@ -140,6 +153,7 @@ const EXPORT_COLUMNS: ExportColumn<ComboListItem>[] = [
   { header: 'Còn bán được', value: (r) => decimalCell(r.available) },
   { header: 'ĐVT', value: (r) => r.baseUomCode },
   { header: 'Ngày tạo', value: (r) => formatDate(r.createdAt), width: 12 },
+  { header: 'Người tạo', value: (r) => r.createdByName ?? '', width: 22 },
   { header: 'Trạng thái', value: (r) => (r.isActive ? 'Đang bán' : 'Ngừng bán') },
 ];
 

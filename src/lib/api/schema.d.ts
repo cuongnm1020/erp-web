@@ -2062,6 +2062,23 @@ export interface paths {
         patch: operations["ComboController_update"];
         trace?: never;
     };
+    "/combos/{id}/history": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Lịch sử sửa combo (2026-11-09): ai sửa, lúc nào, đổi gì — tên, định mức, giá bán; mới nhất trước. */
+        get: operations["ComboController_historyOf"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/goods-issues": {
         parameters: {
             query?: never;
@@ -10188,6 +10205,13 @@ export interface components {
             version: number;
             createdAt: string;
             updatedAt: string;
+            /**
+             * @description Người tạo combo (2026-11-09): `Product.createdBy`, combo cũ chưa ghi cột này → người ghi audit
+             *     CREATE; null = không rõ (import / job).
+             */
+            createdById: string | null;
+            /** @description Tên người tạo; null = không rõ hoặc tài khoản đã xóa. */
+            createdByName: string | null;
         };
         ComboListResponseDto: {
             items: components["schemas"]["ComboListItemDto"][];
@@ -10246,11 +10270,42 @@ export interface components {
             version: number;
             createdAt: string;
             updatedAt: string;
+            /**
+             * @description Người tạo combo (2026-11-09): `Product.createdBy`, combo cũ chưa ghi cột này → người ghi audit
+             *     CREATE; null = không rõ (import / job).
+             */
+            createdById: string | null;
+            /** @description Tên người tạo; null = không rõ hoặc tài khoản đã xóa. */
+            createdByName: string | null;
             categoryId: string | null;
             brandId: string | null;
             description: string | null;
             searchAliases: string[];
             components: components["schemas"]["ComboComponentDto"][];
+        };
+        ComboHistoryChangeDto: {
+            /** @description Trường đã đổi (`created`, `name`, `component`, `componentQty`, `salePrice`…). */
+            field: string;
+            /** @description Nhãn tiếng Việt ("Tên combo", "Định mức SP-0022", "Giá bán"…). */
+            label: string;
+            /** @description Giá trị trước; null = trống. */
+            from: string | null;
+            /** @description Giá trị sau; null = trống / đã bỏ. */
+            to: string | null;
+        };
+        ComboHistoryEntryDto: {
+            /** @description Khoá nhóm (requestId hoặc id dòng audit đầu). */
+            id: string;
+            /** @description ISO datetime. */
+            at: string;
+            /** @description Người thao tác; null = job hệ thống (vd chuẩn hóa hàng loạt). */
+            userId: string | null;
+            /** @description Tên người thao tác; null = hệ thống / tài khoản đã xóa. */
+            userName: string | null;
+            /** @description Admin "đăng nhập với tư cách" userId lúc thao tác; null = chính chủ. */
+            impersonatorId: string | null;
+            impersonatorName: string | null;
+            changes: components["schemas"]["ComboHistoryChangeDto"][];
         };
         ComboComponentInputDto: {
             /**
@@ -21777,6 +21832,27 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ComboDetailDto"];
+                };
+            };
+        };
+    };
+    ComboController_historyOf: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ComboHistoryEntryDto"][];
                 };
             };
         };
