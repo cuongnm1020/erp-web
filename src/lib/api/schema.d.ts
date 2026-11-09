@@ -19431,6 +19431,8 @@ export interface operations {
             query: {
                 /** @description ShipmentStatus nối dấu phẩy */
                 statuses?: string;
+                /** @description Tình trạng in tem (2026-11-09) — xem {@link SHIPMENT_PRINT_STATUSES}. Áp cả số tổng lẫn danh sách. */
+                printStatus?: "PRINTED" | "NOT_PRINTED" | "ERROR";
                 /** @description Ngày theo giờ Việt Nam `YYYY-MM-DD` cho số đóng gói / bàn giao; bỏ trống = hôm nay. */
                 date?: string;
                 carrierId?: string;
@@ -19467,6 +19469,8 @@ export interface operations {
             query: {
                 /** @description ShipmentStatus nối dấu phẩy */
                 statuses?: string;
+                /** @description Tình trạng in tem (2026-11-09) — xem {@link SHIPMENT_PRINT_STATUSES}. Áp cả số tổng lẫn danh sách. */
+                printStatus?: "PRINTED" | "NOT_PRINTED" | "ERROR";
                 /** @description Ngày theo giờ Việt Nam `YYYY-MM-DD` cho số đóng gói / bàn giao; bỏ trống = hôm nay. */
                 date?: string;
                 carrierId?: string;
