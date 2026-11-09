@@ -721,6 +721,78 @@ describe('OrderEditScreen — Lỗi vận đơn + SĐT người nhận riêng ch
     await waitFor(() => expect(push).toHaveBeenCalledWith(`/crm/orders/${ORDER.id}?printLabel=1`));
   });
 
+  it('kích thước gói hàng (2026-11-09): nhập D×R×C → "Lưu và xin lại vận đơn" PATCH shippingOptions giữ tuỳ chọn cũ rồi xin lại vận đơn', async () => {
+    push.mockClear();
+    const patched: Record<string, unknown>[] = [];
+    const waybill: unknown[] = [];
+    server.use(
+      http.get('/api/sales-orders/:id', () =>
+        HttpResponse.json({
+          ...WAYBILL_ERROR,
+          recipientPhoneMasked: false,
+          shippingOptions: { shopPaysFee: true, note: 'Gọi trước', lengthCm: 10 },
+        }),
+      ),
+      http.patch('/api/sales-orders/:id', async ({ params, request }) => {
+        patched.push((await request.json()) as Record<string, unknown>);
+        return HttpResponse.json({
+          orderId: params.id,
+          docNumber: ORDER.docNumber,
+          status: 'APPROVED',
+          carrierId: null,
+          carrierAccountId: null,
+          warehouseId: null,
+          addressId: null,
+          shippingWeightKg: null,
+          shippingOptions: null,
+          changed: ['shippingOptions'],
+        });
+      }),
+      http.post('/api/shipments/:id/waybill', async ({ params }) => {
+        waybill.push(params.id);
+        return HttpResponse.json(
+          {
+            shipmentId: params.id,
+            shipmentDocNumber: 'DN2610-68638',
+            carrierCode: 'GHTK',
+            outcome: 'ISSUED',
+            trackingNo: 'S1.BO.1',
+            reason: null,
+            jobId: null,
+          },
+          { status: 201 },
+        );
+      }),
+    );
+    renderApp(<OrderEditScreen orderId={ORDER.id} />);
+    const length = await screen.findByLabelText('Dài (cm)');
+    expect(length).toHaveValue('10');
+
+    // Thiếu chiều → báo lỗi, không gửi.
+    fireEvent.change(screen.getByLabelText('Rộng (cm)'), { target: { value: '40' } });
+    expect(screen.getByText(/Nhập đủ dài × rộng × cao/)).toBeInTheDocument();
+
+    fireEvent.change(length, { target: { value: '60' } });
+    fireEvent.change(screen.getByLabelText('Cao (cm)'), { target: { value: '30' } });
+    expect(screen.queryByText(/Nhập đủ dài × rộng × cao/)).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Lưu và xin lại vận đơn' }));
+
+    await waitFor(() =>
+      expect(patched).toEqual([
+        {
+          shippingOptions: {
+            shopPaysFee: true,
+            note: 'Gọi trước',
+            lengthCm: 60,
+            widthCm: 40,
+            heightCm: 30,
+          },
+        },
+      ]),
+    );
+    await waitFor(() => expect(waybill).toEqual([ORDER_SHIPMENT_FIXTURE.id]));
+  });
+
   it('không quyền shipment.pack → vẫn thấy lỗi, không có nút xin lại vận đơn', async () => {
     server.use(http.get('/api/sales-orders/:id', () => HttpResponse.json(WAYBILL_ERROR)));
     renderApp(<OrderEditScreen orderId={ORDER.id} />, {
