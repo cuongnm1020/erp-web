@@ -79,6 +79,7 @@ export function ReprintWaybillDialog({
   total = shipments.length,
   triggerLabel,
   triggerClassName,
+  triggerSize = 'sm',
   open: openProp,
   onOpenChange,
 }: {
@@ -87,6 +88,8 @@ export function ReprintWaybillDialog({
   total?: number;
   triggerLabel: string;
   triggerClassName?: string;
+  /** `default` = nút ở PageHeader (cao 32px như các nút đầu màn); `sm` = trong thẻ / thanh chọn. */
+  triggerSize?: 'sm' | 'default';
   open?: boolean;
   onOpenChange?: (open: boolean) => void;
 }) {
@@ -128,7 +131,7 @@ export function ReprintWaybillDialog({
     <>
       {controlled ? null : (
         <Button
-          size="sm"
+          size={triggerSize}
           variant="outline"
           className={triggerClassName}
           onClick={() => setOpen(true)}

@@ -807,6 +807,15 @@ function Detail({ order }: { order: SalesOrderDetail }) {
     order.status === 'APPROVED' &&
     order.carrierId !== null &&
     ability.can('fulfil_manual', 'SalesOrder');
+  // In lại vận đơn ở đầu màn (2026-11-09) — tem ERP 100×75 như "In lại vận đơn" ở danh sách đơn;
+  // đơn đã có mã vận đơn, phiếu chưa hủy, ở mọi trạng thái giao (kể cả Sự cố hoàn).
+  const reprintShipment =
+    order.shipment?.trackingNo &&
+    order.shipment.status !== 'CANCELLED' &&
+    order.shipment.status !== 'CARRIER_CANCELLED' &&
+    ability.can('pack', 'Shipment')
+      ? order.shipment
+      : null;
   // "Nhận lại từ Pancake" — chỉ superadmin (không mã quyền nào cấp `manage OrderIssue`).
   const canPancakeUnlock = order.pancakeErpLockedAt !== null && ability.can('manage', 'OrderIssue');
   const openWork = useOrderOpenWork(order.id, ability.can('read', 'Work'));
@@ -866,6 +875,13 @@ function Detail({ order }: { order: SalesOrderDetail }) {
               // Thay "In phiếu đơn" (2026-11-03): đóng gói (trừ tồn) + xin / in tem vận đơn — đơn đã
               // có vận đơn thì chỉ in lại tem. "In phiếu đơn" chuyển vào menu ⋯.
               <BulkFulfilPrintDialog rows={[order]} onDone={() => undefined} trigger="header" />
+            ) : null}
+            {reprintShipment ? (
+              <ReprintWaybillDialog
+                shipments={[reprintShipment]}
+                triggerLabel="In lại vận đơn"
+                triggerSize="default"
+              />
             ) : null}
             {canCreate ? (
               <Button variant="outline" asChild shortcut="D">
