@@ -294,6 +294,40 @@ describe('OrderDetailScreen — GET /sales-orders/{id} (P1-12)', () => {
     expect(screen.getByRole('button', { name: 'In tem ERP' })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'In nhãn hãng' })).not.toBeInTheDocument();
   });
+
+  it('đầu màn có "In lại vận đơn" khi đơn đã có mã (kể cả Sự cố hoàn); không quyền pack thì ẩn', async () => {
+    server.use(
+      http.get('/api/sales-orders/:id', ({ params }) =>
+        HttpResponse.json({
+          ...makeOrderDetail(String(params.id))!,
+          shipment: { ...ORDER_SHIPMENT_FIXTURE, status: 'RETURNED' },
+        }),
+      ),
+    );
+    const { unmount } = renderApp(<OrderDetailScreen orderId={ORDER.id} />);
+    await screen.findByRole('heading', { level: 1 });
+    fireEvent.click(screen.getByRole('button', { name: 'In lại vận đơn' }));
+    expect(await screen.findByRole('dialog')).toBeInTheDocument();
+    unmount();
+
+    renderApp(<OrderDetailScreen orderId={ORDER.id} />, { me: ME_SALE });
+    await screen.findByRole('heading', { level: 1 });
+    expect(screen.queryByRole('button', { name: 'In lại vận đơn' })).not.toBeInTheDocument();
+  });
+
+  it('phiếu giao đã hủy → không có "In lại vận đơn"', async () => {
+    server.use(
+      http.get('/api/sales-orders/:id', ({ params }) =>
+        HttpResponse.json({
+          ...makeOrderDetail(String(params.id))!,
+          shipment: { ...ORDER_SHIPMENT_FIXTURE, status: 'CANCELLED' },
+        }),
+      ),
+    );
+    renderApp(<OrderDetailScreen orderId={ORDER.id} />);
+    await screen.findByRole('heading', { level: 1 });
+    expect(screen.queryByRole('button', { name: 'In lại vận đơn' })).not.toBeInTheDocument();
+  });
 });
 
 describe('OrderDetailScreen — tên ĐVT thay mã (2026-11-06)', () => {
