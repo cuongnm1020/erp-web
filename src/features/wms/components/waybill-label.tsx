@@ -8,7 +8,13 @@ import { MapPin, Phone, Store, User } from 'lucide-react';
 import { formatDate, formatQuantity, formatTime } from '@/lib/format';
 import { LABEL_SIZES, type PrintController } from '@/lib/print';
 import type { ShipmentLabelData } from '../api/use-pda';
-import { DEFAULT_PRINT_NOTE, hidePhone, parseGhtkTracking, routeLabel } from '../ghtk-label';
+import {
+  DEFAULT_PRINT_NOTE,
+  hidePhone,
+  labelRecipientAddress,
+  parseGhtkTracking,
+  routeLabel,
+} from '../ghtk-label';
 import { f, labelInner, labelOuter, u, WAYBILL_EDGE } from '../label-scale';
 import { estimateLines, fitItems } from '../label-text';
 import { sortLabelsForPrint } from '../waybill-sort';
@@ -166,16 +172,6 @@ const clamp = (lines: number): CSSProperties => ({
 
 const ICON = { width: '1em', height: '1em', flexShrink: 0 } as const;
 
-/**
- * Địa chỉ người nhận tem dọc (2026-10-16): che số nhà → xã/phường bằng `***`, in từ quận/huyện
- * trở đi — "Thị trấn Phú Long, Huyện Hàm Thuận Bắc, Bình Thuận" → "***, Huyện Hàm Thuận Bắc,
- * Bình Thuận".
- */
-function fromDistrictAddress(r: { address: string; fromDistrict: string }): string {
-  if (!r.fromDistrict) return r.address ? '***' : '';
-  return r.address === r.fromDistrict ? r.fromDistrict : `***, ${r.fromDistrict}`;
-}
-
 /** Cỡ chữ hàng người gửi — tem dọc dùng chung cho địa chỉ người nhận và bảng sản phẩm. */
 const SENDER_PT = 7.5;
 
@@ -191,6 +187,8 @@ const SENDER_PT = 7.5;
  * chữ với hàng người gửi (`SENDER_PT`). GHTK dọc cùng khung này: mã vạch đoạn số cuối + mã phân
  * loại + tuyến cạnh COD.
  * 2026-10-28: người gửi chỉ còn tên page Facebook; lề trên / phải bù `WAYBILL_EDGE`.
+ * 2026-11-09: địa chỉ người nhận theo `labelRecipientAddress` — địa chỉ mới in thôn + xã + tỉnh,
+ * địa chỉ cũ in xã + huyện + tỉnh; phần chi tiết hơn che `***` (cả tem ngang).
  * Kích thước thiết kế tính bằng mm/pt qua `u()` / `f()` (dựng ×2 — xem `label-scale.ts`).
  */
 export function WaybillLabel({
@@ -225,7 +223,7 @@ export function WaybillLabel({
     seq: seq != null,
     sender: !!data.facebookPageName,
     vnpost: data.carrierCode === 'VNPOST',
-    addressLines: data.recipient ? estimateAddressLines(fromDistrictAddress(data.recipient)) : 1,
+    addressLines: data.recipient ? estimateAddressLines(labelRecipientAddress(data.recipient)) : 1,
   });
   const pages = portraitPages(data.items, goodsMm);
   const carrier = data.carrierName ?? data.carrierCode ?? 'Vận đơn';
@@ -351,7 +349,7 @@ export function WaybillLabel({
           </div>
           <div className="font-bold leading-tight" style={{ fontSize: f(SENDER_PT), ...clamp(3) }}>
             <MapPin style={{ ...ICON, display: 'inline', verticalAlign: '-0.1em' }} aria-hidden />{' '}
-            {fromDistrictAddress(data.recipient)}
+            {labelRecipientAddress(data.recipient)}
           </div>
         </>
       ) : (

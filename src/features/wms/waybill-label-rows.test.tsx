@@ -36,10 +36,11 @@ const base = {
   recipient: {
     name: 'Pham Duy',
     phone: '0901232000',
-    address: 'Ấp 1, Xã Gia Tân, Huyện Thống Nhất, Đồng Nai',
+    // Địa chỉ in trên tem vừa MỘT dòng (2026-11-09 tem in thêm xã — bỏ xã để giữ 1 dòng).
+    address: 'Ấp 1, Huyện Thống Nhất, Đồng Nai',
     street: 'Ấp 1',
-    locality: 'Xã Gia Tân, Huyện Thống Nhất, Đồng Nai',
-    fromWard: 'Xã Gia Tân, Huyện Thống Nhất, Đồng Nai',
+    locality: 'Huyện Thống Nhất, Đồng Nai',
+    fromWard: 'Huyện Thống Nhất, Đồng Nai',
     fromDistrict: 'Huyện Thống Nhất, Đồng Nai',
     province: 'Đồng Nai',
   },
