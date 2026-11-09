@@ -98,8 +98,42 @@ function baseHandlers() {
     http.get('/api/brands', () => HttpResponse.json([])),
     http.get('/api/categories', () => HttpResponse.json([])),
     http.get('/api/skus', () => HttpResponse.json(SKUS)),
+    http.get('/api/combos/:id/history', () => HttpResponse.json([])),
   ];
 }
+
+/** Đúng shape `ComboHistoryEntryDto` — hai mốc: sửa định mức (admin đăng nhập thay) và tạo combo. */
+const COMBO_HISTORY = [
+  {
+    id: 'req-2',
+    at: '2026-11-09T03:10:00.000Z',
+    userId: uuid(901),
+    userName: 'Trần Anh Tuấn',
+    impersonatorId: uuid(900),
+    impersonatorName: 'Quản trị hệ thống',
+    changes: [
+      { field: 'componentQty', label: 'Định mức SKU-A', from: '1 chai', to: '16 chai' },
+      { field: 'salePrice', label: 'Giá bán', from: '75.000 ₫', to: '1.000.000 ₫' },
+    ],
+  },
+  {
+    id: 'req-1',
+    at: '2026-10-22T02:53:42.000Z',
+    userId: uuid(901),
+    userName: 'Trần Anh Tuấn',
+    impersonatorId: null,
+    impersonatorName: null,
+    changes: [
+      { field: 'created', label: 'Tạo combo', from: null, to: 'CB-1225 · Combo 16 chai' },
+      {
+        field: 'component',
+        label: 'Thêm thành phần',
+        from: null,
+        to: 'SKU-A Thuốc trừ sâu A × 1 chai',
+      },
+    ],
+  },
+];
 
 const fill = (label: string, value: string) =>
   fireEvent.change(screen.getByLabelText(label), { target: { value } });
@@ -309,6 +343,30 @@ describe('ComboFormScreen — sửa combo (PATCH /combos/{id})', () => {
       components: [{ skuId: uuid(1), qty: '5' }],
     });
     await waitFor(() => expect(push).toHaveBeenCalledWith('/catalog/combos'));
+  });
+
+  it('khối "Lịch sử thay đổi": mốc mới nhất trước, cũ → mới, admin đăng nhập thay hiện "(thay …)"; form tạo không có', async () => {
+    server.use(
+      // Đặt TRƯỚC baseHandlers (msw lấy handler khớp đầu tiên; base trả []).
+      http.get('/api/combos/:id/history', () => HttpResponse.json(COMBO_HISTORY)),
+      ...baseHandlers(),
+      http.get('/api/combos/:id', () => HttpResponse.json(COMBO_DETAIL)),
+    );
+    const { unmount } = renderApp(<ComboFormScreen comboId={uuid(300)} />);
+    expect(await screen.findByText('Lịch sử thay đổi')).toBeInTheDocument();
+    const rows = await screen.findAllByText(/Trần Anh Tuấn|Quản trị hệ thống/);
+    expect(rows[0]).toHaveTextContent('Quản trị hệ thống');
+    expect(screen.getByText('(thay Trần Anh Tuấn)')).toBeInTheDocument();
+    expect(screen.getByText('Định mức SKU-A')).toBeInTheDocument();
+    expect(screen.getByText('1 chai').tagName).toBe('S');
+    expect(screen.getByText('16 chai')).toBeInTheDocument();
+    expect(screen.getByText('Tạo combo')).toBeInTheDocument();
+    expect(screen.getByText('CB-1225 · Combo 16 chai')).toBeInTheDocument();
+    unmount();
+
+    renderApp(<ComboFormScreen />);
+    expect(await screen.findByLabelText('Tên combo *')).toBeInTheDocument();
+    expect(screen.queryByText('Lịch sử thay đổi')).not.toBeInTheDocument();
   });
 
   it('nhân bản (?from=): form tạo điền sẵn, mã trống, tên "(bản sao)" → POST combo mới', async () => {
