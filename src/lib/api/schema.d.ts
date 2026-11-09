@@ -10205,6 +10205,13 @@ export interface components {
             version: number;
             createdAt: string;
             updatedAt: string;
+            /**
+             * @description Người tạo combo (2026-11-09): `Product.createdBy`, combo cũ chưa ghi cột này → người ghi audit
+             *     CREATE; null = không rõ (import / job).
+             */
+            createdById: string | null;
+            /** @description Tên người tạo; null = không rõ hoặc tài khoản đã xóa. */
+            createdByName: string | null;
         };
         ComboListResponseDto: {
             items: components["schemas"]["ComboListItemDto"][];
@@ -10263,6 +10270,13 @@ export interface components {
             version: number;
             createdAt: string;
             updatedAt: string;
+            /**
+             * @description Người tạo combo (2026-11-09): `Product.createdBy`, combo cũ chưa ghi cột này → người ghi audit
+             *     CREATE; null = không rõ (import / job).
+             */
+            createdById: string | null;
+            /** @description Tên người tạo; null = không rõ hoặc tài khoản đã xóa. */
+            createdByName: string | null;
             categoryId: string | null;
             brandId: string | null;
             description: string | null;

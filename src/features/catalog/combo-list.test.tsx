@@ -47,6 +47,8 @@ const ROWS = [
     version: 1,
     createdAt: '2026-09-18T00:00:00.000Z',
     updatedAt: '2026-09-18T00:00:00.000Z',
+    createdById: uuid(901),
+    createdByName: 'Trần Anh Tuấn',
   },
   {
     id: uuid(2),
@@ -64,6 +66,8 @@ const ROWS = [
     version: 0,
     createdAt: '2026-09-17T00:00:00.000Z',
     updatedAt: '2026-09-17T00:00:00.000Z',
+    createdById: null,
+    createdByName: null,
   },
 ];
 
@@ -88,6 +92,10 @@ describe('ComboListScreen — GET /combos', () => {
     expect(screen.getByText('Ngừng bán')).toBeInTheDocument();
     // Còn bán được = 0 → chữ đỏ
     expect(screen.getByText('0 PCS')).toHaveClass('text-destructive');
+    // Cột Người tạo (2026-11-09): tên; không rõ → "—"
+    expect(screen.getByRole('columnheader', { name: /Người tạo/ })).toBeInTheDocument();
+    expect(screen.getByText('Combo trừ sâu 2+1').closest('tr')!).toHaveTextContent('Trần Anh Tuấn');
+    expect(screen.getByText('Combo hết hàng').closest('tr')!).toHaveTextContent('—');
     expect(queries[0]).toContain('take=50');
   });
 
