@@ -2046,6 +2046,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/combos/creators": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Người đã tạo combo — ô lọc "Người tạo" của danh sách (2026-11-09). Khai trước `:id`. */
+        get: operations["ComboController_creators"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/combos/{id}": {
         parameters: {
             query?: never;
@@ -10217,6 +10234,10 @@ export interface components {
             items: components["schemas"]["ComboListItemDto"][];
             total: number;
         };
+        ComboCreatorDto: {
+            id: string;
+            name: string | null;
+        };
         ComboComponentDto: {
             skuId: string;
             code: string;
@@ -13897,7 +13918,7 @@ export interface components {
         };
         CarrierSettingFieldDto: {
             /** @enum {string} */
-            key: "shopId" | "baseUrl" | "partnerCode" | "username" | "token" | "password" | "apiKey" | "webhookSecret";
+            key: "shopId" | "serviceCode" | "baseUrl" | "partnerCode" | "username" | "token" | "password" | "apiKey" | "webhookSecret";
             label: string;
             /** @description Bí mật: không bao giờ trả giá trị, chỉ `hint`. */
             secret: boolean;
@@ -13965,6 +13986,8 @@ export interface components {
             shopId?: string | null;
             /** @description GHTK X-Client-Source, VTP / J&T mã đối tác. */
             partnerCode?: string | null;
+            /** @description Dịch vụ mặc định của tài khoản (VTP `ORDER_SERVICE`: ECOD, VCN, VTK…); đơn chọn dịch vụ thì đơn thắng. */
+            serviceCode?: string | null;
             /** @description Bí mật xác thực webhook vào. Trống = dùng token. */
             webhookSecret?: string | null;
         };
@@ -13991,6 +14014,8 @@ export interface components {
             shopId?: string | null;
             /** @description GHTK X-Client-Source, VTP / J&T mã đối tác. */
             partnerCode?: string | null;
+            /** @description Dịch vụ mặc định của tài khoản (VTP `ORDER_SERVICE`: ECOD, VCN, VTK…); đơn chọn dịch vụ thì đơn thắng. */
+            serviceCode?: string | null;
             /** @description Bí mật xác thực webhook vào. Trống = dùng token. */
             webhookSecret?: string | null;
             name: string;
@@ -14012,6 +14037,8 @@ export interface components {
             shopId?: string | null;
             /** @description GHTK X-Client-Source, VTP / J&T mã đối tác. */
             partnerCode?: string | null;
+            /** @description Dịch vụ mặc định của tài khoản (VTP `ORDER_SERVICE`: ECOD, VCN, VTK…); đơn chọn dịch vụ thì đơn thắng. */
+            serviceCode?: string | null;
             /** @description Bí mật xác thực webhook vào. Trống = dùng token. */
             webhookSecret?: string | null;
             name?: string;
@@ -19404,6 +19431,8 @@ export interface operations {
             query: {
                 /** @description ShipmentStatus nối dấu phẩy */
                 statuses?: string;
+                /** @description Tình trạng in tem (2026-11-09) — xem {@link SHIPMENT_PRINT_STATUSES}. Áp cả số tổng lẫn danh sách. */
+                printStatus?: "PRINTED" | "NOT_PRINTED" | "ERROR";
                 /** @description Ngày theo giờ Việt Nam `YYYY-MM-DD` cho số đóng gói / bàn giao; bỏ trống = hôm nay. */
                 date?: string;
                 carrierId?: string;
@@ -19440,6 +19469,8 @@ export interface operations {
             query: {
                 /** @description ShipmentStatus nối dấu phẩy */
                 statuses?: string;
+                /** @description Tình trạng in tem (2026-11-09) — xem {@link SHIPMENT_PRINT_STATUSES}. Áp cả số tổng lẫn danh sách. */
+                printStatus?: "PRINTED" | "NOT_PRINTED" | "ERROR";
                 /** @description Ngày theo giờ Việt Nam `YYYY-MM-DD` cho số đóng gói / bàn giao; bỏ trống = hôm nay. */
                 date?: string;
                 carrierId?: string;
@@ -21727,8 +21758,15 @@ export interface operations {
                 /** @description Tìm theo mã / tên combo, mã / tên SKU thành phần. */
                 q?: string;
                 isActive?: boolean;
+                /** @description Bỏ trống = mới tạo trước (createdAt desc, 2026-11-09). */
                 sortBy?: "code" | "name" | "createdAt" | "quantity";
                 sortDir?: "asc" | "desc";
+                /** @description Người tạo combo (2026-11-09) — cùng luật cột `createdById` (combo cũ: người ghi audit CREATE). */
+                createdBy?: string;
+                /** @description Ngày tạo từ (YYYY-MM-DD, giờ VN, gồm cả ngày này). */
+                createdFrom?: string;
+                /** @description Ngày tạo đến (YYYY-MM-DD, giờ VN, gồm cả ngày này). */
+                createdTo?: string;
                 take: number;
                 skip: number;
             };
@@ -21767,6 +21805,25 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ComboDetailDto"];
+                };
+            };
+        };
+    };
+    ComboController_creators: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ComboCreatorDto"][];
                 };
             };
         };

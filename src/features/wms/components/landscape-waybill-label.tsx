@@ -10,7 +10,7 @@ import {
   DEFAULT_PRINT_NOTE,
   type GhtkTracking,
   hidePhone,
-  maskedAddress,
+  labelRecipientAddress,
   printNote,
   routeLabel,
 } from '../ghtk-label';
@@ -339,7 +339,7 @@ export function LandscapeWaybillLabel({
                       {data.recipient.name} / {hidePhone(data.recipient.phone, 4)}
                     </div>
                     <div className="font-bold" style={clamp(data.facebookPageName ? 2 : 3)}>
-                      Đ/c: {maskedAddress(data.recipient.street, data.recipient.locality)}
+                      Đ/c: {labelRecipientAddress(data.recipient)}
                     </div>
                   </>
                 ) : (

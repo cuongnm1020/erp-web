@@ -44,13 +44,16 @@ import { formatDate, formatDateTime, toLocalDateKey } from '@/lib/format';
 import { useAbility } from '@/lib/permission';
 import { useListState, type SortState } from '@/lib/url-state';
 import {
+  carrierAccountLabel,
   fetchShipmentMonitorList,
   useCarriers,
   useShipmentMonitorList,
   useShipmentMonitorSummary,
   useShipmentStatusLog,
   useShippingTeamOptions,
+  type Carrier,
   type ShipmentMonitorRow,
+  type ShipmentPrintStatus,
   type ShipmentMonitorSort,
   type ShipmentMonitorSummary,
   type ShipmentMonitorView,
@@ -61,7 +64,6 @@ import {
   SHIPMENT_STATUS_BADGE,
   shipmentStatusBadge,
 } from '../labels';
-import { CarrierSelect } from './carrier-select';
 
 const statusBadge = (s: string) => {
   const m = shipmentStatusBadge(s);
@@ -239,6 +241,7 @@ const FILTER_KEYS = [
   'carrierAccountId',
   'team',
   'status',
+  'print',
   'days',
   'view',
 ] as const;
@@ -251,6 +254,34 @@ const STATUS_OPTIONS = Object.entries(SHIPMENT_STATUS_BADGE).map(([value, m]) =>
   value,
   label: m.label,
 }));
+/** Ô "In tem" (2026-11-09) — cùng nghĩa bộ lọc in tem của danh sách đơn. */
+const PRINT_OPTIONS: ReadonlyArray<{ value: ShipmentPrintStatus; label: string }> = [
+  { value: 'NOT_PRINTED', label: 'Chưa in tem' },
+  { value: 'PRINTED', label: 'Đã in tem' },
+  { value: 'ERROR', label: 'Lỗi không in được' },
+];
+
+/**
+ * Ô "Tài khoản vận chuyển" (2026-11-09): tài khoản của hãng đang chọn (không chọn hãng = mọi hãng,
+ * nhãn kèm mã hãng). Mọi tài khoản GET /carriers trả, kể cả chưa đủ cấu hình — vận đơn cũ của
+ * chúng vẫn theo dõi được.
+ */
+function monitorAccountOptions(
+  carriers: Carrier[] | undefined,
+  carrierId: string | undefined,
+): Array<{ value: string; label: string }> {
+  return (carriers ?? [])
+    .filter((c) => !carrierId || c.id === carrierId)
+    .flatMap((c) =>
+      [...c.accounts]
+        .sort((a, b) => Number(b.isDefault) - Number(a.isDefault))
+        .map((a) => {
+          const name = carrierAccountLabel(c, a);
+          return { value: a.id, label: carrierId ? name : `${c.code} ${name}` };
+        }),
+    );
+}
+
 /** URL giữ danh sách nối dấu phẩy (như ô multiSelect của FilterBar). */
 const decodeList = (v: string | undefined): string[] => (v ? v.split(',').filter(Boolean) : []);
 const DAY_OPTIONS = ['3', '5', '7', '14'] as const;
@@ -396,6 +427,7 @@ export function ShippingMonitorScreen() {
   const teamOptions = useShippingTeamOptions(canFilterDept && ability.can('read', 'SalesOrder'));
   const teamOptionList = teamOptions.data ?? [];
   const status = state.filters.status ?? '';
+  const printStatus = PRINT_OPTIONS.find((o) => o.value === state.filters.print)?.value;
   // Sắp theo cột bấm (chỉ cột API hỗ trợ); không bấm = thứ tự mặc định của góc nhìn.
   const sort: SortState | null =
     state.sort && SORTABLE.includes(state.sort.id as ShipmentMonitorSort) ? state.sort : null;
@@ -406,9 +438,10 @@ export function ShippingMonitorScreen() {
       carrierAccountId,
       teamIds: team || undefined,
       statuses: status || undefined,
+      printStatus,
       holdDays,
     }),
-    [date, carrierId, carrierAccountId, team, status, holdDays],
+    [date, carrierId, carrierAccountId, team, status, printStatus, holdDays],
   );
   const listParams = useMemo(
     () => ({
@@ -424,6 +457,7 @@ export function ShippingMonitorScreen() {
   const summary = useShipmentMonitorSummary(filter);
   const list = useShipmentMonitorList(listParams);
   const carriers = useCarriers();
+  const accountOptions = monitorAccountOptions(carriers.data, carrierId);
 
   const setFilters = (patch: Partial<Record<Filter, string | undefined>>) =>
     set({ filters: { ...state.filters, ...patch } });
@@ -481,31 +515,66 @@ export function ShippingMonitorScreen() {
         </label>
         <label className="flex flex-col gap-0.5 text-xs text-muted-foreground">
           Hãng vận chuyển
-          <CarrierSelect
-            className="h-8 w-64"
-            value={
-              carrierAccountId
-                ? (() => {
-                    const c = carriers.data?.find((x) =>
-                      x.accounts.some((a) => a.id === carrierAccountId),
-                    );
-                    return c ? { carrierId: c.id, accountId: carrierAccountId } : ALL;
-                  })()
-                : carrierId
-                  ? { carrierId, accountId: null }
-                  : ALL
+          <Select
+            value={carrierId ?? ALL}
+            // Đổi hãng → bỏ tài khoản đang chọn (có thể thuộc hãng khác).
+            onValueChange={(v) =>
+              setFilters({ carrierId: v === ALL ? undefined : v, carrierAccountId: undefined })
             }
-            specials={[{ value: ALL, label: 'Mọi hãng' }]}
-            onChange={(_, o) =>
-              setFilters(
-                !o
-                  ? { carrierId: undefined, carrierAccountId: undefined }
-                  : o.accountId
-                    ? { carrierId: undefined, carrierAccountId: o.accountId }
-                    : { carrierId: o.carrier.id, carrierAccountId: undefined },
-              )
-            }
-          />
+          >
+            <SelectTrigger className="h-8 w-56" aria-label="Hãng vận chuyển">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value={ALL}>Mọi hãng</SelectItem>
+              {(carriers.data ?? [])
+                .filter((c) => c.isActive || c.id === carrierId)
+                .map((c) => (
+                  <SelectItem key={c.id} value={c.id}>
+                    {c.name}
+                  </SelectItem>
+                ))}
+            </SelectContent>
+          </Select>
+        </label>
+        <label className="flex flex-col gap-0.5 text-xs text-muted-foreground">
+          Tài khoản vận chuyển
+          <Select
+            value={carrierAccountId ?? ALL}
+            onValueChange={(v) => setFilters({ carrierAccountId: v === ALL ? undefined : v })}
+            disabled={accountOptions.length === 0}
+          >
+            <SelectTrigger className="h-8 w-64" aria-label="Tài khoản vận chuyển">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value={ALL}>Mọi tài khoản</SelectItem>
+              {accountOptions.map((o) => (
+                <SelectItem key={o.value} value={o.value}>
+                  {o.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </label>
+        <label className="flex flex-col gap-0.5 text-xs text-muted-foreground">
+          In tem
+          <Select
+            value={printStatus ?? ALL}
+            onValueChange={(v) => setFilters({ print: v === ALL ? undefined : v })}
+          >
+            <SelectTrigger className="h-8 w-44" aria-label="In tem">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value={ALL}>In tem: tất cả</SelectItem>
+              {PRINT_OPTIONS.map((o) => (
+                <SelectItem key={o.value} value={o.value}>
+                  {o.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </label>
         {teamOptionList.length > 0 ? (
           <div className="flex flex-col gap-0.5 text-xs text-muted-foreground">

@@ -217,9 +217,9 @@ describe('Popup nhãn — tem ERP 100×75 mm (2026-10-13)', () => {
     expect(label.queryByText(/0901/)).toBeNull();
     // Đơn 5 món in 2 tờ → ghi chú ở tờ cuối (2026-11-05)
     expect(within(lastPage()).getByText('Quý khách vui lòng quay video khi bóc hàng')).toBeTruthy();
-    // 2026-10-16: địa chỉ người nhận che số nhà → xã, in từ huyện trở đi
-    expect(label.getByText('***, Huyện Trà Ôn, Vĩnh Long')).toBeTruthy();
-    expect(label.queryByText(/Thiện Mỹ/)).toBeNull();
+    // Địa chỉ cũ 3 cấp (2026-11-09): in xã + huyện + tỉnh, che số nhà / ấp.
+    expect(label.getByText('***, Xã Thiện Mỹ, Huyện Trà Ôn, Vĩnh Long')).toBeTruthy();
+    expect(label.queryByText(/ấp Mỹ Phó/)).toBeNull();
     expect(label.queryByText(/Số nhà 137/)).toBeNull();
   });
 
@@ -255,8 +255,9 @@ describe('Popup nhãn — tem ERP 100×75 mm (2026-10-13)', () => {
     expect(label.getByText('Người gửi:')).toBeTruthy();
     expect(label.getByText('Thiên Nông Official')).toBeTruthy();
     expect(label.getByText('******4567')).toBeTruthy();
-    expect(label.getByText('***, Huyện Trà Ôn, Vĩnh Long')).toBeTruthy();
-    expect(label.queryByText(/Thiện Mỹ/)).toBeNull();
+    // Địa chỉ cũ 3 cấp (2026-11-09): in xã + huyện + tỉnh, che số nhà / ấp.
+    expect(label.getByText('***, Xã Thiện Mỹ, Huyện Trà Ôn, Vĩnh Long')).toBeTruthy();
+    expect(label.queryByText(/ấp Mỹ Phó/)).toBeNull();
     // Tuyến chỉ in cho GHTK
     expect(label.queryByText(/MIỀN|NỘI TỈNH/)).toBeNull();
     // Mã đơn hàng đã gửi VNPost (mã phiếu giao)
@@ -364,8 +365,9 @@ describe('Popup nhãn — tem ERP 100×75 mm (2026-10-13)', () => {
     expect(label.getByText('Người gửi:')).toBeTruthy();
     expect(label.getByText('Thiên Nông Official')).toBeTruthy();
     expect(label.getByText('******4567')).toBeTruthy();
-    expect(label.getByText('***, Huyện Trà Ôn, Vĩnh Long')).toBeTruthy();
-    expect(label.queryByText(/Thiện Mỹ/)).toBeNull();
+    // Địa chỉ cũ 3 cấp (2026-11-09): in xã + huyện + tỉnh, che số nhà / ấp.
+    expect(label.getByText('***, Xã Thiện Mỹ, Huyện Trà Ôn, Vĩnh Long')).toBeTruthy();
+    expect(label.queryByText(/ấp Mỹ Phó/)).toBeNull();
     expect(label.queryByText(/Số nhà/)).toBeNull();
     expect(within(lastPage()).getByText('Quý khách vui lòng quay video khi bóc hàng')).toBeTruthy();
     expect(label.queryByText(/0901/)).toBeNull();

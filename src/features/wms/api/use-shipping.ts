@@ -23,8 +23,14 @@ export interface ShipmentMonitorFilter {
   teamIds?: string;
   /** Trạng thái phiếu giao nối dấu phẩy (ô "Trạng thái", 2026-11-04). */
   statuses?: string;
+  /** Tình trạng in tem (ô "In tem", 2026-11-09). */
+  printStatus?: ShipmentPrintStatus;
   holdDays: number;
 }
+
+export type ShipmentPrintStatus = NonNullable<
+  NonNullable<paths['/shipment-monitor']['get']['parameters']['query']>['printStatus']
+>;
 
 export type ShipmentMonitorSort = NonNullable<
   NonNullable<paths['/shipment-monitor']['get']['parameters']['query']>['sortBy']
@@ -180,6 +186,7 @@ export function useShipmentMonitorSummary(params: ShipmentMonitorFilter) {
               carrierAccountId: params.carrierAccountId,
               teamIds: params.teamIds,
               statuses: params.statuses,
+              printStatus: params.printStatus,
               holdDays: params.holdDays,
             },
           },
@@ -203,6 +210,7 @@ export function fetchShipmentMonitorList(params: ShipmentMonitorListParams) {
           carrierAccountId: params.carrierAccountId,
           teamIds: params.teamIds,
           statuses: params.statuses,
+          printStatus: params.printStatus,
           holdDays: params.holdDays,
           q: params.q || undefined,
           sortBy: params.sortBy,

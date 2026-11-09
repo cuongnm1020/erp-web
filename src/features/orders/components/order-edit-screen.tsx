@@ -1,6 +1,7 @@
 'use client';
 
 import {
+  AlertTriangle,
   Boxes,
   CornerDownRight,
   Gift,
@@ -289,6 +290,9 @@ function Editor({ order }: { order: SalesOrderDetail }) {
   const targets = manualStatusTargets(order.status, (a) => ability.can(a, 'SalesOrder'));
   // Chỉ người tạo đơn / NV xử lý / trưởng nhóm của họ sửa được các ô (server: order.canEdit).
   const carrierEditable = canUpdate && orderEditable(order.status) && order.canEdit;
+  // Đơn đã Gửi ĐVVC mà vẫn sửa được (edit_all, 2026-11-09): vận đơn ở hãng không đổi theo; đổi
+  // hãng vẫn phải hủy vận đơn trước (server 409 ORDER_SENT_TO_CARRIER).
+  const sentWithWaybill = !!order.sentToCarrierAt && !order.shipment?.waybillErrorCode;
   // Kho / admin sửa thẻ Nhận hàng của mọi đơn kho mình (2026-11-05, `sales_order.edit_receiver`) —
   // server tính `canEditReceiver` (gồm cả người được sửa đơn).
   const canEditReceiverPerm = ability.can('edit_receiver', 'SalesOrder');
@@ -810,13 +814,25 @@ function Editor({ order }: { order: SalesOrderDetail }) {
           className="flex items-center gap-2 rounded-md border border-warning-line bg-warning-weak px-3 py-2 text-sm"
         >
           <Lock className="h-3.5 w-3.5 text-warning" aria-hidden />
-          Đơn của người khác — bạn sửa được{' '}
+          {sentWithWaybill ? 'Đơn đã gửi ĐVVC' : 'Đơn của người khác'} — bạn sửa được{' '}
           {receiverEditable && orderDayEditable
             ? 'thông tin nhận hàng và ngày tạo đơn'
             : receiverEditable
               ? 'thông tin nhận hàng'
               : 'ngày tạo đơn'}
-          . Ô khác do người tạo đơn, NV xử lý hoặc trưởng nhóm / leader của họ sửa.
+          .{' '}
+          {sentWithWaybill
+            ? 'Ô khác cần quyền sửa mọi đơn (sales_order.edit_all), hoặc hủy vận đơn rồi sửa.'
+            : 'Ô khác do người tạo đơn, NV xử lý hoặc trưởng nhóm / leader của họ sửa.'}
+        </div>
+      ) : order.canEdit && sentWithWaybill && orderEditable(order.status) ? (
+        <div
+          role="status"
+          className="flex items-center gap-2 rounded-md border border-warning-line bg-warning-weak px-3 py-2 text-sm"
+        >
+          <AlertTriangle className="h-3.5 w-3.5 text-warning" aria-hidden />
+          Đơn đã gửi ĐVVC — sửa ở đây KHÔNG cập nhật vận đơn ở hãng (người nhận, COD, sản phẩm). Báo
+          hãng nếu cần, hoặc hủy vận đơn rồi gửi lại.
         </div>
       ) : canUpdate && !order.canEdit && orderEditable(order.status) ? (
         <div
@@ -1344,7 +1360,7 @@ function Editor({ order }: { order: SalesOrderDetail }) {
                   }
                   specials={[{ value: NO_CARRIER, label: '— Chưa chọn —' }]}
                   placeholder="ĐVVC"
-                  disabled={!carrierEditable}
+                  disabled={!carrierEditable || sentWithWaybill}
                   onChange={(v, option) => {
                     if (typeof v === 'string' || !option) {
                       setCarrierId(NO_CARRIER);
@@ -1403,6 +1419,8 @@ function Editor({ order }: { order: SalesOrderDetail }) {
             <p className="text-xs text-muted-foreground">
               {!canChooseCarrier ? (
                 'Kho chọn hãng vận chuyển khi gửi sang ĐVVC.'
+              ) : carrierEditable && sentWithWaybill ? (
+                'Đã gửi ĐVVC — đổi hãng phải hủy vận đơn trước.'
               ) : carrierChanged && order.carrierId ? (
                 <span className="text-warning">Đã đổi từ {carrierLabel(order.carrierId)}</span>
               ) : carrierEditable ? (

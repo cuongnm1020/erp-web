@@ -157,6 +157,38 @@ describe('ShippingMonitorScreen — đóng gói / bàn giao / hãng giữ + cả
     await waitFor(() => expect(lastUrl()).toContain('status=IN_TRANSIT%2COUT_FOR_DELIVERY'));
   });
 
+  it('ô Tài khoản vận chuyển + ô In tem (2026-11-09): URL → API carrierAccountId / printStatus; đổi hãng bỏ tài khoản', async () => {
+    const seen: URLSearchParams[] = [];
+    server.use(
+      http.get('/api/shipment-monitor', ({ request }) => {
+        seen.push(new URL(request.url).searchParams);
+        return HttpResponse.json({ view: 'OVERDUE', items: makeMonitorRows(1), total: 1 });
+      }),
+    );
+    search = 'carrierId=c-ghtk&carrierAccountId=acc-ghtk-default&print=ERROR';
+    renderApp(<ShippingMonitorScreen />);
+    const account = await screen.findByRole('combobox', { name: 'Tài khoản vận chuyển' });
+    await waitFor(() => expect(account).toHaveTextContent('Giao Hàng Tiết Kiệm'));
+    expect(screen.getByRole('combobox', { name: 'In tem' })).toHaveTextContent('Lỗi không in được');
+    await waitFor(() =>
+      expect(
+        seen.some(
+          (p) =>
+            p.get('carrierAccountId') === 'acc-ghtk-default' && p.get('printStatus') === 'ERROR',
+        ),
+      ).toBe(true),
+    );
+
+    fireEvent.click(screen.getByRole('combobox', { name: 'In tem' }));
+    fireEvent.click(await screen.findByRole('option', { name: 'Đã in tem' }));
+    await waitFor(() => expect(lastUrl()).toContain('print=PRINTED'));
+
+    fireEvent.click(screen.getByRole('combobox', { name: 'Hãng vận chuyển' }));
+    fireEvent.click(await screen.findByRole('option', { name: 'Giao Hàng Nhanh' }));
+    await waitFor(() => expect(lastUrl()).toContain('carrierId=c-ghn'));
+    expect(lastUrl()).not.toContain('carrierAccountId');
+  });
+
   it('sắp theo cột Bàn giao hãng (2026-11-04): bấm tiêu đề → URL sort, API sortBy/sortDir', async () => {
     const seen: string[] = [];
     server.use(

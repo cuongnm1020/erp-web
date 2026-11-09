@@ -51,6 +51,25 @@ export function maskedAddress(street: string | null | undefined, locality: strin
   return rest ? `***, ${rest}` : '***';
 }
 
+/**
+ * Địa chỉ người nhận in trên tem (2026-11-09, user chốt): che phần chi tiết bằng `***`.
+ *  - Địa chỉ MỚI (2 cấp, không quận/huyện): in thôn, xã/phường, tỉnh — che số nhà / đường.
+ *  - Địa chỉ CŨ (3 cấp): in xã/phường, quận/huyện, tỉnh — che số nhà / đường và thôn.
+ * Cũ hay mới nhận theo `fromDistrict` (quận/huyện → tỉnh) khác tỉnh.
+ */
+export function labelRecipientAddress(r: {
+  address: string;
+  locality: string;
+  fromWard: string;
+  fromDistrict: string;
+  province: string | null;
+}): string {
+  const oldAddress = r.fromDistrict.trim() !== '' && r.fromDistrict.trim() !== (r.province ?? '');
+  const shown = (oldAddress ? r.fromWard : r.locality).trim();
+  if (!shown) return r.address.trim() ? '***' : '';
+  return r.address.trim() === shown ? shown : `***, ${shown}`;
+}
+
 type Region = 'BAC' | 'TRUNG' | 'NAM';
 
 /** Bỏ dấu, chữ thường, bỏ tiền tố "Tỉnh" / "Thành phố" / "TP." — chỉ giữ chữ cái. */

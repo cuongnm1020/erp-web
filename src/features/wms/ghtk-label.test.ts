@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { hidePhone, maskedAddress, parseGhtkTracking, printNote, routeLabel } from './ghtk-label';
+import {
+  hidePhone,
+  labelRecipientAddress,
+  maskedAddress,
+  parseGhtkTracking,
+  printNote,
+  routeLabel,
+} from './ghtk-label';
 
 describe('tem kiểu GHTK — tiện ích', () => {
   it('tách mã vận đơn GHTK: shop, mã phân loại (đoạn đầu nền đen), mã số ngắn', () => {
@@ -38,6 +45,39 @@ describe('tem kiểu GHTK — tiện ích', () => {
       '***, Ấp Vĩnh Nghĩa, Xã Vĩnh Hậu, An Giang',
     );
     expect(maskedAddress(null, 'Xã Thạch Thất, Hà Nội')).toBe('Xã Thạch Thất, Hà Nội');
+  });
+
+  it('địa chỉ trên tem (2026-11-09): mới in thôn + xã + tỉnh; cũ in xã + huyện + tỉnh; chi tiết hơn che ***', () => {
+    // Địa chỉ mới (2 cấp): không quận/huyện → fromDistrict = tỉnh.
+    expect(
+      labelRecipientAddress({
+        address: 'Số 12 đường A, Thôn 3, Xã Lộc Thạnh, Đồng Nai',
+        locality: 'Thôn 3, Xã Lộc Thạnh, Đồng Nai',
+        fromWard: 'Xã Lộc Thạnh, Đồng Nai',
+        fromDistrict: 'Đồng Nai',
+        province: 'Đồng Nai',
+      }),
+    ).toBe('***, Thôn 3, Xã Lộc Thạnh, Đồng Nai');
+    // Địa chỉ cũ (3 cấp): thôn cũng che.
+    expect(
+      labelRecipientAddress({
+        address: 'Số 5, Ấp Bàu Nghé, Xã Lộc Thạnh, Huyện Lộc Ninh, Bình Phước',
+        locality: 'Ấp Bàu Nghé, Xã Lộc Thạnh, Huyện Lộc Ninh, Bình Phước',
+        fromWard: 'Xã Lộc Thạnh, Huyện Lộc Ninh, Bình Phước',
+        fromDistrict: 'Huyện Lộc Ninh, Bình Phước',
+        province: 'Bình Phước',
+      }),
+    ).toBe('***, Xã Lộc Thạnh, Huyện Lộc Ninh, Bình Phước');
+    // Không có phần chi tiết → không in ***.
+    expect(
+      labelRecipientAddress({
+        address: 'Xã Thạch Thất, Hà Nội',
+        locality: 'Xã Thạch Thất, Hà Nội',
+        fromWard: 'Xã Thạch Thất, Hà Nội',
+        fromDistrict: 'Hà Nội',
+        province: 'Hà Nội',
+      }),
+    ).toBe('Xã Thạch Thất, Hà Nội');
   });
 
   it('tuyến: cùng tỉnh / cùng miền / khác miền; tên có tiền tố, tên cũ; tỉnh lạ → null', () => {

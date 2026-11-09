@@ -507,6 +507,29 @@ describe('OrderEditScreen — trang sửa đơn (D-05, PATCH /sales-orders/{id})
     expect(screen.getByRole('button', { name: /Lưu thay đổi/ })).toBeDisabled();
   });
 
+  it('edit_all sửa đơn đã Gửi ĐVVC (2026-11-09): cảnh báo vận đơn ở hãng không đổi theo, ô hãng khóa', async () => {
+    const approved = makeOrders(60).find((o) => o.status === 'APPROVED')!;
+    server.use(
+      http.get('/api/sales-orders/:id', () =>
+        HttpResponse.json({
+          ...makeOrderDetail(approved.id)!,
+          canEdit: true,
+          sentToCarrierAt: '2026-11-09T03:00:00.000Z',
+          carrierId: 'c-ghn',
+          carrier: { id: 'c-ghn', code: 'GHN', name: CARRIERS[1]!.name },
+        }),
+      ),
+    );
+    renderApp(<OrderEditScreen orderId={approved.id} />);
+    await screen.findByRole('heading', { level: 1 });
+    expect(
+      screen.getByText(/Đơn đã gửi ĐVVC — sửa ở đây KHÔNG cập nhật vận đơn ở hãng/),
+    ).toBeInTheDocument();
+    expect(screen.getByRole('combobox', { name: 'Hãng vận chuyển' })).toBeDisabled();
+    expect(screen.getByText('Đã gửi ĐVVC — đổi hãng phải hủy vận đơn trước.')).toBeInTheDocument();
+    expect(screen.getByRole('textbox', { name: /Ghi chú nội bộ/ })).toBeEnabled();
+  });
+
   it('404: lối về danh sách; 500: ErrorState có traceId', async () => {
     server.use(scenario.orderNotFound);
     const { unmount } = renderApp(<OrderEditScreen orderId={ORDER.id} />);

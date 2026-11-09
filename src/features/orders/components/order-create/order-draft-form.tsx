@@ -295,14 +295,21 @@ export const OrderDraftForm = forwardRef<
   // sau (lỗi mạng, sửa giỏ) không hỏi lại.
   const customerPhone = useWatch({ control: form.control, name: 'customerPhone' });
   const sameDay = useSameDayOrders(customerPhone);
-  const canSetOrderDate = useAbility().can('set_order_date', 'SalesOrder');
+  const ability = useAbility();
+  const canSetOrderDate = ability.can('set_order_date', 'SalesOrder');
+  const canChooseCarrier = ability.can('send_carrier', 'SalesOrder');
   const [pendingDup, setPendingDup] = useState<CreateOrderValues | null>(null);
   const acceptedDupPhone = useRef<string | null>(null);
 
   const send = (values: CreateOrderValues) => {
     idemKey.current ??= newIdempotencyKey();
     // Không có quyền chọn ngày (2026-11-04) → không gửi ngày (nháp cũ có thể còn giá trị).
-    const body = toCreateOrderBody(canSetOrderDate ? values : { ...values, orderDate: '' });
+    // Không có quyền chọn hãng → không gửi ĐVVC (nháp nhân bản cũ còn hãng đơn gốc → 403, 2026-11-09).
+    const body = toCreateOrderBody({
+      ...values,
+      ...(canSetOrderDate ? {} : { orderDate: '' }),
+      ...(canChooseCarrier ? {} : { carrierId: '', carrierAccountId: '' }),
+    });
     create.mutate(
       { body, key: idemKey.current },
       {
