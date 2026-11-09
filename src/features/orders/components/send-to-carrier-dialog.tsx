@@ -630,7 +630,7 @@ export function SendToCarrierDialog({
                                   </SelectTrigger>
                                 </FormControl>
                                 <SelectContent>
-                                  <SelectItem value={NO_SERVICE}>Mặc định của hãng</SelectItem>
+                                  <SelectItem value={NO_SERVICE}>Mặc định của tài khoản</SelectItem>
                                   {services.map((s) => (
                                     <SelectItem key={s.value} value={s.value}>
                                       {s.label}

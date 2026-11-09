@@ -105,6 +105,7 @@ export function toShippingOptions(v: ShippingOptionsFormValues): ShippingOptions
 export const CARRIER_SERVICES: Record<string, { value: string; label: string }[]> = {
   GHTK: [{ value: 'xteam', label: 'Giao nhanh (Xteam)' }],
   VTP: [
+    { value: 'ECOD', label: 'Thương mại điện tử (ECOD)' },
     { value: 'VCN', label: 'Chuyển phát nhanh (VCN)' },
     { value: 'VTK', label: 'Chuyển phát tiết kiệm (VTK)' },
     { value: 'VHT', label: 'Hỏa tốc (VHT)' },

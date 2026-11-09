@@ -13918,7 +13918,7 @@ export interface components {
         };
         CarrierSettingFieldDto: {
             /** @enum {string} */
-            key: "shopId" | "baseUrl" | "partnerCode" | "username" | "token" | "password" | "apiKey" | "webhookSecret";
+            key: "shopId" | "serviceCode" | "baseUrl" | "partnerCode" | "username" | "token" | "password" | "apiKey" | "webhookSecret";
             label: string;
             /** @description Bí mật: không bao giờ trả giá trị, chỉ `hint`. */
             secret: boolean;
@@ -13986,6 +13986,8 @@ export interface components {
             shopId?: string | null;
             /** @description GHTK X-Client-Source, VTP / J&T mã đối tác. */
             partnerCode?: string | null;
+            /** @description Dịch vụ mặc định của tài khoản (VTP `ORDER_SERVICE`: ECOD, VCN, VTK…); đơn chọn dịch vụ thì đơn thắng. */
+            serviceCode?: string | null;
             /** @description Bí mật xác thực webhook vào. Trống = dùng token. */
             webhookSecret?: string | null;
         };
@@ -14012,6 +14014,8 @@ export interface components {
             shopId?: string | null;
             /** @description GHTK X-Client-Source, VTP / J&T mã đối tác. */
             partnerCode?: string | null;
+            /** @description Dịch vụ mặc định của tài khoản (VTP `ORDER_SERVICE`: ECOD, VCN, VTK…); đơn chọn dịch vụ thì đơn thắng. */
+            serviceCode?: string | null;
             /** @description Bí mật xác thực webhook vào. Trống = dùng token. */
             webhookSecret?: string | null;
             name: string;
@@ -14033,6 +14037,8 @@ export interface components {
             shopId?: string | null;
             /** @description GHTK X-Client-Source, VTP / J&T mã đối tác. */
             partnerCode?: string | null;
+            /** @description Dịch vụ mặc định của tài khoản (VTP `ORDER_SERVICE`: ECOD, VCN, VTK…); đơn chọn dịch vụ thì đơn thắng. */
+            serviceCode?: string | null;
             /** @description Bí mật xác thực webhook vào. Trống = dùng token. */
             webhookSecret?: string | null;
             name?: string;
