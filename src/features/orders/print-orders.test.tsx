@@ -345,4 +345,43 @@ describe('PrintOrdersScreen — In đơn (clone màn Đơn hàng, 2026-11-04)', 
       search = 'group=all';
     }
   });
+
+  it('tab cha "Đơn hàng | Cần xử lý" (clone màn Đơn hàng, 2026-11-09): số đỏ trên tab cha, "Đơn hàng" giữ tab trạng thái cũ', async () => {
+    server.use(
+      http.get('/api/sales-orders/tab-counts', () =>
+        HttpResponse.json({ total: 7, attention: 7, counts: { PICKUP_FAILED: 7 } }),
+      ),
+    );
+    renderApp(<PrintOrdersScreen />);
+    await screen.findByText(FIRST.docNumber);
+    const parent = screen.getByRole('tablist', { name: 'Nhóm tab' });
+    expect(parent).toHaveTextContent('Đơn hàng');
+    await waitFor(() => expect(parent).toHaveTextContent(/Cần xử lý\s*7/));
+    // Tab "Đơn hàng" giữ nguyên dãy trạng thái cũ.
+    expect(screen.getByRole('tablist', { name: 'Trạng thái đơn' })).toBeInTheDocument();
+  });
+
+  it('URL view=issues&ci=PICKUP_FAILED → dãy chip Cần xử lý thay tab trạng thái, danh sách gửi carrierIssue', async () => {
+    search = 'view=issues&ci=PICKUP_FAILED';
+    const list: URLSearchParams[] = [];
+    server.use(
+      http.get('/api/sales-orders', ({ request }) => {
+        list.push(new URL(request.url).searchParams);
+        return HttpResponse.json({ items: [], total: 0 });
+      }),
+    );
+    try {
+      renderApp(<PrintOrdersScreen />);
+      const chips = await screen.findByRole('tablist', { name: 'Đơn cần xử lý' });
+      expect(chips).toHaveTextContent('Không lấy được hàng');
+      expect(screen.queryByRole('tablist', { name: 'Trạng thái đơn' })).not.toBeInTheDocument();
+      await waitFor(() =>
+        expect(
+          list.some((p) => p.getAll('carrierIssue').includes('PICKUP_FAILED') && !p.get('flow')),
+        ).toBe(true),
+      );
+    } finally {
+      search = 'group=all';
+    }
+  });
 });

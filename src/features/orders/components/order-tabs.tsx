@@ -53,22 +53,9 @@ export function OrderTabs({
   onShowAll: () => void;
   onExitSearch: () => void;
 }) {
-  const attention = issueCounts?.attention;
   return (
     <div className="mb-3 grid gap-2">
-      <div role="tablist" aria-label="Nhóm tab" className="flex border-b">
-        <ParentTab active={view === 'orders'} onClick={() => onViewChange('orders')}>
-          Đơn hàng
-        </ParentTab>
-        <ParentTab active={view === 'issues'} onClick={() => onViewChange('issues')}>
-          Cần xử lý
-          {attention !== undefined && attention > 0 ? (
-            <span className="rounded-full bg-destructive-weak px-1.5 text-xs font-semibold leading-5 text-destructive tabular-nums">
-              {groupVi(String(attention))}
-            </span>
-          ) : null}
-        </ParentTab>
-      </div>
+      <OrderViewTabs view={view} issueCounts={issueCounts} onViewChange={onViewChange} />
 
       {view === 'orders' ? (
         <div
@@ -98,29 +85,7 @@ export function OrderTabs({
           ))}
         </div>
       ) : (
-        <div
-          role="tablist"
-          aria-label="Đơn cần xử lý"
-          className="flex flex-wrap items-stretch gap-1.5"
-        >
-          <FlowChip
-            label="Tất cả"
-            n={issueCounts?.total}
-            family="off"
-            active={issue === null}
-            onClick={() => onIssueChange(null)}
-          />
-          {CARRIER_ISSUE_DEFS.map((d) => (
-            <FlowChip
-              key={d.issue}
-              label={d.label}
-              n={issueCounts ? (issueCounts.counts[d.issue] ?? 0) : undefined}
-              family={d.family}
-              active={issue === d.issue}
-              onClick={() => onIssueChange(d.issue)}
-            />
-          ))}
-        </div>
+        <IssueChips issue={issue} issueCounts={issueCounts} onIssueChange={onIssueChange} />
       )}
 
       {view === 'orders' && searching ? (
@@ -138,6 +103,71 @@ export function OrderTabs({
           </Button>
         </div>
       ) : null}
+    </div>
+  );
+}
+
+/**
+ * Hàng tab cha "Đơn hàng | Cần xử lý" (gạch chân) — số đỏ cạnh "Cần xử lý" = `attention` (các chip
+ * đỏ). Dùng chung màn Đơn hàng (/crm/orders) và Kho › Đơn hàng (/wms/print-orders, 2026-11-09).
+ */
+export function OrderViewTabs({
+  view,
+  issueCounts,
+  onViewChange,
+}: {
+  view: OrderTabView;
+  issueCounts: OrderTabCounts | undefined;
+  onViewChange: (v: OrderTabView) => void;
+}) {
+  const attention = issueCounts?.attention;
+  return (
+    <div role="tablist" aria-label="Nhóm tab" className="flex border-b">
+      <ParentTab active={view === 'orders'} onClick={() => onViewChange('orders')}>
+        Đơn hàng
+      </ParentTab>
+      <ParentTab active={view === 'issues'} onClick={() => onViewChange('issues')}>
+        Cần xử lý
+        {attention !== undefined && attention > 0 ? (
+          <span className="rounded-full bg-destructive-weak px-1.5 text-xs font-semibold leading-5 text-destructive tabular-nums">
+            {groupVi(String(attention))}
+          </span>
+        ) : null}
+      </ParentTab>
+    </div>
+  );
+}
+
+/** Dãy chip của tab cha "Cần xử lý": "Tất cả" (mọi chip đỏ) + từng loại vấn đề hãng. */
+export function IssueChips({
+  issue,
+  issueCounts,
+  onIssueChange,
+}: {
+  /** null = chip "Tất cả". */
+  issue: CarrierIssue | null;
+  issueCounts: OrderTabCounts | undefined;
+  onIssueChange: (i: CarrierIssue | null) => void;
+}) {
+  return (
+    <div role="tablist" aria-label="Đơn cần xử lý" className="flex flex-wrap items-stretch gap-1.5">
+      <FlowChip
+        label="Tất cả"
+        n={issueCounts?.total}
+        family="off"
+        active={issue === null}
+        onClick={() => onIssueChange(null)}
+      />
+      {CARRIER_ISSUE_DEFS.map((d) => (
+        <FlowChip
+          key={d.issue}
+          label={d.label}
+          n={issueCounts ? (issueCounts.counts[d.issue] ?? 0) : undefined}
+          family={d.family}
+          active={issue === d.issue}
+          onClick={() => onIssueChange(d.issue)}
+        />
+      ))}
     </div>
   );
 }

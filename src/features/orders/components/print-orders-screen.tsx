@@ -60,6 +60,7 @@ import {
   fetchOrdersPage,
   orderKeys,
   useOrderFlowCounts,
+  useOrderTabCounts,
   useOrderListPrefs,
   useOrders,
   useRequestWaybill,
@@ -70,12 +71,15 @@ import {
   useFacebookPageOptions,
   usePancakeShops,
   useSaveOrderListPrefs,
+  type CarrierIssue,
   type OrderDateField,
   type OrderFlow,
   type OrderSortField,
   type SalesOrderListItem,
 } from '../api/use-orders';
 import {
+  CARRIER_ISSUES_ALL,
+  parseCarrierIssue,
   fulfilmentLabel,
   orderCancellable,
   orderFlowLabel,
@@ -92,6 +96,7 @@ import { BulkRetryWaybillDialog, retryableWaybill } from './bulk-retry-waybill-d
 import { BulkShippingDialog } from './bulk-shipping-dialog';
 import { carrierTone } from './carrier-status-card';
 import { OrderFlowTabs } from './order-flow-tabs';
+import { CarrierStageTag, IssueChips, OrderViewTabs, type OrderTabView } from './order-tabs';
 import { FlowBadge, OrderQuickView, TelcoBadge } from './order-quick-view';
 import { rangeChip, WeightRangeFilter } from './weight-range-filter';
 import { OrderScanButton } from './order-scan-button';
@@ -142,6 +147,9 @@ const DEFAULTS = {
   size: 50,
   filterKeys: [
     'flow',
+    // Tab cha "Cần xử lý" (`view=issues`) + chip của nó (`ci`) — clone từ màn Đơn hàng 2026-11-09.
+    'view',
+    'ci',
     // Tab cha (2026-11-03): wait / fulfil / issue / ship, `all` = mọi trạng thái (link từ màn khác).
     // Có `flow` thì nhóm suy từ flow.
     'group',
@@ -553,6 +561,12 @@ const buildColumns = (
             <span title={o.fulfilmentStatus ? fulfilmentLabel(o.fulfilmentStatus) : undefined}>
               <FlowBadge flow={o.flow} />
             </span>
+            {/* Trạng thái hãng (như màn Đơn hàng) — chữ hãng gần nhất khi rê chuột. */}
+            {o.carrierStage ? (
+              <span title={o.carrierStatusText ?? undefined}>
+                <CarrierStageTag stage={o.carrierStage} />
+              </span>
+            ) : null}
             {o.sameDayCount > 0 ? (
               <span className="inline-flex items-center gap-0.5">
                 <span title={`Cùng SĐT khách còn ${o.sameDayCount} đơn khác hôm đặt đơn này`}>
@@ -886,9 +900,19 @@ export function PrintOrdersScreen() {
   // 2026-11-04 (user): bấm tab khi ô tìm có chữ GIỮ chữ — lọc chữ trong đúng tab đó (URL ghi
   // `flow` tường minh, kể cả NEW, bỏ `group`); gõ chữ từ ô trống → `group=all`, tìm mọi trạng thái.
   // Link chỉ có `?q=` (quét mã, màn khác) cũng tìm mọi trạng thái.
-  const searching = state.filters.group === 'all' || (state.q !== '' && !urlFlow);
+  // Tab cha (2026-11-09, clone màn Đơn hàng): `?view=issues` = "Cần xử lý" (chip `?ci=`, trống =
+  // Tất cả = mọi chip đỏ trừ Chưa đối soát); còn lại = "Đơn hàng" (các tab trạng thái cũ giữ
+  // nguyên). Ô tìm có chữ trong "Cần xử lý" lọc trong đúng chip đang chọn.
+  const view: OrderTabView = state.filters.view === 'issues' ? 'issues' : 'orders';
+  const issue: CarrierIssue | null = parseCarrierIssue(state.filters.ci) ?? null;
+  const searching =
+    view === 'orders' && (state.filters.group === 'all' || (state.q !== '' && !urlFlow));
   const currentFlow: OrderFlow = urlFlow ?? DEFAULT_ORDER_FLOW;
-  const flow = searching ? undefined : currentFlow;
+  const flow = view === 'orders' && !searching ? currentFlow : undefined;
+  const carrierIssue = useMemo(
+    () => (view === 'issues' ? (issue ? [issue] : CARRIER_ISSUES_ALL) : undefined),
+    [view, issue],
+  );
   const status = parseOrderStatus(state.filters.status);
   const customerId = state.filters.customerId ?? '';
   const shortSkuId = state.filters.shortSkuId ?? '';
@@ -980,11 +1004,12 @@ export function PrintOrdersScreen() {
     () => ({
       ...filterParams,
       flow,
+      carrierIssue,
       sortBy,
       sortDir: sortBy ? (sort?.desc ? ('desc' as const) : ('asc' as const)) : undefined,
       ...skipTake,
     }),
-    [filterParams, flow, sortBy, sort?.desc, skipTake],
+    [filterParams, flow, carrierIssue, sortBy, sort?.desc, skipTake],
   );
   const carriers = useCarriers();
   // Chữ chip "Đang lọc" của ô Sản phẩm — cùng nguồn dữ liệu với ô chọn.
@@ -1049,15 +1074,18 @@ export function PrintOrdersScreen() {
   const query = useOrders(params, { enabled: state.sort != null || !prefs.isPending });
   // Đếm cả 14 trạng thái trong một lần (GROUP BY flow).
   const counts = useOrderFlowCounts(filterParams);
+  // Số chip "Cần xử lý" — số trên tab cha hiện cả khi đang ở "Đơn hàng".
+  const issueCounts = useOrderTabCounts(filterParams, 'issues');
   // Xuất Excel = mọi trang của đúng bộ lọc + tab + sắp xếp đang xem.
   const exportParams = useMemo(
     () => ({
       ...filterParams,
       flow,
+      carrierIssue,
       sortBy,
       sortDir: sortBy ? (sort?.desc ? ('desc' as const) : ('asc' as const)) : undefined,
     }),
-    [filterParams, flow, sortBy, sort?.desc],
+    [filterParams, flow, carrierIssue, sortBy, sort?.desc],
   );
   const exportColumns = useMemo(() => {
     const carrierById = new Map((carriers.data ?? []).map((c) => [c.id, c]));
@@ -1167,23 +1195,50 @@ export function PrintOrdersScreen() {
         z-40 ngang PageHeader, trên ô dính của bảng.
       */}
       <div className="sticky top-sticky-page-header z-40 -mx-5 flex flex-col bg-background px-5">
-        <OrderFlowTabs
-          flow={currentFlow}
-          counts={counts.data}
-          searching={searching}
-          searchingLabel={state.q}
-          onFlowChange={(f) =>
-            set({
-              filters: {
-                ...state.filters,
-                group: undefined,
-                flow: f === DEFAULT_ORDER_FLOW && state.q === '' ? undefined : f,
-              },
-            })
-          }
-          onExitSearch={() => set({ q: '', filters: { ...state.filters, group: undefined } })}
-          onShowAll={() => set({ filters: { ...state.filters, group: 'all' } })}
-        />
+        <div className="mb-2">
+          <OrderViewTabs
+            view={view}
+            issueCounts={issueCounts.data}
+            onViewChange={(v) =>
+              set({
+                filters: {
+                  ...state.filters,
+                  view: v === 'issues' ? 'issues' : undefined,
+                  ci: v === 'issues' ? (issue ?? undefined) : undefined,
+                },
+              })
+            }
+          />
+        </div>
+        {view === 'orders' ? (
+          <OrderFlowTabs
+            flow={currentFlow}
+            counts={counts.data}
+            searching={searching}
+            searchingLabel={state.q}
+            onFlowChange={(f) =>
+              set({
+                filters: {
+                  ...state.filters,
+                  group: undefined,
+                  flow: f === DEFAULT_ORDER_FLOW && state.q === '' ? undefined : f,
+                },
+              })
+            }
+            onExitSearch={() => set({ q: '', filters: { ...state.filters, group: undefined } })}
+            onShowAll={() => set({ filters: { ...state.filters, group: 'all' } })}
+          />
+        ) : (
+          <div className="mb-3">
+            <IssueChips
+              issue={issue}
+              issueCounts={issueCounts.data}
+              onIssueChange={(i) =>
+                set({ filters: { ...state.filters, view: 'issues', ci: i ?? undefined } })
+              }
+            />
+          </div>
+        )}
 
         {flow === 'WAITING_STOCK' || shortSkuId ? (
           <WaitingStockNote
@@ -1207,12 +1262,15 @@ export function PrintOrdersScreen() {
             onQChange={(q) =>
               // Bắt đầu tìm từ ô trống → mọi trạng thái (`group=all`, giữ `flow` cho nút "Quay lại");
               // xóa hết chữ → về tab; sửa chữ đang tìm → giữ nguyên (tab đã chọn vẫn lọc).
+              // Tab cha "Cần xử lý": chỉ lọc chữ trong chip đang chọn.
               set(
-                state.q === '' && q !== ''
-                  ? { q, filters: { ...state.filters, group: 'all' } }
-                  : q === ''
-                    ? { q, filters: { ...state.filters, group: undefined } }
-                    : { q },
+                view === 'issues'
+                  ? { q }
+                  : state.q === '' && q !== ''
+                    ? { q, filters: { ...state.filters, group: 'all' } }
+                    : q === ''
+                      ? { q, filters: { ...state.filters, group: undefined } }
+                      : { q },
               )
             }
             filters={[
