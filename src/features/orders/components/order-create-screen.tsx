@@ -10,6 +10,7 @@ import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { toast } from '@/components/ui/toaster';
 import { cn } from '@/lib/cn';
+import { useAbility } from '@/lib/permission';
 import { useWarehouse } from '@/lib/warehouse';
 import { useDefaultPosShopId, useUploadOrderAttachment } from '../api/use-order-create';
 import { useOrder, type SalesOrderDetail } from '../api/use-orders';
@@ -29,8 +30,16 @@ function omitKey<T>(m: Record<string, T>, key: string): Record<string, T> {
   return next;
 }
 
-/** Đơn cũ → giá trị form "Tạo lại đơn" (?from=). Không chép tiền chuyển khoản / giờ tạo. */
-function valuesFromOrder(o: SalesOrderDetail, warehouseId: string): CreateOrderValues {
+/**
+ * Đơn cũ → giá trị form "Tạo lại đơn" (?from=). Không chép tiền chuyển khoản / giờ tạo, không chép
+ * NV xử lý (trống = người nhân bản). ĐVVC chỉ chép cho người được chọn hãng (`send_carrier`) — sale
+ * gửi hãng lên là 403 FORBIDDEN (sự cố 2026-11-09: nhân bản đơn kho đã gán hãng rồi Chốt đơn).
+ */
+export function valuesFromOrder(
+  o: SalesOrderDetail,
+  warehouseId: string,
+  canChooseCarrier: boolean,
+): CreateOrderValues {
   const opts = o.shippingOptions;
   const cm = (v: number | null | undefined) => (v == null ? '' : String(v));
   return {
@@ -64,8 +73,8 @@ function valuesFromOrder(o: SalesOrderDetail, warehouseId: string): CreateOrderV
     tagIds: o.tags.map((t) => t.id),
     internalNote: o.internalNote ?? '',
     printNote: o.printNote ?? '',
-    carrierId: o.carrierId ?? '',
-    carrierAccountId: o.carrierAccountId ?? '',
+    carrierId: canChooseCarrier ? (o.carrierId ?? '') : '',
+    carrierAccountId: canChooseCarrier ? (o.carrierAccountId ?? '') : '',
     shippingWeightKg: o.shippingWeightKg ?? '',
     lengthCm: cm(opts?.lengthCm),
     widthCm: cm(opts?.widthCm),
@@ -101,6 +110,7 @@ export function OrderCreateScreen() {
   const drafts = useOrderDrafts(defaultWh, defaultPos);
   const { openDraft, closeDraft, activate, updateValues } = drafts;
   const source = useOrder(fromId);
+  const canChooseCarrier = useAbility().can('send_carrier', 'SalesOrder');
   const upload = useUploadOrderAttachment();
   const formRef = useRef<OrderDraftFormHandle>(null);
   const [files, setFiles] = useState<Record<string, File[]>>({});
@@ -112,7 +122,7 @@ export function OrderCreateScreen() {
     if (fromId) {
       if (!source.data) return;
       seeded.current = true;
-      openDraft(valuesFromOrder(source.data, defaultWh), `from:${fromId}`);
+      openDraft(valuesFromOrder(source.data, defaultWh, canChooseCarrier), `from:${fromId}`);
     } else if (presetCustomerId) {
       seeded.current = true;
       openDraft(
@@ -122,7 +132,16 @@ export function OrderCreateScreen() {
     } else {
       seeded.current = true;
     }
-  }, [drafts.ready, fromId, presetCustomerId, source.data, defaultWh, defaultPos, openDraft]);
+  }, [
+    drafts.ready,
+    fromId,
+    presetCustomerId,
+    source.data,
+    defaultWh,
+    defaultPos,
+    openDraft,
+    canChooseCarrier,
+  ]);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -270,7 +289,10 @@ export function OrderCreateScreen() {
       </div>
 
       {drafts.ready && drafts.active.origin?.startsWith('from:') ? (
-        <DuplicateBanner orderId={drafts.active.origin.slice('from:'.length)} />
+        <DuplicateBanner
+          orderId={drafts.active.origin.slice('from:'.length)}
+          withCarrier={canChooseCarrier}
+        />
       ) : null}
 
       {!drafts.ready || (fromId && !seeded.current) ? (
@@ -304,7 +326,7 @@ export function OrderCreateScreen() {
  * Tab nháp nhân bản từ đơn cũ (?from=, redesign Bán hàng 2026-10-22): nói rõ chép gì / không chép gì
  * để sale kiểm lại phí ship và tiền chuyển khoản trước khi chốt. Đơn gốc giữ nguyên.
  */
-function DuplicateBanner({ orderId }: { orderId: string }) {
+function DuplicateBanner({ orderId, withCarrier }: { orderId: string; withCarrier: boolean }) {
   const source = useOrder(orderId);
   return (
     <div
@@ -319,9 +341,10 @@ function DuplicateBanner({ orderId }: { orderId: string }) {
             {source.data?.docNumber ?? 'đơn cũ'}
           </Link>
         </b>{' '}
-        — đã chép khách, địa chỉ, sản phẩm, kho, ĐVVC, thẻ, ghi chú.{' '}
-        <b className="font-semibold">Không chép</b> phí ship, phụ thu, tiền chuyển khoản. Đơn gốc
-        giữ nguyên.
+        — đã chép khách, địa chỉ, sản phẩm, kho, {withCarrier ? 'ĐVVC, ' : ''}thẻ, ghi chú.{' '}
+        <b className="font-semibold">Không chép</b> phí ship, phụ thu, tiền chuyển khoản
+        {withCarrier ? '' : ', ĐVVC (kho chọn khi gửi hàng)'}; bạn là người tạo đơn mới. Đơn gốc giữ
+        nguyên.
       </span>
     </div>
   );

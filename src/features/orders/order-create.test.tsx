@@ -13,7 +13,8 @@ import {
 } from '@/test/msw/handlers';
 import { server } from '@/test/msw/server';
 import { renderApp } from '@/test/render';
-import { OrderCreateScreen } from './components/order-create-screen';
+import type { SalesOrderDetail } from './api/use-orders';
+import { OrderCreateScreen, valuesFromOrder } from './components/order-create-screen';
 import {
   createOrderSchema,
   emptyOrderValues,
@@ -576,6 +577,47 @@ describe('OrderCreateScreen — màn tạo đơn mới', () => {
       ).toBeGreaterThan(0),
     );
     expect(screen.getAllByText('Đã chuyển khoản').length).toBeGreaterThan(0);
+  });
+
+  it('nhân bản đơn đã gán hãng (2026-11-09): sale không gửi ĐVVC (tránh 403), không gửi NV xử lý = người nhân bản; kho giữ ĐVVC', async () => {
+    search = `from=${ORDER.id}`;
+    const withCarrier = {
+      ...DETAIL,
+      manualDiscount: '0',
+      manualDiscountRate: null,
+      carrierId: 'c-ghtk',
+      carrierAccountId: null,
+    } as unknown as SalesOrderDetail; // fixture msw gõ trạng thái là string
+    const captured: Array<Record<string, unknown>> = [];
+    server.use(
+      ...skuHandlers(),
+      http.get(`/api/sales-orders/${ORDER.id}`, () => HttpResponse.json(withCarrier)),
+      http.post('/api/sales-orders', async ({ request }) => {
+        captured.push((await request.json()) as Record<string, unknown>);
+        return HttpResponse.json(CREATED, { status: 201 });
+      }),
+    );
+    const sale = {
+      permissions: ['sales_order.read', 'sales_order.create'],
+      hasGlobalAccess: false,
+    };
+    const { unmount } = renderApp(<OrderCreateScreen />, { me: sale });
+    await waitFor(
+      () => expect(screen.getAllByLabelText('Số lượng')).toHaveLength(REAL_LINES.length),
+      { timeout: 3000 },
+    );
+    expect(screen.getByRole('note')).toHaveTextContent('ĐVVC (kho chọn khi gửi hàng)');
+    fireEvent.click(screen.getByRole('button', { name: /^Chốt đơn F10/ }));
+    await waitFor(() => expect(captured).toHaveLength(1));
+    expect(captured[0]).not.toHaveProperty('carrierId');
+    expect(captured[0]).not.toHaveProperty('carrierAccountId');
+    expect(captured[0]).not.toHaveProperty('ownerId');
+    unmount();
+    // Kho / admin (send_carrier) nhân bản vẫn giữ hãng của đơn gốc; NV xử lý không chép.
+    const wh = valuesFromOrder(withCarrier, 'wh1', true);
+    expect(wh.carrierId).toBe('c-ghtk');
+    expect(wh.ownerId).toBe('');
+    expect(valuesFromOrder(withCarrier, 'wh1', false).carrierId).toBe('');
   });
 
   it('Ngày tạo đơn (2026-11-04): sale / CSKH ô khóa "Hôm nay"; có sales_order.set_order_date → chọn được', async () => {
