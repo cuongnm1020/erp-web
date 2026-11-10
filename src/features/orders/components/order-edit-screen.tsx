@@ -525,7 +525,12 @@ function Editor({ order }: { order: SalesOrderDetail }) {
               setWarehouseId(order.warehouseId ?? NO_WAREHOUSE);
               return;
             }
-            saveLinesThenPatch(['kho lấy hàng']);
+            // Chuyển kho gỡ hãng (2026-11-10) — nhắc gán lại hãng trước khi gửi ĐVVC.
+            saveLinesThenPatch([
+              r.moved[0]?.waybillCancelled
+                ? `kho lấy hàng (đã hủy vận đơn ${r.moved[0].waybillCancelled}, gán lại hãng vận chuyển)`
+                : 'kho lấy hàng (gán lại hãng vận chuyển)',
+            ]);
           },
           onError: (err) => toast.error(messageFor(err)),
         },

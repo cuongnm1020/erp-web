@@ -21,6 +21,7 @@ import {
 } from '@/components/ui/select';
 import { toast } from '@/components/ui/toaster';
 import { messageFor, messageForCode } from '@/lib/error-messages';
+import { useAbility } from '@/lib/permission';
 import { useWarehouse } from '@/lib/warehouse';
 import { useMoveOrdersWarehouse, type SalesOrder } from '../api/use-orders';
 
@@ -41,15 +42,21 @@ export function BulkMoveWarehouseDialog({
   const [failures, setFailures] = useState<{ doc: string; reason: string }[]>([]);
   const { options } = useWarehouse();
   const move = useMoveOrdersWarehouse();
+  const ability = useAbility();
+  // Đơn đã Gửi ĐVVC: server tự hủy vận đơn kho cũ rồi chuyển (2026-11-10) — cùng quyền nút Hủy
+  // vận đơn. Hãng đã lấy / từ chối hủy → đơn đó vào danh sách lỗi.
+  const canCancelWaybill =
+    ability.can('cancel', 'SalesOrder') || ability.can('cancel_after_carrier', 'SalesOrder');
 
   const movable = rows.filter(
     (r) =>
       r.status !== 'CANCELLED' &&
       r.status !== 'POSTED' &&
-      // Đã Gửi ĐVVC (Đang đóng hàng / Chờ chuyển hàng) phải hủy vận đơn trước (2026-11-07).
-      !r.sentToCarrierAt &&
-      (r.fulfilmentStatus === null || r.fulfilmentStatus === 'NOT_STARTED'),
+      (r.sentToCarrierAt
+        ? canCancelWaybill
+        : r.fulfilmentStatus === null || r.fulfilmentStatus === 'NOT_STARTED'),
   );
+  const sentCount = movable.filter((r) => r.sentToCarrierAt).length;
   const skipped = rows.length - movable.length;
 
   const submit = async () => {
@@ -61,11 +68,15 @@ export function BulkMoveWarehouseDialog({
       });
       const moved = r.moved.filter((m) => m.outcome === 'MOVED');
       const waiting = moved.filter((m) => m.awaitingStock).length;
+      const cancelled = moved.filter((m) => m.waybillCancelled).length;
       toast.success(`Đã chuyển ${moved.length} đơn sang ${nameOf(target)}`, {
-        description:
-          waiting > 0
-            ? `${waiting} đơn Pancake thiếu hàng ở kho mới — đơn chờ hàng về.`
-            : 'Hàng đã giữ ở kho mới, việc lấy hàng đã lập lại theo kho mới.',
+        description: [
+          cancelled > 0 ? `Đã hủy ${cancelled} vận đơn của kho cũ.` : null,
+          waiting > 0 ? `${waiting} đơn Pancake thiếu hàng ở kho mới — đơn chờ hàng về.` : null,
+          'Đã gỡ hãng vận chuyển — gán lại hãng trước khi gửi ĐVVC.',
+        ]
+          .filter(Boolean)
+          .join(' '),
       });
       if (r.failed.length > 0) {
         setFailures(
@@ -107,10 +118,13 @@ export function BulkMoveWarehouseDialog({
           <DialogHeader>
             <DialogTitle>Chuyển {movable.length} đơn sang kho khác</DialogTitle>
             <DialogDescription>
-              Giữ chỗ của đơn chuyển sang kho mới. Chỉ chuyển được đơn Đơn mới / Chờ hàng / Đã xác
-              nhận — đơn đã gửi ĐVVC phải hủy vận đơn trước.
+              Giữ chỗ của đơn chuyển sang kho mới. Hãng vận chuyển bị gỡ — gán lại hãng trước khi
+              gửi ĐVVC.
+              {sentCount > 0
+                ? ` ${sentCount} đơn đã gửi ĐVVC sẽ được hủy vận đơn của kho cũ trước khi chuyển (hãng đã lấy hàng thì không chuyển được).`
+                : ''}
               {skipped > 0
-                ? ` ${skipped} đơn đã gửi ĐVVC / kho đã làm / đã kết thúc sẽ bị bỏ qua.`
+                ? ` ${skipped} đơn ${canCancelWaybill ? '' : 'đã gửi ĐVVC (cần quyền hủy vận đơn) / '}kho đã làm / đã kết thúc sẽ bị bỏ qua.`
                 : ''}
             </DialogDescription>
           </DialogHeader>

@@ -83,8 +83,9 @@ describe('BulkMoveWarehouseDialog', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Chuyển kho' }));
     const dialog = await screen.findByRole('dialog');
     expect(
-      within(dialog).getByText(/1 đơn đã gửi ĐVVC \/ kho đã làm \/ đã kết thúc sẽ bị bỏ qua/),
+      within(dialog).getByText(/1 đơn kho đã làm \/ đã kết thúc sẽ bị bỏ qua/),
     ).toBeInTheDocument();
+    expect(within(dialog).getByText(/Hãng vận chuyển bị gỡ/)).toBeInTheDocument();
     fireEvent.click(within(dialog).getByRole('combobox', { name: 'Chuyển tới kho' }));
     fireEvent.click(await screen.findByRole('option', { name: 'Kho Long An' }));
     fireEvent.click(within(dialog).getByRole('button', { name: 'Chuyển 2 đơn' }));
@@ -102,5 +103,57 @@ describe('BulkMoveWarehouseDialog', () => {
     // Nút "Đóng" ở chân dialog (nút X góc trên cũng tên "Đóng" — đứng sau).
     fireEvent.click(within(dialog).getAllByRole('button', { name: 'Đóng' })[0]!);
     expect(onDone).toHaveBeenCalled();
+  });
+
+  it('đơn đã Gửi ĐVVC (có quyền hủy vận đơn) vẫn gửi đi — server tự hủy vận đơn kho cũ, toast nhắc gán lại hãng (2026-11-10)', async () => {
+    const all = makeOrders(10);
+    const sent = {
+      ...all.find((o) => o.status === 'APPROVED')!,
+      fulfilmentStatus: 'PACKED' as const,
+      sentToCarrierAt: '2026-11-10T03:00:00.000Z',
+    };
+    const rows = [sent] as unknown as SalesOrder[];
+    const bodies: unknown[] = [];
+    server.use(
+      http.post('/api/sales-orders/move-warehouse', async ({ request }) => {
+        bodies.push(await request.json());
+        return HttpResponse.json({
+          moved: [
+            {
+              orderId: sent.id,
+              docNumber: sent.docNumber,
+              fromWarehouseId: 'wh-tt',
+              outcome: 'MOVED',
+              pick: 'none',
+              awaitingStock: false,
+              waybillCancelled: 'S1.123',
+              carrierCleared: true,
+            },
+          ],
+          failed: [],
+        });
+      }),
+    );
+    renderApp(
+      <WarehouseProvider me={ME}>
+        <BulkMoveWarehouseDialog rows={rows} onDone={vi.fn()} />
+      </WarehouseProvider>,
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Chuyển kho' }));
+    const dialog = await screen.findByRole('dialog');
+    expect(
+      within(dialog).getByText(/1 đơn đã gửi ĐVVC sẽ được hủy vận đơn của kho cũ/),
+    ).toBeInTheDocument();
+    fireEvent.click(within(dialog).getByRole('combobox', { name: 'Chuyển tới kho' }));
+    fireEvent.click(await screen.findByRole('option', { name: 'Kho Long An' }));
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Chuyển 1 đơn' }));
+    await waitFor(() => expect(bodies).toEqual([{ orderIds: [sent.id], warehouseId: 'wh-la' }]));
+    await waitFor(() =>
+      expect(toastSuccess).toHaveBeenCalledWith('Đã chuyển 1 đơn sang Kho Long An', {
+        description: expect.stringMatching(
+          /Đã hủy 1 vận đơn của kho cũ\..*gán lại hãng trước khi gửi ĐVVC/,
+        ),
+      }),
+    );
   });
 });
