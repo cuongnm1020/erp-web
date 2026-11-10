@@ -12585,6 +12585,11 @@ export interface components {
         SalesOrderListResponseDto: {
             items: components["schemas"]["SalesOrderListItemDto"][];
             total: number;
+            /**
+             * @description Chỉ khi `withTotalAmount=true`: Σ giá trị đơn (`total`, chuỗi decimal) của mọi đơn khớp bộ lọc
+             *     — cùng tập đơn với `total` (2026-11-10).
+             */
+            totalAmount?: string;
         };
         SameDayOrderItemDto: {
             name: string;
@@ -25085,6 +25090,21 @@ export interface operations {
                  *     (`carrierAccountId` null) tính là tài khoản mặc định của hãng. Thay được cho `carrierId`.
                  */
                 carrierAccountId?: string;
+                /**
+                 * @description Nhiều hãng (wms.Carrier.id cách nhau dấu phẩy, tối đa 100, 2026-11-10 màn In đơn): đơn gán
+                 *     BẤT KỲ tài khoản nào của hãng. Cùng `carrierAccountIds` thì đơn khớp một trong hai (OR).
+                 */
+                carrierIds?: string;
+                /**
+                 * @description Nhiều tài khoản hãng (wms.CarrierAccount.id cách nhau dấu phẩy, tối đa 100, 2026-11-10) — luật
+                 *     từng tài khoản như `carrierAccountId` (tài khoản mặc định gồm đơn chưa chọn tài khoản).
+                 */
+                carrierAccountIds?: string;
+                /**
+                 * @description `true` = trả thêm `totalAmount` (Σ giá trị đơn `total` của MỌI đơn khớp bộ lọc, không chỉ
+                 *     trang này) — doanh số dưới số đơn màn In đơn (2026-11-10). Thêm một câu SUM.
+                 */
+                withTotalAmount?: string;
                 /** @description Chỉ đơn có ngày đơn cũ hơn N ngày (so với bây giờ) — dùng với `issue`. */
                 olderThanDays?: number;
                 /**
@@ -25390,6 +25410,21 @@ export interface operations {
                  *     (`carrierAccountId` null) tính là tài khoản mặc định của hãng. Thay được cho `carrierId`.
                  */
                 carrierAccountId?: string;
+                /**
+                 * @description Nhiều hãng (wms.Carrier.id cách nhau dấu phẩy, tối đa 100, 2026-11-10 màn In đơn): đơn gán
+                 *     BẤT KỲ tài khoản nào của hãng. Cùng `carrierAccountIds` thì đơn khớp một trong hai (OR).
+                 */
+                carrierIds?: string;
+                /**
+                 * @description Nhiều tài khoản hãng (wms.CarrierAccount.id cách nhau dấu phẩy, tối đa 100, 2026-11-10) — luật
+                 *     từng tài khoản như `carrierAccountId` (tài khoản mặc định gồm đơn chưa chọn tài khoản).
+                 */
+                carrierAccountIds?: string;
+                /**
+                 * @description `true` = trả thêm `totalAmount` (Σ giá trị đơn `total` của MỌI đơn khớp bộ lọc, không chỉ
+                 *     trang này) — doanh số dưới số đơn màn In đơn (2026-11-10). Thêm một câu SUM.
+                 */
+                withTotalAmount?: string;
                 /** @description Chỉ đơn có ngày đơn cũ hơn N ngày (so với bây giờ) — dùng với `issue`. */
                 olderThanDays?: number;
                 /**
@@ -25598,6 +25633,21 @@ export interface operations {
                  *     (`carrierAccountId` null) tính là tài khoản mặc định của hãng. Thay được cho `carrierId`.
                  */
                 carrierAccountId?: string;
+                /**
+                 * @description Nhiều hãng (wms.Carrier.id cách nhau dấu phẩy, tối đa 100, 2026-11-10 màn In đơn): đơn gán
+                 *     BẤT KỲ tài khoản nào của hãng. Cùng `carrierAccountIds` thì đơn khớp một trong hai (OR).
+                 */
+                carrierIds?: string;
+                /**
+                 * @description Nhiều tài khoản hãng (wms.CarrierAccount.id cách nhau dấu phẩy, tối đa 100, 2026-11-10) — luật
+                 *     từng tài khoản như `carrierAccountId` (tài khoản mặc định gồm đơn chưa chọn tài khoản).
+                 */
+                carrierAccountIds?: string;
+                /**
+                 * @description `true` = trả thêm `totalAmount` (Σ giá trị đơn `total` của MỌI đơn khớp bộ lọc, không chỉ
+                 *     trang này) — doanh số dưới số đơn màn In đơn (2026-11-10). Thêm một câu SUM.
+                 */
+                withTotalAmount?: string;
                 /** @description Chỉ đơn có ngày đơn cũ hơn N ngày (so với bây giờ) — dùng với `issue`. */
                 olderThanDays?: number;
                 /**
@@ -25808,6 +25858,21 @@ export interface operations {
                  *     (`carrierAccountId` null) tính là tài khoản mặc định của hãng. Thay được cho `carrierId`.
                  */
                 carrierAccountId?: string;
+                /**
+                 * @description Nhiều hãng (wms.Carrier.id cách nhau dấu phẩy, tối đa 100, 2026-11-10 màn In đơn): đơn gán
+                 *     BẤT KỲ tài khoản nào của hãng. Cùng `carrierAccountIds` thì đơn khớp một trong hai (OR).
+                 */
+                carrierIds?: string;
+                /**
+                 * @description Nhiều tài khoản hãng (wms.CarrierAccount.id cách nhau dấu phẩy, tối đa 100, 2026-11-10) — luật
+                 *     từng tài khoản như `carrierAccountId` (tài khoản mặc định gồm đơn chưa chọn tài khoản).
+                 */
+                carrierAccountIds?: string;
+                /**
+                 * @description `true` = trả thêm `totalAmount` (Σ giá trị đơn `total` của MỌI đơn khớp bộ lọc, không chỉ
+                 *     trang này) — doanh số dưới số đơn màn In đơn (2026-11-10). Thêm một câu SUM.
+                 */
+                withTotalAmount?: string;
                 /** @description Chỉ đơn có ngày đơn cũ hơn N ngày (so với bây giờ) — dùng với `issue`. */
                 olderThanDays?: number;
                 /**
