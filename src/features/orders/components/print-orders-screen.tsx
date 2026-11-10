@@ -199,6 +199,8 @@ const DEFAULTS = {
     'skuId',
     // `true` = chỉ đơn mà mọi dòng đều là SKU đó — "lọc sản phẩm duy nhất" (2026-11-04).
     'skuOnly',
+    // Loại trừ sản phẩm (2026-11-10): id SKU nối dấu phẩy — bỏ đơn có SP đó (kể cả trong combo).
+    'excludeSku',
   ] as const,
 };
 
@@ -834,6 +836,61 @@ function ProductFilter({
   );
 }
 
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+/** Khớp `@ArrayMaxSize(20)` của `excludeSkuIds` bên API. */
+const EXCLUDE_SKU_MAX = 20;
+
+/**
+ * Ô "Loại trừ SP" (2026-11-10, user: có kết quả rồi muốn bỏ đơn có LION): chọn từng sản phẩm —
+ * mỗi lần chọn thêm một chip, × để bỏ. Đơn có SP đó (kể cả nằm trong combo) bị loại khỏi danh sách.
+ */
+function ExcludeProductFilter({
+  skuIds,
+  onChange,
+}: {
+  skuIds: string[];
+  onChange: (ids: string[]) => void;
+}) {
+  return (
+    <div className="flex flex-wrap items-center gap-2" data-testid="filter-exclude-sku">
+      <EntityPicker
+        className="h-9 w-56"
+        value=""
+        onChange={(id) => {
+          if (id && !skuIds.includes(id) && skuIds.length < EXCLUDE_SKU_MAX) {
+            onChange([...skuIds, id]);
+          }
+        }}
+        // Như ô Sản phẩm: chỉ SP thường — bỏ SP thì đơn có combo chứa SP đó cũng bị loại.
+        useSearch={useNonComboSkuSearch}
+        placeholder={skuIds.length ? 'Loại trừ thêm SP…' : 'Loại trừ SP: không'}
+        searchPlaceholder="Gõ tên / mã sản phẩm cần bỏ…"
+        emptyText="Không tìm thấy sản phẩm"
+      />
+      {skuIds.map((id) => (
+        <ExcludedSkuChip
+          key={id}
+          skuId={id}
+          onRemove={() => onChange(skuIds.filter((x) => x !== id))}
+        />
+      ))}
+    </div>
+  );
+}
+
+function ExcludedSkuChip({ skuId, onRemove }: { skuId: string; onRemove: () => void }) {
+  const detail = useSkuDetail(skuId);
+  const name = detail.data ? `${detail.data.code} · ${detail.data.name}` : 'Đang tải…';
+  return (
+    <span className="inline-flex h-7 items-center gap-1 rounded-full border border-input bg-secondary pl-2.5 pr-1 text-xs">
+      <span className="max-w-48 truncate">Bỏ {name}</span>
+      <Button variant="ghost" size="icon-sm" aria-label={`Bỏ loại trừ ${name}`} onClick={onRemove}>
+        <X aria-hidden />
+      </Button>
+    </span>
+  );
+}
+
 /**
  * Cân nặng gửi hãng hiệu lực (`weightKg` = đặt tay ?? Σ dòng × cân nặng SKU) — cột Cân nặng
  * (2026-11-06, trước nằm dưới cột Vận chuyển khi chưa có mã). Đặt tay có dấu ✎ + tooltip Σ dòng;
@@ -923,6 +980,13 @@ export function PrintOrdersScreen() {
   const shortSkuId = state.filters.shortSkuId ?? '';
   const skuId = state.filters.skuId ?? '';
   const skuOnly = skuId !== '' && state.filters.skuOnly === 'true';
+  // Loại trừ sản phẩm (2026-11-10): chỉ giữ id dạng UUID (link dán sai bỏ qua), tối đa 20 như API.
+  const excludeSku = (state.filters.excludeSku ?? '')
+    .split(',')
+    .filter((s) => UUID_RE.test(s))
+    .slice(0, EXCLUDE_SKU_MAX)
+    .join(',');
+  const excludeSkuIds = useMemo(() => (excludeSku ? excludeSku.split(',') : []), [excludeSku]);
   // Cân nặng (2026-11-06, user "clone phần lọc cân nặng từ Bán hàng › Đơn hàng"): cân gửi hãng
   // hiệu lực (đặt tay ?? Σ dòng × cân SKU), API lọc như màn Đơn hàng.
   const weightMin = state.filters.weightMin ?? '';
@@ -980,6 +1044,7 @@ export function PrintOrdersScreen() {
       shortSkuId,
       skuId,
       skuOnly,
+      excludeSkuIds,
       weightMin,
       weightMax,
       pancakeShopId: pos || undefined,
@@ -1000,6 +1065,7 @@ export function PrintOrdersScreen() {
       shortSkuId,
       skuId,
       skuOnly,
+      excludeSkuIds,
       weightMin,
       weightMax,
       pos,
@@ -1026,6 +1092,7 @@ export function PrintOrdersScreen() {
   const carriers = useCarriers();
   // Chữ chip "Đang lọc" của ô Sản phẩm — cùng nguồn dữ liệu với ô chọn.
   const skuChip = useSkuDetail(skuId);
+  const excludeChip = useSkuDetail(excludeSkuIds[0] ?? '');
   const router = useRouter();
   // Kho / admin sửa người nhận / ngày tạo đơn của mọi đơn kho mình, cả khi kho đã thao tác (2026-11-05).
   const canEditFields =
@@ -1131,6 +1198,7 @@ export function PrintOrdersScreen() {
     customerId !== '' ||
     shortSkuId !== '' ||
     skuId !== '' ||
+    excludeSku !== '' ||
     weightMin !== '' ||
     weightMax !== '' ||
     pos !== '' ||
@@ -1315,6 +1383,23 @@ export function PrintOrdersScreen() {
                   />
                 ),
               },
+              {
+                key: 'excludeSku',
+                label: 'Loại trừ SP',
+                type: 'custom',
+                chip:
+                  excludeSkuIds.length > 1
+                    ? `Bỏ ${excludeSkuIds.length} sản phẩm`
+                    : excludeSkuIds.length === 1
+                      ? `Bỏ ${excludeChip.data?.name ?? 'sản phẩm đã chọn'}`
+                      : null,
+                render: () => (
+                  <ExcludeProductFilter
+                    skuIds={excludeSkuIds}
+                    onChange={(ids) => setFilter({ excludeSku: ids.join(',') || undefined })}
+                  />
+                ),
+              },
               // POS, Page, Phòng ban bày ngay trên thanh cạnh ô Sản phẩm (user 2026-11-04); không
               // `pinned` → không có panel "Bộ lọc khác", "Xóa lọc (n)" đứng cạnh ô lọc cuối. Ô POS
               // chọn nhiều thay ô Nguồn (ERP / Pancake).
@@ -1388,6 +1473,7 @@ export function PrintOrdersScreen() {
               team,
               fbPage: state.filters.fbPage,
               skuId: state.filters.skuId,
+              excludeSku: excludeSku || undefined,
               weightMin: state.filters.weightMin,
               weightMax: state.filters.weightMax,
               pickup: pickupStatus,
