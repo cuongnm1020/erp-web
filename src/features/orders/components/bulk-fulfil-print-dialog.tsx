@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { PackageCheck } from 'lucide-react';
+import { PackageCheck, Printer } from 'lucide-react';
 import { useEffect, useState, type ReactNode } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
@@ -39,6 +39,8 @@ import {
 } from '@/features/wms/api/use-pda';
 import { readOrientation, rememberOrientation } from '@/features/wms/components/label-print-dialog';
 import {
+  parseFromSeq,
+  ReprintFromField,
   WaybillLabelBatchPrintSheet,
   type WaybillOrientation,
 } from '@/features/wms/components/waybill-label';
@@ -84,6 +86,8 @@ export function useFulfilPrint() {
   useEffect(() => setOrientationState(readOrientation()), []);
   const [labels, setLabels] = useState<ShipmentLabelData[]>([]);
   const [printedAt, setPrintedAt] = useState(() => new Date());
+  /** In từ tem số (2026-11-10) — 1 = cả lô; "In lại từ tem số N" đặt N rồi in lại. */
+  const [fromSeq, setFromSeq] = useState(1);
   const printer = usePrint();
   const bulk = useBulkFulfilOrders();
   const queryClient = useQueryClient();
@@ -132,6 +136,7 @@ export function useFulfilPrint() {
         const data = await fetchLabels.mutateAsync(printable);
         if (data.length > 0) {
           setLabels(data);
+          setFromSeq(1);
           setPrintedAt(new Date());
           printer.print();
           // Bộ lọc "In tem" của danh sách đơn (2026-11-02) — ghi nhận không chặn việc in.
@@ -172,14 +177,29 @@ export function useFulfilPrint() {
         orientation={orientation}
         printedAt={printedAt}
         printer={printer}
+        fromSeq={fromSeq}
       />
     ) : null;
+
+  /**
+   * In lại phần còn lại của lô vừa in, từ tem số `from` (máy in dừng giữa chừng — 2026-11-10).
+   * Không đóng gói / xin mã lại; số "x/N" giữ như lần in đầu.
+   */
+  const reprintFrom = (from: number) => {
+    if (labels.length === 0) return;
+    setFromSeq(Math.min(Math.max(from, 1), labels.length));
+    setPrintedAt(new Date());
+    printer.print();
+  };
 
   return {
     orientation,
     setOrientation,
     run,
     sheet,
+    /** Số tem của lô vừa in (0 = chưa in) — ô "In lại từ tem số". */
+    labelCount: labels.length,
+    reprintFrom,
     printing: printer.open,
     pending: progress !== null || bulk.isPending || fetchLabels.isPending,
     /** Chữ trên nút đang chạy — "Đang đóng gói 16/50…" / "Đang lấy tem…"; null = rảnh. */
@@ -300,13 +320,18 @@ export function FulfilResultsPanel({
   outcome,
   onClose,
   flush = false,
+  reprint,
 }: {
   outcome: FulfilPrintOutcome;
   onClose: () => void;
   /** Hộp thoại không padding (popup Gửi sang ĐVVC) — chân tự chừa lề. */
   flush?: boolean;
+  /** Ô "In lại từ tem số" (2026-11-10) — lô vừa in từ 2 tem. */
+  reprint?: { total: number; onPrint: (from: number) => void; busy: boolean };
 }) {
   const { rows, failed } = outcome;
+  const [fromText, setFromText] = useState('');
+  const from = reprint ? parseFromSeq(fromText, reprint.total) : 1;
   return (
     <OrderResultsPanel
       title={
@@ -328,24 +353,50 @@ export function FulfilResultsPanel({
         fix: 'Lỗi — cần sửa',
       }}
       footer={
-        <DialogFooter
-          className={cn('items-center border-t sm:justify-between', flush ? 'px-5 py-3' : 'pt-3')}
-        >
-          {failed.some((f) => f.packed) ? (
-            <Link
-              href="/crm/orders?flow=NEEDS_FIX"
-              className="text-sm font-semibold text-primary hover:underline"
-              onClick={onClose}
+        <>
+          {reprint && reprint.total > 1 ? (
+            <div
+              className={cn(
+                'flex flex-wrap items-end gap-3 border-t',
+                flush ? 'px-5 py-3' : 'pt-3',
+              )}
+              data-testid="reprint-from"
             >
-              Xem ở tab Cần sửa
-            </Link>
-          ) : (
-            <span />
-          )}
-          <Button variant="outline" onClick={onClose}>
-            Đóng
-          </Button>
-        </DialogFooter>
+              <ReprintFromField
+                id="fulfil-reprint-from"
+                total={reprint.total}
+                value={fromText}
+                onChange={setFromText}
+              />
+              <Button
+                variant="outline"
+                disabled={reprint.busy || from <= 1}
+                onClick={() => reprint.onPrint(from)}
+              >
+                <Printer aria-hidden />
+                {from > 1 ? `In lại ${reprint.total - from + 1} tem` : 'In lại tem'}
+              </Button>
+            </div>
+          ) : null}
+          <DialogFooter
+            className={cn('items-center border-t sm:justify-between', flush ? 'px-5 py-3' : 'pt-3')}
+          >
+            {failed.some((f) => f.packed) ? (
+              <Link
+                href="/crm/orders?flow=NEEDS_FIX"
+                className="text-sm font-semibold text-primary hover:underline"
+                onClick={onClose}
+              >
+                Xem ở tab Cần sửa
+              </Link>
+            ) : (
+              <span />
+            )}
+            <Button variant="outline" onClick={onClose}>
+              Đóng
+            </Button>
+          </DialogFooter>
+        </>
       }
     />
   );
@@ -472,7 +523,11 @@ export function BulkFulfilPrintDialog({
           {outcome ? (
             <>
               <DialogTitle className="sr-only">Kết quả đóng gói và in vận đơn</DialogTitle>
-              <FulfilResultsPanel outcome={outcome} onClose={() => close(false)} />
+              <FulfilResultsPanel
+                outcome={outcome}
+                onClose={() => close(false)}
+                reprint={{ total: fp.labelCount, onPrint: fp.reprintFrom, busy: fp.printing }}
+              />
             </>
           ) : (
             <>

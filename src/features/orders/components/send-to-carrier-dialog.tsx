@@ -382,7 +382,12 @@ export function SendToCarrierDialog({
           </div>
 
           {fulfilled ? (
-            <FulfilResultsPanel outcome={fulfilled} onClose={close} flush />
+            <FulfilResultsPanel
+              outcome={fulfilled}
+              onClose={close}
+              flush
+              reprint={{ total: fp.labelCount, onPrint: fp.reprintFrom, busy: fp.printing }}
+            />
           ) : failedResult ? (
             <SendResults
               carrierCode={carrier.code}

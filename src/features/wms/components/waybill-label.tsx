@@ -3,6 +3,8 @@
 import type { CSSProperties, ReactNode } from 'react';
 import { Barcode } from '@/components/data/barcode';
 import { PrintSheet } from '@/components/data/print-sheet';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { cn } from '@/lib/cn';
 import { MapPin, Phone, Store, User } from 'lucide-react';
 import { formatDate, formatQuantity, formatTime } from '@/lib/format';
@@ -561,28 +563,79 @@ export function WaybillLabelBatchPrintSheet({
   orientation,
   printedAt,
   printer,
+  fromSeq = 1,
 }: {
   labels: ShipmentLabelData[];
   orientation: WaybillOrientation;
   printedAt: Date;
   printer: PrintController;
+  /**
+   * In từ tem số này trong lô (1-based, 2026-11-10 — máy in dừng giữa lô thì in lại phần còn lại).
+   * Số "x/N" vẫn đánh theo cả lô nên tem in lại khớp tem đã ra giấy.
+   */
+  fromSeq?: number;
 }) {
+  const all = sortLabelsForPrint(labels);
   return (
     <PrintSheet
       open={printer.open}
       onDone={printer.done}
       size={orientation === 'landscape' ? 'WAYBILL_100x75' : 'WAYBILL_75x100'}
     >
-      {sortLabelsForPrint(labels).map((data, i, all) => (
-        <WaybillLabel
-          key={data.shipmentId}
-          data={data}
-          orientation={orientation}
-          printedAt={printedAt}
-          // Lô từ 2 tem: in số thứ tự "x/N" theo đúng thứ tự in (2026-10-31).
-          seq={all.length > 1 ? { index: i + 1, total: all.length } : undefined}
-        />
-      ))}
+      {all.map((data, i) =>
+        i + 1 < fromSeq ? null : (
+          <WaybillLabel
+            key={data.shipmentId}
+            data={data}
+            orientation={orientation}
+            printedAt={printedAt}
+            // Lô từ 2 tem: in số thứ tự "x/N" theo đúng thứ tự in (2026-10-31).
+            seq={all.length > 1 ? { index: i + 1, total: all.length } : undefined}
+          />
+        ),
+      )}
     </PrintSheet>
   );
+}
+
+/**
+ * Ô "In lại từ tem số" (2026-11-10, user chốt): cả lô là MỘT lệnh in nên web không biết máy in
+ * dừng ở tem nào — người in nhìn số "x/N" trên tem cuối ra giấy rồi nhập số kế tiếp.
+ */
+export function ReprintFromField({
+  id,
+  total,
+  value,
+  onChange,
+}: {
+  id: string;
+  total: number;
+  value: string;
+  onChange: (v: string) => void;
+}) {
+  return (
+    <div className="space-y-1.5">
+      <Label htmlFor={id}>Bắt đầu từ tem số</Label>
+      <div className="flex items-center gap-2 text-sm">
+        <Input
+          id={id}
+          inputMode="numeric"
+          className="h-9 w-24"
+          value={value}
+          onChange={(e) => onChange(e.target.value.replace(/\D/g, ''))}
+          placeholder="1"
+        />
+        <span className="text-muted-foreground">đến {total}</span>
+      </div>
+      <p className="text-xs text-muted-foreground">
+        Máy in dừng giữa chừng: nhìn số “x/{total}” trên tem cuối đã ra giấy, nhập số kế tiếp.
+      </p>
+    </div>
+  );
+}
+
+/** Số tem bắt đầu hợp lệ (1…total); ô trống / sai = 1. */
+export function parseFromSeq(v: string, total: number): number {
+  const n = Number.parseInt(v, 10);
+  return Number.isFinite(n) && n >= 1 && n <= total ? n : 1;
 }

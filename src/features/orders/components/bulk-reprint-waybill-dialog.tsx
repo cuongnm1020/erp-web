@@ -29,9 +29,12 @@ import {
 } from '@/features/wms/api/use-pda';
 import { readOrientation, rememberOrientation } from '@/features/wms/components/label-print-dialog';
 import {
+  parseFromSeq,
+  ReprintFromField,
   WaybillLabelBatchPrintSheet,
   type WaybillOrientation,
 } from '@/features/wms/components/waybill-label';
+import { sortLabelsForPrint } from '@/features/wms/waybill-sort';
 import type { SalesOrder } from '../api/use-orders';
 import { useControlledOpen } from '../use-controlled-open';
 
@@ -50,12 +53,16 @@ export function BulkReprintWaybillDialog({
   rows,
   open,
   onOpenChange,
+  onDeselect,
 }: {
   rows: SalesOrder[];
   /** Có `open` = mở từ menu "Khác" của thanh chọn nhiều — không vẽ nút riêng. */
   open?: boolean;
   onOpenChange?: (open: boolean) => void;
+  /** In từ tem số N (2026-11-10): bỏ tích các đơn của tem 1…N−1 (đã ra giấy). */
+  onDeselect?: (orderIds: string[]) => void;
 }) {
+  const orderOf = new Map(rows.flatMap((r) => (r.shipment ? [[r.shipment.id, r.id]] : [])));
   return (
     <ReprintWaybillDialog
       shipments={rows.flatMap((r) => (r.shipment ? [r.shipment] : []))}
@@ -64,6 +71,12 @@ export function BulkReprintWaybillDialog({
       triggerClassName="h-7 px-2 text-xs"
       open={open}
       onOpenChange={onOpenChange}
+      onSkipped={
+        onDeselect
+          ? (shipmentIds) =>
+              onDeselect(shipmentIds.flatMap((id) => (orderOf.has(id) ? [orderOf.get(id)!] : [])))
+          : undefined
+      }
     />
   );
 }
@@ -82,7 +95,10 @@ export function ReprintWaybillDialog({
   triggerSize = 'sm',
   open: openProp,
   onOpenChange,
+  onSkipped,
 }: {
+  /** Phiếu giao của tem 1…N−1 không in lại (in từ tem số N) — theo thứ tự in. */
+  onSkipped?: (shipmentIds: string[]) => void;
   shipments: ReprintShipment[];
   /** Số đơn đã chọn (kể cả đơn chưa có phiếu giao) — để báo số bị bỏ qua. */
   total?: number;
@@ -102,8 +118,12 @@ export function ReprintWaybillDialog({
   const fetchLabels = useShipmentLabelDataMany();
   const markPrinted = useMarkLabelsPrinted();
 
+  const [fromText, setFromText] = useState('');
+  const [fromSeq, setFromSeq] = useState(1);
+
   const printable = shipments.filter((sh) => sh.trackingNo && !DEAD.has(sh.status));
   const skipped = total - printable.length;
+  const from = parseFromSeq(fromText, printable.length);
 
   const submit = async () => {
     if (printable.length === 0 || fetchLabels.isPending) return;
@@ -113,10 +133,20 @@ export function ReprintWaybillDialog({
         toast.error('Không lấy được dữ liệu tem của đơn nào.');
         return;
       }
+      const start = parseFromSeq(fromText, data.length);
       setLabels(data);
+      setFromSeq(start);
       setPrintedAt(new Date());
       setOpen(false);
+      setFromText('');
       printer.print();
+      if (start > 1) {
+        onSkipped?.(
+          sortLabelsForPrint(data)
+            .slice(0, start - 1)
+            .map((l) => l.shipmentId),
+        );
+      }
       // Bộ lọc "In tem" của danh sách đơn (2026-11-02) — ghi nhận không chặn việc in.
       markPrinted.mutate(
         data.filter((l) => l.trackingNo).map((l) => l.shipmentId),
@@ -172,6 +202,14 @@ export function ReprintWaybillDialog({
               Hộp thoại in: chọn máy in tem, khổ giấy 100×75 mm, lề “Không có”, tỉ lệ 100%.
             </p>
           </div>
+          {printable.length > 1 ? (
+            <ReprintFromField
+              id="bulk-reprint-from"
+              total={printable.length}
+              value={fromText}
+              onChange={setFromText}
+            />
+          ) : null}
           <DialogFooter>
             <Button
               variant="outline"
@@ -185,7 +223,9 @@ export function ReprintWaybillDialog({
               onClick={() => void submit()}
             >
               <Printer aria-hidden />
-              {fetchLabels.isPending ? 'Đang lấy tem…' : `In ${printable.length} tem`}
+              {fetchLabels.isPending
+                ? 'Đang lấy tem…'
+                : `In ${printable.length - from + 1} tem${from > 1 ? ` (từ tem ${from})` : ''}`}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -196,6 +236,7 @@ export function ReprintWaybillDialog({
           orientation={orientation}
           printedAt={printedAt}
           printer={printer}
+          fromSeq={fromSeq}
         />
       ) : null}
     </>
