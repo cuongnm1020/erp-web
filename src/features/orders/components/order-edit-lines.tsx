@@ -153,6 +153,7 @@ export function linesChange(
 export function OrderEditLines({
   form,
   order,
+  warehouseId,
   lockedReason,
   dirty,
   removedCustom,
@@ -162,6 +163,11 @@ export function OrderEditLines({
 }: {
   form: LinesForm;
   order: SalesOrderDetail;
+  /**
+   * Kho xuất ĐANG CHỌN ở màn cha ('' = chưa có) — khả dụng và "Chỉ bán từ kho" tính theo kho này,
+   * vì đổi kho được lưu trước sản phẩm (2026-11-10).
+   */
+  warehouseId: string;
   lockedReason: string | null;
   dirty: boolean;
   /** Khóa `CustomRow.key` các món ngoài hệ thống đã bấm xóa (màn cha giữ để tính `linesChange`). */
@@ -174,7 +180,6 @@ export function OrderEditLines({
 }) {
   const lines = useFieldArray({ control: form.control, name: 'lines' });
   const searchRef = useRef<HTMLInputElement>(null);
-  const warehouseId = order.warehouseId ?? '';
   const [metrics, setMetrics] = useState<Record<string, LineMetrics>>({});
   const onMetrics = useCallback((fieldId: string, m: LineMetrics) => {
     setMetrics((prev) =>
