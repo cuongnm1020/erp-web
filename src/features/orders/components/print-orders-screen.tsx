@@ -1223,6 +1223,11 @@ export function PrintOrdersScreen() {
     ...[...selectedRowCache.current.values()].filter((r) => !items.some((i) => i.id === r.id)),
   ];
   const clearSelection = () => setSelected({});
+  // In lại từ tem số N (2026-11-10): bỏ tích đơn của các tem đã ra giấy.
+  const deselect = (ids: string[]) => {
+    const drop = new Set(ids);
+    setSelected((s) => Object.fromEntries(Object.entries(s).filter(([id]) => !drop.has(id))));
+  };
 
   return (
     <>
@@ -1336,7 +1341,7 @@ export function PrintOrdersScreen() {
         ) : null}
 
         {selectedRows.length > 0 ? (
-          <OrderBulkBar rows={selectedRows} onClear={clearSelection} />
+          <OrderBulkBar rows={selectedRows} onClear={clearSelection} onDeselect={deselect} />
         ) : (
           <FilterBar<OrderFilter>
             busy={query.isPlaceholderData}
@@ -1573,7 +1578,15 @@ type BulkDialog = 'shipping' | 'reprint' | 'retry-waybill' | 'cancel-waybill' | 
  * đơn mình, trưởng phòng / trưởng nhóm CSKH hủy đơn nhân viên; server kiểm từng đơn, đơn không
  * được hủy vào `failed`.
  */
-function OrderBulkBar({ rows, onClear }: { rows: SalesOrderListItem[]; onClear: () => void }) {
+function OrderBulkBar({
+  rows,
+  onClear,
+  onDeselect,
+}: {
+  rows: SalesOrderListItem[];
+  onClear: () => void;
+  onDeselect: (orderIds: string[]) => void;
+}) {
   const ability = useAbility();
   const [dialog, setDialog] = useState<BulkDialog>(null);
   const openChange = (d: Exclude<BulkDialog, null>) => (o: boolean) => setDialog(o ? d : null);
@@ -1743,6 +1756,7 @@ function OrderBulkBar({ rows, onClear }: { rows: SalesOrderListItem[]; onClear: 
           rows={rows}
           open={dialog === 'reprint'}
           onOpenChange={openChange('reprint')}
+          onDeselect={onDeselect}
         />
       ) : null}
       {canReprint ? (
