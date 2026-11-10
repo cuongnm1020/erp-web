@@ -56,6 +56,7 @@ import { useHotkey } from '@/lib/use-hotkey';
 import { useListState, type SortState } from '@/lib/url-state';
 import { decimalCell } from '@/lib/xlsx-writer';
 import { useCarriers } from '@/features/wms/api/use-shipping';
+import { carrierFilterOptions, parseCarrierFilter } from '../carrier-filter';
 import {
   fetchOrdersPage,
   orderKeys,
@@ -205,6 +206,8 @@ const DEFAULTS = {
     'excludeSku',
     // Lỗi đơn (2026-11-10): khoá lỗi mã hoá URI, nối dấu phẩy.
     'orderError',
+    // Hãng VC (2026-11-10): `c:<hãng>` = mọi tài khoản của hãng, `a:<tài khoản>`, nối dấu phẩy.
+    'carrier',
   ] as const,
 };
 
@@ -282,7 +285,9 @@ const SENT_LOCKED = 'Đã gửi ĐVVC — hủy vận đơn để sửa đơn';
 
 function orderRowItems(o: SalesOrderListItem, ctx: RowActionContext): RowActionItem[] {
   const stageOpen = OPEN_FLOWS.includes(o.flow);
-  const editOpen = EDIT_OPEN_FLOWS.includes(o.flow);
+  // Cần sửa mà CHƯA gửi hãng: người lên đơn sửa được — server kiểm lại (assertOrderStageOpen).
+  const editOpen =
+    EDIT_OPEN_FLOWS.includes(o.flow) || (o.flow === 'NEEDS_FIX' && !o.sentToCarrierAt);
   // Nút "Xác nhận" trên dòng đã bỏ (user 2026-11-03) — xác nhận ở màn chi tiết / sửa đơn.
   return [
     ...(ctx.canPack && o.flow === 'NEEDS_FIX' && o.waybillErrorCode && o.shipment?.carrierCode
@@ -1025,6 +1030,7 @@ export function PrintOrdersScreen() {
   const orderError = state.filters.orderError ?? '';
   const orderErrorKeys = useMemo(() => decodeKeys(orderError), [orderError]);
   const orderErrorOptions = useOrderErrorOptions();
+  const carrierFilter = parseCarrierFilter(state.filters.carrier);
   // Cân nặng (2026-11-06, user "clone phần lọc cân nặng từ Bán hàng › Đơn hàng"): cân gửi hãng
   // hiệu lực (đặt tay ?? Σ dòng × cân SKU), API lọc như màn Đơn hàng.
   const weightMin = state.filters.weightMin ?? '';
@@ -1094,10 +1100,14 @@ export function PrintOrdersScreen() {
       facebookPageIds: fbPage || undefined,
       pickupStatus,
       printStatus,
+      carrierIds: carrierFilter.carrierIds || undefined,
+      carrierAccountIds: carrierFilter.carrierAccountIds || undefined,
       // Tab Đã xác nhận màn In đơn chỉ đơn chưa có mã vận đơn (2026-11-06) — cả danh sách lẫn số đếm.
       warehouseNoWaybill: true,
     }),
     [
+      carrierFilter.carrierIds,
+      carrierFilter.carrierAccountIds,
       state.q,
       status,
       customerId,
@@ -1125,6 +1135,8 @@ export function PrintOrdersScreen() {
       carrierIssue,
       sortBy,
       sortDir: sortBy ? (sort?.desc ? ('desc' as const) : ('asc' as const)) : undefined,
+      // Doanh số dưới số đơn (2026-11-10): Σ giá trị đơn mọi đơn khớp tab + bộ lọc.
+      withTotalAmount: true,
       ...skipTake,
     }),
     [filterParams, flow, carrierIssue, sortBy, sort?.desc, skipTake],
@@ -1248,7 +1260,8 @@ export function PrintOrdersScreen() {
     team !== '' ||
     fbPage !== '' ||
     pickupStatus !== undefined ||
-    printStatus !== undefined;
+    printStatus !== undefined ||
+    carrierFilter.value !== '';
   const customerName = query.data?.items[0]?.customer.name;
   // Dòng đã chọn: nhớ cả dòng vừa RỜI bộ lọc (sự cố 2026-11-07, màn In đơn: Gửi ĐVVC xong đơn sang
   // tab Đang đóng hàng → tab Đã xác nhận không còn dòng chọn → thanh chọn nhiều bị gỡ kéo theo hộp
@@ -1286,6 +1299,15 @@ export function PrintOrdersScreen() {
                 className="block text-2xl font-bold leading-tight text-foreground"
               >
                 {groupVi(String(query.data.total))}
+              </span>
+            ) : null}
+            {query.data?.totalAmount !== undefined ? (
+              // Doanh số (2026-11-10, user): Σ giá trị đơn (gồm phí ship) của đúng số đơn trên.
+              <span data-testid="order-amount" className="block text-sm">
+                Doanh số{' '}
+                <span className="font-semibold tabular-nums text-foreground">
+                  {formatMoney(query.data.totalAmount)}
+                </span>
               </span>
             ) : null}
           </span>
@@ -1459,6 +1481,14 @@ export function PrintOrdersScreen() {
                   label: pancakeShopLabel(s),
                 })),
               },
+              // Hãng VC (2026-11-10, user): dòng hãng = mọi tài khoản, tài khoản liệt kê dưới hãng.
+              {
+                key: 'carrier',
+                label: 'Hãng VC',
+                type: 'multiSelect',
+                unit: 'lựa chọn',
+                options: carrierFilterOptions(carriers.data),
+              },
               {
                 key: 'fbPage',
                 label: 'Page',
@@ -1515,7 +1545,7 @@ export function PrintOrdersScreen() {
                 unit: 'lỗi',
                 options: orderErrorFilterOptions(orderErrorOptions.data ?? []),
               },
-              // Bỏ 2026-11-04 (user): Hãng VC, NV lên đơn, nhóm Vận chuyển (Gán hãng, Trạng thái
+              // Bỏ 2026-11-04 (user): Hãng VC (đưa lại 2026-11-10 dạng chọn nhiều), NV lên đơn, nhóm Vận chuyển (Gán hãng, Trạng thái
               // hãng), nhóm Đơn (Trùng trong ngày, SP ngoài ERP, Giá trị đơn).
             ]}
             values={{
@@ -1534,6 +1564,7 @@ export function PrintOrdersScreen() {
               pickup: pickupStatus,
               printStatus,
               orderError: orderError || undefined,
+              carrier: carrierFilter.value || undefined,
             }}
             onFilterChange={setFilter}
             searchPlaceholder="Mã đơn, SĐT, tên SP, mã vận đơn… nhiều giá trị cách dấu phẩy hoặc dấu cách"

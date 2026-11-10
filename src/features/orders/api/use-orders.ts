@@ -64,6 +64,12 @@ export interface OrderListParams {
   carrierId?: string;
   /** Đơn gán tài khoản hãng này (mặc định gồm cả đơn chưa chọn tài khoản). */
   carrierAccountId?: string;
+  /** Nhiều hãng (id nối dấu phẩy) — đơn gán bất kỳ tài khoản nào của hãng (màn In đơn, 2026-11-10). */
+  carrierIds?: string;
+  /** Nhiều tài khoản hãng (id nối dấu phẩy) — OR với `carrierIds` (màn In đơn, 2026-11-10). */
+  carrierAccountIds?: string;
+  /** true = danh sách trả thêm `totalAmount` = Σ giá trị đơn mọi đơn khớp (màn In đơn, 2026-11-10). */
+  withTotalAmount?: boolean;
   /** Ai gán hãng: ERP = chọn trong ERP, PANCAKE = Pancake gán + cấp vận đơn (gửi ngoài ERP). */
   carrierSource?: OrderCarrierSource;
   /** Chữ "Trạng thái VC" gần nhất hãng gửi — nhiều giá trị (khớp một trong số đó). */
@@ -214,6 +220,7 @@ export function orderListQuery(params: OrderListParams) {
               ...listQuery(params),
               sortBy: params.sortBy,
               sortDir: params.sortBy ? params.sortDir : undefined,
+              withTotalAmount: params.withTotalAmount ? ('true' as const) : undefined,
               take: params.take,
               skip: params.skip,
             },
@@ -256,6 +263,8 @@ function listQuery(params: Omit<OrderListParams, 'take' | 'skip'>) {
     sentToCarrier: params.sentToCarrier ? ('true' as const) : undefined,
     carrierId: params.carrierId || undefined,
     carrierAccountId: params.carrierAccountId || undefined,
+    carrierIds: params.carrierIds || undefined,
+    carrierAccountIds: params.carrierAccountIds || undefined,
     carrierSource: params.carrierSource,
     carrierStatusText: params.carrierStatusText?.length ? params.carrierStatusText : undefined,
     shortSkuId: params.shortSkuId || undefined,

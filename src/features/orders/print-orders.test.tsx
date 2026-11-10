@@ -199,7 +199,8 @@ describe('PrintOrdersScreen — In đơn (clone màn Đơn hàng, 2026-11-04)', 
     try {
       renderApp(<PrintOrdersScreen />);
       await screen.findByText(FIRST.docNumber);
-      for (const label of ['Hãng VC: tất cả', 'Giá trị đơn']) {
+      // Hãng VC đưa lại 2026-11-10 dạng chọn nhiều (`carrier=`) — link cũ `carrierId=` vẫn bỏ qua.
+      for (const label of ['NV lên đơn: tất cả', 'Giá trị đơn']) {
         expect(screen.queryByText(label)).not.toBeInTheDocument();
       }
       expect(screen.getByRole('button', { name: 'Sắp xếp theo Cân nặng' })).toBeInTheDocument();
@@ -215,6 +216,43 @@ describe('PrintOrdersScreen — In đơn (clone màn Đơn hàng, 2026-11-04)', 
       ];
       expect(seen.length).toBeGreaterThan(0);
       for (const p of seen) for (const k of keys) expect(p.has(k)).toBe(false);
+    } finally {
+      search = 'group=all';
+    }
+  });
+
+  it('Hãng VC chọn nhiều (2026-11-10): URL carrier=c:…,a:… → carrierIds / carrierAccountIds cho danh sách + đếm tab; doanh số dưới số đơn', async () => {
+    const c = '11111111-1111-4111-8111-111111111111';
+    const a = '22222222-2222-4222-8222-222222222222';
+    search = `group=all&carrier=c:${c},a:${a}`;
+    const seen: URLSearchParams[] = [];
+    const counts: URLSearchParams[] = [];
+    server.use(
+      http.get('/api/sales-orders', ({ request }) => {
+        const p = new URL(request.url).searchParams;
+        seen.push(p);
+        return HttpResponse.json({
+          items: [FIRST],
+          total: 1,
+          ...(p.get('withTotalAmount') === 'true' ? { totalAmount: '1250000.0000' } : {}),
+        });
+      }),
+      http.get('/api/sales-orders/flow-counts', ({ request }) => {
+        counts.push(new URL(request.url).searchParams);
+        return HttpResponse.json({ total: 1, NEW: 1 });
+      }),
+    );
+    try {
+      renderApp(<PrintOrdersScreen />);
+      await screen.findByText(FIRST.docNumber);
+      await waitFor(() =>
+        expect(
+          seen.some((p) => p.get('carrierIds') === c && p.get('carrierAccountIds') === a),
+        ).toBe(true),
+      );
+      await waitFor(() => expect(counts.some((p) => p.get('carrierIds') === c)).toBe(true));
+      expect(screen.getByRole('combobox', { name: 'Hãng VC' })).toBeInTheDocument();
+      expect(screen.getByTestId('order-amount')).toHaveTextContent(/Doanh số\s*1\.250\.000/);
     } finally {
       search = 'group=all';
     }
