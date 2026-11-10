@@ -356,6 +356,51 @@ describe('PrintOrdersScreen — In đơn (clone màn Đơn hàng, 2026-11-04)', 
     }
   });
 
+  it('lọc Lỗi đơn (2026-11-10): lựa chọn SP ngoài hệ thống + câu hãng; URL orderError → danh sách + số đếm gửi từng khoá', async () => {
+    const msgKey =
+      'msg:Lưu danh sách đơn hàng không thành công. Đơn hàng thiếu thông tin địa chỉ (Đường hoặc Phường).';
+    search = `group=all&orderError=NON_ERP_ITEMS,${encodeURIComponent(encodeURIComponent(msgKey))}`;
+    const list: URLSearchParams[] = [];
+    const counts: URLSearchParams[] = [];
+    server.use(
+      http.get('/api/sales-orders/order-error-options', () =>
+        HttpResponse.json([
+          { key: msgKey, code: 'CARRIER_REJECTED', message: msgKey.slice(4) },
+          { key: 'code:CARRIER_WAYBILL_DATA', code: 'CARRIER_WAYBILL_DATA', message: null },
+        ]),
+      ),
+      http.get('/api/sales-orders', ({ request }) => {
+        list.push(new URL(request.url).searchParams);
+        return HttpResponse.json({ items: [], total: 0 });
+      }),
+      http.get('/api/sales-orders/flow-counts', ({ request }) => {
+        counts.push(new URL(request.url).searchParams);
+        return HttpResponse.json({ total: 0 });
+      }),
+    );
+    try {
+      renderApp(<PrintOrdersScreen />);
+      await waitFor(() =>
+        expect(
+          list.some((p) => p.getAll('orderError').join('|') === `NON_ERP_ITEMS|${msgKey}`),
+        ).toBe(true),
+      );
+      await waitFor(() =>
+        expect(
+          counts.some((p) => p.getAll('orderError').join('|') === `NON_ERP_ITEMS|${msgKey}`),
+        ).toBe(true),
+      );
+      // Hai lỗi đã chọn → ô hiện "Lỗi đơn: 2 lỗi".
+      const box = await screen.findByRole('combobox', { name: 'Lỗi đơn' });
+      expect(box).toHaveTextContent('2 lỗi');
+      fireEvent.click(box);
+      expect(await screen.findByText('Có SP ngoài hệ thống')).toBeInTheDocument();
+      expect(screen.getAllByText(msgKey.slice(4)).length).toBeGreaterThan(0);
+    } finally {
+      search = 'group=all';
+    }
+  });
+
   it('lọc Hãng lấy hàng + In tem (2026-11-10): hiện hai ô; URL pickup / printStatus → danh sách + số đếm tab cùng gửi, giá trị lạ bỏ qua', async () => {
     search = 'flow=PACKED&pickup=AWAITING&printStatus=NOT_PRINTED';
     const list: URLSearchParams[] = [];

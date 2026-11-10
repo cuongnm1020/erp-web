@@ -71,7 +71,9 @@ import {
   useFacebookPageOptions,
   usePancakeShops,
   useSaveOrderListPrefs,
+  useOrderErrorOptions,
   type CarrierIssue,
+  type OrderErrorOption,
   type OrderDateField,
   type OrderFlow,
   type OrderSortField,
@@ -201,6 +203,8 @@ const DEFAULTS = {
     'skuOnly',
     // Loại trừ sản phẩm (2026-11-10): id SKU nối dấu phẩy — bỏ đơn có SP đó (kể cả trong combo).
     'excludeSku',
+    // Lỗi đơn (2026-11-10): khoá lỗi mã hoá URI, nối dấu phẩy.
+    'orderError',
   ] as const,
 };
 
@@ -836,6 +840,37 @@ function ProductFilter({
   );
 }
 
+/** Khoá "SP ngoài hệ thống" của ô Lỗi đơn — trùng `NON_ERP_ITEMS_ERROR` bên API. */
+const NON_ERP_ITEMS_ERROR = 'NON_ERP_ITEMS';
+
+/** Giá trị URL nối dấu phẩy, mỗi phần mã hoá URI (câu hãng có dấu phẩy); phần hỏng bỏ qua. */
+const decodeKeys = (v: string): string[] =>
+  v
+    .split(',')
+    .filter(Boolean)
+    .flatMap((x) => {
+      try {
+        return [decodeURIComponent(x)];
+      } catch {
+        return [];
+      }
+    });
+
+/**
+ * Lựa chọn ô "Lỗi đơn" (2026-11-10): "Có SP ngoài hệ thống" + nhóm lỗi vận đơn. Hãng từ chối →
+ * câu hãng đã gom (chữ như cột Vận chuyển hiện); lỗi khác → câu theo mã (luật 6).
+ */
+function orderErrorFilterOptions(rows: OrderErrorOption[]) {
+  return [
+    { value: NON_ERP_ITEMS_ERROR, label: 'Có SP ngoài hệ thống', hint: 'Cần sửa' },
+    ...rows.map((r) => ({
+      value: encodeURIComponent(r.key),
+      label: r.message ?? messageForCode(r.code),
+      hint: r.message ? 'Hãng từ chối' : 'Lỗi vận đơn',
+    })),
+  ];
+}
+
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 /** Khớp `@ArrayMaxSize(20)` của `excludeSkuIds` bên API. */
 const EXCLUDE_SKU_MAX = 20;
@@ -987,6 +1022,9 @@ export function PrintOrdersScreen() {
     .slice(0, EXCLUDE_SKU_MAX)
     .join(',');
   const excludeSkuIds = useMemo(() => (excludeSku ? excludeSku.split(',') : []), [excludeSku]);
+  const orderError = state.filters.orderError ?? '';
+  const orderErrorKeys = useMemo(() => decodeKeys(orderError), [orderError]);
+  const orderErrorOptions = useOrderErrorOptions();
   // Cân nặng (2026-11-06, user "clone phần lọc cân nặng từ Bán hàng › Đơn hàng"): cân gửi hãng
   // hiệu lực (đặt tay ?? Σ dòng × cân SKU), API lọc như màn Đơn hàng.
   const weightMin = state.filters.weightMin ?? '';
@@ -1045,6 +1083,7 @@ export function PrintOrdersScreen() {
       skuId,
       skuOnly,
       excludeSkuIds,
+      orderError: orderErrorKeys,
       weightMin,
       weightMax,
       pancakeShopId: pos || undefined,
@@ -1066,6 +1105,7 @@ export function PrintOrdersScreen() {
       skuId,
       skuOnly,
       excludeSkuIds,
+      orderErrorKeys,
       weightMin,
       weightMax,
       pos,
@@ -1199,6 +1239,7 @@ export function PrintOrdersScreen() {
     shortSkuId !== '' ||
     skuId !== '' ||
     excludeSku !== '' ||
+    orderError !== '' ||
     weightMin !== '' ||
     weightMax !== '' ||
     pos !== '' ||
@@ -1465,6 +1506,15 @@ export function PrintOrdersScreen() {
               // cùng ô với màn Theo dõi đơn.
               { key: 'pickup', label: 'Hãng lấy hàng', type: 'select', options: PICKUP_OPTIONS },
               { key: 'printStatus', label: 'In tem', type: 'select', options: PRINT_OPTIONS },
+              // Lỗi đơn (2026-11-10, user): lỗi đang hiện trên danh sách — SP ngoài hệ thống + lỗi
+              // vận đơn gom theo câu hãng. Giá trị mã hoá URI (câu hãng có dấu phẩy).
+              {
+                key: 'orderError',
+                label: 'Lỗi đơn',
+                type: 'multiSelect',
+                unit: 'lỗi',
+                options: orderErrorFilterOptions(orderErrorOptions.data ?? []),
+              },
               // Bỏ 2026-11-04 (user): Hãng VC, NV lên đơn, nhóm Vận chuyển (Gán hãng, Trạng thái
               // hãng), nhóm Đơn (Trùng trong ngày, SP ngoài ERP, Giá trị đơn).
             ]}
@@ -1483,6 +1533,7 @@ export function PrintOrdersScreen() {
               weightMax: state.filters.weightMax,
               pickup: pickupStatus,
               printStatus,
+              orderError: orderError || undefined,
             }}
             onFilterChange={setFilter}
             searchPlaceholder="Mã đơn, SĐT, tên SP, mã vận đơn… nhiều giá trị cách dấu phẩy hoặc dấu cách"
