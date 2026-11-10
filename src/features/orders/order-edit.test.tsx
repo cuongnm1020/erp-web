@@ -1086,30 +1086,23 @@ describe('OrderEditScreen — sửa sản phẩm / người nhận, quyền sử
     await waitFor(() => expect(push).toHaveBeenCalledWith(`/crm/orders/${ORDER.id}`));
   });
 
-  it('đổi Kho xuất + sửa sản phẩm cùng lúc (2026-11-10, SO2611-02941) → chuyển kho TRƯỚC rồi mới PUT /lines', async () => {
+  it('đổi Kho xuất + sửa sản phẩm cùng lúc (2026-11-10, SO2611-02941) → MỘT lệnh move-warehouse-lines (một transaction), không gọi move-warehouse / PUT /lines riêng', async () => {
     push.mockClear();
     withDetail({ linesLockedReason: null });
     const calls: string[] = [];
+    let sent: { warehouseId: string; lines: unknown[] } | null = null;
     server.use(
-      http.post('/api/sales-orders/move-warehouse', async ({ request }) => {
-        const body = (await request.json()) as { orderIds: string[]; warehouseId: string };
-        calls.push(`move:${body.warehouseId}`);
-        return HttpResponse.json({
-          moved: [
-            {
-              orderId: body.orderIds[0],
-              docNumber: ORDER.docNumber,
-              fromWarehouseId: null,
-              outcome: 'MOVED',
-              pick: 'replanned',
-              awaitingStock: false,
-            },
-          ],
-          failed: [],
-        });
+      http.post('/api/sales-orders/move-warehouse', () => {
+        calls.push('move');
+        return HttpResponse.json({ moved: [], failed: [] });
       }),
-      http.put('/api/sales-orders/:id/lines', ({ params }) => {
+      http.put('/api/sales-orders/:id/lines', () => {
         calls.push('lines');
+        return HttpResponse.json({});
+      }),
+      http.post('/api/sales-orders/:id/move-warehouse-lines', async ({ params, request }) => {
+        sent = (await request.json()) as { warehouseId: string; lines: unknown[] };
+        calls.push(`move+lines:${sent.warehouseId}`);
         return HttpResponse.json({
           orderId: params.id,
           docNumber: ORDER.docNumber,
@@ -1131,7 +1124,8 @@ describe('OrderEditScreen — sửa sản phẩm / người nhận, quyền sử
     );
     fireEvent.click((await screen.findAllByRole('button', { name: 'Tăng số lượng' }))[0]!);
     fireEvent.click(screen.getByRole('button', { name: /Lưu thay đổi/ }));
-    await waitFor(() => expect(calls).toEqual([`move:${PICKUP_WAREHOUSES[0]!.id}`, 'lines']));
+    await waitFor(() => expect(calls).toEqual([`move+lines:${PICKUP_WAREHOUSES[0]!.id}`]));
+    expect(sent!.lines.length).toBeGreaterThan(0);
     await waitFor(() => expect(push).toHaveBeenCalledWith(`/crm/orders/${ORDER.id}`));
   });
 

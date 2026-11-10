@@ -4967,6 +4967,27 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/sales-orders/{id}/move-warehouse-lines": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Màn Sửa đơn đổi Kho xuất KÈM sửa sản phẩm (2026-11-10): chuyển kho + thay toàn bộ dòng trong MỘT
+         *     transaction — "Chỉ bán từ kho" và khả dụng kiểm theo dòng mới ở kho mới, hỏng thì không đổi gì.
+         *     Luật như hai lệnh riêng (`move-warehouse` + `PUT lines`); đơn Pancake → 409 (lưu chuyển kho trước).
+         */
+        post: operations["OrderWarehouseController_moveWithLines"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/pda/locations/{id}/contents": {
         parameters: {
             query?: never;
@@ -14482,6 +14503,14 @@ export interface components {
         MoveOrdersWarehouseResultDto: {
             moved: components["schemas"]["MovedOrderDto"][];
             failed: components["schemas"]["MoveOrderFailedDto"][];
+        };
+        MoveOrderWithLinesDto: {
+            lines: components["schemas"]["EditOrderLineDto"][];
+            /**
+             * Format: uuid
+             * @description Kho chuyển tới (wms.Warehouse.id) — phải là kho người thao tác được phép.
+             */
+            warehouseId: string;
         };
         PdaLocationRefDto: {
             id: string;
@@ -27139,6 +27168,31 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["MoveOrdersWarehouseResultDto"];
+                };
+            };
+        };
+    };
+    OrderWarehouseController_moveWithLines: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MoveOrderWithLinesDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReplaceOrderLinesResultDto"];
                 };
             };
         };

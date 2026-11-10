@@ -1052,6 +1052,26 @@ export function useReplaceOrderLines(id: string) {
   });
 }
 
+export type MoveOrderWithLinesBody = components['schemas']['MoveOrderWithLinesDto'];
+
+/**
+ * POST /sales-orders/{id}/move-warehouse-lines (2026-11-10) — Sửa đơn đổi Kho xuất KÈM sản phẩm:
+ * một transaction, dòng mới kiểm "Chỉ bán từ kho" + khả dụng theo kho mới; hỏng thì không đổi gì.
+ */
+export function useMoveOrderWithLines(id: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (body: MoveOrderWithLinesBody) =>
+      unwrap(
+        api.POST('/sales-orders/{id}/move-warehouse-lines', { params: { path: { id } }, body }),
+      ),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: orderKeys.detail(id) });
+      void qc.invalidateQueries({ queryKey: orderKeys.lists() });
+    },
+  });
+}
+
 /** GET /sales-orders/{id}/edit-history — ai sửa, lúc nào, đổi gì (mới nhất trước). */
 export function useOrderEditHistory(id: string) {
   return useQuery({

@@ -55,6 +55,7 @@ import {
   usePickupWarehouses,
   useShippingQuote,
   useMoveOrdersWarehouse,
+  useMoveOrderWithLines,
   useReplaceOrderLines,
   useRequestWaybill,
   useUpdateOrder,
@@ -230,6 +231,7 @@ function Editor({ order }: { order: SalesOrderDetail }) {
   const canUpdate = ability.can('update', 'SalesOrder');
   const update = useUpdateOrder(order.id);
   const replaceLines = useReplaceOrderLines(order.id);
+  const moveWithLines = useMoveOrderWithLines(order.id);
   const linesForm = useOrderLinesForm(order);
   const watchedLines = useWatch({ control: linesForm.control, name: 'lines' });
   const [removedCustom, setRemovedCustom] = useState<string[]>([]);
@@ -449,7 +451,7 @@ function Editor({ order }: { order: SalesOrderDetail }) {
 
   const save = () => {
     if (update.isPending || fulfil.isPending || moveWarehouse.isPending) return;
-    if (requestWaybill.isPending || replaceLines.isPending) return;
+    if (requestWaybill.isPending || replaceLines.isPending || moveWithLines.isPending) return;
     if (lineEdit.invalid === 'custom') {
       toast.error(
         'Còn món ngoài hệ thống trên đơn — xóa hết các món này trước khi lưu thay đổi sản phẩm',
@@ -497,6 +499,21 @@ function Editor({ order }: { order: SalesOrderDetail }) {
     // Đổi Kho xuất → chuyển kho TRƯỚC (2026-11-10, SO2611-02941: thêm SP "Chỉ bán từ Kho Thạch
     // Thất" cùng lúc chuyển Long An → Thạch Thất bị chặn vì dòng lưu trước, còn ở kho cũ), rồi sản
     // phẩm (giữ chỗ + PICK lại ở kho mới), cuối cùng PATCH các ô còn lại.
+    // Đổi kho KÈM sản phẩm → một lệnh, một transaction (2026-11-10): thay SP khoá kho cũ bằng SP
+    // khoá kho mới thì chuyển kho riêng bị chặn bởi dòng cũ — lệnh gộp kiểm dòng mới ở kho mới.
+    if (moveTo && lineEdit.body) {
+      moveWithLines.mutate(
+        { warehouseId: moveTo, lines: lineEdit.body.lines },
+        {
+          onSuccess: (r) => {
+            if (patchFieldsDirtyAll) patch();
+            else finishSave([`kho lấy hàng, sản phẩm, tổng tiền ${formatMoney(r.total)}`]);
+          },
+          onError: (err) => toast.error(messageFor(err)),
+        },
+      );
+      return;
+    }
     if (moveTo) {
       moveWarehouse.mutate(
         { orderIds: [order.id], warehouseId: moveTo },
@@ -518,25 +535,27 @@ function Editor({ order }: { order: SalesOrderDetail }) {
     saveLinesThenPatch([]);
   };
 
+  /** Lưu xong, không còn PATCH: toast phần đã lưu rồi chuyển trạng thái kho / về chi tiết. */
+  const finishSave = (parts: string[]) => {
+    toast.success('Đã lưu thay đổi', { description: `${order.docNumber} · ${parts.join(', ')}` });
+    if (fulfilTarget) runFulfil(fulfilTarget);
+    else router.push(detailHref);
+  };
+
   /** Bước sau chuyển kho: sản phẩm (nếu đổi) rồi PATCH (nếu còn ô đổi); `done` = phần đã lưu. */
   const saveLinesThenPatch = (done: string[]) => {
-    const finish = (parts: string[]) => {
-      toast.success('Đã lưu thay đổi', { description: `${order.docNumber} · ${parts.join(', ')}` });
-      if (fulfilTarget) runFulfil(fulfilTarget);
-      else router.push(detailHref);
-    };
     if (lineEdit.body) {
       replaceLines.mutate(lineEdit.body, {
         onSuccess: (r) => {
           if (patchFieldsDirtyAll) patch();
-          else finish([...done, `sản phẩm, tổng tiền ${formatMoney(r.total)}`]);
+          else finishSave([...done, `sản phẩm, tổng tiền ${formatMoney(r.total)}`]);
         },
         onError: (err) => toast.error(messageFor(err)),
       });
       return;
     }
     if (patchFieldsDirtyAll || done.length === 0) patch();
-    else finish(done);
+    else finishSave(done);
   };
 
   const patch = () => {
@@ -760,7 +779,8 @@ function Editor({ order }: { order: SalesOrderDetail }) {
     fulfil.isPending ||
     moveWarehouse.isPending ||
     requestWaybill.isPending ||
-    replaceLines.isPending;
+    replaceLines.isPending ||
+    moveWithLines.isPending;
   // Ô SĐT riêng còn trống mà SĐT hiệu lực bị che → tô đỏ, hãng sẽ từ chối.
   const phoneStillMasked = order.recipientPhoneMasked && trimOrNull(recipientPhone) === null;
   const prepaid = new Decimal(order.prepaidAmount || 0);
