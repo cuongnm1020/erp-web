@@ -25024,6 +25024,11 @@ export interface operations {
                  */
                 skuOnly?: "true" | "false";
                 /**
+                 * @description Loại trừ sản phẩm (2026-11-10, màn In đơn): bỏ đơn có dòng thuộc MỘT trong các SKU này — kể cả
+                 *     dòng thành phần của combo SKU đó (cùng luật với `skuId`). Lặp tham số cho nhiều SKU, tối đa 20.
+                 */
+                excludeSkuIds?: string[];
+                /**
                  * @description `true` = tab Đã xác nhận (`WAREHOUSE`) chỉ gồm đơn CHƯA có mã vận đơn — màn In đơn (2026-11-06).
                  *     Áp cho danh sách khi lọc tab đó và cho số đếm tab đó; tab khác không đổi.
                  */
@@ -25318,6 +25323,11 @@ export interface operations {
                  */
                 skuOnly?: "true" | "false";
                 /**
+                 * @description Loại trừ sản phẩm (2026-11-10, màn In đơn): bỏ đơn có dòng thuộc MỘT trong các SKU này — kể cả
+                 *     dòng thành phần của combo SKU đó (cùng luật với `skuId`). Lặp tham số cho nhiều SKU, tối đa 20.
+                 */
+                excludeSkuIds?: string[];
+                /**
                  * @description `true` = tab Đã xác nhận (`WAREHOUSE`) chỉ gồm đơn CHƯA có mã vận đơn — màn In đơn (2026-11-06).
                  *     Áp cho danh sách khi lọc tab đó và cho số đếm tab đó; tab khác không đổi.
                  */
@@ -25514,6 +25524,11 @@ export interface operations {
                  *     "lọc sản phẩm duy nhất" màn In đơn (2026-11-04). Không có `skuId` thì bỏ qua.
                  */
                 skuOnly?: "true" | "false";
+                /**
+                 * @description Loại trừ sản phẩm (2026-11-10, màn In đơn): bỏ đơn có dòng thuộc MỘT trong các SKU này — kể cả
+                 *     dòng thành phần của combo SKU đó (cùng luật với `skuId`). Lặp tham số cho nhiều SKU, tối đa 20.
+                 */
+                excludeSkuIds?: string[];
                 /**
                  * @description `true` = tab Đã xác nhận (`WAREHOUSE`) chỉ gồm đơn CHƯA có mã vận đơn — màn In đơn (2026-11-06).
                  *     Áp cho danh sách khi lọc tab đó và cho số đếm tab đó; tab khác không đổi.
@@ -25713,6 +25728,11 @@ export interface operations {
                  *     "lọc sản phẩm duy nhất" màn In đơn (2026-11-04). Không có `skuId` thì bỏ qua.
                  */
                 skuOnly?: "true" | "false";
+                /**
+                 * @description Loại trừ sản phẩm (2026-11-10, màn In đơn): bỏ đơn có dòng thuộc MỘT trong các SKU này — kể cả
+                 *     dòng thành phần của combo SKU đó (cùng luật với `skuId`). Lặp tham số cho nhiều SKU, tối đa 20.
+                 */
+                excludeSkuIds?: string[];
                 /**
                  * @description `true` = tab Đã xác nhận (`WAREHOUSE`) chỉ gồm đơn CHƯA có mã vận đơn — màn In đơn (2026-11-06).
                  *     Áp cho danh sách khi lọc tab đó và cho số đếm tab đó; tab khác không đổi.

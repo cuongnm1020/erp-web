@@ -317,6 +317,45 @@ describe('PrintOrdersScreen — In đơn (clone màn Đơn hàng, 2026-11-04)', 
     }
   });
 
+  it('lọc loại trừ SP (2026-11-10): URL excludeSku → danh sách + số đếm gửi excludeSkuIds từng SP, chip có ×; giá trị lạ bỏ qua', async () => {
+    const a = '00000000-0000-4000-8000-0000000000a1';
+    const b = '00000000-0000-4000-8000-0000000000b2';
+    search = `group=all&excludeSku=${a},khong-phai-id,${b}`;
+    const list: URLSearchParams[] = [];
+    const counts: URLSearchParams[] = [];
+    server.use(
+      http.get('/api/sales-orders', ({ request }) => {
+        list.push(new URL(request.url).searchParams);
+        return HttpResponse.json({ items: [], total: 0 });
+      }),
+      http.get('/api/sales-orders/flow-counts', ({ request }) => {
+        counts.push(new URL(request.url).searchParams);
+        return HttpResponse.json({ total: 0 });
+      }),
+      http.get('/api/skus/:id', ({ params }) =>
+        HttpResponse.json({
+          id: params.id,
+          code: params.id === a ? 'SP-LION' : 'SP-B',
+          name: params.id === a ? 'LION SUPER 450ML' : 'Sản phẩm B',
+        }),
+      ),
+    );
+    try {
+      renderApp(<PrintOrdersScreen />);
+      await waitFor(() =>
+        expect(list.some((p) => p.getAll('excludeSkuIds').join(',') === `${a},${b}`)).toBe(true),
+      );
+      await waitFor(() =>
+        expect(counts.some((p) => p.getAll('excludeSkuIds').join(',') === `${a},${b}`)).toBe(true),
+      );
+      expect(
+        await screen.findByRole('button', { name: 'Bỏ loại trừ SP-LION · LION SUPER 450ML' }),
+      ).toBeInTheDocument();
+    } finally {
+      search = 'group=all';
+    }
+  });
+
   it('lọc Hãng lấy hàng + In tem (2026-11-10): hiện hai ô; URL pickup / printStatus → danh sách + số đếm tab cùng gửi, giá trị lạ bỏ qua', async () => {
     search = 'flow=PACKED&pickup=AWAITING&printStatus=NOT_PRINTED';
     const list: URLSearchParams[] = [];
