@@ -13771,7 +13771,7 @@ export interface components {
             /** @description ISO datetime. */
             at: string;
             userId: string;
-            /** @description Tên người thao tác; null = tài khoản đã xóa. */
+            /** @description Tên người thao tác; "Hệ thống" = hệ thống tự làm (vd thiếu hàng → Chờ hàng); null = tài khoản đã xóa. */
             userName: string | null;
             /** @description Admin "đăng nhập với tư cách" userId lúc thao tác; null = chính chủ. */
             impersonatorId: string | null;
