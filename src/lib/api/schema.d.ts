@@ -5618,6 +5618,74 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/wms-cleanup/tasks": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Việc PICK / PACK, mới tạo trước — gồm cả PICK chưa đưa kho (Điều phối ẩn). */
+        get: operations["WmsCleanupController_tasks"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/wms-cleanup/reservations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Phiếu giữ chỗ theo kệ (`wms.Reservation`), mới tạo trước. */
+        get: operations["WmsCleanupController_reservations"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/wms-cleanup/tasks/cancel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Hủy việc PICK / PACK (tối đa 200). PACK đã xong / đơn đã trừ tồn / đã hủy → vào `failed`. */
+        post: operations["WmsCleanupController_cancelTasks"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/wms-cleanup/reservations/release": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Nhả giữ chỗ ACTIVE (tối đa 200): → RELEASED, giảm `StockBalance.reserved`. */
+        post: operations["WmsCleanupController_releaseReservations"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/reports/profit": {
         parameters: {
             query?: never;
@@ -15512,6 +15580,84 @@ export interface components {
             lines: components["schemas"]["WaitingMatchLineDto"][];
             /** @description Đơn PARTIAL, chờ lâu trước (tối đa 200). */
             warnings: components["schemas"]["WaitingMatchOrderDto"][];
+        };
+        CleanupTaskRowDto: {
+            id: string;
+            docNumber: string;
+            /** @enum {string} */
+            type: "PICK" | "PACK";
+            /** @enum {string} */
+            status: "CANCELLED" | "PENDING" | "ASSIGNED" | "IN_PROGRESS" | "COMPLETED" | "EXCEPTION";
+            warehouseCode: string;
+            warehouseName: string;
+            /** @description Đơn bán của việc (refType SalesOrder); null = việc không gắn đơn. */
+            orderId: string | null;
+            orderDocNumber: string | null;
+            assigneeName: string | null;
+            /** @description Việc đang nằm trong lượt gộp. */
+            inWave: boolean;
+            lineCount: number;
+            exceptionLineCount: number;
+            /** @description Tổng SL kế hoạch — Decimal(18,6) dạng chuỗi. */
+            qtyPlanned: string;
+            /** @description Tổng SL đã làm — Decimal(18,6) dạng chuỗi. */
+            qtyDone: string;
+            /** @description Mã SKU của các dòng (tối đa 5, phân cách ", "). */
+            skuCodes: string;
+            /** @description PICK: lúc đưa cho kho (null = đơn chưa Gửi ĐVVC). */
+            releasedAt: string | null;
+            createdAt: string;
+            completedAt: string | null;
+            /**
+             * @description null = hủy được.
+             * @enum {string|null}
+             */
+            blockedReason: "CANCELLED" | "PACK_COMPLETED" | "STOCK_ISSUED" | null;
+        };
+        CleanupTaskListDto: {
+            items: components["schemas"]["CleanupTaskRowDto"][];
+            total: number;
+        };
+        CleanupReservationRowDto: {
+            id: string;
+            /** @enum {string} */
+            status: "ACTIVE" | "FULFILLED" | "RELEASED" | "EXPIRED";
+            /** @description Decimal(18,6) dạng chuỗi, ĐVT gốc. */
+            qty: string;
+            skuId: string;
+            skuCode: string | null;
+            skuName: string | null;
+            locationCode: string | null;
+            warehouseCode: string | null;
+            warehouseName: string | null;
+            containerBarcode: string | null;
+            lotNumber: string | null;
+            refType: string;
+            refId: string;
+            /** @description `SalesOrder.docNumber` khi refType = SalesOrder. */
+            refDocNumber: string | null;
+            expiresAt: string | null;
+            createdAt: string;
+        };
+        CleanupReservationListDto: {
+            items: components["schemas"]["CleanupReservationRowDto"][];
+            total: number;
+        };
+        CleanupActionDto: {
+            ids: string[];
+            /** @description Lý do — ghi vào dòng việc và event outbox. */
+            reason: string;
+        };
+        CleanupActionFailureDto: {
+            id: string;
+            /** @description Mã lỗi nghiệp vụ (WMS_CLEANUP_*, RESERVATION_NOT_ACTIVE, TASK_NOT_FOUND…). */
+            code: string;
+            message: string;
+        };
+        CleanupActionResultDto: {
+            /** @description Id đã hủy / nhả. */
+            done: string[];
+            failed: components["schemas"]["CleanupActionFailureDto"][];
         };
         ProfitSummaryDto: {
             orderCount: number;
@@ -27794,6 +27940,117 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["WaitingMatchDto"];
+                };
+            };
+        };
+    };
+    WmsCleanupController_tasks: {
+        parameters: {
+            query: {
+                type: "PICK" | "PACK";
+                status?: "CANCELLED" | "PENDING" | "ASSIGNED" | "IN_PROGRESS" | "COMPLETED" | "EXCEPTION";
+                warehouseId?: string;
+                /** @description Mã đơn (SO… / SOP…) hoặc mã việc (PICK… / PACK…) — khớp đúng, không phân biệt hoa thường. */
+                q?: string;
+                /** @description Mã SKU (SP-…) — khớp đúng, không phân biệt hoa thường. */
+                skuCode?: string;
+                /** @description Ngày tạo từ (`YYYY-MM-DD`, giờ VN). */
+                from?: string;
+                /** @description Ngày tạo đến hết ngày (`YYYY-MM-DD`, giờ VN). */
+                to?: string;
+                take: number;
+                skip: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CleanupTaskListDto"];
+                };
+            };
+        };
+    };
+    WmsCleanupController_reservations: {
+        parameters: {
+            query: {
+                status?: "ACTIVE" | "FULFILLED" | "RELEASED" | "EXPIRED";
+                warehouseId?: string;
+                /** @description Mã đơn (SO… / SOP…) hoặc mã việc (PICK… / PACK…) — khớp đúng, không phân biệt hoa thường. */
+                q?: string;
+                /** @description Mã SKU (SP-…) — khớp đúng, không phân biệt hoa thường. */
+                skuCode?: string;
+                /** @description Ngày tạo từ (`YYYY-MM-DD`, giờ VN). */
+                from?: string;
+                /** @description Ngày tạo đến hết ngày (`YYYY-MM-DD`, giờ VN). */
+                to?: string;
+                take: number;
+                skip: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CleanupReservationListDto"];
+                };
+            };
+        };
+    };
+    WmsCleanupController_cancelTasks: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CleanupActionDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CleanupActionResultDto"];
+                };
+            };
+        };
+    };
+    WmsCleanupController_releaseReservations: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CleanupActionDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CleanupActionResultDto"];
                 };
             };
         };
