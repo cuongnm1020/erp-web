@@ -78,6 +78,8 @@ const MESSAGES: Record<string, string> = {
   // Chuyển đơn sang kho khác (PLAN-warehouse-context K3)
   ORDER_WAREHOUSE_MOVE_LOCKED:
     'Kho đã nhận hoặc bắt đầu lấy hàng cho đơn này nên không chuyển kho được. Trả việc về hàng đợi ở Điều phối rồi chuyển lại.',
+  ORDER_WAREHOUSE_WAYBILL_FORBIDDEN:
+    'Đơn đã có vận đơn — chuyển kho sẽ hủy vận đơn này nên cần quyền hủy vận đơn. Nhờ kho hoặc quản lý chuyển kho.',
   MOVE_TARGET_WAREHOUSE_INVALID: 'Kho chuyển tới đã ngừng dùng. Chọn kho khác.',
   PANCAKE_ORDER_WAREHOUSE_LOCKED:
     'Pancake không cho đổi kho đơn này (đơn trên Pancake đã qua bước đóng gói, đã có vận đơn, hoặc Pancake từ chối) nên ERP không chuyển. Kiểm tra đơn trên Pancake rồi thử lại.',

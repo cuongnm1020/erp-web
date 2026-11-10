@@ -14497,6 +14497,13 @@ export interface components {
             pick: "none" | "unchanged" | "replanned";
             /** @description Đơn Pancake: kho mới thiếu hàng → đơn chờ hàng (dòng PICK thiếu tồn). */
             awaitingStock: boolean;
+            /**
+             * @description Mã vận đơn kho cũ đã tự hủy trước khi chuyển (đơn đã Gửi ĐVVC / có mã, 2026-11-10); null =
+             *     đơn chưa có vận đơn.
+             */
+            waybillCancelled: string | null;
+            /** @description Đã gỡ hãng + tài khoản hãng — kho mới phải gán lại hãng trước khi Gửi ĐVVC. */
+            carrierCleared: boolean;
         };
         MoveOrderFailedDto: {
             orderId: string;
