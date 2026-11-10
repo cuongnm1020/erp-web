@@ -25122,8 +25122,18 @@ export interface operations {
                 /** @description Đơn có dòng SKU này (core.Sku.id) — kể cả dòng thành phần của combo SKU này (2026-11-02). */
                 skuId?: string;
                 /**
-                 * @description Với `skuId`: `true` = chỉ đơn mà MỌI dòng đều là SKU đó (hoặc thành phần của combo SKU đó) —
-                 *     "lọc sản phẩm duy nhất" màn In đơn (2026-11-04). Không có `skuId` thì bỏ qua.
+                 * @description Nhiều sản phẩm (2026-11-10, màn In đơn tích chọn nhiều): đơn có dòng thuộc MỘT trong các SKU này
+                 *     (kể cả thành phần combo) — gộp với `skuId` nếu gửi cả hai. Lặp tham số, tối đa 20.
+                 */
+                skuIds?: string[];
+                /**
+                 * @description Chỉ các đơn này (2026-11-10, màn In đơn): làm mới dòng đang tích đã rời tab sau thao tác hàng
+                 *     loạt. Phạm vi xem đơn giữ nguyên. Lặp tham số, tối đa 200.
+                 */
+                ids?: string[];
+                /**
+                 * @description Với `skuId` / `skuIds`: `true` = chỉ đơn mà MỌI dòng đều thuộc các SKU đó (hoặc thành phần của
+                 *     combo SKU đó) — "lọc sản phẩm duy nhất" màn In đơn (2026-11-04). Không có SKU thì bỏ qua.
                  */
                 skuOnly?: "true" | "false";
                 /**
@@ -25442,8 +25452,18 @@ export interface operations {
                 /** @description Đơn có dòng SKU này (core.Sku.id) — kể cả dòng thành phần của combo SKU này (2026-11-02). */
                 skuId?: string;
                 /**
-                 * @description Với `skuId`: `true` = chỉ đơn mà MỌI dòng đều là SKU đó (hoặc thành phần của combo SKU đó) —
-                 *     "lọc sản phẩm duy nhất" màn In đơn (2026-11-04). Không có `skuId` thì bỏ qua.
+                 * @description Nhiều sản phẩm (2026-11-10, màn In đơn tích chọn nhiều): đơn có dòng thuộc MỘT trong các SKU này
+                 *     (kể cả thành phần combo) — gộp với `skuId` nếu gửi cả hai. Lặp tham số, tối đa 20.
+                 */
+                skuIds?: string[];
+                /**
+                 * @description Chỉ các đơn này (2026-11-10, màn In đơn): làm mới dòng đang tích đã rời tab sau thao tác hàng
+                 *     loạt. Phạm vi xem đơn giữ nguyên. Lặp tham số, tối đa 200.
+                 */
+                ids?: string[];
+                /**
+                 * @description Với `skuId` / `skuIds`: `true` = chỉ đơn mà MỌI dòng đều thuộc các SKU đó (hoặc thành phần của
+                 *     combo SKU đó) — "lọc sản phẩm duy nhất" màn In đơn (2026-11-04). Không có SKU thì bỏ qua.
                  */
                 skuOnly?: "true" | "false";
                 /**
@@ -25665,8 +25685,18 @@ export interface operations {
                 /** @description Đơn có dòng SKU này (core.Sku.id) — kể cả dòng thành phần của combo SKU này (2026-11-02). */
                 skuId?: string;
                 /**
-                 * @description Với `skuId`: `true` = chỉ đơn mà MỌI dòng đều là SKU đó (hoặc thành phần của combo SKU đó) —
-                 *     "lọc sản phẩm duy nhất" màn In đơn (2026-11-04). Không có `skuId` thì bỏ qua.
+                 * @description Nhiều sản phẩm (2026-11-10, màn In đơn tích chọn nhiều): đơn có dòng thuộc MỘT trong các SKU này
+                 *     (kể cả thành phần combo) — gộp với `skuId` nếu gửi cả hai. Lặp tham số, tối đa 20.
+                 */
+                skuIds?: string[];
+                /**
+                 * @description Chỉ các đơn này (2026-11-10, màn In đơn): làm mới dòng đang tích đã rời tab sau thao tác hàng
+                 *     loạt. Phạm vi xem đơn giữ nguyên. Lặp tham số, tối đa 200.
+                 */
+                ids?: string[];
+                /**
+                 * @description Với `skuId` / `skuIds`: `true` = chỉ đơn mà MỌI dòng đều thuộc các SKU đó (hoặc thành phần của
+                 *     combo SKU đó) — "lọc sản phẩm duy nhất" màn In đơn (2026-11-04). Không có SKU thì bỏ qua.
                  */
                 skuOnly?: "true" | "false";
                 /**
@@ -25890,8 +25920,18 @@ export interface operations {
                 /** @description Đơn có dòng SKU này (core.Sku.id) — kể cả dòng thành phần của combo SKU này (2026-11-02). */
                 skuId?: string;
                 /**
-                 * @description Với `skuId`: `true` = chỉ đơn mà MỌI dòng đều là SKU đó (hoặc thành phần của combo SKU đó) —
-                 *     "lọc sản phẩm duy nhất" màn In đơn (2026-11-04). Không có `skuId` thì bỏ qua.
+                 * @description Nhiều sản phẩm (2026-11-10, màn In đơn tích chọn nhiều): đơn có dòng thuộc MỘT trong các SKU này
+                 *     (kể cả thành phần combo) — gộp với `skuId` nếu gửi cả hai. Lặp tham số, tối đa 20.
+                 */
+                skuIds?: string[];
+                /**
+                 * @description Chỉ các đơn này (2026-11-10, màn In đơn): làm mới dòng đang tích đã rời tab sau thao tác hàng
+                 *     loạt. Phạm vi xem đơn giữ nguyên. Lặp tham số, tối đa 200.
+                 */
+                ids?: string[];
+                /**
+                 * @description Với `skuId` / `skuIds`: `true` = chỉ đơn mà MỌI dòng đều thuộc các SKU đó (hoặc thành phần của
+                 *     combo SKU đó) — "lọc sản phẩm duy nhất" màn In đơn (2026-11-04). Không có SKU thì bỏ qua.
                  */
                 skuOnly?: "true" | "false";
                 /**

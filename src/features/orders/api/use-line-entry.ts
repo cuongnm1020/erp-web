@@ -1,4 +1,4 @@
-import { useQuery } from '@tanstack/react-query';
+import { useQueries, useQuery } from '@tanstack/react-query';
 import type { EntityOption, EntitySearchResult } from '@/components/data/form';
 import { api, unwrap } from '@/lib/api/client';
 import type { components } from '@/lib/api/schema';
@@ -137,6 +137,24 @@ export function useSkuDetail(id: string) {
     queryFn: () => unwrap(api.GET('/skus/{id}', { params: { path: { id } } })),
     enabled: id !== '',
     staleTime: 60_000,
+  });
+}
+
+/**
+ * Nhãn các SKU đang chọn ở ô lọc chọn nhiều (màn In đơn, 2026-11-10) — cùng cache với
+ * {@link useSkuDetail} (mỗi SKU một query GET /skus/{id}).
+ */
+export function useSkuOptions(ids: readonly string[]): EntityOption[] {
+  const results = useQueries({
+    queries: ids.map((id) => ({
+      queryKey: lineEntryKeys.sku(id),
+      queryFn: () => unwrap(api.GET('/skus/{id}', { params: { path: { id } } })),
+      staleTime: 60_000,
+    })),
+  });
+  return ids.flatMap((id, i) => {
+    const d = results[i]?.data;
+    return d ? [{ id, label: d.name, hint: d.code }] : [];
   });
 }
 

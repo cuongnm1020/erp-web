@@ -111,8 +111,8 @@ import { SendToCarrierMenu } from './send-to-carrier-menu';
 import { PancakeErpLockedBadge, PancakeMirrorBadge, PancakeOrderLink } from './pancake-order-link';
 import { SameDayOrdersHover } from './same-day-orders-hover';
 import { MarketplaceBadge, MaskedPhoneBadge, waybillErrorText } from './waybill-error';
-import { EntityPicker } from '@/components/data/form';
-import { useNonComboSkuSearch, useSkuDetail } from '../api/use-line-entry';
+import { EntityMultiPicker } from '@/components/data/form';
+import { useNonComboSkuSearch, useSkuDetail, useSkuOptions } from '../api/use-line-entry';
 
 /**
  * In đơn (2026-11-04, user): màn Kho phục vụ in đơn, menu ngay dưới "Theo dõi đơn" — bản CLONE từ
@@ -250,6 +250,11 @@ const DATE_FIELDS: Array<{ value: OrderDateField; label: string }> = [
 
 /** Quyền + handler mà cột thao tác cần — tính một lần ở màn, không gọi hook trong cell. */
 interface RowActionContext {
+  /**
+   * Dòng đang tích nhưng đã RỜI bộ lọc / tab sau thao tác hàng loạt (2026-11-10) — vẫn hiện tại
+   * chỗ cũ tới khi bỏ tích hoặc tải lại trang, kèm trạng thái mới.
+   */
+  isLeft: (orderId: string) => boolean;
   canUpdate: boolean;
   canCreate: boolean;
   /** `shipment.pack` — xin lại vận đơn cho đơn lỗi vận đơn. */
@@ -400,6 +405,15 @@ const buildColumns = (
             <PancakeMirrorBadge mirror={o.pancakeMirror} />
             {o.marketplace ? <MarketplaceBadge marketplace={o.marketplace} /> : null}
           </div>
+          {actions.isLeft(o.id) ? (
+            <div
+              className="flex flex-wrap items-center gap-1 text-xs text-info"
+              data-testid="row-left"
+              title="Đơn không còn khớp tab / bộ lọc — giữ lại để bạn xem kết quả; bỏ tích hoặc tải lại trang để ẩn"
+            >
+              Đã chuyển <FlowBadge flow={o.flow} />
+            </div>
+          ) : null}
         </div>
       );
     },
@@ -803,43 +817,45 @@ function PrintStatusNote({ order }: { order: SalesOrderListItem }) {
 }
 
 /**
- * Ô lọc "Sản phẩm" (2026-11-02): chọn một SKU — đơn có dòng SKU đó, kể cả thành phần combo.
- * Màn In đơn (2026-11-04): tick "Chỉ sản phẩm này" = đơn không có sản phẩm nào khác (in theo lô
- * cùng một mặt hàng).
+ * Ô lọc "Sản phẩm" (2026-11-02): đơn có dòng SKU đó, kể cả thành phần combo. Màn In đơn
+ * (2026-11-04): tick "Chỉ sản phẩm này" = đơn không có sản phẩm nào khác (in theo lô cùng một mặt
+ * hàng). Tích chọn nhiều (2026-11-10, user chốt): đơn có MỘT trong các SP; "Chỉ các SP này" = mọi
+ * dòng thuộc các SP đã chọn.
  */
 function ProductFilter({
-  skuId,
+  skuIds,
   only,
   onChange,
   onOnlyChange,
 }: {
-  skuId: string;
+  skuIds: string[];
   only: boolean;
-  onChange: (v: string) => void;
+  onChange: (ids: string[]) => void;
   onOnlyChange: (on: boolean) => void;
 }) {
-  const detail = useSkuDetail(skuId);
+  const selected = useSkuOptions(skuIds);
   return (
-    <div className="flex items-center gap-3">
-      <EntityPicker
-        className="h-9 w-64"
-        value={skuId}
-        onChange={(id) => onChange(id)}
+    <div className="flex items-center gap-3" data-testid="filter-sku">
+      <EntityMultiPicker
+        label="Sản phẩm"
+        unit="SP"
+        max={SKU_FILTER_MAX}
+        values={skuIds}
+        onChange={onChange}
         // Chỉ sản phẩm thường, bỏ combo (2026-11-04) — đơn có combo chứa SP vẫn lọc ra.
         useSearch={useNonComboSkuSearch}
-        selectedLabel={detail.data ? `${detail.data.code} · ${detail.data.name}` : undefined}
-        placeholder="Sản phẩm: tất cả"
+        selectedOptions={selected}
         searchPlaceholder="Gõ tên / mã sản phẩm…"
         emptyText="Không tìm thấy sản phẩm"
       />
       <label className="flex items-center gap-2 text-sm">
         <Checkbox
           checked={only}
-          disabled={!skuId}
+          disabled={skuIds.length === 0}
           onCheckedChange={(v) => onOnlyChange(v === true)}
           data-testid="filter-sku-only"
         />
-        Chỉ sản phẩm này
+        {skuIds.length > 1 ? 'Chỉ các sản phẩm này' : 'Chỉ sản phẩm này'}
       </label>
     </div>
   );
@@ -877,12 +893,20 @@ function orderErrorFilterOptions(rows: OrderErrorOption[]) {
 }
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-/** Khớp `@ArrayMaxSize(20)` của `excludeSkuIds` bên API. */
-const EXCLUDE_SKU_MAX = 20;
+/** Khớp `@ArrayMaxSize(20)` của `skuIds` / `excludeSkuIds` bên API. */
+const SKU_FILTER_MAX = 20;
+
+/** Danh sách id SKU trên URL (nối dấu phẩy): chỉ giữ UUID (link dán sai bỏ qua), tối đa 20. */
+const parseSkuIds = (v: string | undefined): string =>
+  (v ?? '')
+    .split(',')
+    .filter((s) => UUID_RE.test(s))
+    .slice(0, SKU_FILTER_MAX)
+    .join(',');
 
 /**
- * Ô "Loại trừ SP" (2026-11-10, user: có kết quả rồi muốn bỏ đơn có LION): chọn từng sản phẩm —
- * mỗi lần chọn thêm một chip, × để bỏ. Đơn có SP đó (kể cả nằm trong combo) bị loại khỏi danh sách.
+ * Ô "Loại trừ SP" (2026-11-10, user: có kết quả rồi muốn bỏ đơn có LION): tích chọn nhiều sản
+ * phẩm. Đơn có SP đó (kể cả nằm trong combo) bị loại khỏi danh sách.
  */
 function ExcludeProductFilter({
   skuIds,
@@ -891,43 +915,23 @@ function ExcludeProductFilter({
   skuIds: string[];
   onChange: (ids: string[]) => void;
 }) {
+  const selected = useSkuOptions(skuIds);
   return (
-    <div className="flex flex-wrap items-center gap-2" data-testid="filter-exclude-sku">
-      <EntityPicker
-        className="h-9 w-56"
-        value=""
-        onChange={(id) => {
-          if (id && !skuIds.includes(id) && skuIds.length < EXCLUDE_SKU_MAX) {
-            onChange([...skuIds, id]);
-          }
-        }}
+    <div data-testid="filter-exclude-sku">
+      <EntityMultiPicker
+        label="Loại trừ SP"
+        unit="SP"
+        max={SKU_FILTER_MAX}
+        values={skuIds}
+        onChange={onChange}
+        emptySummary="Loại trừ SP: không"
         // Như ô Sản phẩm: chỉ SP thường — bỏ SP thì đơn có combo chứa SP đó cũng bị loại.
         useSearch={useNonComboSkuSearch}
-        placeholder={skuIds.length ? 'Loại trừ thêm SP…' : 'Loại trừ SP: không'}
+        selectedOptions={selected}
         searchPlaceholder="Gõ tên / mã sản phẩm cần bỏ…"
         emptyText="Không tìm thấy sản phẩm"
       />
-      {skuIds.map((id) => (
-        <ExcludedSkuChip
-          key={id}
-          skuId={id}
-          onRemove={() => onChange(skuIds.filter((x) => x !== id))}
-        />
-      ))}
     </div>
-  );
-}
-
-function ExcludedSkuChip({ skuId, onRemove }: { skuId: string; onRemove: () => void }) {
-  const detail = useSkuDetail(skuId);
-  const name = detail.data ? `${detail.data.code} · ${detail.data.name}` : 'Đang tải…';
-  return (
-    <span className="inline-flex h-7 items-center gap-1 rounded-full border border-input bg-secondary pl-2.5 pr-1 text-xs">
-      <span className="max-w-48 truncate">Bỏ {name}</span>
-      <Button variant="ghost" size="icon-sm" aria-label={`Bỏ loại trừ ${name}`} onClick={onRemove}>
-        <X aria-hidden />
-      </Button>
-    </span>
   );
 }
 
@@ -1018,14 +1022,12 @@ export function PrintOrdersScreen() {
   const status = parseOrderStatus(state.filters.status);
   const customerId = state.filters.customerId ?? '';
   const shortSkuId = state.filters.shortSkuId ?? '';
-  const skuId = state.filters.skuId ?? '';
+  // Sản phẩm (tích chọn nhiều 2026-11-10): `?skuId=` nối dấu phẩy — link cũ một SKU vẫn đúng.
+  const skuId = parseSkuIds(state.filters.skuId);
+  const skuIds = useMemo(() => (skuId ? skuId.split(',') : []), [skuId]);
   const skuOnly = skuId !== '' && state.filters.skuOnly === 'true';
   // Loại trừ sản phẩm (2026-11-10): chỉ giữ id dạng UUID (link dán sai bỏ qua), tối đa 20 như API.
-  const excludeSku = (state.filters.excludeSku ?? '')
-    .split(',')
-    .filter((s) => UUID_RE.test(s))
-    .slice(0, EXCLUDE_SKU_MAX)
-    .join(',');
+  const excludeSku = parseSkuIds(state.filters.excludeSku);
   const excludeSkuIds = useMemo(() => (excludeSku ? excludeSku.split(',') : []), [excludeSku]);
   const orderError = state.filters.orderError ?? '';
   const orderErrorKeys = useMemo(() => decodeKeys(orderError), [orderError]);
@@ -1086,7 +1088,7 @@ export function PrintOrdersScreen() {
       status,
       customerId,
       shortSkuId,
-      skuId,
+      skuIds,
       skuOnly,
       excludeSkuIds,
       orderError: orderErrorKeys,
@@ -1112,7 +1114,7 @@ export function PrintOrdersScreen() {
       status,
       customerId,
       shortSkuId,
-      skuId,
+      skuIds,
       skuOnly,
       excludeSkuIds,
       orderErrorKeys,
@@ -1143,8 +1145,8 @@ export function PrintOrdersScreen() {
   );
   const carriers = useCarriers();
   // Chữ chip "Đang lọc" của ô Sản phẩm — cùng nguồn dữ liệu với ô chọn.
-  const skuChip = useSkuDetail(skuId);
-  const excludeChip = useSkuDetail(excludeSkuIds[0] ?? '');
+  const skuChip = useSkuDetail(skuIds.length === 1 ? skuIds[0]! : '');
+  const excludeChip = useSkuDetail(excludeSkuIds.length === 1 ? excludeSkuIds[0]! : '');
   const router = useRouter();
   // Kho / admin sửa người nhận / ngày tạo đơn của mọi đơn kho mình, cả khi kho đã thao tác (2026-11-05).
   const canEditFields =
@@ -1160,9 +1162,12 @@ export function PrintOrdersScreen() {
   // Nút Hủy trên dòng → hộp xác nhận dùng chung với hủy hàng loạt (một đơn).
   const [cancelling, setCancelling] = useState<SalesOrderListItem | null>(null);
   const requestWaybill = useRequestWaybill();
+  // Id dòng đang tích đã rời bộ lọc (tính lại mỗi lần render bên dưới) — ref để cột không dựng lại.
+  const leftIdsRef = useRef(new Set<string>());
   const columns = useMemo(() => {
     const carrierById = new Map((carriers.data ?? []).map((c) => [c.id, c]));
     const all = buildColumns((id) => carrierById.get(id) ?? null, {
+      isLeft: (id) => leftIdsRef.current.has(id),
       canUpdate,
       canCreate,
       canPack,
@@ -1266,16 +1271,45 @@ export function PrintOrdersScreen() {
   // Dòng đã chọn: nhớ cả dòng vừa RỜI bộ lọc (sự cố 2026-11-07, màn In đơn: Gửi ĐVVC xong đơn sang
   // tab Đang đóng hàng → tab Đã xác nhận không còn dòng chọn → thanh chọn nhiều bị gỡ kéo theo hộp
   // Sang ĐVVC đang hỏi "Đóng gói + in vận đơn luôn?"). Chỉ bỏ nhớ khi bỏ chọn.
+  // 2026-11-10 (user): thao tác hàng loạt xong KHÔNG tự bỏ tích — đơn đã rời tab vẫn hiện đúng
+  // chỗ cũ (dữ liệu mới nhất qua `ids`) tới khi bỏ tích / tải lại trang, để bỏ tích đơn đã xong rồi
+  // làm tiếp với đơn lỗi (vd 6 đơn gửi GHTK được, 4 đơn lỗi đẩy sang Viettel).
   const selectedRowCache = useRef(new Map<string, SalesOrderListItem>());
   const items = query.data?.items ?? [];
+  const itemIds = new Set(items.map((r) => r.id));
+  const leftIds = [...selectedRowCache.current.keys()].filter(
+    (id) => selected[id] && !itemIds.has(id),
+  );
+  const leftQuery = useOrders(
+    { ids: leftIds, take: Math.min(Math.max(leftIds.length, 1), 200), skip: 0 },
+    { enabled: leftIds.length > 0 && !query.isPlaceholderData },
+  );
   for (const r of items) if (selected[r.id]) selectedRowCache.current.set(r.id, r);
+  for (const r of leftQuery.data?.items ?? []) {
+    if (selected[r.id] && !itemIds.has(r.id)) selectedRowCache.current.set(r.id, r);
+  }
   for (const id of [...selectedRowCache.current.keys()]) {
     if (!selected[id]) selectedRowCache.current.delete(id);
   }
-  const selectedRows = [
-    ...items.filter((r) => selected[r.id]),
-    ...[...selectedRowCache.current.values()].filter((r) => !items.some((i) => i.id === r.id)),
-  ];
+  leftIdsRef.current = new Set(leftIds);
+  // Vị trí cũ của từng dòng (lần hiện trước) — dòng đã rời chèn lại đúng chỗ đó.
+  const lastOrder = useRef<string[]>([]);
+  const displayRows = useMemo(() => {
+    const out = [...items];
+    const pos = new Map(lastOrder.current.map((id, i) => [id, i]));
+    const left = leftIds
+      .map((id) => selectedRowCache.current.get(id))
+      .filter((r): r is SalesOrderListItem => r !== undefined)
+      .sort((a, b) => (pos.get(a.id) ?? Infinity) - (pos.get(b.id) ?? Infinity));
+    for (const r of left) out.splice(Math.min(pos.get(r.id) ?? out.length, out.length), 0, r);
+    return out;
+    // leftIds / cache đổi theo selected + dữ liệu hai query.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [items, leftIds.join(','), leftQuery.data, selected]);
+  useEffect(() => {
+    lastOrder.current = displayRows.map((r) => r.id);
+  }, [displayRows]);
+  const selectedRows = displayRows.filter((r) => selected[r.id]);
   const clearSelection = () => setSelected({});
   // In lại từ tem số N (2026-11-10): bỏ tích đơn của các tem đã ra giấy.
   const deselect = (ids: string[]) => {
@@ -1404,7 +1438,12 @@ export function PrintOrdersScreen() {
         ) : null}
 
         {selectedRows.length > 0 ? (
-          <OrderBulkBar rows={selectedRows} onClear={clearSelection} onDeselect={deselect} />
+          <OrderBulkBar
+            rows={selectedRows}
+            onClear={clearSelection}
+            onDone={KEEP_SELECTION}
+            onDeselect={deselect}
+          />
         ) : (
           <FilterBar<OrderFilter>
             busy={query.isPlaceholderData}
@@ -1439,13 +1478,21 @@ export function PrintOrdersScreen() {
                 key: 'skuId',
                 label: 'Sản phẩm',
                 type: 'custom',
-                chip: skuId ? `${skuOnly ? 'Chỉ ' : ''}${skuChip.data?.name ?? 'đã chọn'}` : null,
+                chip:
+                  skuIds.length > 1
+                    ? `${skuOnly ? 'Chỉ ' : ''}${skuIds.length} sản phẩm`
+                    : skuIds.length === 1
+                      ? `${skuOnly ? 'Chỉ ' : ''}${skuChip.data?.name ?? 'đã chọn'}`
+                      : null,
                 render: () => (
                   <ProductFilter
-                    skuId={skuId}
+                    skuIds={skuIds}
                     only={skuOnly}
-                    onChange={(v) =>
-                      setFilter({ skuId: v || undefined, ...(v ? {} : { skuOnly: undefined }) })
+                    onChange={(ids) =>
+                      setFilter({
+                        skuId: ids.join(',') || undefined,
+                        ...(ids.length ? {} : { skuOnly: undefined }),
+                      })
                     }
                     onOnlyChange={(on) => setFilter({ skuOnly: on ? 'true' : undefined })}
                   />
@@ -1557,7 +1604,7 @@ export function PrintOrdersScreen() {
               dateField: state.filters.dateField,
               team,
               fbPage: state.filters.fbPage,
-              skuId: state.filters.skuId,
+              skuId: skuId || undefined,
               excludeSku: excludeSku || undefined,
               weightMin: state.filters.weightMin,
               weightMax: state.filters.weightMax,
@@ -1589,7 +1636,7 @@ export function PrintOrdersScreen() {
       <QueryState
         query={query}
         skeleton={<ListSkeleton rows={12} columns={9} />}
-        isEmpty={(d) => d.items.length === 0}
+        isEmpty={(d) => d.items.length === 0 && leftIds.length === 0}
         empty={
           <EmptyState
             title={hasFilter ? 'Không có đơn nào khớp' : 'Chưa có đơn hàng nào'}
@@ -1620,7 +1667,7 @@ export function PrintOrdersScreen() {
         {(data) => (
           <DataTable
             columns={columns}
-            rows={data.items}
+            rows={data.items === items ? displayRows : data.items}
             getRowId={(r) => r.id}
             total={data.total}
             page={state.page}
@@ -1652,6 +1699,9 @@ export function PrintOrdersScreen() {
 
 type BulkDialog = 'shipping' | 'reprint' | 'retry-waybill' | 'cancel-waybill' | null;
 
+/** Thao tác hàng loạt xong: giữ nguyên tích (user 2026-11-10) — chỉ "Bỏ chọn" / bỏ tích tay. */
+const KEEP_SELECTION = () => undefined;
+
 /**
  * Thanh chọn nhiều (design system BulkActionBar, thay chỗ thanh lọc): tổng tiền / COD của các đơn
  * đã chọn; nút phụ Hủy đơn · Chuyển kho · Đóng gói + in vận đơn; "Khác" gom Gán hãng / cân nặng · Xin lại vận đơn ·
@@ -1663,10 +1713,14 @@ type BulkDialog = 'shipping' | 'reprint' | 'retry-waybill' | 'cancel-waybill' | 
 function OrderBulkBar({
   rows,
   onClear,
+  onDone,
   onDeselect,
 }: {
   rows: SalesOrderListItem[];
+  /** Nút "Bỏ chọn". */
   onClear: () => void;
+  /** Sau khi một thao tác hàng loạt xong — màn In đơn giữ nguyên tích (2026-11-10). */
+  onDone: () => void;
   onDeselect: (orderIds: string[]) => void;
 }) {
   const ability = useAbility();
@@ -1690,7 +1744,7 @@ function OrderBulkBar({
               `${r.failed.length} đơn không ${verb} được: ${messageForCode(r.failed[0]!.code, 409)}`,
             );
           }
-          if (r.failed.length === 0) onClear();
+          onDone();
         },
         onError: (err) => toast.error(messageFor(err)),
       },
@@ -1720,7 +1774,7 @@ function OrderBulkBar({
               `${r.failed.length} đơn không xác nhận được: ${messageForCode(r.failed[0]!.code, 409)}`,
             );
           }
-          if (r.failed.length === 0) onClear();
+          onDone();
         },
         onError: (err) => toast.error(messageFor(err)),
       },
@@ -1742,7 +1796,7 @@ function OrderBulkBar({
         }
       >
         <span className="ml-auto" />
-        {canCancel ? <BulkCancelDialog rows={rows} onDone={onClear} /> : null}
+        {canCancel ? <BulkCancelDialog rows={rows} onDone={onDone} /> : null}
         {ability.can('create', 'SalesOrder') && unconfirmed.length > 0 ? (
           <Button variant="outline" size="sm" loading={confirm.isPending} onClick={confirmAll}>
             Xác nhận đơn ({unconfirmed.length})
@@ -1750,11 +1804,11 @@ function OrderBulkBar({
         ) : null}
         {/* Kho chuyển kho đơn bằng `send_carrier` (2026-11-04, user chốt) như sale có `update`. */}
         {ability.can('update', 'SalesOrder') || canUpdate ? (
-          <BulkMoveWarehouseDialog rows={rows} onDone={onClear} />
+          <BulkMoveWarehouseDialog rows={rows} onDone={onDone} />
         ) : null}
         <Can I="fulfil_manual" a="SalesOrder">
           {/* Màn In đơn: chọn NV đóng hàng trước khi in (2026-11-04). */}
-          <BulkFulfilPrintDialog rows={rows} onDone={onClear} askPacker />
+          <BulkFulfilPrintDialog rows={rows} onDone={onDone} askPacker />
         </Can>
         {canReprint ? (
           // Ra ngoài menu "Khác" (user 2026-11-06) — như màn Đơn lỗi; đếm đơn đã có mã vận đơn.
@@ -1811,12 +1865,12 @@ function OrderBulkBar({
             </DropdownMenuContent>
           </DropdownMenu>
         ) : null}
-        {canUpdate ? <SendToCarrierMenu rows={rows} onDone={onClear} /> : null}
+        {canUpdate ? <SendToCarrierMenu rows={rows} onDone={onDone} /> : null}
       </BulkActionBar>
       {canUpdate ? (
         <BulkShippingDialog
           rows={rows}
-          onDone={onClear}
+          onDone={onDone}
           open={dialog === 'shipping'}
           onOpenChange={openChange('shipping')}
         />
@@ -1830,7 +1884,7 @@ function OrderBulkBar({
           }))}
           open={dialog === 'cancel-waybill'}
           onOpenChange={openChange('cancel-waybill')}
-          onDone={onClear}
+          onDone={onDone}
         />
       ) : null}
       {canReprint ? (
@@ -1846,7 +1900,7 @@ function OrderBulkBar({
           rows={rows}
           open={dialog === 'retry-waybill'}
           onOpenChange={openChange('retry-waybill')}
-          onDone={onClear}
+          onDone={onDone}
         />
       ) : null}
     </div>
