@@ -333,7 +333,10 @@ const SENT_LOCKED = 'Đã gửi ĐVVC — hủy vận đơn để sửa đơn';
 
 function orderRowItems(o: SalesOrderListItem, ctx: RowActionContext): RowActionItem[] {
   const stageOpen = OPEN_FLOWS.includes(o.flow);
-  const editOpen = EDIT_OPEN_FLOWS.includes(o.flow);
+  // Cần sửa mà CHƯA gửi hãng (SP ngoài hệ thống, đơn còn Đơn mới…): người lên đơn sửa được — server
+  // kiểm lại chính xác (assertOrderStageOpen). Sự cố 2026-11-10: sale không bấm được Sửa đơn mình.
+  const editOpen =
+    EDIT_OPEN_FLOWS.includes(o.flow) || (o.flow === 'NEEDS_FIX' && !o.sentToCarrierAt);
   // Nút "Xác nhận" trên dòng đã bỏ (user 2026-11-03) — xác nhận ở màn chi tiết / sửa đơn.
   return [
     ...(ctx.canPack && o.flow === 'NEEDS_FIX' && o.waybillErrorCode && o.shipment?.carrierCode
