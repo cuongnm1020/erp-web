@@ -6,6 +6,7 @@ import {
   CalendarClock,
   ChartLine,
   ClipboardList,
+  Eraser,
   FileCheck2,
   Columns3,
   Flag,
@@ -356,6 +357,15 @@ export const NAV_MODULES: NavModule[] = [
         icon: Gauge,
         section: 'Vận hành',
         ability: { action: 'read_all', subject: 'Task' },
+      },
+      {
+        // Dọn việc kho (2026-11-10): hủy mềm PICK / PACK / giữ chỗ — CHỈ superadmin. Không có quyền
+        // nào tên WmsCleanup nên chỉ `manage all` (hasGlobalAccess) thấy menu; API 403 người khác.
+        label: 'Dọn việc kho',
+        href: '/wms/cleanup',
+        icon: Eraser,
+        section: 'Vận hành',
+        ability: { action: 'manage', subject: 'WmsCleanup' },
       },
       {
         label: 'Phiếu nhập kho',
