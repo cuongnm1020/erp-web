@@ -85,6 +85,8 @@ export interface OrderListParams {
   skuOnly?: boolean;
   /** Loại trừ đơn có một trong các SKU này, kể cả thành phần combo (màn In đơn, 2026-11-10). */
   excludeSkuIds?: readonly string[];
+  /** Lỗi đơn (màn In đơn, 2026-11-10): `NON_ERP_ITEMS` | khoá từ GET /sales-orders/order-error-options. */
+  orderError?: readonly string[];
   /** true = tab Đã xác nhận chỉ đơn CHƯA có mã vận đơn (màn In đơn, 2026-11-06); tab khác không đổi. */
   warehouseNoWaybill?: boolean;
   /** true = chỉ đơn có đơn trùng trong ngày (cùng SĐT, cùng ngày VN, chưa hủy — CSKH-5). */
@@ -263,6 +265,7 @@ function listQuery(params: Omit<OrderListParams, 'take' | 'skip'>) {
     skuId: params.skuId || undefined,
     skuOnly: params.skuId && params.skuOnly ? ('true' as const) : undefined,
     excludeSkuIds: params.excludeSkuIds?.length ? [...params.excludeSkuIds] : undefined,
+    orderError: params.orderError?.length ? [...params.orderError] : undefined,
     warehouseNoWaybill: params.warehouseNoWaybill ? ('true' as const) : undefined,
     duplicate: params.duplicate ? ('true' as const) : undefined,
     from: params.from || undefined,
@@ -403,6 +406,17 @@ export function useCarrierStatusOptions() {
     queryKey: [...orderKeys.all, 'carrier-status-options'] as const,
     queryFn: () => unwrap(api.GET('/sales-orders/carrier-status-options')),
     staleTime: 60_000,
+  });
+}
+
+export type OrderErrorOption = components['schemas']['OrderErrorOptionDto'];
+
+/** GET /sales-orders/order-error-options — nhóm lỗi vận đơn cho ô lọc "Lỗi đơn" (2026-11-10). */
+export function useOrderErrorOptions() {
+  return useQuery({
+    queryKey: [...orderKeys.all, 'order-error-options'] as const,
+    queryFn: () => unwrap(api.GET('/sales-orders/order-error-options')),
+    staleTime: 30_000,
   });
 }
 

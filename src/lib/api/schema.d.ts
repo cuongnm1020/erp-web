@@ -3792,6 +3792,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/sales-orders/order-error-options": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Nhóm lỗi vận đơn cho ô lọc "Lỗi đơn" màn In đơn (2026-11-10) — khai TRƯỚC `:id`. Giá trị
+         *     `key` dùng cho `orderError` của GET /sales-orders.
+         */
+        get: operations["SalesOrderController_orderErrorOptions"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/sales-orders/label-printer-options": {
         parameters: {
             query?: never;
@@ -12215,6 +12235,14 @@ export interface components {
             /** @description Hãng chọn trên đơn (wms.Carrier.id); null = đơn chưa chọn hãng. */
             carrierId: string | null;
             carrierCode: string | null;
+        };
+        OrderErrorOptionDto: {
+            /** @description Giá trị cho `orderError` của GET /sales-orders: `code:<mã>` hoặc `msg:<câu đã gom>`. */
+            key: string;
+            /** @description Mã lỗi vận đơn (`CARRIER_REJECTED`, `CARRIER_WAYBILL_DATA`…) — web dịch câu theo mã. */
+            code: string;
+            /** @description Câu hãng đã gom (thay phần thay đổi bằng "…") khi hãng từ chối; null = lỗi theo mã. */
+            message: string | null;
         };
         OrderLabelPrinterOptionDto: {
             /** @description Giá trị cho `labelPrintedBy` của GET /sales-orders (core.User.id). */
@@ -24828,6 +24856,25 @@ export interface operations {
             };
         };
     };
+    SalesOrderController_orderErrorOptions: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OrderErrorOptionDto"][];
+                };
+            };
+        };
+    };
     SalesOrderController_labelPrinterOptions: {
         parameters: {
             query?: never;
@@ -25028,6 +25075,12 @@ export interface operations {
                  *     dòng thành phần của combo SKU đó (cùng luật với `skuId`). Lặp tham số cho nhiều SKU, tối đa 20.
                  */
                 excludeSkuIds?: string[];
+                /**
+                 * @description Lỗi đơn (2026-11-10, màn In đơn) — đơn có MỘT trong các lỗi: `NON_ERP_ITEMS` = có SP ngoài hệ
+                 *     thống (tab Cần sửa), `code:<mã>` / `msg:<câu đã gom>` = lỗi vận đơn theo GET
+                 *     /sales-orders/order-error-options. Lặp tham số, tối đa 50.
+                 */
+                orderError?: string[];
                 /**
                  * @description `true` = tab Đã xác nhận (`WAREHOUSE`) chỉ gồm đơn CHƯA có mã vận đơn — màn In đơn (2026-11-06).
                  *     Áp cho danh sách khi lọc tab đó và cho số đếm tab đó; tab khác không đổi.
@@ -25328,6 +25381,12 @@ export interface operations {
                  */
                 excludeSkuIds?: string[];
                 /**
+                 * @description Lỗi đơn (2026-11-10, màn In đơn) — đơn có MỘT trong các lỗi: `NON_ERP_ITEMS` = có SP ngoài hệ
+                 *     thống (tab Cần sửa), `code:<mã>` / `msg:<câu đã gom>` = lỗi vận đơn theo GET
+                 *     /sales-orders/order-error-options. Lặp tham số, tối đa 50.
+                 */
+                orderError?: string[];
+                /**
                  * @description `true` = tab Đã xác nhận (`WAREHOUSE`) chỉ gồm đơn CHƯA có mã vận đơn — màn In đơn (2026-11-06).
                  *     Áp cho danh sách khi lọc tab đó và cho số đếm tab đó; tab khác không đổi.
                  */
@@ -25529,6 +25588,12 @@ export interface operations {
                  *     dòng thành phần của combo SKU đó (cùng luật với `skuId`). Lặp tham số cho nhiều SKU, tối đa 20.
                  */
                 excludeSkuIds?: string[];
+                /**
+                 * @description Lỗi đơn (2026-11-10, màn In đơn) — đơn có MỘT trong các lỗi: `NON_ERP_ITEMS` = có SP ngoài hệ
+                 *     thống (tab Cần sửa), `code:<mã>` / `msg:<câu đã gom>` = lỗi vận đơn theo GET
+                 *     /sales-orders/order-error-options. Lặp tham số, tối đa 50.
+                 */
+                orderError?: string[];
                 /**
                  * @description `true` = tab Đã xác nhận (`WAREHOUSE`) chỉ gồm đơn CHƯA có mã vận đơn — màn In đơn (2026-11-06).
                  *     Áp cho danh sách khi lọc tab đó và cho số đếm tab đó; tab khác không đổi.
@@ -25733,6 +25798,12 @@ export interface operations {
                  *     dòng thành phần của combo SKU đó (cùng luật với `skuId`). Lặp tham số cho nhiều SKU, tối đa 20.
                  */
                 excludeSkuIds?: string[];
+                /**
+                 * @description Lỗi đơn (2026-11-10, màn In đơn) — đơn có MỘT trong các lỗi: `NON_ERP_ITEMS` = có SP ngoài hệ
+                 *     thống (tab Cần sửa), `code:<mã>` / `msg:<câu đã gom>` = lỗi vận đơn theo GET
+                 *     /sales-orders/order-error-options. Lặp tham số, tối đa 50.
+                 */
+                orderError?: string[];
                 /**
                  * @description `true` = tab Đã xác nhận (`WAREHOUSE`) chỉ gồm đơn CHƯA có mã vận đơn — màn In đơn (2026-11-06).
                  *     Áp cho danh sách khi lọc tab đó và cho số đếm tab đó; tab khác không đổi.

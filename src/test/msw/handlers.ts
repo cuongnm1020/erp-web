@@ -1649,6 +1649,8 @@ export const handlers = [
   // Ô "Phòng ban" dùng chung (đơn hàng, theo dõi giao hàng) — mặc định rỗng = ẩn ô; test cần thì
   // `server.use` đè.
   http.get('/api/sales-orders/team-filter-options', () => HttpResponse.json([])),
+  // Ô "Lỗi đơn" màn In đơn (2026-11-10) — mặc định chưa có lỗi vận đơn nào.
+  http.get('/api/sales-orders/order-error-options', () => HttpResponse.json([])),
   // Ô lọc NV lên đơn: danh sách theo người xem (API lọc theo leader / trưởng nhóm CSKH).
   http.get('/api/sales-orders/creator-options', () =>
     HttpResponse.json([
