@@ -494,27 +494,9 @@ function Editor({ order }: { order: SalesOrderDetail }) {
       return;
     }
     if (!canSave) return;
-    // Sản phẩm lưu TRƯỚC (giữ chỗ + PICK lại), rồi mới chuyển kho / PATCH các ô còn lại.
-    if (lineEdit.body) {
-      replaceLines.mutate(lineEdit.body, {
-        onSuccess: (r) => {
-          if (moveTo || patchFieldsDirtyAll) saveRest();
-          else {
-            toast.success('Đã lưu thay đổi', {
-              description: `${order.docNumber} · sản phẩm, tổng tiền ${formatMoney(r.total)}`,
-            });
-            if (fulfilTarget) runFulfil(fulfilTarget);
-            else router.push(detailHref);
-          }
-        },
-        onError: (err) => toast.error(messageFor(err)),
-      });
-      return;
-    }
-    saveRest();
-  };
-
-  const saveRest = () => {
+    // Đổi Kho xuất → chuyển kho TRƯỚC (2026-11-10, SO2611-02941: thêm SP "Chỉ bán từ Kho Thạch
+    // Thất" cùng lúc chuyển Long An → Thạch Thất bị chặn vì dòng lưu trước, còn ở kho cũ), rồi sản
+    // phẩm (giữ chỗ + PICK lại ở kho mới), cuối cùng PATCH các ô còn lại.
     if (moveTo) {
       moveWarehouse.mutate(
         { orderIds: [order.id], warehouseId: moveTo },
@@ -526,21 +508,35 @@ function Editor({ order }: { order: SalesOrderDetail }) {
               setWarehouseId(order.warehouseId ?? NO_WAREHOUSE);
               return;
             }
-            if (patchFieldsDirtyAll) patch();
-            else {
-              toast.success('Đã lưu thay đổi', {
-                description: `${order.docNumber} · kho lấy hàng`,
-              });
-              if (fulfilTarget) runFulfil(fulfilTarget);
-              else router.push(detailHref);
-            }
+            saveLinesThenPatch(['kho lấy hàng']);
           },
           onError: (err) => toast.error(messageFor(err)),
         },
       );
       return;
     }
-    patch();
+    saveLinesThenPatch([]);
+  };
+
+  /** Bước sau chuyển kho: sản phẩm (nếu đổi) rồi PATCH (nếu còn ô đổi); `done` = phần đã lưu. */
+  const saveLinesThenPatch = (done: string[]) => {
+    const finish = (parts: string[]) => {
+      toast.success('Đã lưu thay đổi', { description: `${order.docNumber} · ${parts.join(', ')}` });
+      if (fulfilTarget) runFulfil(fulfilTarget);
+      else router.push(detailHref);
+    };
+    if (lineEdit.body) {
+      replaceLines.mutate(lineEdit.body, {
+        onSuccess: (r) => {
+          if (patchFieldsDirtyAll) patch();
+          else finish([...done, `sản phẩm, tổng tiền ${formatMoney(r.total)}`]);
+        },
+        onError: (err) => toast.error(messageFor(err)),
+      });
+      return;
+    }
+    if (patchFieldsDirtyAll || done.length === 0) patch();
+    else finish(done);
   };
 
   const patch = () => {
@@ -1025,6 +1021,7 @@ function Editor({ order }: { order: SalesOrderDetail }) {
           <OrderEditLines
             form={linesForm}
             order={order}
+            warehouseId={nextWarehouse ?? ''}
             lockedReason={order.linesLockedReason}
             dirty={linesChanged}
             removedCustom={removedCustom}

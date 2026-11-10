@@ -1086,6 +1086,55 @@ describe('OrderEditScreen — sửa sản phẩm / người nhận, quyền sử
     await waitFor(() => expect(push).toHaveBeenCalledWith(`/crm/orders/${ORDER.id}`));
   });
 
+  it('đổi Kho xuất + sửa sản phẩm cùng lúc (2026-11-10, SO2611-02941) → chuyển kho TRƯỚC rồi mới PUT /lines', async () => {
+    push.mockClear();
+    withDetail({ linesLockedReason: null });
+    const calls: string[] = [];
+    server.use(
+      http.post('/api/sales-orders/move-warehouse', async ({ request }) => {
+        const body = (await request.json()) as { orderIds: string[]; warehouseId: string };
+        calls.push(`move:${body.warehouseId}`);
+        return HttpResponse.json({
+          moved: [
+            {
+              orderId: body.orderIds[0],
+              docNumber: ORDER.docNumber,
+              fromWarehouseId: null,
+              outcome: 'MOVED',
+              pick: 'replanned',
+              awaitingStock: false,
+            },
+          ],
+          failed: [],
+        });
+      }),
+      http.put('/api/sales-orders/:id/lines', ({ params }) => {
+        calls.push('lines');
+        return HttpResponse.json({
+          orderId: params.id,
+          docNumber: ORDER.docNumber,
+          subtotal: '0.0000',
+          discount: '0.0000',
+          total: '100000.0000',
+          awaitingStock: false,
+          pick: 'replanned',
+        });
+      }),
+    );
+    renderApp(<OrderEditScreen orderId={ORDER.id} />);
+    await screen.findByRole('heading', { level: 1 });
+    const whPicker = screen.getByRole('combobox', { name: 'Kho lấy hàng' });
+    await waitFor(() => expect(whPicker).toBeEnabled());
+    fireEvent.click(whPicker);
+    fireEvent.click(
+      await screen.findByRole('option', { name: `${PICKUP_WAREHOUSES[0]!.name} (WH01)` }),
+    );
+    fireEvent.click((await screen.findAllByRole('button', { name: 'Tăng số lượng' }))[0]!);
+    fireEvent.click(screen.getByRole('button', { name: /Lưu thay đổi/ }));
+    await waitFor(() => expect(calls).toEqual([`move:${PICKUP_WAREHOUSES[0]!.id}`, 'lines']));
+    await waitFor(() => expect(push).toHaveBeenCalledWith(`/crm/orders/${ORDER.id}`));
+  });
+
   it('đơn Pancake có món gõ tay (2026-11-02): món hiện thành dòng "Ngoài hệ thống"; đổi giỏ khi còn món → chặn, không PUT; xóa món rồi lưu → PUT /lines; Pancake chặn → báo SKU thiếu trên shop', async () => {
     withDetail({
       linesLockedReason: null,
