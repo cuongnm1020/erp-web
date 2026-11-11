@@ -14381,7 +14381,14 @@ export interface components {
         CancelWaybillDto: {
             reason?: string;
         };
+        /**
+         * @description Giai đoạn hành trình (tên theo app Viettel Post, dùng chung mọi hãng — 2026-11-11).
+         * @enum {string}
+         */
+        JourneyStage: "CREATED" | "PICKUP_FAILED" | "PICKED_UP" | "IN_TRANSIT" | "DELIVERING" | "DELIVERY_FAILED" | "DELIVERED" | "RETURNING" | "RETURNED" | "CANCELLED" | "INCIDENT" | "OTHER";
         CarrierStatusLogDto: {
+            /** @description Giai đoạn hành trình (tên theo app Viettel Post, dùng chung mọi hãng — 2026-11-11). */
+            journeyStage: components["schemas"]["JourneyStage"];
             id: string;
             /** @enum {string} */
             source: "WEBHOOK" | "POLL";
@@ -14399,6 +14406,8 @@ export interface components {
             statusText: string | null;
             /** @description Bưu cục / vị trí hãng gửi kèm (VTP, VNPost); null = hãng không gửi. */
             location: string | null;
+            /** @description Ghi chú hãng + bưu tá (VTP NOTE + EMPLOYEE_*, GHTK reason); null = không có / dòng cũ. */
+            remark: string | null;
             /** @description Mốc theo hãng (null = hãng không trả). */
             occurredAt: string | null;
             createdAt: string;

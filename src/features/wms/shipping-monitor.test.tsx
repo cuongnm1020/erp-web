@@ -90,7 +90,7 @@ describe('ShippingMonitorScreen — đóng gói / bàn giao / hãng giữ + cả
     fireEvent.click(await screen.findByText(OLD!.docNumber));
     const dialog = await screen.findByRole('dialog');
     expect(within(dialog).getByText(`Hành trình ${OLD!.docNumber}`)).toBeInTheDocument();
-    expect(await within(dialog).findByText('Webhook')).toBeInTheDocument();
+    expect((await within(dialog).findAllByText('Webhook')).length).toBeGreaterThan(0);
   });
 
   it('không có đơn quá hạn → không cảnh báo, empty state rõ ràng', async () => {

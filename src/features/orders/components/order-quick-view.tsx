@@ -22,18 +22,17 @@ import {
   toDecimal,
 } from '@/lib/format';
 import { Can } from '@/lib/permission';
-import { useShipmentStatusLog } from '@/features/wms/api/use-shipping';
-import { shipmentStatusBadge } from '@/features/wms/labels';
 import { cn } from '@/lib/cn';
 import { useOrder, type OrderFlow, type SalesOrderListItem } from '../api/use-orders';
 import { orderFlowClass, orderFlowLabel, shownAmounts, telcoClass } from '../labels';
+import { CarrierJourney } from './carrier-journey';
 import { OrderProgress } from './order-progress';
 import { PancakeOrderLink } from './pancake-order-link';
 
 /**
  * Xem nhanh một đơn từ danh sách (ngăn kéo phải 480px) — tiến độ, người nhận, sản phẩm, tiền,
  * vận chuyển, hành trình hãng, ghi chú — không rời danh sách. Chi tiết đơn từ GET
- * /sales-orders/:id; hành trình từ GET /shipments/:id/status-log (chỉ các mốc đổi trạng thái).
+ * /sales-orders/:id; hành trình từ GET /shipments/:id/status-log (mọi lần quét, nhóm theo giai đoạn — `CarrierJourney`, 2026-11-11).
  * Tiền trên dòng danh sách (thực thu ĐVVC, COD) lấy từ `row` để khớp con số vừa thấy ở bảng.
  * Redesign Bán hàng 2026-10-22: sao chép mã / SĐT / mã vận đơn, chân ngăn kéo 3 nút
  * (Nhân bản đơn · Sửa đơn · Mở đơn đầy đủ).
@@ -195,7 +194,7 @@ function Body({ row }: { row: SalesOrderListItem }) {
           ) : (
             <p className="text-muted-foreground">Kho chưa tạo phiếu giao cho đơn này.</p>
           )}
-          {shipmentId ? <Journey shipmentId={shipmentId} /> : null}
+          {shipmentId ? <CarrierJourney shipmentId={shipmentId} /> : null}
         </Section>
 
         <Section title="Ghi chú" last>
@@ -255,31 +254,6 @@ const PROGRESS_FLOWS: ReadonlySet<OrderFlow> = new Set<OrderFlow>([
   'OUT_FOR_DELIVERY',
   'DELIVERED',
 ]);
-
-function Journey({ shipmentId }: { shipmentId: string }) {
-  const log = useShipmentStatusLog(shipmentId);
-  if (log.isPending) return <p className="text-xs text-muted-foreground">Đang tải hành trình…</p>;
-  if (log.isError) return <p className="text-xs text-destructive">{messageFor(log.error)}</p>;
-  if (log.data.items.length === 0)
-    return <p className="text-xs text-muted-foreground">Chưa có mốc nào từ hãng.</p>;
-  return (
-    <ol className="space-y-2" aria-label="Hành trình từ hãng">
-      {log.data.items.map((e) => (
-        <li key={e.id} className="flex items-start gap-2.5">
-          <span aria-hidden className="mt-1.5 h-2 w-2 flex-none rounded-full bg-primary" />
-          <span className="flex flex-col">
-            <span className="font-medium">
-              {e.mappedStatus ? shipmentStatusBadge(e.mappedStatus).label : e.carrierStatusCode}
-            </span>
-            <span className="text-xs text-muted-foreground">
-              {formatDateTime(e.occurredAt ?? e.createdAt)}
-            </span>
-          </span>
-        </li>
-      ))}
-    </ol>
-  );
-}
 
 function Section({
   title,
