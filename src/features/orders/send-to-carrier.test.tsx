@@ -92,6 +92,14 @@ const LABEL = {
 const openMenu = () =>
   fireEvent.keyDown(screen.getByRole('button', { name: /Gửi sang ĐVVC/ }), { key: 'ArrowDown' });
 
+/** Hộp Gửi ĐVVC bắt buộc chọn NV đóng hàng (2026-11-11) — chọn người đầu của kho. */
+const choosePacker = async (dialog: HTMLElement, name = 'Lê Đóng Gói') => {
+  const packer = within(dialog).getByRole('combobox', { name: 'NV đóng hàng' });
+  await waitFor(() => expect(packer).toBeEnabled());
+  fireEvent.click(packer);
+  fireEvent.click(await screen.findByRole('option', { name }));
+};
+
 const openFor = async (code: string) => {
   openMenu();
   // Nhãn dùng chung "<MÃ HÃNG> <tên tài khoản / tên hãng>" — khớp theo mã hãng ở đầu.
@@ -172,6 +180,7 @@ describe('Gửi sang ĐVVC — SendToCarrierMenu + SendToCarrierDialog', () => {
       target: { value: 'Giao giờ hành chính' },
     });
     fireEvent.change(within(dialog).getByLabelText('Dài (cm)'), { target: { value: '20' } });
+    await choosePacker(dialog);
     fireEvent.click(submit);
 
     await waitFor(() => expect(bodies).toHaveLength(1));
@@ -191,6 +200,7 @@ describe('Gửi sang ĐVVC — SendToCarrierMenu + SendToCarrierDialog', () => {
       },
       // Admin đóng gói nhanh được → giữ việc lấy hàng, hỏi "Đóng gói + in" (2026-10-29).
       holdPick: true,
+      packerId: 'u-pk1',
     });
     await waitFor(() =>
       expect(toastSuccess).toHaveBeenCalledWith('Đã gửi 1 đơn sang GHTK', expect.anything()),
@@ -239,6 +249,7 @@ describe('Gửi sang ĐVVC — SendToCarrierMenu + SendToCarrierDialog', () => {
     );
     await selectTwoRows();
     const dialog = await openFor('GHTK');
+    await choosePacker(dialog);
     fireEvent.click(within(dialog).getByRole('button', { name: 'Cập nhật 2 đơn' }));
     const note = await within(dialog).findByRole('alert');
     expect(note).toHaveTextContent('Không đủ tồn cho 1 sản phẩm — chưa gửi đơn nào');
@@ -248,6 +259,34 @@ describe('Gửi sang ĐVVC — SendToCarrierMenu + SendToCarrierDialog', () => {
     const rows = makeOrders(3);
     fireEvent.click(within(dialog).getByRole('button', { name: `Bỏ đơn ${rows[1]!.docNumber}` }));
     expect(within(dialog).queryByRole('alert')).not.toBeInTheDocument();
+  }, 15_000);
+
+  it('NV đóng hàng bắt buộc (2026-11-11): chưa chọn → không gửi, báo dưới ô; chọn rồi mới gửi', async () => {
+    search = ALL;
+    const bodies: unknown[] = [];
+    server.use(
+      http.post('/api/sales-orders/send-to-carrier', async ({ request }) => {
+        bodies.push(await request.json());
+        return HttpResponse.json({ sent: [], failed: [] }, { status: 201 });
+      }),
+    );
+    await selectTwoRows();
+    const dialog = await openFor('GHTK');
+    const packer = within(dialog).getByRole('combobox', { name: 'NV đóng hàng' });
+    await waitFor(() => expect(packer).toBeEnabled());
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Cập nhật 2 đơn' }));
+    expect(
+      await within(dialog).findByText('Chọn NV đóng hàng trước khi gửi sang hãng.'),
+    ).toBeInTheDocument();
+    expect(packer).toHaveAttribute('aria-invalid', 'true');
+    expect(bodies).toEqual([]);
+    // Không còn lựa chọn "Không chọn (giao trên PDA)".
+    fireEvent.click(packer);
+    expect(screen.queryByRole('option', { name: /Không chọn/ })).not.toBeInTheDocument();
+    fireEvent.click(await screen.findByRole('option', { name: 'Lê Đóng Gói' }));
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Cập nhật 2 đơn' }));
+    await waitFor(() => expect(bodies).toHaveLength(1));
+    expect(bodies[0]).toMatchObject({ packerId: 'u-pk1' });
   }, 15_000);
 
   it('NV đóng hàng (2026-11-06): đơn cùng kho → chọn người đóng gói của kho, POST kèm packerId', async () => {
@@ -330,6 +369,7 @@ describe('Gửi sang ĐVVC — SendToCarrierMenu + SendToCarrierDialog', () => {
 
     fireEvent.click(within(dialog).getByRole('combobox', { name: 'Dịch vụ vận chuyển' }));
     fireEvent.click(await screen.findByRole('option', { name: /VTK/ }));
+    await choosePacker(dialog);
     fireEvent.click(within(dialog).getByRole('button', { name: 'Cập nhật 3 đơn' }));
 
     await waitFor(() => expect(bodies).toHaveLength(1));
@@ -388,6 +428,7 @@ describe('Gửi sang ĐVVC — SendToCarrierMenu + SendToCarrierDialog', () => {
     );
     await selectTwoRows();
     const dialog = await openFor('GHTK');
+    await choosePacker(dialog);
     fireEvent.click(within(dialog).getByRole('button', { name: 'Cập nhật 2 đơn' }));
 
     const list = await within(dialog).findByRole('list', { name: 'Danh sách đơn lỗi' });
@@ -473,6 +514,7 @@ describe('Gửi sang ĐVVC — SendToCarrierMenu + SendToCarrierDialog', () => {
     );
     await selectTwoRows();
     const dialog = await openFor('GHTK');
+    await choosePacker(dialog);
     fireEvent.click(within(dialog).getByRole('button', { name: 'Cập nhật 2 đơn' }));
 
     const band = await within(dialog).findByRole('group', { name: 'Hủy vận đơn cũ' });
@@ -533,6 +575,7 @@ describe('Gửi sang ĐVVC — SendToCarrierMenu + SendToCarrierDialog', () => {
     );
     await selectTwoRows();
     const dialog = await openFor('GHTK');
+    await choosePacker(dialog);
     fireEvent.click(within(dialog).getByRole('button', { name: 'Cập nhật 2 đơn' }));
 
     const panel = await within(dialog).findByRole('region', { name: 'Kết quả từng đơn' });
@@ -602,6 +645,7 @@ describe('Gửi sang ĐVVC — SendToCarrierMenu + SendToCarrierDialog', () => {
     );
     await selectTwoRows();
     const dialog = await openFor('GHTK');
+    await choosePacker(dialog);
     fireEvent.click(within(dialog).getByRole('button', { name: 'Cập nhật 2 đơn' }));
     const panel = await within(dialog).findByRole('region', { name: 'Kết quả từng đơn' });
     const bar = await within(dialog).findByRole('progressbar', {
@@ -687,6 +731,7 @@ describe('Gửi sang ĐVVC — SendToCarrierMenu + SendToCarrierDialog', () => {
     );
     await selectTwoRows();
     const dialog = await openFor('GHTK');
+    await choosePacker(dialog);
     fireEvent.click(within(dialog).getByRole('button', { name: 'Cập nhật 2 đơn' }));
     fireEvent.click(await within(dialog).findByRole('button', { name: 'Đóng gói + in 1 tem' }));
 
@@ -708,6 +753,7 @@ describe('Gửi sang ĐVVC — SendToCarrierMenu + SendToCarrierDialog', () => {
     const released = captureRelease();
     await selectTwoRows();
     const dialog = await openFor('GHTK');
+    await choosePacker(dialog);
     fireEvent.click(within(dialog).getByRole('button', { name: 'Cập nhật 2 đơn' }));
     // Handler mặc định: đơn đầu có mã, đơn sau chờ đóng gói — cả hai hỏi đóng gói.
     expect(
@@ -753,6 +799,8 @@ describe('Gửi sang ĐVVC — SendToCarrierMenu + SendToCarrierDialog', () => {
       me: { ...ME_SALE, permissions: [...ME_SALE.permissions, 'sales_order.send_carrier'] },
     });
     const dialog = await openFor('GHTK');
+    // Không có task.execute → không có ô NV đóng hàng (không tra được danh sách) → không bắt buộc.
+    expect(within(dialog).queryByRole('combobox', { name: 'NV đóng hàng' })).toBeNull();
     fireEvent.click(within(dialog).getByRole('button', { name: 'Cập nhật 2 đơn' }));
     const panel = await within(dialog).findByRole('region', { name: 'Kết quả từng đơn' });
     expect(bodies[0]).not.toHaveProperty('holdPick');
@@ -786,6 +834,7 @@ describe('Gửi sang ĐVVC — SendToCarrierMenu + SendToCarrierDialog', () => {
     );
     await selectTwoRows();
     const dialog = await openFor('GHTK');
+    await choosePacker(dialog);
     fireEvent.click(within(dialog).getByRole('button', { name: 'Cập nhật 2 đơn' }));
     const list = await within(dialog).findByRole('list', { name: 'Danh sách đơn lỗi' });
     expect(within(dialog).getByText('2 đơn không gửi được sang GHTK')).toBeInTheDocument();
@@ -878,6 +927,7 @@ describe('Gửi sang ĐVVC — SendToCarrierMenu + SendToCarrierDialog', () => {
     expect(within(dialog).getByRole('combobox', { name: 'Tài khoản GHTK' })).toHaveTextContent(
       'GHTK S23119447 Nam Việt - Hàng Lòng',
     );
+    await choosePacker(dialog);
     fireEvent.click(within(dialog).getByRole('button', { name: 'Cập nhật 2 đơn' }));
     await waitFor(() => expect(bodies).toHaveLength(1));
     expect(bodies[0]).toMatchObject({ carrierId: 'c-ghtk', carrierAccountId: 'acc-ghtk-shop2' });
