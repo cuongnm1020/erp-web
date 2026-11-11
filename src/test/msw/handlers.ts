@@ -1925,7 +1925,9 @@ export const handlers = [
     const from = url.searchParams.get('from');
     const to = url.searchParams.get('to');
     await delay(50);
-    let all = makeOrders(60);
+    // Danh sách: các đơn cùng một kho xuất — hộp Gửi ĐVVC bắt buộc chọn NV đóng hàng của kho
+    // (2026-11-11), cần kho chung mới chọn được.
+    let all = makeOrders(60).map((o) => ({ ...o, warehouseId: o.warehouseId ?? 'wh-1' }));
     if (q)
       all = all.filter(
         (o) =>
@@ -2227,6 +2229,9 @@ export const handlers = [
   }),
   // Việc đã giao cho tôi (GET /pda/tasks, màn pick cột "Việc được giao") — mặc định rỗng.
   http.get('/api/pda/tasks', () => HttpResponse.json([])),
+  http.get('/api/pda/packers', () =>
+    HttpResponse.json([{ id: 'u-pk1', code: 'pk1', fullName: 'Lê Đóng Gói' }]),
+  ),
   // Lượt gộp đã giao cho tôi (GET /pda/waves) — mặc định rỗng.
   http.get('/api/pda/waves', () => HttpResponse.json({ items: [], total: 0 })),
   // Cột "Đơn mới" + giao người đóng gói (2026-10-12) — mặc định rỗng; test luồng mới tự ghi đè.

@@ -213,9 +213,15 @@ export function SendToCarrierDialog({
   }, [customPickup, pickupWarehouseId, sendable]);
   const packers = usePdaPackers(canPickPacker ? packWarehouseId : null);
   const [packerId, setPackerId] = useState<string>(NO_PACKER);
+  // Bắt buộc chọn NV đóng hàng khi gán hãng (user chốt 2026-11-11) — bấm Gửi mà chưa chọn thì báo
+  // ngay dưới ô, không gửi.
+  const [packerMissing, setPackerMissing] = useState(false);
   // Mở lại với lô khác → bỏ NV đã chọn của lô trước.
   useEffect(() => {
-    if (open) setPackerId(NO_PACKER);
+    if (open) {
+      setPackerId(NO_PACKER);
+      setPackerMissing(false);
+    }
   }, [open]);
   useEffect(() => {
     if (packerId !== NO_PACKER && !(packers.data ?? []).some((p) => p.id === packerId)) {
@@ -255,6 +261,11 @@ export function SendToCarrierDialog({
 
   const submit = form.handleSubmit(async (v) => {
     if (sendable.length === 0 || send.isPending) return;
+    if (canPickPacker && packerId === NO_PACKER) {
+      setPackerMissing(true);
+      document.getElementById('send-carrier-packer')?.focus();
+      return;
+    }
     try {
       const r = await send.mutateAsync({
         orderIds: sendable.map((o) => o.id),
@@ -554,24 +565,27 @@ export function SendToCarrierDialog({
                             htmlFor="send-carrier-packer"
                             className="text-sm text-muted-foreground"
                           >
-                            NV đóng hàng
+                            NV đóng hàng <span className="text-destructive">*</span>
                           </label>
                           <Select
-                            value={packerId}
-                            onValueChange={setPackerId}
+                            value={packerId === NO_PACKER ? '' : packerId}
+                            onValueChange={(v) => {
+                              setPackerId(v);
+                              setPackerMissing(false);
+                            }}
                             disabled={!packWarehouseId || packers.isPending}
                           >
                             <SelectTrigger
                               id="send-carrier-packer"
                               aria-label="NV đóng hàng"
+                              aria-required
+                              aria-invalid={packerMissing || undefined}
+                              aria-describedby="send-carrier-packer-hint"
                               className="h-9 w-full"
                             >
-                              <SelectValue placeholder="Không chọn" />
+                              <SelectValue placeholder="Chọn NV đóng hàng" />
                             </SelectTrigger>
                             <SelectContent>
-                              <SelectItem value={NO_PACKER}>
-                                — Không chọn (giao trên PDA) —
-                              </SelectItem>
                               {(packers.data ?? []).map((p) => (
                                 <SelectItem key={p.id} value={p.id}>
                                   {p.fullName}
@@ -579,12 +593,21 @@ export function SendToCarrierDialog({
                               ))}
                             </SelectContent>
                           </Select>
-                          <p className="text-xs text-muted-foreground">
+                          <p
+                            id="send-carrier-packer-hint"
+                            className={
+                              packerMissing
+                                ? 'text-xs text-destructive'
+                                : 'text-xs text-muted-foreground'
+                            }
+                          >
                             {!packWarehouseId
-                              ? 'Các đơn khác kho xuất — chọn "Tùy chọn địa chỉ lấy hàng" để chọn NV.'
-                              : packerId !== NO_PACKER
-                                ? 'Lấy hàng xong, việc đóng gói giao thẳng người này.'
-                                : 'Để trống: người lấy hàng giao người đóng gói trên PDA.'}
+                              ? 'Các đơn khác kho xuất — chọn "Tùy chọn địa chỉ lấy hàng" để chọn NV đóng hàng.'
+                              : packers.data && packers.data.length === 0
+                                ? 'Kho xuất chưa có NV đóng hàng nào — thêm người đóng gói cho kho này trước.'
+                                : packerMissing
+                                  ? 'Chọn NV đóng hàng trước khi gửi sang hãng.'
+                                  : 'Lấy hàng xong, việc đóng gói giao thẳng người này.'}
                           </p>
                         </div>
                       ) : null}
