@@ -17,12 +17,16 @@ import {
 import { Input } from '@/components/ui/input';
 import { toast } from '@/components/ui/toaster';
 import { messageFor } from '@/lib/error-messages';
+import { Spinner } from '@/components/ui/spinner';
 import {
+  isShopPushRunning,
   usePancakeShopProducts,
+  usePancakeShopPush,
   useProductPickSearch,
   useUpdatePancakeShopProducts,
   type PancakeShopConfig,
   type PancakeShopProduct,
+  type PancakeShopPushStatus,
 } from '../api/use-pancake-config';
 
 function useDebounced<T>(v: T, ms = 300): T {
@@ -39,7 +43,8 @@ function useDebounced<T>(v: T, ms = 300): T {
  *
  * Mỗi POS bán bộ sản phẩm khác nhau. "Bán tất cả" = như trước (mọi sản phẩm ERP đẩy lên shop);
  * "Chỉ sản phẩm được chọn" = chỉ các sản phẩm tick ở đây được đẩy / hiện, sản phẩm khác đã có
- * trên shop sẽ bị ẩn. Lưu xong server đẩy lại nền — POS cập nhật sau ít phút.
+ * trên shop sẽ bị ẩn. Lưu xong server đẩy ngay (job `pushJobId`): hộp thoại hiện tiến độ, đẩy hết
+ * thì đóng kèm toast, còn sản phẩm chờ Pancake / lỗi thì giữ lại liệt kê (mockup duyệt 2026-11-11).
  * Danh sách chọn giữ khi chuyển về "Bán tất cả" để bật lại không phải chọn từ đầu.
  */
 export function PancakeShopProductsDialog({
@@ -59,6 +64,8 @@ export function PancakeShopProductsDialog({
   const [q, setQ] = useState('');
   const debouncedQ = useDebounced(q.trim());
   const results = useProductPickSearch(debouncedQ, open && restricted);
+  const [jobId, setJobId] = useState<string | null>(null);
+  const push = usePancakeShopPush(shop.shopId, jobId);
 
   useEffect(() => {
     if (loaded || !current.data) return;
@@ -80,11 +87,38 @@ export function PancakeShopProductsDialog({
       return next;
     });
 
+  const running = !!jobId && !push.isError && isShopPushRunning(push.data);
+  const finished = !!jobId && !running;
+  // Đẩy hết không còn chờ / lỗi → toast + tự đóng; còn thì giữ hộp thoại liệt kê.
+  const allDone =
+    push.data?.state === 'missing' ||
+    (push.data?.state === 'completed' &&
+      push.data.counts.pending === 0 &&
+      push.data.counts.failed === 0);
+
+  useEffect(() => {
+    if (!finished || !allDone || !push.data) return;
+    toast.success('Đã lưu sản phẩm bán', {
+      description:
+        push.data.state === 'missing'
+          ? `Shop ${shop.shopId}: đang cập nhật sản phẩm lên Pancake.`
+          : push.data.total > 0
+            ? `Shop ${shop.shopId}: đã đẩy ${push.data.total} sản phẩm lên Pancake.`
+            : `Shop ${shop.shopId}: không có thay đổi cần đẩy lên Pancake.`,
+    });
+    onOpenChange(false);
+  }, [finished, allDone, push.data, shop.shopId, onOpenChange]);
+
   const onSave = () => {
     save.mutate(
       { restricted, productIds: [...selected.keys()] },
       {
         onSuccess: (r) => {
+          if (r.pushJobId) {
+            setJobId(r.pushJobId);
+            return;
+          }
+          // Không có lượt đẩy riêng: không có gì cần đẩy, hoặc server rơi về hàng đợi chung.
           toast.success('Đã lưu sản phẩm bán', {
             description:
               (r.queued ?? 0) > 0
@@ -120,8 +154,36 @@ export function PancakeShopProductsDialog({
               Thử lại
             </Button>
           </div>
-        ) : (
+        ) : finished ? (
           <div className="flex min-w-0 flex-col gap-3">
+            <p className="rounded-md border px-3 py-2 text-sm">
+              <span className="font-medium">
+                {restricted ? 'Chỉ sản phẩm được chọn' : 'Bán tất cả sản phẩm'}
+              </span>
+              {restricted ? (
+                <span className="text-muted-foreground">
+                  {' '}
+                  · {selected.size} sản phẩm đang chọn.
+                </span>
+              ) : null}
+            </p>
+            {push.isError ? (
+              <div className="rounded-md border border-destructive-line px-3 py-2 text-sm text-destructive">
+                Đã lưu, nhưng không xem được tiến độ đẩy: {messageFor(push.error)}
+              </div>
+            ) : push.data ? (
+              <PushResultPanel status={push.data} />
+            ) : null}
+          </div>
+        ) : (
+          <div
+            className={
+              running
+                ? 'pointer-events-none flex min-w-0 select-none flex-col gap-3 opacity-60'
+                : 'flex min-w-0 flex-col gap-3'
+            }
+            aria-disabled={running || undefined}
+          >
             <div role="radiogroup" aria-label="Phạm vi sản phẩm" className="flex flex-col gap-2">
               <ModeOption
                 checked={!restricted}
@@ -243,13 +305,38 @@ export function PancakeShopProductsDialog({
           </div>
         )}
 
+        {running ? <PushProgress status={push.data} /> : null}
+
         <DialogFooter>
-          <Button variant="ghost" onClick={() => onOpenChange(false)}>
-            Hủy bỏ
-          </Button>
-          <Button onClick={onSave} disabled={!loaded || save.isPending}>
-            {save.isPending ? 'Đang lưu…' : 'Lưu sản phẩm bán'}
-          </Button>
+          {finished ? (
+            <Button onClick={() => onOpenChange(false)}>Đóng</Button>
+          ) : running ? (
+            <>
+              <span className="mr-auto self-center text-xs text-muted-foreground">
+                Đóng hộp thoại thì việc đẩy vẫn chạy tiếp.
+              </span>
+              <Button variant="ghost" onClick={() => onOpenChange(false)}>
+                Đóng
+              </Button>
+              <Button loading loadingText="Đang đẩy…">
+                Lưu sản phẩm bán
+              </Button>
+            </>
+          ) : (
+            <>
+              <Button variant="ghost" onClick={() => onOpenChange(false)}>
+                Hủy bỏ
+              </Button>
+              <Button
+                onClick={onSave}
+                disabled={!loaded}
+                loading={save.isPending}
+                loadingText="Đang lưu…"
+              >
+                Lưu sản phẩm bán
+              </Button>
+            </>
+          )}
         </DialogFooter>
       </DialogContent>
     </Dialog>
@@ -292,6 +379,96 @@ function ModeOption({
         <span className="block text-xs text-muted-foreground">{hint}</span>
       </span>
     </button>
+  );
+}
+
+/** Dòng tiến độ trên chân hộp thoại khi lượt đẩy đang chờ / đang chạy. */
+function PushProgress({ status }: { status: PancakeShopPushStatus | undefined }) {
+  const active = status?.state === 'active' && status.total > 0;
+  const pct = active ? Math.round((status.done / status.total) * 100) : 0;
+  return (
+    <div
+      role="status"
+      aria-live="polite"
+      className="flex flex-col gap-2 rounded-md border px-3 py-2"
+    >
+      <div className="flex items-center gap-2 text-sm">
+        <Spinner className="size-3.5 text-primary" />
+        <span className="font-medium">
+          {active
+            ? `Đang đẩy lên Pancake · ${status.done}/${status.total}`
+            : 'Đang chờ lượt đẩy trước xong…'}
+        </span>
+      </div>
+      {active ? (
+        <div
+          className="h-1.5 overflow-hidden rounded-full bg-muted"
+          role="progressbar"
+          aria-label="Tiến độ đẩy lên Pancake"
+          aria-valuemin={0}
+          aria-valuemax={status.total}
+          aria-valuenow={status.done}
+        >
+          <div className="h-full rounded-full bg-primary" style={{ width: `${pct}%` }} />
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+/** Kết quả lượt đẩy còn sản phẩm chờ Pancake / lỗi (hoặc lượt đẩy dừng giữa chừng). */
+function PushResultPanel({ status }: { status: PancakeShopPushStatus }) {
+  const { pending, failed } = status.counts;
+  const ok = Math.max(0, status.done - pending - failed);
+  const stopped = status.state === 'failed';
+  return (
+    <div
+      role="status"
+      className="flex flex-col gap-2 rounded-md border border-warning-line bg-warning-weak px-3 py-2"
+    >
+      <p className="text-sm font-medium">
+        {stopped
+          ? `Đã lưu · lượt đẩy dừng ở ${status.done}/${status.total} sản phẩm — lưu lại để đẩy tiếp`
+          : `Đã lưu · ${ok}/${status.total} sản phẩm đã lên Pancake`}
+      </p>
+      <p className="flex gap-4 text-xs text-muted-foreground">
+        <span>
+          <strong className="text-foreground">{ok}</strong> đã lên
+        </span>
+        <span>
+          <strong className="text-foreground">{pending}</strong> chờ Pancake
+        </span>
+        <span>
+          <strong className="text-foreground">{failed}</strong> lỗi
+        </span>
+      </p>
+      {status.items.length > 0 ? (
+        <ul className="max-h-72 divide-y overflow-y-auto rounded-md border bg-card">
+          {status.items.map((it) => (
+            <li key={it.productId} className="flex flex-col gap-0.5 px-3 py-1.5 text-sm">
+              <span className="flex min-w-0 items-center gap-2">
+                {it.action === 'pending' ? (
+                  <StatusBadge tone="warn">Chờ Pancake</StatusBadge>
+                ) : (
+                  <StatusBadge tone="err">Lỗi</StatusBadge>
+                )}
+                <span className="shrink-0 font-mono text-xs">{it.productCode}</span>
+                <span className="truncate">{it.productName}</span>
+              </span>
+              {it.reason ? (
+                <span className="text-xs text-muted-foreground">{it.reason}</span>
+              ) : null}
+            </li>
+          ))}
+        </ul>
+      ) : null}
+      {pending > 0 ? (
+        <p className="text-xs text-muted-foreground">
+          Sản phẩm chờ Pancake: ERP tự liên kết lại sau 1, 5, 15, 30, 60 phút. Lưu lại lần nữa thì
+          ERP đẩy lại mọi sản phẩm đang chọn chưa lên được.
+        </p>
+      ) : null}
+    </div>
   );
 }
 

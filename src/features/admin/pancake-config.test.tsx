@@ -358,6 +358,146 @@ describe('PancakeConfigScreen — /pancake-sync/config', () => {
     );
   });
 
+  it('sản phẩm bán: lưu → hiện tiến độ đẩy; còn chờ Pancake / lỗi thì giữ hộp thoại liệt kê lý do', async () => {
+    const counts = {
+      created: 0,
+      updated: 1,
+      linked: 0,
+      hidden: 0,
+      skipped: 0,
+      failed: 1,
+      pending: 1,
+    };
+    let polls = 0;
+    server.use(
+      http.put('/api/pancake-sync/config/:shopId/products', () =>
+        HttpResponse.json({
+          shopId: '407957969',
+          restricted: false,
+          products: [],
+          updatedAt: '2026-11-11T08:00:00.000Z',
+          updatedBy: null,
+          queued: 3,
+          pushJobId: 'push-shop-catalog-407957969-1',
+        }),
+      ),
+      http.get('/api/pancake-sync/config/:shopId/products/push/:jobId', ({ params }) => {
+        expect(params.jobId).toBe('push-shop-catalog-407957969-1');
+        polls += 1;
+        const base = {
+          jobId: 'push-shop-catalog-407957969-1',
+          total: 3,
+          error: null,
+          startedAt: null,
+          finishedAt: null,
+        };
+        if (polls === 1) {
+          return HttpResponse.json({
+            ...base,
+            state: 'active',
+            done: 1,
+            counts: { ...counts, failed: 0, pending: 0 },
+            items: [],
+          });
+        }
+        return HttpResponse.json({
+          ...base,
+          state: 'completed',
+          done: 3,
+          counts,
+          items: [
+            {
+              productId: 'p-1',
+              productCode: 'SP-0053',
+              productName: 'Bo canxi magie kẽm 1kg',
+              action: 'pending',
+              reason:
+                'Pancake đã có sản phẩm mã này nhưng chưa trả về khi tìm — ERP tự liên kết lại sau',
+            },
+            {
+              productId: 'p-2',
+              productCode: 'CB-0631',
+              productName: 'Combo 5 gói purger',
+              action: 'failed',
+              reason: 'Định mức không phải số nguyên',
+            },
+          ],
+        });
+      }),
+    );
+    renderApp(<PancakeConfigScreen />);
+    await screen.findByText('Shop chính');
+    fireEvent.click(screen.getByRole('button', { name: 'Chọn sản phẩm bán cho shop 407957969' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Lưu sản phẩm bán' }));
+
+    expect(await screen.findByText('Đang đẩy lên Pancake · 1/3')).toBeInTheDocument();
+    expect(screen.getByRole('progressbar', { name: 'Tiến độ đẩy lên Pancake' })).toHaveAttribute(
+      'aria-valuenow',
+      '1',
+    );
+    expect(
+      await screen.findByText('Đã lưu · 1/3 sản phẩm đã lên Pancake', undefined, { timeout: 4000 }),
+    ).toBeInTheDocument();
+    expect(screen.getByText('Chờ Pancake')).toBeInTheDocument();
+    expect(screen.getByText('SP-0053')).toBeInTheDocument();
+    expect(screen.getByText('Định mức không phải số nguyên')).toBeInTheDocument();
+    expect(toastSuccess).not.toHaveBeenCalled();
+    // Chân hộp thoại chỉ còn "Đóng" — không lưu lại khi đang xem kết quả.
+    expect(screen.queryByRole('button', { name: 'Lưu sản phẩm bán' })).not.toBeInTheDocument();
+    expect(screen.getAllByRole('button', { name: 'Đóng' }).length).toBeGreaterThan(0);
+  });
+
+  it('sản phẩm bán: lượt đẩy xong hết → toast số sản phẩm đã đẩy và tự đóng', async () => {
+    server.use(
+      http.put('/api/pancake-sync/config/:shopId/products', () =>
+        HttpResponse.json({
+          shopId: '407957969',
+          restricted: false,
+          products: [],
+          updatedAt: '2026-11-11T08:00:00.000Z',
+          updatedBy: null,
+          queued: 5,
+          pushJobId: 'push-shop-catalog-407957969-2',
+        }),
+      ),
+      http.get('/api/pancake-sync/config/:shopId/products/push/:jobId', () =>
+        HttpResponse.json({
+          jobId: 'push-shop-catalog-407957969-2',
+          state: 'completed',
+          done: 5,
+          total: 5,
+          counts: {
+            created: 2,
+            updated: 3,
+            linked: 0,
+            hidden: 0,
+            skipped: 0,
+            failed: 0,
+            pending: 0,
+          },
+          items: [],
+          error: null,
+          startedAt: null,
+          finishedAt: null,
+        }),
+      ),
+    );
+    renderApp(<PancakeConfigScreen />);
+    await screen.findByText('Shop chính');
+    fireEvent.click(screen.getByRole('button', { name: 'Chọn sản phẩm bán cho shop 407957969' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Lưu sản phẩm bán' }));
+
+    await waitFor(() =>
+      expect(toastSuccess).toHaveBeenCalledWith(
+        'Đã lưu sản phẩm bán',
+        expect.objectContaining({ description: expect.stringMatching(/đã đẩy 5 sản phẩm/) }),
+      ),
+    );
+    await waitFor(() =>
+      expect(screen.queryByRole('button', { name: 'Lưu sản phẩm bán' })).not.toBeInTheDocument(),
+    );
+  });
+
   it('nhân viên Pancake: chưa gắn / tự tạo hiện rõ; gắn tài khoản → POST staff/relink đúng body', async () => {
     const seen: Record<string, unknown>[] = [];
     server.use(

@@ -28,6 +28,8 @@ const COUNT_LABELS: Array<[keyof PancakeBulkPushStatus['counts'], string]> = [
   ['updated', 'Cập nhật'],
   ['hidden', 'Ẩn'],
   ['skipped', 'Bỏ qua'],
+  // Đã tạo / đã có trên Pancake nhưng Pancake chưa trả về để liên kết — ERP tự liên kết lại sau.
+  ['pending', 'Chờ Pancake'],
   ['failed', 'Lỗi'],
 ];
 

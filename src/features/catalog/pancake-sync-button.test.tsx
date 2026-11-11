@@ -21,7 +21,7 @@ vi.mock('next/navigation', () => ({
   useSearchParams: () => new URLSearchParams(''),
 }));
 
-const counts = { created: 0, updated: 0, linked: 0, hidden: 0, skipped: 0, failed: 0 };
+const counts = { created: 0, updated: 0, linked: 0, hidden: 0, skipped: 0, failed: 0, pending: 0 };
 const status = (patch: Partial<PancakeBulkPushStatus>): PancakeBulkPushStatus => ({
   state: 'idle',
   done: 0,
