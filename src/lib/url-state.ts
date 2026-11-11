@@ -1,7 +1,21 @@
 'use client';
 
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
-import { useCallback, useMemo, useRef } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import {
+  listMemoryKey,
+  memorableQuery,
+  readSavedListQuery,
+  writeSavedListQuery,
+} from './list-state-memory';
+
+/** Đã có một `useListState` mount trên client → các lần mount sau không còn là hydrate. */
+let clientMounted = false;
+
+/** Chỉ cho test: trả cờ về trạng thái "tải cứng trang". */
+export function resetListStateClientFlag(mounted = false): void {
+  clientMounted = mounted;
+}
 
 /**
  * Trạng thái danh sách nằm trên URL (luật 8): page / size / sort / q / filter.
@@ -110,8 +124,39 @@ export function useListState<F extends string = string>(defaults: ListStateDefau
   const params = useSearchParams();
   const router = useRouter();
   const pathname = usePathname();
-  const paramsKey = params.toString();
+  const urlKey = params.toString();
   const defaultsRef = useMemo(() => defaults, [defaults]);
+
+  // Bộ lọc lần gần nhất (2026-11-12, xem list-state-memory.ts): mở màn bằng URL trần → áp lại.
+  //  - Vào màn bằng điều hướng trong app (đã có hook nào mount trước đó, không còn hydrate): đọc
+  //    ngay ở lần render đầu để danh sách chỉ tải MỘT lần với bộ lọc đã nhớ, rồi ghi lên URL.
+  //  - Tải cứng trang (render lần đầu phải khớp HTML của server): chỉ ghi lên URL sau khi mount.
+  const memoryKey = useMemo(
+    () => listMemoryKey(pathname, defaultsRef.filterKeys ?? []),
+    [pathname, defaultsRef],
+  );
+  const [restored] = useState(() =>
+    clientMounted && urlKey === '' ? readSavedListQuery(memoryKey) : '',
+  );
+  const restoring = useRef(restored !== '');
+  if (urlKey !== '') restoring.current = false;
+  const paramsKey = restoring.current ? restored : urlKey;
+
+  useEffect(() => {
+    clientMounted = true;
+    if (urlKey !== '') return;
+    const qs = restored || readSavedListQuery(memoryKey);
+    if (!qs) return;
+    restoring.current = true;
+    router.replace(`${pathname}?${qs}`, { scroll: false });
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- chỉ một lần khi mở màn
+  }, []);
+
+  // Nhớ mỗi lần bộ lọc trên URL đổi (kể cả xóa hết lọc → quên). Đang chờ áp lại thì chưa ghi.
+  useEffect(() => {
+    if (restoring.current) return;
+    writeSavedListQuery(memoryKey, memorableQuery(urlKey, defaultsRef.filterKeys ?? []));
+  }, [urlKey, memoryKey, defaultsRef]);
 
   const state = useMemo(
     () => parseListState<F>(new URLSearchParams(paramsKey), defaultsRef),

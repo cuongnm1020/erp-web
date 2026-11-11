@@ -23,10 +23,11 @@ export interface CookieSpec {
 }
 
 /**
- * Refresh TTL mặc định khớp apps/api WEB_REFRESH_TTL (135 phút, phiên web — PDA mới giữ 7 ngày):
- * đóng trình duyệt quá mốc này thì cookie cũng hết, mở lại vào thẳng /login.
+ * Refresh TTL mặc định khớp apps/api REFRESH_TTL_SECONDS (7 ngày). 2026-11-12 (user chốt): bỏ tự
+ * đăng xuất khi không thao tác — trước đó phiên web chỉ giữ 135 phút (WEB_REFRESH_TTL, đã bỏ).
+ * Không mở web quá mốc này thì cookie hết, mở lại vào thẳng /login.
  */
-export const DEFAULT_REFRESH_TTL_SECONDS = 135 * 60;
+export const DEFAULT_REFRESH_TTL_SECONDS = 7 * 24 * 60 * 60;
 
 export function buildAuthCookies(
   pair: TokenPairLike,

@@ -76,6 +76,8 @@ export interface DataTableProps<T> {
   maxHeight?: string;
   /** false = bảng không phân trang (API trả đủ dòng, ví dụ báo cáo theo nhân viên) — ẩn thanh trang. */
   pagination?: boolean;
+  /** Các cỡ trang chọn được (mặc định 20 / 50 / 100 / 200) — danh sách đơn thêm 1000. */
+  pageSizes?: readonly number[];
   /** id cột đang ẩn — chọn bằng `ColumnPicker`. */
   hiddenColumns?: string[];
   /** Cột STT đầu bảng (mặc định bật) — false cho bảng nhỏ trong thẻ / hộp thoại. */
@@ -107,6 +109,7 @@ export function DataTable<T>({
   bulkActions,
   maxHeight = '70vh',
   pagination = true,
+  pageSizes,
   hiddenColumns,
   rowNumbers = true,
   className,
@@ -325,6 +328,7 @@ export function DataTable<T>({
           size={size}
           total={total}
           selectedCount={selectedIds.length}
+          sizes={pageSizes}
           onPageChange={onPageChange}
           onSizeChange={onSizeChange}
         />

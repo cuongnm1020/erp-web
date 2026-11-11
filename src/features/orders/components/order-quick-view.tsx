@@ -236,7 +236,9 @@ function Body({ row }: { row: SalesOrderListItem }) {
           </Can>
         ) : null}
         <Button asChild>
-          <Link href={`/crm/orders/${row.id}`}>Mở đơn đầy đủ</Link>
+          <Link href={`/crm/orders/${row.id}`} target="_blank" rel="noreferrer">
+            Mở đơn đầy đủ
+          </Link>
         </Button>
       </div>
     </>

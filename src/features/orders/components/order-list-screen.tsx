@@ -21,7 +21,13 @@ import { CopyButton } from '@/components/data/copy-button';
 import { CopyText } from '@/components/data/copy-text';
 import { ExportExcelButton, type ExportColumn } from '@/components/data/export-excel-button';
 import { pancakeShopLabel } from '@/components/data/pancake-shop-select';
-import { ColumnPicker, DataTable, FilterBar, type ColumnDef } from '@/components/data/data-table';
+import {
+  ColumnPicker,
+  DataTable,
+  FilterBar,
+  ORDER_PAGE_SIZES,
+  type ColumnDef,
+} from '@/components/data/data-table';
 import { RowActions, type RowActionItem } from '@/components/data/row-actions';
 import { EmptyState, ListSkeleton, QueryState } from '@/components/data/states';
 import { StatusBadge } from '@/components/data/status-badge';
@@ -152,6 +158,8 @@ import { useSkuDetail, useSkuSearch } from '../api/use-line-entry';
  */
 const DEFAULTS = {
   size: 50,
+  // 1000 dòng / trang (2026-11-12, user chốt) — GET /sales-orders nhận take ≤ 1000.
+  maxSize: 1000,
   filterKeys: [
     'flow',
     // Tab cha "Cần xử lý" (`view=issues`) + chip của nó (`ci`), 2026-11-07.
@@ -423,6 +431,9 @@ const buildColumns = (
           <div className="flex items-center gap-1.5">
             <Link
               href={`/crm/orders/${o.id}`}
+              // Mở tab mới (2026-11-12, user chốt) — danh sách giữ nguyên bộ lọc + dòng đang tích.
+              target="_blank"
+              rel="noreferrer"
               onClick={(e) => e.stopPropagation()}
               className="font-mono text-xs font-semibold text-primary hover:underline"
             >
@@ -1831,6 +1842,7 @@ export function OrderListScreen() {
             size={state.size}
             sort={sortBy ? sort : null}
             hiddenColumns={hidden}
+            pageSizes={ORDER_PAGE_SIZES}
             onPageChange={(page) => set({ page })}
             onSizeChange={(size) => set({ size })}
             onSortChange={changeSort}
