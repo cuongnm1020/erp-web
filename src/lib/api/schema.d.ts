@@ -2321,10 +2321,28 @@ export interface paths {
         /** Sản phẩm bán trên shop (POS) này — `restricted = false` = bán mọi sản phẩm. */
         get: operations["PancakeConfigController_shopProducts"];
         /**
-         * Gán sản phẩm cho shop (ghi đè danh sách). Worker đẩy lại các sản phẩm bị ảnh hưởng: được
-         *     gán → tạo / hiện trên POS; bỏ gán → ẩn. Trả `queued` = số sản phẩm đã xếp đẩy.
+         * Gán sản phẩm cho shop (ghi đè danh sách) rồi xếp NGAY lượt đẩy riêng của shop: được gán →
+         *     tạo / hiện trên POS; bỏ gán → ẩn; sản phẩm đang chọn chưa liên kết đủ → đẩy lại. Trả
+         *     `queued` = số sản phẩm xếp đẩy, `pushJobId` để hỏi tiến độ.
          */
         put: operations["PancakeConfigController_replaceShopProducts"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/pancake-sync/config/{shopId}/products/push/{jobId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Tiến độ lượt đẩy danh mục shop (`pushJobId` của PUT) — sản phẩm chờ Pancake / lỗi kèm lý do. */
+        get: operations["PancakeConfigController_shopProductsPush"];
+        put?: never;
         post?: never;
         delete?: never;
         options?: never;
@@ -10851,14 +10869,50 @@ export interface components {
             updatedBy: string | null;
             /**
              * @description Chỉ có ở PUT: số sản phẩm đã xếp đẩy lại lên shop (thêm vào → đẩy lên / hiện lại, bỏ ra →
-             *     ẩn). Chạy nền ở worker; 0 = không có gì đổi.
+             *     ẩn; cộng sản phẩm đang chọn chưa liên kết đủ). Chạy nền ở worker; 0 = không có gì đổi.
              */
             queued?: number;
+            /**
+             * @description Chỉ có ở PUT: id lượt đẩy (queue `pancake-push`) — hỏi
+             *     `GET /pancake-sync/config/:shopId/products/push/:jobId` tới khi xong. null = không có gì cần
+             *     đẩy, hoặc không xếp được job (đã chuyển sang hàng đợi event, POS cập nhật sau ít phút).
+             */
+            pushJobId?: string | null;
         };
         UpdateShopProductsDto: {
             restricted: boolean;
             /** @description core.Product.id — sản phẩm thường hoặc combo, chưa xoá. */
             productIds: string[];
+        };
+        PancakePushCountsDto: {
+            created: number;
+            updated: number;
+            linked: number;
+            hidden: number;
+            skipped: number;
+            failed: number;
+            pending: number;
+        };
+        PancakeShopPushItemDto: {
+            productId: string;
+            productCode: string;
+            productName: string;
+            /** @enum {string} */
+            action: "pending" | "failed";
+            reason: string | null;
+        };
+        PancakeShopPushStatusDto: {
+            jobId: string;
+            /** @enum {string} */
+            state: "completed" | "failed" | "active" | "waiting" | "missing";
+            done: number;
+            total: number;
+            counts: components["schemas"]["PancakePushCountsDto"];
+            /** @description Sản phẩm `pending` / `failed` (tối đa 100), xếp theo mã. */
+            items: components["schemas"]["PancakeShopPushItemDto"][];
+            error: string | null;
+            startedAt: string | null;
+            finishedAt: string | null;
         };
         PancakeShopOptionDto: {
             /** @description Mã shop Pancake (bigint dạng chuỗi) — giá trị gửi vào `pancakeShopId` của GET /sales-orders. */
@@ -10929,14 +10983,6 @@ export interface components {
             shopId: number;
             limit?: number;
         };
-        PancakePushCountsDto: {
-            created: number;
-            updated: number;
-            linked: number;
-            hidden: number;
-            skipped: number;
-            failed: number;
-        };
         PancakeBulkPushFailureDto: {
             shopId: string;
             productId: string;
@@ -10966,10 +11012,13 @@ export interface components {
             /**
              * @description created = POST mới; updated = PUT theo id đã liên kết; linked = chưa liên kết nhưng đã có
              *     trên Pancake (tìm theo mã) → liên kết rồi PUT, không tạo trùng; hidden = sản phẩm ngừng / xóa → ẩn trên
-             *     POS; skipped = không đẩy (lý do ở `reason`); failed = Pancake từ chối (lý do ở `reason`).
+             *     POS; skipped = không đẩy (lý do ở `reason`); failed = Pancake từ chối (lý do ở `reason`);
+             *     pending = đã có trên Pancake (vừa tạo, hoặc Pancake báo "đã tồn tại") nhưng Pancake chưa trả
+             *     về khi tìm theo mã (index chậm, có khi hàng giờ) → chưa liên kết được; ERP tự tìm lại theo
+             *     lịch (1 / 5 / 15 / 30 / 60 phút) rồi liên kết + khai thành phần combo.
              * @enum {string}
              */
-            action: "failed" | "created" | "updated" | "skipped" | "linked" | "hidden";
+            action: "pending" | "failed" | "created" | "updated" | "skipped" | "linked" | "hidden";
             /** @description Id trên Pancake sau khi đẩy (sync.entity_link); null khi chưa liên kết được. */
             externalId: string | null;
             reason: string | null;
@@ -22646,6 +22695,28 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["PancakeShopProductsDto"];
+                };
+            };
+        };
+    };
+    PancakeConfigController_shopProductsPush: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                shopId: number;
+                jobId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PancakeShopPushStatusDto"];
                 };
             };
         };

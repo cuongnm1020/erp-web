@@ -119,8 +119,9 @@ export function pancakeShopProductsQuery(shopId: string) {
 }
 
 /**
- * PUT /pancake-sync/config/{shopId}/products — ghi đè danh sách gán. Server xếp đẩy lại các sản
- * phẩm bị ảnh hưởng lên Pancake (`queued`).
+ * PUT /pancake-sync/config/{shopId}/products — ghi đè danh sách gán. Server xếp ngay một lượt đẩy
+ * (`pushJobId`, gồm sản phẩm thêm/bớt + sản phẩm đang chọn chưa lên đủ); theo dõi bằng
+ * `usePancakeShopPush`. `pushJobId` null = không có gì cần đẩy (hoặc server rơi về hàng đợi chung).
  */
 export function useUpdatePancakeShopProducts(shopId: string) {
   const qc = useQueryClient();
@@ -133,6 +134,32 @@ export function useUpdatePancakeShopProducts(shopId: string) {
         }),
       ),
     onSuccess: () => void qc.invalidateQueries({ queryKey: pancakeShopProductKeys.detail(shopId) }),
+  });
+}
+
+export type PancakeShopPushStatus = components['schemas']['PancakeShopPushStatusDto'];
+export type PancakeShopPushItem = components['schemas']['PancakeShopPushItemDto'];
+
+/** Lượt đẩy còn chạy (đang chờ lượt trước / đang đẩy) — hết thì thôi hỏi lại. */
+export function isShopPushRunning(s: PancakeShopPushStatus | undefined): boolean {
+  return !s || s.state === 'waiting' || s.state === 'active';
+}
+
+/**
+ * GET /pancake-sync/config/{shopId}/products/push/{jobId} — tiến độ lượt đẩy danh mục shop. Hỏi
+ * lại mỗi 1,5 s tới khi job xong / lỗi / hết hạn (`missing`).
+ */
+export function usePancakeShopPush(shopId: string, jobId: string | null) {
+  return useQuery({
+    queryKey: [...pancakeShopProductKeys.detail(shopId), 'push', jobId] as const,
+    queryFn: () =>
+      unwrap(
+        api.GET('/pancake-sync/config/{shopId}/products/push/{jobId}', {
+          params: { path: { shopId: Number(shopId), jobId: jobId ?? '' } },
+        }),
+      ),
+    enabled: !!jobId,
+    refetchInterval: (query) => (isShopPushRunning(query.state.data) ? 1500 : false),
   });
 }
 
