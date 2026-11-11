@@ -3696,6 +3696,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/sales-orders/marketer-options": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Ô Marketer trên màn tạo / sửa đơn: chỉ nhân viên sale (SALES_LEADER / SALES_MEMBER) — khai TRƯỚC `:id`. */
+        get: operations["SalesOrderController_marketerOptions"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/sales-orders/creator-options": {
         parameters: {
             query?: never;
@@ -24859,6 +24876,25 @@ export interface operations {
         };
     };
     SalesOrderController_staffOptions: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OrderStaffOptionDto"][];
+                };
+            };
+        };
+    };
+    SalesOrderController_marketerOptions: {
         parameters: {
             query?: never;
             header?: never;

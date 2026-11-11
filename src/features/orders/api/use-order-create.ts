@@ -41,6 +41,7 @@ export type SameDayOrders = components['schemas']['SameDayOrdersDto'];
 const createKeys = {
   staff: () => [...lineEntryKeys.all, 'staff'] as const,
   owners: () => [...lineEntryKeys.all, 'owners'] as const,
+  marketers: () => [...lineEntryKeys.all, 'marketers'] as const,
   tags: () => [...lineEntryKeys.all, 'tags'] as const,
   skuQuick: (q: string, isCombo: boolean) =>
     [...lineEntryKeys.all, 'sku-quick', { q, isCombo }] as const,
@@ -70,6 +71,18 @@ export function useOrderOwnerOptions() {
   return useQuery({
     queryKey: createKeys.owners(),
     queryFn: () => unwrap(api.GET('/sales-orders/owner-options')),
+    staleTime: 5 * 60_000,
+  });
+}
+
+/**
+ * GET /sales-orders/marketer-options — ô Marketer (2026-11-11): chỉ nhân viên sale. Đơn gán cho
+ * sale qua `marketerId` để thống kê doanh số theo sale.
+ */
+export function useOrderMarketerOptions() {
+  return useQuery({
+    queryKey: createKeys.marketers(),
+    queryFn: () => unwrap(api.GET('/sales-orders/marketer-options')),
     staleTime: 5 * 60_000,
   });
 }

@@ -207,6 +207,40 @@ describe('OrderEditScreen — trang sửa đơn (D-05, PATCH /sales-orders/{id})
     );
   });
 
+  it('Marketer (2026-11-11): chọn nhân viên sale → PATCH marketerId', async () => {
+    const calls: Array<Record<string, unknown>> = [];
+    const patch = http.patch('/api/sales-orders/:id', async ({ params, request }) => {
+      const body = (await request.json()) as Record<string, unknown>;
+      calls.push(body);
+      return HttpResponse.json({
+        orderId: params.id,
+        docNumber: ORDER.docNumber,
+        status: ORDER.status,
+        carrierId: null,
+        changed: Object.keys(body),
+      });
+    });
+    server.use(
+      patch,
+      http.get('/api/sales-orders/marketer-options', () =>
+        HttpResponse.json([
+          { id: '00000000-0000-4000-8000-0000000000a3', code: 'sale.hn.3', fullName: 'Lê Văn Ba' },
+        ]),
+      ),
+      http.get('/api/sales-orders/:id', () =>
+        HttpResponse.json({ ...DETAIL, marketerId: null, marketerName: null }),
+      ),
+    );
+    renderApp(<OrderEditScreen orderId={ORDER.id} />);
+    await screen.findByRole('heading', { level: 1 });
+    fireEvent.click(screen.getByRole('combobox', { name: 'Marketer' }));
+    fireEvent.click(await screen.findByRole('option', { name: /Lê Văn Ba/ }));
+    fireEvent.click(screen.getByRole('button', { name: /Lưu thay đổi/ }));
+    await waitFor(() =>
+      expect(calls).toEqual([{ marketerId: '00000000-0000-4000-8000-0000000000a3' }]),
+    );
+  });
+
   it('chọn hãng có bảng cước (GHTK) → hỏi GET shipping-quote?carrierId và hiện cước; hãng không có quote → không hỏi', async () => {
     const asked: string[] = [];
     server.use(

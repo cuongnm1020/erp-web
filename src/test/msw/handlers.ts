@@ -1671,6 +1671,16 @@ export const handlers = [
       },
     ]),
   ),
+  // Marketer (2026-11-11): chỉ nhân viên sale.
+  http.get('/api/sales-orders/marketer-options', () =>
+    HttpResponse.json([
+      {
+        id: '00000000-0000-4000-8000-0000000000a1',
+        code: 'sale.hn.1',
+        fullName: 'Nguyễn Văn Sale',
+      },
+    ]),
+  ),
   http.get('/api/pickup-warehouses', () => HttpResponse.json(PICKUP_WAREHOUSES)),
   http.get('/api/sales-orders/:id/shipping-quote', ({ params, request }) => {
     const carrierId = new URL(request.url).searchParams.get('carrierId') ?? '';

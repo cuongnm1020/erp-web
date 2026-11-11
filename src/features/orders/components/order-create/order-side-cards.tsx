@@ -52,6 +52,7 @@ import {
   useCustomerPhoneMatch,
   useCustomerPhoneSuggest,
   useSameDayOrders,
+  useOrderMarketerOptions,
   useOrderOwnerOptions,
   useOrderStaffOptions,
   useOrderTags,
@@ -145,6 +146,8 @@ const staffSearch =
 const useStaffSearch = staffSearch(useOrderStaffOptions);
 /** NV xử lý chỉ chọn trong team người tạo (GET /sales-orders/owner-options). */
 const useOwnerSearch = staffSearch(useOrderOwnerOptions);
+/** Marketer chỉ chọn nhân viên sale (GET /sales-orders/marketer-options, 2026-11-11). */
+const useMarketerSearch = staffSearch(useOrderMarketerOptions);
 
 /**
  * Ô NV xử lý không gắn form (màn Sửa đơn, 2026-11-07): cùng danh sách người cùng team như lúc tạo
@@ -182,6 +185,39 @@ export function OwnerPicker({
 }
 
 /**
+ * Ô Marketer không gắn form (màn Sửa đơn, 2026-11-11): chỉ nhân viên sale; xoá được (`''` = bỏ
+ * gán). Marketer cũ có thể không còn là sale — hiện tên từ đơn.
+ */
+export function MarketerPicker({
+  value,
+  onChange,
+  currentName,
+  disabled,
+}: {
+  value: string;
+  onChange: (id: string, name: string | null) => void;
+  currentName?: string | null;
+  disabled?: boolean;
+}) {
+  const marketers = useOrderMarketerOptions();
+  const list = Array.isArray(marketers.data) ? marketers.data : [];
+  return (
+    <EntityPicker
+      value={value}
+      onChange={(id) => onChange(id, list.find((u) => u.id === id)?.fullName ?? null)}
+      useSearch={useMarketerSearch}
+      selectedLabel={list.find((u) => u.id === value)?.fullName ?? currentName ?? undefined}
+      placeholder="Chọn nhân viên sale"
+      searchPlaceholder="Tìm tên, mã nhân viên…"
+      emptyText="Không có nhân viên sale khớp"
+      clearable
+      disabled={disabled}
+      aria-label="Marketer"
+    />
+  );
+}
+
+/**
  * Ô chọn nhân viên trên đơn. `bare` = chỉ ô chọn (nhãn do nơi gọi vẽ — dải "Thông tin đơn" đầu
  * màn, redesign 2026-10-22); mặc định = hàng nhãn ← → ô của card bên phải.
  */
@@ -199,9 +235,12 @@ export function StaffField({
   bare?: boolean;
 }) {
   const isOwner = name === 'ownerId';
+  const isMarketer = name === 'marketerId';
   const staffAll = useOrderStaffOptions();
   const owners = useOrderOwnerOptions();
-  const staff = isOwner ? owners : staffAll;
+  const marketers = useOrderMarketerOptions();
+  const staff = isOwner ? owners : isMarketer ? marketers : staffAll;
+  const useSearch = isOwner ? useOwnerSearch : isMarketer ? useMarketerSearch : useStaffSearch;
   return (
     <FormField
       control={form.control}
@@ -212,7 +251,7 @@ export function StaffField({
             <EntityPicker
               value={field.value}
               onChange={(id) => field.onChange(id)}
-              useSearch={isOwner ? useOwnerSearch : useStaffSearch}
+              useSearch={useSearch}
               selectedLabel={staff.data?.find((u) => u.id === field.value)?.fullName}
               placeholder={placeholder}
               searchPlaceholder="Tìm tên, mã nhân viên…"
@@ -300,8 +339,8 @@ export function TagPicker({ form }: { form: Form }) {
 }
 
 /**
- * NV phụ (NV đóng hàng / NV chăm sóc / Marketer) — tạm ẩn (user yêu cầu 2026-10-21), bật lại bằng
- * cờ. Ngày tạo đơn đã lên dải "Thông tin đơn" đầu màn (2026-11-03).
+ * NV phụ (NV đóng hàng / NV chăm sóc) — tạm ẩn (user yêu cầu 2026-10-21), bật lại bằng cờ.
+ * Marketer đã lên dải "Thông tin đơn" (2026-11-11). Ngày tạo đơn đã lên dải "Thông tin đơn" đầu màn (2026-11-03).
  */
 export function InfoCard({ form }: { form: Form }) {
   if (!SHOW_EXTRA_STAFF) return null;
@@ -319,7 +358,6 @@ export function InfoCard({ form }: { form: Form }) {
         label="NV chăm sóc"
         placeholder="Chọn NV chăm sóc"
       />
-      <StaffField form={form} name="marketerId" label="Marketer" placeholder="Chọn Marketer" />
     </Card>
   );
 }
