@@ -87,7 +87,8 @@ function EventLine({ e }: { e: CarrierStatusLog }) {
 
 function Group({ g, current, last }: { g: JourneyGroup; current: boolean; last: boolean }) {
   const [open, setOpen] = useState(false);
-  const meta = STAGE[g.stage];
+  // API cũ (trước 2026-11-11) chưa trả journeyStage → "Cập nhật khác", không vỡ màn.
+  const meta = STAGE[g.stage] ?? STAGE.OTHER;
   const [latest, ...older] = g.events;
   if (!latest) return null;
   return (
