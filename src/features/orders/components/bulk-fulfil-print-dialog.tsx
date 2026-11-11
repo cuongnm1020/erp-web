@@ -52,6 +52,8 @@ import {
   type SalesOrder,
 } from '../api/use-orders';
 import { OrderResultsPanel, type OrderResultRow } from './order-results-panel';
+import { usePrintStates, type OrderPrintState } from '../api/use-print-states';
+import { isPrintLocked, printLockReason } from '@/features/wms/print-guard';
 
 type Failed = BulkFulfilOrdersResult['failed'][number];
 
@@ -61,6 +63,97 @@ export interface FulfilPrintOutcome {
   failed: Failed[];
   /** Đơn có mã nhưng hãng chưa phản hồi (đang thử lại) — chưa in được. */
   queued: number;
+  /** Đơn đã in tem + đã gán NV đóng hàng — không in, nằm tab Cảnh báo (PRINT-DUP-1). */
+  locked?: OrderPrintState[];
+}
+
+/** Đơn bị chặn in trùng → dòng tab Cảnh báo. */
+export function lockedRows(locked: OrderPrintState[]): OrderResultRow[] {
+  return locked.map((s) => ({
+    orderId: s.orderId,
+    docNumber: s.docNumber,
+    customerName: s.customerName,
+    marketplace: s.marketplace,
+    group: 'warn',
+    status: 'Không in — đã in, đã có NV đóng',
+    reason: printLockReason(s),
+  }));
+}
+
+/** Phiếu in lại được của các đơn bị chặn: có mã vận đơn, phiếu chưa hủy. */
+export function lockedShipmentIds(locked: OrderPrintState[]): string[] {
+  return locked.flatMap((s) =>
+    s.shipment?.trackingNo && !['CANCELLED', 'CARRIER_CANCELLED'].includes(s.shipment.status)
+      ? [s.shipment.id]
+      : [],
+  );
+}
+
+/**
+ * Nút "In lại N đơn này" trên tab Cảnh báo — bấm lần đầu chỉ hỏi lại (nêu hậu quả: đóng trùng),
+ * bấm "In lại N tem" mới in (PRINT-DUP-1, user chốt phải xác nhận trước khi in lại).
+ */
+export function LockedReprintAction({
+  count,
+  busy,
+  onPrint,
+}: {
+  count: number;
+  busy: boolean;
+  onPrint: () => Promise<boolean>;
+}) {
+  const [asking, setAsking] = useState(false);
+  const [done, setDone] = useState(false);
+  if (count === 0) {
+    return (
+      <p className="text-sm text-muted-foreground">
+        Các đơn này chưa có mã vận đơn còn dùng được — không in lại được.
+      </p>
+    );
+  }
+  if (done) return <p className="text-sm text-success">Đã gửi lệnh in lại {count} tem.</p>;
+  if (!asking) {
+    return (
+      <>
+        <p className="text-sm text-muted-foreground">
+          Các đơn này đã in tem và đã có NV đóng hàng — in lại có thể làm đóng trùng một đơn.
+        </p>
+        <Button size="sm" variant="outline" onClick={() => setAsking(true)}>
+          <Printer aria-hidden />
+          In lại {count} đơn này
+        </Button>
+      </>
+    );
+  }
+  return (
+    <div
+      className="w-full space-y-2 rounded-md border border-warning-line bg-warning-weak p-3"
+      role="alertdialog"
+      aria-label={`In lại tem ${count} đơn đã in?`}
+    >
+      <p className="text-sm font-semibold">In lại tem {count} đơn đã in?</p>
+      <p className="text-sm">
+        Đơn đã có NV đóng hàng. In thêm tem có thể khiến hai người cùng đóng một đơn — chỉ in khi
+        tem cũ bị mất / hỏng.
+      </p>
+      <div className="flex justify-end gap-2">
+        <Button size="sm" variant="outline" disabled={busy} onClick={() => setAsking(false)}>
+          Hủy
+        </Button>
+        <Button
+          size="sm"
+          loading={busy}
+          onClick={() =>
+            void onPrint().then((ok) => {
+              if (ok) setDone(true);
+            })
+          }
+        >
+          In lại {count} tem
+        </Button>
+      </div>
+    </div>
+  );
 }
 
 /** Lý do theo mã lỗi (luật 6) + nguyên văn lời hãng; đơn đã trừ tồn thì nói rõ đừng đóng lại. */
@@ -93,6 +186,7 @@ export function useFulfilPrint() {
   const queryClient = useQueryClient();
   const fetchLabels = useShipmentLabelDataMany();
   const markPrinted = useMarkLabelsPrinted();
+  const printStates = usePrintStates();
 
   const setOrientation = (v: WaybillOrientation) => {
     setOrientationState(v);
@@ -182,6 +276,52 @@ export function useFulfilPrint() {
     ) : null;
 
   /**
+   * Cảnh báo in trùng (PRINT-DUP-1): tách đơn ĐÃ in tem + ĐÃ gán NV đóng hàng theo trạng thái MỚI
+   * NHẤT trên server. null = không đọc được (đã báo toast) — không in gì.
+   */
+  const splitLocked = async (
+    orderIds: string[],
+  ): Promise<{ free: string[]; locked: OrderPrintState[] } | null> => {
+    try {
+      const states = await printStates.mutateAsync(orderIds);
+      const locked = orderIds.flatMap((id) => {
+        const s = states.get(id);
+        return s && isPrintLocked(s) ? [s] : [];
+      });
+      const lockedIds = new Set(locked.map((s) => s.orderId));
+      return { free: orderIds.filter((id) => !lockedIds.has(id)), locked };
+    } catch (err) {
+      toast.error(messageFor(err));
+      return null;
+    }
+  };
+
+  /** In lại tem các phiếu (đơn ở tab Cảnh báo, người dùng đã xác nhận) — không đóng gói lại. */
+  const printShipments = async (shipmentIds: string[]): Promise<boolean> => {
+    if (shipmentIds.length === 0) return false;
+    try {
+      const data = await fetchLabels.mutateAsync(shipmentIds);
+      if (data.length === 0) {
+        toast.error('Không lấy được dữ liệu tem của đơn nào.');
+        return false;
+      }
+      setLabels(data);
+      setFromSeq(1);
+      setPrintedAt(new Date());
+      printer.print();
+      markPrinted.mutate(
+        data.filter((l) => l.trackingNo).map((l) => l.shipmentId),
+        { onError: () => undefined },
+      );
+      toast.success(`Đã in lại ${data.length} tem`);
+      return true;
+    } catch (err) {
+      toast.error(messageFor(err));
+      return false;
+    }
+  };
+
+  /**
    * In lại phần còn lại của lô vừa in, từ tem số `from` (máy in dừng giữa chừng — 2026-11-10).
    * Không đóng gói / xin mã lại; số "x/N" giữ như lần in đầu.
    */
@@ -196,12 +336,14 @@ export function useFulfilPrint() {
     orientation,
     setOrientation,
     run,
+    splitLocked,
+    printShipments,
     sheet,
     /** Số tem của lô vừa in (0 = chưa in) — ô "In lại từ tem số". */
     labelCount: labels.length,
     reprintFrom,
     printing: printer.open,
-    pending: progress !== null || bulk.isPending || fetchLabels.isPending,
+    pending: progress !== null || bulk.isPending || fetchLabels.isPending || printStates.isPending,
     /** Chữ trên nút đang chạy — "Đang đóng gói 16/50…" / "Đang lấy tem…"; null = rảnh. */
     busyLabel: progress
       ? progress.stage === 'pack'
@@ -321,6 +463,7 @@ export function FulfilResultsPanel({
   onClose,
   flush = false,
   reprint,
+  onPrintLocked,
 }: {
   outcome: FulfilPrintOutcome;
   onClose: () => void;
@@ -328,18 +471,34 @@ export function FulfilResultsPanel({
   flush?: boolean;
   /** Ô "In lại từ tem số" (2026-11-10) — lô vừa in từ 2 tem. */
   reprint?: { total: number; onPrint: (from: number) => void; busy: boolean };
+  /** In lại đơn tab Cảnh báo (đã xác nhận) — PRINT-DUP-1. */
+  onPrintLocked?: (shipmentIds: string[]) => Promise<boolean>;
 }) {
-  const { rows, failed } = outcome;
+  const { failed } = outcome;
+  const locked = outcome.locked ?? [];
+  const rows = locked.length > 0 ? [...outcome.rows, ...lockedRows(locked)] : outcome.rows;
   const [fromText, setFromText] = useState('');
   const from = reprint ? parseFromSeq(fromText, reprint.total) : 1;
+  const lockedShipments = lockedShipmentIds(locked);
   return (
     <OrderResultsPanel
       title={
         failed.length > 0 ? (
           <span className="text-destructive">{failed.length} đơn không đóng gói / in được</span>
+        ) : locked.length > 0 ? (
+          <span className="text-warning">{locked.length} đơn không in — đã in, đã có NV đóng</span>
         ) : (
           `Đã xử lý ${rows.length} đơn`
         )
+      }
+      warnAction={
+        locked.length > 0 && onPrintLocked ? (
+          <LockedReprintAction
+            count={lockedShipments.length}
+            busy={!!reprint?.busy}
+            onPrint={() => onPrintLocked(lockedShipments)}
+          />
+        ) : undefined
       }
       description={
         failed.some((f) => f.packed)
@@ -351,6 +510,7 @@ export function FulfilResultsPanel({
         ok: 'Có mã vận đơn — đã gửi lệnh in',
         wait: 'Hãng chưa phản hồi — đang thử lại',
         fix: 'Lỗi — cần sửa',
+        ...(locked.length > 0 ? { warn: 'Đã in + có NV đóng — không in' } : {}),
       }}
       footer={
         <>
@@ -439,6 +599,8 @@ export function BulkFulfilPrintDialog({
   const fp = useFulfilPrint();
   const [packerId, setPackerId] = useState('');
   const assignPacker = useBulkUpdateOrders();
+  /** Đơn lẻ đã in + đã có NV đóng → hỏi trước khi in lại (PRINT-DUP-1). */
+  const [confirmLock, setConfirmLock] = useState<OrderPrintState | null>(null);
 
   // Đơn Pancake sale để Chờ hàng trên POS (DRAFT, tab Chờ hàng) cũng đóng gói được — server tự xác
   // nhận (Pancake 11 → 1) trước khi đóng gói (2026-11-06, user chốt).
@@ -469,12 +631,33 @@ export function BulkFulfilPrintDialog({
   const close = (o: boolean) => {
     if (fp.pending) return;
     setOpen(o);
-    if (!o) setOutcome(null);
+    if (!o) {
+      setOutcome(null);
+      setConfirmLock(null);
+    }
   };
 
-  const submit = async () => {
+  /** `force` = người dùng đã xác nhận in lại đơn lẻ đã in + đã có NV đóng (PRINT-DUP-1). */
+  const submit = async (force = false) => {
     if (ready.length === 0 || fp.pending || assignPacker.isPending || packerBlocked) return;
     let ids = ready.map((o) => o.id);
+    let locked: OrderPrintState[] = [];
+    if (!force) {
+      // Kiểm TRƯỚC khi gán NV đóng hàng — không ghi đè NV của đơn đã in.
+      const split = await fp.splitLocked(ids);
+      if (!split) return;
+      if (split.locked.length > 0 && ready.length === 1) {
+        setConfirmLock(split.locked[0]!);
+        return;
+      }
+      ids = split.free;
+      locked = split.locked;
+    }
+    const lockedOnly = () => setOutcome({ rows: [], failed: [], queued: 0, locked });
+    if (ids.length === 0) {
+      lockedOnly();
+      return;
+    }
     if (askPacker) {
       // Gán NV đóng hàng TRƯỚC khi in; đơn nào không gán được thì không đóng gói đơn đó.
       try {
@@ -490,13 +673,18 @@ export function BulkFulfilPrintDialog({
         toast.error(messageFor(err));
         return;
       }
-      if (ids.length === 0) return;
+      if (ids.length === 0) {
+        if (locked.length > 0) lockedOnly();
+        return;
+      }
     }
     const r = await fp.run(ids, new Map(rows.map((o) => [o.id, o])));
     if (!r) return;
-    // Nhiều đơn / có lỗi / hãng chưa phản hồi → giữ hộp thoại với kết quả TỪNG đơn (2026-10-28).
-    if (r.failed.length > 0 || r.rows.length > 1 || r.queued > 0) setOutcome(r);
-    else setOpen(false);
+    // Nhiều đơn / có lỗi / hãng chưa phản hồi / đơn bị chặn in trùng → giữ hộp thoại với kết quả
+    // TỪNG đơn (2026-10-28).
+    if (r.failed.length > 0 || r.rows.length > 1 || r.queued > 0 || locked.length > 0) {
+      setOutcome({ ...r, locked });
+    } else setOpen(false);
     setFinished(true);
   };
 
@@ -526,8 +714,43 @@ export function BulkFulfilPrintDialog({
               <FulfilResultsPanel
                 outcome={outcome}
                 onClose={() => close(false)}
-                reprint={{ total: fp.labelCount, onPrint: fp.reprintFrom, busy: fp.printing }}
+                reprint={{
+                  total: fp.labelCount,
+                  onPrint: fp.reprintFrom,
+                  busy: fp.printing || fp.pending,
+                }}
+                onPrintLocked={fp.printShipments}
               />
+            </>
+          ) : confirmLock ? (
+            <>
+              <DialogHeader>
+                <DialogTitle>In lại tem đơn {confirmLock.docNumber}?</DialogTitle>
+                <DialogDescription>
+                  {printLockReason(confirmLock)}. In thêm tem có thể khiến hai người cùng đóng một
+                  đơn — chỉ in khi tem cũ bị mất / hỏng.
+                </DialogDescription>
+              </DialogHeader>
+              {fp.progressBar}
+              <DialogFooter>
+                <Button
+                  variant="outline"
+                  disabled={fp.pending || assignPacker.isPending}
+                  onClick={() => setConfirmLock(null)}
+                >
+                  Hủy
+                </Button>
+                <Button
+                  loading={fp.pending || assignPacker.isPending}
+                  onClick={() => {
+                    setConfirmLock(null);
+                    void submit(true);
+                  }}
+                >
+                  <Printer aria-hidden />
+                  In lại tem
+                </Button>
+              </DialogFooter>
             </>
           ) : (
             <>

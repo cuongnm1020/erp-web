@@ -745,13 +745,15 @@ describe('OrderCreateScreen — màn tạo đơn mới', () => {
     expect(sent[1]).toEqual({ skuId: SKU.id, uomId: expect.any(String), qty: '2', isGift: true });
   }, 15_000);
 
-  it('Nguồn · POS · Page là ba ô độc lập, không bắt buộc (2026-10-26); NV đóng hàng / NV chăm sóc / Marketer ẩn', async () => {
+  it('Nguồn · POS · Page là ba ô độc lập, không bắt buộc (2026-10-26); NV đóng hàng / NV chăm sóc ẩn, Marketer đầu dải (2026-11-11)', async () => {
     server.use(...skuHandlers());
     renderApp(<OrderCreateScreen />);
     await screen.findByLabelText('Số điện thoại khách');
     expect(screen.queryByText('NV đóng hàng')).not.toBeInTheDocument();
     expect(screen.queryByText('NV chăm sóc')).not.toBeInTheDocument();
-    expect(screen.queryByText('Marketer')).not.toBeInTheDocument();
+    expect(screen.getByRole('combobox', { name: 'Marketer' })).toHaveTextContent(
+      'Chọn nhân viên sale',
+    );
     // Chưa chọn nguồn vẫn có ô POS + Page.
     expect(screen.getByRole('combobox', { name: 'POS' })).toHaveTextContent('Không chọn POS');
     expect(screen.getByRole('combobox', { name: 'Page Facebook' })).toHaveTextContent(
@@ -1588,6 +1590,15 @@ describe('OrderCreateScreen — màn tạo đơn mới', () => {
     fireEvent.click(await screen.findByRole('combobox', { name: 'NV xử lý' }));
     expect(await screen.findByRole('option', { name: /Nguyễn Văn Sale/ })).toBeInTheDocument();
     expect(screen.queryByRole('option', { name: /Trần Thị Đóng/ })).not.toBeInTheDocument();
+  });
+
+  it('ô Marketer chỉ liệt kê nhân viên sale (GET /sales-orders/marketer-options), không lấy danh sách mọi nhân viên', async () => {
+    renderApp(<OrderCreateScreen />);
+    fireEvent.click(await screen.findByRole('combobox', { name: 'Marketer' }));
+    expect(await screen.findByRole('option', { name: /Nguyễn Văn Sale/ })).toBeInTheDocument();
+    expect(screen.queryByRole('option', { name: /Trần Thị Đóng/ })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('option', { name: /Nguyễn Văn Sale/ }));
+    expect(screen.getByRole('combobox', { name: 'Marketer' })).toHaveTextContent('Nguyễn Văn Sale');
   });
 
   it('ô ĐVVC chỉ liệt kê hãng đang bật và đã cấu hình (ẩn GHN chưa cấu hình, hãng đã tắt)', async () => {

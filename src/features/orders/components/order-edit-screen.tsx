@@ -83,7 +83,7 @@ import { CarrierStatusCard } from './carrier-status-card';
 import { MarketplaceBadge, waybillErrorText } from './waybill-error';
 import { CART_GRID } from './order-create/cart-line';
 import { DENSE } from './order-create/order-draft-form';
-import { Card, OwnerPicker } from './order-create/order-side-cards';
+import { Card, MarketerPicker, OwnerPicker } from './order-create/order-side-cards';
 import { AddressPicker } from './address-picker';
 import { OrderTagsField } from './order-tags-field';
 import { OrderEditHistory } from './order-edit-history';
@@ -267,6 +267,9 @@ function Editor({ order }: { order: SalesOrderDetail }) {
   // NV xử lý (2026-11-07): đổi được, doanh số nhân viên + team chuyển theo người mới.
   const [ownerId, setOwnerId] = useState(order.ownerId ?? '');
   const [ownerName, setOwnerName] = useState<string | null>(order.ownerName ?? null);
+  // Marketer (2026-11-11): nhân viên sale được gán đơn — thống kê doanh số theo sale; '' = bỏ gán.
+  const [marketerId, setMarketerId] = useState(order.marketerId ?? '');
+  const [marketerName, setMarketerName] = useState<string | null>(order.marketerName ?? null);
   const [expectedDate, setExpectedDate] = useState(order.expectedDeliveryDate ?? '');
   // Ngày tạo đơn (2026-11-04): chỉ admin / `sales_order.set_order_date` đổi được, giữ nguyên giờ.
   const canSetOrderDate = ability.can('set_order_date', 'SalesOrder');
@@ -365,6 +368,7 @@ function Editor({ order }: { order: SalesOrderDetail }) {
   const tagsChanged =
     tagIds.length !== originalTags.length || tagIds.some((t) => !originalTags.includes(t));
   const ownerChanged = ownerId !== '' && ownerId !== (order.ownerId ?? '');
+  const marketerChanged = marketerId !== (order.marketerId ?? '');
   const dateChanged = (expectedDate || null) !== (order.expectedDeliveryDate ?? null);
   const orderDayEditable = canSetOrderDate && orderEditable(order.status);
   const orderDayChanged = orderDayEditable && orderDay !== '' && orderDay !== origOrderDay;
@@ -380,6 +384,7 @@ function Editor({ order }: { order: SalesOrderDetail }) {
     printChanged ||
     tagsChanged ||
     ownerChanged ||
+    marketerChanged ||
     dateChanged ||
     orderDayChanged ||
     accountChanged ||
@@ -578,6 +583,7 @@ function Editor({ order }: { order: SalesOrderDetail }) {
         ...(recipientPhoneChanged ? { recipientPhone: trimOrNull(recipientPhone) } : {}),
         ...(tagsChanged ? { tagIds } : {}),
         ...(ownerChanged ? { ownerId } : {}),
+        ...(marketerChanged ? { marketerId: marketerId || null } : {}),
         ...(dateChanged ? { expectedDeliveryDate: expectedDate || null } : {}),
         ...(orderDayChanged
           ? { orderDate: movedOrderDateIso(order.orderDate, origOrderDay, orderDay) }
@@ -722,6 +728,15 @@ function Editor({ order }: { order: SalesOrderDetail }) {
             label: 'NV xử lý (doanh số chuyển theo)',
             from: order.ownerName ?? '—',
             to: ownerName ?? '—',
+          },
+        ]
+      : []),
+    ...(marketerChanged
+      ? [
+          {
+            label: 'Marketer',
+            from: order.marketerName ?? '—',
+            to: (marketerId && marketerName) || '—',
           },
         ]
       : []),
@@ -990,6 +1005,17 @@ function Editor({ order }: { order: SalesOrderDetail }) {
                   setOwnerName(name);
                 }}
                 currentName={order.ownerName}
+                disabled={!carrierEditable}
+              />
+            </HeaderField>
+            <HeaderField label="Marketer">
+              <MarketerPicker
+                value={marketerId}
+                onChange={(id, name) => {
+                  setMarketerId(id);
+                  setMarketerName(name);
+                }}
+                currentName={order.marketerName}
                 disabled={!carrierEditable}
               />
             </HeaderField>

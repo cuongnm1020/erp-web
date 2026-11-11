@@ -113,7 +113,7 @@ const SERVER_PATHS: Record<string, { field: Path<CreateOrderValues>; message: st
   ownerId: { field: 'ownerId', message: 'Nhân viên không tồn tại hoặc đã nghỉ' },
   packerId: { field: 'packerId', message: 'Nhân viên không tồn tại hoặc đã nghỉ' },
   careStaffId: { field: 'careStaffId', message: 'Nhân viên không tồn tại hoặc đã nghỉ' },
-  marketerId: { field: 'marketerId', message: 'Nhân viên không tồn tại hoặc đã nghỉ' },
+  marketerId: { field: 'marketerId', message: 'Chỉ chọn nhân viên sale đang làm việc' },
   tagIds: { field: 'tagIds', message: 'Thẻ đã bị xóa — bỏ thẻ rồi chốt lại' },
   purposeTagIds: {
     field: 'purposeTagIds',
@@ -691,7 +691,7 @@ function pageSearchFor(posShopId: string): (q: string) => EntitySearchResult {
 }
 
 /**
- * Dải "Thông tin đơn" đầu màn (redesign 2026-10-22): Kênh · Nguồn · POS · Page · Kho xuất · NV xử lý ·
+ * Dải "Thông tin đơn" đầu màn (redesign 2026-10-22): Marketer (2026-11-11) · POS · Page · Kho xuất · NV xử lý ·
  * Thẻ trên một hàng, nhãn trên ô. POS và Page tách khỏi Nguồn (2026-10-26, mockup
  * 3r3H9T9rT1URgjzyQuuUwV màn 3): ba ô độc lập, đều không bắt buộc.
  */
@@ -717,6 +717,17 @@ function HeaderSelects({
     // Kênh + Nguồn đơn ẩn khỏi màn tạo đơn (2026-11-07, user chốt) — gửi mặc định (Trực tiếp /
     // trống) theo giá trị sẵn của form; màn chi tiết / sửa đơn vẫn hiện để xem.
     <div className="grid grid-cols-2 gap-x-2.5 gap-y-2 sm:grid-cols-3 xl:grid-cols-6">
+      {/* Marketer (2026-11-11, user chốt): nhân viên sale được gán đơn — thống kê doanh số theo sale
+          (`marketerId`), độc lập với NV xử lý. Chỉ liệt kê nhân viên sale. */}
+      <HeaderField label="Marketer">
+        <StaffField
+          form={form}
+          name="marketerId"
+          label="Marketer"
+          placeholder="Chọn nhân viên sale"
+          bare
+        />
+      </HeaderField>
       <HeaderField label="POS">
         <FormField
           control={form.control}

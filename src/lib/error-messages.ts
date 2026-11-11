@@ -248,6 +248,9 @@ const MESSAGES: Record<string, string> = {
   // 2026-11-07 (user chốt): đã gửi hãng thì không ai sửa đơn; đổi hãng phải hủy vận đơn trước.
   ORDER_SENT_TO_CARRIER:
     'Đơn đã gửi sang đơn vị vận chuyển — không sửa được. Hủy vận đơn để đơn về Đã xác nhận rồi sửa / gửi hãng khác.',
+  // 2026-11-10 (user chốt): gửi lại lô sang hãng khác — đơn đã có vận đơn lượt trước báo lỗi.
+  ORDER_WAYBILL_LIVE:
+    'Đơn đã có vận đơn của hãng khác (gửi thành công lượt trước) — bỏ tích đơn này, hoặc Hủy vận đơn trước nếu muốn đổi hãng.',
   ORDER_PACK_IN_PROGRESS: 'Kho đang đóng gói đơn này — chờ đóng gói xong rồi hủy.',
   // 2026-11-07 (user chốt): gán hãng kiểm tồn thực cả lô; hộp Gửi ĐVVC hiện danh sách SP thiếu.
   ORDER_CARRIER_STOCK_SHORT:

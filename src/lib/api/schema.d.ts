@@ -3696,6 +3696,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/sales-orders/marketer-options": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Ô Marketer trên màn tạo / sửa đơn: chỉ nhân viên sale (SALES_LEADER / SALES_MEMBER) — khai TRƯỚC `:id`. */
+        get: operations["SalesOrderController_marketerOptions"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/sales-orders/creator-options": {
         parameters: {
             query?: never;
@@ -5635,6 +5652,26 @@ export interface paths {
             cookie?: never;
         };
         get: operations["WaitingStockController_summary"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/waiting-stock/return-match": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Quét kiện hoàn (PDA P-14, RTN-WAIT-1): đơn Chờ hàng / Đã xác nhận cùng kho đang thiếu SP của
+         *     kiện + đơn Chờ hàng đã đủ hàng (đưa về Đã xác nhận được). Cùng quyền với returnable.
+         */
+        get: operations["WaitingStockController_returnMatch"];
         put?: never;
         post?: never;
         delete?: never;
@@ -8665,6 +8702,13 @@ export interface components {
             /** @description Tuỳ chọn gửi hãng trên đơn — null = không chọn. */
             allowInspection: boolean | null;
             callShopOnFailure: boolean | null;
+            /**
+             * @description Lần in tem gần nhất của phiếu (ISO) — null = chưa in. Cùng `packerName` khác null → web cảnh
+             *     báo in trùng, phải xác nhận mới in lại (2026-11-11).
+             */
+            labelPrintedAt: string | null;
+            /** @description NV đóng hàng đã gán trên đơn — null = chưa gán. */
+            packerName: string | null;
         };
         ShipmentLabelDataBulkDto: {
             shipmentIds: string[];
@@ -14021,6 +14065,12 @@ export interface components {
         SetOrdersWaitingStockDto: {
             orderIds: string[];
             waiting: boolean;
+            /**
+             * Format: uuid
+             * @description Khóa idempotency do client sinh (bắt buộc với PDA — bất biến 10; web bỏ trống). Dedupe theo
+             *     từng đơn: (key, orderId) — gửi lại cùng key trả lại kết quả cũ của đơn đã chuyển.
+             */
+            idempotencyKey?: string;
         };
         SetOrdersWaitingStockResultDto: {
             updated: components["schemas"]["OrderWaitingStockItemDto"][];
@@ -15601,6 +15651,54 @@ export interface components {
             /** @description Sắp theo số đơn cần nhiều nhất. */
             items: components["schemas"]["WaitingStockSkuDto"][];
         };
+        WaitingMatchItemDto: {
+            skuId: string;
+            skuCode: string;
+            skuName: string;
+            qty: string;
+        };
+        ReturnWaitingOrderDto: {
+            /** @enum {string} */
+            flow: "WAITING_STOCK" | "WAREHOUSE";
+            /**
+             * @description FULL = đủ hàng cả đơn nhờ kiện này; PARTIAL = nhận được SP của kiện nhưng còn thiếu SP khác;
+             *     LATER = cần SP của kiện nhưng hết phần (đơn chờ lâu hơn được chia trước).
+             * @enum {string}
+             */
+            outcome: "FULL" | "PARTIAL" | "LATER";
+            orderId: string;
+            docNumber: string;
+            customerName: string;
+            /** @description Mốc chờ: kho chuyển Chờ hàng, không có thì giờ tạo đơn. */
+            waitingSince: string;
+            got: components["schemas"]["WaitingMatchItemDto"][];
+            missing: components["schemas"]["WaitingMatchItemDto"][];
+        };
+        ReturnReleasableOrderDto: {
+            orderId: string;
+            docNumber: string;
+            customerName: string;
+            waitingSince: string;
+        };
+        ReturnWaitingMatchDto: {
+            orderId: string;
+            docNumber: string;
+            warehouseId: string | null;
+            /** @description SP còn hoàn được của kiện (đơn vị cơ sở). */
+            incoming: components["schemas"]["WaitingMatchItemDto"][];
+            fullOrders: number;
+            partialOrders: number;
+            laterOrders: number;
+            /** @description FULL → PARTIAL → LATER, chờ lâu trước (tối đa 100). */
+            orders: components["schemas"]["ReturnWaitingOrderDto"][];
+            /**
+             * @description Đơn Chờ hàng chuyển tay, có SP của kiện, đủ hàng theo tồn HIỆN TẠI (chia lần lượt, chờ lâu
+             *     trước) — gọi lại sau khi nhập kho để đưa về Đã xác nhận (POST /sales-orders/waiting-stock).
+             */
+            releasable: components["schemas"]["ReturnReleasableOrderDto"][];
+            /** @description Quá số đơn đọc tối đa — kết quả có thể thiếu. */
+            truncated: boolean;
+        };
         WaitingMatchLineDto: {
             skuId: string;
             skuCode: string;
@@ -15619,12 +15717,6 @@ export interface components {
             later: number;
             /** @description Dư sau khi chia. */
             left: string;
-        };
-        WaitingMatchItemDto: {
-            skuId: string;
-            skuCode: string;
-            skuName: string;
-            qty: string;
         };
         WaitingMatchOrderDto: {
             orderId: string;
@@ -24802,6 +24894,25 @@ export interface operations {
             };
         };
     };
+    SalesOrderController_marketerOptions: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OrderStaffOptionDto"][];
+                };
+            };
+        };
+    };
     SalesOrderController_creatorOptions: {
         parameters: {
             query?: never;
@@ -25122,8 +25233,18 @@ export interface operations {
                 /** @description Đơn có dòng SKU này (core.Sku.id) — kể cả dòng thành phần của combo SKU này (2026-11-02). */
                 skuId?: string;
                 /**
-                 * @description Với `skuId`: `true` = chỉ đơn mà MỌI dòng đều là SKU đó (hoặc thành phần của combo SKU đó) —
-                 *     "lọc sản phẩm duy nhất" màn In đơn (2026-11-04). Không có `skuId` thì bỏ qua.
+                 * @description Nhiều sản phẩm (2026-11-10, màn In đơn tích chọn nhiều): đơn có dòng thuộc MỘT trong các SKU này
+                 *     (kể cả thành phần combo) — gộp với `skuId` nếu gửi cả hai. Lặp tham số, tối đa 20.
+                 */
+                skuIds?: string[];
+                /**
+                 * @description Chỉ các đơn này (2026-11-10, màn In đơn): làm mới dòng đang tích đã rời tab sau thao tác hàng
+                 *     loạt. Phạm vi xem đơn giữ nguyên. Lặp tham số, tối đa 200.
+                 */
+                ids?: string[];
+                /**
+                 * @description Với `skuId` / `skuIds`: `true` = chỉ đơn mà MỌI dòng đều thuộc các SKU đó (hoặc thành phần của
+                 *     combo SKU đó) — "lọc sản phẩm duy nhất" màn In đơn (2026-11-04). Không có SKU thì bỏ qua.
                  */
                 skuOnly?: "true" | "false";
                 /**
@@ -25442,8 +25563,18 @@ export interface operations {
                 /** @description Đơn có dòng SKU này (core.Sku.id) — kể cả dòng thành phần của combo SKU này (2026-11-02). */
                 skuId?: string;
                 /**
-                 * @description Với `skuId`: `true` = chỉ đơn mà MỌI dòng đều là SKU đó (hoặc thành phần của combo SKU đó) —
-                 *     "lọc sản phẩm duy nhất" màn In đơn (2026-11-04). Không có `skuId` thì bỏ qua.
+                 * @description Nhiều sản phẩm (2026-11-10, màn In đơn tích chọn nhiều): đơn có dòng thuộc MỘT trong các SKU này
+                 *     (kể cả thành phần combo) — gộp với `skuId` nếu gửi cả hai. Lặp tham số, tối đa 20.
+                 */
+                skuIds?: string[];
+                /**
+                 * @description Chỉ các đơn này (2026-11-10, màn In đơn): làm mới dòng đang tích đã rời tab sau thao tác hàng
+                 *     loạt. Phạm vi xem đơn giữ nguyên. Lặp tham số, tối đa 200.
+                 */
+                ids?: string[];
+                /**
+                 * @description Với `skuId` / `skuIds`: `true` = chỉ đơn mà MỌI dòng đều thuộc các SKU đó (hoặc thành phần của
+                 *     combo SKU đó) — "lọc sản phẩm duy nhất" màn In đơn (2026-11-04). Không có SKU thì bỏ qua.
                  */
                 skuOnly?: "true" | "false";
                 /**
@@ -25665,8 +25796,18 @@ export interface operations {
                 /** @description Đơn có dòng SKU này (core.Sku.id) — kể cả dòng thành phần của combo SKU này (2026-11-02). */
                 skuId?: string;
                 /**
-                 * @description Với `skuId`: `true` = chỉ đơn mà MỌI dòng đều là SKU đó (hoặc thành phần của combo SKU đó) —
-                 *     "lọc sản phẩm duy nhất" màn In đơn (2026-11-04). Không có `skuId` thì bỏ qua.
+                 * @description Nhiều sản phẩm (2026-11-10, màn In đơn tích chọn nhiều): đơn có dòng thuộc MỘT trong các SKU này
+                 *     (kể cả thành phần combo) — gộp với `skuId` nếu gửi cả hai. Lặp tham số, tối đa 20.
+                 */
+                skuIds?: string[];
+                /**
+                 * @description Chỉ các đơn này (2026-11-10, màn In đơn): làm mới dòng đang tích đã rời tab sau thao tác hàng
+                 *     loạt. Phạm vi xem đơn giữ nguyên. Lặp tham số, tối đa 200.
+                 */
+                ids?: string[];
+                /**
+                 * @description Với `skuId` / `skuIds`: `true` = chỉ đơn mà MỌI dòng đều thuộc các SKU đó (hoặc thành phần của
+                 *     combo SKU đó) — "lọc sản phẩm duy nhất" màn In đơn (2026-11-04). Không có SKU thì bỏ qua.
                  */
                 skuOnly?: "true" | "false";
                 /**
@@ -25890,8 +26031,18 @@ export interface operations {
                 /** @description Đơn có dòng SKU này (core.Sku.id) — kể cả dòng thành phần của combo SKU này (2026-11-02). */
                 skuId?: string;
                 /**
-                 * @description Với `skuId`: `true` = chỉ đơn mà MỌI dòng đều là SKU đó (hoặc thành phần của combo SKU đó) —
-                 *     "lọc sản phẩm duy nhất" màn In đơn (2026-11-04). Không có `skuId` thì bỏ qua.
+                 * @description Nhiều sản phẩm (2026-11-10, màn In đơn tích chọn nhiều): đơn có dòng thuộc MỘT trong các SKU này
+                 *     (kể cả thành phần combo) — gộp với `skuId` nếu gửi cả hai. Lặp tham số, tối đa 20.
+                 */
+                skuIds?: string[];
+                /**
+                 * @description Chỉ các đơn này (2026-11-10, màn In đơn): làm mới dòng đang tích đã rời tab sau thao tác hàng
+                 *     loạt. Phạm vi xem đơn giữ nguyên. Lặp tham số, tối đa 200.
+                 */
+                ids?: string[];
+                /**
+                 * @description Với `skuId` / `skuIds`: `true` = chỉ đơn mà MỌI dòng đều thuộc các SKU đó (hoặc thành phần của
+                 *     combo SKU đó) — "lọc sản phẩm duy nhất" màn In đơn (2026-11-04). Không có SKU thì bỏ qua.
                  */
                 skuOnly?: "true" | "false";
                 /**
@@ -28136,6 +28287,28 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["WaitingStockSummaryDto"];
+                };
+            };
+        };
+    };
+    WaitingStockController_returnMatch: {
+        parameters: {
+            query: {
+                /** @description Đơn của kiện hoàn (kết quả GET /return-receipts/returnable). */
+                orderId: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReturnWaitingMatchDto"];
                 };
             };
         };

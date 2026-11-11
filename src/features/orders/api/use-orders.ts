@@ -87,8 +87,12 @@ export interface OrderListParams {
   labelPrintedBy?: string;
   /** Đơn có sản phẩm (SKU) này — kể cả thành phần combo. */
   skuId?: string;
-  /** Với `skuId`: true = chỉ đơn mà mọi dòng đều là SKU đó (màn In đơn, 2026-11-04). */
+  /** Đơn có MỘT trong các SKU này — kể cả thành phần combo (màn In đơn chọn nhiều, 2026-11-10). */
+  skuIds?: readonly string[];
+  /** Với `skuId` / `skuIds`: true = chỉ đơn mà mọi dòng đều thuộc các SKU đó (màn In đơn, 2026-11-04). */
   skuOnly?: boolean;
+  /** Chỉ các đơn này — làm mới dòng đang tích đã rời tab (màn In đơn, 2026-11-10). */
+  ids?: readonly string[];
   /** Loại trừ đơn có một trong các SKU này, kể cả thành phần combo (màn In đơn, 2026-11-10). */
   excludeSkuIds?: readonly string[];
   /** Lỗi đơn (màn In đơn, 2026-11-10): `NON_ERP_ITEMS` | khoá từ GET /sales-orders/order-error-options. */
@@ -272,7 +276,10 @@ function listQuery(params: Omit<OrderListParams, 'take' | 'skip'>) {
     pickupStatus: params.pickupStatus,
     labelPrintedBy: params.labelPrintedBy || undefined,
     skuId: params.skuId || undefined,
-    skuOnly: params.skuId && params.skuOnly ? ('true' as const) : undefined,
+    skuIds: params.skuIds?.length ? [...params.skuIds] : undefined,
+    skuOnly:
+      (params.skuId || params.skuIds?.length) && params.skuOnly ? ('true' as const) : undefined,
+    ids: params.ids?.length ? [...params.ids] : undefined,
     excludeSkuIds: params.excludeSkuIds?.length ? [...params.excludeSkuIds] : undefined,
     orderError: params.orderError?.length ? [...params.orderError] : undefined,
     warehouseNoWaybill: params.warehouseNoWaybill ? ('true' as const) : undefined,

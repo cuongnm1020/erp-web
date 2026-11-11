@@ -128,11 +128,20 @@ describe('PrintOrdersScreen — In đơn (clone màn Đơn hàng, 2026-11-04)', 
     expect(calls[0]!.body).toEqual({ orderIds: [rows[0]!.id, rows[1]!.id], packerId: 'u-pack' });
   });
 
-  it('dòng đã chọn rời bộ lọc khi nạp lại (Gửi ĐVVC xong đơn sang tab khác) → thanh chọn nhiều vẫn còn, không gỡ hộp thoại đang mở (2026-11-07)', async () => {
+  it('dòng đã chọn rời bộ lọc khi nạp lại (Gửi ĐVVC xong đơn sang tab khác) → vẫn hiện đúng chỗ, trạng thái mới qua ?ids=, còn tích; bỏ tích mới ẩn (2026-11-10)', async () => {
     const two = makeOrders(2);
     let calls = 0;
+    const idsAsked: string[][] = [];
     server.use(
-      http.get('/api/sales-orders', () => {
+      http.get('/api/sales-orders', ({ request }) => {
+        const ids = new URL(request.url).searchParams.getAll('ids');
+        if (ids.length > 0) {
+          idsAsked.push(ids);
+          return HttpResponse.json({
+            items: [{ ...two[0]!, flow: 'PACKING' as const }],
+            total: 1,
+          });
+        }
         calls += 1;
         return HttpResponse.json(
           calls === 1 ? { items: two, total: 2 } : { items: [two[1]], total: 1 },
@@ -146,12 +155,51 @@ describe('PrintOrdersScreen — In đơn (clone màn Đơn hàng, 2026-11-04)', 
     expect(await screen.findByRole('toolbar')).toHaveTextContent('1 đơn đã chọn');
 
     await queryClient.invalidateQueries();
-    await waitFor(() => expect(screen.queryByText(two[0]!.docNumber)).not.toBeInTheDocument());
-    expect(calls).toBeGreaterThan(1);
+    await waitFor(() => expect(calls).toBeGreaterThan(1));
+    await waitFor(() => expect(idsAsked).toContainEqual([two[0]!.id]));
+    // Vẫn ở dòng đầu, kèm "Đã chuyển <tab mới>", vẫn tích.
+    expect(await screen.findByTestId('row-left')).toBeInTheDocument();
+    const rows = screen.getAllByRole('checkbox', { name: 'Chọn dòng' });
+    expect(rows).toHaveLength(2);
+    expect(rows[0]).toBeChecked();
+    expect(screen.getAllByRole('link', { name: /SO/ })[0]).toHaveTextContent(two[0]!.docNumber);
     expect(screen.getByRole('toolbar')).toHaveTextContent('1 đơn đã chọn');
 
-    fireEvent.click(screen.getByRole('button', { name: 'Bỏ chọn' }));
-    await waitFor(() => expect(screen.queryByRole('toolbar')).not.toBeInTheDocument());
+    // Bỏ tích → dòng đã rời ẩn đi.
+    fireEvent.click(rows[0]!);
+    await waitFor(() => expect(screen.queryByText(two[0]!.docNumber)).not.toBeInTheDocument());
+    expect(screen.queryByRole('toolbar')).not.toBeInTheDocument();
+  });
+
+  it('thao tác hàng loạt xong KHÔNG bỏ tích (2026-11-10): Xác nhận đơn có đơn lỗi / đơn thành công → vẫn tích đủ', async () => {
+    const [a, b] = makeOrders(2);
+    const rows = [
+      { ...a!, status: 'DRAFT' as const, pancakeOrderId: null },
+      { ...b!, status: 'DRAFT' as const, pancakeOrderId: null },
+    ];
+    let posted = false;
+    server.use(
+      http.get('/api/sales-orders', () => HttpResponse.json({ items: rows, total: rows.length })),
+      http.post('/api/sales-orders/bulk-confirm', () => {
+        posted = true;
+        return HttpResponse.json({
+          confirmed: [{ orderId: a!.id, docNumber: a!.docNumber }],
+          failed: [
+            { orderId: b!.id, docNumber: b!.docNumber, code: 'ORDER_NOT_DRAFT', message: 'x' },
+          ],
+        });
+      }),
+    );
+    renderApp(<PrintOrdersScreen />);
+    await screen.findByText(a!.docNumber);
+    fireEvent.click(screen.getByRole('checkbox', { name: /Chọn tất cả/ }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Xác nhận đơn (2)' }));
+    await waitFor(() => expect(posted).toBe(true));
+    await new Promise((r) => setTimeout(r, 50));
+    expect(screen.getByRole('toolbar')).toHaveTextContent('2 đơn đã chọn');
+    for (const c of screen.getAllByRole('checkbox', { name: 'Chọn dòng' })) {
+      expect(c).toBeChecked();
+    }
   });
 
   it('ô tìm Sản phẩm chỉ liệt kê sản phẩm thường — GET /products?isCombo=false', async () => {
@@ -335,7 +383,7 @@ describe('PrintOrdersScreen — In đơn (clone màn Đơn hàng, 2026-11-04)', 
     }
   });
 
-  it('lọc "Chỉ sản phẩm này": URL skuOnly=true + skuId → gửi skuOnly=true lên API', async () => {
+  it('lọc "Chỉ sản phẩm này": URL skuOnly=true + skuId (link cũ một SKU) → skuIds + skuOnly=true lên API', async () => {
     const sku = '00000000-0000-4000-8000-0000000000aa';
     search = `group=all&skuId=${sku}&skuOnly=true`;
     const seen: URLSearchParams[] = [];
@@ -348,14 +396,44 @@ describe('PrintOrdersScreen — In đơn (clone màn Đơn hàng, 2026-11-04)', 
     try {
       renderApp(<PrintOrdersScreen />);
       await waitFor(() =>
-        expect(seen.some((p) => p.get('skuId') === sku && p.get('skuOnly') === 'true')).toBe(true),
+        expect(
+          seen.some((p) => p.getAll('skuIds').join(',') === sku && p.get('skuOnly') === 'true'),
+        ).toBe(true),
+      );
+      for (const p of seen) expect(p.has('skuId')).toBe(false);
+    } finally {
+      search = 'group=all';
+    }
+  });
+
+  it('lọc Sản phẩm chọn nhiều (2026-11-10): URL skuId=a,b,lạ → skuIds từng SP; ô hiện "Sản phẩm: 2 SP"', async () => {
+    const a = '00000000-0000-4000-8000-0000000000a1';
+    const b = '00000000-0000-4000-8000-0000000000b2';
+    search = `group=all&skuId=${a},khong-phai-id,${b}`;
+    const seen: URLSearchParams[] = [];
+    server.use(
+      http.get('/api/sales-orders', ({ request }) => {
+        seen.push(new URL(request.url).searchParams);
+        return HttpResponse.json({ items: [], total: 0 });
+      }),
+      http.get('/api/skus/:id', ({ params }) =>
+        HttpResponse.json({ id: params.id, code: 'SP', name: `Tên ${String(params.id)}` }),
+      ),
+    );
+    try {
+      renderApp(<PrintOrdersScreen />);
+      await waitFor(() =>
+        expect(seen.some((p) => p.getAll('skuIds').join(',') === `${a},${b}`)).toBe(true),
+      );
+      expect(screen.getByRole('combobox', { name: 'Sản phẩm' })).toHaveTextContent(
+        'Sản phẩm: 2 SP',
       );
     } finally {
       search = 'group=all';
     }
   });
 
-  it('lọc loại trừ SP (2026-11-10): URL excludeSku → danh sách + số đếm gửi excludeSkuIds từng SP, chip có ×; giá trị lạ bỏ qua', async () => {
+  it('lọc loại trừ SP (2026-11-10): URL excludeSku → danh sách + số đếm gửi excludeSkuIds từng SP, ô tích chọn nhiều; giá trị lạ bỏ qua', async () => {
     const a = '00000000-0000-4000-8000-0000000000a1';
     const b = '00000000-0000-4000-8000-0000000000b2';
     search = `group=all&excludeSku=${a},khong-phai-id,${b}`;
@@ -386,9 +464,12 @@ describe('PrintOrdersScreen — In đơn (clone màn Đơn hàng, 2026-11-04)', 
       await waitFor(() =>
         expect(counts.some((p) => p.getAll('excludeSkuIds').join(',') === `${a},${b}`)).toBe(true),
       );
-      expect(
-        await screen.findByRole('button', { name: 'Bỏ loại trừ SP-LION · LION SUPER 450ML' }),
-      ).toBeInTheDocument();
+      const box = screen.getByRole('combobox', { name: 'Loại trừ SP' });
+      expect(box).toHaveTextContent('Loại trừ SP: 2 SP');
+      // Mở hộp: hai SP đang loại trừ ghim đầu, đã tích.
+      fireEvent.click(box);
+      expect(await screen.findByText('LION SUPER 450ML')).toBeInTheDocument();
+      expect(screen.getByText('Đã chọn 2 / tối đa 20')).toBeInTheDocument();
     } finally {
       search = 'group=all';
     }
