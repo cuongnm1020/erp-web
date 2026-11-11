@@ -7,11 +7,10 @@ import { CopyButton } from '@/components/data/copy-button';
 import { StatusBadge } from '@/components/data/status-badge';
 import { TrackingLink } from '@/components/data/tracking-link';
 import { cn } from '@/lib/cn';
-import { messageFor } from '@/lib/error-messages';
 import { formatDate, formatMoney, formatTime, toLocalDateKey } from '@/lib/format';
-import { useShipmentStatusLog } from '@/features/wms/api/use-shipping';
 import { shipmentStatusBadge } from '@/features/wms/labels';
 import type { SalesOrderDetail } from '../api/use-orders';
+import { CarrierJourney } from './carrier-journey';
 
 type Shipment = NonNullable<SalesOrderDetail['shipment']>;
 
@@ -164,57 +163,16 @@ function ReconcileBox({ s, tone }: { s: Shipment; tone: typeof OTHER_TONE }) {
   );
 }
 
-/** "Xem hành trình" — các mốc đổi trạng thái (CarrierStatusLog APPLIED) với chữ + vị trí hãng. */
-function Journey({ shipmentId, dotClass }: { shipmentId: string; dotClass: string }) {
-  const q = useShipmentStatusLog(shipmentId);
-  if (q.isPending) return <p className="text-xs text-muted-foreground">Đang tải hành trình…</p>;
-  if (q.isError) return <p className="text-xs text-destructive">{messageFor(q.error)}</p>;
-  const items = q.data.items.filter((e) => e.outcome === 'APPLIED');
-  if (items.length === 0) {
-    return (
-      <p className="text-xs text-muted-foreground">
-        Chưa có mốc đổi trạng thái nào — mốc mới sẽ hiện ở đây khi hãng báo.
-      </p>
-    );
-  }
-  return (
-    <ol className="space-y-2" aria-label="Hành trình từ hãng">
-      {items.map((e, i) => {
-        const mapped = e.mappedStatus ? shipmentStatusBadge(e.mappedStatus) : null;
-        return (
-          <li key={e.id} className="flex gap-2 text-xs">
-            <span
-              aria-hidden
-              className={cn(
-                'mt-1 h-2 w-2 shrink-0 rounded-full',
-                i === 0 ? dotClass : 'bg-border-strong',
-              )}
-            />
-            <div className="min-w-0 space-y-0.5">
-              <div className="flex flex-wrap items-center gap-1.5">
-                <span className="tabular-nums text-muted-foreground">
-                  {carrierTime(e.occurredAt ?? e.createdAt)}
-                </span>
-                <span className="font-semibold">{e.statusText ?? `Mã ${e.carrierStatusCode}`}</span>
-                {mapped ? <StatusBadge tone={mapped.tone}>{mapped.label}</StatusBadge> : null}
-              </div>
-              {e.location ? <p className="text-muted-foreground">{e.location}</p> : null}
-            </div>
-          </li>
-        );
-      })}
-    </ol>
-  );
-}
-
 /**
  * Thẻ hãng vận chuyển trên màn đơn (2026-10-28, mockup KDfmt8dqg3ztLcfbsGZ229 theo mẫu Pancake):
  * hộp Đối soát + hộp hãng (Dịch vụ vận chuyển, Cập nhật cuối = tín hiệu mới nhất hãng gửi kể cả
- * không đổi trạng thái) + "Xem hành trình" (mốc đổi trạng thái). Chưa có vận đơn → không vẽ.
+ * không đổi trạng thái) + "Xem hành trình" (2026-11-11: mọi lần quét, nhóm theo giai đoạn như app
+ * hãng — `CarrierJourney`). Chưa có vận đơn → không vẽ.
  */
 export function CarrierStatusCard({ order }: { order: SalesOrderDetail }) {
   const s = order.shipment;
-  const [journey, setJourney] = useState(false);
+  // null = theo mặc định: mở sẵn khi đơn đang tồn / hoàn / hãng hủy (có cảnh báo bên dưới).
+  const [journeyToggle, setJourney] = useState<boolean | null>(null);
   if (!s?.trackingNo) return null;
   const code = s.carrierCode ?? '';
   const tone = carrierTone(code);
@@ -248,6 +206,7 @@ export function CarrierStatusCard({ order }: { order: SalesOrderDetail }) {
               text: 'Giao chưa thành công, hãng sẽ giao lại. Gọi khách trước lần giao tới.',
             }
           : null;
+  const journey = journeyToggle ?? alert !== null;
 
   return (
     <div className="space-y-3">
@@ -362,12 +321,12 @@ export function CarrierStatusCard({ order }: { order: SalesOrderDetail }) {
             type="button"
             className="font-semibold text-primary hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
             aria-expanded={journey}
-            onClick={() => setJourney((v) => !v)}
+            onClick={() => setJourney(!journey)}
           >
             {journey ? 'Thu gọn hành trình' : 'Xem hành trình'}
           </button>
         </div>
-        {journey ? <Journey shipmentId={s.id} dotClass={tone.bg} /> : null}
+        {journey ? <CarrierJourney shipmentId={s.id} /> : null}
       </section>
     </div>
   );

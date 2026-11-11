@@ -465,7 +465,25 @@ describe('OrderDetailScreen — trạng thái kho + tự mở nhãn (?printLabel
 });
 
 describe('OrderDetailScreen — thẻ hãng trên thẻ Vận đơn (2026-10-28)', () => {
-  it('Dịch vụ + Cập nhật cuối từ order.shipment; "Xem hành trình" chỉ liệt kê mốc đổi trạng thái kèm chữ + vị trí của hãng', async () => {
+  it('hành trình mở sẵn khi hãng đang giao mà báo giao không thành (2026-11-11)', async () => {
+    search = '';
+    server.use(
+      http.get('/api/sales-orders/:id', () =>
+        HttpResponse.json({
+          ...DETAIL,
+          shipment: { ...ORDER_SHIPMENT_FIXTURE, status: 'OUT_FOR_DELIVERY' },
+        }),
+      ),
+    );
+    renderApp(<OrderDetailScreen orderId={ORDER.id} />);
+    const card = await screen.findByRole('region', { name: 'Hãng vận chuyển GHTK' });
+    expect(
+      await within(card).findByRole('list', { name: 'Hành trình từ hãng' }),
+    ).toBeInTheDocument();
+    expect(within(card).getByRole('button', { name: 'Thu gọn hành trình' })).toBeInTheDocument();
+  });
+
+  it('Dịch vụ + Cập nhật cuối từ order.shipment; hành trình nhóm theo giai đoạn như app hãng (2026-11-11)', async () => {
     search = '';
     server.use(scenario.orderWithShipment);
     const user = userEvent.setup();
@@ -478,12 +496,28 @@ describe('OrderDetailScreen — thẻ hãng trên thẻ Vận đơn (2026-10-28)
     expect(card).toHaveTextContent('Với ghi chú:Không liên lạc được với KH 3 lần');
     expect(screen.getByText('Chưa đối soát')).toBeInTheDocument();
 
+    // Phiếu Đã đóng gói, không cảnh báo → hành trình đóng, bấm mới mở.
     await user.click(within(card).getByRole('button', { name: 'Xem hành trình' }));
     const list = await within(card).findByRole('list', { name: 'Hành trình từ hãng' });
-    expect(list).toHaveTextContent('Đã điều phối giao hàng / đang giao hàng');
-    expect(list).toHaveTextContent('Bưu cục Gia Lâm');
-    // Mốc không đổi trạng thái (REJECTED_UNMAPPED) không vào hành trình.
-    expect(list).not.toHaveTextContent('45');
+    const items = within(list).getAllByRole('listitem');
+    expect(items.map((li) => li.querySelector('span.text-sm')?.textContent)).toEqual([
+      'Tồn - Giao không thành công',
+      'Giao hàng',
+      'Đã nhận hàng',
+      'Tạo đơn hàng',
+    ]);
+    expect(items[0]).toHaveTextContent('Không giao được hàng · Không liên lạc được với KH 3 lần');
+    expect(items[1]).toHaveTextContent('Đã điều phối giao hàng / đang giao hàng · Bưu cục Gia Lâm');
+    // Tạo đơn hàng có 2 lần quét: hiện lần mới nhất, bấm để xem lần trước.
+    expect(items[3]).toHaveTextContent('Đã tiếp nhận');
+    expect(items[3]).not.toHaveTextContent('Chưa tiếp nhận');
+    await user.click(
+      within(items[3]!).getByRole('button', { name: 'Xem 1 lần quét trước của Tạo đơn hàng' }),
+    );
+    expect(items[3]).toHaveTextContent('Chưa tiếp nhận');
+    // Thu gọn tay vẫn được.
+    await user.click(within(card).getByRole('button', { name: 'Thu gọn hành trình' }));
+    expect(within(card).queryByRole('list', { name: 'Hành trình từ hãng' })).toBeNull();
   });
 });
 

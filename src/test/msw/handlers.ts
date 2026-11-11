@@ -1384,41 +1384,83 @@ export function makeMonitorSummary(holdDays = 5, date = '2026-08-20') {
   };
 }
 
-/** Đúng shape `CarrierStatusLogListDto`. */
+/**
+ * Đúng shape `CarrierStatusLogListDto` — API sắp theo giờ hãng, MỚI NHẤT TRƯỚC, ghi mọi tín hiệu
+ * (2026-11-11). Hai dòng Tạo đơn hàng liền nhau → một mục có 2 lần quét.
+ */
+const statusLogRow = (
+  i: number,
+  over: Partial<{
+    source: 'WEBHOOK' | 'POLL';
+    carrierStatusCode: string;
+    mappedStatus: 'PICKED_UP' | 'OUT_FOR_DELIVERY' | null;
+    outcome: 'APPLIED' | 'DUPLICATE' | 'REJECTED_UNMAPPED';
+    statusText: string;
+    location: string | null;
+    remark: string | null;
+    journeyStage: 'CREATED' | 'PICKED_UP' | 'DELIVERING' | 'DELIVERY_FAILED';
+    at: string;
+  }>,
+) => ({
+  id: uuid('0000000f', i),
+  source: over.source ?? 'WEBHOOK',
+  carrierCode: 'GHTK',
+  carrierName: 'Giao Hàng Tiết Kiệm',
+  trackingNo: 'S00000001.HN',
+  carrierStatusCode: over.carrierStatusCode ?? '4',
+  mappedStatus: over.mappedStatus ?? null,
+  outcome: over.outcome ?? 'APPLIED',
+  note: null,
+  statusText: over.statusText ?? null,
+  location: over.location ?? null,
+  remark: over.remark ?? null,
+  journeyStage: over.journeyStage ?? 'DELIVERING',
+  occurredAt: over.at ?? null,
+  createdAt: over.at ?? new Date(Date.UTC(2026, 10, 12, 3)).toISOString(),
+});
 export const STATUS_LOG_FIXTURE = {
   shipmentId: uuid('0000000e', 0),
   shipmentDocNumber: 'DN-2608-00001',
   items: [
-    {
-      id: uuid('0000000f', 0),
-      source: 'WEBHOOK',
-      carrierCode: 'GHTK',
-      carrierName: 'Giao Hàng Tiết Kiệm',
-      trackingNo: 'S00000001.HN',
+    statusLogRow(0, {
+      carrierStatusCode: '9',
+      mappedStatus: 'OUT_FOR_DELIVERY',
+      outcome: 'DUPLICATE',
+      statusText: 'Không giao được hàng',
+      remark: 'Không liên lạc được với KH 3 lần',
+      journeyStage: 'DELIVERY_FAILED',
+      at: '2026-11-13T09:20:05.000Z',
+    }),
+    statusLogRow(1, {
       carrierStatusCode: '4',
-      mappedStatus: 'IN_TRANSIT',
-      outcome: 'APPLIED',
-      note: null,
+      mappedStatus: 'OUT_FOR_DELIVERY',
       statusText: 'Đã điều phối giao hàng / đang giao hàng',
       location: 'Bưu cục Gia Lâm',
-      occurredAt: new Date(Date.UTC(2026, 7, 21, 3)).toISOString(),
-      createdAt: new Date(Date.UTC(2026, 7, 21, 3, 1)).toISOString(),
-    },
-    {
-      id: uuid('0000000f', 1),
+      at: '2026-11-13T01:03:30.000Z',
+    }),
+    statusLogRow(2, {
+      carrierStatusCode: '3',
+      mappedStatus: 'PICKED_UP',
+      statusText: 'Đã lấy hàng / đã nhập kho',
+      journeyStage: 'PICKED_UP',
+      at: '2026-11-12T08:15:00.000Z',
+    }),
+    statusLogRow(3, {
       source: 'POLL',
-      carrierCode: 'GHTK',
-      carrierName: 'Giao Hàng Tiết Kiệm',
-      trackingNo: 'S00000001.HN',
-      carrierStatusCode: '45',
-      mappedStatus: null,
+      carrierStatusCode: '2',
       outcome: 'REJECTED_UNMAPPED',
-      note: 'mã trạng thái 45 chưa được ánh xạ',
-      statusText: null,
-      location: null,
-      occurredAt: null,
-      createdAt: new Date(Date.UTC(2026, 7, 22, 3)).toISOString(),
-    },
+      statusText: 'Đã tiếp nhận',
+      journeyStage: 'CREATED',
+      at: '2026-11-12T03:02:15.000Z',
+    }),
+    statusLogRow(4, {
+      source: 'POLL',
+      carrierStatusCode: '1',
+      outcome: 'REJECTED_UNMAPPED',
+      statusText: 'Chưa tiếp nhận',
+      journeyStage: 'CREATED',
+      at: '2026-11-12T02:47:30.000Z',
+    }),
   ],
 };
 
