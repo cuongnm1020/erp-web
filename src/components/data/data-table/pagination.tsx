@@ -11,7 +11,13 @@ import {
 } from '@/components/ui/select';
 import { groupVi } from '@/lib/format';
 
-const SIZES = [20, 50, 100, 200];
+/** Cỡ trang chuẩn — khớp trần `take ≤ 200` của ListQueryDto. */
+export const PAGE_SIZES: readonly number[] = [20, 50, 100, 200];
+/**
+ * Cỡ trang của danh sách đơn (2026-11-12, user chốt): thêm 1000 dòng — chỉ GET /sales-orders nhận
+ * `take ≤ 1000`; màn dùng bộ này phải đặt `maxSize: 1000` cho `useListState`.
+ */
+export const ORDER_PAGE_SIZES: readonly number[] = [...PAGE_SIZES, 1000];
 
 /** Phân trang server (offset). Có số dòng chọn được, nhảy đầu/cuối, đếm tổng. */
 export function DataTablePagination({
@@ -19,6 +25,7 @@ export function DataTablePagination({
   size,
   total,
   selectedCount,
+  sizes = PAGE_SIZES,
   onPageChange,
   onSizeChange,
 }: {
@@ -26,6 +33,8 @@ export function DataTablePagination({
   size: number;
   total: number;
   selectedCount?: number;
+  /** Các cỡ trang chọn được — mặc định {@link PAGE_SIZES}. */
+  sizes?: readonly number[];
   onPageChange: (page: number) => void;
   onSizeChange: (size: number) => void;
 }) {
@@ -46,11 +55,11 @@ export function DataTablePagination({
         <label className="flex items-center gap-2">
           <span className="text-muted-foreground">Mỗi trang</span>
           <Select value={String(size)} onValueChange={(v) => onSizeChange(Number(v))}>
-            <SelectTrigger className="h-8 w-[72px]" aria-label="Số dòng mỗi trang">
+            <SelectTrigger className="h-8 w-20" aria-label="Số dòng mỗi trang">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              {SIZES.map((s) => (
+              {sizes.map((s) => (
                 <SelectItem key={s} value={String(s)}>
                   {s}
                 </SelectItem>

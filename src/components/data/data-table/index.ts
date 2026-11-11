@@ -4,7 +4,7 @@ export { ColumnHeader } from './column-header';
 export { exportColumnsOf } from './export-columns';
 export { ColumnPicker } from './column-picker';
 export type { ColumnPickerOption } from './column-picker';
-export { DataTablePagination } from './pagination';
+export { DataTablePagination, ORDER_PAGE_SIZES, PAGE_SIZES } from './pagination';
 export { FilterBar } from './filter-bar';
 export type { FilterDef } from './filter-bar';
 export type { ColumnDef, RowSelectionState } from '@tanstack/react-table';
