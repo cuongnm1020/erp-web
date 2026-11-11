@@ -5643,6 +5643,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/waiting-stock/return-match": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Quét kiện hoàn (PDA P-14, RTN-WAIT-1): đơn Chờ hàng / Đã xác nhận cùng kho đang thiếu SP của
+         *     kiện + đơn Chờ hàng đã đủ hàng (đưa về Đã xác nhận được). Cùng quyền với returnable.
+         */
+        get: operations["WaitingStockController_returnMatch"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/goods-receipts/{id}/waiting-match": {
         parameters: {
             query?: never;
@@ -14021,6 +14041,12 @@ export interface components {
         SetOrdersWaitingStockDto: {
             orderIds: string[];
             waiting: boolean;
+            /**
+             * Format: uuid
+             * @description Khóa idempotency do client sinh (bắt buộc với PDA — bất biến 10; web bỏ trống). Dedupe theo
+             *     từng đơn: (key, orderId) — gửi lại cùng key trả lại kết quả cũ của đơn đã chuyển.
+             */
+            idempotencyKey?: string;
         };
         SetOrdersWaitingStockResultDto: {
             updated: components["schemas"]["OrderWaitingStockItemDto"][];
@@ -15601,6 +15627,54 @@ export interface components {
             /** @description Sắp theo số đơn cần nhiều nhất. */
             items: components["schemas"]["WaitingStockSkuDto"][];
         };
+        WaitingMatchItemDto: {
+            skuId: string;
+            skuCode: string;
+            skuName: string;
+            qty: string;
+        };
+        ReturnWaitingOrderDto: {
+            /** @enum {string} */
+            flow: "WAITING_STOCK" | "WAREHOUSE";
+            /**
+             * @description FULL = đủ hàng cả đơn nhờ kiện này; PARTIAL = nhận được SP của kiện nhưng còn thiếu SP khác;
+             *     LATER = cần SP của kiện nhưng hết phần (đơn chờ lâu hơn được chia trước).
+             * @enum {string}
+             */
+            outcome: "FULL" | "PARTIAL" | "LATER";
+            orderId: string;
+            docNumber: string;
+            customerName: string;
+            /** @description Mốc chờ: kho chuyển Chờ hàng, không có thì giờ tạo đơn. */
+            waitingSince: string;
+            got: components["schemas"]["WaitingMatchItemDto"][];
+            missing: components["schemas"]["WaitingMatchItemDto"][];
+        };
+        ReturnReleasableOrderDto: {
+            orderId: string;
+            docNumber: string;
+            customerName: string;
+            waitingSince: string;
+        };
+        ReturnWaitingMatchDto: {
+            orderId: string;
+            docNumber: string;
+            warehouseId: string | null;
+            /** @description SP còn hoàn được của kiện (đơn vị cơ sở). */
+            incoming: components["schemas"]["WaitingMatchItemDto"][];
+            fullOrders: number;
+            partialOrders: number;
+            laterOrders: number;
+            /** @description FULL → PARTIAL → LATER, chờ lâu trước (tối đa 100). */
+            orders: components["schemas"]["ReturnWaitingOrderDto"][];
+            /**
+             * @description Đơn Chờ hàng chuyển tay, có SP của kiện, đủ hàng theo tồn HIỆN TẠI (chia lần lượt, chờ lâu
+             *     trước) — gọi lại sau khi nhập kho để đưa về Đã xác nhận (POST /sales-orders/waiting-stock).
+             */
+            releasable: components["schemas"]["ReturnReleasableOrderDto"][];
+            /** @description Quá số đơn đọc tối đa — kết quả có thể thiếu. */
+            truncated: boolean;
+        };
         WaitingMatchLineDto: {
             skuId: string;
             skuCode: string;
@@ -15619,12 +15693,6 @@ export interface components {
             later: number;
             /** @description Dư sau khi chia. */
             left: string;
-        };
-        WaitingMatchItemDto: {
-            skuId: string;
-            skuCode: string;
-            skuName: string;
-            qty: string;
         };
         WaitingMatchOrderDto: {
             orderId: string;
@@ -28176,6 +28244,28 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["WaitingStockSummaryDto"];
+                };
+            };
+        };
+    };
+    WaitingStockController_returnMatch: {
+        parameters: {
+            query: {
+                /** @description Đơn của kiện hoàn (kết quả GET /return-receipts/returnable). */
+                orderId: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReturnWaitingMatchDto"];
                 };
             };
         };
