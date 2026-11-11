@@ -32,6 +32,7 @@ import {
 } from '../api/use-pda';
 import { useCarriers, type CarrierAccountOption } from '../api/use-shipping';
 import { CarrierSelect, type CarrierValue } from './carrier-select';
+import { isPrintLocked, printLockReason } from '../print-guard';
 import { WaybillLabel, WaybillLabelPrintSheet, type WaybillOrientation } from './waybill-label';
 
 /** A6 / A5 = PDF của hãng; `ERP_100x75` = nhãn ERP tự vẽ cho máy in nhiệt 3 inch (2026-10-13). */
@@ -284,9 +285,17 @@ function ErpLabel({
     if (hasTracking) markRef.current([shipmentId], { onError: () => undefined });
   }, [openPrint, hasTracking, shipmentId]);
 
+  // Cảnh báo in trùng (PRINT-DUP-1): đơn đã in tem + đã có NV đóng hàng LÚC MỞ hộp → không tự in,
+  // phải bấm "In lại tem" xác nhận. Xét theo dữ liệu lần đầu — lần in của chính hộp này không tính.
+  const [locked, setLocked] = useState(false);
+
   useEffect(() => {
     if (label.data && !autoPrinted.current) {
       autoPrinted.current = true;
+      if (isPrintLocked(label.data)) {
+        setLocked(true);
+        return;
+      }
       setPrintedAt(new Date());
       print();
     }
@@ -310,12 +319,41 @@ function ErpLabel({
             setPrintedAt(new Date());
             print();
           }}
-          disabled={!label.data}
+          disabled={!label.data || locked}
         >
           <Printer aria-hidden />
           In lại
         </Button>
       </div>
+      {label.data && locked ? (
+        <div
+          className="space-y-2 rounded-md border border-warning-line bg-warning-weak p-3"
+          role="alertdialog"
+          aria-label={`In lại tem đơn ${label.data.orderDocNumber ?? label.data.shipmentDocNumber}?`}
+          data-testid="print-lock-confirm"
+        >
+          <p className="text-sm font-semibold">
+            In lại tem đơn {label.data.orderDocNumber ?? label.data.shipmentDocNumber}?
+          </p>
+          <p className="text-sm">
+            {printLockReason(label.data)}. In thêm tem có thể khiến hai người cùng đóng một đơn —
+            chỉ in khi tem cũ bị mất / hỏng.
+          </p>
+          <div className="flex justify-end">
+            <Button
+              size="sm"
+              onClick={() => {
+                setLocked(false);
+                setPrintedAt(new Date());
+                print();
+              }}
+            >
+              <Printer aria-hidden />
+              In lại tem
+            </Button>
+          </div>
+        </div>
+      ) : null}
       {label.data ? (
         <>
           <div className="flex justify-center rounded-md border bg-muted p-4">

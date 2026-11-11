@@ -8685,6 +8685,13 @@ export interface components {
             /** @description Tuỳ chọn gửi hãng trên đơn — null = không chọn. */
             allowInspection: boolean | null;
             callShopOnFailure: boolean | null;
+            /**
+             * @description Lần in tem gần nhất của phiếu (ISO) — null = chưa in. Cùng `packerName` khác null → web cảnh
+             *     báo in trùng, phải xác nhận mới in lại (2026-11-11).
+             */
+            labelPrintedAt: string | null;
+            /** @description NV đóng hàng đã gán trên đơn — null = chưa gán. */
+            packerName: string | null;
         };
         ShipmentLabelDataBulkDto: {
             shipmentIds: string[];
