@@ -1693,6 +1693,8 @@ export const handlers = [
   http.get('/api/sales-orders/team-filter-options', () => HttpResponse.json([])),
   // Ô "Lỗi đơn" màn In đơn (2026-11-10) — mặc định chưa có lỗi vận đơn nào.
   http.get('/api/sales-orders/order-error-options', () => HttpResponse.json([])),
+  // Ô lọc NV đóng hàng màn In đơn (2026-11-13) — mặc định rỗng.
+  http.get('/api/sales-orders/packer-options', () => HttpResponse.json([])),
   // Ô lọc NV lên đơn: danh sách theo người xem (API lọc theo leader / trưởng nhóm CSKH).
   http.get('/api/sales-orders/creator-options', () =>
     HttpResponse.json([

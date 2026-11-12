@@ -448,6 +448,18 @@ export function useLabelPrinterOptions() {
   });
 }
 
+/**
+ * GET /sales-orders/packer-options — người từng được gán đóng hàng ở kho đang làm việc, KỂ CẢ đã
+ * nghỉ (2026-11-13). Đổi kho → WarehouseProvider reset mọi query nên key không cần kho.
+ */
+export function useOrderPackerOptions() {
+  return useQuery({
+    queryKey: [...orderKeys.all, 'packer-options'] as const,
+    queryFn: () => unwrap(api.GET('/sales-orders/packer-options')),
+    staleTime: 60_000,
+  });
+}
+
 export type OrderCareTeamOption = components['schemas']['OrderCareTeamOptionDto'];
 
 /** GET /sales-orders/care-team-options — team CSKH (= phòng ban loại CSKH) để lọc đơn. */

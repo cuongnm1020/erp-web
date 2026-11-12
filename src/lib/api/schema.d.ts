@@ -3864,6 +3864,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/sales-orders/packer-options": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Người từng được gán đóng hàng (kể cả đã nghỉ) ở kho đang làm việc — ô lọc "NV đóng hàng" màn
+         *     In đơn (2026-11-13). Khai TRƯỚC `:id`.
+         */
+        get: operations["SalesOrderController_packerOptions"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/sales-orders/shipping-quote-preview": {
         parameters: {
             query?: never;
@@ -12364,6 +12384,15 @@ export interface components {
             fullName: string;
             /** @description Mã / tài khoản nhân viên. */
             code: string;
+        };
+        OrderPackerOptionDto: {
+            /** @description Giá trị cho `packerId` của GET /sales-orders (core.User.id). */
+            userId: string;
+            fullName: string;
+            /** @description Mã / tài khoản nhân viên. */
+            code: string;
+            /** @description false = đã nghỉ (khóa / xóa tài khoản) — vẫn lọc được đơn cũ của họ. */
+            isActive: boolean;
         };
         ShippingQuotePreviewDto: {
             /** Format: uuid */
@@ -25122,6 +25151,25 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["OrderLabelPrinterOptionDto"][];
+                };
+            };
+        };
+    };
+    SalesOrderController_packerOptions: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OrderPackerOptionDto"][];
                 };
             };
         };

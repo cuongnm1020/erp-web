@@ -61,13 +61,12 @@ import { useHotkey } from '@/lib/use-hotkey';
 import { useListState, type SortState } from '@/lib/url-state';
 import { decimalCell } from '@/lib/xlsx-writer';
 import { useCarriers } from '@/features/wms/api/use-shipping';
-import { usePdaPackers } from '@/features/wms/api/use-pda';
-import { useWarehouse } from '@/lib/warehouse/warehouse-provider';
 import { carrierFilterOptions, parseCarrierFilter } from '../carrier-filter';
 import {
   fetchOrdersPage,
   orderKeys,
   useOrderFlowCounts,
+  useOrderPackerOptions,
   useOrderTabCounts,
   useOrderListPrefs,
   useOrders,
@@ -1076,12 +1075,10 @@ export function PrintOrdersScreen() {
   const printStatus = pickOption(PRINT_OPTIONS, state.filters.printStatus);
   const teamOptions = useTeamFilterOptions(canFilterDept);
   const facebookPages = useFacebookPageOptions();
-  // NV đóng hàng (2026-11-13): danh sách như hộp Gửi ĐVVC — người đóng gói của kho đang làm việc
-  // (GET /pda/packers, quyền task.execute). Không có quyền / chưa chọn kho → ẩn ô, bỏ giá trị URL.
-  const { formWarehouseId } = useWarehouse();
-  const canFilterPacker = ability.can('execute', 'Task') && formWarehouseId !== '';
-  const packers = usePdaPackers(canFilterPacker ? formWarehouseId : null);
-  const packerId = canFilterPacker ? (state.filters.packerId ?? '') : '';
+  // NV đóng hàng (2026-11-13): người TỪNG được gán đóng hàng ở kho đang làm việc, kể cả đã nghỉ
+  // (user: "hiện thị cả người nghỉ") — GET /sales-orders/packer-options; "Tất cả kho" → mọi kho.
+  const packers = useOrderPackerOptions();
+  const packerId = state.filters.packerId ?? '';
   // Sắp xếp lưu theo người dùng ở server (đăng xuất / đổi máy vẫn giữ). Sắp xếp trên URL (link
   // dán cho đồng nghiệp) thắng; URL không có thì lấy lần sắp gần nhất của người dùng. Cột ẩn không
   // còn (luôn hiện hết cột).
@@ -1606,21 +1603,18 @@ export function PrintOrdersScreen() {
               // cùng ô với màn Theo dõi đơn.
               { key: 'pickup', label: 'Hãng lấy hàng', type: 'select', options: PICKUP_OPTIONS },
               { key: 'printStatus', label: 'In tem', type: 'select', options: PRINT_OPTIONS },
-              // NV đóng hàng (2026-11-13, user) — người đóng gói của kho đang làm việc.
-              ...(canFilterPacker
-                ? [
-                    {
-                      key: 'packerId' as const,
-                      label: 'NV đóng hàng',
-                      type: 'select' as const,
-                      searchable: true,
-                      options: (packers.data ?? []).map((p) => ({
-                        value: p.id,
-                        label: p.fullName,
-                      })),
-                    },
-                  ]
-                : []),
+              // NV đóng hàng (2026-11-13, user) — người đã nghỉ vẫn chọn được, ghi "(đã nghỉ)".
+              {
+                key: 'packerId',
+                label: 'NV đóng hàng',
+                type: 'select',
+                searchable: true,
+                options: (packers.data ?? []).map((p) => ({
+                  value: p.userId,
+                  label: p.isActive ? p.fullName : `${p.fullName} (đã nghỉ)`,
+                  hint: p.code,
+                })),
+              },
               // Lỗi đơn (2026-11-10, user): lỗi đang hiện trên danh sách — SP ngoài hệ thống + lỗi
               // vận đơn gom theo câu hãng. Giá trị mã hoá URI (câu hãng có dấu phẩy).
               {
