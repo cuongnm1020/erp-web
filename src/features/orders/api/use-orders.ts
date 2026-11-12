@@ -115,6 +115,8 @@ export interface OrderListParams {
   teamIds?: string;
   /** NV lên đơn = người bấm tạo đơn (ERP: người tạo, Pancake: người tạo trên Pancake), 2026-10-29. */
   creatorId?: string;
+  /** NV đóng hàng (`SalesOrder.packerId`) — màn In đơn, 2026-11-13. */
+  packerId?: string;
   /** Page Facebook (id, nối dấu phẩy) — đơn ERP chọn page + đơn Pancake theo Page ID. */
   facebookPageIds?: string;
   /** Nhóm đơn lỗi — màn Xử lý đơn lỗi, CHỈ superadmin (2026-11-02). */
@@ -294,6 +296,7 @@ function listQuery(params: Omit<OrderListParams, 'take' | 'skip'>) {
     careTeamId: params.careTeamId || undefined,
     teamIds: params.teamIds || undefined,
     creatorId: params.creatorId || undefined,
+    packerId: params.packerId || undefined,
     facebookPageIds: params.facebookPageIds || undefined,
     issue: params.issue,
     olderThanDays: params.olderThanDays,

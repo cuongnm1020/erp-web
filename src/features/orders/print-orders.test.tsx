@@ -1,6 +1,7 @@
 import { fireEvent, screen, waitFor } from '@testing-library/react';
 import { http, HttpResponse } from 'msw';
 import { describe, expect, it, vi } from 'vitest';
+import { forgetWarehouseSelection } from '@/lib/warehouse';
 import { makeOrders } from '@/test/msw/handlers';
 import { server } from '@/test/msw/server';
 import { makeTestQueryClient, renderApp } from '@/test/render';
@@ -573,6 +574,61 @@ describe('PrintOrdersScreen — In đơn (clone màn Đơn hàng, 2026-11-04)', 
         expect(p.has('pickupStatus')).toBe(false);
         expect(p.has('printStatus')).toBe(false);
       }
+    } finally {
+      search = 'group=all';
+    }
+  });
+
+  it('lọc NV đóng hàng (2026-11-13): ô liệt kê người đóng gói kho đang làm việc; URL packerId → danh sách + số đếm tab; không chọn kho → ẩn ô, không lọc ngầm', async () => {
+    search = 'group=all&packerId=u-pk1';
+    const list: URLSearchParams[] = [];
+    const counts: URLSearchParams[] = [];
+    const packerWh: (string | null)[] = [];
+    server.use(
+      http.get('/api/sales-orders', ({ request }) => {
+        list.push(new URL(request.url).searchParams);
+        return HttpResponse.json({ items: [], total: 0 });
+      }),
+      http.get('/api/sales-orders/flow-counts', ({ request }) => {
+        counts.push(new URL(request.url).searchParams);
+        return HttpResponse.json({ total: 0 });
+      }),
+      http.get('/api/pda/packers', ({ request }) => {
+        packerWh.push(new URL(request.url).searchParams.get('warehouseId'));
+        return HttpResponse.json([{ id: 'u-pk1', code: 'pk1', fullName: 'Lê Đóng Gói' }]);
+      }),
+    );
+    let first: ReturnType<typeof renderApp> | undefined;
+    try {
+      first = renderApp(<PrintOrdersScreen />, {
+        warehouses: [{ id: 'wh-la', code: 'KHO-LA-01', name: 'Kho Long An' }],
+      });
+      const box = await screen.findByRole('combobox', { name: 'NV đóng hàng' });
+      expect(box).toBeInTheDocument();
+      await waitFor(() => expect(box).toHaveTextContent('Lê Đóng Gói'));
+      expect(packerWh).toContain('wh-la');
+      await waitFor(() => expect(list.some((p) => p.get('packerId') === 'u-pk1')).toBe(true));
+      await waitFor(() => expect(counts.some((p) => p.get('packerId') === 'u-pk1')).toBe(true));
+    } finally {
+      search = 'group=all';
+      first?.unmount();
+      forgetWarehouseSelection();
+    }
+
+    // Không có kho làm việc → không có danh sách người đóng gói: ẩn ô, link cũ không lọc ngầm.
+    search = 'group=all&packerId=u-pk1';
+    const bare: URLSearchParams[] = [];
+    server.use(
+      http.get('/api/sales-orders', ({ request }) => {
+        bare.push(new URL(request.url).searchParams);
+        return HttpResponse.json({ items: [], total: 0 });
+      }),
+    );
+    try {
+      renderApp(<PrintOrdersScreen />);
+      await waitFor(() => expect(bare.length).toBeGreaterThan(0));
+      expect(screen.queryByRole('combobox', { name: 'NV đóng hàng' })).not.toBeInTheDocument();
+      for (const p of bare) expect(p.has('packerId')).toBe(false);
     } finally {
       search = 'group=all';
     }

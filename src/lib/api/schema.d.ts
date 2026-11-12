@@ -25375,6 +25375,8 @@ export interface operations {
                 facebookPageIds?: string;
                 /** @description Người phụ trách (SalesOrder.ownerId). */
                 ownerId?: string;
+                /** @description NV đóng hàng (`SalesOrder.packerId`, chọn khi Gửi sang ĐVVC) — màn In đơn, 2026-11-13. */
+                packerId?: string;
                 /**
                  * @description Người bấm tạo đơn (2026-10-29): đơn ERP theo `createdBy`, đơn Pancake theo người tạo trên
                  *     Pancake (`external.creatorUserId`) — cùng nguồn với cột `creatorName`.
@@ -25705,6 +25707,8 @@ export interface operations {
                 facebookPageIds?: string;
                 /** @description Người phụ trách (SalesOrder.ownerId). */
                 ownerId?: string;
+                /** @description NV đóng hàng (`SalesOrder.packerId`, chọn khi Gửi sang ĐVVC) — màn In đơn, 2026-11-13. */
+                packerId?: string;
                 /**
                  * @description Người bấm tạo đơn (2026-10-29): đơn ERP theo `createdBy`, đơn Pancake theo người tạo trên
                  *     Pancake (`external.creatorUserId`) — cùng nguồn với cột `creatorName`.
@@ -25938,6 +25942,8 @@ export interface operations {
                 facebookPageIds?: string;
                 /** @description Người phụ trách (SalesOrder.ownerId). */
                 ownerId?: string;
+                /** @description NV đóng hàng (`SalesOrder.packerId`, chọn khi Gửi sang ĐVVC) — màn In đơn, 2026-11-13. */
+                packerId?: string;
                 /**
                  * @description Người bấm tạo đơn (2026-10-29): đơn ERP theo `createdBy`, đơn Pancake theo người tạo trên
                  *     Pancake (`external.creatorUserId`) — cùng nguồn với cột `creatorName`.
@@ -26173,6 +26179,8 @@ export interface operations {
                 facebookPageIds?: string;
                 /** @description Người phụ trách (SalesOrder.ownerId). */
                 ownerId?: string;
+                /** @description NV đóng hàng (`SalesOrder.packerId`, chọn khi Gửi sang ĐVVC) — màn In đơn, 2026-11-13. */
+                packerId?: string;
                 /**
                  * @description Người bấm tạo đơn (2026-10-29): đơn ERP theo `createdBy`, đơn Pancake theo người tạo trên
                  *     Pancake (`external.creatorUserId`) — cùng nguồn với cột `creatorName`.
