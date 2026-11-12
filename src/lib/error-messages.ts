@@ -99,8 +99,12 @@ const MESSAGES: Record<string, string> = {
   PANCAKE_WAREHOUSE_NOT_FOUND:
     'Shop không còn kho này trên Pancake (có thể vừa bị xóa). Tải lại danh sách kho rồi chọn lại.',
   // Hãng vận chuyển (tra cước ở màn sửa đơn, vận đơn ở bàn đóng gói)
+  // 2026-11-13: gần như luôn là địa chỉ giao để trống ô Phường/xã (gõ cả "xã…, huyện…" vào ô số
+  // nhà) — nói đúng nguyên nhân đó trước; kho chưa khai điểm lấy hàng là trường hợp hiếm.
   CARRIER_WAYBILL_DATA:
-    'Đơn chưa có địa chỉ giao đủ tỉnh/thành hoặc chưa có dòng hàng. Chọn địa chỉ giao ở hồ sơ khách rồi thử lại.',
+    'Địa chỉ giao chưa chọn Tỉnh / Phường xã (thường do gõ cả địa chỉ vào ô số nhà) nên chưa gửi được sang hãng. Sửa đơn, chọn Tỉnh / Phường xã rồi xin lại vận đơn. Địa chỉ đã đủ mà vẫn lỗi thì kho chưa khai điểm lấy hàng ở Kho & vị trí.',
+  ORDER_ADDRESS_INCOMPLETE:
+    'Địa chỉ giao chưa chọn Tỉnh / Phường xã (thường do gõ cả địa chỉ vào ô số nhà) — đơn chưa được gửi sang hãng. Sửa đơn, chọn Tỉnh / Phường xã rồi gửi lại.',
   CARRIER_NOT_CONFIGURED:
     'Hãng này chưa có token hoặc địa chỉ API. Quản trị viên nhập ở Quản trị › Cấu hình hệ thống › Đơn vị vận chuyển.',
   CARRIER_SECRET_KEY_MISSING:
