@@ -445,7 +445,7 @@ describe('OrderEditScreen — trang sửa đơn (D-05, PATCH /sales-orders/{id})
     fireEvent.click(await screen.findByRole('option', { name: `GHTK ${CARRIERS[3]!.name}` }));
     // Luật 6: không render message thô của server — câu từ bộ dịch lỗi theo `code`.
     await waitFor(() =>
-      expect(screen.getByText(/Đơn chưa có địa chỉ giao đủ tỉnh\/thành/)).toBeInTheDocument(),
+      expect(screen.getByText(/Địa chỉ giao chưa chọn Tỉnh \/ Phường xã/)).toBeInTheDocument(),
     );
     expect(screen.getByRole('button', { name: /Lưu thay đổi/ })).toBeEnabled();
   });
