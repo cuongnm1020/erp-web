@@ -3884,6 +3884,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/sales-orders/packer-stats": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Đơn gán NV đóng hàng theo ngày Gửi ĐVVC + tình trạng kho lúc gọi — màn Kho › Năng suất kho
+         *     (2026-11-13). Cùng quyền với GET /tasks/productivity. Khai TRƯỚC `:id`.
+         */
+        get: operations["SalesOrderController_packerStats"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/sales-orders/shipping-quote-preview": {
         parameters: {
             query?: never;
@@ -12393,6 +12413,38 @@ export interface components {
             code: string;
             /** @description false = đã nghỉ (khóa / xóa tài khoản) — vẫn lọc được đơn cũ của họ. */
             isActive: boolean;
+        };
+        PackerStatsCountsDto: {
+            assigned: number;
+            notPacked: number;
+            packed: number;
+            dispatched: number;
+            cancelled: number;
+        };
+        PackerStatsRowDto: {
+            assigned: number;
+            notPacked: number;
+            packed: number;
+            dispatched: number;
+            cancelled: number;
+            /** @description core.User.id — giá trị `packerId` của GET /sales-orders. */
+            userId: string;
+            code: string;
+            fullName: string;
+            /** @description false = đã nghỉ (khóa / xóa tài khoản). */
+            isActive: boolean;
+        };
+        PackerStatsDto: {
+            /** @description YYYY-MM-DD (Asia/Ho_Chi_Minh), bao gồm hai đầu. */
+            from: string;
+            to: string;
+            warehouseId: string | null;
+            /** @description Mọi đơn đã gán NV đóng hàng trong khoảng (không gồm `unassigned`). */
+            totals: components["schemas"]["PackerStatsCountsDto"];
+            /** @description Đơn đã Gửi ĐVVC trong khoảng nhưng chưa gán NV đóng hàng. */
+            unassigned: components["schemas"]["PackerStatsCountsDto"];
+            /** @description Người có đơn trong khoảng — nhiều đơn trước, rồi theo tên. */
+            rows: components["schemas"]["PackerStatsRowDto"][];
         };
         ShippingQuotePreviewDto: {
             /** Format: uuid */
@@ -25170,6 +25222,29 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["OrderPackerOptionDto"][];
+                };
+            };
+        };
+    };
+    SalesOrderController_packerStats: {
+        parameters: {
+            query?: {
+                from?: string;
+                to?: string;
+                warehouseId?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PackerStatsDto"];
                 };
             };
         };
