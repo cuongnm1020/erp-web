@@ -916,13 +916,14 @@ describe('OrderCreateScreen — màn tạo đơn mới', () => {
     expect(box()).toHaveTextContent('Xã Ngũ Hiệp, Huyện Cai Lậy, Tiền Giang');
     expect(box()).not.toHaveTextContent('Đồng Tháp');
 
-    // Mở lại: đang là địa chỉ cũ → tab Địa chỉ cũ, vào bước Quận / Huyện của Tiền Giang.
+    // Mở lại: đang là địa chỉ cũ → tab Địa chỉ cũ, vào thẳng xã của Huyện Cai Lậy (2026-11-13).
     fireEvent.click(box());
     expect(await screen.findByRole('tab', { name: 'Địa chỉ cũ' })).toHaveAttribute(
       'aria-selected',
       'true',
     );
-    expect(await screen.findByRole('option', { name: 'Huyện Cai Lậy' })).toBeInTheDocument();
+    expect(await screen.findByRole('tab', { name: 'Huyện Cai Lậy' })).toBeInTheDocument();
+    expect(await screen.findByRole('option', { name: 'Xã Ngũ Hiệp' })).toBeInTheDocument();
 
     // Bấm tab tỉnh → về danh sách tỉnh, chọn lại được (lỗi 2026-11-07: tự nhảy lại bước huyện).
     fireEvent.click(screen.getByRole('tab', { name: 'Tiền Giang' }));

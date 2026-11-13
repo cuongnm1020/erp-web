@@ -578,6 +578,37 @@ describe('PrintOrdersScreen — In đơn (clone màn Đơn hàng, 2026-11-04)', 
     }
   });
 
+  it('lọc NV đóng hàng (2026-11-13): người từng được gán, KỂ CẢ đã nghỉ ("(đã nghỉ)"); URL packerId → danh sách + số đếm tab', async () => {
+    search = 'group=all&packerId=u-old';
+    const list: URLSearchParams[] = [];
+    const counts: URLSearchParams[] = [];
+    server.use(
+      http.get('/api/sales-orders', ({ request }) => {
+        list.push(new URL(request.url).searchParams);
+        return HttpResponse.json({ items: [], total: 0 });
+      }),
+      http.get('/api/sales-orders/flow-counts', ({ request }) => {
+        counts.push(new URL(request.url).searchParams);
+        return HttpResponse.json({ total: 0 });
+      }),
+      http.get('/api/sales-orders/packer-options', () =>
+        HttpResponse.json([
+          { userId: 'u-pk1', code: 'pk1', fullName: 'Lê Đóng Gói', isActive: true },
+          { userId: 'u-old', code: 'pk0', fullName: 'Trần Đã Nghỉ', isActive: false },
+        ]),
+      ),
+    );
+    try {
+      renderApp(<PrintOrdersScreen />);
+      const box = await screen.findByRole('combobox', { name: 'NV đóng hàng' });
+      await waitFor(() => expect(box).toHaveTextContent('Trần Đã Nghỉ (đã nghỉ)'));
+      await waitFor(() => expect(list.some((p) => p.get('packerId') === 'u-old')).toBe(true));
+      await waitFor(() => expect(counts.some((p) => p.get('packerId') === 'u-old')).toBe(true));
+    } finally {
+      search = 'group=all';
+    }
+  });
+
   it('tab Đã xác nhận bỏ đơn đã có mã vận đơn (2026-11-06): danh sách + số đếm tab gửi warehouseNoWaybill=true', async () => {
     search = 'flow=WAREHOUSE';
     const list: URLSearchParams[] = [];

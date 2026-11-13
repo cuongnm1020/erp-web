@@ -6,6 +6,9 @@ import type { components } from '@/lib/api/schema';
 export type Productivity = components['schemas']['TaskProductivityDto'];
 export type ProductivitySection = components['schemas']['ProductivitySectionDto'];
 export type ProductivityRow = components['schemas']['ProductivityRowDto'];
+export type PackerStats = components['schemas']['PackerStatsDto'];
+export type PackerStatsRow = components['schemas']['PackerStatsRowDto'];
+export type PackerStatsCounts = components['schemas']['PackerStatsCountsDto'];
 
 export interface ProductivityParams {
   /** YYYY-MM-DD giờ VN, bao gồm hai đầu. */
@@ -18,7 +21,32 @@ export interface ProductivityParams {
 export const productivityKeys = {
   all: ['wms', 'productivity'] as const,
   detail: (p: ProductivityParams) => [...productivityKeys.all, p] as const,
+  packers: (p: ProductivityParams) => [...productivityKeys.all, 'packers', p] as const,
 };
+
+/**
+ * GET /sales-orders/packer-stats — đơn gán NV đóng hàng theo ngày Gửi ĐVVC (2026-11-13), tách
+ * chưa đóng / đã đóng chờ hãng / đã rời kho / đã hủy theo tình trạng lúc gọi.
+ */
+export function usePackerStats(params: ProductivityParams) {
+  return useQuery({
+    queryKey: productivityKeys.packers(params),
+    queryFn: () =>
+      unwrap(
+        api.GET('/sales-orders/packer-stats', {
+          params: {
+            query: {
+              from: params.from,
+              to: params.to,
+              warehouseId: params.warehouseId || undefined,
+            },
+          },
+        }),
+      ),
+    placeholderData: keepPreviousData,
+    refetchInterval: 60_000,
+  });
+}
 
 /**
  * GET /tasks/productivity — đơn đã lấy / đã đóng theo nhân viên trong khoảng ngày + việc đang giao

@@ -3864,6 +3864,46 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/sales-orders/packer-options": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Người từng được gán đóng hàng (kể cả đã nghỉ) ở kho đang làm việc — ô lọc "NV đóng hàng" màn
+         *     In đơn (2026-11-13). Khai TRƯỚC `:id`.
+         */
+        get: operations["SalesOrderController_packerOptions"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/sales-orders/packer-stats": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Đơn gán NV đóng hàng theo ngày Gửi ĐVVC + tình trạng kho lúc gọi — màn Kho › Năng suất kho
+         *     (2026-11-13). Cùng quyền với GET /tasks/productivity. Khai TRƯỚC `:id`.
+         */
+        get: operations["SalesOrderController_packerStats"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/sales-orders/shipping-quote-preview": {
         parameters: {
             query?: never;
@@ -12365,6 +12405,47 @@ export interface components {
             /** @description Mã / tài khoản nhân viên. */
             code: string;
         };
+        OrderPackerOptionDto: {
+            /** @description Giá trị cho `packerId` của GET /sales-orders (core.User.id). */
+            userId: string;
+            fullName: string;
+            /** @description Mã / tài khoản nhân viên. */
+            code: string;
+            /** @description false = đã nghỉ (khóa / xóa tài khoản) — vẫn lọc được đơn cũ của họ. */
+            isActive: boolean;
+        };
+        PackerStatsCountsDto: {
+            assigned: number;
+            notPacked: number;
+            packed: number;
+            dispatched: number;
+            cancelled: number;
+        };
+        PackerStatsRowDto: {
+            assigned: number;
+            notPacked: number;
+            packed: number;
+            dispatched: number;
+            cancelled: number;
+            /** @description core.User.id — giá trị `packerId` của GET /sales-orders. */
+            userId: string;
+            code: string;
+            fullName: string;
+            /** @description false = đã nghỉ (khóa / xóa tài khoản). */
+            isActive: boolean;
+        };
+        PackerStatsDto: {
+            /** @description YYYY-MM-DD (Asia/Ho_Chi_Minh), bao gồm hai đầu. */
+            from: string;
+            to: string;
+            warehouseId: string | null;
+            /** @description Mọi đơn đã gán NV đóng hàng trong khoảng (không gồm `unassigned`). */
+            totals: components["schemas"]["PackerStatsCountsDto"];
+            /** @description Đơn đã Gửi ĐVVC trong khoảng nhưng chưa gán NV đóng hàng. */
+            unassigned: components["schemas"]["PackerStatsCountsDto"];
+            /** @description Người có đơn trong khoảng — nhiều đơn trước, rồi theo tên. */
+            rows: components["schemas"]["PackerStatsRowDto"][];
+        };
         ShippingQuotePreviewDto: {
             /** Format: uuid */
             carrierId: string;
@@ -16174,7 +16255,7 @@ export interface components {
             previousFrom: string;
             previousTo: string;
             /** @enum {string} */
-            groupBy: "team" | "owner" | "owner_shop" | "shop";
+            groupBy: "team" | "owner" | "owner_shop" | "shop" | "marketer";
             /**
              * @description Sắp doanh số như Pancake (grossRevenue) giảm dần ("Chưa gán" đứng sau khi bằng nhau). Gồm cả người / team chỉ có doanh
              *     số kỳ trước (số kỳ này 0). Nhân viên chỉ thấy dòng của mình; trưởng nhóm thấy team mình.
@@ -25126,6 +25207,48 @@ export interface operations {
             };
         };
     };
+    SalesOrderController_packerOptions: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OrderPackerOptionDto"][];
+                };
+            };
+        };
+    };
+    SalesOrderController_packerStats: {
+        parameters: {
+            query?: {
+                from?: string;
+                to?: string;
+                warehouseId?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PackerStatsDto"];
+                };
+            };
+        };
+    };
     SalesOrderController_shippingQuotePreview: {
         parameters: {
             query?: never;
@@ -25375,6 +25498,8 @@ export interface operations {
                 facebookPageIds?: string;
                 /** @description Người phụ trách (SalesOrder.ownerId). */
                 ownerId?: string;
+                /** @description NV đóng hàng (`SalesOrder.packerId`, chọn khi Gửi sang ĐVVC) — màn In đơn, 2026-11-13. */
+                packerId?: string;
                 /**
                  * @description Người bấm tạo đơn (2026-10-29): đơn ERP theo `createdBy`, đơn Pancake theo người tạo trên
                  *     Pancake (`external.creatorUserId`) — cùng nguồn với cột `creatorName`.
@@ -25705,6 +25830,8 @@ export interface operations {
                 facebookPageIds?: string;
                 /** @description Người phụ trách (SalesOrder.ownerId). */
                 ownerId?: string;
+                /** @description NV đóng hàng (`SalesOrder.packerId`, chọn khi Gửi sang ĐVVC) — màn In đơn, 2026-11-13. */
+                packerId?: string;
                 /**
                  * @description Người bấm tạo đơn (2026-10-29): đơn ERP theo `createdBy`, đơn Pancake theo người tạo trên
                  *     Pancake (`external.creatorUserId`) — cùng nguồn với cột `creatorName`.
@@ -25938,6 +26065,8 @@ export interface operations {
                 facebookPageIds?: string;
                 /** @description Người phụ trách (SalesOrder.ownerId). */
                 ownerId?: string;
+                /** @description NV đóng hàng (`SalesOrder.packerId`, chọn khi Gửi sang ĐVVC) — màn In đơn, 2026-11-13. */
+                packerId?: string;
                 /**
                  * @description Người bấm tạo đơn (2026-10-29): đơn ERP theo `createdBy`, đơn Pancake theo người tạo trên
                  *     Pancake (`external.creatorUserId`) — cùng nguồn với cột `creatorName`.
@@ -26173,6 +26302,8 @@ export interface operations {
                 facebookPageIds?: string;
                 /** @description Người phụ trách (SalesOrder.ownerId). */
                 ownerId?: string;
+                /** @description NV đóng hàng (`SalesOrder.packerId`, chọn khi Gửi sang ĐVVC) — màn In đơn, 2026-11-13. */
+                packerId?: string;
                 /**
                  * @description Người bấm tạo đơn (2026-10-29): đơn ERP theo `createdBy`, đơn Pancake theo người tạo trên
                  *     Pancake (`external.creatorUserId`) — cùng nguồn với cột `creatorName`.
@@ -28801,7 +28932,7 @@ export interface operations {
                 customerId?: string;
                 /** @description POS Pancake của đơn (shop_id, chuỗi số) — như `pancakeShopId` của GET /sales-orders. */
                 pancakeShopId?: string;
-                groupBy: "owner" | "team" | "owner_shop" | "shop";
+                groupBy: "owner" | "team" | "owner_shop" | "shop" | "marketer";
             };
             header?: never;
             path?: never;

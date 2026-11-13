@@ -3,7 +3,7 @@ import { http, HttpResponse } from 'msw';
 import { describe, expect, it, vi } from 'vitest';
 import { server } from '@/test/msw/server';
 import { renderApp } from '@/test/render';
-import type { Productivity } from './api/use-productivity';
+import type { PackerStats, Productivity } from './api/use-productivity';
 import { formatDuration, ProductivityScreen } from './components/productivity-screen';
 
 let search = '';
@@ -69,8 +69,49 @@ const DATA: Productivity = {
   },
 };
 
-const useApi = (onQuery?: (q: URLSearchParams) => void, body: Productivity = DATA) =>
+const counts = (notPacked: number, packed: number, dispatched: number, cancelled: number) => ({
+  assigned: notPacked + packed + dispatched + cancelled,
+  notPacked,
+  packed,
+  dispatched,
+  cancelled,
+});
+
+/** Đúng shape `PackerStatsDto` (GET /sales-orders/packer-stats). */
+const PACKERS: PackerStats = {
+  from: '2026-09-21',
+  to: '2026-09-27',
+  warehouseId: null,
+  totals: counts(4, 6, 20, 1),
+  unassigned: counts(3, 0, 0, 0),
+  rows: [
+    {
+      userId: 'u3',
+      code: 'packer.chi',
+      fullName: 'Lê Chi',
+      isActive: true,
+      ...counts(4, 5, 18, 1),
+    },
+    {
+      userId: 'u9',
+      code: 'packer.cu',
+      fullName: 'Phạm Cũ',
+      isActive: false,
+      ...counts(0, 1, 2, 0),
+    },
+  ],
+};
+
+const useApi = (
+  onQuery?: (q: URLSearchParams) => void,
+  body: Productivity = DATA,
+  packers: PackerStats = PACKERS,
+) =>
   server.use(
+    http.get('/api/sales-orders/packer-stats', ({ request }) => {
+      onQuery?.(new URL(request.url).searchParams);
+      return HttpResponse.json(packers);
+    }),
     http.get('/api/warehouses', () =>
       HttpResponse.json([{ id: 'wh-1', code: 'WH01', name: 'Kho Hà Nội' }]),
     ),
@@ -106,6 +147,30 @@ describe('ProductivityScreen — /wms/productivity', () => {
     const pack = screen.getByRole('region', { name: 'Nhân viên đóng gói' });
     expect(within(pack).getByText('1 giờ 05 phút')).toBeInTheDocument();
     expect(within(pack).queryByText('Báo thiếu')).toBeNull();
+  });
+
+  it('bảng Đơn gán nhân viên đóng hàng (2026-11-13): cùng khoảng ngày, tách tình trạng, người nghỉ, dòng chưa gán + tổng', async () => {
+    search = 'from=2026-09-21&to=2026-09-27';
+    const seen: URLSearchParams[] = [];
+    useApi((q) => seen.push(q));
+    renderApp(<ProductivityScreen />);
+
+    const sec = await screen.findByRole('region', { name: 'Đơn gán nhân viên đóng hàng' });
+    const chi = (await within(sec).findByText('Lê Chi')).closest('tr')!;
+    expect(
+      within(chi)
+        .getAllByRole('cell')
+        .slice(1)
+        .map((c) => c.textContent),
+    ).toEqual(['28', '4', '5', '18', '1']);
+    expect(within(sec).getByText('(đã nghỉ)')).toBeInTheDocument();
+    const none = within(sec).getByText('Chưa gán NV đóng hàng').closest('tr')!;
+    expect(within(none).getAllByRole('cell')[1]?.textContent).toBe('3');
+    const total = within(sec).getByText('Tổng đơn đã gán').closest('tr')!;
+    expect(within(total).getAllByRole('cell')[1]?.textContent).toBe('31');
+    expect(seen.every((q) => q.get('from') === '2026-09-21' && q.get('to') === '2026-09-27')).toBe(
+      true,
+    );
   });
 
   it('chọn nhanh "7 ngày" ghi from/to lên URL (luật 8)', async () => {

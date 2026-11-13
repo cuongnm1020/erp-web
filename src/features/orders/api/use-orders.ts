@@ -115,6 +115,8 @@ export interface OrderListParams {
   teamIds?: string;
   /** NV lên đơn = người bấm tạo đơn (ERP: người tạo, Pancake: người tạo trên Pancake), 2026-10-29. */
   creatorId?: string;
+  /** NV đóng hàng (`SalesOrder.packerId`) — màn In đơn, 2026-11-13. */
+  packerId?: string;
   /** Page Facebook (id, nối dấu phẩy) — đơn ERP chọn page + đơn Pancake theo Page ID. */
   facebookPageIds?: string;
   /** Nhóm đơn lỗi — màn Xử lý đơn lỗi, CHỈ superadmin (2026-11-02). */
@@ -294,6 +296,7 @@ function listQuery(params: Omit<OrderListParams, 'take' | 'skip'>) {
     careTeamId: params.careTeamId || undefined,
     teamIds: params.teamIds || undefined,
     creatorId: params.creatorId || undefined,
+    packerId: params.packerId || undefined,
     facebookPageIds: params.facebookPageIds || undefined,
     issue: params.issue,
     olderThanDays: params.olderThanDays,
@@ -441,6 +444,18 @@ export function useLabelPrinterOptions() {
   return useQuery({
     queryKey: [...orderKeys.all, 'label-printer-options'] as const,
     queryFn: () => unwrap(api.GET('/sales-orders/label-printer-options')),
+    staleTime: 60_000,
+  });
+}
+
+/**
+ * GET /sales-orders/packer-options — người từng được gán đóng hàng ở kho đang làm việc, KỂ CẢ đã
+ * nghỉ (2026-11-13). Đổi kho → WarehouseProvider reset mọi query nên key không cần kho.
+ */
+export function useOrderPackerOptions() {
+  return useQuery({
+    queryKey: [...orderKeys.all, 'packer-options'] as const,
+    queryFn: () => unwrap(api.GET('/sales-orders/packer-options')),
     staleTime: 60_000,
   });
 }

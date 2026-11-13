@@ -66,6 +66,7 @@ import {
   fetchOrdersPage,
   orderKeys,
   useOrderFlowCounts,
+  useOrderPackerOptions,
   useOrderTabCounts,
   useOrderListPrefs,
   useOrders,
@@ -215,6 +216,8 @@ const DEFAULTS = {
     'orderError',
     // Hãng VC (2026-11-10): `c:<hãng>` = mọi tài khoản của hãng, `a:<tài khoản>`, nối dấu phẩy.
     'carrier',
+    // NV đóng hàng (`SalesOrder.packerId`, chọn khi Gửi ĐVVC) — 2026-11-13.
+    'packerId',
   ] as const,
 };
 
@@ -1072,6 +1075,10 @@ export function PrintOrdersScreen() {
   const printStatus = pickOption(PRINT_OPTIONS, state.filters.printStatus);
   const teamOptions = useTeamFilterOptions(canFilterDept);
   const facebookPages = useFacebookPageOptions();
+  // NV đóng hàng (2026-11-13): người TỪNG được gán đóng hàng ở kho đang làm việc, kể cả đã nghỉ
+  // (user: "hiện thị cả người nghỉ") — GET /sales-orders/packer-options; "Tất cả kho" → mọi kho.
+  const packers = useOrderPackerOptions();
+  const packerId = state.filters.packerId ?? '';
   // Sắp xếp lưu theo người dùng ở server (đăng xuất / đổi máy vẫn giữ). Sắp xếp trên URL (link
   // dán cho đồng nghiệp) thắng; URL không có thì lấy lần sắp gần nhất của người dùng. Cột ẩn không
   // còn (luôn hiện hết cột).
@@ -1114,10 +1121,12 @@ export function PrintOrdersScreen() {
       printStatus,
       carrierIds: carrierFilter.carrierIds || undefined,
       carrierAccountIds: carrierFilter.carrierAccountIds || undefined,
+      packerId: packerId || undefined,
       // Tab Đã xác nhận màn In đơn chỉ đơn chưa có mã vận đơn (2026-11-06) — cả danh sách lẫn số đếm.
       warehouseNoWaybill: true,
     }),
     [
+      packerId,
       carrierFilter.carrierIds,
       carrierFilter.carrierAccountIds,
       state.q,
@@ -1276,7 +1285,8 @@ export function PrintOrdersScreen() {
     fbPage !== '' ||
     pickupStatus !== undefined ||
     printStatus !== undefined ||
-    carrierFilter.value !== '';
+    carrierFilter.value !== '' ||
+    packerId !== '';
   const customerName = query.data?.items[0]?.customer.name;
   // Dòng đã chọn: nhớ cả dòng vừa RỜI bộ lọc (sự cố 2026-11-07, màn In đơn: Gửi ĐVVC xong đơn sang
   // tab Đang đóng hàng → tab Đã xác nhận không còn dòng chọn → thanh chọn nhiều bị gỡ kéo theo hộp
@@ -1593,6 +1603,18 @@ export function PrintOrdersScreen() {
               // cùng ô với màn Theo dõi đơn.
               { key: 'pickup', label: 'Hãng lấy hàng', type: 'select', options: PICKUP_OPTIONS },
               { key: 'printStatus', label: 'In tem', type: 'select', options: PRINT_OPTIONS },
+              // NV đóng hàng (2026-11-13, user) — người đã nghỉ vẫn chọn được, ghi "(đã nghỉ)".
+              {
+                key: 'packerId',
+                label: 'NV đóng hàng',
+                type: 'select',
+                searchable: true,
+                options: (packers.data ?? []).map((p) => ({
+                  value: p.userId,
+                  label: p.isActive ? p.fullName : `${p.fullName} (đã nghỉ)`,
+                  hint: p.code,
+                })),
+              },
               // Lỗi đơn (2026-11-10, user): lỗi đang hiện trên danh sách — SP ngoài hệ thống + lỗi
               // vận đơn gom theo câu hãng. Giá trị mã hoá URI (câu hãng có dấu phẩy).
               {
@@ -1622,6 +1644,7 @@ export function PrintOrdersScreen() {
               printStatus,
               orderError: orderError || undefined,
               carrier: carrierFilter.value || undefined,
+              packerId: packerId || undefined,
             }}
             onFilterChange={setFilter}
             searchPlaceholder="Mã đơn, SĐT, tên SP, mã vận đơn… nhiều giá trị cách dấu phẩy hoặc dấu cách"

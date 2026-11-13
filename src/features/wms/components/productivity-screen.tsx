@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useCallback, useMemo } from 'react';
+import { useCallback, useMemo, type ReactNode } from 'react';
 import { KpiCard } from '@/components/data/kpi-card';
 import { EmptyState, ErrorState, ListSkeleton } from '@/components/data/states';
 import { PageHeader } from '@/components/layout/page-header';
@@ -19,7 +19,10 @@ import { cn } from '@/lib/cn';
 import { formatDate, formatQuantity, toLocalDateKey } from '@/lib/format';
 import { useListState } from '@/lib/url-state';
 import {
+  usePackerStats,
   useProductivity,
+  type PackerStatsCounts,
+  type ProductivityParams,
   type ProductivityRow,
   type ProductivitySection,
 } from '../api/use-productivity';
@@ -190,9 +193,116 @@ export function ProductivityScreen() {
             showShort={false}
             emptyText="Chưa có nhân viên đóng gói nào. Gán role Nhân viên đóng hàng ở Quản trị › Nhân viên."
           />
+          <PackerOrdersTable params={params} />
         </>
       ) : null}
     </div>
+  );
+}
+
+/**
+ * Đơn gán NV đóng hàng (2026-11-13) — GET /sales-orders/packer-stats. Người được chọn ở ô "NV đóng
+ * hàng" khi Gửi ĐVVC; đếm theo NGÀY GỬI ĐVVC trong khoảng, tình trạng kho là lúc xem. Dòng cuối là
+ * đơn đã gửi ĐVVC mà chưa chọn NV đóng hàng.
+ */
+function PackerOrdersTable({ params }: { params: ProductivityParams }) {
+  const query = usePackerStats(params);
+  const title = 'Đơn gán nhân viên đóng hàng';
+  return (
+    <section className="flex flex-col gap-2" aria-label={title}>
+      <div className="flex flex-col">
+        <h2 className="text-sm font-semibold">{title}</h2>
+        <p className="text-xs text-muted-foreground">
+          Theo ngày Gửi ĐVVC trong khoảng đã chọn · tình trạng kho là số lúc này
+        </p>
+      </div>
+      {query.isPending || (query.data === undefined && !query.error) ? (
+        <ListSkeleton rows={4} columns={6} />
+      ) : query.error ? (
+        <ErrorState error={query.error} onRetry={() => void query.refetch()} />
+      ) : query.data.rows.length === 0 && query.data.unassigned.assigned === 0 ? (
+        <EmptyState
+          title="Chưa có đơn gửi ĐVVC trong khoảng này"
+          description="Đơn được gán NV đóng hàng ở hộp Gửi sang ĐVVC. Thử chọn khoảng ngày dài hơn."
+          action={
+            <Button variant="outline" onClick={() => void query.refetch()}>
+              Tải lại
+            </Button>
+          }
+        />
+      ) : (
+        <div className="overflow-x-auto rounded-md border bg-card">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Nhân viên đóng hàng</TableHead>
+                <TableHead className="text-right">Đơn được gán</TableHead>
+                <TableHead className="text-right">Chưa đóng gói</TableHead>
+                <TableHead className="text-right">Đã đóng, chờ hãng lấy</TableHead>
+                <TableHead className="text-right">Đã rời kho</TableHead>
+                <TableHead className="text-right">Đã hủy</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {query.data.rows.map((r) => (
+                <PackerRow
+                  key={r.userId}
+                  name={
+                    <span className="flex flex-col">
+                      <span>
+                        {r.fullName || r.code}
+                        {r.isActive ? null : (
+                          <span className="text-muted-foreground"> (đã nghỉ)</span>
+                        )}
+                      </span>
+                      <span className="font-mono text-xs text-muted-foreground">{r.code}</span>
+                    </span>
+                  }
+                  c={r}
+                />
+              ))}
+              {query.data.unassigned.assigned > 0 ? (
+                <PackerRow
+                  name={<span className="text-muted-foreground">Chưa gán NV đóng hàng</span>}
+                  c={query.data.unassigned}
+                />
+              ) : null}
+              <PackerRow
+                name={<span className="font-semibold">Tổng đơn đã gán</span>}
+                c={query.data.totals}
+                strong
+              />
+            </TableBody>
+          </Table>
+        </div>
+      )}
+    </section>
+  );
+}
+
+function PackerRow({
+  name,
+  c,
+  strong = false,
+}: {
+  name: ReactNode;
+  c: PackerStatsCounts;
+  strong?: boolean;
+}) {
+  const num = (n: number, extra?: string) => (
+    <TableCell className={cn('text-right tabular-nums', n === 0 && 'text-muted-foreground', extra)}>
+      {n}
+    </TableCell>
+  );
+  return (
+    <TableRow>
+      <TableCell>{name}</TableCell>
+      {num(c.assigned, 'font-semibold')}
+      {num(c.notPacked, strong ? undefined : c.notPacked > 0 ? 'text-warning' : undefined)}
+      {num(c.packed)}
+      {num(c.dispatched)}
+      {num(c.cancelled)}
+    </TableRow>
   );
 }
 
