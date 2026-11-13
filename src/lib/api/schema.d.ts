@@ -13183,6 +13183,8 @@ export interface components {
             skuId: string;
             skuCode: string;
             skuName: string;
+            /** @description Tên danh mục sản phẩm của combo; null = chưa gán danh mục (2026-11-13). */
+            categoryName: string | null;
             /** @description Thứ tự combo trong đơn — khoá gộp dòng. */
             groupNo: number;
             /** @description Số combo khách đặt — Decimal(18,6) chuỗi. */
@@ -13200,6 +13202,8 @@ export interface components {
             skuId: string;
             skuCode: string;
             skuName: string;
+            /** @description Tên danh mục sản phẩm của dòng (danh mục gán trực tiếp); null = chưa gán (2026-11-13). */
+            categoryName: string | null;
             /**
              * @description Đơn đồng bộ từ Pancake: tên sản phẩm GỐC trên Pancake của dòng (đúng như trên POS) — người
              *     đóng hàng tìm hàng theo tên này. null = đơn tạo trong ERP / Pancake không gửi tên.

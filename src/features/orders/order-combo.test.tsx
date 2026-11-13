@@ -83,6 +83,9 @@ describe('OrderDetailScreen — đơn có combo', () => {
     expect(screen.queryByText(/\/ combo/)).not.toBeInTheDocument();
     // Dòng thường không có nhãn combo
     expect(screen.getByText('Sản phẩm C')).toBeInTheDocument();
+    // Danh mục sản phẩm hiện cạnh mã (2026-11-13) — cả dòng combo lẫn dòng thường.
+    expect(within(comboRow).getByText(/Thuốc BVTV/)).toBeInTheDocument();
+    expect(screen.getByText(/Phân bón/)).toBeInTheDocument();
   });
 });
 

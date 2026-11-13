@@ -344,6 +344,9 @@ function LineRow({ l, component = false }: { l: SalesOrderLine; component?: bool
         >
           {l.skuCode}
           {component && l.combo ? ` · ${qty(l.combo.componentQty)} / combo` : ''}
+          {!component && l.categoryName ? (
+            <span className="font-sans"> · {l.categoryName}</span>
+          ) : null}
         </div>
         {l.pancakeName && l.pancakeName !== l.skuName ? (
           <div
@@ -557,7 +560,12 @@ function Lines({ order }: { order: SalesOrderDetail }) {
                           Combo
                         </StatusBadge>
                       </div>
-                      <div className="font-mono text-xs text-muted-foreground">{g.skuCode}</div>
+                      <div className="font-mono text-xs text-muted-foreground">
+                        {g.skuCode}
+                        {g.categoryName ? (
+                          <span className="font-sans"> · {g.categoryName}</span>
+                        ) : null}
+                      </div>
                     </TableCell>
                     <TableCell className="px-2.5 py-1.5">combo</TableCell>
                     <TableCell className="px-2.5 py-1.5 text-right tabular-nums">
