@@ -1,6 +1,7 @@
 import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import { http, HttpResponse } from 'msw';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { readOrderDefaults, writeOrderDefaults } from '@/lib/order-defaults-memory';
 import { forgetWarehouseSelection, WarehouseProvider } from '@/lib/warehouse';
 import {
   FACEBOOK_PAGE_OPTIONS,
@@ -1409,6 +1410,58 @@ describe('OrderCreateScreen — màn tạo đơn mới', () => {
     fireEvent.click(screen.getByRole('button', { name: /^Chốt đơn F10/ }));
     await waitFor(() => expect(uploads).toEqual(['new-order-1']));
     await waitFor(() => expect(push).toHaveBeenCalledWith('/crm/orders/new-order-1'));
+    // Chốt xong → nhớ Marketer / POS / Page / Kho xuất cho đơn sau (2026-11-13).
+    expect(readOrderDefaults()).toEqual({
+      marketerId: DETAIL.marketerId ?? '',
+      posShopId: '',
+      facebookPageId: '',
+      warehouseId: DETAIL.warehouseId ?? '',
+    });
+  });
+
+  it('đơn mới điền sẵn Marketer / Kho xuất của đơn tạo trước đó (2026-11-13)', async () => {
+    writeOrderDefaults({
+      marketerId: '00000000-0000-4000-8000-0000000000a1',
+      posShopId: '',
+      facebookPageId: '',
+      warehouseId: 'wh-tt',
+    });
+    renderApp(
+      <WarehouseProvider
+        me={{
+          ...ME_ADMIN,
+          managesDepartments: false,
+          managesCareTeam: false,
+          warehouseOnly: false,
+          salesOnly: false,
+          warehouseIds: ['wh-tt', 'wh-la'],
+          warehouses: [
+            { id: 'wh-tt', code: 'KHO-TT-01', name: 'Kho Thạch Thất' },
+            { id: 'wh-la', code: 'KHO-LA-01', name: 'Kho Long An' },
+          ],
+          defaultWarehouseId: 'wh-la',
+          defaultPosShopId: null,
+          selectedWarehouseId: null,
+        }}
+      >
+        <OrderCreateScreen />
+      </WarehouseProvider>,
+    );
+    await waitFor(() =>
+      expect(screen.getByRole('combobox', { name: 'Kho xuất' })).toHaveTextContent(
+        'Kho Thạch Thất',
+      ),
+    );
+    await waitFor(() =>
+      expect(screen.getByRole('combobox', { name: 'Marketer' })).toHaveTextContent(
+        'Nguyễn Văn Sale',
+      ),
+    );
+    // F6 mở tab mới cũng điền sẵn.
+    fireEvent.keyDown(window, { key: 'F6' });
+    await screen.findByRole('tab', { name: 'Đơn mới 2', selected: true });
+    expect(screen.getByRole('combobox', { name: 'Kho xuất' })).toHaveTextContent('Kho Thạch Thất');
+    forgetWarehouseSelection();
   });
 
   it('ô Kho xuất: đang "Tất cả kho" (mặc định sau đăng nhập) → kho mặc định của tài khoản', async () => {

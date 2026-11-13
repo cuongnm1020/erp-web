@@ -1,6 +1,7 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/lib/api/client';
 import { forgetSavedListStates } from '@/lib/list-state-memory';
+import { forgetOrderDefaults } from '@/lib/order-defaults-memory';
 import { forgetWarehouseSelection } from '@/lib/warehouse';
 
 export function useLogout() {
@@ -15,6 +16,7 @@ export function useLogout() {
       // Bộ lọc lần gần nhất của các danh sách là của tài khoản vừa thoát — người đăng nhập sau
       // trên cùng trình duyệt không thừa hưởng.
       forgetSavedListStates();
+      forgetOrderDefaults();
       qc.clear();
       window.location.assign('/login');
     },

@@ -12,6 +12,8 @@ export interface ComboGroup {
   skuId: string;
   skuCode: string;
   skuName: string;
+  /** Danh mục sản phẩm của combo; null = chưa gán. */
+  categoryName: string | null;
   /** Số combo đặt — Decimal(18,6) chuỗi. */
   qty: string;
   /** Giá niêm yết / giá bán MỘT combo — Decimal(18,4) chuỗi. */
@@ -42,6 +44,7 @@ export function groupOrderLines(lines: readonly SalesOrderLine[]): OrderLineGrou
         skuId: line.combo.skuId,
         skuCode: line.combo.skuCode,
         skuName: line.combo.skuName,
+        categoryName: line.combo.categoryName,
         qty: line.combo.qty,
         listPrice: line.combo.listPrice,
         unitPrice: line.combo.unitPrice,

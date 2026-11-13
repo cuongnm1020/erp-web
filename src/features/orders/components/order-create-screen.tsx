@@ -15,8 +15,9 @@ import { useWarehouse } from '@/lib/warehouse';
 import { useDefaultPosShopId, useUploadOrderAttachment } from '../api/use-order-create';
 import { useOrder, type SalesOrderDetail } from '../api/use-orders';
 import { collapseComboLines } from '../combo-lines';
+import { writeOrderDefaults } from '@/lib/order-defaults-memory';
 import { emptyOrderValues, type CreateOrderValues } from '../schema';
-import { useOrderDrafts } from '../use-order-drafts';
+import { freshOrderValues, useOrderDrafts } from '../use-order-drafts';
 import {
   OrderDraftForm,
   type AfterCreate,
@@ -126,7 +127,7 @@ export function OrderCreateScreen() {
     } else if (presetCustomerId) {
       seeded.current = true;
       openDraft(
-        { ...emptyOrderValues(defaultWh, defaultPos), customerId: presetCustomerId },
+        { ...freshOrderValues(defaultWh, defaultPos), customerId: presetCustomerId },
         `customer:${presetCustomerId}`,
       );
     } else {
@@ -171,6 +172,16 @@ export function OrderCreateScreen() {
 
   const onCreated = async (r: CreateOrderResult, mode: AfterCreate) => {
     const draftId = activeId;
+    // Đơn sau điền sẵn Marketer / POS / Page / Kho xuất của đơn này (2026-11-13).
+    const done = drafts.drafts.find((d) => d.id === draftId)?.values;
+    if (done) {
+      writeOrderDefaults({
+        marketerId: done.marketerId ?? '',
+        posShopId: done.posShopId ?? '',
+        facebookPageId: done.facebookPageId ?? '',
+        warehouseId: done.warehouseId ?? '',
+      });
+    }
     // Lưu nháp → Đơn mới; Chốt đơn → Đã xác nhận (2026-11-02). Chốt đơn mà xác nhận hỏng (đơn vẫn
     // DRAFT) thì OrderDraftForm đã báo lỗi — chỉ mở đơn để xác nhận lại.
     if (r.status === 'PENDING_APPROVAL') {
