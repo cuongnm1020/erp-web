@@ -25522,6 +25522,12 @@ export interface operations {
                  */
                 teamIds?: string;
                 /**
+                 * @description Danh mục sản phẩm (core.ProductCategory.id cách nhau dấu phẩy, tối đa 50, 2026-11-13): đơn có
+                 *     dòng thuộc sản phẩm của MỘT trong các danh mục này (gồm danh mục con) — kể cả dòng thành phần
+                 *     của combo thuộc danh mục đó. Danh sách: GET /categories.
+                 */
+                categoryIds?: string;
+                /**
                  * @description `true` = chỉ đơn có đơn trùng trong ngày (cùng SĐT khách, cùng ngày VN, chưa hủy, mọi nguồn —
                  *     CSKH-5). Theo from/to nếu có, không thì 7 ngày VN gần nhất.
                  */
@@ -25861,6 +25867,12 @@ export interface operations {
                  */
                 teamIds?: string;
                 /**
+                 * @description Danh mục sản phẩm (core.ProductCategory.id cách nhau dấu phẩy, tối đa 50, 2026-11-13): đơn có
+                 *     dòng thuộc sản phẩm của MỘT trong các danh mục này (gồm danh mục con) — kể cả dòng thành phần
+                 *     của combo thuộc danh mục đó. Danh sách: GET /categories.
+                 */
+                categoryIds?: string;
+                /**
                  * @description `true` = chỉ đơn có đơn trùng trong ngày (cùng SĐT khách, cùng ngày VN, chưa hủy, mọi nguồn —
                  *     CSKH-5). Theo from/to nếu có, không thì 7 ngày VN gần nhất.
                  */
@@ -26102,6 +26114,12 @@ export interface operations {
                  *     /sales-orders/team-filter-options (phòng CSKH + phòng Sale/MKT đã có đơn).
                  */
                 teamIds?: string;
+                /**
+                 * @description Danh mục sản phẩm (core.ProductCategory.id cách nhau dấu phẩy, tối đa 50, 2026-11-13): đơn có
+                 *     dòng thuộc sản phẩm của MỘT trong các danh mục này (gồm danh mục con) — kể cả dòng thành phần
+                 *     của combo thuộc danh mục đó. Danh sách: GET /categories.
+                 */
+                categoryIds?: string;
                 /**
                  * @description `true` = chỉ đơn có đơn trùng trong ngày (cùng SĐT khách, cùng ngày VN, chưa hủy, mọi nguồn —
                  *     CSKH-5). Theo from/to nếu có, không thì 7 ngày VN gần nhất.
@@ -26346,6 +26364,12 @@ export interface operations {
                  *     /sales-orders/team-filter-options (phòng CSKH + phòng Sale/MKT đã có đơn).
                  */
                 teamIds?: string;
+                /**
+                 * @description Danh mục sản phẩm (core.ProductCategory.id cách nhau dấu phẩy, tối đa 50, 2026-11-13): đơn có
+                 *     dòng thuộc sản phẩm của MỘT trong các danh mục này (gồm danh mục con) — kể cả dòng thành phần
+                 *     của combo thuộc danh mục đó. Danh sách: GET /categories.
+                 */
+                categoryIds?: string;
                 /**
                  * @description `true` = chỉ đơn có đơn trùng trong ngày (cùng SĐT khách, cùng ngày VN, chưa hủy, mọi nguồn —
                  *     CSKH-5). Theo from/to nếu có, không thì 7 ngày VN gần nhất.

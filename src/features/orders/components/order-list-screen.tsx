@@ -86,6 +86,7 @@ import {
   useBulkConfirmOrders,
   isUnconfirmedErp,
   useTeamFilterOptions,
+  useCategoryFilterOptions,
   useCarrierStatusOptions,
   useOrderCreatorOptions,
   useFacebookPageOptions,
@@ -206,6 +207,8 @@ const DEFAULTS = {
     'printStatus',
     // Đơn có sản phẩm (SKU) này, kể cả thành phần combo (2026-11-02).
     'skuId',
+    // Danh mục sản phẩm (id nối dấu phẩy, chọn nhiều, gồm danh mục con), 2026-11-13.
+    'category',
   ] as const,
 };
 
@@ -1190,6 +1193,10 @@ export function OrderListScreen() {
   const team = canFilterDept ? (state.filters.team ?? '') : '';
   const creatorId = canFilterTeam ? (state.filters.creatorId ?? '') : '';
   const fbPage = state.filters.fbPage ?? '';
+  // Ô Danh mục cần `product.read` (GET /categories) — thiếu quyền thì ẩn ô, bỏ lọc trên URL.
+  const canFilterCategory = ability.can('read', 'Product');
+  const category = canFilterCategory ? (state.filters.category ?? '') : '';
+  const categoryOptions = useCategoryFilterOptions(canFilterCategory);
   const carrierStatus = state.filters.carrierStatus ?? '';
   const carrierStatusText = useMemo(() => decodeList(carrierStatus), [carrierStatus]);
   const carrierStatuses = useCarrierStatusOptions();
@@ -1248,6 +1255,7 @@ export function OrderListScreen() {
       teamIds: team || undefined,
       creatorId,
       facebookPageIds: fbPage || undefined,
+      categoryIds: category || undefined,
       carrierStatusText,
     }),
     [
@@ -1275,6 +1283,7 @@ export function OrderListScreen() {
       team,
       creatorId,
       fbPage,
+      category,
       carrierStatusText,
     ],
   );
@@ -1427,6 +1436,7 @@ export function OrderListScreen() {
     shortSkuId !== '' ||
     printStatus !== undefined ||
     skuId !== '' ||
+    category !== '' ||
     source !== undefined ||
     from !== '' ||
     to !== '' ||
@@ -1601,6 +1611,23 @@ export function OrderListScreen() {
                 />
               ),
             },
+            // Danh mục sản phẩm (2026-11-13), chọn nhiều = đơn có SP thuộc MỘT trong các danh mục
+            // (gồm danh mục con, kể cả thành phần combo).
+            ...(canFilterCategory
+              ? [
+                  {
+                    key: 'category' as const,
+                    label: 'Danh mục',
+                    type: 'multiSelect' as const,
+                    unit: 'danh mục',
+                    options: (categoryOptions.data ?? []).map((c) => ({
+                      value: c.id,
+                      label: c.name,
+                      hint: c.code,
+                    })),
+                  },
+                ]
+              : []),
             {
               // Một ô cho cả "chưa gán hãng" lẫn "đã gán hãng X" — hai key URL (noCarrier / carrierId)
               // loại trừ nhau.
@@ -1764,6 +1791,7 @@ export function OrderListScreen() {
             carrierStatus: state.filters.carrierStatus,
             printStatus: state.filters.printStatus,
             skuId: state.filters.skuId,
+            category,
           }}
           onFilterChange={(patch) =>
             // Chọn "In tem" khi chưa lọc ngày → mặc định đơn gán ĐVVC HÔM NAY (2026-11-02); đổi
