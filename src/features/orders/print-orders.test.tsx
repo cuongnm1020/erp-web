@@ -609,6 +609,39 @@ describe('PrintOrdersScreen — In đơn (clone màn Đơn hàng, 2026-11-04)', 
     }
   });
 
+  it('ô SĐT riêng (2026-11-13): URL phone → danh sách + số đếm gửi ?phone=, không đụng q; < 3 chữ số thì chưa gửi', async () => {
+    const list: URLSearchParams[] = [];
+    const counts: URLSearchParams[] = [];
+    server.use(
+      http.get('/api/sales-orders', ({ request }) => {
+        list.push(new URL(request.url).searchParams);
+        return HttpResponse.json({ items: [], total: 0 });
+      }),
+      http.get('/api/sales-orders/flow-counts', ({ request }) => {
+        counts.push(new URL(request.url).searchParams);
+        return HttpResponse.json({ total: 0 });
+      }),
+    );
+    try {
+      search = 'group=all&phone=5678';
+      const { unmount } = renderApp(<PrintOrdersScreen />);
+      const box = await screen.findByRole('textbox', { name: 'SĐT' });
+      expect(box).toHaveValue('5678');
+      await waitFor(() => expect(list.some((p) => p.get('phone') === '5678')).toBe(true));
+      await waitFor(() => expect(counts.some((p) => p.get('phone') === '5678')).toBe(true));
+      expect(list.every((p) => !p.get('q'))).toBe(true);
+      unmount();
+
+      list.length = 0;
+      search = 'group=all&phone=12';
+      renderApp(<PrintOrdersScreen />);
+      await waitFor(() => expect(list.length).toBeGreaterThan(0));
+      expect(list.every((p) => !p.has('phone'))).toBe(true);
+    } finally {
+      search = 'group=all';
+    }
+  });
+
   it('tab Đã xác nhận bỏ đơn đã có mã vận đơn (2026-11-06): danh sách + số đếm tab gửi warehouseNoWaybill=true', async () => {
     search = 'flow=WAREHOUSE';
     const list: URLSearchParams[] = [];
