@@ -75,6 +75,7 @@ import {
   useBulkConfirmOrders,
   isUnconfirmedErp,
   useTeamFilterOptions,
+  useCategoryFilterOptions,
   useFacebookPageOptions,
   usePancakeShops,
   useSaveOrderListPrefs,
@@ -212,6 +213,8 @@ const DEFAULTS = {
     'skuOnly',
     // Loại trừ sản phẩm (2026-11-10): id SKU nối dấu phẩy — bỏ đơn có SP đó (kể cả trong combo).
     'excludeSku',
+    // Danh mục sản phẩm (2026-11-13): id nối dấu phẩy, chọn nhiều, gồm danh mục con.
+    'category',
     // Lỗi đơn (2026-11-10): khoá lỗi mã hoá URI, nối dấu phẩy.
     'orderError',
     // Hãng VC (2026-11-10): `c:<hãng>` = mọi tài khoản của hãng, `a:<tài khoản>`, nối dấu phẩy.
@@ -1072,6 +1075,11 @@ export function PrintOrdersScreen() {
     ability.can('filter_dept', 'SalesOrder') || ability.can('sales_all', 'Report');
   const team = canFilterDept ? (state.filters.team ?? '') : '';
   const fbPage = state.filters.fbPage ?? '';
+  // Danh mục sản phẩm (2026-11-13) — cần `product.read` (GET /categories); thiếu quyền thì ẩn ô và
+  // bỏ giá trị trên URL như ô Phòng ban.
+  const canFilterCategory = ability.can('read', 'Product');
+  const category = canFilterCategory ? (state.filters.category ?? '') : '';
+  const categoryOptions = useCategoryFilterOptions(canFilterCategory);
   // Hãng lấy hàng / In tem (2026-11-10, user) — cùng ô với màn Theo dõi đơn, lọc kèm mọi tab.
   const pickupStatus = pickOption(PICKUP_OPTIONS, state.filters.pickup);
   const printStatus = pickOption(PRINT_OPTIONS, state.filters.printStatus);
@@ -1114,6 +1122,7 @@ export function PrintOrdersScreen() {
       skuIds,
       skuOnly,
       excludeSkuIds,
+      categoryIds: category || undefined,
       orderError: orderErrorKeys,
       weightMin,
       weightMax,
@@ -1143,6 +1152,7 @@ export function PrintOrdersScreen() {
       skuIds,
       skuOnly,
       excludeSkuIds,
+      category,
       orderErrorKeys,
       weightMin,
       weightMax,
@@ -1282,6 +1292,7 @@ export function PrintOrdersScreen() {
     shortSkuId !== '' ||
     skuId !== '' ||
     excludeSku !== '' ||
+    category !== '' ||
     orderError !== '' ||
     weightMin !== '' ||
     weightMax !== '' ||
@@ -1546,6 +1557,23 @@ export function PrintOrdersScreen() {
                   />
                 ),
               },
+              // Danh mục sản phẩm (2026-11-13): đơn có SP thuộc MỘT trong các danh mục (gồm danh
+              // mục con, kể cả thành phần combo).
+              ...(canFilterCategory
+                ? [
+                    {
+                      key: 'category' as const,
+                      label: 'Danh mục',
+                      type: 'multiSelect' as const,
+                      unit: 'danh mục',
+                      options: (categoryOptions.data ?? []).map((c) => ({
+                        value: c.id,
+                        label: c.name,
+                        hint: c.code,
+                      })),
+                    },
+                  ]
+                : []),
               // POS, Page, Phòng ban bày ngay trên thanh cạnh ô Sản phẩm (user 2026-11-04); không
               // `pinned` → không có panel "Bộ lọc khác", "Xóa lọc (n)" đứng cạnh ô lọc cuối. Ô POS
               // chọn nhiều thay ô Nguồn (ERP / Pancake).
@@ -1649,6 +1677,7 @@ export function PrintOrdersScreen() {
               fbPage: state.filters.fbPage,
               skuId: skuId || undefined,
               excludeSku: excludeSku || undefined,
+              category: category || undefined,
               weightMin: state.filters.weightMin,
               weightMax: state.filters.weightMax,
               pickup: pickupStatus,
