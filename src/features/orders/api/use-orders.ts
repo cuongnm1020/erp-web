@@ -118,6 +118,11 @@ export interface OrderListParams {
    * mọi phòng. Danh sách: useTeamFilterOptions.
    */
   teamIds?: string;
+  /**
+   * Danh mục sản phẩm (id nối dấu phẩy, gồm danh mục con), 2026-11-13: đơn có SP thuộc MỘT trong
+   * các danh mục (kể cả thành phần combo). Danh sách: useCategories.
+   */
+  categoryIds?: string;
   /** NV lên đơn = người bấm tạo đơn (ERP: người tạo, Pancake: người tạo trên Pancake), 2026-10-29. */
   creatorId?: string;
   /** NV đóng hàng (`SalesOrder.packerId`) — màn In đơn, 2026-11-13. */
@@ -301,6 +306,7 @@ function listQuery(params: Omit<OrderListParams, 'take' | 'skip'>) {
     itemOrigin: params.itemOrigin,
     careTeamId: params.careTeamId || undefined,
     teamIds: params.teamIds || undefined,
+    categoryIds: params.categoryIds || undefined,
     creatorId: params.creatorId || undefined,
     packerId: params.packerId || undefined,
     facebookPageIds: params.facebookPageIds || undefined,
@@ -486,6 +492,19 @@ export function useTeamFilterOptions(enabled = true) {
     queryKey: [...orderKeys.all, 'team-filter-options'] as const,
     queryFn: () => unwrap(api.GET('/sales-orders/team-filter-options')),
     staleTime: 5 * 60_000,
+    enabled,
+  });
+}
+
+/**
+ * GET /categories — ô lọc "Danh mục" (2026-11-13; quyền `product.read`). Cùng key với hook danh mục
+ * màn Sản phẩm để dùng chung cache; danh mục nhỏ, đổi hiếm.
+ */
+export function useCategoryFilterOptions(enabled = true) {
+  return useQuery({
+    queryKey: ['catalog', 'categories'] as const,
+    queryFn: () => unwrap(api.GET('/categories')),
+    staleTime: 60_000,
     enabled,
   });
 }
