@@ -207,6 +207,12 @@ export const ProductSearch = forwardRef<
                         {r.code} · <UomText code={r.baseUomCode} />
                         {r.isCombo ? ' · Combo' : ''}
                       </span>
+                      {/* Danh mục sản phẩm dưới mã (2026-11-13). */}
+                      {r.categoryName ? (
+                        <span className="block truncate text-xs text-muted-foreground">
+                          {r.categoryName}
+                        </span>
+                      ) : null}
                     </span>
                     <span
                       className={cn(
