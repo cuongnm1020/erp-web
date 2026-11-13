@@ -2,6 +2,7 @@ import '@testing-library/jest-dom/vitest';
 import { cleanup } from '@testing-library/react';
 import { afterAll, afterEach, beforeAll } from 'vitest';
 import { forgetSavedListStates } from '@/lib/list-state-memory';
+import { forgetOrderDefaults } from '@/lib/order-defaults-memory';
 import { server } from './msw/server';
 
 // Node fetch không nhận URL tương đối ('/api/...') như browser → gắn origin của jsdom.
@@ -37,5 +38,7 @@ afterEach(() => {
   cleanup();
   // Bộ lọc lần gần nhất của danh sách (lib/list-state-memory) không được rò sang test sau.
   if (typeof window !== 'undefined') forgetSavedListStates();
+  // Giá trị điền sẵn của đơn trước (lib/order-defaults-memory) cũng vậy.
+  if (typeof window !== 'undefined') forgetOrderDefaults();
 });
 afterAll(() => server.close());

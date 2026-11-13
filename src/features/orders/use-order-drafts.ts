@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { readOrderDefaults } from '@/lib/order-defaults-memory';
 import { emptyOrderValues, type CreateOrderValues } from './schema';
 
 /**
@@ -33,6 +34,23 @@ function newId(): string {
 
 function makeDraft(no: number, values: CreateOrderValues, origin?: string): OrderDraft {
   return { id: newId(), no, values, ...(origin ? { origin } : {}) };
+}
+
+/**
+ * Giá trị tab nháp mới: trống + Marketer / POS / Page / Kho xuất của đơn tạo gần nhất trên máy
+ * này (2026-11-13). Đơn trước để trống POS / kho → dùng mặc định tài khoản / kho đang làm việc.
+ */
+export function freshOrderValues(warehouseId: string, posShopId: string): CreateOrderValues {
+  const base = emptyOrderValues(warehouseId, posShopId);
+  const last = readOrderDefaults();
+  if (!last) return base;
+  return {
+    ...base,
+    marketerId: last.marketerId,
+    posShopId: last.posShopId || posShopId,
+    facebookPageId: last.facebookPageId,
+    warehouseId: last.warehouseId || warehouseId,
+  };
 }
 
 function load(): DraftState | null {
@@ -77,6 +95,11 @@ export function useOrderDrafts(defaultWarehouseId: string, defaultPosShopId = ''
   useEffect(() => {
     const stored = load();
     if (stored) setState(stored);
+    else {
+      // Không có nháp cũ: tab đầu dựng lại sau mount để lấy giá trị của đơn trước (localStorage).
+      const first = makeDraft(1, freshOrderValues(defaultWh.current, defaultPos.current));
+      setState({ drafts: [first], activeId: first.id });
+    }
     setReady(true);
   }, []);
 
@@ -95,7 +118,7 @@ export function useOrderDrafts(defaultWarehouseId: string, defaultPosShopId = ''
       const kept = s.drafts.length >= MAX_DRAFTS ? s.drafts.slice(1) : s.drafts;
       const d = makeDraft(
         nextNo(s.drafts),
-        values ?? emptyOrderValues(defaultWh.current, defaultPos.current),
+        values ?? freshOrderValues(defaultWh.current, defaultPos.current),
         origin,
       );
       return { drafts: [...kept, d], activeId: d.id };
@@ -109,7 +132,7 @@ export function useOrderDrafts(defaultWarehouseId: string, defaultPosShopId = ''
       if (idx < 0) return s;
       const rest = s.drafts.filter((d) => d.id !== id);
       if (rest.length === 0) {
-        const d = makeDraft(1, emptyOrderValues(defaultWh.current, defaultPos.current));
+        const d = makeDraft(1, freshOrderValues(defaultWh.current, defaultPos.current));
         return { drafts: [d], activeId: d.id };
       }
       const activeId = s.activeId === id ? rest[Math.min(idx, rest.length - 1)]!.id : s.activeId;
