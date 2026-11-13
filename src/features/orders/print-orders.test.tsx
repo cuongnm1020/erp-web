@@ -475,6 +475,44 @@ describe('PrintOrdersScreen — In đơn (clone màn Đơn hàng, 2026-11-04)', 
     }
   });
 
+  it('lọc Danh mục (2026-11-13): URL category=a,b → danh sách + số đếm gửi categoryIds; ô chọn nhiều liệt kê danh mục', async () => {
+    const a = '00000000-0000-4000-8000-0000000000c1';
+    const b = '00000000-0000-4000-8000-0000000000c2';
+    search = `group=all&category=${a},${b}`;
+    const list: URLSearchParams[] = [];
+    const counts: URLSearchParams[] = [];
+    server.use(
+      http.get('/api/categories', () =>
+        HttpResponse.json([
+          { id: a, code: 'THUOC', name: 'Thuốc', parentId: null, version: 0 },
+          { id: b, code: 'PHAN', name: 'Phân bón', parentId: null, version: 0 },
+        ]),
+      ),
+      http.get('/api/sales-orders', ({ request }) => {
+        list.push(new URL(request.url).searchParams);
+        return HttpResponse.json({ items: [], total: 0 });
+      }),
+      http.get('/api/sales-orders/flow-counts', ({ request }) => {
+        counts.push(new URL(request.url).searchParams);
+        return HttpResponse.json({ total: 0 });
+      }),
+    );
+    try {
+      renderApp(<PrintOrdersScreen />);
+      await waitFor(() =>
+        expect(list.some((p) => p.get('categoryIds') === `${a},${b}`)).toBe(true),
+      );
+      await waitFor(() =>
+        expect(counts.some((p) => p.get('categoryIds') === `${a},${b}`)).toBe(true),
+      );
+      const box = await screen.findByRole('combobox', { name: 'Danh mục' });
+      fireEvent.click(box);
+      expect(await screen.findByText('Phân bón')).toBeInTheDocument();
+    } finally {
+      search = 'group=all';
+    }
+  });
+
   it('lọc Lỗi đơn (2026-11-10): lựa chọn SP ngoài hệ thống + câu hãng; URL orderError → danh sách + số đếm gửi từng khoá', async () => {
     const msgKey =
       'msg:Lưu danh sách đơn hàng không thành công. Đơn hàng thiếu thông tin địa chỉ (Đường hoặc Phường).';
