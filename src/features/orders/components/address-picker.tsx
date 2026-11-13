@@ -86,8 +86,24 @@ export function AddressPicker({
     }
   }, [open, gen, value.province, provinces.data]);
 
+  // Địa chỉ cũ có huyện → nhảy tiếp vào xã của huyện đó (2026-11-13: "Xã Long Hòa, Huyện Cần Giờ"
+  // mở ra chỉ thấy danh sách huyện, con trỏ ở Huyện Bình Chánh — tưởng mất Cần Giờ).
+  const jumpedDistrict = useRef(false);
+  useEffect(() => {
+    if (!open || jumpedDistrict.current || step !== 'district' || !units.data) return;
+    jumpedDistrict.current = true;
+    const d = value.district.trim()
+      ? units.data.items.find((x) => x.name === value.district)
+      : undefined;
+    if (d) {
+      setDistrict(d);
+      setStep('ward');
+    }
+  }, [open, step, value.district, units.data]);
+
   const openPicker = () => {
     jumped.current = false;
+    jumpedDistrict.current = false;
     setGen(value.district.trim() ? 'OLD' : 'NEW');
     setOpen(true);
   };
@@ -337,7 +353,9 @@ export function AddressPicker({
               <>
                 <CommandEmpty>Không có mục nào khớp</CommandEmpty>
                 {items.map((u) => {
-                  const chosen = u.level === 'WARD' && u.name === value.ward;
+                  const chosen =
+                    (u.level === 'WARD' && u.name === value.ward) ||
+                    (u.level === 'DISTRICT' && u.name === value.district);
                   return (
                     <CommandItem
                       key={u.id}
