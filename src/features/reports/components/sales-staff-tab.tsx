@@ -29,6 +29,8 @@ const GROUPS: ReadonlyArray<readonly [StaffGroupBy, string]> = [
   ['owner_shop', 'Nhân viên × POS'],
   // Tỉ lệ hoàn từng POS (2026-11-02) — đơn không từ Pancake gom "Đơn tạo trên ERP".
   ['shop', 'POS'],
+  // Người chọn ở ô Marketer màn tạo / sửa đơn (2026-11-13) — đơn không chọn gom "Không có marketer".
+  ['marketer', 'Marketer'],
 ];
 const GROUP_VALUES = new Set<string>(GROUPS.map(([g]) => g));
 
@@ -56,7 +58,9 @@ export function SalesStaffTab() {
   const byShop = groupBy === 'owner_shop';
   const posOnly = groupBy === 'shop';
   const query = useSalesByStaff(filter, groupBy);
-  const head = groupBy === 'team' ? 'Team' : posOnly ? 'POS' : 'Nhân viên phụ trách';
+  const byMarketer = groupBy === 'marketer';
+  const head =
+    groupBy === 'team' ? 'Team' : posOnly ? 'POS' : byMarketer ? 'Marketer' : 'Nhân viên phụ trách';
 
   const columns = useMemo<ColumnDef<SalesByStaffItem, unknown>[]>(
     () => [
@@ -180,7 +184,8 @@ export function SalesStaffTab() {
         meta: { width: 70 },
         cell: ({ row }) => {
           const { id, name, shopId, shopName } = row.original.key;
-          if (id === null) return null;
+          // Chưa có bộ lọc theo marketer cho các tab khác → không có "Lọc".
+          if (id === null || byMarketer) return null;
           const scope = byShop && shopId ? `${name} ở ${shopName}` : name;
           return (
             <Button
@@ -209,13 +214,13 @@ export function SalesStaffTab() {
         },
       },
     ],
-    [head, groupBy, byShop, posOnly, setFilters],
+    [head, groupBy, byShop, posOnly, byMarketer, setFilters],
   );
 
   const downloadCsv = useCsvExport('Báo cáo doanh thu theo nhân viên / POS');
   const exportCsv = (items: SalesByStaffItem[]) =>
     downloadCsv(
-      `doanh-thu-theo-${groupBy === 'team' ? 'team' : posOnly ? 'pos' : byShop ? 'nhan-vien-pos' : 'nhan-vien'}_${range.from}_${range.to}`,
+      `doanh-thu-theo-${groupBy === 'team' ? 'team' : posOnly ? 'pos' : byShop ? 'nhan-vien-pos' : byMarketer ? 'marketer' : 'nhan-vien'}_${range.from}_${range.to}`,
       [
         head,
         ...(byShop ? ['POS'] : []),
@@ -298,7 +303,9 @@ export function SalesStaffTab() {
                     ? 'POS'
                     : byShop
                       ? 'dòng nhân viên × POS'
-                      : 'người'}{' '}
+                      : byMarketer
+                        ? 'dòng marketer'
+                        : 'người'}{' '}
                 cao nhất
               </h2>
               <BarList

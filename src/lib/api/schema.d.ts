@@ -16203,7 +16203,7 @@ export interface components {
             previousFrom: string;
             previousTo: string;
             /** @enum {string} */
-            groupBy: "team" | "owner" | "owner_shop" | "shop";
+            groupBy: "team" | "owner" | "owner_shop" | "shop" | "marketer";
             /**
              * @description Sắp doanh số như Pancake (grossRevenue) giảm dần ("Chưa gán" đứng sau khi bằng nhau). Gồm cả người / team chỉ có doanh
              *     số kỳ trước (số kỳ này 0). Nhân viên chỉ thấy dòng của mình; trưởng nhóm thấy team mình.
@@ -28857,7 +28857,7 @@ export interface operations {
                 customerId?: string;
                 /** @description POS Pancake của đơn (shop_id, chuỗi số) — như `pancakeShopId` của GET /sales-orders. */
                 pancakeShopId?: string;
-                groupBy: "owner" | "team" | "owner_shop" | "shop";
+                groupBy: "owner" | "team" | "owner_shop" | "shop" | "marketer";
             };
             header?: never;
             path?: never;

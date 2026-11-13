@@ -790,6 +790,29 @@ describe('Tab Nhân viên × POS Pancake', () => {
     expect(lastUrl().get('pancakeShopId')).toBeNull();
   });
 
+  it('Xem theo Marketer (2026-11-13): groupBy=marketer, cột Marketer, không có nút Lọc', async () => {
+    search = `tab=staff&staff=marketer&from=${RANGE.from}&to=${RANGE.to}`;
+    const groups: string[] = [];
+    server.use(
+      http.get('/api/reports/sales/by-staff', ({ request }) => {
+        groups.push(new URL(request.url).searchParams.get('groupBy')!);
+        return HttpResponse.json({
+          ...BY_STAFF,
+          groupBy: 'marketer',
+          items: [
+            staffItem('u-1', 'Trần Thị Sale', '700000.0000'),
+            staffItem(null, 'Không có marketer', '900000.0000'),
+          ],
+        });
+      }),
+    );
+    renderApp(<SalesReportScreen />, { me: ME_POS });
+    expect(await screen.findByRole('columnheader', { name: 'Marketer' })).toBeInTheDocument();
+    expect(groups[0]).toBe('marketer');
+    expect(screen.getByRole('cell', { name: 'Trần Thị Sale' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /^Chỉ xem số của/ })).toBeNull();
+  });
+
   it('Xem theo POS (2026-11-02): groupBy=shop, cột Tỉ lệ hoàn; Lọc đặt pancakeShopId; dòng đơn ERP không có Lọc', async () => {
     search = `tab=staff&staff=shop&from=${RANGE.from}&to=${RANGE.to}`;
     const groups: string[] = [];
