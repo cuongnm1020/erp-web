@@ -218,6 +218,8 @@ const DEFAULTS = {
     'carrier',
     // NV đóng hàng (`SalesOrder.packerId`, chọn khi Gửi ĐVVC) — 2026-11-13.
     'packerId',
+    // Ô "SĐT" riêng (2026-11-13): chỉ đuôi SĐT khách / người nhận, vd 4 số cuối.
+    'phone',
   ] as const,
 };
 
@@ -1079,6 +1081,9 @@ export function PrintOrdersScreen() {
   // (user: "hiện thị cả người nghỉ") — GET /sales-orders/packer-options; "Tất cả kho" → mọi kho.
   const packers = useOrderPackerOptions();
   const packerId = state.filters.packerId ?? '';
+  // Ô "SĐT" (2026-11-13, user: gõ 4 số cuối chỉ tìm theo SĐT): < 3 chữ số thì chưa gửi (API 400).
+  const phone = state.filters.phone ?? '';
+  const phoneQuery = phone.replace(/\D/g, '').length >= 3 ? phone : undefined;
   // Sắp xếp lưu theo người dùng ở server (đăng xuất / đổi máy vẫn giữ). Sắp xếp trên URL (link
   // dán cho đồng nghiệp) thắng; URL không có thì lấy lần sắp gần nhất của người dùng. Cột ẩn không
   // còn (luôn hiện hết cột).
@@ -1102,6 +1107,7 @@ export function PrintOrdersScreen() {
   const filterParams = useMemo(
     () => ({
       q: state.q,
+      phone: phoneQuery,
       status,
       customerId,
       shortSkuId,
@@ -1126,6 +1132,7 @@ export function PrintOrdersScreen() {
       warehouseNoWaybill: true,
     }),
     [
+      phoneQuery,
       packerId,
       carrierFilter.carrierIds,
       carrierFilter.carrierAccountIds,
@@ -1286,7 +1293,8 @@ export function PrintOrdersScreen() {
     pickupStatus !== undefined ||
     printStatus !== undefined ||
     carrierFilter.value !== '' ||
-    packerId !== '';
+    packerId !== '' ||
+    phone !== '';
   const customerName = query.data?.items[0]?.customer.name;
   // Dòng đã chọn: nhớ cả dòng vừa RỜI bộ lọc (sự cố 2026-11-07, màn In đơn: Gửi ĐVVC xong đơn sang
   // tab Đang đóng hàng → tab Đã xác nhận không còn dòng chọn → thanh chọn nhiều bị gỡ kéo theo hộp
@@ -1483,6 +1491,9 @@ export function PrintOrdersScreen() {
               )
             }
             filters={[
+              // Ô SĐT riêng cạnh ô tìm (2026-11-13, user): 4 số cuối chỉ khớp SĐT khách / người
+              // nhận, không ra đơn trùng đuôi mã đơn / mã vận đơn như ô tìm chung.
+              { key: 'phone', label: 'SĐT', type: 'text', placeholder: 'SĐT · 4 số cuối' },
               {
                 key: 'from',
                 toKey: 'to',
@@ -1645,8 +1656,22 @@ export function PrintOrdersScreen() {
               orderError: orderError || undefined,
               carrier: carrierFilter.value || undefined,
               packerId: packerId || undefined,
+              phone: phone || undefined,
             }}
-            onFilterChange={setFilter}
+            onFilterChange={(patch) =>
+              // Như ô tìm chung: bắt đầu tìm SĐT từ ô trống → mọi trạng thái (`group=all`); xóa hết
+              // → về tab. Tab cha "Cần xử lý" giữ chip đang chọn.
+              'phone' in patch && view !== 'issues' && state.q === ''
+                ? setFilter({
+                    ...patch,
+                    ...(phone === '' && patch.phone
+                      ? { group: 'all' }
+                      : !patch.phone
+                        ? { group: undefined }
+                        : {}),
+                  })
+                : setFilter(patch)
+            }
             searchPlaceholder="Mã đơn, SĐT, tên SP, mã vận đơn… nhiều giá trị cách dấu phẩy hoặc dấu cách"
             right={
               <>

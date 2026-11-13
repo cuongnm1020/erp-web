@@ -25536,6 +25536,13 @@ export interface operations {
                  *     thường ("Magie kẽm") hay số ngắn ("0779 988 814") thì giữ nguyên cả cụm.
                  */
                 q?: string;
+                /**
+                 * @description Ô "SĐT" riêng (màn In đơn, 2026-11-13): CHỈ tìm theo số điện thoại — SĐT khách hoặc SĐT người
+                 *     nhận (địa chỉ giao / `recipientPhone`) KẾT THÚC bằng các số đã gõ (vd 4 số cuối "2822"); không
+                 *     khớp mã đơn / mã vận đơn / sản phẩm như `q`. Gõ đủ số → so 9 số cuối (khớp cả 0… lẫn 84…).
+                 *     3–20 ký tự, chỉ số (khoảng trắng / chấm / gạch / + / ngoặc bỏ qua). Kết hợp AND với `q`.
+                 */
+                phone?: string;
                 take: number;
                 skip: number;
             };
@@ -25868,6 +25875,13 @@ export interface operations {
                  *     thường ("Magie kẽm") hay số ngắn ("0779 988 814") thì giữ nguyên cả cụm.
                  */
                 q?: string;
+                /**
+                 * @description Ô "SĐT" riêng (màn In đơn, 2026-11-13): CHỈ tìm theo số điện thoại — SĐT khách hoặc SĐT người
+                 *     nhận (địa chỉ giao / `recipientPhone`) KẾT THÚC bằng các số đã gõ (vd 4 số cuối "2822"); không
+                 *     khớp mã đơn / mã vận đơn / sản phẩm như `q`. Gõ đủ số → so 9 số cuối (khớp cả 0… lẫn 84…).
+                 *     3–20 ký tự, chỉ số (khoảng trắng / chấm / gạch / + / ngoặc bỏ qua). Kết hợp AND với `q`.
+                 */
+                phone?: string;
                 take: number;
                 skip: number;
             };
@@ -26103,6 +26117,13 @@ export interface operations {
                  *     thường ("Magie kẽm") hay số ngắn ("0779 988 814") thì giữ nguyên cả cụm.
                  */
                 q?: string;
+                /**
+                 * @description Ô "SĐT" riêng (màn In đơn, 2026-11-13): CHỈ tìm theo số điện thoại — SĐT khách hoặc SĐT người
+                 *     nhận (địa chỉ giao / `recipientPhone`) KẾT THÚC bằng các số đã gõ (vd 4 số cuối "2822"); không
+                 *     khớp mã đơn / mã vận đơn / sản phẩm như `q`. Gõ đủ số → so 9 số cuối (khớp cả 0… lẫn 84…).
+                 *     3–20 ký tự, chỉ số (khoảng trắng / chấm / gạch / + / ngoặc bỏ qua). Kết hợp AND với `q`.
+                 */
+                phone?: string;
                 take: number;
                 skip: number;
                 /** @description `orders` = chip tab "Đơn hàng"; `issues` = chip tab "Cần xử lý". */
@@ -26340,6 +26361,13 @@ export interface operations {
                  *     thường ("Magie kẽm") hay số ngắn ("0779 988 814") thì giữ nguyên cả cụm.
                  */
                 q?: string;
+                /**
+                 * @description Ô "SĐT" riêng (màn In đơn, 2026-11-13): CHỈ tìm theo số điện thoại — SĐT khách hoặc SĐT người
+                 *     nhận (địa chỉ giao / `recipientPhone`) KẾT THÚC bằng các số đã gõ (vd 4 số cuối "2822"); không
+                 *     khớp mã đơn / mã vận đơn / sản phẩm như `q`. Gõ đủ số → so 9 số cuối (khớp cả 0… lẫn 84…).
+                 *     3–20 ký tự, chỉ số (khoảng trắng / chấm / gạch / + / ngoặc bỏ qua). Kết hợp AND với `q`.
+                 */
+                phone?: string;
                 take: number;
                 skip: number;
             };

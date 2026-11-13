@@ -29,6 +29,11 @@ export type OrderDateField = NonNullable<
 
 export interface OrderListParams {
   q?: string;
+  /**
+   * Ô "SĐT" riêng (màn In đơn, 2026-11-13): chỉ SĐT khách / người nhận KẾT THÚC bằng các số này
+   * (vd 4 số cuối) — không khớp mã đơn / mã vận đơn / sản phẩm như `q`. ≥ 3 chữ số.
+   */
+  phone?: string;
   /** Tab của danh sách (gộp trạng thái chứng từ + kho / giao hàng). */
   flow?: OrderFlow;
   /** Nhiều tab — đơn thuộc một trong các tab (tab cha "Tất cả kho"…, 2026-11-03). `flow` thắng. */
@@ -252,6 +257,7 @@ export function fetchOrdersPage(
 function listQuery(params: Omit<OrderListParams, 'take' | 'skip'>) {
   return {
     q: params.q || undefined,
+    phone: params.phone || undefined,
     flow: params.flow,
     flows: params.flows?.length ? [...params.flows] : undefined,
     tab: params.tab,
