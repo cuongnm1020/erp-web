@@ -1557,8 +1557,8 @@ export function PrintOrdersScreen() {
                   />
                 ),
               },
-              // Danh mục sản phẩm (2026-11-13): đơn có SP thuộc TỪNG danh mục đã chọn (chọn
-              // nhiều = VÀ; gồm danh mục con, kể cả thành phần combo).
+              // Danh mục sản phẩm (2026-11-13): đơn CHỈ gồm SP thuộc các danh mục đã chọn, có
+              // đủ từng danh mục (gồm danh mục con, kể cả thành phần combo) — lọc ở API.
               ...(canFilterCategory
                 ? [
                     {

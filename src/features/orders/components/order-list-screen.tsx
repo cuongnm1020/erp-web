@@ -1611,8 +1611,8 @@ export function OrderListScreen() {
                 />
               ),
             },
-            // Danh mục sản phẩm (2026-11-13), chọn nhiều = đơn có SP thuộc TỪNG danh mục đã chọn
-            // (VÀ; gồm danh mục con, kể cả thành phần combo).
+            // Danh mục sản phẩm (2026-11-13): đơn CHỈ gồm SP thuộc các danh mục đã chọn, có đủ
+            // từng danh mục (gồm danh mục con, kể cả thành phần combo) — lọc ở API.
             ...(canFilterCategory
               ? [
                   {

@@ -25526,9 +25526,9 @@ export interface operations {
                  */
                 teamIds?: string;
                 /**
-                 * @description Danh mục sản phẩm (core.ProductCategory.id cách nhau dấu phẩy, tối đa 50, 2026-11-13): đơn có
-                 *     dòng thuộc sản phẩm của TỪNG danh mục đã chọn (chọn nhiều = VÀ; gồm danh mục con) — kể cả dòng
-                 *     thành phần của combo thuộc danh mục đó. Danh sách: GET /categories.
+                 * @description Danh mục sản phẩm (core.ProductCategory.id cách nhau dấu phẩy, tối đa 50, 2026-11-13): đơn CHỈ
+                 *     gồm sản phẩm thuộc các danh mục đã chọn (gồm danh mục con) và có dòng của TỪNG danh mục — dòng
+                 *     thành phần combo tính theo SKU của nó hoặc combo. Danh sách: GET /categories.
                  */
                 categoryIds?: string;
                 /**
@@ -25871,9 +25871,9 @@ export interface operations {
                  */
                 teamIds?: string;
                 /**
-                 * @description Danh mục sản phẩm (core.ProductCategory.id cách nhau dấu phẩy, tối đa 50, 2026-11-13): đơn có
-                 *     dòng thuộc sản phẩm của TỪNG danh mục đã chọn (chọn nhiều = VÀ; gồm danh mục con) — kể cả dòng
-                 *     thành phần của combo thuộc danh mục đó. Danh sách: GET /categories.
+                 * @description Danh mục sản phẩm (core.ProductCategory.id cách nhau dấu phẩy, tối đa 50, 2026-11-13): đơn CHỈ
+                 *     gồm sản phẩm thuộc các danh mục đã chọn (gồm danh mục con) và có dòng của TỪNG danh mục — dòng
+                 *     thành phần combo tính theo SKU của nó hoặc combo. Danh sách: GET /categories.
                  */
                 categoryIds?: string;
                 /**
@@ -26119,9 +26119,9 @@ export interface operations {
                  */
                 teamIds?: string;
                 /**
-                 * @description Danh mục sản phẩm (core.ProductCategory.id cách nhau dấu phẩy, tối đa 50, 2026-11-13): đơn có
-                 *     dòng thuộc sản phẩm của TỪNG danh mục đã chọn (chọn nhiều = VÀ; gồm danh mục con) — kể cả dòng
-                 *     thành phần của combo thuộc danh mục đó. Danh sách: GET /categories.
+                 * @description Danh mục sản phẩm (core.ProductCategory.id cách nhau dấu phẩy, tối đa 50, 2026-11-13): đơn CHỈ
+                 *     gồm sản phẩm thuộc các danh mục đã chọn (gồm danh mục con) và có dòng của TỪNG danh mục — dòng
+                 *     thành phần combo tính theo SKU của nó hoặc combo. Danh sách: GET /categories.
                  */
                 categoryIds?: string;
                 /**
@@ -26369,9 +26369,9 @@ export interface operations {
                  */
                 teamIds?: string;
                 /**
-                 * @description Danh mục sản phẩm (core.ProductCategory.id cách nhau dấu phẩy, tối đa 50, 2026-11-13): đơn có
-                 *     dòng thuộc sản phẩm của TỪNG danh mục đã chọn (chọn nhiều = VÀ; gồm danh mục con) — kể cả dòng
-                 *     thành phần của combo thuộc danh mục đó. Danh sách: GET /categories.
+                 * @description Danh mục sản phẩm (core.ProductCategory.id cách nhau dấu phẩy, tối đa 50, 2026-11-13): đơn CHỈ
+                 *     gồm sản phẩm thuộc các danh mục đã chọn (gồm danh mục con) và có dòng của TỪNG danh mục — dòng
+                 *     thành phần combo tính theo SKU của nó hoặc combo. Danh sách: GET /categories.
                  */
                 categoryIds?: string;
                 /**
