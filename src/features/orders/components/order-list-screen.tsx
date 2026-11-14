@@ -114,7 +114,7 @@ import {
   parseOrderTab,
 } from '../labels';
 import { BulkCancelDialog } from './bulk-cancel-dialog';
-import { CancelWaybillDialog } from './cancel-waybill-dialog';
+import { CancelWaybillDialog, cancellableWaybill } from './cancel-waybill-dialog';
 import { BulkMoveWarehouseDialog } from './bulk-move-warehouse-dialog';
 import { BulkFulfilPrintDialog } from './bulk-fulfil-print-dialog';
 import { BulkReprintWaybillDialog } from './bulk-reprint-waybill-dialog';
@@ -1956,6 +1956,8 @@ function OrderBulkBar({ rows, onClear }: { rows: SalesOrderListItem[]; onClear: 
   const canCancelWaybill =
     ability.can('cancel_after_carrier', 'SalesOrder') || ability.can('cancel', 'SalesOrder');
   const withWaybill = rows.filter((r) => r.shipment?.trackingNo);
+  // Hủy vận đơn đếm cả đơn đã gửi hãng mà hãng chưa cấp / từ chối cấp mã (2026-11-14).
+  const waybillCancellable = rows.filter(cancellableWaybill);
   // Xin lại vận đơn hàng loạt (2026-11-02) — cùng quyền với nút trên dòng (`pack` Shipment).
   const retryable = rows.filter(retryableWaybill);
   const canCancel =
@@ -2038,10 +2040,11 @@ function OrderBulkBar({ rows, onClear }: { rows: SalesOrderListItem[]; onClear: 
               {canCancelWaybill ? (
                 <DropdownMenuItem
                   danger
-                  disabled={withWaybill.length === 0}
+                  disabled={waybillCancellable.length === 0}
                   onSelect={() => setDialog('cancel-waybill')}
                 >
-                  Hủy vận đơn{withWaybill.length > 0 ? ` (${withWaybill.length})` : ''}
+                  Hủy vận đơn
+                  {waybillCancellable.length > 0 ? ` (${waybillCancellable.length})` : ''}
                 </DropdownMenuItem>
               ) : null}
             </DropdownMenuContent>
@@ -2059,7 +2062,7 @@ function OrderBulkBar({ rows, onClear }: { rows: SalesOrderListItem[]; onClear: 
       ) : null}
       {canCancelWaybill ? (
         <CancelWaybillDialog
-          rows={withWaybill.map((r) => ({
+          rows={waybillCancellable.map((r) => ({
             id: r.id,
             docNumber: r.docNumber,
             trackingNo: r.shipment?.trackingNo ?? null,

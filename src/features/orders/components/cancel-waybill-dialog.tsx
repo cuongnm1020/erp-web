@@ -23,6 +23,24 @@ export interface CancelWaybillRow {
   trackingNo?: string | null;
 }
 
+/** Dòng danh sách đủ trường để xét "Hủy vận đơn" ở thanh chọn nhiều. */
+interface CancellableWaybillRow {
+  status: string;
+  sentToCarrierAt: string | null;
+  shipment: { status: string; trackingNo: string | null } | null;
+}
+
+/**
+ * Đơn đưa được vào "Hủy vận đơn" ở thanh chọn nhiều (2026-11-14) — cùng luật màn chi tiết: đã có
+ * mã vận đơn, HOẶC đã Gửi sang ĐVVC mà phiếu giao còn chờ (hãng từ chối cấp mã — tab Cần sửa).
+ * Đơn chưa có mã thì API chỉ đưa về Đã xác nhận, gỡ lỗi vận đơn để gửi hãng khác.
+ */
+export function cancellableWaybill(r: CancellableWaybillRow): boolean {
+  if (r.status === 'CANCELLED') return false;
+  if (r.shipment?.trackingNo) return true;
+  return Boolean(r.sentToCarrierAt) && (!r.shipment || r.shipment.status === 'PENDING');
+}
+
 /**
  * Câu lý do của một đơn không hủy được vận đơn. Mã hủy-đơn dùng chung (ORDER_CARRIER_*) có câu
  * nói về "hủy đơn" — ở đây đơn không bị hủy nên dùng câu riêng; mã khác đi bảng chung (luật 6).
@@ -60,6 +78,8 @@ export function CancelWaybillDialog({
   const [reason, setReason] = useState('');
   const cancel = useCancelOrderWaybills();
   const one = rows.length === 1 ? rows[0] : undefined;
+  // `trackingNo: null` = biết chắc chưa có mã (undefined = nơi gọi không có sẵn mã, không nói gì).
+  const noCode = rows.filter((r) => r.trackingNo === null).length;
 
   const submit = async () => {
     if (rows.length === 0 || cancel.isPending) return;
@@ -118,6 +138,13 @@ export function CancelWaybillDialog({
             Hãng sẽ hủy mã vận đơn — không đến lấy hàng theo mã này nữa. Kho chưa lấy hàng thì đơn
             về <strong>Đã xác nhận</strong>: sửa lại đơn, rồi gửi sang ĐVVC (đổi hãng được). Đơn
             hãng đã lấy hàng sẽ báo lỗi riêng.
+            {noCode > 0 ? (
+              <>
+                {' '}
+                {one ? 'Đơn' : `${noCode} đơn`} chưa có mã (hãng chưa cấp / từ chối) — không gọi
+                hãng, chỉ đưa về Đã xác nhận.
+              </>
+            ) : null}
           </DialogDescription>
         </DialogHeader>
         <div className="space-y-1.5">
