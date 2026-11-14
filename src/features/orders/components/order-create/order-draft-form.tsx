@@ -57,6 +57,7 @@ import {
 } from '../../api/use-orders';
 import {
   createOrderSchema,
+  orderCustomerPhone,
   previewManualDiscount,
   toCreateOrderBody,
   type CreateOrderValues,
@@ -76,6 +77,7 @@ import { addCartSku, GiftLines } from './gift-lines';
 import { ProductSearch } from './product-search';
 import { COD_LOW_RATIO, formatRatioPct, lowCodRatio } from './cod-check';
 import { SameDayDialog } from './same-day-dialog';
+import { useOrderCustomerPhone } from './use-order-customer-phone';
 
 const DEFAULT_WAREHOUSE = '__default__';
 /**
@@ -276,7 +278,13 @@ export const OrderDraftForm = forwardRef<
         return;
       }
       const path = (err.details as { path?: string } | undefined)?.path;
-      const mapped = path ? SERVER_PATHS[path] : undefined;
+      // Ô Khách hàng trống → SĐT khách gửi đi là SĐT người nhận (2026-11-14): báo lỗi ở ô đó.
+      const mapped =
+        path === 'customer.phone' && values.customerPhone === ''
+          ? SERVER_PATHS['address.phone']
+          : path
+            ? SERVER_PATHS[path]
+            : undefined;
       if (err.code === 'VALIDATION' && mapped) {
         form.setError(mapped.field, { type: 'server', message: mapped.message });
         toast.error(mapped.message);
@@ -293,7 +301,8 @@ export const OrderDraftForm = forwardRef<
   // Đơn trùng trong ngày (CSKH-5): cùng SĐT đã có đơn chưa hủy hôm nay → hỏi lại trước khi chốt.
   // Cảnh báo, không chặn — "Vẫn tạo đơn" gửi đúng đơn đang chờ. Đã đồng ý cho SĐT nào thì lần bấm
   // sau (lỗi mạng, sửa giỏ) không hỏi lại.
-  const customerPhone = useWatch({ control: form.control, name: 'customerPhone' });
+  // SĐT khách của đơn: ô Khách hàng, trống thì SĐT người nhận (2026-11-14).
+  const customerPhone = useOrderCustomerPhone(form);
   const sameDay = useSameDayOrders(customerPhone);
   const ability = useAbility();
   const canSetOrderDate = ability.can('set_order_date', 'SalesOrder');
@@ -348,7 +357,7 @@ export const OrderDraftForm = forwardRef<
 
   const afterCodCheck = (values: CreateOrderValues) => {
     const dup = sameDay.data;
-    if (dup && dup.total > 0 && acceptedDupPhone.current !== values.customerPhone) {
+    if (dup && dup.total > 0 && acceptedDupPhone.current !== orderCustomerPhone(values)) {
       setPendingDup(values);
       return;
     }
@@ -424,12 +433,12 @@ export const OrderDraftForm = forwardRef<
       {pendingDup && sameDay.data ? (
         <SameDayDialog
           data={sameDay.data}
-          phone={pendingDup.customerPhone}
-          customerName={pendingDup.customerName}
+          phone={orderCustomerPhone(pendingDup)}
+          customerName={pendingDup.customerName || pendingDup.recipient}
           pending={create.isPending}
           onCancel={() => setPendingDup(null)}
           onConfirm={() => {
-            acceptedDupPhone.current = pendingDup.customerPhone;
+            acceptedDupPhone.current = orderCustomerPhone(pendingDup);
             send(pendingDup);
           }}
         />

@@ -173,13 +173,28 @@ export const createOrderSchema = z
     lines: z.array(orderLineSchema).min(1, 'Đơn phải có ít nhất một dòng hàng'),
   })
   .superRefine((v, ctx) => {
-    const issue = (path: string, message: string) =>
+    // Mỗi ô một lỗi — luật khách và luật địa chỉ cùng có thể báo ô người nhận.
+    const seen = new Set<string>();
+    const issue = (path: string, message: string) => {
+      if (seen.has(path)) return;
+      seen.add(path);
       ctx.addIssue({ code: z.ZodIssueCode.custom, path: [path], message });
+    };
 
+    // Ô Khách hàng chỉ để TÌM khách (2026-11-14): bỏ trống thì khách của đơn lấy theo tên + SĐT
+    // người nhận (server tìm theo SĐT, chưa có thì tạo). Gõ SĐT khách thì phải đúng định dạng.
     if (!v.customerId) {
-      if (v.customerName === '') issue('customerName', 'Nhập tên khách hàng');
-      if (!phoneSchema.safeParse(normalizePhoneInput(v.customerPhone)).success) {
+      const typedPhone = normalizePhoneInput(v.customerPhone);
+      if (typedPhone !== '' && !phoneSchema.safeParse(typedPhone).success) {
         issue('customerPhone', 'Số điện thoại không hợp lệ');
+      }
+      if (v.customerName === '' && v.recipient === '') issue('recipient', 'Nhập tên người nhận');
+      if (typedPhone === '') {
+        const receiverPhone = normalizePhoneInput(v.recipientPhone);
+        if (receiverPhone === '') issue('recipientPhone', 'Nhập số điện thoại người nhận');
+        else if (!phoneSchema.safeParse(receiverPhone).success) {
+          issue('recipientPhone', 'Số điện thoại không hợp lệ');
+        }
       }
     }
     // Khách mới: thông tin khai thác KHÔNG bắt buộc (tạm bỏ 2026-11-02) — mục nào điền thì phải
@@ -305,11 +320,22 @@ export function orderDateIso(key: string, now: Date = new Date()): string | unde
   return at.toISOString();
 }
 
+/**
+ * SĐT khách của đơn khi chưa chọn khách (2026-11-14): SĐT gõ ở ô Khách hàng, bỏ trống thì SĐT
+ * người nhận — dùng chung cho thân gửi API, tra khách đã có và cảnh báo đơn trùng trong ngày.
+ */
+export function orderCustomerPhone(
+  v: Pick<CreateOrderValues, 'customerPhone' | 'recipientPhone'>,
+): string {
+  return normalizePhoneInput(v.customerPhone) || normalizePhoneInput(v.recipientPhone);
+}
+
 /** Form values → body POST /sales-orders. CK% "5" → "0.05" qua decimal.js. */
 export function toCreateOrderBody(v: CreateOrderValues) {
+  // Ô Khách hàng trống → khách theo tên + SĐT người nhận (2026-11-14).
   const customer = v.customerId
     ? undefined
-    : { name: v.customerName.trim(), phone: normalizePhoneInput(v.customerPhone) };
+    : { name: (v.customerName.trim() || v.recipient).trim(), phone: orderCustomerPhone(v) };
   const profile = {
     ...(v.customerEmail ? { email: v.customerEmail } : {}),
     ...(v.customerBirthday ? { birthday: v.customerBirthday } : {}),
