@@ -16,6 +16,7 @@ import {
 import { useCareLookup, useCustomerPhoneMatch } from '../../api/use-order-create';
 import type { CreateOrderValues } from '../../schema';
 import { Card } from './order-side-cards';
+import { useOrderCustomerPhone } from './use-order-customer-phone';
 
 type Form = UseFormReturn<CreateOrderValues>;
 
@@ -28,7 +29,8 @@ type Form = UseFormReturn<CreateOrderValues>;
  */
 export function CareCard({ form }: { form: Form }) {
   const customerId = useWatch({ control: form.control, name: 'customerId' });
-  const phone = useWatch({ control: form.control, name: 'customerPhone' });
+  // SĐT khách của đơn: ô Khách hàng, trống thì SĐT người nhận (2026-11-14).
+  const phone = useOrderCustomerPhone(form);
   const selected = useWatch({ control: form.control, name: 'purposeTagIds' });
   const careNote = useWatch({ control: form.control, name: 'careNote' });
   // Cùng cache với thẻ Khách hàng: khách trong tầm nhìn theo SĐT, không thì tra toàn hệ thống.

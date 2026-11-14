@@ -65,6 +65,7 @@ import { GENDERS, normalizePhoneInput, type CreateOrderValues } from '../../sche
 import { AddressPicker, addressLabel, type AddressValue } from '../address-picker';
 import { NewCustomerFarm } from './new-customer-farm';
 import { useDebounced } from './use-debounced';
+import { useOrderCustomerPhone } from './use-order-customer-phone';
 
 type Form = UseFormReturn<CreateOrderValues>;
 /** Radix Select không nhận value rỗng. */
@@ -362,11 +363,112 @@ export function InfoCard({ form }: { form: Form }) {
   );
 }
 
+// ── Gợi ý khách theo SĐT gõ dở ─────────────────────────────
+
+type PhoneSuggestion = NonNullable<ReturnType<typeof useCustomerPhoneSuggest>['data']>[number];
+
+/**
+ * Gợi ý khách khi gõ dở SĐT (2026-10-29) — chỉ khách người lên đơn được xem. Dùng ở ô SĐT khách và
+ * ô SĐT người nhận (2026-11-14). Trả props combobox cho ô nhập + danh sách đặt ngay dưới ô.
+ */
+function usePhoneSuggest(
+  rawPhone: string,
+  enabled: boolean,
+  listId: string,
+  onPick: (c: PhoneSuggestion) => void,
+) {
+  const [open, setOpen] = useState(false);
+  const [active, setActive] = useState(0);
+  const digits = useDebounced(enabled ? normalizePhoneInput(rawPhone) : '', 250);
+  const suggest = useCustomerPhoneSuggest(digits);
+  const items = digits.length >= PHONE_SUGGEST_MIN_DIGITS ? (suggest.data ?? []) : [];
+  const show = open && enabled && items.length > 0;
+  useEffect(() => setActive(0), [digits]);
+
+  const pick = (c: PhoneSuggestion) => {
+    setOpen(false);
+    onPick(c);
+  };
+  const onKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (!show) return;
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      setActive((i) => Math.min(i + 1, items.length - 1));
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      setActive((i) => Math.max(i - 1, 0));
+    } else if (e.key === 'Enter' && items[active]) {
+      e.preventDefault();
+      pick(items[active]);
+    } else if (e.key === 'Escape') {
+      setOpen(false);
+    }
+  };
+
+  return {
+    inputProps: {
+      role: 'combobox' as const,
+      'aria-expanded': show,
+      'aria-controls': listId,
+      'aria-autocomplete': 'list' as const,
+      onKeyDown,
+      onFocus: () => setOpen(true),
+    },
+    /** Gọi trong onChange của ô — gõ thì mở lại danh sách. */
+    reopen: () => setOpen(true),
+    /** Gọi trong onBlur của ô — trễ để kịp nhận cú bấm vào gợi ý. */
+    closeSoon: () => setTimeout(() => setOpen(false), 150),
+    list: show ? (
+      <ul
+        id={listId}
+        role="listbox"
+        aria-label="Khách có SĐT khớp"
+        className="absolute left-0 top-full z-30 mt-1 max-h-72 w-full overflow-y-auto sm:w-80 rounded-md border bg-popover p-1 shadow-md"
+      >
+        {items.map((c, i) => (
+          <li
+            key={c.id}
+            role="option"
+            aria-selected={i === active}
+            onMouseDown={(e) => e.preventDefault()}
+            onMouseEnter={() => setActive(i)}
+            onClick={() => pick(c)}
+            className={cn(
+              'cursor-pointer rounded px-2 py-1.5 text-sm',
+              i === active && 'bg-accent',
+            )}
+          >
+            <span className="block truncate font-medium">{c.name}</span>
+            <span className="block truncate text-xs text-muted-foreground">
+              <span className="font-mono tabular-nums">{normalizePhoneInput(c.phone ?? '')}</span> ·{' '}
+              {c.code}
+            </span>
+          </li>
+        ))}
+      </ul>
+    ) : null,
+  };
+}
+
+/** Chọn khách từ gợi ý SĐT → gắn khách; phần Nhận hàng xoá để ReceiverCard điền địa chỉ đơn gần nhất. */
+function attachSuggested(form: Form, c: PhoneSuggestion) {
+  const set = (k: keyof CreateOrderValues, v: string) => form.setValue(k, v, { shouldDirty: true });
+  set('addressId', '');
+  for (const k of ADDRESS_FIELDS) set(k, '');
+  set('customerId', c.id);
+  set('customerName', c.name);
+  set('customerPhone', normalizePhoneInput(c.phone ?? ''));
+}
+
 // ── Khách hàng ─────────────────────────────────────────────
 
 export function CustomerCard({ form }: { form: Form }) {
   const customerId = useWatch({ control: form.control, name: 'customerId' });
-  const phone = useWatch({ control: form.control, name: 'customerPhone' });
+  // SĐT gõ ở ô này (gợi ý, gỡ khách khi đổi số) …
+  const typedPhone = useWatch({ control: form.control, name: 'customerPhone' });
+  // … còn tra khách đã có / đơn trùng theo SĐT khách của đơn: ô này, trống thì SĐT người nhận
+  // (2026-11-14 — ô Khách hàng chỉ để tìm, không bắt nhập lại).
+  const phone = useOrderCustomerPhone(form);
   const brief = useCustomerBrief(customerId);
   const match = useCustomerPhoneMatch(customerId ? '' : phone);
   // Tra SĐT toàn hệ thống (mọi người lên đơn, 2026-10-22 — trước chỉ CSKH) — khách ngoài tầm nhìn
@@ -377,14 +479,9 @@ export function CustomerCard({ form }: { form: Form }) {
   const careCustomer = !customerId && match.data === null ? care.data?.customer : undefined;
   const sameDay = useSameDayOrders(phone);
   const [pickOpen, setPickOpen] = useState(false);
-  // Gợi ý khách khi gõ dở SĐT (2026-10-29) — chỉ khách người lên đơn được xem.
-  const [suggestOpen, setSuggestOpen] = useState(false);
-  const [suggestActive, setSuggestActive] = useState(0);
-  const suggestDigits = useDebounced(customerId ? '' : normalizePhoneInput(phone), 250);
-  const suggest = useCustomerPhoneSuggest(suggestDigits);
-  const suggestions = suggestDigits.length >= PHONE_SUGGEST_MIN_DIGITS ? (suggest.data ?? []) : [];
-  const showSuggest = suggestOpen && !customerId && suggestions.length > 0;
-  useEffect(() => setSuggestActive(0), [suggestDigits]);
+  const suggest = usePhoneSuggest(typedPhone, !customerId, 'customer-phone-suggest', (c) =>
+    attachSuggested(form, c),
+  );
   // Email / ngày sinh / giới tính không có trên thiết kế — gập sau menu ⋯, tự mở khi đã có giá trị.
   const [extraOpen, setExtraOpen] = useState(
     () =>
@@ -411,38 +508,17 @@ export function CustomerCard({ form }: { form: Form }) {
     setValue('customerId', match.data.id);
     setValue('customerName', match.data.name);
   };
-  /** Chọn từ gợi ý SĐT → gắn khách như "Chọn khách này" (ReceiverCard điền địa chỉ đơn gần nhất). */
-  const pickSuggestion = (c: { id: string; name: string; phone: string | null }) => {
-    setSuggestOpen(false);
-    clearReceiver();
-    setValue('customerId', c.id);
-    setValue('customerName', c.name);
-    setValue('customerPhone', normalizePhoneInput(c.phone ?? ''));
-  };
-  const onPhoneKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (!showSuggest) return;
-    if (e.key === 'ArrowDown') {
-      e.preventDefault();
-      setSuggestActive((i) => Math.min(i + 1, suggestions.length - 1));
-    } else if (e.key === 'ArrowUp') {
-      e.preventDefault();
-      setSuggestActive((i) => Math.max(i - 1, 0));
-    } else if (e.key === 'Enter' && suggestions[suggestActive]) {
-      e.preventDefault();
-      pickSuggestion(suggestions[suggestActive]);
-    } else if (e.key === 'Escape') {
-      setSuggestOpen(false);
-    }
-  };
   /** Khách ngoài tầm nhìn → chỉ điền tên + địa chỉ mặc định (hồ sơ không mở được, không gắn id). */
   const pickCare = () => {
     if (!careCustomer) return;
     setCareChosenId(careCustomer.id);
     clearReceiver();
+    // SĐT khách giữ ở ô Khách hàng — tra từ SĐT người nhận thì địa chỉ điền vào có thể mang số khác.
+    setValue('customerPhone', phone);
     setValue('customerName', careCustomer.name);
     const a = careCustomer.address;
     setValue('recipient', a?.recipient || careCustomer.name);
-    setValue('recipientPhone', a?.phone || careCustomer.phone || normalizePhoneInput(phone));
+    setValue('recipientPhone', a?.phone || careCustomer.phone || phone);
     if (!a) return;
     setValue('line1', [a.line1, a.hamlet].filter(Boolean).join(', '));
     setValue('ward', a.ward ?? '');
@@ -450,9 +526,10 @@ export function CustomerCard({ form }: { form: Form }) {
     setValue('province', a.province);
   };
 
-  // Khách mới (SĐT chưa có trên hệ thống) → chép SĐT xuống SĐT người nhận, trừ khi người nhận đã
-  // được gõ số khác.
-  const normalizedPhone = normalizePhoneInput(phone);
+  // Khách mới (SĐT chưa có trên hệ thống) → chép SĐT gõ ở ô này xuống SĐT người nhận, trừ khi người
+  // nhận đã được gõ số khác.
+  const normalizedPhone = phone;
+  const typedNormalized = normalizePhoneInput(typedPhone);
   const isNewCustomer =
     !customerId &&
     /^0\d{9,10}$/.test(normalizedPhone) &&
@@ -467,12 +544,12 @@ export function CustomerCard({ form }: { form: Form }) {
   }, [isNewCustomer, form]);
   const autoRecipientPhone = useRef('');
   useEffect(() => {
-    if (!isNewCustomer) return;
+    if (!isNewCustomer || typedNormalized === '') return;
     const cur = form.getValues('recipientPhone');
     if (cur !== '' && cur !== autoRecipientPhone.current) return;
-    autoRecipientPhone.current = normalizedPhone;
-    form.setValue('recipientPhone', normalizedPhone, { shouldDirty: true });
-  }, [isNewCustomer, normalizedPhone, form]);
+    autoRecipientPhone.current = typedNormalized;
+    form.setValue('recipientPhone', typedNormalized, { shouldDirty: true });
+  }, [isNewCustomer, typedNormalized, form]);
 
   // Khách vừa gắn (chọn từ danh sách / khớp SĐT / tạo lại đơn) → điền các ô còn trống.
   useEffect(() => {
@@ -485,15 +562,14 @@ export function CustomerCard({ form }: { form: Form }) {
     fillEmpty('customerEmail', brief.data.email);
   }, [brief.data, form]);
 
-  // Đổi SĐT khác số của khách đang gắn → gỡ khách (đơn sẽ đi theo SĐT mới).
+  // Đổi SĐT ở ô này khác số của khách đang gắn → gỡ khách (đơn sẽ đi theo SĐT mới).
   useEffect(() => {
     if (!customerId || !brief.data?.phone) return;
-    const cur = normalizePhoneInput(phone);
-    if (cur !== '' && cur !== normalizePhoneInput(brief.data.phone)) {
+    if (typedNormalized !== '' && typedNormalized !== normalizePhoneInput(brief.data.phone)) {
       form.setValue('customerId', '', { shouldDirty: true });
       form.setValue('addressId', '', { shouldDirty: true });
     }
-  }, [phone, customerId, brief.data, form]);
+  }, [typedNormalized, customerId, brief.data, form]);
 
   const clearCustomer = () => {
     for (const k of [
@@ -532,7 +608,7 @@ export function CustomerCard({ form }: { form: Form }) {
               <DropdownMenuItem onSelect={() => setExtraOpen((o) => !o)}>
                 {extraOpen ? 'Ẩn email, ngày sinh, giới tính' : 'Thêm email, ngày sinh, giới tính'}
               </DropdownMenuItem>
-              {customerId || phone ? (
+              {customerId || typedPhone ? (
                 <DropdownMenuItem onSelect={clearCustomer}>Xóa thông tin khách</DropdownMenuItem>
               ) : null}
             </DropdownMenuContent>
@@ -581,54 +657,19 @@ export function CustomerCard({ form }: { form: Form }) {
                     inputMode="tel"
                     autoComplete="off"
                     className="tabular-nums"
-                    role="combobox"
-                    aria-expanded={showSuggest}
-                    aria-controls="customer-phone-suggest"
-                    aria-autocomplete="list"
+                    {...suggest.inputProps}
                     {...field}
                     onChange={(e) => {
                       field.onChange(e);
-                      setSuggestOpen(true);
+                      suggest.reopen();
                     }}
-                    onFocus={() => setSuggestOpen(true)}
                     onBlur={() => {
                       field.onBlur();
-                      setTimeout(() => setSuggestOpen(false), 150);
+                      suggest.closeSoon();
                     }}
-                    onKeyDown={onPhoneKeyDown}
                   />
                 </FormControl>
-                {showSuggest ? (
-                  <ul
-                    id="customer-phone-suggest"
-                    role="listbox"
-                    aria-label="Khách có SĐT khớp"
-                    className="absolute left-0 top-full z-30 mt-1 max-h-72 w-full overflow-y-auto sm:w-80 rounded-md border bg-popover p-1 shadow-md"
-                  >
-                    {suggestions.map((c, i) => (
-                      <li
-                        key={c.id}
-                        role="option"
-                        aria-selected={i === suggestActive}
-                        onMouseDown={(e) => e.preventDefault()}
-                        onMouseEnter={() => setSuggestActive(i)}
-                        onClick={() => pickSuggestion(c)}
-                        className={cn(
-                          'cursor-pointer rounded px-2 py-1.5 text-sm',
-                          i === suggestActive && 'bg-accent',
-                        )}
-                      >
-                        <span className="block truncate font-medium">{c.name}</span>
-                        <span className="block truncate text-xs text-muted-foreground">
-                          <span className="font-mono tabular-nums">
-                            {normalizePhoneInput(c.phone ?? '')}
-                          </span>{' '}
-                          · {c.code}
-                        </span>
-                      </li>
-                    ))}
-                  </ul>
-                ) : null}
+                {suggest.list}
               </div>
               <FormMessage />
             </FormItem>
@@ -643,7 +684,7 @@ export function CustomerCard({ form }: { form: Form }) {
               <FormControl>
                 <Input
                   aria-label="Tên khách hàng"
-                  placeholder="Tên khách hàng"
+                  placeholder="Trống = theo người nhận"
                   autoComplete="off"
                   {...field}
                 />
@@ -813,6 +854,11 @@ export function ReceiverCard({ form }: { form: Form }) {
   const brief = useCustomerBrief(customerId);
   const addresses = useMemo(() => brief.data?.addresses ?? [], [brief.data]);
   const filledFor = useRef<string>('');
+  const recipientPhone = useWatch({ control: form.control, name: 'recipientPhone' });
+  // Gợi ý khách khi gõ dở SĐT người nhận (2026-11-14) — như ô Khách hàng; chưa gắn khách mới gợi ý.
+  const suggest = usePhoneSuggest(recipientPhone, !customerId, 'recipient-phone-suggest', (c) =>
+    attachSuggested(form, c),
+  );
 
   const fill = (id: string) => {
     const a = addresses.find((x) => x.id === id);
@@ -922,9 +968,43 @@ export function ReceiverCard({ form }: { form: Form }) {
           ) : null}
         </div>
       ) : null}
+      {/* SĐT trước tên (2026-11-14, như ô Khách hàng): gõ SĐT là gợi ý khách đã có. */}
       <div className="grid gap-2.5 sm:grid-cols-2">
+        <FormField
+          control={form.control}
+          name="recipientPhone"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel className={FIELD_LABEL}>SĐT người nhận</FormLabel>
+              <div className="relative">
+                <FormControl>
+                  <Input
+                    aria-label="Số điện thoại người nhận"
+                    placeholder="SĐT — tìm khách đã có"
+                    autoComplete="off"
+                    inputMode="tel"
+                    className="tabular-nums"
+                    {...suggest.inputProps}
+                    name={field.name}
+                    ref={field.ref}
+                    value={field.value}
+                    onBlur={() => {
+                      field.onBlur();
+                      suggest.closeSoon();
+                    }}
+                    onChange={(e) => {
+                      onTyped('recipientPhone', e.target.value);
+                      suggest.reopen();
+                    }}
+                  />
+                </FormControl>
+                {suggest.list}
+              </div>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
         {textField('recipient', 'Người nhận', 'Tên người nhận')}
-        {textField('recipientPhone', 'SĐT người nhận', 'Số điện thoại', { inputMode: 'tel' })}
         {textField('line1', 'Địa chỉ', 'Địa chỉ chi tiết (số nhà, đường, thôn/xóm)', {
           className: 'sm:col-span-2',
         })}

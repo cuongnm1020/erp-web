@@ -20,6 +20,7 @@ import {
   createOrderSchema,
   emptyOrderValues,
   normalizePhoneInput,
+  orderCustomerPhone,
   previewManualDiscount,
   toCreateOrderBody,
   type CreateOrderValues,
@@ -284,11 +285,48 @@ describe('toCreateOrderBody — form → body POST /sales-orders', () => {
 });
 
 describe('createOrderSchema — kiểm tra trước khi gọi API', () => {
-  it('không chọn khách: bắt buộc tên + SĐT hợp lệ', () => {
+  it('không chọn khách: SĐT khách gõ sai báo ở ô khách; không có tên nào → báo ở Người nhận', () => {
     const r = createOrderSchema.safeParse(values({ customerName: '', customerPhone: '123' }));
     expect(r.success).toBe(false);
     const paths = r.success ? [] : r.error.issues.map((i) => i.path.join('.'));
-    expect(paths).toEqual(expect.arrayContaining(['customerName', 'customerPhone']));
+    expect(paths).toEqual(expect.arrayContaining(['customerPhone', 'recipient']));
+    expect(paths).not.toContain('customerName');
+  });
+
+  it('ô Khách hàng trống (2026-11-14): khách lấy theo tên + SĐT người nhận, không bắt nhập lại', () => {
+    const receiver = {
+      customerName: '',
+      customerPhone: '',
+      recipient: 'A Phong',
+      recipientPhone: '0977 191 246',
+      line1: 'Thôn 1 Kim Quan',
+      province: 'Hà Nội',
+    };
+    const r = createOrderSchema.safeParse(values(receiver));
+    expect(r.success).toBe(true);
+    if (!r.success) return;
+    expect(toCreateOrderBody(r.data).customer).toEqual({ name: 'A Phong', phone: '0977191246' });
+    expect(orderCustomerPhone(r.data)).toBe('0977191246');
+
+    // Gõ ô Khách hàng thì ô đó thắng.
+    const typed = createOrderSchema.safeParse(
+      values({ ...receiver, customerName: 'Chú Hùng', customerPhone: '0909888777' }),
+    );
+    expect(typed.success && toCreateOrderBody(typed.data).customer).toEqual({
+      name: 'Chú Hùng',
+      phone: '0909888777',
+    });
+
+    // Trống cả hai nơi → báo ở phần Nhận hàng, không báo ô Khách hàng.
+    const none = createOrderSchema.safeParse(values({ customerName: '', customerPhone: '' }));
+    const issues = none.success ? [] : none.error.issues;
+    expect(issues.map((i) => [i.path.join('.'), i.message])).toEqual(
+      expect.arrayContaining([
+        ['recipient', 'Nhập tên người nhận'],
+        ['recipientPhone', 'Nhập số điện thoại người nhận'],
+      ]),
+    );
+    expect(issues.map((i) => i.path.join('.'))).not.toContain('customerPhone');
   });
 
   it('địa chỉ gõ dở dang: thiếu người nhận / địa chỉ / tỉnh → báo đúng ô', () => {
@@ -389,7 +427,10 @@ describe('OrderCreateScreen — màn tạo đơn mới', () => {
     renderApp(<OrderCreateScreen />);
     expect(await screen.findByText('Chưa có sản phẩm trong giỏ')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: /^Chốt đơn F10/ }));
-    expect(await screen.findByText('Nhập tên khách hàng')).toBeInTheDocument();
+    // Ô Khách hàng chỉ để tìm (2026-11-14) — lỗi nằm ở phần Nhận hàng.
+    expect(await screen.findByText('Nhập tên người nhận')).toBeInTheDocument();
+    expect(screen.getByText('Nhập số điện thoại người nhận')).toBeInTheDocument();
+    expect(screen.queryByText('Nhập tên khách hàng')).not.toBeInTheDocument();
     expect(screen.getByText('Đơn phải có ít nhất một dòng hàng')).toBeInTheDocument();
     expect(posts).toHaveLength(0);
   });
@@ -996,7 +1037,9 @@ describe('OrderCreateScreen — màn tạo đơn mới', () => {
     await waitFor(() =>
       expect(screen.getByLabelText('Tên người nhận')).toHaveValue('Nguyễn Thị Thu Hà'),
     );
-    expect(screen.getByRole('textbox', { name: 'Số điện thoại' })).toHaveValue('0903112233');
+    expect(screen.getByRole('combobox', { name: 'Số điện thoại người nhận' })).toHaveValue(
+      '0903112233',
+    );
     expect(screen.getByLabelText('Địa chỉ chi tiết (số nhà, đường, thôn/xóm)')).toHaveValue(
       '12 Lê Thanh Nghị',
     );
@@ -1055,6 +1098,81 @@ describe('OrderCreateScreen — màn tạo đơn mới', () => {
     expect(screen.getByLabelText('Địa chỉ chi tiết (số nhà, đường, thôn/xóm)')).toHaveValue(
       'Thôn 3, Xóm Đông',
     );
+  });
+
+  it('Nhận hàng (2026-11-14): SĐT người nhận đứng trước tên; gõ dở SĐT người nhận → gợi ý khách như ô Khách hàng, chọn → gắn khách + điền địa chỉ đơn gần nhất', async () => {
+    const CUST = makeCustomers(1)[0]!;
+    server.use(
+      http.get('/api/customers', () => HttpResponse.json({ items: [CUST], total: 1 })),
+      http.get(`/api/customers/${CUST.id}`, () =>
+        HttpResponse.json({
+          ...CUST,
+          addresses: makeCustomerAddresses(CUST.id),
+          mergedInto: null,
+          lastOrderAddressId: '00000077-0000-4000-8000-000000000002',
+        }),
+      ),
+    );
+    renderApp(<OrderCreateScreen />);
+    const phoneBox = await screen.findByRole('combobox', { name: 'Số điện thoại người nhận' });
+    const nameBox = screen.getByLabelText('Tên người nhận');
+    // SĐT trước tên trong box Nhận hàng.
+    expect(
+      phoneBox.compareDocumentPosition(nameBox) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+
+    fireEvent.change(phoneBox, { target: { value: CUST.phone!.slice(0, 6) } });
+    const list = await screen.findByRole('listbox', { name: 'Khách có SĐT khớp' });
+    fireEvent.click(within(list).getByRole('option', { name: new RegExp(CUST.name) }));
+
+    expect(await screen.findByText('Khách cũ')).toBeInTheDocument();
+    expect(screen.getByLabelText('Tên khách hàng')).toHaveValue(CUST.name);
+    expect(screen.getByLabelText('Số điện thoại khách')).toHaveValue(CUST.phone);
+    await waitFor(() => expect(nameBox).toHaveValue('Trần Văn Bình'));
+    expect(screen.getByLabelText('Địa chỉ chi tiết (số nhà, đường, thôn/xóm)')).toHaveValue(
+      'Thôn 3, Xóm Đông',
+    );
+  });
+
+  it('chỉ nhập phần Nhận hàng, bỏ trống ô Khách hàng → chốt được, khách gửi đi = tên + SĐT người nhận (2026-11-14)', async () => {
+    const bodies: Record<string, unknown>[] = [];
+    server.use(
+      ...skuHandlers(),
+      geoUnitHandler(),
+      http.post('/api/sales-orders', async ({ request }) => {
+        bodies.push((await request.json()) as Record<string, unknown>);
+        return HttpResponse.json(CREATED, { status: 201 });
+      }),
+    );
+    renderApp(<OrderCreateScreen />);
+    const box = await screen.findByRole('combobox', { name: 'Tìm sản phẩm' });
+    fireEvent.change(box, { target: { value: 'amino' } });
+    fireEvent.click(await screen.findByRole('option', { name: /Amino GA3 500ml/ }));
+    await waitFor(() => expect(screen.getAllByLabelText('Số lượng')).toHaveLength(1));
+    fireEvent.change(screen.getByRole('combobox', { name: 'Số điện thoại người nhận' }), {
+      target: { value: '0977 191 246' },
+    });
+    fireEvent.change(screen.getByLabelText('Tên người nhận'), { target: { value: 'A Phong' } });
+    fireEvent.change(screen.getByLabelText('Địa chỉ chi tiết (số nhà, đường, thôn/xóm)'), {
+      target: { value: 'Thôn 1 Kim Quan' },
+    });
+    fireEvent.click(screen.getByRole('combobox', { name: 'Tỉnh / Phường xã' }));
+    fireEvent.click(await screen.findByRole('option', { name: 'Đồng Tháp' }));
+    fireEvent.click(await screen.findByRole('option', { name: 'Xã Ngũ Hiệp' }));
+    fireEvent.click(screen.getByRole('button', { name: /^Chốt đơn F10/ }));
+
+    await waitFor(() => expect(bodies).toHaveLength(1));
+    expect(bodies[0]).not.toHaveProperty('customerId');
+    expect(bodies[0]).toMatchObject({
+      customer: { name: 'A Phong', phone: '0977191246' },
+      address: {
+        recipient: 'A Phong',
+        phone: '0977191246',
+        line1: 'Thôn 1 Kim Quan',
+        province: 'Đồng Tháp',
+      },
+    });
+    expect(screen.queryByText('Nhập tên khách hàng')).not.toBeInTheDocument();
   });
 
   it('thẻ Chăm sóc khách: mục đích khách đã có bật sẵn (khóa), bấm thêm mục đích + ghi chú → chốt gửi purposeTagIds + careNote', async () => {
@@ -1297,26 +1415,32 @@ describe('OrderCreateScreen — màn tạo đơn mới', () => {
     expect(screen.getByRole('combobox', { name: 'Cây trồng' })).toBeInTheDocument();
     // SĐT khách mới chép xuống SĐT người nhận; sửa SĐT khách thì người nhận đi theo.
     await waitFor(() =>
-      expect(screen.getByRole('textbox', { name: 'Số điện thoại' })).toHaveValue('0909888777'),
+      expect(screen.getByRole('combobox', { name: 'Số điện thoại người nhận' })).toHaveValue(
+        '0909888777',
+      ),
     );
     fireEvent.change(screen.getByLabelText('Số điện thoại khách'), {
       target: { value: '0909888666' },
     });
     await waitFor(() =>
-      expect(screen.getByRole('textbox', { name: 'Số điện thoại' })).toHaveValue('0909888666'),
+      expect(screen.getByRole('combobox', { name: 'Số điện thoại người nhận' })).toHaveValue(
+        '0909888666',
+      ),
     );
   });
 
   it('khách mới: người nhận đã gõ SĐT khác thì không bị ghi đè', async () => {
     renderApp(<OrderCreateScreen />, { me: ME_SALE });
-    fireEvent.change(await screen.findByRole('textbox', { name: 'Số điện thoại' }), {
+    fireEvent.change(await screen.findByRole('combobox', { name: 'Số điện thoại người nhận' }), {
       target: { value: '0911222333' },
     });
     fireEvent.change(screen.getByLabelText('Số điện thoại khách'), {
       target: { value: '0909888777' },
     });
     expect(await screen.findByText(/Khách mới — sẽ tạo hồ sơ khách/)).toBeInTheDocument();
-    expect(screen.getByRole('textbox', { name: 'Số điện thoại' })).toHaveValue('0911222333');
+    expect(screen.getByRole('combobox', { name: 'Số điện thoại người nhận' })).toHaveValue(
+      '0911222333',
+    );
   });
 
   it('thẻ Nhận hàng nằm trên thẻ Chăm sóc khách', async () => {
