@@ -14126,6 +14126,13 @@ export interface components {
             orderIds: string[];
             /** @description Lý do gửi kèm cho hãng; bỏ trống = "Hủy vận đơn để gửi lại". */
             reason?: string;
+            /**
+             * Format: uuid
+             * @description Khóa idempotency do client sinh (bắt buộc với PDA — bất biến 10; web bỏ trống, 2026-11-14).
+             *     Dedupe theo từng đơn (key, orderId): gửi lại cùng key trả lại kết quả cũ của đơn đã hủy vận
+             *     đơn; đơn lỗi không ghi nhớ, gửi lại chạy lại.
+             */
+            idempotencyKey?: string;
         };
         CancelledOrderWaybillDto: {
             orderId: string;
@@ -14162,6 +14169,12 @@ export interface components {
         };
         CancelOrderDto: {
             reason?: string;
+            /**
+             * Format: uuid
+             * @description Khóa idempotency do client sinh (bắt buộc với PDA — bất biến 10; web bỏ trống, 2026-11-14).
+             *     Gửi lại cùng key sau khi đơn đã hủy trả lại kết quả lần đầu thay vì lỗi chuyển trạng thái.
+             */
+            idempotencyKey?: string;
         };
         ConfirmOrderDto: {
             /** @description true = Đơn mới → thẳng Chờ hàng — chỉ người tạo đơn hoặc NV xử lý. */
